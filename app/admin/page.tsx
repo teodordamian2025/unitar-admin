@@ -1,28 +1,32 @@
 'use client';
 
-import React from 'react';
-import { signOut } from 'firebase/auth';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
+import { signOut } from 'firebase/auth';
 
 export default function AdminPage() {
   const router = useRouter();
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+    await signOut(auth);
+    router.push('/login');
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Bun venit în zona de administrare!</h1>
-      <button onClick={handleLogout} style={{ marginTop: '1rem', padding: '0.5rem 1rem' }}>
-        Logout
-      </button>
+    <div>
+      <h1>Dashboard Admin</h1>
+      <button onClick={handleLogout}>Logout</button>
     </div>
   );
 }
