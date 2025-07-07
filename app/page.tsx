@@ -1,102 +1,40 @@
 'use client';
-import { useState } from 'react';
 
-export default function Page() {
-  const [aiText, setAiText] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../lib/firebaseConfig';
 
-  const [project, setProject] = useState({
-    nume: '',
-    client: '',
-    valoare: '',
-    termen: ''
-  });
+export default function HomePage() {
+  const router = useRouter();
+  const [checkedAuth, setCheckedAuth] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
-  const [docText, setDocText] = useState('');
-  const [docResponse, setDocResponse] = useState('');
-
-  const handleAiSubmit = async () => {
-    const res = await fetch('https://webhook-ul-tau.ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: aiText })
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setAuthenticated(true);
+      } else {
+        router.replace('/login');
+      }
+      setCheckedAuth(true);
     });
-    const data = await res.json();
-    setAiResponse(JSON.stringify(data));
-  };
 
-  const handleProjectSubmit = () => {
-    alert(`Proiect salvat:\n${JSON.stringify(project, null, 2)}`);
-  };
+    return () => unsubscribe();
+  }, [router]);
 
-  const handleDocGenerate = () => {
-    setDocResponse(`📝 Generăm automat document pentru: ${docText}`);
-  };
+  if (!checkedAuth) {
+    return <p>Se verifică autentificarea...</p>; // sau loading
+  }
+
+  if (!authenticated) {
+    return null;
+  }
 
   return (
-    <main className="max-w-2xl mx-auto p-6 space-y-10">
-      <h1 className="text-3xl font-bold text-center">Panou de management Unitar Proiect TDA</h1>
-
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Introducere date prin AI</h2>
-        <textarea
-          className="w-full p-2 border rounded"
-          rows={3}
-          placeholder="Ex: Am emis o factură de 4200 lei pentru clientul X"
-          value={aiText}
-          onChange={(e) => setAiText(e.target.value)}
-        />
-        <button onClick={handleAiSubmit} className="mt-2 px-4 py-2 bg-black text-white rounded">
-          Trimite
-        </button>
-        {aiResponse && <pre className="mt-3 bg-gray-100 p-2 rounded">{aiResponse}</pre>}
-      </section>
-
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Adaugă proiect nou</h2>
-        <input
-          className="w-full mb-2 p-2 border rounded"
-          placeholder="Nume proiect"
-          value={project.nume}
-          onChange={(e) => setProject({ ...project, nume: e.target.value })}
-        />
-        <input
-          className="w-full mb-2 p-2 border rounded"
-          placeholder="Client"
-          value={project.client}
-          onChange={(e) => setProject({ ...project, client: e.target.value })}
-        />
-        <input
-          className="w-full mb-2 p-2 border rounded"
-          placeholder="Valoare (lei)"
-          value={project.valoare}
-          onChange={(e) => setProject({ ...project, valoare: e.target.value })}
-        />
-        <input
-          className="w-full mb-2 p-2 border rounded"
-          placeholder="Termen (ex: 30 septembrie)"
-          value={project.termen}
-          onChange={(e) => setProject({ ...project, termen: e.target.value })}
-        />
-        <button onClick={handleProjectSubmit} className="mt-2 px-4 py-2 bg-black text-white rounded">
-          Salvează proiect
-        </button>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-semibold mb-2">Completare document automat</h2>
-        <textarea
-          className="w-full p-2 border rounded"
-          rows={3}
-          placeholder="Ex: Generează un contract pentru clientul X pentru suma de 5000 lei"
-          value={docText}
-          onChange={(e) => setDocText(e.target.value)}
-        />
-        <button onClick={handleDocGenerate} className="mt-2 px-4 py-2 bg-black text-white rounded">
-          Generează document
-        </button>
-        {docResponse && <p className="mt-2">{docResponse}</p>}
-      </section>
-    </main>
+    <div>
+      <h1>Bun venit la Unitar Admin</h1>
+      <p>Aceasta este pagina de start protejată.</p>
+    </div>
   );
 }
