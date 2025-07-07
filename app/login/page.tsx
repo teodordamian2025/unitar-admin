@@ -1,49 +1,33 @@
-'use client';
-
-import { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, app } from '../../lib/firebaseConfig';
+import { auth } from '../../lib/firebaseConfig';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
-  const [parola, setParola] = useState('');
-  const [eroare, setEroare] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, parola);
-      router.push('/admin'); // redirect după login
-    } catch (err: any) {
-      setEroare('Autentificare eșuată. Verifică emailul și parola.');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+
+      // Stochează token în cookie
+      document.cookie = `authToken=${idToken}; path=/`;
+
+      router.push('/admin');
+    } catch (error) {
+      alert('Autentificare eșuată');
     }
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h2>Autentificare Admin</h2>
-      <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <br /><br />
-        <input
-          type="password"
-          placeholder="Parola"
-          value={parola}
-          onChange={e => setParola(e.target.value)}
-          required
-        />
-        <br /><br />
-        <button type="submit">Autentificare</button>
-        {eroare && <p style={{ color: 'red' }}>{eroare}</p>}
-      </form>
+    <div>
+      <h1>Autentificare</h1>
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Parola" />
+      <button onClick={handleLogin}>Autentificare</button>
     </div>
   );
 }
