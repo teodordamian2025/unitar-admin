@@ -1,8 +1,22 @@
-const handleLogout = async () => {
-  await signOut(auth);
+"use client";
 
-  // Șterge cookie-ul
-  document.cookie = 'authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../lib/firebaseConfig';
 
-  router.push('/login');
-};
+export default function AdminPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    router.push('/login');
+  };
+
+  return (
+    <div>
+      <h1>Panou Admin</h1>
+      <button onClick={handleLogout}>Logout</button>
+    </div>
+  );
+}
