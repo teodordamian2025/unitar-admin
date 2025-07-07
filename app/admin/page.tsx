@@ -7,21 +7,29 @@ import { auth } from '../../lib/firebaseConfig';
 
 export default function AdminPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [checkedAuth, setCheckedAuth] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push('/login');
+      if (user) {
+        setAuthenticated(true);
       } else {
-        setLoading(false);
+        router.replace('/login'); // mai sigur decât push()
       }
+      setCheckedAuth(true);
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  if (loading) return <p>Se încarcă...</p>;
+  if (!checkedAuth) {
+    return <p>Se verifică autentificarea...</p>; // sau loading spinner
+  }
+
+  if (!authenticated) {
+    return null; // Nu afișăm nimic cât timp redirecționează
+  }
 
   return (
     <div>
