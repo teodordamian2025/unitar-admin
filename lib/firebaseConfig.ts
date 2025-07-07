@@ -1,5 +1,4 @@
-// lib/firebaseConfig.ts
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -11,7 +10,8 @@ const firebaseConfig = {
   appId: '...',
 };
 
-const app = initializeApp(firebaseConfig);
+// Evită reinițializarea dacă deja există o instanță
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 
-export { app, auth };
+export { auth, app };
