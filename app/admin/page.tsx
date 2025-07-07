@@ -1,6 +1,6 @@
 'use client'
 
-import AuthGuard from '@/lib/authGuard'
+import AuthGuard from '../../lib/authGuard'
 
 export default function AdminPage() {
   return (
