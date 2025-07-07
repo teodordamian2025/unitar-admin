@@ -1,25 +1,26 @@
-"use client";
+'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
-import authGuard from '../../lib/authGuard';
 
-function AdminContent() {
+export default function AdminPage() {
   const router = useRouter();
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    router.push('/login');
-  };
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   return (
     <div>
-      <h1>Panou Admin</h1>
-      <button onClick={handleLogout}>Logout</button>
+      <h1>Admin Panel</h1>
+      <p>Bine ai venit în zona protejată!</p>
     </div>
   );
 }
-
-export default authGuard(AdminContent);
