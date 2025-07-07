@@ -3,8 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
+import authGuard from '../../lib/authGuard';
 
-export default function AdminPage() {
+function AdminContent() {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -20,3 +21,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+export default authGuard(AdminContent);

@@ -1,26 +1,27 @@
-'use client'
+"use client";
 
-import { useRouter } from 'next/navigation'
-import { useEffect, ReactNode } from 'react'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import { app } from './firebaseConfig'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-interface AuthGuardProps {
-  children: ReactNode
-}
+const authGuard = (WrappedComponent: React.ComponentType) => {
+  const Wrapper = (props: any) => {
+    const router = useRouter();
 
-export default function AuthGuard({ children }: AuthGuardProps) {
-  const router = useRouter()
+    useEffect(() => {
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('authToken='))
+        ?.split('=')[1];
 
-  useEffect(() => {
-    const auth = getAuth(app)
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push('/login')
+      if (!token) {
+        router.replace('/login');
       }
-    })
-    return () => unsubscribe()
-  }, [router])
+    }, []);
 
-  return <>{children}</>
-}
+    return <WrappedComponent {...props} />;
+  };
+
+  return Wrapper;
+};
+
+export default authGuard;
