@@ -3,7 +3,7 @@
 import React from 'react';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import auth from '../../lib/firebaseConfig';
+import { auth } from '../../lib/firebaseConfig';
 
 export default function AdminPage() {
   const router = useRouter();
