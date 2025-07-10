@@ -7,6 +7,8 @@ import { auth } from '../../lib/firebaseConfig';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function LoginPage() {
+  console.log("Site Key:", process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
