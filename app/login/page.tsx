@@ -7,8 +7,6 @@ import { auth } from '../../lib/firebaseConfig';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function LoginPage() {
-  console.log("Site Key:", process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,30 +17,36 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
-    // Execută reCAPTCHA și obține token
-    const token = await recaptchaRef.current?.executeAsync();
-    recaptchaRef.current?.reset();
-
-    // Trimite tokenul spre backend (API route) pentru validare
-    const verifyResponse = await fetch('/api/verify-recaptcha', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-
-    const { success } = await verifyResponse.json();
-
-    if (!success) {
-      setError('Verificare reCAPTCHA eșuată.');
-      return;
-    }
-
     try {
+      // Execută reCAPTCHA și obține token
+      const token = await recaptchaRef.current?.executeAsync();
+      recaptchaRef.current?.reset();
+
+      if (!token) {
+        setError('Tokenul reCAPTCHA nu a fost generat.');
+        return;
+      }
+
+      // Trimite tokenul spre backend pentru validare
+      const verifyResponse = await fetch('/api/verify-recaptcha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      const { success } = await verifyResponse.json();
+
+      if (!success) {
+        setError('Verificare reCAPTCHA eșuată.');
+        return;
+      }
+
+      // Dacă reCAPTCHA este valid, încearcă autentificarea
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err: any) {
-      console.error('Firebase login error:', err.code, err.message);
-      setError(`Autentificare eșuată: ${err.message}`);
+      console.error('Eroare autentificare:', err);
+      setError('Autentificare eșuată. Verifică datele și reîncearcă.');
     }
   };
 
