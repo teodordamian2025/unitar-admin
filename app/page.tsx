@@ -49,25 +49,43 @@ export default function HomePage() {
       <p>Aceasta este pagina de start protejată.</p>
 
       {user && (
-        <p style={{ marginTop: '0.5rem' }}>
-          Te-ai autentificat ca <strong>{user.displayName || user.email}</strong>.
-        </p>
-      )}
+        <>
+          <p style={{ marginTop: '0.5rem' }}>
+            Te-ai autentificat ca <strong>{user.displayName || user.email}</strong>.
+          </p>
 
-      <button
-        onClick={handleLogout}
-        style={{
-          marginTop: '1.5rem',
-          padding: '0.5rem 1rem',
-          backgroundColor: '#c0392b',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}
-      >
-        Logout
-      </button>
+          <div style={{ marginTop: '1.5rem' }}>
+            <button
+              onClick={() => router.push('/profil')}
+              style={{
+                marginRight: '1rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: '#2980b9',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Profil
+            </button>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#c0392b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
