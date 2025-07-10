@@ -2,13 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, browserLocalPersistence, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const recaptchaRef = useRef<ReCAPTCHA>(null);
@@ -18,16 +19,9 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Execută reCAPTCHA și obține token
       const token = await recaptchaRef.current?.executeAsync();
       recaptchaRef.current?.reset();
 
-      if (!token) {
-        setError('Tokenul reCAPTCHA nu a fost generat.');
-        return;
-      }
-
-      // Trimite tokenul spre backend pentru validare
       const verifyResponse = await fetch('/api/verify-recaptcha', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,12 +35,14 @@ export default function LoginPage() {
         return;
       }
 
-      // Dacă reCAPTCHA este valid, încearcă autentificarea
+      // Setăm persistența înainte de autentificare
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err: any) {
-      console.error('Eroare autentificare:', err);
-      setError('Autentificare eșuată. Verifică datele și reîncearcă.');
+      console.error('Firebase login error:', err.code, err.message);
+      setError(`Autentificare eșuată: ${err.message}`);
     }
   };
 
@@ -66,11 +62,17 @@ export default function LoginPage() {
           value={password}
           onChange={e => setPassword(e.target.value)}
         /><br />
+        <label>
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={e => setRememberMe(e.target.checked)}
+          /> Ține-mă minte
+        </label><br />
         <button type="submit">Autentificare</button>
       </form>
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      {/* reCAPTCHA invizibil */}
       <ReCAPTCHA
         sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
         size="invisible"
