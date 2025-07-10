@@ -1,3 +1,6 @@
 {
-  "/login/page": "app/login/page.js"
+  "/page": "app/page.js",
+  "/login/page": "app/login/page.js",
+  "/profil/page": "app/profil/page.js",
+  "/api/verify-recaptcha/route": "app/api/verify-recaptcha/route.js"
 }

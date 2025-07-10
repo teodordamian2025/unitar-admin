@@ -2,102 +2,91 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth, db } from '../../lib/firebaseConfig';
-import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { auth } from '../lib/firebaseConfig';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-export default function ProfilPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [checkedAuth, setCheckedAuth] = useState(false);
-  const [formData, setFormData] = useState({
-    displayName: '',
-    phone: '',
-    role: '',
-    position: '',
-  });
-
+export default function HomePage() {
   const router = useRouter();
+  const [checkedAuth, setCheckedAuth] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('onAuthStateChanged triggered:', firebaseUser);
       if (firebaseUser) {
+        setAuthenticated(true);
         setUser(firebaseUser);
-
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(userRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setFormData({
-            displayName: data.displayName || '',
-            phone: data.phone || '',
-            role: data.role || '',
-            position: data.position || '',
-          });
-        } else {
-          setFormData({
-            displayName: firebaseUser.displayName || '',
-            phone: '',
-            role: '',
-            position: '',
-          });
-        }
+        const nameOrEmail = firebaseUser.displayName || firebaseUser.email || 'Utilizator';
+        toast.success(`Bine ai revenit, ${nameOrEmail}!`);
       } else {
+        console.log('User is not authenticated. Redirecting to /login...');
         router.replace('/login');
       }
-
       setCheckedAuth(true);
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleLogout = async () => {
+    const confirmLogout = confirm('Sigur vrei să te deloghezi?');
+    if (!confirmLogout) return;
 
-  const handleSave = async () => {
-    if (!user) return;
-
-    const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, formData, { merge: true });
-    await updateProfile(user, { displayName: formData.displayName });
-
-    alert('Profilul a fost salvat cu succes!');
+    await signOut(auth);
+    toast.success('Te-ai delogat cu succes!');
+    setTimeout(() => router.replace('/login'), 1500);
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
-  if (!user) return null;
+  if (!authenticated) return null;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Profilul meu</h1>
-      <label>
-        Nume complet:
-        <input name="displayName" value={formData.displayName} onChange={handleChange} />
-      </label>
-      <br />
-      <label>
-        Telefon:
-        <input name="phone" value={formData.phone} onChange={handleChange} />
-      </label>
-      <br />
-      <label>
-        Funcția:
-        <input name="position" value={formData.position} onChange={handleChange} />
-      </label>
-      <br />
-      <label>
-        Rol:
-        <select name="role" value={formData.role} onChange={handleChange}>
-          <option value="">Selectează un rol</option>
-          <option value="administrator">Administrator</option>
-          <option value="manager">Manager</option>
-          <option value="utilizator">Utilizator</option>
-        </select>
-      </label>
-      <br />
-      <button onClick={handleSave}>Salvează</button>
+      <ToastContainer />
+      <h1>Bun venit la Unitar Admin</h1>
+      <p>Aceasta este pagina de start protejată.</p>
+
+      {user && (
+        <p style={{ marginTop: '0.5rem' }}>
+          Te-ai autentificat ca <strong>{user.displayName || user.email}</strong>.
+        </p>
+      )}
+
+      {/* Buton Profil */}
+      <button
+        onClick={() => router.push('/profil')}
+        style={{
+          marginTop: '1.5rem',
+          marginRight: '1rem',
+          padding: '0.5rem 1rem',
+          backgroundColor: '#2980b9',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+        }}
+      >
+        Profil
+      </button>
+
+      {/* Buton Logout */}
+      <button
+        onClick={handleLogout}
+        style={{
+          marginTop: '1.5rem',
+          padding: '0.5rem 1rem',
+          backgroundColor: '#c0392b',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+        }}
+      >
+        Logout
+      </button>
     </div>
   );
 }
