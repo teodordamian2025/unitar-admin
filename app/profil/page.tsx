@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '../../lib/firebaseConfig';
+import { auth, db } from '../../lib/firebaseConfig';
 import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function ProfilPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -17,12 +17,12 @@ export default function ProfilPage() {
   });
 
   const router = useRouter();
-  const db = getFirestore(); // evităm import direct de `db`, folosim corect contextul Firebase
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
+
         const userRef = doc(db, 'users', firebaseUser.uid);
         const docSnap = await getDoc(userRef);
 
@@ -43,13 +43,14 @@ export default function ProfilPage() {
           });
         }
       } else {
-        router.push('/login');
+        router.replace('/login');
       }
+
       setCheckedAuth(true);
     });
 
     return () => unsubscribe();
-  }, [router, db]);
+  }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -60,7 +61,6 @@ export default function ProfilPage() {
 
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, formData, { merge: true });
-
     await updateProfile(user, { displayName: formData.displayName });
 
     alert('Profilul a fost salvat cu succes!');
