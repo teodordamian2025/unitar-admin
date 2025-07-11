@@ -14,10 +14,18 @@ export default function AdminPage() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user || auth.currentUser) {
         setAuthenticated(true);
+        setCheckedAuth(true);
       } else {
-        router.replace('/login');
+        // Așteaptă 1 secundă pentru eventuală reautentificare după updateProfile
+        setTimeout(() => {
+          if (!auth.currentUser) {
+            router.replace('/login');
+          } else {
+            setAuthenticated(true);
+            setCheckedAuth(true);
+          }
+        }, 1000);
       }
-      setCheckedAuth(true);
     });
 
     return () => unsubscribe();
