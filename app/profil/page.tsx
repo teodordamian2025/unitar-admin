@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../../lib/firebaseConfig';
+import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
+import { auth } from '../../lib/firebaseConfig';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function ProfilPage() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
@@ -20,38 +19,14 @@ export default function ProfilPage() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       console.log('onAuthStateChanged triggered:', firebaseUser);
-
-      if (!firebaseUser) {
-        console.log('Utilizatorul nu este autentificat. Redirecționez...');
-        router.replace('/login');
-        return;
-      }
-
-      try {
-        console.log('Utilizator autentificat:', firebaseUser.uid);
+      if (firebaseUser) {
         setUser(firebaseUser);
-
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(userRef);
-
-        if (docSnap.exists()) {
-          console.log('Document Firestore EXISTĂ. Date:', docSnap.data());
-          setFormData({
-            displayName: docSnap.data().displayName || '',
-            phone: docSnap.data().phone || '',
-            role: docSnap.data().role || '',
-            position: docSnap.data().position || '',
-          });
+        const localData = localStorage.getItem(`userProfile-${firebaseUser.uid}`);
+        if (localData) {
+          setFormData(JSON.parse(localData));
         } else {
-          console.log('Document Firestore NU există. Îl creez...');
-          await setDoc(userRef, {
-            displayName: firebaseUser.displayName || '',
-            phone: '',
-            role: '',
-            position: '',
-          });
           setFormData({
             displayName: firebaseUser.displayName || '',
             phone: '',
@@ -59,11 +34,9 @@ export default function ProfilPage() {
             position: '',
           });
         }
-
         setCheckedAuth(true);
-      } catch (error) {
-        console.error('Eroare la accesarea Firestore:', error);
-        toast.error('Eroare la încărcarea datelor. Verifică consola.');
+      } else {
+        router.replace('/login');
       }
     });
 
@@ -77,19 +50,13 @@ export default function ProfilPage() {
   const handleSave = async () => {
     if (!user) return;
 
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, formData, { merge: true });
+    // Salvează local
+    localStorage.setItem(`userProfile-${user.uid}`, JSON.stringify(formData));
 
-      if (formData.displayName && formData.displayName !== user.displayName) {
-        await updateProfile(user, { displayName: formData.displayName });
-      }
+    // Actualizează doar displayName în Firebase Auth
+    await updateProfile(user, { displayName: formData.displayName });
 
-      toast.success('Profil salvat cu succes!');
-    } catch (error) {
-      console.error('Eroare la salvarea profilului:', error);
-      toast.error('Eroare la salvarea profilului.');
-    }
+    toast.success('Profilul a fost salvat local!');
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
@@ -101,25 +68,42 @@ export default function ProfilPage() {
 
       <label>
         Nume complet:
-        <input name="displayName" value={formData.displayName} onChange={handleChange} />
+        <input
+          name="displayName"
+          value={formData.displayName}
+          onChange={handleChange}
+          style={{ marginLeft: '1rem', padding: '0.25rem' }}
+        />
       </label>
       <br />
-
       <label>
         Telefon:
-        <input name="phone" value={formData.phone} onChange={handleChange} />
+        <input
+          name="phone"
+          value={formData.phone}
+          onChange={handleChange}
+          style={{ marginLeft: '3.2rem', marginTop: '0.5rem', padding: '0.25rem' }}
+        />
       </label>
       <br />
-
       <label>
         Funcția:
-        <input name="position" value={formData.position} onChange={handleChange} />
+        <input
+          name="position"
+          value={formData.position}
+          onChange={handleChange}
+          style={{ marginLeft: '3.1rem', marginTop: '0.5rem', padding: '0.25rem' }}
+        />
       </label>
       <br />
-
       <label>
         Rol:
-        <select name="role" value={formData.role} onChange={handleChange}>
+        <select
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          style={{ marginLeft: '4.9rem', marginTop: '0.5rem', padding: '0.25rem' }}
+        >
           <option value="">Selectează un rol</option>
           <option value="administrator">Administrator</option>
           <option value="manager">Manager</option>
@@ -127,8 +111,20 @@ export default function ProfilPage() {
         </select>
       </label>
       <br />
-
-      <button onClick={handleSave}>Salvează</button>
+      <button
+        onClick={handleSave}
+        style={{
+          marginTop: '1rem',
+          padding: '0.5rem 1rem',
+          backgroundColor: '#27ae60',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+        }}
+      >
+        Salvează
+      </button>
     </div>
   );
 }
