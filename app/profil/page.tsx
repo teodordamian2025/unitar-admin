@@ -7,36 +7,28 @@ import { auth } from '../../lib/firebaseConfig';
 
 export default function ProfilPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
-    position: '',
     role: '',
+    position: '',
   });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        setAuthenticated(true);
         setUser(firebaseUser);
-        const local = localStorage.getItem('userProfile');
-        if (local) {
-          const localData = JSON.parse(local);
-          setFormData({
-            displayName: localData.displayName || firebaseUser.displayName || '',
-            phone: localData.phone || '',
-            position: localData.position || '',
-            role: localData.role || '',
-          });
-        } else {
-          setFormData({
-            displayName: firebaseUser.displayName || '',
-            phone: '',
-            position: '',
-            role: '',
-          });
-        }
+
+        setFormData({
+          displayName: firebaseUser.displayName || '',
+          phone: localStorage.getItem('userPhone') || '',
+          role: localStorage.getItem('userRole') || '',
+          position: localStorage.getItem('userPosition') || '',
+        });
       } else {
         router.replace('/login');
       }
@@ -53,21 +45,25 @@ export default function ProfilPage() {
   const handleSave = async () => {
     if (!user) return;
 
-    // Salvează în localStorage
-    localStorage.setItem('userProfile', JSON.stringify(formData));
-
-    // Actualizează doar displayName în Firebase Auth
-    if (formData.displayName !== user.displayName) {
+    try {
       await updateProfile(user, { displayName: formData.displayName });
-    }
 
-    // Redirecționare cu întârziere + semnalizarea succesului
-    setTimeout(() => {
-      router.replace('/admin?success=1');
-    }, 500);
+      localStorage.setItem('userPhone', formData.phone);
+      localStorage.setItem('userRole', formData.role);
+      localStorage.setItem('userPosition', formData.position);
+
+      await user.reload();
+
+      alert('Profil salvat cu succes!');
+      router.push('/admin?success=1');
+    } catch (error) {
+      console.error('Eroare la salvare:', error);
+      alert('A apărut o eroare la salvarea profilului.');
+    }
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
+  if (!authenticated) return null;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
@@ -76,51 +72,51 @@ export default function ProfilPage() {
       <label>
         Nume complet:
         <input
-          type="text"
           name="displayName"
           value={formData.displayName}
           onChange={handleChange}
+          style={{ display: 'block', marginBottom: '1rem' }}
         />
       </label>
-      <br />
 
       <label>
         Telefon:
         <input
-          type="text"
           name="phone"
           value={formData.phone}
           onChange={handleChange}
+          style={{ display: 'block', marginBottom: '1rem' }}
         />
       </label>
-      <br />
 
       <label>
         Funcția:
         <input
-          type="text"
           name="position"
           value={formData.position}
           onChange={handleChange}
+          style={{ display: 'block', marginBottom: '1rem' }}
         />
       </label>
-      <br />
 
       <label>
         Rol:
-        <select name="role" value={formData.role} onChange={handleChange}>
+        <select
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          style={{ display: 'block', marginBottom: '1rem' }}
+        >
           <option value="">Selectează un rol</option>
           <option value="administrator">Administrator</option>
           <option value="manager">Manager</option>
           <option value="utilizator">Utilizator</option>
         </select>
       </label>
-      <br />
 
       <button
         onClick={handleSave}
         style={{
-          marginTop: '1.5rem',
           padding: '0.5rem 1rem',
           backgroundColor: '#27ae60',
           color: 'white',
