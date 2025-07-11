@@ -2,91 +2,141 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth, db } from '../../lib/firebaseConfig';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebaseConfig';
 
-export default function HomePage() {
+export default function ProfilPage() {
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    phone: '',
+    role: '',
+    position: '',
+  });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      console.log('onAuthStateChanged triggered:', firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('onAuthStateChanged în profil:', firebaseUser);
       if (firebaseUser) {
-        setAuthenticated(true);
         setUser(firebaseUser);
-        const nameOrEmail = firebaseUser.displayName || firebaseUser.email || 'Utilizator';
-        toast.success(`Bine ai revenit, ${nameOrEmail}!`);
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const docSnap = await getDoc(userRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFormData({
+            displayName: data.displayName || '',
+            phone: data.phone || '',
+            role: data.role || '',
+            position: data.position || '',
+          });
+        } else {
+          setFormData({
+            displayName: firebaseUser.displayName || '',
+            phone: '',
+            role: '',
+            position: '',
+          });
+        }
       } else {
-        console.log('User is not authenticated. Redirecting to /login...');
+        console.log('Utilizator neautentificat, redirect către login.');
         router.replace('/login');
       }
+
       setCheckedAuth(true);
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  const handleLogout = async () => {
-    const confirmLogout = confirm('Sigur vrei să te deloghezi?');
-    if (!confirmLogout) return;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-    await signOut(auth);
-    toast.success('Te-ai delogat cu succes!');
-    setTimeout(() => router.replace('/login'), 1500);
+  const handleSave = async () => {
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, formData, { merge: true });
+
+    // Actualizează displayName în Firebase Auth
+    if (formData.displayName !== user.displayName) {
+      await updateProfile(user, { displayName: formData.displayName });
+    }
+
+    alert('Profil salvat cu succes!');
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
-  if (!authenticated) return null;
+  if (!user) return null;
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
-      <ToastContainer />
-      <h1>Bun venit la Unitar Admin</h1>
-      <p>Aceasta este pagina de start protejată.</p>
+    <div style={{ padding: '2rem', fontFamily: 'Arial' }}>
+      <h1>Profilul meu</h1>
+      <div style={{ maxWidth: '400px' }}>
+        <label>
+          Nume complet:
+          <input
+            name="displayName"
+            value={formData.displayName}
+            onChange={handleChange}
+            style={{ width: '100%', marginBottom: '1rem' }}
+          />
+        </label>
 
-      {user && (
-        <p style={{ marginTop: '0.5rem' }}>
-          Te-ai autentificat ca <strong>{user.displayName || user.email}</strong>.
-        </p>
-      )}
+        <label>
+          Telefon:
+          <input
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            style={{ width: '100%', marginBottom: '1rem' }}
+          />
+        </label>
 
-      {/* Buton Profil */}
-      <button
-        onClick={() => router.push('/profil')}
-        style={{
-          marginTop: '1.5rem',
-          marginRight: '1rem',
-          padding: '0.5rem 1rem',
-          backgroundColor: '#2980b9',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}
-      >
-        Profil
-      </button>
+        <label>
+          Funcția:
+          <input
+            name="position"
+            value={formData.position}
+            onChange={handleChange}
+            style={{ width: '100%', marginBottom: '1rem' }}
+          />
+        </label>
 
-      {/* Buton Logout */}
-      <button
-        onClick={handleLogout}
-        style={{
-          marginTop: '1.5rem',
-          padding: '0.5rem 1rem',
-          backgroundColor: '#c0392b',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}
-      >
-        Logout
-      </button>
+        <label>
+          Rol:
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            style={{ width: '100%', marginBottom: '1rem' }}
+          >
+            <option value="">Selectează un rol</option>
+            <option value="administrator">Administrator</option>
+            <option value="manager">Manager</option>
+            <option value="utilizator">Utilizator</option>
+          </select>
+        </label>
+
+        <button
+          onClick={handleSave}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: '#27ae60',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          Salvează
+        </button>
+      </div>
     </div>
   );
 }
