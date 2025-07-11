@@ -52,10 +52,8 @@ export default function ProfilPage() {
       localStorage.setItem('userRole', formData.role);
       localStorage.setItem('userPosition', formData.position);
 
-      await user.reload();
-
       alert('Profil salvat cu succes!');
-      router.push('/admin?success=1');
+      router.push('/admin');
     } catch (error) {
       console.error('Eroare la salvare:', error);
       alert('A apărut o eroare la salvarea profilului.');
