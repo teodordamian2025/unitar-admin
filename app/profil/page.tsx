@@ -4,14 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 export default function ProfilPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
-  const router = useRouter();
-
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
@@ -23,14 +20,14 @@ export default function ProfilPage() {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const localData = localStorage.getItem(`profile_${firebaseUser.uid}`);
-        if (localData) {
-          const parsed = JSON.parse(localData);
+        const local = localStorage.getItem('userProfile');
+        if (local) {
+          const localData = JSON.parse(local);
           setFormData({
-            displayName: firebaseUser.displayName || '',
-            phone: parsed.phone || '',
-            position: parsed.position || '',
-            role: parsed.role || '',
+            displayName: localData.displayName || firebaseUser.displayName || '',
+            phone: localData.phone || '',
+            position: localData.position || '',
+            role: localData.role || '',
           });
         } else {
           setFormData({
@@ -56,84 +53,74 @@ export default function ProfilPage() {
   const handleSave = async () => {
     if (!user) return;
 
-    try {
-      // Salvează în localStorage
-      localStorage.setItem(`profile_${user.uid}`, JSON.stringify({
-        phone: formData.phone,
-        position: formData.position,
-        role: formData.role,
-      }));
+    // Salvează în localStorage
+    localStorage.setItem('userProfile', JSON.stringify(formData));
 
-      // Salvează în Firebase Auth doar displayName
-      if (formData.displayName !== user.displayName) {
-        await updateProfile(user, { displayName: formData.displayName });
-      }
-
-      toast.success('Profilul a fost salvat cu succes!');
-      setTimeout(() => {
-        router.replace('/admin');
-      }, 1500);
-    } catch (err) {
-      toast.error('A apărut o eroare la salvarea profilului.');
+    // Actualizează doar displayName în Firebase Auth
+    if (formData.displayName !== user.displayName) {
+      await updateProfile(user, { displayName: formData.displayName });
     }
+
+    // Redirecționare cu întârziere + semnalizarea succesului
+    setTimeout(() => {
+      router.replace('/admin?success=1');
+    }, 500);
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
-  if (!user) return null;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
-      <ToastContainer />
       <h1>Profilul meu</h1>
 
       <label>
         Nume complet:
         <input
+          type="text"
           name="displayName"
           value={formData.displayName}
           onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem', width: '100%' }}
         />
       </label>
+      <br />
 
       <label>
         Telefon:
         <input
+          type="text"
           name="phone"
           value={formData.phone}
           onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem', width: '100%' }}
         />
       </label>
+      <br />
 
       <label>
         Funcția:
         <input
+          type="text"
           name="position"
           value={formData.position}
           onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem', width: '100%' }}
         />
       </label>
+      <br />
 
       <label>
         Rol:
-        <select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem', width: '100%' }}
-        >
+        <select name="role" value={formData.role} onChange={handleChange}>
           <option value="">Selectează un rol</option>
           <option value="administrator">Administrator</option>
           <option value="manager">Manager</option>
           <option value="utilizator">Utilizator</option>
         </select>
       </label>
+      <br />
 
       <button
         onClick={handleSave}
         style={{
+          marginTop: '1.5rem',
           padding: '0.5rem 1rem',
           backgroundColor: '#27ae60',
           color: 'white',
