@@ -3,28 +3,26 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
-import { auth, db } from '../../lib/firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../lib/firebaseConfig';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function ProfilPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [checkedAuth, setCheckedAuth] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
-    position: '',
     role: '',
+    position: '',
   });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('onAuthStateChanged triggered:', firebaseUser);
       if (firebaseUser) {
         setUser(firebaseUser);
-
         const userRef = doc(db, 'users', firebaseUser.uid);
         const docSnap = await getDoc(userRef);
 
@@ -33,21 +31,21 @@ export default function ProfilPage() {
           setFormData({
             displayName: data.displayName || '',
             phone: data.phone || '',
-            position: data.position || '',
             role: data.role || '',
+            position: data.position || '',
           });
         } else {
-          // ⚠️ Dacă documentul nu există, îl creăm cu date implicite
-          const initialData = {
+          // Dacă nu există documentul, îl creăm cu datele minime disponibile
+          const defaultData = {
             displayName: firebaseUser.displayName || '',
             phone: '',
-            position: '',
             role: '',
+            position: '',
           };
-          await setDoc(userRef, initialData);
-          setFormData(initialData);
-          console.log('Document nou creat în Firestore pentru utilizator.');
+          await setDoc(userRef, defaultData);
+          setFormData(defaultData);
         }
+
         setCheckedAuth(true);
       } else {
         router.replace('/login');
@@ -63,24 +61,22 @@ export default function ProfilPage() {
 
   const handleSave = async () => {
     if (!user) return;
-
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, formData, { merge: true });
 
-    if (user.displayName !== formData.displayName) {
-      await updateProfile(user, { displayName: formData.displayName });
-    }
-
+    // Actualizează și profilul Firebase Auth
+    await updateProfile(user, { displayName: formData.displayName });
     toast.success('Profilul a fost salvat cu succes!');
   };
 
-  if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
+  if (!checkedAuth) {
+    return <p>Se verifică autentificarea...</p>;
+  }
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
       <ToastContainer />
       <h1>Profilul meu</h1>
-
       <label>
         Nume complet:
         <input name="displayName" value={formData.displayName} onChange={handleChange} />
