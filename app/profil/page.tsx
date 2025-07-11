@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebaseConfig';
+import { auth, db } from '../../lib/firebaseConfig';
 
 export default function ProfilPage() {
   const router = useRouter();
