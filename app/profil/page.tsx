@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
-import { auth } from '../../lib/firebaseConfig'; // corect cu aliasul
-import { db } from '../../lib/firebaseConfig';
+import { auth, db } from '@/lib/firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -16,16 +15,16 @@ export default function ProfilPage() {
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
-    role: '',
     position: '',
+    role: '',
   });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('onAuthStateChanged (profil):', firebaseUser);
-
+      console.log('onAuthStateChanged triggered:', firebaseUser);
       if (firebaseUser) {
         setUser(firebaseUser);
+
         const userRef = doc(db, 'users', firebaseUser.uid);
         const docSnap = await getDoc(userRef);
 
@@ -34,18 +33,21 @@ export default function ProfilPage() {
           setFormData({
             displayName: data.displayName || '',
             phone: data.phone || '',
-            role: data.role || '',
             position: data.position || '',
+            role: data.role || '',
           });
         } else {
-          setFormData({
+          // ⚠️ Dacă documentul nu există, îl creăm cu date implicite
+          const initialData = {
             displayName: firebaseUser.displayName || '',
             phone: '',
-            role: '',
             position: '',
-          });
+            role: '',
+          };
+          await setDoc(userRef, initialData);
+          setFormData(initialData);
+          console.log('Document nou creat în Firestore pentru utilizator.');
         }
-
         setCheckedAuth(true);
       } else {
         router.replace('/login');
@@ -65,9 +67,9 @@ export default function ProfilPage() {
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, formData, { merge: true });
 
-    await updateProfile(user, {
-      displayName: formData.displayName,
-    });
+    if (user.displayName !== formData.displayName) {
+      await updateProfile(user, { displayName: formData.displayName });
+    }
 
     toast.success('Profilul a fost salvat cu succes!');
   };
@@ -75,7 +77,7 @@ export default function ProfilPage() {
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Arial' }}>
+    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
       <ToastContainer />
       <h1>Profilul meu</h1>
 
@@ -104,7 +106,7 @@ export default function ProfilPage() {
         </select>
       </label>
       <br />
-      <button onClick={handleSave} style={{ marginTop: '1rem' }}>Salvează</button>
+      <button onClick={handleSave}>Salvează</button>
     </div>
   );
 }
