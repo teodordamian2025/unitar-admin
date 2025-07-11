@@ -9,44 +9,35 @@ export default function AdminPage() {
   const router = useRouter();
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [profile, setProfile] = useState<{ displayName?: string; role?: string }>({});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user || auth.currentUser) {
+      if (user) {
         setAuthenticated(true);
+        const savedProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+        setProfile({
+          displayName: savedProfile.displayName || user.displayName || user.email,
+          role: savedProfile.role || '',
+        });
         setCheckedAuth(true);
       } else {
-        // Așteaptă 1 secundă pentru eventuală reautentificare după updateProfile
-        setTimeout(() => {
-          if (!auth.currentUser) {
-            router.replace('/login');
-          } else {
-            setAuthenticated(true);
-            setCheckedAuth(true);
-          }
-        }, 1000);
+        router.replace('/login');
       }
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  if (!checkedAuth) {
-    return <p>Se verifică autentificarea...</p>;
-  }
-
-  if (!authenticated) {
-    return null;
-  }
-
-  const name = auth.currentUser?.displayName || auth.currentUser?.email || 'Utilizator';
+  if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
+  if (!authenticated) return null;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
       <h1>Bun venit la Unitar Admin</h1>
       <p>Aceasta este pagina de start protejată.</p>
       <p style={{ marginTop: '1rem' }}>
-        Te-ai autentificat ca <strong>{name}</strong>.
+        Te-ai autentificat ca <strong>{profile.displayName}</strong> ({profile.role})
       </p>
     </div>
   );
