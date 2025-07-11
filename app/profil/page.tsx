@@ -42,17 +42,21 @@ export default function ProfilPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!user) return;
 
-    // Doar localStorage - fără updateProfile
+    // Salvăm doar în localStorage
     localStorage.setItem('displayName', formData.displayName);
     localStorage.setItem('userPhone', formData.phone);
     localStorage.setItem('userRole', formData.role);
     localStorage.setItem('userPosition', formData.position);
 
-    alert('Profil salvat cu succes!');
-    router.push('/admin');
+    alert('Profil salvat cu succes! Vei fi redirecționat...');
+    
+    // Redirecționare întârziată
+    setTimeout(() => {
+      router.push('/admin');
+    }, 1000); // 1 secundă întârziere
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
