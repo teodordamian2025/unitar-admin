@@ -1,22 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
 
 export default function AdminPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string>('Utilizator');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
         setAuthenticated(true);
-        setUser(firebaseUser);
+
+        // Citire displayName din localStorage
+        const storedName = localStorage.getItem('displayName');
+        setDisplayName(storedName || user.displayName || user.email || 'Utilizator');
       } else {
         router.replace('/login');
       }
@@ -34,24 +36,13 @@ export default function AdminPage() {
     return null;
   }
 
-  const success = searchParams.get('success');
-
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
       <h1>Admin Panel</h1>
       <p>Bine ai venit în zona protejată!</p>
-
-      {user && (
-        <p>
-          Te-ai autentificat ca <strong>{user.displayName || user.email}</strong>.
-        </p>
-      )}
-
-      {success === '1' && (
-        <p style={{ color: 'green', marginTop: '1rem' }}>
-          Profil salvat cu succes!
-        </p>
-      )}
+      <p style={{ marginTop: '1rem' }}>
+        Te-ai autentificat ca <strong>{displayName}</strong>.
+      </p>
     </div>
   );
 }
