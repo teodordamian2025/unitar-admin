@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, updateProfile, User } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../../lib/firebaseConfig';
 
 export default function ProfilPage() {
@@ -24,7 +24,7 @@ export default function ProfilPage() {
         setUser(firebaseUser);
 
         setFormData({
-          displayName: firebaseUser.displayName || '',
+          displayName: localStorage.getItem('displayName') || firebaseUser.displayName || '',
           phone: localStorage.getItem('userPhone') || '',
           role: localStorage.getItem('userRole') || '',
           position: localStorage.getItem('userPosition') || '',
@@ -45,19 +45,14 @@ export default function ProfilPage() {
   const handleSave = async () => {
     if (!user) return;
 
-    try {
-      await updateProfile(user, { displayName: formData.displayName });
+    // Doar localStorage - fără updateProfile
+    localStorage.setItem('displayName', formData.displayName);
+    localStorage.setItem('userPhone', formData.phone);
+    localStorage.setItem('userRole', formData.role);
+    localStorage.setItem('userPosition', formData.position);
 
-      localStorage.setItem('userPhone', formData.phone);
-      localStorage.setItem('userRole', formData.role);
-      localStorage.setItem('userPosition', formData.position);
-
-      alert('Profil salvat cu succes!');
-      router.push('/admin');
-    } catch (error) {
-      console.error('Eroare la salvare:', error);
-      alert('A apărut o eroare la salvarea profilului.');
-    }
+    alert('Profil salvat cu succes!');
+    router.push('/admin');
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
