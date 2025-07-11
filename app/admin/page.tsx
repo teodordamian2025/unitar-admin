@@ -12,10 +12,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+      if (user || auth.currentUser) {
         setAuthenticated(true);
       } else {
-        router.replace('/login'); // mai sigur decât push()
+        router.replace('/login');
       }
       setCheckedAuth(true);
     });
@@ -24,17 +24,22 @@ export default function AdminPage() {
   }, [router]);
 
   if (!checkedAuth) {
-    return <p>Se verifică autentificarea...</p>; // sau loading spinner
+    return <p>Se verifică autentificarea...</p>;
   }
 
   if (!authenticated) {
-    return null; // Nu afișăm nimic cât timp redirecționează
+    return null;
   }
 
+  const name = auth.currentUser?.displayName || auth.currentUser?.email || 'Utilizator';
+
   return (
-    <div>
-      <h1>Admin Panel</h1>
-      <p>Bine ai venit în zona protejată!</p>
+    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
+      <h1>Bun venit la Unitar Admin</h1>
+      <p>Aceasta este pagina de start protejată.</p>
+      <p style={{ marginTop: '1rem' }}>
+        Te-ai autentificat ca <strong>{name}</strong>.
+      </p>
     </div>
   );
 }
