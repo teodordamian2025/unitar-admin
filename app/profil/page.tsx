@@ -7,28 +7,29 @@ import { auth } from '../../lib/firebaseConfig';
 
 export default function ProfilPage() {
   const router = useRouter();
-  const [checkedAuth, setCheckedAuth] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [checkedAuth, setCheckedAuth] = useState(false);
+
   const [formData, setFormData] = useState({
     displayName: '',
     phone: '',
-    role: '',
     position: '',
+    role: '',
   });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        setAuthenticated(true);
         setUser(firebaseUser);
 
-        setFormData({
+        // Încărcăm din localStorage, dacă există
+        const savedData = {
           displayName: localStorage.getItem('displayName') || firebaseUser.displayName || '',
-          phone: localStorage.getItem('userPhone') || '',
-          role: localStorage.getItem('userRole') || '',
-          position: localStorage.getItem('userPosition') || '',
-        });
+          phone: localStorage.getItem('phone') || '',
+          position: localStorage.getItem('position') || '',
+          role: localStorage.getItem('role') || '',
+        };
+        setFormData(savedData);
       } else {
         router.replace('/login');
       }
@@ -47,20 +48,16 @@ export default function ProfilPage() {
 
     // Salvăm doar în localStorage
     localStorage.setItem('displayName', formData.displayName);
-    localStorage.setItem('userPhone', formData.phone);
-    localStorage.setItem('userRole', formData.role);
-    localStorage.setItem('userPosition', formData.position);
+    localStorage.setItem('phone', formData.phone);
+    localStorage.setItem('position', formData.position);
+    localStorage.setItem('role', formData.role);
 
-    alert('Profil salvat cu succes! Vei fi redirecționat...');
-    
-    // Redirecționare întârziată
-    setTimeout(() => {
-      router.push('/admin');
-    }, 1000); // 1 secundă întârziere
+    alert('Profil salvat cu succes!');
+    router.push('/admin'); // Redirecționăm la pagina protejată
   };
 
   if (!checkedAuth) return <p>Se verifică autentificarea...</p>;
-  if (!authenticated) return null;
+  if (!user) return null;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
@@ -68,52 +65,34 @@ export default function ProfilPage() {
 
       <label>
         Nume complet:
-        <input
-          name="displayName"
-          value={formData.displayName}
-          onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem' }}
-        />
+        <input name="displayName" value={formData.displayName} onChange={handleChange} />
       </label>
-
+      <br />
       <label>
         Telefon:
-        <input
-          name="phone"
-          value={formData.phone}
-          onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem' }}
-        />
+        <input name="phone" value={formData.phone} onChange={handleChange} />
       </label>
-
+      <br />
       <label>
         Funcția:
-        <input
-          name="position"
-          value={formData.position}
-          onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem' }}
-        />
+        <input name="position" value={formData.position} onChange={handleChange} />
       </label>
-
+      <br />
       <label>
         Rol:
-        <select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          style={{ display: 'block', marginBottom: '1rem' }}
-        >
+        <select name="role" value={formData.role} onChange={handleChange}>
           <option value="">Selectează un rol</option>
           <option value="administrator">Administrator</option>
           <option value="manager">Manager</option>
           <option value="utilizator">Utilizator</option>
         </select>
       </label>
+      <br />
 
       <button
         onClick={handleSave}
         style={{
+          marginTop: '1rem',
           padding: '0.5rem 1rem',
           backgroundColor: '#27ae60',
           color: 'white',
