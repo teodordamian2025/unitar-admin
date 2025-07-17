@@ -1,76 +1,56 @@
 import { NextRequest } from 'next/server';
 import pdfParse from 'pdf-parse';
 
-export const runtime = 'nodejs'; // Important pentru Vercel — nu folosi 'edge'
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get('file') as File;
+  const prompt = formData.get('prompt') as string;
+
+  if (!file || !file.name.endsWith('.pdf')) {
+    return new Response(JSON.stringify({ reply: 'Te rog încarcă un fișier PDF.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const prompt = formData.get('prompt') as string;
-
-    if (!file || !file.name.endsWith('.pdf')) {
-      return new Response(JSON.stringify({ reply: 'Te rog încarcă un fișier PDF valid.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Transformă fișierul în buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // DEBUG: log dimensiune fișier
-    console.log(`PDF uploadat: ${file.name}, dimensiune: ${buffer.length} bytes`);
-
-    // Extrage textul din PDF
+    // 1. Extrage conținutul PDF
+    const buffer = Buffer.from(await file.arrayBuffer());
     const data = await pdfParse(buffer);
-    const extractedText = data.text?.trim();
+    const extractedText = data.text?.trim().slice(0, 2000) || 'Niciun text detectat în fișierul PDF.';
 
-    if (!extractedText || extractedText.length < 10) {
-      return new Response(JSON.stringify({
-        reply: 'Nu am putut extrage text suficient din PDF.',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // 2. Creează un prompt combinat
+    const combinedPrompt = `Am extras următorul text dintr-un PDF:\n\n${extractedText}\n\nÎntrebarea utilizatorului este:\n${prompt}`;
 
-    // Combină promptul cu textul extras
-    const mesajComplet = `${prompt.trim()}\n\n---\nConținut extras din PDF:\n${extractedText.slice(0, 2000)}`;
-
-    // Trimite promptul + textul către asistentul AI local
-    const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_AI_URL || 'http://localhost:3000'}/api/queryOpenAI`, {
+    // 3. Trimite la asistentul AI local
+    const apiUrl = process.env.NEXT_PUBLIC_API_AI_URL || 'http://localhost:3000';
+    const aiResponse = await fetch(`${apiUrl}/api/queryOpenAI`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: mesajComplet }),
+      body: JSON.stringify({ message: combinedPrompt }),
     });
 
-    const aiData = await aiRes.json();
-
-    if (!aiRes.ok) {
-      console.error('Eroare de la AI:', aiData);
-      return new Response(JSON.stringify({
-        reply: 'Eroare de la asistentul AI.',
-        details: aiData,
-      }), {
-        status: aiRes.status,
+    if (!aiResponse.ok) {
+      const errorData = await aiResponse.text();
+      console.error('Eroare răspuns AI:', errorData);
+      return new Response(JSON.stringify({ reply: 'A apărut o eroare la interogarea asistentului AI.' }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({
-      reply: aiData.reply || 'Nu am primit un răspuns.',
-    }), {
+    const { reply } = await aiResponse.json();
+
+    return new Response(JSON.stringify({ reply }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
 
   } catch (err: any) {
     console.error('Eroare la procesarea PDF:', err);
-    return new Response(JSON.stringify({
-      reply: `A apărut o eroare la procesarea fișierului PDF: ${err.message || 'necunoscută'}`,
-    }), {
+    return new Response(JSON.stringify({ reply: `A apărut o eroare la procesarea fișierului PDF: ${err.message || err}` }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
