@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const prompt = body.prompt || body.message;
 
-    if (!body?.message || typeof body.message !== 'string') {
+    if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Mesaj invalid trimis.' }, { status: 400 });
     }
 
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
           },
           {
             role: 'user',
-            content: body.message,
+            content: prompt,
           },
         ],
         temperature: 0.7,
@@ -50,3 +51,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Eroare internă server.' }, { status: 500 });
   }
 }
+
