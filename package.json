@@ -1,0 +1,33 @@
+{
+  "name": "unitar-admin",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.0",
+    "docx": "^9.5.1",
+    "exceljs": "^4.4.0",
+    "firebase": "^11.10.0",
+    "framer-motion": "^10.12.16",
+    "get-stream": "^9.0.1",
+    "next": "13.4.19",
+    "openai": "^5.9.0",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.17.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-dropzone": "^14.3.8",
+    "react-google-recaptcha": "^3.1.0",
+    "react-toastify": "^11.0.5",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.9",
+    "@types/react": "^18.2.7",
+    "@types/react-dropzone": "^4.2.2",
+    "typescript": "^5.2.2"
+  }
+}
