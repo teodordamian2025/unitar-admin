@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import pdfParse from 'pdf-parse/lib/pdf-parse'; // import specific
+import pdfParse from 'pdf-parse/lib/pdf-parse'; // import specific pentru Vercel
 
 export const runtime = 'nodejs';
 
@@ -24,8 +24,12 @@ export async function POST(req: NextRequest) {
     // 2. Creează un prompt combinat
     const combinedPrompt = `Am extras următorul text dintr-un PDF:\n\n${extractedText}\n\nÎntrebarea utilizatorului este:\n${prompt}`;
 
-    // 3. Trimite la asistentul AI local
-    const apiUrl = process.env.NEXT_PUBLIC_API_AI_URL || 'http://localhost:3000';
+    // 3. Trimite la asistentul AI
+    const isProd = process.env.NODE_ENV === 'production';
+    const apiUrl = isProd
+      ? process.env.NEXT_PUBLIC_API_AI_URL || 'https://unitar-admin.vercel.app'
+      : 'http://localhost:3000';
+
     const aiResponse = await fetch(`${apiUrl}/api/queryOpenAI`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,8 +37,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!aiResponse.ok) {
-      const errorData = await aiResponse.text();
-      console.error('Eroare răspuns AI:', errorData);
+      const errorText = await aiResponse.text();
+      console.error('Eroare răspuns AI:', errorText);
       return new Response(JSON.stringify({ reply: 'A apărut o eroare la interogarea asistentului AI.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
