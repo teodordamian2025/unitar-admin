@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse/lib/pdf-parse'; // import specific
 
 export const runtime = 'nodejs';
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const aiResponse = await fetch(`${apiUrl}/api/queryOpenAI`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: combinedPrompt }),
+      body: JSON.stringify({ prompt: combinedPrompt }),
     });
 
     if (!aiResponse.ok) {
