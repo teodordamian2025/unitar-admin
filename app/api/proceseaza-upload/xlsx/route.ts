@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
+import { buffer } from 'node:stream/consumers';
 
 export const runtime = 'nodejs';
 
@@ -16,12 +17,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const buffer: Buffer = Buffer.from(uint8Array.buffer);
+    const bufferData: Buffer = await buffer(file.stream());
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(bufferData);
 
     const sheet = workbook.worksheets[0];
     let content = '';
