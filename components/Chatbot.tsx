@@ -15,86 +15,104 @@ export default function Chatbot() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+// ... restul codului rămâne neschimbat ...
+
   const handleSend = async () => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  const trimmed = input.trim();
+  if (!trimmed) return;
 
-    const userMessage: Message = { from: 'user', text: trimmed };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setLoading(true);
+  const userMessage: Message = { from: 'user', text: trimmed };
+  setMessages(prev => [...prev, userMessage]);
+  setInput('');
+  setLoading(true);
 
-    try {
-      const lower = trimmed.toLowerCase();
-      const format = lower.includes('excel') ? 'xlsx' :
-                     lower.includes('pdf') ? 'pdf' :
-                     lower.includes('word') || lower.includes('.docx') ? 'docx' :
-                     null;
+  try {
+    const lower = trimmed.toLowerCase();
+    const format = lower.includes('excel') ? 'xlsx' :
+                   lower.includes('pdf') ? 'pdf' :
+                   lower.includes('word') || lower.includes('.docx') ? 'docx' :
+                   null;
 
-      if (format) {
-        const res = await fetch('/api/genereaza-document', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: trimmed, format }),
-        });
+    // 🔁 GENERARE DOCUMENTE
+    if (format) {
+      const endpoint = format === 'pdf'
+        ? '/api/genereaza/pdf'
+        : '/api/genereaza-document';
 
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed, format }),
+      });
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const fileName = `document.${format}`;
+
+      const botMessage: Message = {
+        from: 'bot',
+        text: `Document generat: <a href="${url}" download="${fileName}">Descarcă ${fileName}</a>`
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+
+    } else if (uploadedFile) {
+      // 🔁 UPLOAD ȘI ANALIZĂ DOCUMENT
+      const ext = uploadedFile.name.toLowerCase().split('.').pop();
+      const isPdf = ext === 'pdf';
+      const endpoint = isPdf
+        ? '/api/proceseaza-upload/pdf'
+        : '/api/proceseaza-upload';
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+      formData.append('prompt', trimmed);
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const contentType = res.headers.get('Content-Type') || '';
+
+      if (contentType.startsWith('application/json')) {
+        const data = await res.json();
+        const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const fileName = `document.${format}`;
+        const fileName = res.headers.get('X-Filename') || uploadedFile.name;
 
         const botMessage: Message = {
           from: 'bot',
           text: `Document generat: <a href="${url}" download="${fileName}">Descarcă ${fileName}</a>`
         };
-
-        setMessages(prev => [...prev, botMessage]);
-      } else if (uploadedFile) {
-        const formData = new FormData();
-        formData.append('file', uploadedFile);
-        formData.append('prompt', trimmed);
-
-        const res = await fetch('/api/proceseaza-upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        const contentType = res.headers.get('Content-Type') || '';
-
-        if (contentType.startsWith('application/json')) {
-          const data = await res.json();
-          const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
-          setMessages(prev => [...prev, botMessage]);
-        } else {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const fileName = res.headers.get('X-Filename') || uploadedFile.name;
-
-          const botMessage: Message = {
-            from: 'bot',
-            text: `Document generat: <a href="${url}" download="${fileName}">Descarcă ${fileName}</a>`
-          };
-          setMessages(prev => [...prev, botMessage]);
-        }
-
-        setUploadedFile(null); // resetăm după trimitere
-      } else {
-        const res = await fetch('/api/queryOpenAI', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: trimmed }),
-        });
-
-        const data = await res.json();
-        const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
         setMessages(prev => [...prev, botMessage]);
       }
 
-    } catch (err) {
-      setMessages(prev => [...prev, { from: 'bot', text: 'Eroare la conectare cu serverul.' }]);
+      setUploadedFile(null); // resetăm după trimitere
+
+    } else {
+      // 🔁 SIMPLU PROMPT TEXTUAL
+      const res = await fetch('/api/queryOpenAI', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed }),
+      });
+
+      const data = await res.json();
+      const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
+      setMessages(prev => [...prev, botMessage]);
     }
 
-    setLoading(false);
-  };
+  } catch (err) {
+    setMessages(prev => [...prev, { from: 'bot', text: 'Eroare la conectare cu serverul.' }]);
+  }
+
+  setLoading(false);
+};
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && e.ctrlKey) {
