@@ -1,0 +1,224 @@
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+
+type Message = {
+  from: 'user' | 'bot';
+  text: string;
+};
+
+export default function Chatbot() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    const userMessage: Message = { from: 'user', text: trimmed };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const lower = trimmed.toLowerCase();
+      const format = lower.includes('excel') ? 'xlsx' :
+                     lower.includes('pdf') ? 'pdf' :
+                     lower.includes('word') || lower.includes('.docx') ? 'docx' :
+                     null;
+
+      if (format) {
+        const res = await fetch('/api/genereaza-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: trimmed, format }),
+        });
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const fileName = `document.${format}`;
+
+        const botMessage: Message = {
+          from: 'bot',
+          text: `Document generat: <a href="${url}" download="${fileName}">Descarcă ${fileName}</a>`
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+      } else if (uploadedFile) {
+        const formData = new FormData();
+        formData.append('file', uploadedFile);
+        formData.append('prompt', trimmed);
+
+        const res = await fetch('/api/proceseaza-upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const contentType = res.headers.get('Content-Type') || '';
+
+        if (contentType.startsWith('application/json')) {
+          const data = await res.json();
+          const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
+          setMessages(prev => [...prev, botMessage]);
+        } else {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const fileName = res.headers.get('X-Filename') || uploadedFile.name;
+
+          const botMessage: Message = {
+            from: 'bot',
+            text: `Document generat: <a href="${url}" download="${fileName}">Descarcă ${fileName}</a>`
+          };
+          setMessages(prev => [...prev, botMessage]);
+        }
+
+        setUploadedFile(null); // resetăm după trimitere
+      } else {
+        const res = await fetch('/api/queryOpenAI', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: trimmed }),
+        });
+
+        const data = await res.json();
+        const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
+        setMessages(prev => [...prev, botMessage]);
+      }
+
+    } catch (err) {
+      setMessages(prev => [...prev, { from: 'bot', text: 'Eroare la conectare cu serverul.' }]);
+    }
+
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      setUploadedFile(file);
+      setMessages(prev => [...prev, {
+        from: 'user',
+        text: `Am încărcat fișierul: ${file.name}`
+      }]);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '10px',
+      right: '10px',
+      width: '340px',
+      background: '#fefefe',
+      border: '1px solid #ccc',
+      borderRadius: '8px',
+      zIndex: 9999,
+      boxShadow: '0 0 10px rgba(0,0,0,0.1)',
+      display: 'flex',
+      flexDirection: 'column',
+      maxHeight: '90vh'
+    }}>
+      <div style={{
+        background: '#4caf50',
+        color: 'white',
+        padding: '10px',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px'
+      }}>
+        Asistent AI
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '10px',
+        paddingBottom: '0'
+      }}>
+        {messages.map((msg, index) => (
+          <div key={index} style={{ textAlign: msg.from === 'user' ? 'right' : 'left', margin: '5px 0' }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '6px 10px',
+              borderRadius: '12px',
+              background: msg.from === 'user' ? '#dcf8c6' : '#e0e0e0',
+              maxWidth: '90%',
+              wordWrap: 'break-word'
+            }}>
+              {msg.text.startsWith('Document generat') ? (
+                <span dangerouslySetInnerHTML={{ __html: msg.text }} />
+              ) : msg.text}
+            </span>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={{ padding: '10px', borderTop: '1px solid #ccc' }}>
+        <textarea
+          rows={3}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Scrie un mesaj... (Ctrl+Enter pentru a trimite)"
+          style={{
+            width: '100%',
+            resize: 'none',
+            padding: '8px',
+            borderRadius: '6px',
+            border: '1px solid #ccc',
+            fontSize: '14px'
+          }}
+        />
+
+        <div {...getRootProps()} style={{
+          border: '2px dashed #aaa',
+          padding: '6px',
+          textAlign: 'center',
+          marginTop: '6px',
+          cursor: 'pointer',
+          borderRadius: '6px',
+          background: isDragActive ? '#eee' : '#fafafa'
+        }}>
+          <input {...getInputProps()} />
+          {isDragActive ? 'Lasa fișierele aici...' : 'Încarcă fișier'}
+        </div>
+
+        <button
+          onClick={handleSend}
+          disabled={loading}
+          style={{
+            marginTop: '8px',
+            width: '100%',
+            padding: '8px',
+            background: '#4caf50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {loading ? 'Se generează...' : 'Trimite'}
+        </button>
+      </div>
+    </div>
+  );
+}
