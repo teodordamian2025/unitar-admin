@@ -18,10 +18,11 @@ export async function POST(req: NextRequest) {
   try {
     // conversie corectă: din Web File -> Node.js Buffer
     const arrayBuffer = await file.arrayBuffer();
-    const bufferData = Buffer.from(arrayBuffer as ArrayBuffer);
+    const bufferData: Buffer = Buffer.from(new Uint8Array(arrayBuffer as ArrayBuffer));
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(bufferData); // compatibil cu Vercel
+    await workbook.xlsx.load(bufferData); // Acum funcționează corect
+
 
     const sheet = workbook.worksheets[0];
     let content = '';
