@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
-import { buffer } from 'node:stream/consumers';
 
 export const runtime = 'nodejs';
 
@@ -17,17 +16,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const bufferData: Buffer = await buffer(file.stream());
+    // conversie corectă: din Web File -> Node.js Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const bufferData = Buffer.from(arrayBuffer as ArrayBuffer);
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(bufferData);
+    await workbook.xlsx.load(bufferData); // compatibil cu Vercel
 
     const sheet = workbook.worksheets[0];
     let content = '';
 
     sheet.eachRow((row) => {
       const rowValues = row.values
-        .filter(v => v !== null && v !== undefined && typeof v !== 'object')
+        .filter((v) => v !== null && v !== undefined && typeof v !== 'object')
         .join(' | ');
       content += rowValues + '\n';
     });
