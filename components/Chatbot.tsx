@@ -33,11 +33,9 @@ export default function Chatbot() {
                    lower.includes('word') || lower.includes('.docx') ? 'docx' :
                    null;
 
-    // 🔁 GENERARE DOCUMENTE
+    // 🔁 GENERARE DOCUMENT
     if (format) {
-      const endpoint = format === 'pdf'
-        ? '/api/genereaza/pdf'
-        : '/api/genereaza-document';
+      const endpoint = `/api/genereaza/${format}`;
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -57,11 +55,11 @@ export default function Chatbot() {
       setMessages(prev => [...prev, botMessage]);
 
     } else if (uploadedFile) {
-      // 🔁 UPLOAD ȘI ANALIZĂ DOCUMENT
+      // 🔁 UPLOAD + INTERPRETARE
       const ext = uploadedFile.name.toLowerCase().split('.').pop();
-      const isPdf = ext === 'pdf';
-      const endpoint = isPdf
-        ? '/api/proceseaza-upload/pdf'
+      const supported = ['pdf', 'xlsx', 'docx'];
+      const endpoint = supported.includes(ext || '') 
+        ? `/api/proceseaza-upload/${ext}`
         : '/api/proceseaza-upload';
 
       const formData = new FormData();
@@ -91,10 +89,10 @@ export default function Chatbot() {
         setMessages(prev => [...prev, botMessage]);
       }
 
-      setUploadedFile(null); // resetăm după trimitere
+      setUploadedFile(null); // resetăm
 
     } else {
-      // 🔁 SIMPLU PROMPT TEXTUAL
+      // 🔁 SIMPLU PROMPT TEXT
       const res = await fetch('/api/queryOpenAI', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,11 +105,13 @@ export default function Chatbot() {
     }
 
   } catch (err) {
+    console.error('Eroare chatbot:', err);
     setMessages(prev => [...prev, { from: 'bot', text: 'Eroare la conectare cu serverul.' }]);
   }
 
   setLoading(false);
 };
+
 
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
