@@ -13,6 +13,7 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9));
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleSend = async () => {
@@ -116,7 +117,7 @@ export default function Chatbot() {
           const res = await fetch('/api/ai-database', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: trimmed }),
+            body: JSON.stringify({ prompt: trimmed, sessionId }),
           });
 
           const data = await res.json();
