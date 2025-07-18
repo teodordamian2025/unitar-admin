@@ -5,6 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const prompt = formData.get('prompt') as string;
     
     if (!file) {
       return NextResponse.json({ error: 'Nu a fost găsit fișierul' }, { status: 400 });
@@ -102,8 +103,44 @@ export async function POST(request: NextRequest) {
     // Combinarea conținutului pentru AI
     const aiContent = extractedContent.join('\n\n');
     
+    // 🔴 PARTEA NOUĂ: Interpretarea cu AI
+    let aiReply = 'Fișierul Excel a fost procesat cu succes.';
+    
+    if (prompt && aiContent.trim()) {
+      try {
+        const aiPrompt = `Analizează următorul fișier Excel și răspunde la întrebarea utilizatorului:
+
+Nume fișier: ${file.name}
+Numărul de sheet-uri: ${sheetDetails.length}
+Sheet-uri: ${sheetDetails.map(sheet => sheet.sheetName).join(', ')}
+
+Conținut Excel:
+${aiContent}
+
+Întrebarea utilizatorului: ${prompt}
+
+Te rog să răspunzi în română și să fii cât mai precis posibil.`;
+
+        const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/queryOpenAI`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: aiPrompt })
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          aiReply = aiData.reply || aiReply;
+        } else {
+          console.error('Eroare la apelarea OpenAI:', aiResponse.status);
+        }
+      } catch (aiError) {
+        console.error('Eroare la interpretarea AI:', aiError);
+      }
+    }
+    
     return NextResponse.json({
       success: true,
+      reply: aiReply, // 🔴 CÂMPUL PE CARE ÎL AȘTEAPTĂ CHATBOT-UL
       fileName: file.name,
       fileSize: file.size,
       sheets: sheetDetails.length,
@@ -120,6 +157,7 @@ export async function POST(request: NextRequest) {
     console.error('Eroare la procesarea fișierului Excel:', error);
     return NextResponse.json({ 
       error: 'Eroare la procesarea fișierului Excel',
+      reply: 'Eroare la procesarea fișierului Excel. Te rog să încerci din nou.',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });
   }
