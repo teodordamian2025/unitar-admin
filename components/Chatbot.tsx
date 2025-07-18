@@ -31,6 +31,7 @@ export default function Chatbot() {
     const format = lower.includes('excel') ? 'xlsx' :
                    lower.includes('pdf') ? 'pdf' :
                    lower.includes('word') || lower.includes('.docx') ? 'docx' :
+                   lower.includes('text') || lower.includes('.txt') ? 'txt' :
                    null;
 
     // 🔁 GENERARE DOCUMENT
@@ -57,7 +58,7 @@ export default function Chatbot() {
     } else if (uploadedFile) {
       // 🔁 UPLOAD + INTERPRETARE
       const ext = uploadedFile.name.toLowerCase().split('.').pop();
-      const supported = ['pdf', 'xlsx', 'docx'];
+      const supported = ['pdf', 'xlsx', 'docx', 'txt'];
       const endpoint = supported.includes(ext || '') 
         ? `/api/proceseaza-upload/${ext}`
         : '/api/proceseaza-upload';
