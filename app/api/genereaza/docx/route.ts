@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableCell, TableRow, WidthType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableCell, TableRow, WidthType } from 'docx';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +21,6 @@ Te rog să răspunzi cu o structură JSON care să conțină:
 2. Titlul principal
 3. Secțiuni cu subtitluri și conținut
 4. Tabele dacă sunt necesare
-5. Formatare sugerată
 
 Exemplu de răspuns:
 {
@@ -99,8 +98,13 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
     // Adăugarea titlului principal
     children.push(
       new Paragraph({
-        text: structure.title || "Document",
-        heading: HeadingLevel.TITLE,
+        children: [
+          new TextRun({
+            text: structure.title || "Document",
+            bold: true,
+            size: 32, // 16pt
+          }),
+        ],
         alignment: AlignmentType.CENTER,
         spacing: {
           after: 400,
@@ -129,8 +133,13 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
       // Subtitlul secțiunii
       children.push(
         new Paragraph({
-          text: section.heading,
-          heading: HeadingLevel.HEADING_1,
+          children: [
+            new TextRun({
+              text: section.heading,
+              bold: true,
+              size: 24, // 12pt
+            }),
+          ],
           spacing: {
             before: 400,
             after: 200,
@@ -144,7 +153,11 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
         contentParagraphs.forEach((paragraph: string) => {
           children.push(
             new Paragraph({
-              text: paragraph.trim(),
+              children: [
+                new TextRun({
+                  text: paragraph.trim(),
+                }),
+              ],
               spacing: {
                 after: 200,
               },
@@ -185,7 +198,11 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
             new TableCell({
               children: [
                 new Paragraph({
-                  text: cell,
+                  children: [
+                    new TextRun({
+                      text: cell,
+                    }),
+                  ],
                   alignment: AlignmentType.LEFT,
                 }),
               ],
@@ -202,21 +219,13 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
               size: 100,
               type: WidthType.PERCENTAGE,
             },
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 1 },
-              bottom: { style: BorderStyle.SINGLE, size: 1 },
-              left: { style: BorderStyle.SINGLE, size: 1 },
-              right: { style: BorderStyle.SINGLE, size: 1 },
-              insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
-              insideVertical: { style: BorderStyle.SINGLE, size: 1 },
-            },
           })
         );
 
         // Spațiu după tabel
         children.push(
           new Paragraph({
-            text: "",
+            children: [new TextRun({ text: "" })],
             spacing: {
               after: 300,
             },
