@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import JSZip from 'jszip';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,26 +21,23 @@ export async function POST(request: NextRequest) {
     let extractedText = '';
     
     try {
-      // Extragere text din XML DOCX
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
+      // Folosim JSZip pentru a extrage conținutul DOCX
+      const zip = new JSZip();
+      const zipContent = await zip.loadAsync(arrayBuffer);
       
-      // Încercăm să găsim textul în format XML
-      let rawText = '';
-      try {
-        rawText = decoder.decode(uint8Array);
-      } catch (decodeError) {
-        // Dacă UTF-8 nu funcționează, încercăm cu latin1
-        const latin1Decoder = new TextDecoder('latin1');
-        rawText = latin1Decoder.decode(uint8Array);
+      // Extragem document.xml din arhiva ZIP
+      const documentXml = zipContent.files['word/document.xml'];
+      if (!documentXml) {
+        throw new Error('Nu s-a găsit document.xml în fișierul DOCX');
       }
       
-      // Extragere text din tagurile XML w:t (fără flag 's' pentru compatibilitate)
-      const textMatches = rawText.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+      const xmlContent = await documentXml.async('text');
+      
+      // Extragere text din XML folosind regex
+      const textMatches = xmlContent.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
       if (textMatches && textMatches.length > 0) {
         extractedText = textMatches
           .map(match => {
-            // Extrage doar textul din interiorul tagului
             const textMatch = match.match(/<w:t[^>]*>(.*?)<\/w:t>/);
             return textMatch ? textMatch[1] : '';
           })
@@ -49,24 +47,19 @@ export async function POST(request: NextRequest) {
           .trim();
       }
       
-      // Dacă nu găsim text cu w:t, încercăm alte taguri
-      if (!extractedText.trim()) {
-        const alternativeMatches = rawText.match(/>([^<]+)</g);
-        if (alternativeMatches) {
-          extractedText = alternativeMatches
-            .map(match => match.replace(/^>|<$/g, ''))
-            .filter(text => text.trim().length > 2 && !text.includes('xml'))
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        }
-      }
+      // Curățăm textul de caractere XML speciale
+      extractedText = extractedText
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
       
     } catch (parseError) {
       console.error('Eroare la parsarea Word:', parseError);
       return NextResponse.json({ 
         error: 'Fișierul Word nu poate fi procesat',
-        reply: 'Nu am putut citi conținutul fișierului Word. Te rog să încerci din nou.'
+        reply: 'Nu am putut citi conținutul fișierului Word. Te rog să încerci din nou sau să verifici dacă fișierul este valid.'
       }, { status: 400 });
     }
 

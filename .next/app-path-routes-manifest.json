@@ -4,12 +4,12 @@
   "/profil/page": "/profil",
   "/test-page/page": "/test-page",
   "/admin/page": "/admin",
-  "/api/verify-recaptcha/route": "/api/verify-recaptcha",
   "/api/queryOpenAI/route": "/api/queryOpenAI",
+  "/api/verify-recaptcha/route": "/api/verify-recaptcha",
   "/api/genereaza/pdf/route": "/api/genereaza/pdf",
   "/api/genereaza/docx/route": "/api/genereaza/docx",
   "/api/genereaza/xlsx/route": "/api/genereaza/xlsx",
-  "/api/proceseaza-upload/xlsx/route": "/api/proceseaza-upload/xlsx",
   "/api/proceseaza-upload/docx/route": "/api/proceseaza-upload/docx",
+  "/api/proceseaza-upload/xlsx/route": "/api/proceseaza-upload/xlsx",
   "/api/proceseaza-upload/pdf/route": "/api/proceseaza-upload/pdf"
 }
