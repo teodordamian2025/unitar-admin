@@ -1,4 +1,4 @@
-// File: E:\PM2\unitar-admin\app\api\verify-recaptcha\route.ts
+// File: /home/teodor/PM1-2025-07-17/unitar-admin/app/api/verify-recaptcha/route.ts
 import * as entry from '../../../../../app/api/verify-recaptcha/route.js'
 import type { NextRequest } from 'next/server.js'
 

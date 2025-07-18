@@ -5,21 +5,21 @@ exports.id = 131;
 exports.ids = [131];
 exports.modules = {
 
-/***/ 730:
+/***/ 90730:
 /***/ ((module) => {
 
 module.exports = require("next/dist/server/api-utils/node.js");
 
 /***/ }),
 
-/***/ 3076:
+/***/ 43076:
 /***/ ((module) => {
 
 module.exports = require("next/dist/server/future/route-modules/route-module.js");
 
 /***/ }),
 
-/***/ 6599:
+/***/ 36599:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 // ESM COMPAT FLAG
@@ -40,11 +40,11 @@ __webpack_require__.d(queryBigQuery_namespaceObject, {
 });
 
 // EXTERNAL MODULE: ./node_modules/next/dist/server/future/route-modules/pages-api/module.js
-var pages_api_module = __webpack_require__(6429);
+var pages_api_module = __webpack_require__(56429);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/future/route-kind.js
-var route_kind = __webpack_require__(7153);
+var route_kind = __webpack_require__(47153);
 // EXTERNAL MODULE: ./node_modules/next/dist/build/webpack/loaders/next-route-loader/helpers.js
-var helpers = __webpack_require__(7305);
+var helpers = __webpack_require__(37305);
 ;// CONCATENATED MODULE: external "@google-cloud/bigquery"
 const bigquery_namespaceObject = require("@google-cloud/bigquery");
 ;// CONCATENATED MODULE: ./pages/api/queryBigQuery.ts
@@ -106,7 +106,7 @@ const routeModule = new PagesAPIRouteModule({
 var __webpack_require__ = require("../../webpack-api-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [172], () => (__webpack_exec__(6599)));
+var __webpack_exports__ = __webpack_require__.X(0, [172], () => (__webpack_exec__(36599)));
 module.exports = __webpack_exports__;
 
 })();

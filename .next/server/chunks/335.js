@@ -3,103 +3,261 @@ exports.id = 335;
 exports.ids = [335];
 exports.modules = {
 
-/***/ 7335:
-/***/ ((module, exports, __webpack_require__) => {
+/***/ 89335:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
+var __webpack_unused_export__;
+// This file is for modularized imports for next/server to get fully-treeshaking.
 
-Object.defineProperty(exports, "__esModule", ({
+__webpack_unused_export__ = ({
     value: true
-}));
-Object.defineProperty(exports, "default", ({
+});
+Object.defineProperty(exports, "Z", ({
     enumerable: true,
     get: function() {
-        return dynamic;
+        return _response.NextResponse;
     }
 }));
-const _interop_require_default = __webpack_require__(2147);
-const _react = /*#__PURE__*/ _interop_require_default._(__webpack_require__(7640));
-const _loadable = /*#__PURE__*/ _interop_require_default._(__webpack_require__(1464));
-// Normalize loader to return the module as form { default: Component } for `React.lazy`.
-// Also for backward compatible since next/dynamic allows to resolve a component directly with loader
-// Client component reference proxy need to be converted to a module.
-function convertModule(mod) {
-    return {
-        default: (mod == null ? void 0 : mod.default) || mod
-    };
-}
-function dynamic(dynamicOptions, options) {
-    const loadableFn = _loadable.default;
-    const loadableOptions = {
-        // A loading component is not required, so we default it
-        loading: (param)=>{
-            let { error, isLoading, pastDelay } = param;
-            if (!pastDelay) return null;
-            if (false) {}
-            return null;
-        }
-    };
-    if (typeof dynamicOptions === "function") {
-        loadableOptions.loader = dynamicOptions;
-    }
-    Object.assign(loadableOptions, options);
-    const loaderFn = loadableOptions.loader;
-    const loader = ()=>loaderFn != null ? loaderFn().then(convertModule) : Promise.resolve(convertModule(()=>null));
-    return loadableFn({
-        ...loadableOptions,
-        loader: loader
-    });
-}
-if ((typeof exports.default === "function" || typeof exports.default === "object" && exports.default !== null) && typeof exports.default.__esModule === "undefined") {
-    Object.defineProperty(exports.default, "__esModule", {
-        value: true
-    });
-    Object.assign(exports.default, exports);
-    module.exports = exports.default;
-} //# sourceMappingURL=app-dynamic.js.map
+const _response = __webpack_require__(57099); //# sourceMappingURL=next-response.js.map
 
 
 /***/ }),
 
-/***/ 1464:
+/***/ 57099:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
 Object.defineProperty(exports, "__esModule", ({
     value: true
 }));
-Object.defineProperty(exports, "default", ({
+Object.defineProperty(exports, "NextResponse", ({
     enumerable: true,
     get: function() {
-        return _default;
+        return NextResponse;
     }
 }));
-const _interop_require_default = __webpack_require__(2147);
-const _react = /*#__PURE__*/ _interop_require_default._(__webpack_require__(7640));
-const _dynamicnossr = __webpack_require__(9708);
-function Loadable(options) {
-    const opts = Object.assign({
-        loader: null,
-        loading: null,
-        ssr: true
-    }, options);
-    opts.lazy = /*#__PURE__*/ _react.default.lazy(opts.loader);
-    function LoadableComponent(props) {
-        const Loading = opts.loading;
-        const fallbackElement = /*#__PURE__*/ _react.default.createElement(Loading, {
-            isLoading: true,
-            pastDelay: true,
-            error: null
-        });
-        const Wrap = opts.ssr ? _react.default.Fragment : _dynamicnossr.NoSSR;
-        const Lazy = opts.lazy;
-        return /*#__PURE__*/ _react.default.createElement(_react.default.Suspense, {
-            fallback: fallbackElement
-        }, /*#__PURE__*/ _react.default.createElement(Wrap, null, /*#__PURE__*/ _react.default.createElement(Lazy, props)));
+const _nexturl = __webpack_require__(12284);
+const _utils = __webpack_require__(28217);
+const _cookies = __webpack_require__(81220);
+const INTERNALS = Symbol("internal response");
+const REDIRECTS = new Set([
+    301,
+    302,
+    303,
+    307,
+    308
+]);
+function handleMiddlewareField(init, headers) {
+    var _init_request;
+    if (init == null ? void 0 : (_init_request = init.request) == null ? void 0 : _init_request.headers) {
+        if (!(init.request.headers instanceof Headers)) {
+            throw new Error("request.headers must be an instance of Headers");
+        }
+        const keys = [];
+        for (const [key, value] of init.request.headers){
+            headers.set("x-middleware-request-" + key, value);
+            keys.push(key);
+        }
+        headers.set("x-middleware-override-headers", keys.join(","));
     }
-    LoadableComponent.displayName = "LoadableComponent";
-    return LoadableComponent;
 }
-const _default = Loadable; //# sourceMappingURL=loadable.js.map
+class NextResponse extends Response {
+    constructor(body, init = {}){
+        super(body, init);
+        this[INTERNALS] = {
+            cookies: new _cookies.ResponseCookies(this.headers),
+            url: init.url ? new _nexturl.NextURL(init.url, {
+                headers: (0, _utils.toNodeOutgoingHttpHeaders)(this.headers),
+                nextConfig: init.nextConfig
+            }) : undefined
+        };
+    }
+    [Symbol.for("edge-runtime.inspect.custom")]() {
+        return {
+            cookies: this.cookies,
+            url: this.url,
+            // rest of props come from Response
+            body: this.body,
+            bodyUsed: this.bodyUsed,
+            headers: Object.fromEntries(this.headers),
+            ok: this.ok,
+            redirected: this.redirected,
+            status: this.status,
+            statusText: this.statusText,
+            type: this.type
+        };
+    }
+    get cookies() {
+        return this[INTERNALS].cookies;
+    }
+    static json(body, init) {
+        // @ts-expect-error This is not in lib/dom right now, and we can't augment it.
+        const response = Response.json(body, init);
+        return new NextResponse(response.body, response);
+    }
+    static redirect(url, init) {
+        const status = typeof init === "number" ? init : (init == null ? void 0 : init.status) ?? 307;
+        if (!REDIRECTS.has(status)) {
+            throw new RangeError('Failed to execute "redirect" on "response": Invalid status code');
+        }
+        const initObj = typeof init === "object" ? init : {};
+        const headers = new Headers(initObj == null ? void 0 : initObj.headers);
+        headers.set("Location", (0, _utils.validateURL)(url));
+        return new NextResponse(null, {
+            ...initObj,
+            headers,
+            status
+        });
+    }
+    static rewrite(destination, init) {
+        const headers = new Headers(init == null ? void 0 : init.headers);
+        headers.set("x-middleware-rewrite", (0, _utils.validateURL)(destination));
+        handleMiddlewareField(init, headers);
+        return new NextResponse(null, {
+            ...init,
+            headers
+        });
+    }
+    static next(init) {
+        const headers = new Headers(init == null ? void 0 : init.headers);
+        headers.set("x-middleware-next", "1");
+        handleMiddlewareField(init, headers);
+        return new NextResponse(null, {
+            ...init,
+            headers
+        });
+    }
+} //# sourceMappingURL=response.js.map
+
+
+/***/ }),
+
+/***/ 28217:
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({
+    value: true
+}));
+0 && (0);
+function _export(target, all) {
+    for(var name in all)Object.defineProperty(target, name, {
+        enumerable: true,
+        get: all[name]
+    });
+}
+_export(exports, {
+    fromNodeOutgoingHttpHeaders: function() {
+        return fromNodeOutgoingHttpHeaders;
+    },
+    splitCookiesString: function() {
+        return splitCookiesString;
+    },
+    toNodeOutgoingHttpHeaders: function() {
+        return toNodeOutgoingHttpHeaders;
+    },
+    validateURL: function() {
+        return validateURL;
+    }
+});
+function fromNodeOutgoingHttpHeaders(nodeHeaders) {
+    const headers = new Headers();
+    for (let [key, value] of Object.entries(nodeHeaders)){
+        const values = Array.isArray(value) ? value : [
+            value
+        ];
+        for (let v of values){
+            if (typeof v === "undefined") continue;
+            if (typeof v === "number") {
+                v = v.toString();
+            }
+            headers.append(key, v);
+        }
+    }
+    return headers;
+}
+function splitCookiesString(cookiesString) {
+    var cookiesStrings = [];
+    var pos = 0;
+    var start;
+    var ch;
+    var lastComma;
+    var nextStart;
+    var cookiesSeparatorFound;
+    function skipWhitespace() {
+        while(pos < cookiesString.length && /\s/.test(cookiesString.charAt(pos))){
+            pos += 1;
+        }
+        return pos < cookiesString.length;
+    }
+    function notSpecialChar() {
+        ch = cookiesString.charAt(pos);
+        return ch !== "=" && ch !== ";" && ch !== ",";
+    }
+    while(pos < cookiesString.length){
+        start = pos;
+        cookiesSeparatorFound = false;
+        while(skipWhitespace()){
+            ch = cookiesString.charAt(pos);
+            if (ch === ",") {
+                // ',' is a cookie separator if we have later first '=', not ';' or ','
+                lastComma = pos;
+                pos += 1;
+                skipWhitespace();
+                nextStart = pos;
+                while(pos < cookiesString.length && notSpecialChar()){
+                    pos += 1;
+                }
+                // currently special character
+                if (pos < cookiesString.length && cookiesString.charAt(pos) === "=") {
+                    // we found cookies separator
+                    cookiesSeparatorFound = true;
+                    // pos is inside the next cookie, so back up and return it.
+                    pos = nextStart;
+                    cookiesStrings.push(cookiesString.substring(start, lastComma));
+                    start = pos;
+                } else {
+                    // in param ',' or param separator ';',
+                    // we continue from that comma
+                    pos = lastComma + 1;
+                }
+            } else {
+                pos += 1;
+            }
+        }
+        if (!cookiesSeparatorFound || pos >= cookiesString.length) {
+            cookiesStrings.push(cookiesString.substring(start, cookiesString.length));
+        }
+    }
+    return cookiesStrings;
+}
+function toNodeOutgoingHttpHeaders(headers) {
+    const nodeHeaders = {};
+    const cookies = [];
+    if (headers) {
+        for (const [key, value] of headers.entries()){
+            if (key.toLowerCase() === "set-cookie") {
+                // We may have gotten a comma joined string of cookies, or multiple
+                // set-cookie headers. We need to merge them into one header array
+                // to represent all the cookies.
+                cookies.push(...splitCookiesString(value));
+                nodeHeaders[key] = cookies.length === 1 ? cookies[0] : cookies;
+            } else {
+                nodeHeaders[key] = value;
+            }
+        }
+    }
+    return nodeHeaders;
+}
+function validateURL(url) {
+    try {
+        return String(new URL(String(url)));
+    } catch (error) {
+        throw new Error(`URL is malformed "${String(url)}". Please use only absolute URLs - https://nextjs.org/docs/messages/middleware-relative-urls`, {
+            cause: error
+        });
+    }
+} //# sourceMappingURL=utils.js.map
 
 
 /***/ })

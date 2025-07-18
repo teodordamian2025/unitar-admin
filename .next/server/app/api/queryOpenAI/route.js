@@ -5,14 +5,14 @@ exports.id = 167;
 exports.ids = [167];
 exports.modules = {
 
-/***/ 2037:
+/***/ 22037:
 /***/ ((module) => {
 
 module.exports = require("os");
 
 /***/ }),
 
-/***/ 4015:
+/***/ 5752:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 // ESM COMPAT FLAG
@@ -37,19 +37,20 @@ __webpack_require__.d(route_namespaceObject, {
 });
 
 // EXTERNAL MODULE: ./node_modules/next/dist/server/node-polyfill-headers.js
-var node_polyfill_headers = __webpack_require__(2394);
+var node_polyfill_headers = __webpack_require__(42394);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/future/route-modules/app-route/module.js
-var app_route_module = __webpack_require__(9692);
+var app_route_module = __webpack_require__(69692);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/future/route-kind.js
-var route_kind = __webpack_require__(9513);
+var route_kind = __webpack_require__(19513);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/web/exports/next-response.js
-var next_response = __webpack_require__(9335);
+var next_response = __webpack_require__(89335);
 ;// CONCATENATED MODULE: ./app/api/queryOpenAI/route.ts
 
 async function POST(req) {
     try {
         const body = await req.json();
-        if (!body?.message || typeof body.message !== "string") {
+        const prompt = body.prompt || body.message;
+        if (!prompt || typeof prompt !== "string") {
             return next_response/* default */.Z.json({
                 error: "Mesaj invalid trimis."
             }, {
@@ -79,7 +80,7 @@ async function POST(req) {
                     },
                     {
                         role: "user",
-                        content: body.message
+                        content: prompt
                     }
                 ],
                 temperature: 0.7
@@ -109,7 +110,7 @@ async function POST(req) {
     }
 }
 
-;// CONCATENATED MODULE: ./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?page=%2Fapi%2FqueryOpenAI%2Froute&name=app%2Fapi%2FqueryOpenAI%2Froute&pagePath=private-next-app-dir%2Fapi%2FqueryOpenAI%2Froute.ts&appDir=E%3A%5CPM2%5Cunitar-admin%5Capp&appPaths=%2Fapi%2FqueryOpenAI%2Froute&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+;// CONCATENATED MODULE: ./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?page=%2Fapi%2FqueryOpenAI%2Froute&name=app%2Fapi%2FqueryOpenAI%2Froute&pagePath=private-next-app-dir%2Fapi%2FqueryOpenAI%2Froute.ts&appDir=%2Fhome%2Fteodor%2FPM1-2025-07-17%2Funitar-admin%2Fapp&appPaths=%2Fapi%2FqueryOpenAI%2Froute&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
 
 // @ts-ignore this need to be imported from next/dist to be external
 
@@ -128,7 +129,7 @@ const routeModule = new AppRouteRouteModule({
         filename: "route",
         bundlePath: "app/api/queryOpenAI/route"
     },
-    resolvedPagePath: "E:\\PM2\\unitar-admin\\app\\api\\queryOpenAI\\route.ts",
+    resolvedPagePath: "/home/teodor/PM1-2025-07-17/unitar-admin/app/api/queryOpenAI/route.ts",
     nextConfigOutput,
     userland: route_namespaceObject
 });
@@ -150,7 +151,7 @@ const originalPathname = "/api/queryOpenAI/route";
 var __webpack_require__ = require("../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,101], () => (__webpack_exec__(4015)));
+var __webpack_exports__ = __webpack_require__.X(0, [478,501,335], () => (__webpack_exec__(5752)));
 module.exports = __webpack_exports__;
 
 })();
