@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ExcelJS } from 'exceljs';
+import ExcelJS from 'exceljs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,24 +31,50 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Extragerea conținutului
-    const extractedData: any[] = [];
+    // Extragerea conținutului pentru AI
+    const extractedContent: string[] = [];
+    const sheetDetails: any[] = [];
     
     workbook.eachSheet((worksheet, sheetId) => {
       const sheetData = {
         sheetName: worksheet.name,
         sheetId: sheetId,
+        rowCount: worksheet.rowCount,
+        columnCount: worksheet.columnCount,
         data: [] as any[]
       };
 
+      // Extragere pentru AI - text simplu
+      let sheetText = `Sheet: ${worksheet.name}\n`;
+      
       worksheet.eachRow((row, rowNumber) => {
         const rowData: any[] = [];
+        const cellValues: string[] = [];
+        
         row.eachCell((cell, colNumber) => {
+          let cellValue = '';
+          
+          // Convertește valorile în text pentru AI
+          if (cell.value !== null && cell.value !== undefined) {
+            if (typeof cell.value === 'object' && cell.value.text) {
+              cellValue = cell.value.text;
+            } else if (typeof cell.value === 'object' && cell.value.result) {
+              cellValue = String(cell.value.result);
+            } else {
+              cellValue = String(cell.value);
+            }
+          }
+          
           rowData.push({
             column: colNumber,
             value: cell.value,
+            displayValue: cellValue,
             type: cell.type
           });
+          
+          if (cellValue.trim()) {
+            cellValues.push(cellValue.trim());
+          }
         });
         
         if (rowData.length > 0) {
@@ -57,23 +83,38 @@ export async function POST(request: NextRequest) {
             cells: rowData
           });
         }
+        
+        if (cellValues.length > 0) {
+          sheetText += `Row ${rowNumber}: ${cellValues.join(' | ')}\n`;
+        }
       });
 
-      extractedData.push(sheetData);
+      sheetDetails.push(sheetData);
+      extractedContent.push(sheetText);
     });
 
+    // Combinarea conținutului pentru AI
+    const aiContent = extractedContent.join('\n\n');
+    
     return NextResponse.json({
       success: true,
       fileName: file.name,
       fileSize: file.size,
-      sheets: extractedData.length,
-      extractedData: extractedData
+      sheets: sheetDetails.length,
+      extractedData: sheetDetails,
+      aiContent: aiContent, // Conținut formatat pentru AI
+      summary: {
+        totalSheets: sheetDetails.length,
+        totalRows: sheetDetails.reduce((sum, sheet) => sum + sheet.rowCount, 0),
+        sheetNames: sheetDetails.map(sheet => sheet.sheetName)
+      }
     });
 
   } catch (error) {
     console.error('Eroare la procesarea fișierului Excel:', error);
     return NextResponse.json({ 
-      error: 'Eroare la procesarea fișierului Excel' 
+      error: 'Eroare la procesarea fișierului Excel',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });
   }
 }
