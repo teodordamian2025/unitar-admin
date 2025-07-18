@@ -409,7 +409,7 @@ const originalPathname = "/api/genereaza/xlsx/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,189,50], () => (__webpack_exec__(44184)));
+var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,507,189,256,50], () => (__webpack_exec__(44184)));
 module.exports = __webpack_exports__;
 
 })();

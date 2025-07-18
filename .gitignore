@@ -1,2 +1,12 @@
 node_modules/
 .env.local
+.env.production
+.env.development
+.env
+
+# Test files
+test-*.js
+test-bigquery.js
+
+# BigQuery service account
+service-account-key.json

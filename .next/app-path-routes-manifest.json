@@ -1,9 +1,11 @@
 {
   "/login/page": "/login",
-  "/profil/page": "/profil",
   "/logout/page": "/logout",
+  "/profil/page": "/profil",
   "/test-page/page": "/test-page",
   "/admin/page": "/admin",
+  "/api/ai-database/route": "/api/ai-database",
+  "/api/bigquery/route": "/api/bigquery",
   "/api/queryOpenAI/route": "/api/queryOpenAI",
   "/api/verify-recaptcha/route": "/api/verify-recaptcha",
   "/api/genereaza/docx/route": "/api/genereaza/docx",
