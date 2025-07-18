@@ -386,8 +386,8 @@ var jsx_runtime_ = __webpack_require__(76931);
 var react_experimental_ = __webpack_require__(17640);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
 var navigation = __webpack_require__(57114);
-// EXTERNAL MODULE: ./node_modules/firebase/auth/dist/index.mjs + 3 modules
-var dist = __webpack_require__(81864);
+// EXTERNAL MODULE: ./node_modules/firebase/auth/dist/index.mjs + 2 modules
+var dist = __webpack_require__(53498);
 // EXTERNAL MODULE: ./lib/firebaseConfig.ts
 var firebaseConfig = __webpack_require__(79850);
 ;// CONCATENATED MODULE: ./components/ProtectedRoute.tsx
@@ -446,7 +446,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(76931);
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var firebase_auth__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(81864);
+/* harmony import */ var firebase_auth__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(53498);
 /* harmony import */ var _lib_firebaseConfig__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(79850);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(57114);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_3__);
@@ -592,7 +592,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,448,43,890,194,313,850], () => (__webpack_exec__(54481)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,7335,7194,8313,9850], () => (__webpack_exec__(54481)));
 module.exports = __webpack_exports__;
 
 })();

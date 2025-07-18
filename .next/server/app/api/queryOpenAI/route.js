@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 167;
-exports.ids = [167];
+exports.id = 3167;
+exports.ids = [3167];
 exports.modules = {
 
 /***/ 22037:
@@ -151,7 +151,7 @@ const originalPathname = "/api/queryOpenAI/route";
 var __webpack_require__ = require("../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335], () => (__webpack_exec__(5752)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335], () => (__webpack_exec__(5752)));
 module.exports = __webpack_exports__;
 
 })();

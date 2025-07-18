@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 497;
-exports.ids = [497];
+exports.id = 8003;
+exports.ids = [8003];
 exports.modules = {
 
 /***/ 22037:
@@ -176,7 +176,7 @@ const originalPathname = "/api/genereaza/txt/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335], () => (__webpack_exec__(8879)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335], () => (__webpack_exec__(8879)));
 module.exports = __webpack_exports__;
 
 })();
