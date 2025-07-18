@@ -5,10 +5,38 @@ exports.id = 904;
 exports.ids = [904];
 exports.modules = {
 
+/***/ 14300:
+/***/ ((module) => {
+
+module.exports = require("buffer");
+
+/***/ }),
+
+/***/ 82361:
+/***/ ((module) => {
+
+module.exports = require("events");
+
+/***/ }),
+
 /***/ 22037:
 /***/ ((module) => {
 
 module.exports = require("os");
+
+/***/ }),
+
+/***/ 12781:
+/***/ ((module) => {
+
+module.exports = require("stream");
+
+/***/ }),
+
+/***/ 73837:
+/***/ ((module) => {
+
+module.exports = require("util");
 
 /***/ }),
 
@@ -44,7 +72,11 @@ var app_route_module = __webpack_require__(69692);
 var route_kind = __webpack_require__(19513);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/web/exports/next-response.js
 var next_response = __webpack_require__(89335);
+// EXTERNAL MODULE: ./node_modules/jszip/lib/index.js
+var lib = __webpack_require__(3189);
+var lib_default = /*#__PURE__*/__webpack_require__.n(lib);
 ;// CONCATENATED MODULE: ./app/api/proceseaza-upload/docx/route.ts
+
 
 async function POST(request) {
     try {
@@ -69,41 +101,30 @@ async function POST(request) {
         const arrayBuffer = await file.arrayBuffer();
         let extractedText = "";
         try {
-            // Extragere text din XML DOCX
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const decoder = new TextDecoder("utf-8", {
-                ignoreBOM: true
-            });
-            // Încercăm să găsim textul în format XML
-            let rawText = "";
-            try {
-                rawText = decoder.decode(uint8Array);
-            } catch (decodeError) {
-                // Dacă UTF-8 nu funcționează, încercăm cu latin1
-                const latin1Decoder = new TextDecoder("latin1");
-                rawText = latin1Decoder.decode(uint8Array);
+            // Folosim JSZip pentru a extrage conținutul DOCX
+            const zip = new (lib_default())();
+            const zipContent = await zip.loadAsync(arrayBuffer);
+            // Extragem document.xml din arhiva ZIP
+            const documentXml = zipContent.files["word/document.xml"];
+            if (!documentXml) {
+                throw new Error("Nu s-a găsit document.xml \xeen fișierul DOCX");
             }
-            // Extragere text din tagurile XML w:t (fără flag 's' pentru compatibilitate)
-            const textMatches = rawText.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+            const xmlContent = await documentXml.async("text");
+            // Extragere text din XML folosind regex
+            const textMatches = xmlContent.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
             if (textMatches && textMatches.length > 0) {
                 extractedText = textMatches.map((match)=>{
-                    // Extrage doar textul din interiorul tagului
                     const textMatch = match.match(/<w:t[^>]*>(.*?)<\/w:t>/);
                     return textMatch ? textMatch[1] : "";
                 }).filter((text)=>text.trim().length > 0).join(" ").replace(/\s+/g, " ").trim();
             }
-            // Dacă nu găsim text cu w:t, încercăm alte taguri
-            if (!extractedText.trim()) {
-                const alternativeMatches = rawText.match(/>([^<]+)</g);
-                if (alternativeMatches) {
-                    extractedText = alternativeMatches.map((match)=>match.replace(/^>|<$/g, "")).filter((text)=>text.trim().length > 2 && !text.includes("xml")).join(" ").replace(/\s+/g, " ").trim();
-                }
-            }
+            // Curățăm textul de caractere XML speciale
+            extractedText = extractedText.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
         } catch (parseError) {
             console.error("Eroare la parsarea Word:", parseError);
             return next_response/* default */.Z.json({
                 error: "Fișierul Word nu poate fi procesat",
-                reply: "Nu am putut citi conținutul fișierului Word. Te rog să \xeencerci din nou."
+                reply: "Nu am putut citi conținutul fișierului Word. Te rog să \xeencerci din nou sau să verifici dacă fișierul este valid."
             }, {
                 status: 400
             });
@@ -233,7 +254,7 @@ const originalPathname = "/api/proceseaza-upload/docx/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335], () => (__webpack_exec__(841)));
+var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,189], () => (__webpack_exec__(841)));
 module.exports = __webpack_exports__;
 
 })();

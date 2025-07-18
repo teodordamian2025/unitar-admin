@@ -5,10 +5,38 @@ exports.id = 30;
 exports.ids = [30];
 exports.modules = {
 
+/***/ 14300:
+/***/ ((module) => {
+
+module.exports = require("buffer");
+
+/***/ }),
+
+/***/ 82361:
+/***/ ((module) => {
+
+module.exports = require("events");
+
+/***/ }),
+
 /***/ 22037:
 /***/ ((module) => {
 
 module.exports = require("os");
+
+/***/ }),
+
+/***/ 12781:
+/***/ ((module) => {
+
+module.exports = require("stream");
+
+/***/ }),
+
+/***/ 73837:
+/***/ ((module) => {
+
+module.exports = require("util");
 
 /***/ }),
 
@@ -44,7 +72,11 @@ var app_route_module = __webpack_require__(69692);
 var route_kind = __webpack_require__(19513);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/web/exports/next-response.js
 var next_response = __webpack_require__(89335);
+// EXTERNAL MODULE: ./node_modules/jszip/lib/index.js
+var lib = __webpack_require__(3189);
+var lib_default = /*#__PURE__*/__webpack_require__.n(lib);
 ;// CONCATENATED MODULE: ./app/api/genereaza/docx/route.ts
+
 
 async function POST(request) {
     try {
@@ -56,43 +88,21 @@ async function POST(request) {
                 status: 400
             });
         }
-        // Interpretarea AI pentru structura Word
-        let aiStructure = "";
+        // Interpretarea AI pentru conținut
+        let aiContent = "";
+        let fileName = "document_generat";
         try {
-            const aiPrompt = `Analizează următoarea cerere și creează o structură detaliată pentru un document Word:
+            const aiPrompt = `Creează un document Word profesional bazat pe următoarea cerere:
 
 Cererea utilizatorului: ${prompt}
 
-Te rog să răspunzi cu o structură JSON care să conțină:
-1. Un nume pentru document (fără extensie)
-2. Titlul principal
-3. Secțiuni cu subtitluri și conținut
-4. Tabele dacă sunt necesare
+Te rog să creezi un document structurat cu:
+1. Titlu principal
+2. Secțiuni cu subtitluri
+3. Conținut detaliat și relevant
+4. Informații practice și utile
 
-Exemplu de răspuns:
-{
-  "fileName": "raport_proiect",
-  "title": "Raport de Proiect",
-  "sections": [
-    {
-      "heading": "Introducere",
-      "content": "Acest document prezintă..."
-    },
-    {
-      "heading": "Detalii Tehnice",
-      "content": "Aspectele tehnice includ...",
-      "table": {
-        "headers": ["Element", "Descriere", "Status"],
-        "rows": [
-          ["Fundație", "Beton armat", "Finalizat"],
-          ["Structură", "Cadre metalice", "În progres"]
-        ]
-      }
-    }
-  ]
-}
-
-Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
+Răspunde cu textul complet al documentului, bine structurat și formatat pentru a fi folosit într-un document Word profesional.`;
             const aiResponse = await fetch(`${"https://admin.unitarproiect.eu" || 0}/api/queryOpenAI`, {
                 method: "POST",
                 headers: {
@@ -104,202 +114,113 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
             });
             if (aiResponse.ok) {
                 const aiData = await aiResponse.json();
-                aiStructure = aiData.reply || "";
+                aiContent = aiData.reply || "Document generat automat";
+                // Extragem un nume de fișier din conținut
+                const firstLine = aiContent.split("\n")[0];
+                if (firstLine && firstLine.length > 0 && firstLine.length < 50) {
+                    fileName = firstLine.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_").toLowerCase();
+                }
             }
         } catch (aiError) {
             console.error("Eroare la interpretarea AI:", aiError);
+            aiContent = `Document generat automat
+
+Cererea dumneavoastră: ${prompt}
+
+Acest document a fost creat pe baza cererii de mai sus. Conținutul poate fi personalizat conform nevoilor specifice ale proiectului.
+
+Data generării: ${new Date().toLocaleDateString("ro-RO")}`;
         }
-        // Parsarea structurii AI sau crearea unei structuri default
-        let structure;
-        try {
-            const cleanJson = aiStructure.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-            structure = JSON.parse(cleanJson);
-        } catch (parseError) {
-            console.log("Folosesc structura default, AI nu a returnat JSON valid");
-            structure = {
-                fileName: "document_generat",
-                title: "Document Generat",
-                sections: [
-                    {
-                        heading: "Introducere",
-                        content: "Acest document a fost generat automat pe baza cererii dumneavoastră."
-                    },
-                    {
-                        heading: "Detalii",
-                        content: "Conținutul documentului poate fi personalizat conform nevoilor specifice ale proiectului.",
-                        table: {
-                            headers: [
-                                "Element",
-                                "Descriere",
-                                "Status"
-                            ],
-                            rows: [
-                                [
-                                    "Punct 1",
-                                    "Descriere detaliată",
-                                    "Activ"
-                                ],
-                                [
-                                    "Punct 2",
-                                    "Informații suplimentare",
-                                    "Planificat"
-                                ],
-                                [
-                                    "Punct 3",
-                                    "Alte specificații",
-                                    "\xcen progres"
-                                ]
-                            ]
-                        }
-                    }
-                ]
-            };
-        }
-        // Import dinamic pentru docx
-        const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableCell, TableRow, WidthType } = await __webpack_require__.e(/* import() */ 55).then(__webpack_require__.bind(__webpack_require__, 4055));
-        // Crearea documentului Word
-        const children = [];
-        // Adăugarea titlului principal
-        children.push(new Paragraph({
-            children: [
-                new TextRun({
-                    text: structure.title || "Document",
-                    bold: true,
-                    size: 32
-                })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: {
-                after: 400
+        // Crearea documentului Word XML
+        const wordXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="32"/>
+          <w:szCs w:val="32"/>
+        </w:rPr>
+        <w:t>Document Generat</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="right"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:i/>
+        </w:rPr>
+        <w:t>Data: ${new Date().toLocaleDateString("ro-RO")}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t></w:t>
+      </w:r>
+    </w:p>
+    ${aiContent.split("\n").map((line)=>{
+            if (line.trim().length === 0) {
+                return `<w:p><w:r><w:t></w:t></w:r></w:p>`;
             }
-        }));
-        // Adăugarea datei
-        children.push(new Paragraph({
-            children: [
-                new TextRun({
-                    text: `Data: ${new Date().toLocaleDateString("ro-RO")}`,
-                    italics: true
-                })
-            ],
-            alignment: AlignmentType.RIGHT,
-            spacing: {
-                after: 600
+            // Verifică dacă este titlu (prima linie sau linie scurtă cu majuscule)
+            const isTitle = line.trim().length < 50 && line.trim() === line.trim().toUpperCase() && line.trim().length > 0;
+            if (isTitle) {
+                return `<w:p>
+          <w:pPr>
+            <w:jc w:val="center"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:b/>
+              <w:sz w:val="24"/>
+              <w:szCs w:val="24"/>
+            </w:rPr>
+            <w:t>${line.trim()}</w:t>
+          </w:r>
+        </w:p>`;
+            } else {
+                return `<w:p>
+          <w:r>
+            <w:t>${line.trim()}</w:t>
+          </w:r>
+        </w:p>`;
             }
-        }));
-        // Adăugarea secțiunilor
-        structure.sections.forEach((section)=>{
-            // Subtitlul secțiunii
-            children.push(new Paragraph({
-                children: [
-                    new TextRun({
-                        text: section.heading,
-                        bold: true,
-                        size: 24
-                    })
-                ],
-                spacing: {
-                    before: 400,
-                    after: 200
-                }
-            }));
-            // Conținutul secțiunii
-            if (section.content) {
-                const contentParagraphs = section.content.split("\n").filter((p)=>p.trim());
-                contentParagraphs.forEach((paragraph)=>{
-                    children.push(new Paragraph({
-                        children: [
-                            new TextRun({
-                                text: paragraph.trim()
-                            })
-                        ],
-                        spacing: {
-                            after: 200
-                        }
-                    }));
-                });
-            }
-            // Tabelul dacă există
-            if (section.table && section.table.headers && section.table.rows) {
-                const tableRows = [];
-                // Rândul cu anteturi
-                const headerCells = section.table.headers.map((header)=>new TableCell({
-                        children: [
-                            new Paragraph({
-                                children: [
-                                    new TextRun({
-                                        text: header,
-                                        bold: true,
-                                        color: "FFFFFF"
-                                    })
-                                ],
-                                alignment: AlignmentType.CENTER
-                            })
-                        ],
-                        shading: {
-                            fill: "366092"
-                        }
-                    }));
-                tableRows.push(new TableRow({
-                    children: headerCells
-                }));
-                // Rândurile cu date
-                section.table.rows.forEach((row)=>{
-                    const dataCells = row.map((cell)=>new TableCell({
-                            children: [
-                                new Paragraph({
-                                    children: [
-                                        new TextRun({
-                                            text: cell
-                                        })
-                                    ],
-                                    alignment: AlignmentType.LEFT
-                                })
-                            ]
-                        }));
-                    tableRows.push(new TableRow({
-                        children: dataCells
-                    }));
-                });
-                // Adăugarea tabelului
-                children.push(new Table({
-                    rows: tableRows,
-                    width: {
-                        size: 100,
-                        type: WidthType.PERCENTAGE
-                    }
-                }));
-                // Spațiu după tabel
-                children.push(new Paragraph({
-                    children: [
-                        new TextRun({
-                            text: ""
-                        })
-                    ],
-                    spacing: {
-                        after: 300
-                    }
-                }));
-            }
-        });
-        // Crearea documentului
-        const doc = new Document({
-            sections: [
-                {
-                    properties: {},
-                    children: children
-                }
-            ]
-        });
+        }).join("")}
+  </w:body>
+</w:document>`;
+        // Crearea unui ZIP cu structura DOCX
+        const zip = new (lib_default())();
+        // Adăugarea fișierelor necesare pentru DOCX
+        zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+        zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+        zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`);
+        zip.file("word/document.xml", wordXml);
         // Generarea buffer-ului
-        const buffer = await Packer.toBuffer(doc);
-        // Determinarea numelui fișierului
-        const fileName = `${structure.fileName || "document_generat"}.docx`;
-        // Returnarea fișierului
+        const buffer = await zip.generateAsync({
+            type: "nodebuffer"
+        });
         return new next_response/* default */.Z(buffer, {
             headers: {
                 "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "Content-Disposition": `attachment; filename="${fileName}"`,
-                "X-Filename": fileName
+                "Content-Disposition": `attachment; filename="${fileName}.docx"`,
+                "X-Filename": `${fileName}.docx`
             }
         });
     } catch (error) {
@@ -354,7 +275,7 @@ const originalPathname = "/api/genereaza/docx/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335], () => (__webpack_exec__(37120)));
+var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,189], () => (__webpack_exec__(37120)));
 module.exports = __webpack_exports__;
 
 })();
