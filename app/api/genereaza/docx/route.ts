@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableCell, TableRow, WidthType } from 'docx';
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +91,9 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
       };
     }
 
+    // Import dinamic pentru docx
+    const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableCell, TableRow, WidthType } = await import('docx');
+
     // Crearea documentului Word
     const children: any[] = [];
 
@@ -168,7 +170,7 @@ Răspunde DOAR cu JSON-ul, fără text suplimentar.`;
 
       // Tabelul dacă există
       if (section.table && section.table.headers && section.table.rows) {
-        const tableRows: TableRow[] = [];
+        const tableRows: any[] = [];
 
         // Rândul cu anteturi
         const headerCells = section.table.headers.map((header: string) =>

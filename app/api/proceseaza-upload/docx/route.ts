@@ -34,13 +34,13 @@ export async function POST(request: NextRequest) {
         rawText = latin1Decoder.decode(uint8Array);
       }
       
-      // Extragere text din tagurile XML w:t
-      const textMatches = rawText.match(/<w:t[^>]*>(.*?)<\/w:t>/gs);
+      // Extragere text din tagurile XML w:t (fără flag 's' pentru compatibilitate)
+      const textMatches = rawText.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
       if (textMatches && textMatches.length > 0) {
         extractedText = textMatches
           .map(match => {
             // Extrage doar textul din interiorul tagului
-            const textMatch = match.match(/<w:t[^>]*>(.*?)<\/w:t>/s);
+            const textMatch = match.match(/<w:t[^>]*>(.*?)<\/w:t>/);
             return textMatch ? textMatch[1] : '';
           })
           .filter(text => text.trim().length > 0)

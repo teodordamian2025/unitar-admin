@@ -1,4 +1,4 @@
-// File: E:\PM2\unitar-admin\app\admin\layout.tsx
+// File: /home/teodor/PM1-2025-07-17/unitar-admin/app/admin/layout.tsx
 import * as entry from '../../../../app/admin/layout.js'
 import type { ResolvingMetadata } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
