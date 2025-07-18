@@ -3,14 +3,14 @@
     "id": 3904,
     "files": [
       "static/chunks/647.06d460581c2eb0d7.js",
-      "static/chunks/904.c0713cf5b1aead17.js"
+      "static/chunks/904.54449bf3395521bd.js"
     ]
   },
   "../app/test-page/page.tsx -> @/components/Chatbot": {
     "id": 3904,
     "files": [
       "static/chunks/647.06d460581c2eb0d7.js",
-      "static/chunks/126.bab387be80a121fa.js"
+      "static/chunks/126.c673bc6d016cd961.js"
     ]
   }
 }
