@@ -14,16 +14,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Fișierul trebuie să fie .xlsx' }, { status: 400 });
     }
 
-    // Conversie sigură pentru ExcelJS
+    // Conversie sigură pentru ExcelJS - folosind ArrayBuffer direct
     const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const buffer = Buffer.from(uint8Array);
-
+    
     // Crearea și încărcarea workbook-ului
     const workbook = new ExcelJS.Workbook();
     
     try {
-      await workbook.xlsx.load(buffer);
+      // ExcelJS acceptă și ArrayBuffer direct
+      await workbook.xlsx.load(arrayBuffer);
     } catch (loadError) {
       console.error('Eroare la încărcarea fișierului Excel:', loadError);
       return NextResponse.json({ 
@@ -56,10 +55,17 @@ export async function POST(request: NextRequest) {
           
           // Convertește valorile în text pentru AI
           if (cell.value !== null && cell.value !== undefined) {
-            if (typeof cell.value === 'object' && cell.value.text) {
-              cellValue = cell.value.text;
-            } else if (typeof cell.value === 'object' && cell.value.result) {
-              cellValue = String(cell.value.result);
+            if (typeof cell.value === 'object' && cell.value !== null) {
+              // Handling rich text, hyperlinks, formulas
+              if ('text' in cell.value) {
+                cellValue = String(cell.value.text);
+              } else if ('result' in cell.value) {
+                cellValue = String(cell.value.result);
+              } else if ('richText' in cell.value) {
+                cellValue = String(cell.value.richText);
+              } else {
+                cellValue = String(cell.value);
+              }
             } else {
               cellValue = String(cell.value);
             }
