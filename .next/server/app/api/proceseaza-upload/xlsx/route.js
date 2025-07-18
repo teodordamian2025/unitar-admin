@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 35;
-exports.ids = [35];
+exports.id = 2035;
+exports.ids = [2035];
 exports.modules = {
 
 /***/ 96076:
@@ -330,7 +330,7 @@ const originalPathname = "/api/proceseaza-upload/xlsx/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,507,189,256,50], () => (__webpack_exec__(73351)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,3189,7256,9050], () => (__webpack_exec__(73351)));
 module.exports = __webpack_exports__;
 
 })();

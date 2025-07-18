@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 475;
-exports.ids = [475];
+exports.id = 9475;
+exports.ids = [9475];
 exports.modules = {
 
 /***/ 70663:
@@ -512,7 +512,7 @@ const originalPathname = "/api/bigquery/route";
 var __webpack_require__ = require("../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,507,256,641,115], () => (__webpack_exec__(71833)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,7256,6641,6115], () => (__webpack_exec__(71833)));
 module.exports = __webpack_exports__;
 
 })();

@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 904;
-exports.ids = [904];
+exports.id = 7904;
+exports.ids = [7904];
 exports.modules = {
 
 /***/ 14300:
@@ -254,7 +254,7 @@ const originalPathname = "/api/proceseaza-upload/docx/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,335,507,189], () => (__webpack_exec__(841)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,3189], () => (__webpack_exec__(841)));
 module.exports = __webpack_exports__;
 
 })();

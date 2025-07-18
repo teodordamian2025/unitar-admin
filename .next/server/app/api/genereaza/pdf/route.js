@@ -1,8 +1,8 @@
 "use strict";
 (() => {
 var exports = {};
-exports.id = 372;
-exports.ids = [372];
+exports.id = 4372;
+exports.ids = [4372];
 exports.modules = {
 
 /***/ 6113:
@@ -147,7 +147,7 @@ const originalPathname = "/api/genereaza/pdf/route";
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [478,501,641,553], () => (__webpack_exec__(46386)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,6641,553], () => (__webpack_exec__(46386)));
 module.exports = __webpack_exports__;
 
 })();
