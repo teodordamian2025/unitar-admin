@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Stocare temporară pentru query-urile pending (în producție ar trebui să folosești Redis sau o bază de date)
+// Stocare temporară pentru query-urile pending
 const pendingQueries = new Map<string, { query: string, timestamp: number }>();
 
 export async function POST(request: NextRequest) {
@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       const pendingQuery = pendingQueries.get(sessionKey);
       
       if (pendingQuery) {
-        // Verifică dacă query-ul nu este prea vechi (5 minute)
         if (Date.now() - pendingQuery.timestamp > 300000) {
           pendingQueries.delete(sessionKey);
           return NextResponse.json({
@@ -29,7 +28,6 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          // Execută query-ul confirmat
           const queryResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/bigquery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -40,31 +38,29 @@ export async function POST(request: NextRequest) {
           });
 
           const queryData = await queryResponse.json();
-          
-          // Șterge query-ul din pending
           pendingQueries.delete(sessionKey);
           
           if (queryData.success) {
             return NextResponse.json({
               success: true,
-              reply: `✅ **Operațiunea a fost executată cu succes!**\n\nQuery executat:\n\`\`\`sql\n${pendingQuery.query}\n\`\`\`\n\nRezultat: Datele au fost modificate în baza de date.`
+              reply: `✅ **Operațiunea executată cu succes!** Datele au fost modificate în baza de date.`
             });
           } else {
             return NextResponse.json({
               success: true,
-              reply: `❌ **Eroare la executarea operațiunii:**\n\n${queryData.error}\n\nQuery-ul nu a fost executat.`
+              reply: `❌ **Eroare:** ${queryData.error}`
             });
           }
         } catch (executeError) {
           return NextResponse.json({
             success: true,
-            reply: `❌ **Eroare la executarea operațiunii:** ${executeError}\n\nQuery-ul nu a fost executat.`
+            reply: `❌ **Eroare:** ${executeError}`
           });
         }
       } else {
         return NextResponse.json({
           success: true,
-          reply: 'Nu am găsit nicio operațiune în așteptare pentru confirmare. Te rog să reintroduci cererea.'
+          reply: 'Nu am găsit nicio operațiune pentru confirmare. Te rog să reintroduci cererea.'
         });
       }
     }
@@ -82,47 +78,23 @@ export async function POST(request: NextRequest) {
       throw new Error('Nu s-a putut obține schema bazei de date');
     }
 
-    // Creează prompt-ul detaliat pentru AI
-    const schemaDescription = Object.entries(schemaData.schema).map(([tableName, tableInfo]: [string, any]) => {
-      const columns = Object.entries(tableInfo.columns).map(([colName, colInfo]: [string, any]) => 
-        `  - ${colName}: ${colInfo.type} (${colInfo.mode}) - ${colInfo.description}`
-      ).join('\n');
-      
-      return `**${tableName}** (${tableInfo.rowCount} rânduri)
-${tableInfo.description}
-Coloane:
-${columns}`;
-    }).join('\n\n');
+    // Prompt optimizat pentru răspunsuri scurte
+    const aiPrompt = `Ești un asistent AI pentru firma Unitar Proiect. Răspunde SCURT și DIRECT.
 
-    const aiPrompt = `Ești un asistent AI pentru administrarea firmei de inginerie structurală Unitar Proiect. 
-Ai acces la o bază de date BigQuery cu următoarele tabele REALE:
-
-Dataset: ${dataset}
-Proiect: ${process.env.GOOGLE_CLOUD_PROJECT_ID}
-
-${schemaDescription}
-
-Contextul conversației: ${context}
+Dataset BigQuery: ${dataset}
+Tabele disponibile: ${Object.keys(schemaData.schema).join(', ')}
 
 Cererea utilizatorului: ${trimmed}
 
-INSTRUCȚIUNI IMPORTANTE:
-1. Folosește numele exacte ale tabelelor și coloanelor din schema de mai sus
-2. Toate query-urile SQL trebuie să folosească sintaxa BigQuery
-3. Folosește format complet pentru tabele: \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.NUME_TABELA\`
-4. Pentru INSERT, UPDATE, DELETE - generează query-ul și cere confirmarea utilizatorului
-5. Pentru SELECT - execută direct query-ul
+REGULI IMPORTANTE:
+1. Dacă trebuie să faci SELECT - execută direct și prezintă rezultatele SCURT
+2. Dacă trebuie INSERT/UPDATE/DELETE - generează query-ul și cere confirmarea
+3. Răspunsurile să fie de maxim 2-3 propoziții
+4. Pentru rezultate, spune: "Am găsit X rezultate:" apoi listează-le simplu
+5. Nu explica ce faci, doar execută și prezintă rezultatul
+6. Folosește format: \`project.dataset.table\`
 
-Te rog să răspunzi și să îmi spui dacă trebuie să:
-1. Interoghez baza de date (SELECT)
-2. Adaug date noi (INSERT)
-3. Actualizez date existente (UPDATE)
-4. Șterg date (DELETE)
-5. Sau doar să răspund la întrebare
-
-Dacă trebuie să interacționez cu baza de date, te rog să îmi dai query-ul SQL exact între \`\`\`sql și \`\`\`.
-
-Răspunde în română și fii foarte precis.`;
+Răspunde în română, scurt și la obiect.`;
 
     // Trimite către OpenAI
     const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/queryOpenAI`, {
@@ -143,15 +115,10 @@ Răspunde în română și fii foarte precis.`;
     
     if (sqlMatch) {
       const sqlQuery = sqlMatch[1].trim();
-      
-      // Verifică tipul de operațiune
       const isSelect = sqlQuery.toUpperCase().startsWith('SELECT');
-      const isInsert = sqlQuery.toUpperCase().startsWith('INSERT');
-      const isUpdate = sqlQuery.toUpperCase().startsWith('UPDATE');
-      const isDelete = sqlQuery.toUpperCase().startsWith('DELETE');
       
       if (isSelect) {
-        // Execută direct SELECT
+        // Execută direct SELECT și formatează rezultatul scurt
         try {
           const queryResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/bigquery`, {
             method: 'POST',
@@ -165,39 +132,82 @@ Răspunde în română și fii foarte precis.`;
           const queryData = await queryResponse.json();
           
           if (queryData.success) {
-            reply += `\n\n**Rezultatul interogării:**\n`;
             if (queryData.data.length === 0) {
-              reply += `Nu s-au găsit rezultate.`;
+              return NextResponse.json({
+                success: true,
+                reply: `Am făcut interogarea - nu s-au găsit rezultate.`
+              });
             } else {
-              reply += `Găsite ${queryData.data.length} rezultate:\n\n`;
+              // Formatare rezultate scurte
+              let shortReply = `Am găsit ${queryData.data.length} rezultate:\n\n`;
+              
               queryData.data.forEach((row: any, index: number) => {
-                reply += `${index + 1}. ${JSON.stringify(row, null, 2)}\n`;
+                shortReply += `**${index + 1}.** `;
+                
+                // Extrage doar câmpurile importante
+                const importantFields = ['ID_Proiect', 'Denumire', 'Client', 'Status', 'Valoare_Estimata', 'nume', 'email', 'Suma', 'Data'];
+                const displayData: string[] = [];
+                
+                importantFields.forEach(field => {
+                  if (row[field] !== undefined && row[field] !== null) {
+                    let value = row[field];
+                    if (typeof value === 'object' && value.value) {
+                      value = value.value;
+                    }
+                    displayData.push(`${field}: ${value}`);
+                  }
+                });
+                
+                if (displayData.length === 0) {
+                  // Dacă nu găsește câmpuri importante, ia primele 3
+                  const allFields = Object.keys(row).slice(0, 3);
+                  allFields.forEach(field => {
+                    let value = row[field];
+                    if (typeof value === 'object' && value.value) {
+                      value = value.value;
+                    }
+                    displayData.push(`${field}: ${value}`);
+                  });
+                }
+                
+                shortReply += displayData.join(', ') + '\n';
+              });
+              
+              return NextResponse.json({
+                success: true,
+                reply: shortReply
               });
             }
           } else {
-            reply += `\n\n**Eroare la executarea interogării:** ${queryData.error}`;
+            return NextResponse.json({
+              success: true,
+              reply: `❌ Eroare la interogare: ${queryData.error}`
+            });
           }
         } catch (queryError) {
-          reply += `\n\n**Eroare la executarea interogării:** ${queryError}`;
+          return NextResponse.json({
+            success: true,
+            reply: `❌ Eroare la interogare: ${queryError}`
+          });
         }
-      } else if (isInsert || isUpdate || isDelete) {
-        // Pentru operațiunile care modifică datele, stochează query-ul și cere confirmarea
+      } else {
+        // Pentru INSERT/UPDATE/DELETE
         pendingQueries.set(sessionKey, {
           query: sqlQuery,
           timestamp: Date.now()
         });
         
-        reply += `\n\n⚠️ **ATENȚIE:** Această operațiune va modifica datele din baza de date!`;
-        reply += `\n\nPentru a executa această operațiune, răspunde cu "CONFIRM" și voi executa query-ul.`;
+        return NextResponse.json({
+          success: true,
+          reply: `⚠️ Această operațiune va modifica baza de date. Răspunde cu "CONFIRM" pentru a continua.`
+        });
       }
     }
 
     return NextResponse.json({
       success: true,
       reply: reply,
-      hasDatabase: true,
-      schema: schemaData.schema,
-      sqlQuery: sqlMatch ? sqlMatch[1].trim() : null
+      hasDatabase: true
     });
 
   } catch (error) {
