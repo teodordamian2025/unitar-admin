@@ -78,23 +78,142 @@ export async function POST(request: NextRequest) {
       throw new Error('Nu s-a putut obține schema bazei de date');
     }
 
-    // Prompt optimizat pentru răspunsuri scurte
-    const aiPrompt = `Ești un asistent AI pentru firma Unitar Proiect. Răspunde SCURT și DIRECT.
+    // Analiză directă a cererii pentru a decide dacă să execute query direct
+    const lower = trimmed.toLowerCase();
+    let directQuery = '';
+    
+    // Detectează cereri simple care necesită query direct
+    if (lower.includes('lista') && lower.includes('proiecte')) {
+      directQuery = `SELECT ID_Proiect, Denumire, Client, Status, Valoare_Estimata FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\``;
+    } else if (lower.includes('câte proiecte') || lower.includes('numar proiecte')) {
+      directQuery = `SELECT COUNT(*) as total_proiecte FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\``;
+    } else if (lower.includes('lista') && lower.includes('client')) {
+      directQuery = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\``;
+    } else if (lower.includes('câți clienți') || lower.includes('numar client')) {
+      directQuery = `SELECT COUNT(*) as total_clienti FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\``;
+    } else if (lower.includes('lista') && lower.includes('contract')) {
+      directQuery = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Contracte\``;
+    } else if (lower.includes('tranzacții') || lower.includes('tranzactii')) {
+      directQuery = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.BancaTranzactii\` LIMIT 10`;
+    }
+
+    // Dacă am identificat un query direct, execută-l
+    if (directQuery) {
+      try {
+        const queryResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/bigquery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'query', 
+            query: directQuery 
+          })
+        });
+
+        const queryData = await queryResponse.json();
+        
+        if (queryData.success) {
+          if (queryData.data.length === 0) {
+            return NextResponse.json({
+              success: true,
+              reply: `Am făcut interogarea - nu s-au găsit rezultate.`
+            });
+          } else {
+            // Formatare rezultate scurte
+            let shortReply = `Am găsit ${queryData.data.length} rezultate:\n\n`;
+            
+            queryData.data.forEach((row: any, index: number) => {
+              shortReply += `**${index + 1}.** `;
+              
+              // Pentru COUNT queries
+              if (row.total_proiecte !== undefined) {
+                shortReply = `Numărul total de proiecte: ${row.total_proiecte}`;
+                return;
+              }
+              if (row.total_clienti !== undefined) {
+                shortReply = `Numărul total de clienți: ${row.total_clienti}`;
+                return;
+              }
+              
+              // Extrage doar câmpurile importante
+              const importantFields = ['ID_Proiect', 'Denumire', 'Client', 'Status', 'Valoare_Estimata', 'nume', 'email', 'Suma', 'Data'];
+              const displayData: string[] = [];
+              
+              importantFields.forEach(field => {
+                if (row[field] !== undefined && row[field] !== null) {
+                  let value = row[field];
+                  if (typeof value === 'object' && value.value) {
+                    value = value.value;
+                  }
+                  displayData.push(`${field}: ${value}`);
+                }
+              });
+              
+              if (displayData.length === 0) {
+                // Dacă nu găsește câmpuri importante, ia primele 3
+                const allFields = Object.keys(row).slice(0, 3);
+                allFields.forEach(field => {
+                  let value = row[field];
+                  if (typeof value === 'object' && value.value) {
+                    value = value.value;
+                  }
+                  if (value !== null && value !== undefined) {
+                    displayData.push(`${field}: ${value}`);
+                  }
+                });
+              }
+              
+              shortReply += displayData.join(', ') + '\n';
+            });
+            
+            return NextResponse.json({
+              success: true,
+              reply: shortReply
+            });
+          }
+        } else {
+          return NextResponse.json({
+            success: true,
+            reply: `❌ Eroare la interogare: ${queryData.error}`
+          });
+        }
+      } catch (queryError) {
+        return NextResponse.json({
+          success: true,
+          reply: `❌ Eroare la interogare: ${queryError}`
+        });
+      }
+    }
+
+    // Dacă nu am query direct, folosesc AI pentru a genera unul
+    const schemaDescription = Object.entries(schemaData.schema).map(([tableName, tableInfo]: [string, any]) => {
+      const columns = Object.entries(tableInfo.columns).map(([colName, colInfo]: [string, any]) => 
+        `${colName} (${colInfo.type})`
+      ).join(', ');
+      
+      return `**${tableName}**: ${columns}`;
+    }).join('\n');
+
+    const aiPrompt = `Ești un asistent AI pentru firma Unitar Proiect. TREBUIE să generezi un query SQL exact pentru BigQuery.
 
 Dataset BigQuery: ${dataset}
-Tabele disponibile: ${Object.keys(schemaData.schema).join(', ')}
+Proiect: ${process.env.GOOGLE_CLOUD_PROJECT_ID}
+
+Schema tabelelor:
+${schemaDescription}
 
 Cererea utilizatorului: ${trimmed}
 
-REGULI IMPORTANTE:
-1. Dacă trebuie să faci SELECT - execută direct și prezintă rezultatele SCURT
-2. Dacă trebuie INSERT/UPDATE/DELETE - generează query-ul și cere confirmarea
-3. Răspunsurile să fie de maxim 2-3 propoziții
-4. Pentru rezultate, spune: "Am găsit X rezultate:" apoi listează-le simplu
-5. Nu explica ce faci, doar execută și prezintă rezultatul
-6. Folosește format: \`project.dataset.table\`
+INSTRUCȚIUNI OBLIGATORII:
+1. Generează ÎNTOTDEAUNA un query SQL valid între \`\`\`sql și \`\`\`
+2. Folosește format complet: \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.NUME_TABELA\`
+3. Pentru SELECT - execut direct
+4. Pentru INSERT/UPDATE/DELETE - cer confirmarea
+5. Nu da răspunsuri false, doar query-uri reale
 
-Răspunde în română, scurt și la obiect.`;
+Răspunde DOAR cu query-ul SQL în format:
+\`\`\`sql
+SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\`
+\`\`\``;
 
     // Trimite către OpenAI
     const aiResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/queryOpenAI`, {
@@ -118,7 +237,7 @@ Răspunde în română, scurt și la obiect.`;
       const isSelect = sqlQuery.toUpperCase().startsWith('SELECT');
       
       if (isSelect) {
-        // Execută direct SELECT și formatează rezultatul scurt
+        // Execută direct SELECT
         try {
           const queryResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/bigquery`, {
             method: 'POST',
@@ -138,13 +257,12 @@ Răspunde în română, scurt și la obiect.`;
                 reply: `Am făcut interogarea - nu s-au găsit rezultate.`
               });
             } else {
-              // Formatare rezultate scurte
+              // Formatare rezultate scurte (același cod ca mai sus)
               let shortReply = `Am găsit ${queryData.data.length} rezultate:\n\n`;
               
               queryData.data.forEach((row: any, index: number) => {
                 shortReply += `**${index + 1}.** `;
                 
-                // Extrage doar câmpurile importante
                 const importantFields = ['ID_Proiect', 'Denumire', 'Client', 'Status', 'Valoare_Estimata', 'nume', 'email', 'Suma', 'Data'];
                 const displayData: string[] = [];
                 
@@ -159,14 +277,15 @@ Răspunde în română, scurt și la obiect.`;
                 });
                 
                 if (displayData.length === 0) {
-                  // Dacă nu găsește câmpuri importante, ia primele 3
                   const allFields = Object.keys(row).slice(0, 3);
                   allFields.forEach(field => {
                     let value = row[field];
                     if (typeof value === 'object' && value.value) {
                       value = value.value;
                     }
-                    displayData.push(`${field}: ${value}`);
+                    if (value !== null && value !== undefined) {
+                      displayData.push(`${field}: ${value}`);
+                    }
                   });
                 }
                 
@@ -202,13 +321,13 @@ Răspunde în română, scurt și la obiect.`;
           reply: `⚠️ Această operațiune va modifica baza de date. Răspunde cu "CONFIRM" pentru a continua.`
         });
       }
+    } else {
+      // Dacă AI nu a generat un query valid
+      return NextResponse.json({
+        success: true,
+        reply: `Nu am putut genera un query pentru cererea ta. Te rog să fii mai specific (ex: "lista cu toate proiectele", "câte contracte am").`
+      });
     }
-
-    return NextResponse.json({
-      success: true,
-      reply: reply,
-      hasDatabase: true
-    });
 
   } catch (error) {
     console.error('Eroare AI-Database:', error);
