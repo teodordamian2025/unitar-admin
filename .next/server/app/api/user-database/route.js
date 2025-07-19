@@ -58,25 +58,23 @@ async function POST(request) {
         }
         // Verifică permisiunile
         const lower = prompt.toLowerCase();
-        const isFinancialQuery = lower.includes("factură") || lower.includes("suma") || lower.includes("buget") || lower.includes("cost") || lower.includes("plată") || lower.includes("bancă");
+        const isFinancialQuery = lower.includes("factură") || lower.includes("suma") || lower.includes("buget") || lower.includes("cost") || lower.includes("plată") || lower.includes("bancă") || lower.includes("tranzacție") || lower.includes("valoare");
         if (isFinancialQuery && userRole === "normal") {
             return next_response/* default */.Z.json({
                 success: true,
-                reply: "\uD83D\uDEAB Nu ai permisiunea să accesezi informații financiare. Contactează un administrator pentru detalii."
+                reply: "\uD83D\uDEAB Nu ai acces la informații financiare. Contactează un administrator."
             });
         }
-        // Pentru utilizatori normali, limitează la proiecte și timp
-        const restrictedPrompt = `${prompt}
+        // Pentru utilizatori normali, prompt restricționat și scurt
+        const restrictedPrompt = `Ești asistent AI pentru utilizator cu rol "${userRole}". Răspunde FOARTE SCURT.
 
-RESTRICȚII IMPORTANTE:
-- Acest utilizator are rol "${userRole}"
-- NU poate accesa informații financiare (sume, bugete, facturi, tranzacții)
-- Poate accesa doar: proiecte, timp lucrat, rapoarte de proiecte
-- Poate modifica doar: proiecte și timp lucrat
-- NU poate accesa tabelele: BancaTranzactii, FacturiEmise, FacturiPrimite
-- Poate accesa: Proiecte, Subproiecte, SesiuniLucru
+Cererea: ${prompt}
 
-Te rog să respecti aceste restricții.`;
+RESTRICȚII: doar proiecte, timp lucrat, rapoarte non-financiare.
+NU accesa: BancaTranzactii, FacturiEmise, FacturiPrimite.
+POATE accesa: Proiecte, Subproiecte, SesiuniLucru.
+
+Răspunde în maximum 2-3 propoziții, direct la obiect.`;
         // Folosește endpoint-ul ai-database cu restricții
         const res = await fetch(`${"https://admin.unitarproiect.eu" || 0}/api/ai-database`, {
             method: "POST",
