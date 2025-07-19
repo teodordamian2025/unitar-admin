@@ -10,6 +10,7 @@ export default function UserDashboard() {
   const [user, loading] = useAuthState(auth);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userPermissions, setUserPermissions] = useState<any>(null);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -39,18 +40,17 @@ export default function UserDashboard() {
       if (data.success) {
         setUserRole(data.role);
         setUserPermissions(data.permissions);
+        setIsCheckingRole(false);
         
-        // Dacă este admin, redirecționează către admin
-        if (data.role === 'admin') {
-          router.push('/admin');
-        }
+        // NU redirectionează automat - lasă utilizatorul să decidă
       }
     } catch (error) {
       console.error('Eroare la verificarea rolului:', error);
+      setIsCheckingRole(false);
     }
   };
 
-  if (loading) {
+  if (loading || isCheckingRole) {
     return (
       <div style={{ 
         display: 'flex', 
@@ -79,13 +79,13 @@ export default function UserDashboard() {
   return (
     <div style={{ padding: '20px' }}>
       <header style={{ 
-        background: '#4caf50', 
+        background: userRole === 'admin' ? '#f39c12' : '#4caf50', 
         color: 'white', 
         padding: '20px', 
         borderRadius: '8px',
         marginBottom: '20px'
       }}>
-        <h1>Unitar Proiect - Dashboard Utilizator</h1>
+        <h1>Unitar Proiect - Dashboard {userRole === 'admin' ? 'Administrator' : 'Utilizator'}</h1>
         <p>Bun venit, {user.displayName || user.email}!</p>
         <p>Rol: {userRole || 'Se încarcă...'}</p>
         <div style={{ marginTop: '10px' }}>
@@ -98,13 +98,51 @@ export default function UserDashboard() {
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '14px'
+              fontSize: '14px',
+              marginRight: '10px'
             }}
           >
             Logout
           </button>
+          
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => router.push('/admin')}
+              style={{
+                background: '#f39c12',
+                color: 'white',
+                padding: '8px 16px',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Mergi la Admin Dashboard
+            </button>
+          )}
         </div>
       </header>
+
+      {userRole === 'normal' && (
+        <div style={{ 
+          background: '#fff3cd',
+          color: '#856404',
+          padding: '1rem',
+          borderRadius: '8px',
+          border: '1px solid #ffeaa7',
+          marginBottom: '20px'
+        }}>
+          <h3>🔒 Acces Utilizator Normal</h3>
+          <p>Ai acces la:</p>
+          <ul>
+            <li>Proiectele tale</li>
+            <li>Înregistrarea timpului lucrat</li>
+            <li>Rapoarte de proiecte</li>
+            <li>❌ Fără acces la informații financiare</li>
+          </ul>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         
@@ -201,31 +239,6 @@ export default function UserDashboard() {
         </div>
 
       </div>
-
-      {userRole === 'admin' && (
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '15px', 
-          background: '#fff3cd', 
-          borderRadius: '8px',
-          border: '1px solid #ffeaa7'
-        }}>
-          <p>Ai acces de administrator:</p>
-          <button 
-            onClick={() => router.push('/admin')}
-            style={{
-              background: '#f39c12',
-              color: 'white',
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            Mergi la Admin Dashboard
-          </button>
-        </div>
-      )}
 
       <UserChatbot userRole={userRole} userPermissions={userPermissions} />
     </div>

@@ -617,6 +617,7 @@ function UserDashboard() {
     const [user, loading] = (0,index_cjs/* useAuthState */.F_)(firebaseConfig/* auth */.I);
     const [userRole, setUserRole] = (0,react_experimental_.useState)(null);
     const [userPermissions, setUserPermissions] = (0,react_experimental_.useState)(null);
+    const [isCheckingRole, setIsCheckingRole] = (0,react_experimental_.useState)(true);
     const router = (0,navigation.useRouter)();
     (0,react_experimental_.useEffect)(()=>{
         if (loading) return;
@@ -648,16 +649,15 @@ function UserDashboard() {
             if (data.success) {
                 setUserRole(data.role);
                 setUserPermissions(data.permissions);
-                // Dacă este admin, redirecționează către admin
-                if (data.role === "admin") {
-                    router.push("/admin");
-                }
+                setIsCheckingRole(false);
+            // NU redirectionează automat - lasă utilizatorul să decidă
             }
         } catch (error) {
             console.error("Eroare la verificarea rolului:", error);
+            setIsCheckingRole(false);
         }
     };
-    if (loading) {
+    if (loading || isCheckingRole) {
         return /*#__PURE__*/ jsx_runtime_.jsx("div", {
             style: {
                 display: "flex",
@@ -690,15 +690,18 @@ function UserDashboard() {
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("header", {
                 style: {
-                    background: "#4caf50",
+                    background: userRole === "admin" ? "#f39c12" : "#4caf50",
                     color: "white",
                     padding: "20px",
                     borderRadius: "8px",
                     marginBottom: "20px"
                 },
                 children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("h1", {
-                        children: "Unitar Proiect - Dashboard Utilizator"
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h1", {
+                        children: [
+                            "Unitar Proiect - Dashboard ",
+                            userRole === "admin" ? "Administrator" : "Utilizator"
+                        ]
                     }),
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                         children: [
@@ -713,23 +716,73 @@ function UserDashboard() {
                             userRole || "Se \xeencarcă..."
                         ]
                     }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
                             marginTop: "10px"
                         },
-                        children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                            onClick: ()=>firebaseConfig/* auth */.I.signOut(),
-                            style: {
-                                background: "#f44336",
-                                color: "white",
-                                padding: "8px 16px",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer",
-                                fontSize: "14px"
-                            },
-                            children: "Logout"
-                        })
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                onClick: ()=>firebaseConfig/* auth */.I.signOut(),
+                                style: {
+                                    background: "#f44336",
+                                    color: "white",
+                                    padding: "8px 16px",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    marginRight: "10px"
+                                },
+                                children: "Logout"
+                            }),
+                            userRole === "admin" && /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                onClick: ()=>router.push("/admin"),
+                                style: {
+                                    background: "#f39c12",
+                                    color: "white",
+                                    padding: "8px 16px",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    cursor: "pointer",
+                                    fontSize: "14px"
+                                },
+                                children: "Mergi la Admin Dashboard"
+                            })
+                        ]
+                    })
+                ]
+            }),
+            userRole === "normal" && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    background: "#fff3cd",
+                    color: "#856404",
+                    padding: "1rem",
+                    borderRadius: "8px",
+                    border: "1px solid #ffeaa7",
+                    marginBottom: "20px"
+                },
+                children: [
+                    /*#__PURE__*/ jsx_runtime_.jsx("h3", {
+                        children: "\uD83D\uDD12 Acces Utilizator Normal"
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                        children: "Ai acces la:"
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("ul", {
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("li", {
+                                children: "Proiectele tale"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("li", {
+                                children: "\xcenregistrarea timpului lucrat"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("li", {
+                                children: "Rapoarte de proiecte"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("li", {
+                                children: "❌ Fără acces la informații financiare"
+                            })
+                        ]
                     })
                 ]
             }),
@@ -854,32 +907,6 @@ function UserDashboard() {
                     })
                 ]
             }),
-            userRole === "admin" && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
-                    marginTop: "20px",
-                    padding: "15px",
-                    background: "#fff3cd",
-                    borderRadius: "8px",
-                    border: "1px solid #ffeaa7"
-                },
-                children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        children: "Ai acces de administrator:"
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                        onClick: ()=>router.push("/admin"),
-                        style: {
-                            background: "#f39c12",
-                            color: "white",
-                            padding: "10px 20px",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: "pointer"
-                        },
-                        children: "Mergi la Admin Dashboard"
-                    })
-                ]
-            }),
             /*#__PURE__*/ jsx_runtime_.jsx(UserChatbot, {
                 userRole: userRole,
                 userPermissions: userPermissions
@@ -939,7 +966,7 @@ function HomePage() {
 var __webpack_require__ = require("../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,5601,8276,8313,9850], () => (__webpack_exec__(49529)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2319,5601,2170,8313,9850], () => (__webpack_exec__(49529)));
 module.exports = __webpack_exports__;
 
 })();

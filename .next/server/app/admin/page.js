@@ -452,11 +452,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_3__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(17640);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var react_toastify__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(7365);
-/* harmony import */ var react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(45996);
-/* harmony import */ var react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(47335);
-/* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(next_dynamic__WEBPACK_IMPORTED_MODULE_7__);
+/* harmony import */ var react_firebase_hooks_auth__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(48045);
+/* harmony import */ var react_toastify__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(7365);
+/* harmony import */ var react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(45996);
+/* harmony import */ var react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_7__);
+/* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(47335);
+/* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(next_dynamic__WEBPACK_IMPORTED_MODULE_8__);
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
@@ -465,7 +466,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const Chatbot = next_dynamic__WEBPACK_IMPORTED_MODULE_7___default()(null, {
+
+const Chatbot = next_dynamic__WEBPACK_IMPORTED_MODULE_8___default()(null, {
     loadableGenerated: {
         modules: [
             "../app/admin/page.tsx -> " + "@/components/Chatbot"
@@ -474,56 +476,218 @@ const Chatbot = next_dynamic__WEBPACK_IMPORTED_MODULE_7___default()(null, {
     ssr: false
 });
 function AdminPage() {
+    const [user, loading] = (0,react_firebase_hooks_auth__WEBPACK_IMPORTED_MODULE_5__/* .useAuthState */ .F_)(_lib_firebaseConfig__WEBPACK_IMPORTED_MODULE_2__/* .auth */ .I);
     const router = (0,next_navigation__WEBPACK_IMPORTED_MODULE_3__.useRouter)();
     const [displayName, setDisplayName] = (0,react__WEBPACK_IMPORTED_MODULE_4__.useState)("Utilizator");
+    const [userRole, setUserRole] = (0,react__WEBPACK_IMPORTED_MODULE_4__.useState)(null);
+    const [isAuthorized, setIsAuthorized] = (0,react__WEBPACK_IMPORTED_MODULE_4__.useState)(false);
     (0,react__WEBPACK_IMPORTED_MODULE_4__.useEffect)(()=>{
         const storedName = localStorage.getItem("displayName");
         if (storedName) setDisplayName(storedName);
     }, []);
+    (0,react__WEBPACK_IMPORTED_MODULE_4__.useEffect)(()=>{
+        if (loading) return;
+        if (!user) {
+            router.push("/login");
+            return;
+        }
+        // Verifică rolul utilizatorului
+        checkUserRole();
+    }, [
+        user,
+        loading,
+        router
+    ]);
+    const checkUserRole = async ()=>{
+        if (!user) return;
+        try {
+            const response = await fetch("/api/user-role", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    uid: user.uid,
+                    email: user.email
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setUserRole(data.role);
+                // Dacă nu este admin, redirecționează către pagina principală
+                if (data.role !== "admin") {
+                    react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.error("Nu ai permisiunea să accesezi zona de administrare!");
+                    setTimeout(()=>router.push("/"), 2000);
+                    return;
+                }
+                setIsAuthorized(true);
+            } else {
+                react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.error("Eroare la verificarea permisiunilor!");
+                setTimeout(()=>router.push("/"), 2000);
+            }
+        } catch (error) {
+            console.error("Eroare la verificarea rolului:", error);
+            react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.error("Eroare de conectare!");
+            setTimeout(()=>router.push("/"), 2000);
+        }
+    };
     const handleLogout = async ()=>{
         const confirmLogout = confirm("Sigur vrei să te deloghezi?");
         if (!confirmLogout) return;
         await (0,firebase_auth__WEBPACK_IMPORTED_MODULE_1__/* .signOut */ .w7)(_lib_firebaseConfig__WEBPACK_IMPORTED_MODULE_2__/* .auth */ .I);
-        react_toastify__WEBPACK_IMPORTED_MODULE_5__/* .toast */ .Am.success("Te-ai delogat cu succes!");
+        react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.success("Te-ai delogat cu succes!");
         setTimeout(()=>router.replace("/login"), 1000);
     };
+    // Loading state
+    if (loading) {
+        return /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+            style: {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100vh"
+            },
+            children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                children: "Se \xeencarcă..."
+            })
+        });
+    }
+    // Not authenticated
+    if (!user) {
+        return /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+            style: {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100vh"
+            },
+            children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                children: "Redirecting to login..."
+            })
+        });
+    }
+    // Not authorized (not admin)
+    if (!isAuthorized) {
+        return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+            style: {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100vh",
+                flexDirection: "column"
+            },
+            children: [
+                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .ToastContainer */ .Ix, {}),
+                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                    children: "Verificare permisiuni..."
+                }),
+                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                    style: {
+                        marginTop: "20px",
+                        fontSize: "14px",
+                        color: "#666"
+                    },
+                    children: "Dacă nu ai permisiuni de admin, vei fi redirecționat \xeen cur\xe2nd."
+                })
+            ]
+        });
+    }
     return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
         style: {
             padding: "2rem",
             fontFamily: "Arial, sans-serif"
         },
         children: [
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(react_toastify__WEBPACK_IMPORTED_MODULE_5__/* .ToastContainer */ .Ix, {}),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h1", {
-                children: "Bun venit la UNITAR PROIECT TDA -Admin"
-            }),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                children: "Aceasta este pagina de start!."
-            }),
-            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .ToastContainer */ .Ix, {}),
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
-                    marginTop: "0.5rem"
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "2rem",
+                    padding: "1rem",
+                    background: "#f8f9fa",
+                    borderRadius: "8px",
+                    border: "1px solid #dee2e6"
                 },
                 children: [
-                    "Te-ai autentificat ca ",
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
-                        children: displayName
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h1", {
+                                children: "Bun venit la UNITAR PROIECT TDA - Admin"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                children: "Aceasta este pagina de administrare cu acces complet!"
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+                                style: {
+                                    marginTop: "0.5rem"
+                                },
+                                children: [
+                                    "Te-ai autentificat ca ",
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: displayName
+                                    }),
+                                    " cu rol ",
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: userRole
+                                    }),
+                                    "."
+                                ]
+                            })
+                        ]
                     }),
-                    "."
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                        onClick: handleLogout,
+                        style: {
+                            padding: "0.5rem 1rem",
+                            backgroundColor: "#c0392b",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontSize: "16px"
+                        },
+                        children: "Logout"
+                    })
                 ]
             }),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
-                onClick: handleLogout,
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
-                    marginTop: "1.5rem",
-                    padding: "0.5rem 1rem",
-                    backgroundColor: "#c0392b",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer"
+                    background: "#d4edda",
+                    color: "#155724",
+                    padding: "1rem",
+                    borderRadius: "8px",
+                    border: "1px solid #c3e6cb",
+                    marginBottom: "2rem"
                 },
-                children: "Logout"
+                children: [
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                        children: "\uD83D\uDD13 Acces Administrator"
+                    }),
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                        children: "Ai acces complet la:"
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                children: "Toate informațiile din baza de date"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                children: "Funcții financiare (facturi, tranzacții, bugete)"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                children: "Gestionarea proiectelor și contractelor"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                children: "Rapoarte complete"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                children: "Administrarea utilizatorilor"
+                            })
+                        ]
+                    })
+                ]
             }),
             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(Chatbot, {})
         ]
@@ -592,7 +756,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,7335,7194,8313,9850], () => (__webpack_exec__(54481)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2319,7335,2245,8313,9850], () => (__webpack_exec__(54481)));
 module.exports = __webpack_exports__;
 
 })();
