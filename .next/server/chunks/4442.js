@@ -94,24 +94,24 @@ function ClientNouModal({ isOpen, onClose, onClientAdded }) {
             }
             console.log("Trimitere date client:", formData); // Debug
             react_toastify__WEBPACK_IMPORTED_MODULE_2__/* .toast */ .Am.info("Se adaugă clientul...");
-            // Încearcă doar BigQuery dacă factureaza.me nu e configurat
-            const apiEndpoint = process.env.FACTUREAZA_API_KEY ? "/api/actions/clients/sync-factureaza" : "/api/rapoarte/clienti";
-            const response = await fetch(apiEndpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(formData)
-            });
+            // Încearcă factureaza.me dacă e configurat, altfel doar BigQuery
+            let response;
+            let result;
+            if (false) {} else {
+                // Doar BigQuery
+                response = await fetch("/api/rapoarte/clienti", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(formData)
+                });
+                result = await response.json();
+            }
             console.log("Response status:", response.status); // Debug
-            const result = await response.json();
             console.log("Response data:", result); // Debug
             if (result.success || response.ok) {
-                if (apiEndpoint.includes("sync-factureaza")) {
-                    react_toastify__WEBPACK_IMPORTED_MODULE_2__/* .toast */ .Am.success("Client adăugat cu succes \xeen BigQuery și factureaza.me!");
-                } else {
-                    react_toastify__WEBPACK_IMPORTED_MODULE_2__/* .toast */ .Am.success("Client adăugat cu succes \xeen BigQuery!");
-                }
+                react_toastify__WEBPACK_IMPORTED_MODULE_2__/* .toast */ .Am.success("Client adăugat cu succes!");
                 onClientAdded();
                 onClose();
                 // Reset form

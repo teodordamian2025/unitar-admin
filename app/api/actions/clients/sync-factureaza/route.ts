@@ -125,7 +125,8 @@ async function fetchClientsFromFactureaza() {
   try {
     console.log('Încercare conectare factureaza.me...'); // Debug
     
-    const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/clienti`, {
+    // Endpoint corect conform documentației: /client/list
+    const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/client/list`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.FACTUREAZA_API_KEY}`,
@@ -146,7 +147,7 @@ async function fetchClientsFromFactureaza() {
     }
 
     // Verifică diferite formate de răspuns
-    const clientsData = data.clienti || data.data || data.clients || data;
+    const clientsData = data.clients || data.clienti || data.data || data;
     
     if (!Array.isArray(clientsData)) {
       console.log('Răspuns neașteptat factureaza.me:', data); // Debug
@@ -196,7 +197,8 @@ async function addClientToFactureaza(clientData: any) {
       ci_eliberata_la: clientData.ci_eliberata_la || ''
     };
 
-    const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/clienti`, {
+    // Endpoint corect conform documentației
+    const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/client/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

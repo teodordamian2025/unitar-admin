@@ -833,7 +833,9 @@ function ActionDropdown({ proiect, onRefresh }) {
                     proiectId: proiect.ID_Proiect
                 })
             });
+            console.log("Invoice response status:", response.status); // Debug
             const result = await response.json();
+            console.log("Invoice response data:", result); // Debug
             if (result.success) {
                 dist/* toast */.Am.success("Factură creată cu succes \xeen factureaza.me!");
                 // Deschide factura în tab nou dacă există URL
@@ -850,9 +852,11 @@ function ActionDropdown({ proiect, onRefresh }) {
                 // Actualează lista pentru a reflecta modificările
                 onRefresh?.();
             } else {
-                dist/* toast */.Am.error(result.error || "Eroare la crearea facturii");
+                console.error("Eroare factură:", result); // Debug
+                dist/* toast */.Am.error(`Eroare factură: ${result.error || "Eroare necunoscută"}`);
             }
         } catch (error) {
+            console.error("Eroare la crearea facturii:", error); // Debug
             dist/* toast */.Am.error("Eroare la crearea facturii");
         }
     };
