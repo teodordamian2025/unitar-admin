@@ -70,36 +70,37 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
       const subproiecteData = await subproiecteResponse.json();
 
-      if (proiecteData.success && subproiecteData.success) {
+      if (proiecteData.success) {
         // Combină proiectele și subproiectele
         const proiecteFormatate = (proiecteData.data || []).map((p: any) => ({
           ...p,
           tip: 'proiect' as const
         }));
 
-        const subproiecteFormatate = (subproiecteData.data || []).map((s: any) => ({
-          ID_Proiect: s.ID_Subproiect,
-          Denumire: s.Denumire,
-          Client: s.Client || 'Subproiect', // Subproiectele moștenesc clientul
-          Status: s.Status,
-          Data_Start: s.Data_Start,
-          Data_Final: s.Data_Final,
-          Valoare_Estimata: s.Valoare_Estimata,
-          tip: 'subproiect' as const,
-          ID_Proiect_Parinte: s.ID_Proiect
-        }));
+        let subproiecteFormatate: Proiect[] = [];
+        if (subproiecteData.success) {
+          subproiecteFormatate = (subproiecteData.data || []).map((s: any) => ({
+            ID_Proiect: s.ID_Subproiect,
+            Denumire: s.Denumire,
+            Client: s.Client || 'Subproiect',
+            Status: s.Status,
+            Data_Start: s.Data_Start,
+            Data_Final: s.Data_Final,
+            Valoare_Estimata: s.Valoare_Estimata,
+            tip: 'subproiect' as const,
+            ID_Proiect_Parinte: s.ID_Proiect
+          }));
+        }
 
-        // Combină și sortează
-        const toateProiectele = [...proiecteFormatate, ...subproiecteFormatate];
-        toateProiectele.sort((a, b) => {
-          // Grupează subproiectele sub proiectul părinte
-          if (a.tip === 'proiect' && b.tip === 'subproiect' && b.ID_Proiect_Parinte === a.ID_Proiect) {
-            return -1;
-          }
-          if (b.tip === 'proiect' && a.tip === 'subproiect' && a.ID_Proiect_Parinte === b.ID_Proiect) {
-            return 1;
-          }
-          return a.ID_Proiect.localeCompare(b.ID_Proiect);
+        // Combină și sortează pentru a grupa subproiectele sub proiectele părinte
+        const toateProiectele: Proiect[] = [];
+        proiecteFormatate.forEach(proiect => {
+          toateProiectele.push(proiect);
+          // Adaugă subproiectele pentru acest proiect
+          const subproiecteProiect = subproiecteFormatate.filter(
+            sub => sub.ID_Proiect_Parinte === proiect.ID_Proiect
+          );
+          toateProiectele.push(...subproiecteProiect);
         });
 
         setProiecte(toateProiectele);
@@ -267,17 +268,42 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }}>
         <div>
           <h3 style={{ margin: 0, color: '#2c3e50' }}>
-            📋 Proiecte găsite: {proiecte.length}
+            📋 Proiecte găsite: {proiecte.filter(p => p.tip === 'proiect').length} 
+            {proiecte.filter(p => p.tip === 'subproiect').length > 0 && 
+              ` (+ ${proiecte.filter(p => p.tip === 'subproiect').length} subproiecte)`
+            }
           </h3>
           <p style={{ margin: '0.25rem 0 0 0', fontSize: '14px', color: '#7f8c8d' }}>
             {searchParams && Object.keys(searchParams).length > 0 
               ? 'Rezultate filtrate' 
-              : 'Toate proiectele'
+              : 'Toate proiectele și subproiectele'
             }
           </p>
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => {
+              const nume = prompt('Nume proiect:');
+              const client = prompt('Client:');
+              if (nume && client) {
+                handleAddProject(nume, client);
+              }
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#27ae60',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            + Proiect Nou
+          </button>
+          
           <button
             onClick={handleRefresh}
             style={{
@@ -298,7 +324,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             onClick={handleExportExcel}
             style={{
               padding: '0.5rem 1rem',
-              background: '#27ae60',
+              background: '#f39c12',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -333,169 +359,173 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           background: 'white',
           borderRadius: '8px',
           border: '1px solid #dee2e6',
-          overflow: 'hidden',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          overflow: 'visible', // Schimbat din 'hidden' în 'visible'
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          position: 'relative' // Adăugat pentru context stacking
         }}>
-          <table style={{ 
-            width: '100%', 
-            borderCollapse: 'collapse',
-            fontSize: '14px'
-          }}>
-            <thead>
-              <tr style={{ 
-                background: '#f8f9fa',
-                borderBottom: '2px solid #dee2e6'
-              }}>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
+          <div style={{ overflow: 'auto' }}> {/* Wrapper pentru scroll doar pe tabel */}
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              fontSize: '14px'
+            }}>
+              <thead>
+                <tr style={{ 
+                  background: '#f8f9fa',
+                  borderBottom: '2px solid #dee2e6'
                 }}>
-                  ID Proiect
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Denumire
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Client
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Status
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Data Început
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'right',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Valoare Estimată
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Acțiuni
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {proiecte.map((proiect, index) => (
-                <tr 
-                  key={proiect.ID_Proiect}
-                  style={{ 
-                    borderBottom: '1px solid #f1f2f6',
-                    background: index % 2 === 0 ? 'white' : '#fafbfc'
-                  }}
-                >
-                  <td style={{ 
-                    padding: '0.75rem',
-                    fontFamily: 'monospace',
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
                     fontWeight: 'bold',
-                    color: '#2c3e50',
-                    paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem' // Indentare pentru subproiecte
-                  }}>
-                    {proiect.tip === 'subproiect' && '└─ '}
-                    {proiect.ID_Proiect}
-                    {proiect.tip === 'subproiect' && (
-                      <span style={{ fontSize: '10px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
-                        (Sub-proiect)
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    color: '#2c3e50',
-                    maxWidth: '250px',
-                    paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
-                  }}>
-                    <div style={{ 
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontStyle: proiect.tip === 'subproiect' ? 'italic' : 'normal'
-                    }} title={proiect.Denumire}>
-                      {proiect.Denumire}
-                    </div>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
                     color: '#2c3e50'
                   }}>
-                    {proiect.Client}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    textAlign: 'center'
+                    ID Proiect
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
                   }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                      background: getStatusColor(proiect.Status)
-                    }}>
-                      {getStatusIcon(proiect.Status)} {proiect.Status}
-                    </span>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
+                    Denumire
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Client
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
                     textAlign: 'center',
-                    color: '#7f8c8d',
-                    fontFamily: 'monospace'
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
                   }}>
-                    {formatDate(proiect.Data_Start)}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
+                    Status
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Data Început
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
                     textAlign: 'right',
                     fontWeight: 'bold',
-                    color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7'
+                    color: '#2c3e50'
                   }}>
-                    {formatCurrency(proiect.Valoare_Estimata)}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    textAlign: 'center'
+                    Valoare Estimată
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
                   }}>
-                    <ActionDropdown 
-                      proiect={proiect} 
-                      onRefresh={handleRefresh}
-                    />
-                  </td>
+                    Acțiuni
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {proiecte.map((proiect, index) => (
+                  <tr 
+                    key={`${proiect.tip}-${proiect.ID_Proiect}`}
+                    style={{ 
+                      borderBottom: '1px solid #f1f2f6',
+                      background: index % 2 === 0 ? 'white' : '#fafbfc'
+                    }}
+                  >
+                    <td style={{ 
+                      padding: '0.75rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      color: '#2c3e50',
+                      paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
+                    }}>
+                      {proiect.tip === 'subproiect' && '└─ '}
+                      {proiect.ID_Proiect}
+                      {proiect.tip === 'subproiect' && (
+                        <span style={{ fontSize: '10px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                          (Sub)
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      color: '#2c3e50',
+                      maxWidth: '250px',
+                      paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
+                    }}>
+                      <div style={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontStyle: proiect.tip === 'subproiect' ? 'italic' : 'normal'
+                      }} title={proiect.Denumire}>
+                        {proiect.Denumire}
+                      </div>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      color: '#2c3e50'
+                    }}>
+                      {proiect.Client}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center'
+                    }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        background: getStatusColor(proiect.Status)
+                      }}>
+                        {getStatusIcon(proiect.Status)} {proiect.Status}
+                      </span>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      color: '#7f8c8d',
+                      fontFamily: 'monospace'
+                    }}>
+                      {formatDate(proiect.Data_Start)}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'right',
+                      fontWeight: 'bold',
+                      color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7'
+                    }}>
+                      {formatCurrency(proiect.Valoare_Estimata)}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      position: 'relative' // Important pentru dropdown positioning
+                    }}>
+                      <ActionDropdown 
+                        proiect={proiect} 
+                        onRefresh={handleRefresh}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
