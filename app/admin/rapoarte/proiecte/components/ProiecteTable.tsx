@@ -12,6 +12,8 @@ interface Proiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
+  tip?: 'proiect' | 'subproiect'; // Pentru diferențiere vizuală
+  ID_Proiect_Parinte?: string; // Pentru subproiecte
 }
 
 interface ProiecteTableProps {
@@ -60,11 +62,47 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         });
       }
 
-      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
-      const data = await response.json();
+      // Încarcă proiectele principale
+      const proiecteResponse = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+      const proiecteData = await proiecteResponse.json();
 
-      if (data.success) {
-        setProiecte(data.data || []);
+      // Încarcă subproiectele
+      const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+      const subproiecteData = await subproiecteResponse.json();
+
+      if (proiecteData.success && subproiecteData.success) {
+        // Combină proiectele și subproiectele
+        const proiecteFormatate = (proiecteData.data || []).map((p: any) => ({
+          ...p,
+          tip: 'proiect' as const
+        }));
+
+        const subproiecteFormatate = (subproiecteData.data || []).map((s: any) => ({
+          ID_Proiect: s.ID_Subproiect,
+          Denumire: s.Denumire,
+          Client: s.Client || 'Subproiect', // Subproiectele moștenesc clientul
+          Status: s.Status,
+          Data_Start: s.Data_Start,
+          Data_Final: s.Data_Final,
+          Valoare_Estimata: s.Valoare_Estimata,
+          tip: 'subproiect' as const,
+          ID_Proiect_Parinte: s.ID_Proiect
+        }));
+
+        // Combină și sortează
+        const toateProiectele = [...proiecteFormatate, ...subproiecteFormatate];
+        toateProiectele.sort((a, b) => {
+          // Grupează subproiectele sub proiectul părinte
+          if (a.tip === 'proiect' && b.tip === 'subproiect' && b.ID_Proiect_Parinte === a.ID_Proiect) {
+            return -1;
+          }
+          if (b.tip === 'proiect' && a.tip === 'subproiect' && a.ID_Proiect_Parinte === b.ID_Proiect) {
+            return 1;
+          }
+          return a.ID_Proiect.localeCompare(b.ID_Proiect);
+        });
+
+        setProiecte(toateProiectele);
       } else {
         toast.error('Eroare la încărcarea proiectelor');
         setProiecte([]);
@@ -75,6 +113,35 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       setProiecte([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddProject = async (nume: string, client: string) => {
+    try {
+      toast.info('Se adaugă proiectul...');
+      
+      const response = await fetch('/api/rapoarte/proiecte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
+          Denumire: nume,
+          Client: client,
+          Status: 'Activ',
+          Data_Start: new Date().toISOString().split('T')[0]
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Proiect adăugat cu succes!');
+        handleRefresh();
+      } else {
+        toast.error(result.error || 'Eroare la adăugarea proiectului');
+      }
+    } catch (error) {
+      toast.error('Eroare la adăugarea proiectului');
     }
   };
 
@@ -350,19 +417,28 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                     padding: '0.75rem',
                     fontFamily: 'monospace',
                     fontWeight: 'bold',
-                    color: '#2c3e50'
+                    color: '#2c3e50',
+                    paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem' // Indentare pentru subproiecte
                   }}>
+                    {proiect.tip === 'subproiect' && '└─ '}
                     {proiect.ID_Proiect}
+                    {proiect.tip === 'subproiect' && (
+                      <span style={{ fontSize: '10px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                        (Sub-proiect)
+                      </span>
+                    )}
                   </td>
                   <td style={{ 
                     padding: '0.75rem',
                     color: '#2c3e50',
-                    maxWidth: '250px'
+                    maxWidth: '250px',
+                    paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
                   }}>
                     <div style={{ 
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      fontStyle: proiect.tip === 'subproiect' ? 'italic' : 'normal'
                     }} title={proiect.Denumire}>
                       {proiect.Denumire}
                     </div>
