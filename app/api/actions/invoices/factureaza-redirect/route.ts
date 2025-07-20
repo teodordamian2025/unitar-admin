@@ -47,18 +47,24 @@ export async function POST(request: NextRequest) {
 
     const proiect = projectRows[0];
 
-    // 2. Obține informații despre client
+    // 2. Obține informații despre client din noua structură
     let clientInfo = null;
     try {
       const clientQuery = `
         SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
-        WHERE nume = @clientNume
+        WHERE nume = @clientNume OR id IN (
+          SELECT client_id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteClienti\`
+          WHERE proiect_id = @proiectId
+        )
         LIMIT 1
       `;
 
       const [clientRows] = await bigquery.query({
         query: clientQuery,
-        params: { clientNume: proiect.Client },
+        params: { 
+          clientNume: proiect.Client,
+          proiectId: proiectId 
+        },
         location: 'EU',
       });
 
@@ -123,7 +129,7 @@ function prepareFactureazaApiData(proiect: any, clientInfo: any | null) {
     scadenta: formatDateForApi(dueDateDefault),
     moneda: 'RON',
     
-    // Informații client
+    // Informații client (compatibil factureaza.me API)
     client: {
       tip: clientInfo?.tip_client || 'persoana_juridica',
       nume: proiect.Client,
@@ -133,11 +139,17 @@ function prepareFactureazaApiData(proiect: any, clientInfo: any | null) {
       judet: clientInfo?.judet || '',
       oras: clientInfo?.oras || '',
       cod_postal: clientInfo?.cod_postal || '',
-      tara: 'România',
+      tara: clientInfo?.tara || 'România',
       telefon: clientInfo?.telefon || '',
       email: clientInfo?.email || '',
       banca: clientInfo?.banca || '',
-      iban: clientInfo?.iban || ''
+      iban: clientInfo?.iban || '',
+      // Date persoane fizice (dacă aplicabil)
+      cnp: clientInfo?.cnp || '',
+      ci_serie: clientInfo?.ci_serie || '',
+      ci_numar: clientInfo?.ci_numar || '',
+      ci_eliberata_de: clientInfo?.ci_eliberata_de || '',
+      ci_eliberata_la: clientInfo?.ci_eliberata_la || ''
     },
     
     // Produse/servicii
