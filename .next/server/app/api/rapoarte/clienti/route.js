@@ -282,15 +282,20 @@ const table = "Clienti";
 async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
+        // Construire query cu filtre
         let query = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
-        const conditions = []; // Tipizare explicită
+        const conditions = [
+            "activ = true"
+        ]; // Doar clienții activi
         const params = {};
         // Filtre
         const search = searchParams.get("search");
         if (search) {
             conditions.push(`(
         LOWER(nume) LIKE LOWER(@search) OR 
-        LOWER(email) LIKE LOWER(@search) OR 
+        LOWER(cui) LIKE LOWER(@search) OR 
+        LOWER(cnp) LIKE LOWER(@search) OR
+        LOWER(email) LIKE LOWER(@search) OR
         LOWER(telefon) LIKE LOWER(@search)
       )`);
             params.search = `%${search}%`;
@@ -300,15 +305,22 @@ async function GET(request) {
             conditions.push("tip_client = @tipClient");
             params.tipClient = tipClient;
         }
-        const activ = searchParams.get("activ");
-        if (activ) {
-            conditions.push("activ = @activ");
-            params.activ = activ === "true";
+        const sincronizat = searchParams.get("sincronizat");
+        if (sincronizat !== null) {
+            if (sincronizat === "true") {
+                conditions.push("sincronizat_factureaza = true");
+            } else if (sincronizat === "false") {
+                conditions.push("(sincronizat_factureaza = false OR sincronizat_factureaza IS NULL)");
+            }
         }
+        // Adaugă condiții la query
         if (conditions.length > 0) {
             query += " WHERE " + conditions.join(" AND ");
         }
-        query += " ORDER BY data_inregistrare DESC";
+        // Sortare
+        query += " ORDER BY data_creare DESC";
+        console.log("Executing clienti query:", query);
+        console.log("With params:", params);
         const [rows] = await bigquery.query({
             query: query,
             params: params,
@@ -332,35 +344,101 @@ async function GET(request) {
 async function POST(request) {
     try {
         const body = await request.json();
-        const { nume, email, telefon, adresa, tip_client = "Firma", activ = true } = body;
+        const { nume, tip_client = "persoana_juridica", cui, nr_reg_com, adresa, judet, oras, cod_postal, telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la, observatii } = body;
         // Validări
-        if (!nume || !email) {
+        if (!nume?.trim()) {
             return next_response/* default */.Z.json({
-                error: "C\xe2mpurile nume și email sunt obligatorii"
+                error: "Numele clientului este obligatoriu"
             }, {
                 status: 400
             });
         }
+        if (tip_client === "persoana_juridica" && !cui?.trim()) {
+            return next_response/* default */.Z.json({
+                error: "CUI-ul este obligatoriu pentru persoanele juridice"
+            }, {
+                status: 400
+            });
+        }
+        if (tip_client === "persoana_fizica" && !cnp?.trim()) {
+            return next_response/* default */.Z.json({
+                error: "CNP-ul este obligatoriu pentru persoanele fizice"
+            }, {
+                status: 400
+            });
+        }
+        // Verifică dacă clientul există deja
+        const checkQuery = `
+      SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      WHERE activ = true AND (
+        nume = @nume 
+        ${cui ? "OR cui = @cui" : ""}
+        ${cnp ? "OR cnp = @cnp" : ""}
+      )
+      LIMIT 1
+    `;
+        const checkParams = {
+            nume: nume.trim()
+        };
+        if (cui) checkParams.cui = cui.trim();
+        if (cnp) checkParams.cnp = cnp.trim();
+        const [existingRows] = await bigquery.query({
+            query: checkQuery,
+            params: checkParams,
+            location: "EU"
+        });
+        if (existingRows.length > 0) {
+            return next_response/* default */.Z.json({
+                error: "Un client cu aceste date există deja"
+            }, {
+                status: 409
+            });
+        }
+        // Generează ID unic
+        const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (nume, email, telefon, adresa, tip_client, activ, data_inregistrare)
-      VALUES (@nume, @email, @telefon, @adresa, @tip_client, @activ, CURRENT_TIMESTAMP())
+      (id, nume, tip_client, cui, nr_reg_com, adresa, judet, oras, cod_postal, tara,
+       telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la,
+       data_creare, data_actualizare, activ, sincronizat_factureaza, observatii)
+      VALUES (@id, @nume, @tip_client, @cui, @nr_reg_com, @adresa, @judet, @oras, @cod_postal, @tara,
+              @telefon, @email, @banca, @iban, @cnp, @ci_serie, @ci_numar, @ci_eliberata_de, @ci_eliberata_la,
+              @data_creare, @data_actualizare, @activ, @sincronizat_factureaza, @observatii)
     `;
         await bigquery.query({
             query: insertQuery,
             params: {
-                nume,
-                email,
-                telefon: telefon || null,
-                adresa: adresa || null,
+                id: clientId,
+                nume: nume.trim(),
                 tip_client,
-                activ
+                cui: cui?.trim() || "",
+                nr_reg_com: nr_reg_com?.trim() || "",
+                adresa: adresa?.trim() || "",
+                judet: judet?.trim() || "",
+                oras: oras?.trim() || "",
+                cod_postal: cod_postal?.trim() || "",
+                tara: "Rom\xe2nia",
+                telefon: telefon?.trim() || "",
+                email: email?.trim() || "",
+                banca: banca?.trim() || "",
+                iban: iban?.trim() || "",
+                cnp: cnp?.trim() || "",
+                ci_serie: ci_serie?.trim() || "",
+                ci_numar: ci_numar?.trim() || "",
+                ci_eliberata_de: ci_eliberata_de?.trim() || "",
+                ci_eliberata_la: ci_eliberata_la || null,
+                data_creare: new Date().toISOString(),
+                data_actualizare: new Date().toISOString(),
+                activ: true,
+                sincronizat_factureaza: false,
+                observatii: observatii?.trim() || ""
             },
             location: "EU"
         });
         return next_response/* default */.Z.json({
             success: true,
-            message: "Client adăugat cu succes"
+            message: "Client adăugat cu succes",
+            clientId: clientId
         });
     } catch (error) {
         console.error("Eroare la adăugarea clientului:", error);
@@ -388,14 +466,26 @@ async function PUT(request) {
         const params = {
             id
         };
-        // Lista câmpurilor permise pentru actualizare
+        // Câmpuri actualizabile
         const allowedFields = [
             "nume",
-            "email",
-            "telefon",
-            "adresa",
             "tip_client",
-            "activ"
+            "cui",
+            "nr_reg_com",
+            "adresa",
+            "judet",
+            "oras",
+            "cod_postal",
+            "telefon",
+            "email",
+            "banca",
+            "iban",
+            "cnp",
+            "ci_serie",
+            "ci_numar",
+            "ci_eliberata_de",
+            "ci_eliberata_la",
+            "observatii"
         ];
         Object.entries(updateData).forEach(([key, value])=>{
             if (allowedFields.includes(key) && value !== undefined) {
@@ -405,15 +495,18 @@ async function PUT(request) {
         });
         if (updateFields.length === 0) {
             return next_response/* default */.Z.json({
-                error: "Nu există c\xe2mpuri valide pentru actualizare"
+                error: "Nu există c\xe2mpuri valide de actualizat"
             }, {
                 status: 400
             });
         }
+        // Adaugă data_actualizare
+        updateFields.push("data_actualizare = @data_actualizare");
+        params.data_actualizare = new Date().toISOString();
         const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(", ")}
-      WHERE id = @id
+      WHERE id = @id AND activ = true
     `;
         await bigquery.query({
             query: updateQuery,
@@ -445,14 +538,17 @@ async function DELETE(request) {
                 status: 400
             });
         }
+        // Soft delete - marchează ca inactiv
         const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SET activ = false, data_actualizare = @data_actualizare
       WHERE id = @id
     `;
         await bigquery.query({
             query: deleteQuery,
             params: {
-                id
+                id,
+                data_actualizare: new Date().toISOString()
             },
             location: "EU"
         });
