@@ -404,7 +404,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
           border: '1px solid #ddd',
           borderRadius: '6px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 1000,
+          zIndex: 9999, // Crescut z-index pentru a fi deasupra tuturor
           minWidth: '220px',
           marginTop: '4px'
         }}>
@@ -499,7 +499,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 999
+            zIndex: 9998 // Un nivel sub dropdown
           }}
           onClick={() => setIsOpen(false)}
         />
