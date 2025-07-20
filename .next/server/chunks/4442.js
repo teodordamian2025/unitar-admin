@@ -20,6 +20,7 @@ exports.modules = {
 
 
 function ClientNouModal({ isOpen, onClose, onClientAdded }) {
+    const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     const [anafLoading, setAnafLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     const handleVerifyANAF = async ()=>{
         if (!formData.cui.trim()) {

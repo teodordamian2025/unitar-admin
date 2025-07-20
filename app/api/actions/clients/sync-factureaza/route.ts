@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
     let errorCount = 0;
     const errors: string[] = [];
 
-    for (const client of factureazaClients.data) {
+    // Verifică că avem date valide
+    const clientsToSync = factureazaClients.data || [];
+
+    for (const client of clientsToSync) {
       try {
         await syncClientToBigQuery(client);
         syncedCount++;
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Sincronizare completă: ${syncedCount} clienți sincronizați, ${errorCount} erori`,
-      totalClients: factureazaClients.data.length,
+      totalClients: clientsToSync.length,
       syncedCount,
       errorCount,
       errors: errorCount > 0 ? errors : undefined
@@ -162,12 +165,6 @@ async function fetchClientsFromFactureaza() {
 
   } catch (error) {
     console.error('Eroare conectare factureaza.me:', error); // Debug
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Eroare de conectare'
-    };
-  }
-}
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Eroare de conectare'
