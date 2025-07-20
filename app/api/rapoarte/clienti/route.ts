@@ -190,36 +190,10 @@ export async function POST(request: NextRequest) {
         data_creare: new Date().toISOString(),
         data_actualizare: new Date().toISOString(),
         activ: true,
-        sincronizat_factureaza: false, // Implicit nu este sincronizat
+        sincronizat_factureaza: false,
         observatii: observatii?.trim() || null
       },
-      location: 'EU',
-      types: {
-        id: 'STRING',
-        nume: 'STRING',
-        tip_client: 'STRING',
-        cui: 'STRING',
-        nr_reg_com: 'STRING',
-        adresa: 'STRING',
-        judet: 'STRING',
-        oras: 'STRING',
-        cod_postal: 'STRING',
-        tara: 'STRING',
-        telefon: 'STRING',
-        email: 'STRING',
-        banca: 'STRING',
-        iban: 'STRING',
-        cnp: 'STRING',
-        ci_serie: 'STRING',
-        ci_numar: 'STRING',
-        ci_eliberata_de: 'STRING',
-        ci_eliberata_la: 'DATE',
-        data_creare: 'TIMESTAMP',
-        data_actualizare: 'TIMESTAMP',
-        activ: 'BOOLEAN',
-        sincronizat_factureaza: 'BOOLEAN',
-        observatii: 'STRING'
-      }
+      location: 'EU'
     });
 
     return NextResponse.json({
