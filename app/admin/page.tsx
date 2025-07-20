@@ -8,6 +8,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
 const Chatbot = dynamic(() => import('@/components/Chatbot'), { ssr: false });
 
@@ -126,9 +127,10 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
       <ToastContainer />
       
+      {/* Header */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -140,10 +142,9 @@ export default function AdminPage() {
         border: '1px solid #dee2e6'
       }}>
         <div>
-          <h1>Bun venit la UNITAR PROIECT TDA - Admin</h1>
-          <p>Aceasta este pagina de administrare cu acces complet!</p>
-          <p style={{ marginTop: '0.5rem' }}>
-            Te-ai autentificat ca <strong>{displayName}</strong> cu rol <strong>{userRole}</strong>.
+          <h1 style={{ margin: 0, color: '#2c3e50' }}>🏢 UNITAR PROIECT - Admin Dashboard</h1>
+          <p style={{ margin: '0.5rem 0', color: '#7f8c8d' }}>
+            Bun venit, <strong>{displayName}</strong> - Rol: <strong>{userRole}</strong>
           </p>
         </div>
         
@@ -151,39 +152,333 @@ export default function AdminPage() {
           onClick={handleLogout}
           style={{
             padding: '0.5rem 1rem',
-            backgroundColor: '#c0392b',
+            backgroundColor: '#e74c3c',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '6px',
             cursor: 'pointer',
-            fontSize: '16px'
+            fontSize: '14px',
+            fontWeight: 'bold'
           }}
         >
           Logout
         </button>
       </div>
 
+      {/* Quick Stats */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '1rem',
+        marginBottom: '2rem'
+      }}>
+        <div style={{ 
+          background: '#3498db', 
+          color: 'white', 
+          padding: '1.5rem', 
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem' }}>📋 PROIECTE</h3>
+          <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>Active</p>
+        </div>
+        
+        <div style={{ 
+          background: '#27ae60', 
+          color: 'white', 
+          padding: '1.5rem', 
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem' }}>👥 CLIENȚI</h3>
+          <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>Activi</p>
+        </div>
+        
+        <div style={{ 
+          background: '#f39c12', 
+          color: 'white', 
+          padding: '1.5rem', 
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem' }}>📄 CONTRACTE</h3>
+          <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>În curs</p>
+        </div>
+        
+        <div style={{ 
+          background: '#9b59b6', 
+          color: 'white', 
+          padding: '1.5rem', 
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem' }}>💰 FACTURI</h3>
+          <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>De plată</p>
+        </div>
+      </div>
+
+      {/* Navigation Cards */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '1.5rem',
+        marginBottom: '2rem'
+      }}>
+        {/* Rapoarte Card */}
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #dee2e6', 
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+            📊 RAPOARTE ȘI MANAGEMENT
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <Link 
+              href="/admin/rapoarte" 
+              style={{ 
+                display: 'block',
+                padding: '0.75rem 1rem',
+                background: '#ecf0f1',
+                color: '#2c3e50',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#3498db';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ecf0f1';
+                e.currentTarget.style.color = '#2c3e50';
+              }}
+            >
+              🏠 Dashboard Rapoarte
+            </Link>
+            
+            <Link 
+              href="/admin/rapoarte/proiecte" 
+              style={{ 
+                display: 'block',
+                padding: '0.75rem 1rem',
+                background: '#ecf0f1',
+                color: '#2c3e50',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#27ae60';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ecf0f1';
+                e.currentTarget.style.color = '#2c3e50';
+              }}
+            >
+              📋 Management Proiecte
+            </Link>
+            
+            <Link 
+              href="/admin/rapoarte/clienti" 
+              style={{ 
+                display: 'block',
+                padding: '0.75rem 1rem',
+                background: '#ecf0f1',
+                color: '#2c3e50',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#f39c12';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ecf0f1';
+                e.currentTarget.style.color = '#2c3e50';
+              }}
+            >
+              👥 Management Clienți
+            </Link>
+          </div>
+        </div>
+
+        {/* Actions Card */}
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #dee2e6', 
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+            ⚡ ACȚIUNI RAPIDE
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#27ae60',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => toast.info('Funcție în dezvoltare!')}
+            >
+              + Proiect Nou
+            </button>
+            
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#3498db',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => toast.info('Funcție în dezvoltare!')}
+            >
+              📄 Generează Contract
+            </button>
+            
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#f39c12',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => toast.info('Funcție în dezvoltare!')}
+            >
+              💰 Creează Factură
+            </button>
+          </div>
+        </div>
+
+        {/* AI & Analytics Card */}
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #dee2e6', 
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+            🤖 AI & ANALIZĂ
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#9b59b6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => {
+                const chatSection = document.querySelector('#chatbot-section');
+                if (chatSection) {
+                  chatSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+            >
+              💬 Deschide AI Chat
+            </button>
+            
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#34495e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => toast.info('Analytics în dezvoltare!')}
+            >
+              📈 Dashboard Analytics
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Features Info */}
       <div style={{ 
         background: '#d4edda',
         color: '#155724',
-        padding: '1rem',
+        padding: '1.5rem',
         borderRadius: '8px',
         border: '1px solid #c3e6cb',
         marginBottom: '2rem'
       }}>
-        <h3>🔓 Acces Administrator</h3>
-        <p>Ai acces complet la:</p>
-        <ul>
-          <li>Toate informațiile din baza de date</li>
-          <li>Funcții financiare (facturi, tranzacții, bugete)</li>
-          <li>Gestionarea proiectelor și contractelor</li>
-          <li>Rapoarte complete</li>
-          <li>Administrarea utilizatorilor</li>
-        </ul>
+        <h3 style={{ margin: '0 0 1rem 0' }}>✅ FUNCȚIONALITĂȚI IMPLEMENTATE</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div>
+            <strong>📋 Management Proiecte:</strong>
+            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+              <li>Vizualizare tabel cu filtrare</li>
+              <li>Editare inline</li>
+              <li>Export Excel</li>
+              <li>Căutare avansată</li>
+            </ul>
+          </div>
+          <div>
+            <strong>👥 Management Clienți:</strong>
+            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+              <li>Lista clienți activi</li>
+              <li>Istoric colaborări</li>
+              <li>Informații contact</li>
+            </ul>
+          </div>
+          <div>
+            <strong>🤖 AI Integration:</strong>
+            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+              <li>Chatbot pentru întrebări</li>
+              <li>Procesare documente</li>
+              <li>Generare conținut</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <Chatbot />
+      {/* Chatbot Section */}
+      <div id="chatbot-section" style={{ 
+        background: 'white', 
+        border: '1px solid #dee2e6', 
+        borderRadius: '8px',
+        padding: '1.5rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+          💬 ASISTENT AI INTELIGENT
+        </h3>
+        <p style={{ margin: '0 0 1rem 0', color: '#7f8c8d' }}>
+          Folosește asistentul AI pentru întrebări despre proiecte, generare documente sau analiză date.
+        </p>
+        <Chatbot />
+      </div>
     </div>
   );
 }
-

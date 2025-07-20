@@ -74,25 +74,26 @@
       "static/chunks/bc9e92e6-13f7a14f8a5eb3f7.js",
       "static/chunks/7c86ec74-4f3d135f122d6068.js",
       "static/chunks/464-903f91b88b6f79ed.js",
+      "static/chunks/396-ee0c02eb2c9d76ac.js",
       "static/chunks/411-05662826e8c0bb2f.js",
       "static/css/4c75274b9952477d.css",
-      "static/chunks/app/admin/page-eb6b8fe3b8a39d59.js"
+      "static/chunks/app/admin/page-8be781d2c9772d4a.js"
     ],
     "/admin/rapoarte/page": [
       "static/chunks/webpack-80a65daafa44ab14.js",
       "static/chunks/bf6a786c-a8895b8ab022e741.js",
       "static/chunks/114-7a98bb28a2b71696.js",
       "static/chunks/main-app-c55efb12a7fbb29b.js",
-      "static/chunks/466-4a5691f56821fb17.js",
-      "static/chunks/app/admin/rapoarte/page-8401c928a8719281.js"
+      "static/chunks/396-ee0c02eb2c9d76ac.js",
+      "static/chunks/app/admin/rapoarte/page-95a55e1a91ea0dd1.js"
     ],
     "/admin/rapoarte/layout": [
       "static/chunks/webpack-80a65daafa44ab14.js",
       "static/chunks/bf6a786c-a8895b8ab022e741.js",
       "static/chunks/114-7a98bb28a2b71696.js",
       "static/chunks/main-app-c55efb12a7fbb29b.js",
-      "static/chunks/466-4a5691f56821fb17.js",
-      "static/chunks/app/admin/rapoarte/layout-8a6ef1344c091607.js"
+      "static/chunks/396-ee0c02eb2c9d76ac.js",
+      "static/chunks/app/admin/rapoarte/layout-1017b2183c7a8400.js"
     ],
     "/admin/rapoarte/clienti/page": [
       "static/chunks/webpack-80a65daafa44ab14.js",

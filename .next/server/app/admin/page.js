@@ -92,11 +92,27 @@ module.exports = require("next/dist/shared/lib/hooks-client-context");
 
 /***/ }),
 
+/***/ 17160:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("next/dist/shared/lib/router-context");
+
+/***/ }),
+
 /***/ 30893:
 /***/ ((module) => {
 
 "use strict";
 module.exports = require("next/dist/shared/lib/router/utils/add-path-prefix");
+
+/***/ }),
+
+/***/ 12336:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("next/dist/shared/lib/router/utils/format-url");
 
 /***/ }),
 
@@ -113,6 +129,14 @@ module.exports = require("next/dist/shared/lib/router/utils/handle-smooth-scroll
 
 "use strict";
 module.exports = require("next/dist/shared/lib/router/utils/is-bot");
+
+/***/ }),
+
+/***/ 60120:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("next/dist/shared/lib/router/utils/is-local-url");
 
 /***/ }),
 
@@ -140,11 +164,27 @@ module.exports = require("next/dist/shared/lib/router/utils/remove-trailing-slas
 
 /***/ }),
 
+/***/ 70982:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("next/dist/shared/lib/router/utils/resolve-href");
+
+/***/ }),
+
 /***/ 79618:
 /***/ ((module) => {
 
 "use strict";
 module.exports = require("next/dist/shared/lib/server-inserted-html");
+
+/***/ }),
+
+/***/ 78423:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("next/dist/shared/lib/utils");
 
 /***/ }),
 
@@ -383,7 +423,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(react_toastify_dist_ReactToastify_css__WEBPACK_IMPORTED_MODULE_7__);
 /* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(47335);
 /* harmony import */ var next_dynamic__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(next_dynamic__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(11440);
+/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(next_link__WEBPACK_IMPORTED_MODULE_9__);
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 
 
@@ -520,7 +563,9 @@ function AdminPage() {
     return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
         style: {
             padding: "2rem",
-            fontFamily: "Arial, sans-serif"
+            fontFamily: "Arial, sans-serif",
+            maxWidth: "1200px",
+            margin: "0 auto"
         },
         children: [
             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .ToastContainer */ .Ix, {}),
@@ -539,25 +584,26 @@ function AdminPage() {
                     /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                         children: [
                             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h1", {
-                                children: "Bun venit la UNITAR PROIECT TDA - Admin"
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                                children: "Aceasta este pagina de administrare cu acces complet!"
+                                style: {
+                                    margin: 0,
+                                    color: "#2c3e50"
+                                },
+                                children: "\uD83C\uDFE2 UNITAR PROIECT - Admin Dashboard"
                             }),
                             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
                                 style: {
-                                    marginTop: "0.5rem"
+                                    margin: "0.5rem 0",
+                                    color: "#7f8c8d"
                                 },
                                 children: [
-                                    "Te-ai autentificat ca ",
+                                    "Bun venit, ",
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
                                         children: displayName
                                     }),
-                                    " cu rol ",
+                                    " - Rol: ",
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
                                         children: userRole
-                                    }),
-                                    "."
+                                    })
                                 ]
                             })
                         ]
@@ -566,12 +612,13 @@ function AdminPage() {
                         onClick: handleLogout,
                         style: {
                             padding: "0.5rem 1rem",
-                            backgroundColor: "#c0392b",
+                            backgroundColor: "#e74c3c",
                             color: "white",
                             border: "none",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             cursor: "pointer",
-                            fontSize: "16px"
+                            fontSize: "14px",
+                            fontWeight: "bold"
                         },
                         children: "Logout"
                     })
@@ -579,42 +626,483 @@ function AdminPage() {
             }),
             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: "1rem",
+                    marginBottom: "2rem"
+                },
+                children: [
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "#3498db",
+                            color: "white",
+                            padding: "1.5rem",
+                            borderRadius: "8px",
+                            textAlign: "center"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "1.2rem"
+                                },
+                                children: "\uD83D\uDCCB PROIECTE"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    margin: 0,
+                                    fontSize: "1.5rem",
+                                    fontWeight: "bold"
+                                },
+                                children: "Active"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "#27ae60",
+                            color: "white",
+                            padding: "1.5rem",
+                            borderRadius: "8px",
+                            textAlign: "center"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "1.2rem"
+                                },
+                                children: "\uD83D\uDC65 CLIENȚI"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    margin: 0,
+                                    fontSize: "1.5rem",
+                                    fontWeight: "bold"
+                                },
+                                children: "Activi"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "#f39c12",
+                            color: "white",
+                            padding: "1.5rem",
+                            borderRadius: "8px",
+                            textAlign: "center"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "1.2rem"
+                                },
+                                children: "\uD83D\uDCC4 CONTRACTE"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    margin: 0,
+                                    fontSize: "1.5rem",
+                                    fontWeight: "bold"
+                                },
+                                children: "\xcen curs"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "#9b59b6",
+                            color: "white",
+                            padding: "1.5rem",
+                            borderRadius: "8px",
+                            textAlign: "center"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "1.2rem"
+                                },
+                                children: "\uD83D\uDCB0 FACTURI"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    margin: 0,
+                                    fontSize: "1.5rem",
+                                    fontWeight: "bold"
+                                },
+                                children: "De plată"
+                            })
+                        ]
+                    })
+                ]
+            }),
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                style: {
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                    gap: "1.5rem",
+                    marginBottom: "2rem"
+                },
+                children: [
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "white",
+                            border: "1px solid #dee2e6",
+                            borderRadius: "8px",
+                            padding: "1.5rem",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 1rem 0",
+                                    color: "#2c3e50",
+                                    display: "flex",
+                                    alignItems: "center"
+                                },
+                                children: "\uD83D\uDCCA RAPOARTE ȘI MANAGEMENT"
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.75rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
+                                        href: "/admin/rapoarte",
+                                        style: {
+                                            display: "block",
+                                            padding: "0.75rem 1rem",
+                                            background: "#ecf0f1",
+                                            color: "#2c3e50",
+                                            textDecoration: "none",
+                                            borderRadius: "6px",
+                                            border: "1px solid #bdc3c7",
+                                            transition: "all 0.3s ease"
+                                        },
+                                        onMouseOver: (e)=>{
+                                            e.currentTarget.style.background = "#3498db";
+                                            e.currentTarget.style.color = "white";
+                                        },
+                                        onMouseOut: (e)=>{
+                                            e.currentTarget.style.background = "#ecf0f1";
+                                            e.currentTarget.style.color = "#2c3e50";
+                                        },
+                                        children: "\uD83C\uDFE0 Dashboard Rapoarte"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
+                                        href: "/admin/rapoarte/proiecte",
+                                        style: {
+                                            display: "block",
+                                            padding: "0.75rem 1rem",
+                                            background: "#ecf0f1",
+                                            color: "#2c3e50",
+                                            textDecoration: "none",
+                                            borderRadius: "6px",
+                                            border: "1px solid #bdc3c7",
+                                            transition: "all 0.3s ease"
+                                        },
+                                        onMouseOver: (e)=>{
+                                            e.currentTarget.style.background = "#27ae60";
+                                            e.currentTarget.style.color = "white";
+                                        },
+                                        onMouseOut: (e)=>{
+                                            e.currentTarget.style.background = "#ecf0f1";
+                                            e.currentTarget.style.color = "#2c3e50";
+                                        },
+                                        children: "\uD83D\uDCCB Management Proiecte"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
+                                        href: "/admin/rapoarte/clienti",
+                                        style: {
+                                            display: "block",
+                                            padding: "0.75rem 1rem",
+                                            background: "#ecf0f1",
+                                            color: "#2c3e50",
+                                            textDecoration: "none",
+                                            borderRadius: "6px",
+                                            border: "1px solid #bdc3c7",
+                                            transition: "all 0.3s ease"
+                                        },
+                                        onMouseOver: (e)=>{
+                                            e.currentTarget.style.background = "#f39c12";
+                                            e.currentTarget.style.color = "white";
+                                        },
+                                        onMouseOut: (e)=>{
+                                            e.currentTarget.style.background = "#ecf0f1";
+                                            e.currentTarget.style.color = "#2c3e50";
+                                        },
+                                        children: "\uD83D\uDC65 Management Clienți"
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "white",
+                            border: "1px solid #dee2e6",
+                            borderRadius: "8px",
+                            padding: "1.5rem",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 1rem 0",
+                                    color: "#2c3e50"
+                                },
+                                children: "⚡ ACȚIUNI RAPIDE"
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.75rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                        style: {
+                                            padding: "0.75rem 1rem",
+                                            background: "#27ae60",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
+                                        children: "+ Proiect Nou"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                        style: {
+                                            padding: "0.75rem 1rem",
+                                            background: "#3498db",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
+                                        children: "\uD83D\uDCC4 Generează Contract"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                        style: {
+                                            padding: "0.75rem 1rem",
+                                            background: "#f39c12",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
+                                        children: "\uD83D\uDCB0 Creează Factură"
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "white",
+                            border: "1px solid #dee2e6",
+                            borderRadius: "8px",
+                            padding: "1.5rem",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 1rem 0",
+                                    color: "#2c3e50"
+                                },
+                                children: "\uD83E\uDD16 AI & ANALIZĂ"
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.75rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                        style: {
+                                            padding: "0.75rem 1rem",
+                                            background: "#9b59b6",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        onClick: ()=>{
+                                            const chatSection = document.querySelector("#chatbot-section");
+                                            if (chatSection) {
+                                                chatSection.scrollIntoView({
+                                                    behavior: "smooth"
+                                                });
+                                            }
+                                        },
+                                        children: "\uD83D\uDCAC Deschide AI Chat"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                        style: {
+                                            padding: "0.75rem 1rem",
+                                            background: "#34495e",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Analytics \xeen dezvoltare!"),
+                                        children: "\uD83D\uDCC8 Dashboard Analytics"
+                                    })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                style: {
                     background: "#d4edda",
                     color: "#155724",
-                    padding: "1rem",
+                    padding: "1.5rem",
                     borderRadius: "8px",
                     border: "1px solid #c3e6cb",
                     marginBottom: "2rem"
                 },
                 children: [
                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
-                        children: "\uD83D\uDD13 Acces Administrator"
+                        style: {
+                            margin: "0 0 1rem 0"
+                        },
+                        children: "✅ FUNCȚIONALITĂȚI IMPLEMENTATE"
                     }),
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                        children: "Ai acces complet la:"
-                    }),
-                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                            gap: "1rem"
+                        },
                         children: [
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
-                                children: "Toate informațiile din baza de date"
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: "\uD83D\uDCCB Management Proiecte:"
+                                    }),
+                                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                                        style: {
+                                            margin: "0.5rem 0",
+                                            paddingLeft: "1.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Vizualizare tabel cu filtrare"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Editare inline"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Export Excel"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Căutare avansată"
+                                            })
+                                        ]
+                                    })
+                                ]
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
-                                children: "Funcții financiare (facturi, tranzacții, bugete)"
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: "\uD83D\uDC65 Management Clienți:"
+                                    }),
+                                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                                        style: {
+                                            margin: "0.5rem 0",
+                                            paddingLeft: "1.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Lista clienți activi"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Istoric colaborări"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Informații contact"
+                                            })
+                                        ]
+                                    })
+                                ]
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
-                                children: "Gestionarea proiectelor și contractelor"
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
-                                children: "Rapoarte complete"
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
-                                children: "Administrarea utilizatorilor"
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: "\uD83E\uDD16 AI Integration:"
+                                    }),
+                                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                                        style: {
+                                            margin: "0.5rem 0",
+                                            paddingLeft: "1.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Chatbot pentru \xeentrebări"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Procesare documente"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Generare conținut"
+                                            })
+                                        ]
+                                    })
+                                ]
                             })
                         ]
                     })
                 ]
             }),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(Chatbot, {})
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                id: "chatbot-section",
+                style: {
+                    background: "white",
+                    border: "1px solid #dee2e6",
+                    borderRadius: "8px",
+                    padding: "1.5rem",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                },
+                children: [
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                        style: {
+                            margin: "0 0 1rem 0",
+                            color: "#2c3e50"
+                        },
+                        children: "\uD83D\uDCAC ASISTENT AI INTELIGENT"
+                    }),
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                        style: {
+                            margin: "0 0 1rem 0",
+                            color: "#7f8c8d"
+                        },
+                        children: "Folosește asistentul AI pentru \xeentrebări despre proiecte, generare documente sau analiză date."
+                    }),
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(Chatbot, {})
+                ]
+            })
         ]
     });
 }
@@ -655,7 +1143,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2319,7335,2245,8313,9850,6166], () => (__webpack_exec__(54481)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,8045,7335,2245,8313,9850,6166], () => (__webpack_exec__(54481)));
 module.exports = __webpack_exports__;
 
 })();
