@@ -47,6 +47,9 @@ export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownPro
         case 'archive':
           await handleArchive();
           break;
+        case 'add_subproject':
+          await handleAddSubproject();
+          break;
         default:
           toast.info('Funcție în dezvoltare');
       }
@@ -176,6 +179,37 @@ export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownPro
       }
     } catch (error) {
       toast.error('Eroare la actualizarea statusului');
+    }
+  };
+
+  const handleAddSubproject = async () => {
+    const denumire = prompt(`Denumire subproiect pentru ${proiect.ID_Proiect}:`);
+    const responsabil = prompt('Responsabil subproiect:');
+    
+    if (!denumire) return;
+
+    try {
+      const response = await fetch('/api/rapoarte/subproiecte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ID_Subproiect: `${proiect.ID_Proiect}_SUB_${Date.now()}`,
+          ID_Proiect: proiect.ID_Proiect,
+          Denumire: denumire,
+          Responsabil: responsabil || '',
+          Status: 'Planificat'
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success('Subproiect adăugat cu succes!');
+        onRefresh?.();
+      } else {
+        toast.error(result.error || 'Eroare la adăugarea subproiectului');
+      }
+    } catch (error) {
+      toast.error('Eroare la adăugarea subproiectului');
     }
   };
 

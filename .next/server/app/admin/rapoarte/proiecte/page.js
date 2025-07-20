@@ -415,11 +415,11 @@ const routeModule = new AppPageRouteModule({
 /***/ 16902:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 66491))
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 15151))
 
 /***/ }),
 
-/***/ 66491:
+/***/ 15151:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -772,6 +772,9 @@ function ActionDropdown({ proiect, onRefresh }) {
                 case "archive":
                     await handleArchive();
                     break;
+                case "add_subproject":
+                    await handleAddSubproject();
+                    break;
                 default:
                     dist/* toast */.Am.info("Funcție \xeen dezvoltare");
             }
@@ -896,6 +899,35 @@ function ActionDropdown({ proiect, onRefresh }) {
             }
         } catch (error) {
             dist/* toast */.Am.error("Eroare la actualizarea statusului");
+        }
+    };
+    const handleAddSubproject = async ()=>{
+        const denumire = prompt(`Denumire subproiect pentru ${proiect.ID_Proiect}:`);
+        const responsabil = prompt("Responsabil subproiect:");
+        if (!denumire) return;
+        try {
+            const response = await fetch("/api/rapoarte/subproiecte", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    ID_Subproiect: `${proiect.ID_Proiect}_SUB_${Date.now()}`,
+                    ID_Proiect: proiect.ID_Proiect,
+                    Denumire: denumire,
+                    Responsabil: responsabil || "",
+                    Status: "Planificat"
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Subproiect adăugat cu succes!");
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la adăugarea subproiectului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la adăugarea subproiectului");
         }
     };
     const handleArchive = async ()=>{
@@ -1134,8 +1166,918 @@ function ActionButton({ onClick, icon, text, loading, danger }) {
     });
 }
 
+// EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx
+var ClientNouModal = __webpack_require__(14442);
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+
+function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
+    const [loading, setLoading] = (0,react_experimental_.useState)(false);
+    const [clienti, setClienti] = (0,react_experimental_.useState)([]);
+    const [showClientModal, setShowClientModal] = (0,react_experimental_.useState)(false);
+    const [clientSearch, setClientSearch] = (0,react_experimental_.useState)("");
+    const [showClientSuggestions, setShowClientSuggestions] = (0,react_experimental_.useState)(false);
+    const [formData, setFormData] = (0,react_experimental_.useState)({
+        ID_Proiect: "",
+        Denumire: "",
+        Client: "",
+        selectedClientId: "",
+        Descriere: "",
+        Data_Start: "",
+        Data_Final: "",
+        Status: "Activ",
+        Valoare_Estimata: "",
+        Responsabil: "",
+        Observatii: "",
+        // Pentru subproiecte
+        subproiecte: []
+    });
+    (0,react_experimental_.useEffect)(()=>{
+        if (isOpen) {
+            loadClienti();
+            // Generează ID proiect automat
+            setFormData((prev)=>({
+                    ...prev,
+                    ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`
+                }));
+        }
+    }, [
+        isOpen
+    ]);
+    const loadClienti = async ()=>{
+        try {
+            const response = await fetch("/api/rapoarte/clienti");
+            const data = await response.json();
+            if (data.success) {
+                setClienti(data.data || []);
+            }
+        } catch (error) {
+            console.error("Eroare la \xeencărcarea clienților:", error);
+        }
+    };
+    const handleSubmit = async (e)=>{
+        e.preventDefault();
+        setLoading(true);
+        try {
+            // Validări
+            if (!formData.ID_Proiect.trim()) {
+                dist/* toast */.Am.error("ID proiect este obligatoriu");
+                setLoading(false);
+                return;
+            }
+            if (!formData.Denumire.trim()) {
+                dist/* toast */.Am.error("Denumirea proiectului este obligatorie");
+                setLoading(false);
+                return;
+            }
+            if (!formData.Client.trim()) {
+                dist/* toast */.Am.error("Clientul este obligatoriu");
+                setLoading(false);
+                return;
+            }
+            console.log("Trimitere date proiect:", formData); // Debug
+            dist/* toast */.Am.info("Se adaugă proiectul...");
+            // Adaugă proiectul principal
+            const proiectData = {
+                ID_Proiect: formData.ID_Proiect.trim(),
+                Denumire: formData.Denumire.trim(),
+                Client: formData.Client.trim(),
+                Descriere: formData.Descriere.trim(),
+                Data_Start: formData.Data_Start || null,
+                Data_Final: formData.Data_Final || null,
+                Status: formData.Status,
+                Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
+                Responsabil: formData.Responsabil.trim(),
+                Observatii: formData.Observatii.trim()
+            };
+            const response = await fetch("/api/rapoarte/proiecte", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(proiectData)
+            });
+            console.log("Response status proiect:", response.status); // Debug
+            const result = await response.json();
+            console.log("Response data proiect:", result); // Debug
+            if (result.success || response.ok) {
+                // Adaugă subproiectele dacă există
+                if (formData.subproiecte.length > 0) {
+                    await addSubproiecte(formData.ID_Proiect);
+                }
+                dist/* toast */.Am.success("Proiect adăugat cu succes!");
+                onProiectAdded();
+                onClose();
+                resetForm();
+            } else {
+                console.error("Eroare API proiect:", result); // Debug
+                dist/* toast */.Am.error(`Eroare: ${result.error || "Eroare necunoscută"}`);
+            }
+        } catch (error) {
+            console.error("Eroare la adăugarea proiectului:", error); // Debug
+            dist/* toast */.Am.error("Eroare la adăugarea proiectului");
+        } finally{
+            setLoading(false);
+        }
+    };
+    const addSubproiecte = async (proiectId)=>{
+        for (const subproiect of formData.subproiecte){
+            try {
+                const subproiectData = {
+                    ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
+                    ID_Proiect: proiectId,
+                    Denumire: subproiect.denumire,
+                    Responsabil: subproiect.responsabil,
+                    Status: subproiect.status,
+                    Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null
+                };
+                await fetch("/api/rapoarte/subproiecte", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(subproiectData)
+                });
+            } catch (error) {
+                console.error(`Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
+            }
+        }
+    };
+    const resetForm = ()=>{
+        setFormData({
+            ID_Proiect: "",
+            Denumire: "",
+            Client: "",
+            selectedClientId: "",
+            Descriere: "",
+            Data_Start: "",
+            Data_Final: "",
+            Status: "Activ",
+            Valoare_Estimata: "",
+            Responsabil: "",
+            Observatii: "",
+            subproiecte: []
+        });
+        setClientSearch("");
+    };
+    const handleInputChange = (field, value)=>{
+        setFormData((prev)=>({
+                ...prev,
+                [field]: value
+            }));
+    };
+    const handleClientSearch = (value)=>{
+        setClientSearch(value);
+        setFormData((prev)=>({
+                ...prev,
+                Client: value
+            }));
+        setShowClientSuggestions(value.length > 0);
+    };
+    const selectClient = (client)=>{
+        setClientSearch(client.nume);
+        setFormData((prev)=>({
+                ...prev,
+                Client: client.nume,
+                selectedClientId: client.id
+            }));
+        setShowClientSuggestions(false);
+    };
+    const filteredClients = clienti.filter((client)=>client.nume.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 5);
+    const addSubproiect = ()=>{
+        const newSubproiect = {
+            id: Date.now().toString(),
+            denumire: "",
+            responsabil: "",
+            valoare: "",
+            status: "Planificat"
+        };
+        setFormData((prev)=>({
+                ...prev,
+                subproiecte: [
+                    ...prev.subproiecte,
+                    newSubproiect
+                ]
+            }));
+    };
+    const removeSubproiect = (id)=>{
+        setFormData((prev)=>({
+                ...prev,
+                subproiecte: prev.subproiecte.filter((sub)=>sub.id !== id)
+            }));
+    };
+    const updateSubproiect = (id, field, value)=>{
+        setFormData((prev)=>({
+                ...prev,
+                subproiecte: prev.subproiecte.map((sub)=>sub.id === id ? {
+                        ...sub,
+                        [field]: value
+                    } : sub)
+            }));
+    };
+    if (!isOpen) return null;
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        style: {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem"
+        },
+        children: [
+            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    background: "white",
+                    borderRadius: "8px",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+                    maxWidth: "900px",
+                    width: "100%",
+                    maxHeight: "90vh",
+                    overflowY: "auto"
+                },
+                children: [
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            padding: "1.5rem",
+                            borderBottom: "1px solid #dee2e6",
+                            background: "#f8f9fa",
+                            borderRadius: "8px 8px 0 0"
+                        },
+                        children: [
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("h2", {
+                                        style: {
+                                            margin: 0,
+                                            color: "#2c3e50"
+                                        },
+                                        children: "\uD83D\uDCCB Adaugă Proiect Nou"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                        onClick: onClose,
+                                        disabled: loading,
+                                        style: {
+                                            background: "transparent",
+                                            border: "none",
+                                            fontSize: "24px",
+                                            cursor: "pointer",
+                                            color: "#6c757d"
+                                        },
+                                        children: "\xd7"
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                style: {
+                                    margin: "0.5rem 0 0 0",
+                                    color: "#7f8c8d",
+                                    fontSize: "14px"
+                                },
+                                children: "Completează informațiile pentru noul proiect și subproiectele asociate"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
+                        onSubmit: handleSubmit,
+                        style: {
+                            padding: "1.5rem"
+                        },
+                        children: [
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                                    gap: "1rem",
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    marginBottom: "0.5rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "ID Proiect *"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                type: "text",
+                                                value: formData.ID_Proiect,
+                                                onChange: (e)=>handleInputChange("ID_Proiect", e.target.value),
+                                                disabled: loading,
+                                                placeholder: "P202501",
+                                                style: {
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #dee2e6",
+                                                    borderRadius: "6px",
+                                                    fontSize: "14px",
+                                                    fontFamily: "monospace",
+                                                    fontWeight: "bold"
+                                                }
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    marginBottom: "0.5rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "Status"
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
+                                                value: formData.Status,
+                                                onChange: (e)=>handleInputChange("Status", e.target.value),
+                                                disabled: loading,
+                                                style: {
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #dee2e6",
+                                                    borderRadius: "6px",
+                                                    fontSize: "14px"
+                                                },
+                                                children: [
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                        value: "Activ",
+                                                        children: "\uD83D\uDFE2 Activ"
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                        value: "Planificat",
+                                                        children: "\uD83D\uDCC5 Planificat"
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                        value: "Suspendat",
+                                                        children: "⏸️ Suspendat"
+                                                    })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Denumire Proiect *"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                        type: "text",
+                                        value: formData.Denumire,
+                                        onChange: (e)=>handleInputChange("Denumire", e.target.value),
+                                        disabled: loading,
+                                        placeholder: "Numele proiectului",
+                                        style: {
+                                            width: "100%",
+                                            padding: "0.75rem",
+                                            border: "1px solid #dee2e6",
+                                            borderRadius: "6px",
+                                            fontSize: "14px"
+                                        }
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem",
+                                    position: "relative"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Client *"
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            gap: "0.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                style: {
+                                                    flex: 1,
+                                                    position: "relative"
+                                                },
+                                                children: [
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "text",
+                                                        value: clientSearch,
+                                                        onChange: (e)=>handleClientSearch(e.target.value),
+                                                        disabled: loading,
+                                                        placeholder: "Caută client sau scrie numele...",
+                                                        style: {
+                                                            width: "100%",
+                                                            padding: "0.75rem",
+                                                            border: "1px solid #dee2e6",
+                                                            borderRadius: "6px",
+                                                            fontSize: "14px"
+                                                        }
+                                                    }),
+                                                    showClientSuggestions && filteredClients.length > 0 && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                        style: {
+                                                            position: "absolute",
+                                                            top: "100%",
+                                                            left: 0,
+                                                            right: 0,
+                                                            background: "white",
+                                                            border: "1px solid #dee2e6",
+                                                            borderTop: "none",
+                                                            borderRadius: "0 0 6px 6px",
+                                                            boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                                                            zIndex: 1000,
+                                                            maxHeight: "200px",
+                                                            overflowY: "auto"
+                                                        },
+                                                        children: filteredClients.map((client)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                onClick: ()=>selectClient(client),
+                                                                style: {
+                                                                    padding: "0.75rem",
+                                                                    cursor: "pointer",
+                                                                    borderBottom: "1px solid #f1f2f6",
+                                                                    fontSize: "14px"
+                                                                },
+                                                                onMouseOver: (e)=>{
+                                                                    e.currentTarget.style.background = "#f8f9fa";
+                                                                },
+                                                                onMouseOut: (e)=>{
+                                                                    e.currentTarget.style.background = "white";
+                                                                },
+                                                                children: [
+                                                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                                        style: {
+                                                                            fontWeight: "bold"
+                                                                        },
+                                                                        children: client.nume
+                                                                    }),
+                                                                    client.cui && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                        style: {
+                                                                            fontSize: "12px",
+                                                                            color: "#7f8c8d"
+                                                                        },
+                                                                        children: [
+                                                                            "CUI: ",
+                                                                            client.cui
+                                                                        ]
+                                                                    })
+                                                                ]
+                                                            }, client.id))
+                                                    })
+                                                ]
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                type: "button",
+                                                onClick: ()=>setShowClientModal(true),
+                                                disabled: loading,
+                                                style: {
+                                                    padding: "0.75rem 1rem",
+                                                    background: "#27ae60",
+                                                    color: "white",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    cursor: loading ? "not-allowed" : "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "bold",
+                                                    whiteSpace: "nowrap"
+                                                },
+                                                children: "+ Client Nou"
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                    gap: "1rem",
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    marginBottom: "0.5rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "Data \xcenceput"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                type: "date",
+                                                value: formData.Data_Start,
+                                                onChange: (e)=>handleInputChange("Data_Start", e.target.value),
+                                                disabled: loading,
+                                                style: {
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #dee2e6",
+                                                    borderRadius: "6px",
+                                                    fontSize: "14px"
+                                                }
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    marginBottom: "0.5rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "Data Finalizare"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                type: "date",
+                                                value: formData.Data_Final,
+                                                onChange: (e)=>handleInputChange("Data_Final", e.target.value),
+                                                disabled: loading,
+                                                style: {
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #dee2e6",
+                                                    borderRadius: "6px",
+                                                    fontSize: "14px"
+                                                }
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    marginBottom: "0.5rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "Valoare Estimată (RON)"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                type: "number",
+                                                value: formData.Valoare_Estimata,
+                                                onChange: (e)=>handleInputChange("Valoare_Estimata", e.target.value),
+                                                disabled: loading,
+                                                placeholder: "15000",
+                                                style: {
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #dee2e6",
+                                                    borderRadius: "6px",
+                                                    fontSize: "14px"
+                                                }
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Responsabil"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                        type: "text",
+                                        value: formData.Responsabil,
+                                        onChange: (e)=>handleInputChange("Responsabil", e.target.value),
+                                        disabled: loading,
+                                        placeholder: "Numele responsabilului de proiect",
+                                        style: {
+                                            width: "100%",
+                                            padding: "0.75rem",
+                                            border: "1px solid #dee2e6",
+                                            borderRadius: "6px",
+                                            fontSize: "14px"
+                                        }
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Descriere"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
+                                        value: formData.Descriere,
+                                        onChange: (e)=>handleInputChange("Descriere", e.target.value),
+                                        disabled: loading,
+                                        placeholder: "Descrierea detaliată a proiectului...",
+                                        rows: 3,
+                                        style: {
+                                            width: "100%",
+                                            padding: "0.75rem",
+                                            border: "1px solid #dee2e6",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            resize: "vertical"
+                                        }
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            marginBottom: "1rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("h4", {
+                                                style: {
+                                                    margin: 0,
+                                                    color: "#2c3e50"
+                                                },
+                                                children: "\uD83D\uDCCB Subproiecte"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                type: "button",
+                                                onClick: addSubproiect,
+                                                disabled: loading,
+                                                style: {
+                                                    padding: "0.5rem 1rem",
+                                                    background: "#3498db",
+                                                    color: "white",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    cursor: loading ? "not-allowed" : "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "bold"
+                                                },
+                                                children: "+ Adaugă Subproiect"
+                                            })
+                                        ]
+                                    }),
+                                    formData.subproiecte.map((subproiect, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            style: {
+                                                border: "1px solid #dee2e6",
+                                                borderRadius: "6px",
+                                                padding: "1rem",
+                                                marginBottom: "1rem",
+                                                background: "#f8f9fa"
+                                            },
+                                            children: [
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                    style: {
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        alignItems: "center",
+                                                        marginBottom: "0.5rem"
+                                                    },
+                                                    children: [
+                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h5", {
+                                                            style: {
+                                                                margin: 0,
+                                                                color: "#2c3e50"
+                                                            },
+                                                            children: [
+                                                                "Subproiect #",
+                                                                index + 1
+                                                            ]
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                            type: "button",
+                                                            onClick: ()=>removeSubproiect(subproiect.id),
+                                                            disabled: loading,
+                                                            style: {
+                                                                background: "#e74c3c",
+                                                                color: "white",
+                                                                border: "none",
+                                                                borderRadius: "4px",
+                                                                padding: "0.25rem 0.5rem",
+                                                                cursor: "pointer",
+                                                                fontSize: "12px"
+                                                            },
+                                                            children: "\uD83D\uDDD1️"
+                                                        })
+                                                    ]
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                    style: {
+                                                        display: "grid",
+                                                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                                        gap: "0.5rem"
+                                                    },
+                                                    children: [
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                            type: "text",
+                                                            value: subproiect.denumire,
+                                                            onChange: (e)=>updateSubproiect(subproiect.id, "denumire", e.target.value),
+                                                            disabled: loading,
+                                                            placeholder: "Denumire subproiect",
+                                                            style: {
+                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                borderRadius: "4px",
+                                                                fontSize: "14px"
+                                                            }
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                            type: "text",
+                                                            value: subproiect.responsabil,
+                                                            onChange: (e)=>updateSubproiect(subproiect.id, "responsabil", e.target.value),
+                                                            disabled: loading,
+                                                            placeholder: "Responsabil",
+                                                            style: {
+                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                borderRadius: "4px",
+                                                                fontSize: "14px"
+                                                            }
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                            type: "number",
+                                                            value: subproiect.valoare,
+                                                            onChange: (e)=>updateSubproiect(subproiect.id, "valoare", e.target.value),
+                                                            disabled: loading,
+                                                            placeholder: "Valoare (RON)",
+                                                            style: {
+                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                borderRadius: "4px",
+                                                                fontSize: "14px"
+                                                            }
+                                                        }),
+                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
+                                                            value: subproiect.status,
+                                                            onChange: (e)=>updateSubproiect(subproiect.id, "status", e.target.value),
+                                                            disabled: loading,
+                                                            style: {
+                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                borderRadius: "4px",
+                                                                fontSize: "14px"
+                                                            },
+                                                            children: [
+                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                    value: "Planificat",
+                                                                    children: "\uD83D\uDCC5 Planificat"
+                                                                }),
+                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                    value: "Activ",
+                                                                    children: "\uD83D\uDFE2 Activ"
+                                                                }),
+                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                    value: "Finalizat",
+                                                                    children: "✅ Finalizat"
+                                                                })
+                                                            ]
+                                                        })
+                                                    ]
+                                                })
+                                            ]
+                                        }, subproiect.id))
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1.5rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Observații"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
+                                        value: formData.Observatii,
+                                        onChange: (e)=>handleInputChange("Observatii", e.target.value),
+                                        disabled: loading,
+                                        placeholder: "Observații despre proiect...",
+                                        rows: 2,
+                                        style: {
+                                            width: "100%",
+                                            padding: "0.75rem",
+                                            border: "1px solid #dee2e6",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            resize: "vertical"
+                                        }
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    justifyContent: "flex-end",
+                                    gap: "1rem",
+                                    paddingTop: "1rem",
+                                    borderTop: "1px solid #dee2e6"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                        type: "button",
+                                        onClick: onClose,
+                                        disabled: loading,
+                                        style: {
+                                            padding: "0.75rem 1.5rem",
+                                            background: "#6c757d",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: loading ? "not-allowed" : "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        children: "Anulează"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                        type: "submit",
+                                        disabled: loading,
+                                        style: {
+                                            padding: "0.75rem 1.5rem",
+                                            background: loading ? "#bdc3c7" : "#27ae60",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "6px",
+                                            cursor: loading ? "not-allowed" : "pointer",
+                                            fontSize: "14px",
+                                            fontWeight: "bold"
+                                        },
+                                        children: loading ? "⏳ Se adaugă..." : "\uD83D\uDCBE Adaugă Proiect"
+                                    })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }),
+            showClientModal && /*#__PURE__*/ jsx_runtime_.jsx(ClientNouModal/* default */.Z, {
+                isOpen: showClientModal,
+                onClose: ()=>setShowClientModal(false),
+                onClientAdded: ()=>{
+                    loadClienti(); // Reîncarcă lista de clienți
+                    setShowClientModal(false);
+                }
+            })
+        ]
+    });
+}
+
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 
 
@@ -1143,6 +2085,7 @@ function ProiecteTable({ searchParams }) {
     const [proiecte, setProiecte] = (0,react_experimental_.useState)([]);
     const [loading, setLoading] = (0,react_experimental_.useState)(true);
     const [refreshTrigger, setRefreshTrigger] = (0,react_experimental_.useState)(0);
+    const [showProiectModal, setShowProiectModal] = (0,react_experimental_.useState)(false);
     (0,react_experimental_.useEffect)(()=>{
         loadProiecte();
     }, [
@@ -1397,13 +2340,7 @@ function ProiecteTable({ searchParams }) {
                         },
                         children: [
                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: ()=>{
-                                    const nume = prompt("Nume proiect:");
-                                    const client = prompt("Client:");
-                                    if (nume && client) {
-                                        handleAddProject(nume, client);
-                                    }
-                                },
+                                onClick: ()=>setShowProiectModal(true),
                                 style: {
                                     padding: "0.5rem 1rem",
                                     background: "#27ae60",
@@ -1682,6 +2619,11 @@ function ProiecteTable({ searchParams }) {
                         })
                     ]
                 })
+            }),
+            /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
+                isOpen: showProiectModal,
+                onClose: ()=>setShowProiectModal(false),
+                onProiectAdded: handleRefresh
             })
         ]
     });
@@ -1875,7 +2817,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549,4442], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();

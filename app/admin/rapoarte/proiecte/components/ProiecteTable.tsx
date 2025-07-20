@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import ActionDropdown from '../../components/ActionDropdown';
+import ProiectNouModal from './ProiectNouModal';
 
 interface Proiect {
   ID_Proiect: string;
@@ -24,6 +25,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [proiecte, setProiecte] = useState<Proiect[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showProiectModal, setShowProiectModal] = useState(false);
 
   useEffect(() => {
     loadProiecte();
@@ -283,13 +285,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => {
-              const nume = prompt('Nume proiect:');
-              const client = prompt('Client:');
-              if (nume && client) {
-                handleAddProject(nume, client);
-              }
-            }}
+            onClick={() => setShowProiectModal(true)}
             style={{
               padding: '0.5rem 1rem',
               background: '#27ae60',
@@ -528,6 +524,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           </div>
         </div>
       )}
+
+      {/* Modal Proiect Nou */}
+      <ProiectNouModal
+        isOpen={showProiectModal}
+        onClose={() => setShowProiectModal(false)}
+        onProiectAdded={handleRefresh}
+      />
     </div>
   );
 }

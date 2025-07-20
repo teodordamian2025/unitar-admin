@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST='{"../app/admin/page.tsx -> @/components/Chatbot":{"id":3904,"files":["static/chunks/647-a7eca9402eeda84a.js","static/chunks/904.00694f94410fda2b.js"]},"../app/test-page/page.tsx -> @/components/Chatbot":{"id":3904,"files":["static/chunks/647-a7eca9402eeda84a.js","static/chunks/126.0dd9ca734ed46b9b.js"]}}';

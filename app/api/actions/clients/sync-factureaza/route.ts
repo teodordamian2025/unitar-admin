@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
 
 async function fetchClientsFromFactureaza() {
   try {
+    console.log('Încercare conectare factureaza.me...'); // Debug
+    
     const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/clienti`, {
       method: 'GET',
       headers: {
@@ -128,21 +130,44 @@ async function fetchClientsFromFactureaza() {
       }
     });
 
+    console.log('Response status factureaza.me:', response.status); // Debug
+    
     const data = await response.json();
+    console.log('Response data factureaza.me:', data); // Debug
 
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || data.error || 'Eroare la obținerea clienților'
+        error: data.message || data.error || `HTTP ${response.status}: Eroare la obținerea clienților`
       };
     }
 
+    // Verifică diferite formate de răspuns
+    const clientsData = data.clienti || data.data || data.clients || data;
+    
+    if (!Array.isArray(clientsData)) {
+      console.log('Răspuns neașteptat factureaza.me:', data); // Debug
+      return {
+        success: false,
+        error: 'Format răspuns neașteptat de la factureaza.me'
+      };
+    }
+
+    console.log(`Găsiți ${clientsData.length} clienți în factureaza.me`); // Debug
+
     return {
       success: true,
-      data: data.clienti || data.data || data // Diferite formate posibile de răspuns
+      data: clientsData
     };
 
   } catch (error) {
+    console.error('Eroare conectare factureaza.me:', error); // Debug
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Eroare de conectare'
+    };
+  }
+}
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Eroare de conectare'
