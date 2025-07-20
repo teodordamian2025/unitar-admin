@@ -439,7 +439,8 @@ function prepareFactureazaApiData(proiect, clientInfo) {
 }
 async function createInvoiceViaApi(invoiceData) {
     try {
-        const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/facturi`, {
+        console.log("Sending invoice data to factureaza.me:", invoiceData); // Debug
+        const response = await fetch(`${process.env.FACTUREAZA_API_ENDPOINT}/invoice/create`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -448,7 +449,20 @@ async function createInvoiceViaApi(invoiceData) {
             },
             body: JSON.stringify(invoiceData)
         });
+        console.log("Factureaza response status:", response.status); // Debug
+        console.log("Factureaza response headers:", response.headers.get("content-type")); // Debug
+        // Verifică dacă răspunsul este JSON
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const textResponse = await response.text();
+            console.error("Response is not JSON:", textResponse.substring(0, 200)); // Debug
+            return {
+                success: false,
+                error: `Răspuns neașteptat de la factureaza.me (${response.status}). Verifică API endpoint-ul și cheia.`
+            };
+        }
         const responseData = await response.json();
+        console.log("Factureaza response data:", responseData); // Debug
         if (!response.ok) {
             return {
                 success: false,

@@ -155,45 +155,42 @@ export async function POST(request: NextRequest) {
     // Generează ID unic
     const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (id, nume, tip_client, cui, nr_reg_com, adresa, judet, oras, cod_postal, tara,
-       telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la,
-       data_creare, data_actualizare, activ, sincronizat_factureaza, observatii)
-      VALUES (@id, @nume, @tip_client, @cui, @nr_reg_com, @adresa, @judet, @oras, @cod_postal, @tara,
-              @telefon, @email, @banca, @iban, @cnp, @ci_serie, @ci_numar, @ci_eliberata_de, @ci_eliberata_la,
-              @data_creare, @data_actualizare, @activ, @sincronizat_factureaza, @observatii)
-    `;
+    // Folosește aceeași abordare ca chatbot-ul - construiește SQL direct
+    const insertData = {
+      id: clientId,
+      nume: nume.trim(),
+      tip_client,
+      cui: cui?.trim() || null,
+      nr_reg_com: nr_reg_com?.trim() || null,
+      adresa: adresa?.trim() || null,
+      judet: judet?.trim() || null,
+      oras: oras?.trim() || null,
+      cod_postal: cod_postal?.trim() || null,
+      tara: 'România',
+      telefon: telefon?.trim() || null,
+      email: email?.trim() || null,
+      banca: banca?.trim() || null,
+      iban: iban?.trim() || null,
+      cnp: cnp?.trim() || null,
+      ci_serie: ci_serie?.trim() || null,
+      ci_numar: ci_numar?.trim() || null,
+      ci_eliberata_de: ci_eliberata_de?.trim() || null,
+      ci_eliberata_la: ci_eliberata_la || null,
+      data_creare: new Date().toISOString(),
+      data_actualizare: new Date().toISOString(),
+      activ: true,
+      sincronizat_factureaza: false,
+      observatii: observatii?.trim() || null
+    };
+
+    // Construiește query-ul ca în chatbot
+    const insertQuery = generateInsertQuery('PanouControlUnitar', 'Clienti', insertData);
+    
+    console.log('Executing insert query:', insertQuery); // Debug
 
     await bigquery.query({
       query: insertQuery,
-      params: {
-        id: clientId,
-        nume: nume.trim(),
-        tip_client,
-        cui: cui?.trim() || null,
-        nr_reg_com: nr_reg_com?.trim() || null,
-        adresa: adresa?.trim() || null,
-        judet: judet?.trim() || null,
-        oras: oras?.trim() || null,
-        cod_postal: cod_postal?.trim() || null,
-        tara: 'România',
-        telefon: telefon?.trim() || null,
-        email: email?.trim() || null,
-        banca: banca?.trim() || null,
-        iban: iban?.trim() || null,
-        cnp: cnp?.trim() || null,
-        ci_serie: ci_serie?.trim() || null,
-        ci_numar: ci_numar?.trim() || null,
-        ci_eliberata_de: ci_eliberata_de?.trim() || null,
-        ci_eliberata_la: ci_eliberata_la || null,
-        data_creare: new Date().toISOString(),
-        data_actualizare: new Date().toISOString(),
-        activ: true,
-        sincronizat_factureaza: false,
-        observatii: observatii?.trim() || null
-      },
-      location: 'EU'
+      location: 'EU',
     });
 
     return NextResponse.json({
@@ -209,6 +206,23 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });
   }
+}
+
+// Funcție helper pentru generarea query-urilor INSERT (copiată din chatbot)
+function generateInsertQuery(dataset: string, table: string, data: any): string {
+  const fullTableName = `\`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
+  
+  const columns = Object.keys(data);
+  const values = columns.map(col => {
+    const value = data[col];
+    if (value === null || value === undefined) return 'NULL';
+    if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+    return `'${value}'`;
+  }).join(', ');
+  
+  return `INSERT INTO ${fullTableName} (${columns.join(', ')}) VALUES (${values})`;
 }
 
 export async function PUT(request: NextRequest) {
