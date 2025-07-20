@@ -108,7 +108,9 @@ export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownPro
         body: JSON.stringify({ proiectId: proiect.ID_Proiect })
       });
 
+      console.log('Invoice response status:', response.status); // Debug
       const result = await response.json();
+      console.log('Invoice response data:', result); // Debug
 
       if (result.success) {
         toast.success('Factură creată cu succes în factureaza.me!');
@@ -129,9 +131,11 @@ export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownPro
         // Actualează lista pentru a reflecta modificările
         onRefresh?.();
       } else {
-        toast.error(result.error || 'Eroare la crearea facturii');
+        console.error('Eroare factură:', result); // Debug
+        toast.error(`Eroare factură: ${result.error || 'Eroare necunoscută'}`);
       }
     } catch (error) {
+      console.error('Eroare la crearea facturii:', error); // Debug
       toast.error('Eroare la crearea facturii');
     }
   };

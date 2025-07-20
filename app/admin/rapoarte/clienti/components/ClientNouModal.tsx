@@ -98,27 +98,44 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
       console.log('Trimitere date client:', formData); // Debug
       toast.info('Se adaugă clientul...');
 
-      // Încearcă doar BigQuery dacă factureaza.me nu e configurat
-      const apiEndpoint = process.env.FACTUREAZA_API_KEY 
-        ? '/api/actions/clients/sync-factureaza' 
-        : '/api/rapoarte/clienti';
+      // Încearcă factureaza.me dacă e configurat, altfel doar BigQuery
+      let response;
+      let result;
 
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+      if (process.env.NEXT_PUBLIC_FACTUREAZA_ENABLED === 'true') {
+        // Încearcă sync cu factureaza.me
+        response = await fetch('/api/actions/clients/sync-factureaza', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        result = await response.json();
+        
+        if (!result.success) {
+          console.log('Factureaza.me failed, trying BigQuery only:', result.error);
+          // Fallback la BigQuery doar
+          response = await fetch('/api/rapoarte/clienti', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          });
+          result = await response.json();
+        }
+      } else {
+        // Doar BigQuery
+        response = await fetch('/api/rapoarte/clienti', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        result = await response.json();
+      }
 
       console.log('Response status:', response.status); // Debug
-      const result = await response.json();
       console.log('Response data:', result); // Debug
 
       if (result.success || response.ok) {
-        if (apiEndpoint.includes('sync-factureaza')) {
-          toast.success('Client adăugat cu succes în BigQuery și factureaza.me!');
-        } else {
-          toast.success('Client adăugat cu succes în BigQuery!');
-        }
+        toast.success('Client adăugat cu succes!');
         onClientAdded();
         onClose();
         // Reset form
