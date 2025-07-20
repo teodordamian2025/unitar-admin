@@ -13,7 +13,41 @@ interface ClientNouModalProps {
 }
 
 export default function ClientNouModal({ isOpen, onClose, onClientAdded }: ClientNouModalProps) {
-  const [loading, setLoading] = useState(false);
+  const [anafLoading, setAnafLoading] = useState(false);
+
+  const handleVerifyANAF = async () => {
+    if (!formData.cui.trim()) {
+      toast.error('Introduceți mai întâi CUI-ul');
+      return;
+    }
+
+    try {
+      setAnafLoading(true);
+      toast.info('Verificare date ANAF...');
+
+      // API simplu pentru verificare ANAF (poți folosi openapi.ro sau alt serviciu)
+      const response = await fetch(`/api/verify-anaf?cui=${formData.cui}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        // Populează form-ul cu datele de la ANAF
+        setFormData(prev => ({
+          ...prev,
+          nume: result.data.nume || prev.nume,
+          adresa: result.data.adresa || prev.adresa,
+          // Alte câmpuri returnate de ANAF
+        }));
+        toast.success('Date ANAF încărcate cu succes!');
+      } else {
+        toast.warning('Nu s-au găsit date pentru acest CUI la ANAF');
+      }
+    } catch (error) {
+      console.error('Eroare verificare ANAF:', error);
+      toast.error('Eroare la verificarea ANAF');
+    } finally {
+      setAnafLoading(false);
+    }
+  };
   const [formData, setFormData] = useState({
     nume: '',
     tip_client: 'persoana_juridica',
@@ -44,32 +78,46 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
       // Validări
       if (!formData.nume.trim()) {
         toast.error('Numele clientului este obligatoriu');
+        setLoading(false);
         return;
       }
 
       if (formData.tip_client === 'persoana_juridica' && !formData.cui.trim()) {
         toast.error('CUI-ul este obligatoriu pentru persoane juridice');
+        setLoading(false);
         return;
       }
 
       if (formData.tip_client === 'persoana_fizica' && !formData.cnp.trim()) {
         toast.error('CNP-ul este obligatoriu pentru persoane fizice');
+        setLoading(false);
         return;
       }
 
-      toast.info('Se adaugă clientul în ambele sisteme...');
+      console.log('Trimitere date client:', formData); // Debug
+      toast.info('Se adaugă clientul...');
 
-      // Trimite datele către API pentru sincronizare
-      const response = await fetch('/api/actions/clients/sync-factureaza', {
+      // Încearcă doar BigQuery dacă factureaza.me nu e configurat
+      const apiEndpoint = process.env.FACTUREAZA_API_KEY 
+        ? '/api/actions/clients/sync-factureaza' 
+        : '/api/rapoarte/clienti';
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 
+      console.log('Response status:', response.status); // Debug
       const result = await response.json();
+      console.log('Response data:', result); // Debug
 
-      if (result.success) {
-        toast.success('Client adăugat cu succes în BigQuery și factureaza.me!');
+      if (result.success || response.ok) {
+        if (apiEndpoint.includes('sync-factureaza')) {
+          toast.success('Client adăugat cu succes în BigQuery și factureaza.me!');
+        } else {
+          toast.success('Client adăugat cu succes în BigQuery!');
+        }
         onClientAdded();
         onClose();
         // Reset form
@@ -94,9 +142,11 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
           observatii: ''
         });
       } else {
-        toast.error(`Eroare: ${result.error}`);
+        console.error('Eroare API:', result); // Debug
+        toast.error(`Eroare: ${result.error || 'Eroare necunoscută'}`);
       }
     } catch (error) {
+      console.error('Eroare la adăugarea clientului:', error); // Debug
       toast.error('Eroare la adăugarea clientului');
     } finally {
       setLoading(false);
@@ -222,20 +272,40 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   CUI *
                 </label>
-                <input
-                  type="text"
-                  value={formData.cui}
-                  onChange={(e) => handleInputChange('cui', e.target.value)}
-                  disabled={loading}
-                  placeholder="RO12345678"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={formData.cui}
+                    onChange={(e) => handleInputChange('cui', e.target.value)}
+                    disabled={loading}
+                    placeholder="RO12345678"
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyANAF}
+                    disabled={loading || anafLoading || !formData.cui.trim()}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      background: anafLoading ? '#bdc3c7' : '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: (loading || anafLoading || !formData.cui.trim()) ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {anafLoading ? '⏳' : '🏛️ ANAF'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
