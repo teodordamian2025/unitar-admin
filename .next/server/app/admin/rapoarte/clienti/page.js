@@ -415,33 +415,194 @@ const routeModule = new AppPageRouteModule({
 /***/ 45845:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 27174))
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 22536))
 
 /***/ }),
 
-/***/ 27174:
+/***/ 22536:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
+// ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (/* binding */ ClientiPage)
-/* harmony export */ });
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(76931);
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17640);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _components_BaseTable__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(47965);
-/* harmony import */ var _components_FilterBar__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(51289);
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, {
+  "default": () => (/* binding */ ClientiPage)
+});
+
+// EXTERNAL MODULE: external "next/dist/compiled/react-experimental/jsx-runtime"
+var jsx_runtime_ = __webpack_require__(76931);
+// EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
+var react_experimental_ = __webpack_require__(17640);
+;// CONCATENATED MODULE: ./app/admin/rapoarte/components/BaseTable.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+function BaseTable({ data, columns, loading = false, onRowClick, actions, emptyMessage = "Nu sunt date disponibile" }) {
+    const [sortColumn, setSortColumn] = (0,react_experimental_.useState)("");
+    const [sortDirection, setSortDirection] = (0,react_experimental_.useState)("asc");
+    const handleSort = (columnKey)=>{
+        if (sortColumn === columnKey) {
+            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+        } else {
+            setSortColumn(columnKey);
+            setSortDirection("asc");
+        }
+    };
+    const sortedData = [
+        ...data
+    ].sort((a, b)=>{
+        if (!sortColumn) return 0;
+        const aValue = a[sortColumn];
+        const bValue = b[sortColumn];
+        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+    });
+    if (loading) {
+        return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+            style: {
+                background: "white",
+                borderRadius: "8px",
+                padding: "2rem",
+                textAlign: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+            },
+            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                children: "Se \xeencarcă..."
+            })
+        });
+    }
+    return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+        style: {
+            background: "white",
+            borderRadius: "8px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            overflow: "hidden"
+        },
+        children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+            style: {
+                overflowX: "auto"
+            },
+            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
+                style: {
+                    width: "100%",
+                    borderCollapse: "collapse"
+                },
+                children: [
+                    /*#__PURE__*/ jsx_runtime_.jsx("thead", {
+                        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                            style: {
+                                background: "#f8f9fa"
+                            },
+                            children: [
+                                columns.map((column)=>/*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem",
+                                            textAlign: "left",
+                                            borderBottom: "1px solid #dee2e6",
+                                            fontWeight: 600,
+                                            color: "#495057",
+                                            cursor: column.sortable ? "pointer" : "default",
+                                            width: column.width,
+                                            userSelect: "none"
+                                        },
+                                        onClick: ()=>column.sortable && handleSort(column.key),
+                                        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            style: {
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem"
+                                            },
+                                            children: [
+                                                column.label,
+                                                column.sortable && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    style: {
+                                                        opacity: sortColumn === column.key ? 1 : 0.3
+                                                    },
+                                                    children: sortColumn === column.key && sortDirection === "desc" ? "↓" : "↑"
+                                                })
+                                            ]
+                                        })
+                                    }, column.key)),
+                                actions && /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                    style: {
+                                        padding: "1rem",
+                                        textAlign: "center",
+                                        borderBottom: "1px solid #dee2e6",
+                                        fontWeight: 600,
+                                        color: "#495057",
+                                        width: "120px"
+                                    },
+                                    children: "Acțiuni"
+                                })
+                            ]
+                        })
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
+                        children: sortedData.length === 0 ? /*#__PURE__*/ jsx_runtime_.jsx("tr", {
+                            children: /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                colSpan: columns.length + (actions ? 1 : 0),
+                                style: {
+                                    padding: "2rem",
+                                    textAlign: "center",
+                                    color: "#6c757d"
+                                },
+                                children: emptyMessage
+                            })
+                        }) : sortedData.map((row, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                onClick: ()=>onRowClick?.(row),
+                                style: {
+                                    cursor: onRowClick ? "pointer" : "default"
+                                },
+                                onMouseEnter: (e)=>{
+                                    if (onRowClick) {
+                                        e.currentTarget.style.background = "#f8f9fa";
+                                    }
+                                },
+                                onMouseLeave: (e)=>{
+                                    if (onRowClick) {
+                                        e.currentTarget.style.background = "transparent";
+                                    }
+                                },
+                                children: [
+                                    columns.map((column)=>/*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "1rem",
+                                                borderBottom: "1px solid #dee2e6",
+                                                color: "#495057"
+                                            },
+                                            children: column.render ? column.render(row[column.key], row) : row[column.key]
+                                        }, column.key)),
+                                    actions && /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                        style: {
+                                            padding: "1rem",
+                                            borderBottom: "1px solid #dee2e6",
+                                            textAlign: "center"
+                                        },
+                                        children: actions(row)
+                                    })
+                                ]
+                            }, index))
+                    })
+                ]
+            })
+        })
+    });
+}
+
+// EXTERNAL MODULE: ./app/admin/rapoarte/components/FilterBar.tsx
+var FilterBar = __webpack_require__(51289);
+;// CONCATENATED MODULE: ./app/admin/rapoarte/clienti/page.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
 
 function ClientiPage() {
-    const [data, setData] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)([]);
-    const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
-    const [filters, setFilters] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)({});
-    (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(()=>{
+    const [data, setData] = (0,react_experimental_.useState)([]);
+    const [loading, setLoading] = (0,react_experimental_.useState)(true);
+    const [filters, setFilters] = (0,react_experimental_.useState)({});
+    (0,react_experimental_.useEffect)(()=>{
         fetchClienti();
     }, [
         filters
@@ -509,15 +670,15 @@ function ClientiPage() {
             key: "nume",
             label: "Nume Client",
             sortable: true,
-            render: (value, row)=>/*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+            render: (value, row)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     children: [
-                        /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 fontWeight: 500
                             },
                             children: value
                         }),
-                        /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 fontSize: "12px",
                                 color: "#6c757d"
@@ -530,15 +691,15 @@ function ClientiPage() {
         {
             key: "email",
             label: "Contact",
-            render: (value, row)=>/*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+            render: (value, row)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     children: [
-                        /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 fontSize: "14px"
                             },
                             children: value
                         }),
-                        /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 fontSize: "12px",
                                 color: "#6c757d"
@@ -551,7 +712,7 @@ function ClientiPage() {
         {
             key: "adresa",
             label: "Adresa",
-            render: (value)=>/*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+            render: (value)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
                     style: {
                         maxWidth: "200px"
                     },
@@ -571,7 +732,7 @@ function ClientiPage() {
         {
             key: "activ",
             label: "Status",
-            render: (value)=>/*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("span", {
+            render: (value)=>/*#__PURE__*/ jsx_runtime_.jsx("span", {
                     style: {
                         padding: "0.25rem 0.75rem",
                         borderRadius: "12px",
@@ -584,9 +745,9 @@ function ClientiPage() {
                 })
         }
     ];
-    return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
         children: [
-            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
                     display: "flex",
                     justifyContent: "space-between",
@@ -594,16 +755,16 @@ function ClientiPage() {
                     marginBottom: "2rem"
                 },
                 children: [
-                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         children: [
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h2", {
+                            /*#__PURE__*/ jsx_runtime_.jsx("h2", {
                                 style: {
                                     margin: 0,
                                     color: "#2c3e50"
                                 },
                                 children: "\uD83D\uDC65 Clienți"
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
                                 style: {
                                     margin: "0.5rem 0 0 0",
                                     color: "#6c757d"
@@ -612,7 +773,7 @@ function ClientiPage() {
                             })
                         ]
                     }),
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
                         onClick: ()=>alert("Adăugare client \xeen dezvoltare"),
                         style: {
                             padding: "0.75rem 1.5rem",
@@ -627,14 +788,14 @@ function ClientiPage() {
                     })
                 ]
             }),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_components_FilterBar__WEBPACK_IMPORTED_MODULE_3__/* ["default"] */ .Z, {
+            /*#__PURE__*/ jsx_runtime_.jsx(FilterBar/* default */.Z, {
                 filters: clientFilters,
                 values: filters,
                 onChange: setFilters,
                 onReset: ()=>setFilters({}),
                 loading: loading
             }),
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_components_BaseTable__WEBPACK_IMPORTED_MODULE_2__/* ["default"] */ .Z, {
+            /*#__PURE__*/ jsx_runtime_.jsx(BaseTable, {
                 data: data,
                 columns: columns,
                 loading: loading,
@@ -680,7 +841,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,8313,9850,6166,6549,8888], () => (__webpack_exec__(33841)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,8313,9850,6166,6549,1289], () => (__webpack_exec__(33841)));
 module.exports = __webpack_exports__;
 
 })();

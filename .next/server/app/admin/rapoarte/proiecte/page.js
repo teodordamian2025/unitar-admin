@@ -415,11 +415,11 @@ const routeModule = new AppPageRouteModule({
 /***/ 16902:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 15241))
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 6936))
 
 /***/ }),
 
-/***/ 15241:
+/***/ 6936:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -437,485 +437,6 @@ var jsx_runtime_ = __webpack_require__(76931);
 var react_experimental_ = __webpack_require__(17640);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
 var navigation = __webpack_require__(57114);
-// EXTERNAL MODULE: ./app/admin/rapoarte/components/BaseTable.tsx
-var BaseTable = __webpack_require__(47965);
-;// CONCATENATED MODULE: ./app/admin/rapoarte/components/ActionDropdown.tsx
-/* __next_internal_client_entry_do_not_use__ default auto */ 
-
-function ActionDropdown({ actions, onAction, data, disabled = false }) {
-    const [isOpen, setIsOpen] = (0,react_experimental_.useState)(false);
-    const dropdownRef = (0,react_experimental_.useRef)(null);
-    (0,react_experimental_.useEffect)(()=>{
-        const handleClickOutside = (event)=>{
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return ()=>document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-    const getActionColor = (color)=>{
-        switch(color){
-            case "primary":
-                return "#007bff";
-            case "secondary":
-                return "#6c757d";
-            case "success":
-                return "#28a745";
-            case "warning":
-                return "#ffc107";
-            case "danger":
-                return "#dc3545";
-            default:
-                return "#495057";
-        }
-    };
-    const handleActionClick = (actionKey)=>{
-        setIsOpen(false);
-        onAction(actionKey, data);
-    };
-    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-        ref: dropdownRef,
-        style: {
-            position: "relative",
-            display: "inline-block"
-        },
-        children: [
-            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                onClick: ()=>setIsOpen(!isOpen),
-                disabled: disabled,
-                style: {
-                    padding: "0.5rem",
-                    background: "transparent",
-                    border: "1px solid #dee2e6",
-                    borderRadius: "6px",
-                    cursor: disabled ? "not-allowed" : "pointer",
-                    color: "#495057",
-                    fontSize: "14px",
-                    opacity: disabled ? 0.6 : 1,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.25rem"
-                },
-                children: [
-                    "⚙️",
-                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                        style: {
-                            fontSize: "12px"
-                        },
-                        children: "▼"
-                    })
-                ]
-            }),
-            isOpen && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    position: "absolute",
-                    top: "100%",
-                    right: 0,
-                    zIndex: 1000,
-                    background: "white",
-                    border: "1px solid #dee2e6",
-                    borderRadius: "6px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    minWidth: "200px",
-                    marginTop: "0.25rem"
-                },
-                children: actions.map((action, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        children: [
-                            action.divider && index > 0 && /*#__PURE__*/ jsx_runtime_.jsx("hr", {
-                                style: {
-                                    margin: "0.5rem 0",
-                                    border: "none",
-                                    borderTop: "1px solid #dee2e6"
-                                }
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                onClick: ()=>handleActionClick(action.key),
-                                disabled: action.disabled,
-                                style: {
-                                    width: "100%",
-                                    padding: "0.75rem 1rem",
-                                    background: "transparent",
-                                    border: "none",
-                                    textAlign: "left",
-                                    cursor: action.disabled ? "not-allowed" : "pointer",
-                                    color: action.disabled ? "#6c757d" : getActionColor(action.color),
-                                    fontSize: "14px",
-                                    opacity: action.disabled ? 0.6 : 1,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                    transition: "background 0.2s"
-                                },
-                                onMouseEnter: (e)=>{
-                                    if (!action.disabled) {
-                                        e.currentTarget.style.background = "#f8f9fa";
-                                    }
-                                },
-                                onMouseLeave: (e)=>{
-                                    e.currentTarget.style.background = "transparent";
-                                },
-                                children: [
-                                    action.icon && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        children: action.icon
-                                    }),
-                                    action.label
-                                ]
-                            })
-                        ]
-                    }, action.key))
-            })
-        ]
-    });
-}
-
-;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-/* __next_internal_client_entry_do_not_use__ default auto */ 
-
-function ProiectActions({ proiect, onAction }) {
-    const actions = [
-        {
-            key: "view",
-            label: "Vezi Detalii",
-            icon: "\uD83D\uDC41️",
-            color: "primary"
-        },
-        {
-            key: "edit",
-            label: "Editează",
-            icon: "✏️",
-            color: "secondary"
-        },
-        {
-            key: "duplicate",
-            label: "Duplică Proiect",
-            icon: "\uD83D\uDCCB",
-            color: "secondary"
-        },
-        {
-            key: "divider1",
-            label: "",
-            divider: true
-        },
-        {
-            key: "generate_contract",
-            label: "Generează Contract",
-            icon: "\uD83D\uDCC4",
-            color: "success",
-            disabled: proiect.Status === "Anulat"
-        },
-        {
-            key: "generate_invoice",
-            label: "Creează Factură",
-            icon: "\uD83D\uDCB0",
-            color: "warning",
-            disabled: proiect.Status !== "Activ" && proiect.Status !== "Finalizat"
-        },
-        {
-            key: "send_email",
-            label: "Trimite Email Client",
-            icon: "\uD83D\uDCE7",
-            color: "primary"
-        },
-        {
-            key: "divider2",
-            label: "",
-            divider: true
-        },
-        {
-            key: "mark_completed",
-            label: "Marchează Finalizat",
-            icon: "✅",
-            color: "success",
-            disabled: proiect.Status === "Finalizat" || proiect.Status === "Anulat"
-        },
-        {
-            key: "suspend",
-            label: "Suspendă Proiect",
-            icon: "⏸️",
-            color: "warning",
-            disabled: proiect.Status === "Suspendat" || proiect.Status === "Finalizat"
-        },
-        {
-            key: "divider3",
-            label: "",
-            divider: true
-        },
-        {
-            key: "delete",
-            label: "Șterge Proiect",
-            icon: "\uD83D\uDDD1️",
-            color: "danger"
-        }
-    ];
-    return /*#__PURE__*/ jsx_runtime_.jsx(ActionDropdown, {
-        actions: actions,
-        onAction: onAction,
-        data: proiect
-    });
-}
-
-;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-/* __next_internal_client_entry_do_not_use__ default auto */ 
-
-
-
-function ProiecteTable({ filters, onRowClick }) {
-    const [data, setData] = (0,react_experimental_.useState)([]);
-    const [loading, setLoading] = (0,react_experimental_.useState)(true);
-    (0,react_experimental_.useEffect)(()=>{
-        fetchProiecte();
-    }, [
-        filters
-    ]);
-    const fetchProiecte = async ()=>{
-        setLoading(true);
-        try {
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value])=>{
-                if (value) queryParams.append(key, value);
-            });
-            const response = await fetch(`/api/rapoarte/proiecte?${queryParams}`);
-            if (response.ok) {
-                const result = await response.json();
-                setData(result.data || []);
-            }
-        } catch (error) {
-            console.error("Eroare la \xeencărcarea proiectelor:", error);
-        } finally{
-            setLoading(false);
-        }
-    };
-    const handleAction = async (actionKey, proiect)=>{
-        switch(actionKey){
-            case "view":
-                window.open(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`, "_blank");
-                break;
-            case "edit":
-                // TODO: Implementare modal editare
-                alert(`Editare proiect: ${proiect.ID_Proiect}`);
-                break;
-            case "generate_contract":
-                try {
-                    const response = await fetch("/api/actions/genereaza-contract", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            proiectId: proiect.ID_Proiect
-                        })
-                    });
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `Contract_${proiect.ID_Proiect}.pdf`;
-                        a.click();
-                        alert("Contract generat cu succes!");
-                    }
-                } catch (error) {
-                    alert("Eroare la generarea contractului");
-                }
-                break;
-            case "generate_invoice":
-                alert(`Generare factură pentru: ${proiect.ID_Proiect}`);
-                break;
-            case "send_email":
-                alert(`Trimitere email pentru: ${proiect.ID_Proiect}`);
-                break;
-            case "mark_completed":
-                if (confirm("Sigur vrei să marchezi acest proiect ca finalizat?")) {
-                    await updateProiectStatus(proiect.ID_Proiect, "Finalizat");
-                }
-                break;
-            case "suspend":
-                if (confirm("Sigur vrei să suspenzi acest proiect?")) {
-                    await updateProiectStatus(proiect.ID_Proiect, "Suspendat");
-                }
-                break;
-            case "delete":
-                if (confirm("Sigur vrei să ștergi acest proiect? Această acțiune nu poate fi anulată!")) {
-                    await deleteProiect(proiect.ID_Proiect);
-                }
-                break;
-        }
-    };
-    const updateProiectStatus = async (proiectId, newStatus)=>{
-        try {
-            const response = await fetch("/api/rapoarte/proiecte", {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    id: proiectId,
-                    status: newStatus
-                })
-            });
-            if (response.ok) {
-                await fetchProiecte(); // Refresh data
-                alert(`Status actualizat la: ${newStatus}`);
-            }
-        } catch (error) {
-            alert("Eroare la actualizarea statusului");
-        }
-    };
-    const deleteProiect = async (proiectId)=>{
-        try {
-            const response = await fetch(`/api/rapoarte/proiecte?id=${proiectId}`, {
-                method: "DELETE"
-            });
-            if (response.ok) {
-                await fetchProiecte(); // Refresh data
-                alert("Proiect șters cu succes");
-            }
-        } catch (error) {
-            alert("Eroare la ștergerea proiectului");
-        }
-    };
-    const renderStatus = (status)=>{
-        const statusConfig = {
-            "Activ": {
-                color: "#28a745",
-                icon: "\uD83D\uDFE2"
-            },
-            "\xcen lucru": {
-                color: "#ffc107",
-                icon: "\uD83D\uDFE1"
-            },
-            "Suspendat": {
-                color: "#fd7e14",
-                icon: "\uD83D\uDFE0"
-            },
-            "Finalizat": {
-                color: "#6f42c1",
-                icon: "✅"
-            },
-            "Anulat": {
-                color: "#dc3545",
-                icon: "\uD83D\uDD34"
-            }
-        };
-        const config = statusConfig[status] || {
-            color: "#6c757d",
-            icon: "⚪"
-        };
-        return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-            style: {
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                padding: "0.25rem 0.75rem",
-                borderRadius: "12px",
-                fontSize: "12px",
-                fontWeight: 500,
-                background: `${config.color}20`,
-                color: config.color,
-                border: `1px solid ${config.color}40`
-            },
-            children: [
-                config.icon,
-                " ",
-                status
-            ]
-        });
-    };
-    const renderValoare = (valoare)=>{
-        if (!valoare) return "-";
-        const amount = typeof valoare === "string" ? parseFloat(valoare) : valoare;
-        return new Intl.NumberFormat("ro-RO", {
-            style: "currency",
-            currency: "RON"
-        }).format(amount);
-    };
-    const renderData = (data)=>{
-        if (!data) return "-";
-        if (typeof data === "object" && data.value) {
-            return new Date(data.value).toLocaleDateString("ro-RO");
-        }
-        return new Date(data).toLocaleDateString("ro-RO");
-    };
-    const columns = [
-        {
-            key: "ID_Proiect",
-            label: "ID Proiect",
-            sortable: true,
-            width: "150px",
-            render: (value)=>/*#__PURE__*/ jsx_runtime_.jsx("span", {
-                    style: {
-                        fontFamily: "monospace",
-                        fontWeight: 500
-                    },
-                    children: value
-                })
-        },
-        {
-            key: "Denumire",
-            label: "Denumire Proiect",
-            sortable: true,
-            render: (value)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
-                    style: {
-                        maxWidth: "300px"
-                    },
-                    children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                        style: {
-                            fontWeight: 500,
-                            marginBottom: "0.25rem"
-                        },
-                        children: value?.length > 50 ? `${value.substring(0, 50)}...` : value
-                    })
-                })
-        },
-        {
-            key: "Client",
-            label: "Client",
-            sortable: true,
-            width: "200px"
-        },
-        {
-            key: "Status",
-            label: "Status",
-            sortable: true,
-            width: "130px",
-            render: renderStatus
-        },
-        {
-            key: "Data_Start",
-            label: "Data \xcenceput",
-            sortable: true,
-            width: "120px",
-            render: renderData
-        },
-        {
-            key: "Data_Final",
-            label: "Data Final",
-            sortable: true,
-            width: "120px",
-            render: renderData
-        },
-        {
-            key: "Valoare_Estimata",
-            label: "Valoare",
-            sortable: true,
-            width: "120px",
-            render: renderValoare
-        }
-    ];
-    return /*#__PURE__*/ jsx_runtime_.jsx(BaseTable/* default */.Z, {
-        data: data,
-        columns: columns,
-        loading: loading,
-        onRowClick: onRowClick,
-        actions: (row)=>/*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
-                proiect: row,
-                onAction: handleAction
-            }),
-        emptyMessage: "Nu sunt proiecte disponibile cu filtrele selectate."
-    });
-}
-
 // EXTERNAL MODULE: ./app/admin/rapoarte/components/FilterBar.tsx
 var FilterBar = __webpack_require__(51289);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectFilters.tsx
@@ -1005,6 +526,853 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
     });
 }
 
+// EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs + 1 modules
+var dist = __webpack_require__(7365);
+;// CONCATENATED MODULE: ./app/admin/rapoarte/components/ActionDropdown.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+function ActionDropdown({ proiect, onRefresh }) {
+    const [isOpen, setIsOpen] = (0,react_experimental_.useState)(false);
+    const [loading, setLoading] = (0,react_experimental_.useState)(null);
+    const handleAction = async (actionType)=>{
+        setLoading(actionType);
+        setIsOpen(false);
+        try {
+            switch(actionType){
+                case "view":
+                    await handleViewDetails();
+                    break;
+                case "edit":
+                    await handleEdit();
+                    break;
+                case "contract":
+                    await handleGenerateContract();
+                    break;
+                case "invoice":
+                    await handleCreateInvoice();
+                    break;
+                case "email":
+                    await handleSendEmail();
+                    break;
+                case "status":
+                    await handleUpdateStatus();
+                    break;
+                case "archive":
+                    await handleArchive();
+                    break;
+                default:
+                    dist/* toast */.Am.info("Funcție \xeen dezvoltare");
+            }
+        } catch (error) {
+            console.error(`Eroare la ${actionType}:`, error);
+            dist/* toast */.Am.error(`Eroare la executarea acțiunii: ${actionType}`);
+        } finally{
+            setLoading(null);
+        }
+    };
+    const handleViewDetails = async ()=>{
+        // TODO: Implementare modal cu detalii complete
+        dist/* toast */.Am.info(`Vizualizare detalii pentru ${proiect.ID_Proiect}`);
+    };
+    const handleEdit = async ()=>{
+        // TODO: Implementare modal editare
+        dist/* toast */.Am.info(`Editare proiect ${proiect.ID_Proiect}`);
+    };
+    const handleGenerateContract = async ()=>{
+        try {
+            const response = await fetch("/api/actions/contracts/generate", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    proiectId: proiect.ID_Proiect
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Contract generat cu succes!");
+                if (result.downloadUrl) {
+                    // Download automat
+                    const link = document.createElement("a");
+                    link.href = result.downloadUrl;
+                    link.download = `Contract_${proiect.ID_Proiect}.docx`;
+                    link.click();
+                }
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la generarea contractului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la generarea contractului");
+        }
+    };
+    const handleCreateInvoice = async ()=>{
+        try {
+            dist/* toast */.Am.info("Se creează factura \xeen factureaza.me...");
+            const response = await fetch("/api/actions/invoices/factureaza-redirect", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    proiectId: proiect.ID_Proiect
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Factură creată cu succes \xeen factureaza.me!");
+                // Deschide factura în tab nou dacă există URL
+                if (result.invoiceUrl) {
+                    window.open(result.invoiceUrl, "_blank");
+                }
+                // Opțional: descarcă automat factura
+                if (result.downloadUrl) {
+                    const downloadConfirm = confirm("Vrei să descarci factura acum?");
+                    if (downloadConfirm) {
+                        window.open(result.downloadUrl, "_blank");
+                    }
+                }
+                // Actualează lista pentru a reflecta modificările
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la crearea facturii");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la crearea facturii");
+        }
+    };
+    const handleSendEmail = async ()=>{
+        try {
+            const response = await fetch("/api/actions/email/send-client", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    proiectId: proiect.ID_Proiect
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Email trimis cu succes!");
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la trimiterea email-ului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la trimiterea email-ului");
+        }
+    };
+    const handleUpdateStatus = async ()=>{
+        const newStatus = proiect.Status === "Activ" ? "Finalizat" : "Activ";
+        try {
+            const response = await fetch("/api/rapoarte/proiecte", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    id: proiect.ID_Proiect,
+                    Status: newStatus
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success(`Status actualizat la: ${newStatus}`);
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la actualizarea statusului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la actualizarea statusului");
+        }
+    };
+    const handleArchive = async ()=>{
+        const confirmed = confirm(`Sigur vrei să arhivezi proiectul ${proiect.ID_Proiect}?`);
+        if (!confirmed) return;
+        try {
+            const response = await fetch("/api/rapoarte/proiecte", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    id: proiect.ID_Proiect,
+                    Status: "Arhivat"
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Proiect arhivat cu succes!");
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la arhivarea proiectului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la arhivarea proiectului");
+        }
+    };
+    const getStatusColor = (status)=>{
+        switch(status){
+            case "Activ":
+                return "#27ae60";
+            case "Finalizat":
+                return "#3498db";
+            case "Suspendat":
+                return "#f39c12";
+            case "Arhivat":
+                return "#95a5a6";
+            default:
+                return "#7f8c8d";
+        }
+    };
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        style: {
+            position: "relative",
+            display: "inline-block"
+        },
+        children: [
+            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                onClick: ()=>setIsOpen(!isOpen),
+                disabled: loading !== null,
+                style: {
+                    padding: "6px 12px",
+                    background: loading ? "#bdc3c7" : "#3498db",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontSize: "14px",
+                    fontWeight: "bold"
+                },
+                children: [
+                    loading ? "⏳" : "⚙️",
+                    " Acțiuni"
+                ]
+            }),
+            isOpen && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    background: "white",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    minWidth: "220px",
+                    marginTop: "4px"
+                },
+                children: [
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            padding: "12px",
+                            borderBottom: "1px solid #eee",
+                            background: "#f8f9fa"
+                        },
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                style: {
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    color: "#2c3e50",
+                                    marginBottom: "4px"
+                                },
+                                children: proiect.ID_Proiect
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    fontSize: "11px",
+                                    color: "#7f8c8d"
+                                },
+                                children: [
+                                    "Status: ",
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            color: getStatusColor(proiect.Status),
+                                            fontWeight: "bold"
+                                        },
+                                        children: proiect.Status
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            padding: "8px 0"
+                        },
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("view"),
+                                icon: "\uD83D\uDC41️",
+                                text: "Vezi Detalii",
+                                loading: loading === "view"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("edit"),
+                                icon: "✏️",
+                                text: "Editează",
+                                loading: loading === "edit"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            borderTop: "1px solid #eee",
+                            padding: "8px 0"
+                        },
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("contract"),
+                                icon: "\uD83D\uDCC4",
+                                text: "Generează Contract",
+                                loading: loading === "contract"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("invoice"),
+                                icon: "\uD83D\uDCB0",
+                                text: "Creează Factură",
+                                loading: loading === "invoice"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("email"),
+                                icon: "\uD83D\uDCE7",
+                                text: "Trimite Email Client",
+                                loading: loading === "email"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            borderTop: "1px solid #eee",
+                            padding: "8px 0"
+                        },
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("status"),
+                                icon: "\uD83D\uDCCA",
+                                text: `Marchează ${proiect.Status === "Activ" ? "Finalizat" : "Activ"}`,
+                                loading: loading === "status"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx(ActionButton, {
+                                onClick: ()=>handleAction("archive"),
+                                icon: "\uD83D\uDDD1️",
+                                text: "Arhivează Proiect",
+                                loading: loading === "archive",
+                                danger: true
+                            })
+                        ]
+                    })
+                ]
+            }),
+            isOpen && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 999
+                },
+                onClick: ()=>setIsOpen(false)
+            })
+        ]
+    });
+}
+function ActionButton({ onClick, icon, text, loading, danger }) {
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+        onClick: onClick,
+        disabled: loading,
+        style: {
+            width: "100%",
+            padding: "8px 12px",
+            background: "transparent",
+            border: "none",
+            textAlign: "left",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: "14px",
+            color: danger ? "#e74c3c" : "#2c3e50",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "background-color 0.2s"
+        },
+        onMouseOver: (e)=>{
+            if (!loading) {
+                e.currentTarget.style.background = danger ? "#fdf2f2" : "#f8f9fa";
+            }
+        },
+        onMouseOut: (e)=>{
+            e.currentTarget.style.background = "transparent";
+        },
+        children: [
+            /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                style: {
+                    minWidth: "16px"
+                },
+                children: loading ? "⏳" : icon
+            }),
+            /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                style: {
+                    opacity: loading ? 0.6 : 1
+                },
+                children: text
+            })
+        ]
+    });
+}
+
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+
+function ProiecteTable({ searchParams }) {
+    const [proiecte, setProiecte] = (0,react_experimental_.useState)([]);
+    const [loading, setLoading] = (0,react_experimental_.useState)(true);
+    const [refreshTrigger, setRefreshTrigger] = (0,react_experimental_.useState)(0);
+    (0,react_experimental_.useEffect)(()=>{
+        loadProiecte();
+    }, [
+        searchParams,
+        refreshTrigger
+    ]);
+    // Verifică notificări pentru statusul facturii din URL
+    (0,react_experimental_.useEffect)(()=>{
+        if (searchParams?.invoice_status && searchParams?.project_id) {
+            const status = searchParams.invoice_status;
+            const projectId = searchParams.project_id;
+            switch(status){
+                case "success":
+                    dist/* toast */.Am.success(`Factură creată cu succes pentru proiectul ${projectId}!`);
+                    break;
+                case "cancelled":
+                    dist/* toast */.Am.info(`Crearea facturii pentru proiectul ${projectId} a fost anulată.`);
+                    break;
+                default:
+                    dist/* toast */.Am.info(`Status factură pentru proiectul ${projectId}: ${status}`);
+            }
+        }
+    }, [
+        searchParams
+    ]);
+    const loadProiecte = async ()=>{
+        try {
+            setLoading(true);
+            // Construiește query string din searchParams
+            const queryParams = new URLSearchParams();
+            if (searchParams) {
+                Object.entries(searchParams).forEach(([key, value])=>{
+                    if (value && key !== "invoice_status" && key !== "project_id") {
+                        queryParams.append(key, value);
+                    }
+                });
+            }
+            const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+            const data = await response.json();
+            if (data.success) {
+                setProiecte(data.data || []);
+            } else {
+                dist/* toast */.Am.error("Eroare la \xeencărcarea proiectelor");
+                setProiecte([]);
+            }
+        } catch (error) {
+            console.error("Eroare la \xeencărcarea proiectelor:", error);
+            dist/* toast */.Am.error("Eroare de conectare");
+            setProiecte([]);
+        } finally{
+            setLoading(false);
+        }
+    };
+    const handleRefresh = ()=>{
+        setRefreshTrigger((prev)=>prev + 1);
+    };
+    const handleExportExcel = async ()=>{
+        try {
+            dist/* toast */.Am.info("Se generează fișierul Excel...");
+            // Construiește query string pentru export cu aceleași filtre
+            const queryParams = new URLSearchParams();
+            if (searchParams) {
+                Object.entries(searchParams).forEach(([key, value])=>{
+                    if (value && key !== "invoice_status" && key !== "project_id") {
+                        queryParams.append(key, value);
+                    }
+                });
+            }
+            const response = await fetch(`/api/rapoarte/proiecte/export?${queryParams.toString()}`);
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                // Obține numele fișierului din header sau folosește unul default
+                const contentDisposition = response.headers.get("Content-Disposition");
+                const fileName = contentDisposition ? contentDisposition.split("filename=")[1]?.replace(/"/g, "") : `Proiecte_${new Date().toISOString().split("T")[0]}.xlsx`;
+                link.download = fileName;
+                link.click();
+                window.URL.revokeObjectURL(url);
+                dist/* toast */.Am.success("Fișier Excel descărcat cu succes!");
+            } else {
+                const errorData = await response.json();
+                dist/* toast */.Am.error(`Eroare la export: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Eroare la exportul Excel:", error);
+            dist/* toast */.Am.error("Eroare la exportul Excel");
+        }
+    };
+    const formatDate = (dateString)=>{
+        if (!dateString) return "";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return "";
+            return date.toLocaleDateString("ro-RO", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            });
+        } catch  {
+            return "";
+        }
+    };
+    const formatCurrency = (amount)=>{
+        if (!amount && amount !== 0) return "";
+        return new Intl.NumberFormat("ro-RO", {
+            style: "currency",
+            currency: "RON"
+        }).format(amount);
+    };
+    const getStatusColor = (status)=>{
+        switch(status){
+            case "Activ":
+                return "#27ae60";
+            case "Finalizat":
+                return "#3498db";
+            case "Suspendat":
+                return "#f39c12";
+            case "Arhivat":
+                return "#95a5a6";
+            default:
+                return "#7f8c8d";
+        }
+    };
+    const getStatusIcon = (status)=>{
+        switch(status){
+            case "Activ":
+                return "\uD83D\uDFE2";
+            case "Finalizat":
+                return "✅";
+            case "Suspendat":
+                return "⏸️";
+            case "Arhivat":
+                return "\uD83D\uDCE6";
+            default:
+                return "⚪";
+        }
+    };
+    if (loading) {
+        return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+            style: {
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "300px",
+                fontSize: "16px",
+                color: "#7f8c8d"
+            },
+            children: "⏳ Se \xeencarcă proiectele..."
+        });
+    }
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        children: [
+            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "1.5rem",
+                    padding: "1rem",
+                    background: "#f8f9fa",
+                    borderRadius: "8px",
+                    border: "1px solid #dee2e6"
+                },
+                children: [
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        children: [
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                                style: {
+                                    margin: 0,
+                                    color: "#2c3e50"
+                                },
+                                children: [
+                                    "\uD83D\uDCCB Proiecte găsite: ",
+                                    proiecte.length
+                                ]
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                style: {
+                                    margin: "0.25rem 0 0 0",
+                                    fontSize: "14px",
+                                    color: "#7f8c8d"
+                                },
+                                children: searchParams && Object.keys(searchParams).length > 0 ? "Rezultate filtrate" : "Toate proiectele"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            display: "flex",
+                            gap: "0.5rem"
+                        },
+                        children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                onClick: handleRefresh,
+                                style: {
+                                    padding: "0.5rem 1rem",
+                                    background: "#3498db",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    fontWeight: "bold"
+                                },
+                                children: "\uD83D\uDD04 Re\xeemprospătează"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                onClick: handleExportExcel,
+                                style: {
+                                    padding: "0.5rem 1rem",
+                                    background: "#27ae60",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    fontWeight: "bold"
+                                },
+                                children: "\uD83D\uDCCA Export Excel"
+                            })
+                        ]
+                    })
+                ]
+            }),
+            proiecte.length === 0 ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    textAlign: "center",
+                    padding: "3rem",
+                    background: "#f8f9fa",
+                    borderRadius: "8px",
+                    border: "2px dashed #dee2e6"
+                },
+                children: [
+                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                        style: {
+                            fontSize: "18px",
+                            color: "#7f8c8d",
+                            margin: 0
+                        },
+                        children: "\uD83D\uDCCB Nu au fost găsite proiecte"
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                        style: {
+                            fontSize: "14px",
+                            color: "#bdc3c7",
+                            margin: "0.5rem 0 0 0"
+                        },
+                        children: "Verifică filtrele aplicate sau adaugă proiecte noi."
+                    })
+                ]
+            }) : /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    background: "white",
+                    borderRadius: "8px",
+                    border: "1px solid #dee2e6",
+                    overflow: "hidden",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                },
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
+                    style: {
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "14px"
+                    },
+                    children: [
+                        /*#__PURE__*/ jsx_runtime_.jsx("thead", {
+                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                style: {
+                                    background: "#f8f9fa",
+                                    borderBottom: "2px solid #dee2e6"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "left",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "ID Proiect"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "left",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Denumire"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "left",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Client"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "center",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Status"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "center",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Data \xcenceput"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "right",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Valoare Estimată"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        style: {
+                                            padding: "1rem 0.75rem",
+                                            textAlign: "center",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Acțiuni"
+                                    })
+                                ]
+                            })
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
+                            children: proiecte.map((proiect, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                    style: {
+                                        borderBottom: "1px solid #f1f2f6",
+                                        background: index % 2 === 0 ? "white" : "#fafbfc"
+                                    },
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                fontFamily: "monospace",
+                                                fontWeight: "bold",
+                                                color: "#2c3e50"
+                                            },
+                                            children: proiect.ID_Proiect
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                color: "#2c3e50",
+                                                maxWidth: "250px"
+                                            },
+                                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap"
+                                                },
+                                                title: proiect.Denumire,
+                                                children: proiect.Denumire
+                                            })
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                color: "#2c3e50"
+                                            },
+                                            children: proiect.Client
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                textAlign: "center"
+                                            },
+                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                style: {
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    gap: "0.25rem",
+                                                    padding: "0.25rem 0.5rem",
+                                                    borderRadius: "12px",
+                                                    fontSize: "12px",
+                                                    fontWeight: "bold",
+                                                    color: "white",
+                                                    background: getStatusColor(proiect.Status)
+                                                },
+                                                children: [
+                                                    getStatusIcon(proiect.Status),
+                                                    " ",
+                                                    proiect.Status
+                                                ]
+                                            })
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                textAlign: "center",
+                                                color: "#7f8c8d",
+                                                fontFamily: "monospace"
+                                            },
+                                            children: formatDate(proiect.Data_Start)
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                textAlign: "right",
+                                                fontWeight: "bold",
+                                                color: proiect.Valoare_Estimata ? "#27ae60" : "#bdc3c7"
+                                            },
+                                            children: formatCurrency(proiect.Valoare_Estimata)
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                            style: {
+                                                padding: "0.75rem",
+                                                textAlign: "center"
+                                            },
+                                            children: /*#__PURE__*/ jsx_runtime_.jsx(ActionDropdown, {
+                                                proiect: proiect,
+                                                onRefresh: handleRefresh
+                                            })
+                                        })
+                                    ]
+                                }, proiect.ID_Proiect))
+                        })
+                    ]
+                })
+            })
+        ]
+    });
+}
+
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/page.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
@@ -1013,179 +1381,143 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 
 function ProiectePage() {
     const router = (0,navigation.useRouter)();
-    const [filters, setFilters] = (0,react_experimental_.useState)({});
-    const [showAddModal, setShowAddModal] = (0,react_experimental_.useState)(false);
-    const handleFiltersChange = (newFilters)=>{
+    const searchParams = (0,navigation.useSearchParams)();
+    // Inițializează filtrele din URL
+    const [filters, setFilters] = (0,react_experimental_.useState)({
+        search: searchParams?.get("search") || "",
+        status: searchParams?.get("status") || "",
+        client: searchParams?.get("client") || "",
+        data_start_start: searchParams?.get("data_start_start") || "",
+        data_start_end: searchParams?.get("data_start_end") || "",
+        valoare_min: searchParams?.get("valoare_min") || "",
+        valoare_max: searchParams?.get("valoare_max") || ""
+    });
+    // Convertește filtrele în searchParams pentru ProiecteTable
+    const tableSearchParams = Object.fromEntries(Object.entries(filters).filter(([_, value])=>value !== ""));
+    const handleFilterChange = (newFilters)=>{
         setFilters(newFilters);
-    };
-    const handleFiltersReset = ()=>{
-        setFilters({});
-    };
-    const handleRowClick = (proiect)=>{
-        router.push(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`);
-    };
-    const handleExportExcel = async ()=>{
-        try {
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value])=>{
-                if (value) queryParams.append(key, value);
-            });
-            const response = await fetch(`/api/rapoarte/proiecte/export?${queryParams}`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `Proiecte_${new Date().toISOString().split("T")[0]}.xlsx`;
-                a.click();
-                URL.revokeObjectURL(url);
-            } else {
-                alert("Eroare la exportul Excel");
+        // Actualizează URL-ul cu noile filtre
+        const params = new URLSearchParams();
+        Object.entries(newFilters).forEach(([key, value])=>{
+            if (value) {
+                params.set(key, value);
             }
-        } catch (error) {
-            console.error("Eroare export:", error);
-            alert("Eroare la exportul Excel");
-        }
+        });
+        const newUrl = params.toString() ? `/admin/rapoarte/proiecte?${params.toString()}` : "/admin/rapoarte/proiecte";
+        router.push(newUrl);
     };
-    const handleSendReport = ()=>{
-        // TODO: Implementare trimitere raport pe email
-        alert("Funcționalitate \xeen dezvoltare - Trimitere raport pe email");
+    const handleFilterReset = ()=>{
+        const emptyFilters = {
+            search: "",
+            status: "",
+            client: "",
+            data_start_start: "",
+            data_start_end: "",
+            valoare_min: "",
+            valoare_max: ""
+        };
+        setFilters(emptyFilters);
+        router.push("/admin/rapoarte/proiecte");
     };
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        style: {
+            padding: "1.5rem"
+        },
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "2rem"
+                    marginBottom: "2rem",
+                    borderBottom: "2px solid #e9ecef",
+                    paddingBottom: "1rem"
                 },
                 children: [
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        children: [
-                            /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                style: {
-                                    margin: 0,
-                                    color: "#2c3e50"
-                                },
-                                children: "\uD83D\uDCCB Proiecte"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                                style: {
-                                    margin: "0.5rem 0 0 0",
-                                    color: "#6c757d"
-                                },
-                                children: "Gestionează toate proiectele firmei"
-                            })
-                        ]
-                    }),
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    /*#__PURE__*/ jsx_runtime_.jsx("h1", {
                         style: {
-                            display: "flex",
-                            gap: "1rem"
+                            margin: 0,
+                            color: "#2c3e50",
+                            fontSize: "2rem",
+                            fontWeight: "bold"
                         },
-                        children: [
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: handleSendReport,
-                                style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#17a2b8",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem"
-                                },
-                                children: "\uD83D\uDCE7 Trimite Raport"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: handleExportExcel,
-                                style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#28a745",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem"
-                                },
-                                children: "\uD83D\uDCCA Export Excel"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: ()=>setShowAddModal(true),
-                                style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#007bff",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem"
-                                },
-                                children: "+ Proiect Nou"
-                            })
-                        ]
+                        children: "\uD83D\uDCCB Management Proiecte"
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                        style: {
+                            margin: "0.5rem 0 0 0",
+                            color: "#7f8c8d",
+                            fontSize: "1.1rem"
+                        },
+                        children: "Gestionează și monitorizează toate proiectele din portofoliu"
                     })
                 ]
             }),
-            /*#__PURE__*/ jsx_runtime_.jsx(ProiectFilters, {
-                values: filters,
-                onChange: handleFiltersChange,
-                onReset: handleFiltersReset
-            }),
-            /*#__PURE__*/ jsx_runtime_.jsx(ProiecteTable, {
-                filters: filters,
-                onRowClick: handleRowClick
-            }),
-            showAddModal && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
                 style: {
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: "rgba(0,0,0,0.5)",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    zIndex: 1000
+                    marginBottom: "1.5rem",
+                    background: "white",
+                    border: "1px solid #dee2e6",
+                    borderRadius: "8px",
+                    padding: "1.5rem",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
                 },
-                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
+                    fallback: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        style: {
+                            padding: "2rem",
+                            textAlign: "center",
+                            color: "#7f8c8d"
+                        },
+                        children: "⏳ Se \xeencarcă filtrele..."
+                    }),
+                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectFilters, {
+                        values: filters,
+                        onChange: handleFilterChange,
+                        onReset: handleFilterReset
+                    })
+                })
+            }),
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    background: "white",
+                    border: "1px solid #dee2e6",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                },
+                children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
+                    fallback: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        style: {
+                            padding: "3rem",
+                            textAlign: "center",
+                            color: "#7f8c8d"
+                        },
+                        children: "⏳ Se \xeencarcă proiectele..."
+                    }),
+                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiecteTable, {
+                        searchParams: tableSearchParams
+                    })
+                })
+            }),
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    marginTop: "2rem",
+                    padding: "1rem",
+                    background: "#f8f9fa",
+                    borderRadius: "6px",
+                    border: "1px solid #e9ecef"
+                },
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                     style: {
-                        background: "white",
-                        borderRadius: "8px",
-                        padding: "2rem",
-                        maxWidth: "500px",
-                        width: "90%"
+                        margin: 0,
+                        fontSize: "14px",
+                        color: "#6c757d",
+                        textAlign: "center"
                     },
                     children: [
-                        /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                            children: "+ Proiect Nou"
+                        "\uD83D\uDCA1 ",
+                        /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                            children: "Tip:"
                         }),
-                        /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                            children: "Funcționalitate \xeen dezvoltare..."
-                        }),
-                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                            onClick: ()=>setShowAddModal(false),
-                            style: {
-                                padding: "0.5rem 1rem",
-                                background: "#6c757d",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer"
-                            },
-                            children: "\xcenchide"
-                        })
+                        ' Folosește filtrele pentru a găsi rapid proiectele dorite. Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.'
                     ]
                 })
             })
@@ -1229,7 +1561,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,8313,9850,6166,6549,8888], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549,1289], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();

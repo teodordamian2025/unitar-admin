@@ -1,184 +1,165 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import ProiecteTable from './components/ProiecteTable';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ProiectFilters from './components/ProiectFilters';
-import { FilterValues } from '../components/FilterBar';
+import ProiecteTable from './components/ProiecteTable';
+
+interface FilterValues {
+  search: string;
+  status: string;
+  client: string;
+  data_start_start: string;
+  data_start_end: string;
+  valoare_min: string;
+  valoare_max: string;
+}
 
 export default function ProiectePage() {
   const router = useRouter();
-  const [filters, setFilters] = useState<FilterValues>({});
-  const [showAddModal, setShowAddModal] = useState(false);
+  const searchParams = useSearchParams();
+  
+  // Inițializează filtrele din URL
+  const [filters, setFilters] = useState<FilterValues>({
+    search: searchParams?.get('search') || '',
+    status: searchParams?.get('status') || '',
+    client: searchParams?.get('client') || '',
+    data_start_start: searchParams?.get('data_start_start') || '',
+    data_start_end: searchParams?.get('data_start_end') || '',
+    valoare_min: searchParams?.get('valoare_min') || '',
+    valoare_max: searchParams?.get('valoare_max') || ''
+  });
 
-  const handleFiltersChange = (newFilters: FilterValues) => {
+  // Convertește filtrele în searchParams pentru ProiecteTable
+  const tableSearchParams = Object.fromEntries(
+    Object.entries(filters).filter(([_, value]) => value !== '')
+  );
+
+  const handleFilterChange = (newFilters: FilterValues) => {
     setFilters(newFilters);
-  };
-
-  const handleFiltersReset = () => {
-    setFilters({});
-  };
-
-  const handleRowClick = (proiect: any) => {
-    router.push(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`);
-  };
-
-  const handleExportExcel = async () => {
-    try {
-      const queryParams = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value as string);
-      });
-
-      const response = await fetch(`/api/rapoarte/proiecte/export?${queryParams}`);
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Proiecte_${new Date().toISOString().split('T')[0]}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        alert('Eroare la exportul Excel');
+    
+    // Actualizează URL-ul cu noile filtre
+    const params = new URLSearchParams();
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
       }
-    } catch (error) {
-      console.error('Eroare export:', error);
-      alert('Eroare la exportul Excel');
-    }
+    });
+    
+    const newUrl = params.toString() 
+      ? `/admin/rapoarte/proiecte?${params.toString()}`
+      : '/admin/rapoarte/proiecte';
+    
+    router.push(newUrl);
   };
 
-  const handleSendReport = () => {
-    // TODO: Implementare trimitere raport pe email
-    alert('Funcționalitate în dezvoltare - Trimitere raport pe email');
+  const handleFilterReset = () => {
+    const emptyFilters: FilterValues = {
+      search: '',
+      status: '',
+      client: '',
+      data_start_start: '',
+      data_start_end: '',
+      valoare_min: '',
+      valoare_max: ''
+    };
+    
+    setFilters(emptyFilters);
+    router.push('/admin/rapoarte/proiecte');
   };
 
   return (
-    <div>
+    <div style={{ padding: '1.5rem' }}>
       {/* Header */}
       <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '2rem'
+        marginBottom: '2rem',
+        borderBottom: '2px solid #e9ecef',
+        paddingBottom: '1rem'
       }}>
-        <div>
-          <h2 style={{ margin: 0, color: '#2c3e50' }}>📋 Proiecte</h2>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#6c757d' }}>
-            Gestionează toate proiectele firmei
-          </p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            onClick={handleSendReport}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#17a2b8',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            📧 Trimite Raport
-          </button>
-          
-          <button
-            onClick={handleExportExcel}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            📊 Export Excel
-          </button>
-          
-          <button
-            onClick={() => setShowAddModal(true)}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            + Proiect Nou
-          </button>
-        </div>
+        <h1 style={{ 
+          margin: 0, 
+          color: '#2c3e50',
+          fontSize: '2rem',
+          fontWeight: 'bold'
+        }}>
+          📋 Management Proiecte
+        </h1>
+        <p style={{ 
+          margin: '0.5rem 0 0 0', 
+          color: '#7f8c8d',
+          fontSize: '1.1rem'
+        }}>
+          Gestionează și monitorizează toate proiectele din portofoliu
+        </p>
       </div>
 
       {/* Filtre */}
-      <ProiectFilters
-        values={filters}
-        onChange={handleFiltersChange}
-        onReset={handleFiltersReset}
-      />
+      <div style={{ 
+        marginBottom: '1.5rem',
+        background: 'white',
+        border: '1px solid #dee2e6',
+        borderRadius: '8px',
+        padding: '1.5rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <Suspense fallback={
+          <div style={{ 
+            padding: '2rem', 
+            textAlign: 'center',
+            color: '#7f8c8d'
+          }}>
+            ⏳ Se încarcă filtrele...
+          </div>
+        }>
+          <ProiectFilters 
+            values={filters}
+            onChange={handleFilterChange}
+            onReset={handleFilterReset}
+          />
+        </Suspense>
+      </div>
 
       {/* Tabel */}
-      <ProiecteTable
-        filters={filters}
-        onRowClick={handleRowClick}
-      />
-
-      {/* Modal Adăugare Proiect - TODO: Implementare */}
-      {showAddModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '2rem',
-            maxWidth: '500px',
-            width: '90%'
+      <div style={{ 
+        background: 'white',
+        border: '1px solid #dee2e6',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <Suspense fallback={
+          <div style={{ 
+            padding: '3rem', 
+            textAlign: 'center',
+            color: '#7f8c8d'
           }}>
-            <h3>+ Proiect Nou</h3>
-            <p>Funcționalitate în dezvoltare...</p>
-            <button
-              onClick={() => setShowAddModal(false)}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              Închide
-            </button>
+            ⏳ Se încarcă proiectele...
           </div>
-        </div>
-      )}
+        }>
+          <ProiecteTable 
+            searchParams={tableSearchParams}
+          />
+        </Suspense>
+      </div>
+
+      {/* Footer info */}
+      <div style={{ 
+        marginTop: '2rem',
+        padding: '1rem',
+        background: '#f8f9fa',
+        borderRadius: '6px',
+        border: '1px solid #e9ecef'
+      }}>
+        <p style={{ 
+          margin: 0, 
+          fontSize: '14px', 
+          color: '#6c757d',
+          textAlign: 'center'
+        }}>
+          💡 <strong>Tip:</strong> Folosește filtrele pentru a găsi rapid proiectele dorite. 
+          Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.
+        </p>
+      </div>
     </div>
   );
 }
-
