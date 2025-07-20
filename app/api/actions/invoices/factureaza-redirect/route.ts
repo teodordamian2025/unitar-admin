@@ -20,10 +20,15 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    console.log('Verificare configurare factureaza.me...'); // Debug
+    console.log('FACTUREAZA_API_KEY exists:', !!process.env.FACTUREAZA_API_KEY); // Debug
+    console.log('FACTUREAZA_API_ENDPOINT:', process.env.FACTUREAZA_API_ENDPOINT); // Debug
+
     // Verifică dacă API key-ul este configurat
     if (!process.env.FACTUREAZA_API_KEY || !process.env.FACTUREAZA_API_ENDPOINT) {
+      console.error('Configurare factureaza.me incompletă'); // Debug
       return NextResponse.json({ 
-        error: 'Configurare factureaza.me incompletă. Verifică variabilele de mediu.' 
+        error: 'Configurare factureaza.me incompletă. Verifică variabilele de mediu FACTUREAZA_API_KEY și FACTUREAZA_API_ENDPOINT în .env.local' 
       }, { status: 500 });
     }
 

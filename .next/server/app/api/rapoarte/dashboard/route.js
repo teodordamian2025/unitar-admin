@@ -276,66 +276,170 @@ const bigquery = new src.BigQuery({
 });
 async function GET(request) {
     try {
-        const dataset = "PanouControlUnitar";
-        // Query pentru statistici paralele
-        const queries = [
-            // Statistici proiecte
-            `SELECT 
-        COUNT(*) as total,
-        COUNTIF(Status IN ('Activ', 'În lucru')) as active,
-        COUNTIF(Status = 'Finalizat') as finalizate
-       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\``,
-            // Statistici clienți
-            `SELECT 
-        COUNT(*) as total,
-        COUNTIF(activ = true) as activi
-       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\``,
-            // Statistici contracte
-            `SELECT 
-        COUNT(*) as total,
-        COUNTIF(Status = 'Activ') as active
-       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Contracte\``,
-            // Statistici financiare
-            `SELECT 
-        SUM(CASE WHEN Tip = 'Intrare' THEN Suma ELSE 0 END) as venit_luna,
-        SUM(CASE WHEN Tip = 'Iesire' AND Status = 'Pending' THEN Suma ELSE 0 END) as de_incasat
-       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.BancaTranzactii\`
-       WHERE DATE(Data) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)`
-        ];
-        // Execută toate query-urile în paralel
-        const results = await Promise.all(queries.map((query)=>bigquery.query({
-                query: query,
-                location: "EU"
-            })));
-        const [[proiecteRows], [clientiRows], [contracteRows], [financiarRows]] = results;
+        console.log("Loading dashboard statistics...");
+        // Obține statistici despre proiecte
+        const proiecteStats = await getProiecteStats();
+        const clientiStats = await getClientiStats();
+        const contracteStats = await getContracteStats();
+        const facturiStats = await getFacturiStats();
         const stats = {
-            proiecte: {
-                total: Number(proiecteRows[0]?.total || 0),
-                active: Number(proiecteRows[0]?.active || 0),
-                finalizate: Number(proiecteRows[0]?.finalizate || 0)
-            },
-            clienti: {
-                total: Number(clientiRows[0]?.total || 0),
-                activi: Number(clientiRows[0]?.activi || 0)
-            },
-            contracte: {
-                total: Number(contracteRows[0]?.total || 0),
-                active: Number(contracteRows[0]?.active || 0)
-            },
-            financiar: {
-                venit_luna: Number(financiarRows[0]?.venit_luna || 0),
-                de_incasat: Number(financiarRows[0]?.de_incasat || 0)
-            }
+            proiecte: proiecteStats,
+            clienti: clientiStats,
+            contracte: contracteStats,
+            facturi: facturiStats
         };
-        return next_response/* default */.Z.json(stats);
-    } catch (error) {
-        console.error("Eroare dashboard stats:", error);
+        console.log("Dashboard stats loaded:", stats);
         return next_response/* default */.Z.json({
-            error: "Eroare la \xeencărcarea statisticilor",
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error("Eroare la \xeencărcarea statisticilor dashboard:", error);
+        return next_response/* default */.Z.json({
+            error: "Eroare la \xeencărcarea statisticilor dashboard",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
         }, {
             status: 500
         });
+    }
+}
+async function getProiecteStats() {
+    try {
+        const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNTIF(Status = 'Activ') as active,
+        COUNTIF(Status = 'Finalizat') as finalizate,
+        COUNTIF(Status = 'Suspendat') as suspendate
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+    `;
+        const [rows] = await bigquery.query({
+            query: query,
+            location: "EU"
+        });
+        if (rows.length > 0) {
+            return {
+                total: parseInt(rows[0].total) || 0,
+                active: parseInt(rows[0].active) || 0,
+                finalizate: parseInt(rows[0].finalizate) || 0,
+                suspendate: parseInt(rows[0].suspendate) || 0
+            };
+        }
+        return {
+            total: 0,
+            active: 0,
+            finalizate: 0,
+            suspendate: 0
+        };
+    } catch (error) {
+        console.error("Eroare la statistici proiecte:", error);
+        return {
+            total: 0,
+            active: 0,
+            finalizate: 0,
+            suspendate: 0
+        };
+    }
+}
+async function getClientiStats() {
+    try {
+        const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNTIF(activ = true) as activi,
+        COUNTIF(sincronizat_factureaza = true) as sincronizati
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+    `;
+        const [rows] = await bigquery.query({
+            query: query,
+            location: "EU"
+        });
+        if (rows.length > 0) {
+            return {
+                total: parseInt(rows[0].total) || 0,
+                activi: parseInt(rows[0].activi) || 0,
+                sincronizati: parseInt(rows[0].sincronizati) || 0
+            };
+        }
+        return {
+            total: 0,
+            activi: 0,
+            sincronizati: 0
+        };
+    } catch (error) {
+        console.error("Eroare la statistici clienți:", error);
+        return {
+            total: 0,
+            activi: 0,
+            sincronizati: 0
+        };
+    }
+}
+async function getContracteStats() {
+    try {
+        // Verifică dacă există tabela ContracteGenerate
+        const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNTIF(status = 'generat') as generate
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ContracteGenerate\`
+    `;
+        const [rows] = await bigquery.query({
+            query: query,
+            location: "EU"
+        });
+        if (rows.length > 0) {
+            return {
+                total: parseInt(rows[0].total) || 0,
+                generate: parseInt(rows[0].generate) || 0
+            };
+        }
+        return {
+            total: 0,
+            generate: 0
+        };
+    } catch (error) {
+        console.error("Tabela contracte nu există sau eroare:", error);
+        return {
+            total: 0,
+            generate: 0
+        };
+    }
+}
+async function getFacturiStats() {
+    try {
+        // Verifică dacă există tabela FacturiGenerate
+        const query = `
+      SELECT 
+        COUNT(*) as total,
+        SUM(valoare_platita) as valoare_incasata,
+        SUM(total - valoare_platita) as valoare_de_incasat
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      WHERE status != 'anulata'
+    `;
+        const [rows] = await bigquery.query({
+            query: query,
+            location: "EU"
+        });
+        if (rows.length > 0) {
+            return {
+                total: parseInt(rows[0].total) || 0,
+                valoare_incasata: parseFloat(rows[0].valoare_incasata) || 0,
+                valoare_de_incasat: parseFloat(rows[0].valoare_de_incasat) || 0
+            };
+        }
+        return {
+            total: 0,
+            valoare_incasata: 0,
+            valoare_de_incasat: 0
+        };
+    } catch (error) {
+        console.error("Tabela facturi nu există sau eroare:", error);
+        return {
+            total: 0,
+            valoare_incasata: 0,
+            valoare_de_incasat: 0
+        };
     }
 }
 
