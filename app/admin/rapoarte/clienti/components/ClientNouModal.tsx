@@ -13,6 +13,7 @@ interface ClientNouModalProps {
 }
 
 export default function ClientNouModal({ isOpen, onClose, onClientAdded }: ClientNouModalProps) {
+  const [loading, setLoading] = useState(false);
   const [anafLoading, setAnafLoading] = useState(false);
 
   const handleVerifyANAF = async () => {
