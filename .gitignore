@@ -10,3 +10,7 @@ test-bigquery.js
 
 # BigQuery service account
 service-account-key.json
+
+uploads/*.pdf
+uploads/*.docx
+!uploads/.gitkeep

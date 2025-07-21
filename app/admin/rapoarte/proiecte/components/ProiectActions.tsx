@@ -1,6 +1,13 @@
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+// MODIFICAT: Înlocuit handleCreateInvoice cu sistemul hibrid
+// ==================================================================
+
 'use client';
 
+import React from 'react';
 import { toast } from 'react-toastify';
+import FacturaHibridModal from './FacturaHibridModal';
 
 interface ActionItem {
   key: string;
@@ -25,6 +32,8 @@ interface ProiectActionsProps {
 }
 
 export default function ProiectActions({ proiect, onRefresh }: ProiectActionsProps) {
+  const [showFacturaModal, setShowFacturaModal] = React.useState(false);
+
   const actions: ActionItem[] = [
     {
       key: 'view',
@@ -60,7 +69,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     },
     {
       key: 'generate_invoice',
-      label: 'Creează Factură',
+      label: 'Generează Factură PDF',
       icon: '💰',
       color: 'warning',
       disabled: proiect.Status !== 'Activ' && proiect.Status !== 'Finalizat'
@@ -130,7 +139,8 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
           await handleGenerateContract();
           break;
         case 'generate_invoice':
-          await handleCreateInvoice();
+          // MODIFICAT: Folosește sistemul hibrid
+          handleCreateInvoiceHibrid();
           break;
         case 'send_email':
           await handleSendEmail();
@@ -153,6 +163,27 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     } catch (error) {
       console.error(`Eroare la ${actionKey}:`, error);
       toast.error(`Eroare la executarea acțiunii: ${actionKey}`);
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Pentru sistemul hibrid
+  const handleCreateInvoiceHibrid = () => {
+    setShowFacturaModal(true);
+  };
+
+  const handleInvoiceSuccess = (invoiceId: string, downloadUrl: string) => {
+    setShowFacturaModal(false);
+    toast.success(`Factura ${invoiceId} a fost generată cu succes!`);
+    
+    // Refresh lista de proiecte
+    if (onRefresh) {
+      onRefresh();
+    }
+    
+    // Opțional: download automat
+    const shouldDownload = window.confirm('Vrei să descarci factura acum?');
+    if (shouldDownload) {
+      window.open(downloadUrl, '_blank');
     }
   };
 
@@ -217,41 +248,6 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
       }
     } catch (error) {
       toast.error('Eroare la generarea contractului');
-    }
-  };
-
-  const handleCreateInvoice = async () => {
-    try {
-      toast.info('Se creează factura în factureaza.me...');
-      
-      const response = await fetch('/api/actions/invoices/factureaza-redirect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proiectId: proiect.ID_Proiect })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success('Factură creată cu succes în factureaza.me!');
-        
-        if (result.invoiceUrl) {
-          window.open(result.invoiceUrl, '_blank');
-        }
-        
-        if (result.downloadUrl) {
-          const downloadConfirm = confirm('Vrei să descarci factura acum?');
-          if (downloadConfirm) {
-            window.open(result.downloadUrl, '_blank');
-          }
-        }
-        
-        onRefresh?.();
-      } else {
-        toast.error(result.error || 'Eroare la crearea facturii');
-      }
-    } catch (error) {
-      toast.error('Eroare la crearea facturii');
     }
   };
 
@@ -333,15 +329,27 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   return (
-    <EnhancedActionDropdown
-      actions={actions}
-      onAction={handleAction}
-      proiect={proiect}
-      getColorClass={getColorClass}
-    />
+    <>
+      <EnhancedActionDropdown
+        actions={actions}
+        onAction={handleAction}
+        proiect={proiect}
+        getColorClass={getColorClass}
+      />
+      
+      {/* NOUĂ: Modal pentru factură hibridă */}
+      {showFacturaModal && (
+        <FacturaHibridModal
+          proiect={proiect}
+          onClose={() => setShowFacturaModal(false)}
+          onSuccess={handleInvoiceSuccess}
+        />
+      )}
+    </>
   );
 }
 
+// Componenta dropdown rămâne neschimbată
 interface EnhancedActionDropdownProps {
   actions: ActionItem[];
   onAction: (actionKey: string) => void;
@@ -404,11 +412,10 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
           border: '1px solid #ddd',
           borderRadius: '6px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 9999, // Crescut z-index pentru a fi deasupra tuturor
+          zIndex: 9999,
           minWidth: '220px',
           marginTop: '4px'
         }}>
-          {/* Informații proiect */}
           <div style={{
             padding: '12px',
             borderBottom: '1px solid #eee',
@@ -432,7 +439,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
             </div>
           </div>
 
-          {/* Acțiuni */}
           <div style={{ padding: '8px 0' }}>
             {actions.map((action) => {
               if (action.divider) {
@@ -490,7 +496,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
         </div>
       )}
 
-      {/* Overlay pentru închidere */}
       {isOpen && (
         <div
           style={{
@@ -499,7 +504,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 9998 // Un nivel sub dropdown
+            zIndex: 9998
           }}
           onClick={() => setIsOpen(false)}
         />
@@ -507,6 +512,3 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
     </div>
   );
 }
-
-// Import React pentru useState
-import React from 'react';
