@@ -261,7 +261,7 @@ export default function AdminPage() {
             </Link>
             
             <Link 
-              href="/admin/rapoarte/facturi" 
+              href="/admin/rapoarte/proiecte" 
               style={{ 
                 display: 'block',
                 padding: '0.75rem 1rem',
@@ -307,6 +307,30 @@ export default function AdminPage() {
             >
               👥 Management Clienți
             </Link>
+
+            <Link 
+              href="/admin/rapoarte/facturi" 
+              style={{ 
+                display: 'block',
+                padding: '0.75rem 1rem',
+                background: '#ecf0f1',
+                color: '#2c3e50',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e67e22';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ecf0f1';
+                e.currentTarget.style.color = '#2c3e50';
+              }}
+            >
+              💰 Management Facturi
+            </Link>
           </div>
         </div>
 
@@ -333,7 +357,7 @@ export default function AdminPage() {
                 fontSize: '14px',
                 fontWeight: 'bold'
               }}
-              onClick={() => toast.info('Funcție în dezvoltare!')}
+              onClick={() => router.push('/admin/rapoarte/proiecte')}
             >
               + Proiect Nou
             </button>
@@ -365,7 +389,7 @@ export default function AdminPage() {
                 fontSize: '14px',
                 fontWeight: 'bold'
               }}
-              onClick={() => toast.info('Funcție în dezvoltare!')}
+              onClick={() => router.push('/admin/rapoarte/facturi')}
             >
               💰 Generează Factură PDF
             </button>
@@ -442,6 +466,7 @@ export default function AdminPage() {
               <li>Editare inline</li>
               <li>Export Excel</li>
               <li>Căutare avansată</li>
+              <li>Generare facturi hibride</li>
             </ul>
           </div>
           <div>
@@ -450,6 +475,16 @@ export default function AdminPage() {
               <li>Lista clienți activi</li>
               <li>Istoric colaborări</li>
               <li>Informații contact</li>
+              <li>Sincronizare ANAF</li>
+            </ul>
+          </div>
+          <div>
+            <strong>💰 Management Facturi:</strong>
+            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+              <li>Generare PDF instant</li>
+              <li>Integrare ANAF</li>
+              <li>Dashboard statistici</li>
+              <li>Export și tracking</li>
             </ul>
           </div>
           <div>

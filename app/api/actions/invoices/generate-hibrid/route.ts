@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// DESCRIERE: Generare factură hibridă (PDF instant + ANAF background)
+// DESCRIERE: Generare factură hibridă (PDF instant + ANAF background) - VERSIUNE CORECTATĂ
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -128,10 +128,19 @@ export async function POST(request: NextRequest) {
       },
       
       linii: body.liniiFactura.map(linie => {
-        const valoare = linie.cantitate * linie.pretUnitar;
-        const valoreTva = valoare * (linie.cotaTva / 100);
+        // FIX: Convertește toate valorile la numere
+        const cantitate = Number(linie.cantitate) || 0;
+        const pretUnitar = Number(linie.pretUnitar) || 0;
+        const cotaTva = Number(linie.cotaTva) || 0;
+        
+        const valoare = cantitate * pretUnitar;
+        const valoreTva = valoare * (cotaTva / 100);
+        
         return {
-          ...linie,
+          denumire: linie.denumire,
+          cantitate,
+          pretUnitar,
+          cotaTva,
           valoare,
           valoreTva,
           total: valoare + valoreTva
@@ -213,8 +222,13 @@ function calculateTotals(linii: any[]) {
   let totalTva = 0;
   
   linii.forEach(linie => {
-    const valoare = linie.cantitate * linie.pretUnitar;
-    const tva = valoare * (linie.cotaTva / 100);
+    // FIX: Asigură-te că toate valorile sunt numere
+    const cantitate = Number(linie.cantitate) || 0;
+    const pretUnitar = Number(linie.pretUnitar) || 0;
+    const cotaTva = Number(linie.cotaTva) || 0;
+    
+    const valoare = cantitate * pretUnitar;
+    const tva = valoare * (cotaTva / 100);
     subtotal += valoare;
     totalTva += tva;
   });
@@ -565,7 +579,7 @@ function generateInvoiceHTML(factura: any): string {
           <strong>📅 Perioada:</strong> 
           ${factura.proiect.dataStart ? new Date(factura.proiect.dataStart).toLocaleDateString('ro-RO') : 'N/A'} - 
           ${factura.proiect.dataFinalizare ? new Date(factura.proiect.dataFinalizare).toLocaleDateString('ro-RO') : 'În curs'}
-          ${factura.proiect.valoareEstimata ? `<br><strong>💰 Valoare estimată:</strong> ${factura.proiect.valoareEstimata.toFixed(2)} RON` : ''}
+          ${factura.proiect.valoareEstimata ? `<br><strong>💰 Valoare estimată:</strong> ${Number(factura.proiect.valoareEstimata).toFixed(2)} RON` : ''}
         </div>
 
         <!-- Tabel servicii/produse -->
@@ -587,12 +601,12 @@ function generateInvoiceHTML(factura: any): string {
               <tr>
                 <td class="center">${index + 1}</td>
                 <td>${linie.denumire}</td>
-                <td class="center">${linie.cantitate}</td>
-                <td class="number">${linie.pretUnitar.toFixed(2)}</td>
-                <td class="number">${linie.valoare.toFixed(2)}</td>
-                <td class="center">${linie.cotaTva}%</td>
-                <td class="number">${linie.valoreTva.toFixed(2)}</td>
-                <td class="number"><strong>${linie.total.toFixed(2)}</strong></td>
+                <td class="center">${Number(linie.cantitate).toFixed(0)}</td>
+                <td class="number">${Number(linie.pretUnitar).toFixed(2)}</td>
+                <td class="number">${Number(linie.valoare).toFixed(2)}</td>
+                <td class="center">${Number(linie.cotaTva).toFixed(0)}%</td>
+                <td class="number">${Number(linie.valoreTva).toFixed(2)}</td>
+                <td class="number"><strong>${Number(linie.total).toFixed(2)}</strong></td>
               </tr>
             `).join('')}
           </tbody>
@@ -603,15 +617,15 @@ function generateInvoiceHTML(factura: any): string {
           <div class="total-box">
             <div class="total-row">
               <div class="total-label">Total fără TVA:</div>
-              <div class="total-value">${factura.subtotal.toFixed(2)} RON</div>
+              <div class="total-value">${Number(factura.subtotal).toFixed(2)} RON</div>
             </div>
             <div class="total-row">
               <div class="total-label">TVA:</div>
-              <div class="total-value">${factura.totalTva.toFixed(2)} RON</div>
+              <div class="total-value">${Number(factura.totalTva).toFixed(2)} RON</div>
             </div>
             <div class="total-row final-total">
               <div class="total-label">TOTAL DE PLATĂ:</div>
-              <div class="total-value">${factura.totalGeneral.toFixed(2)} RON</div>
+              <div class="total-value">${Number(factura.totalGeneral).toFixed(2)} RON</div>
             </div>
           </div>
         </div>

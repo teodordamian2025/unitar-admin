@@ -972,6 +972,11 @@ function FacturiPage() {
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             className: "flex items-center gap-3",
                             children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                    onClick: ()=>window.location.href = "/admin/rapoarte/proiecte",
+                                    className: "bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 flex items-center gap-2",
+                                    children: "➕ Generează Factură Nouă"
+                                }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                     className: "text-sm font-medium text-gray-700",
                                     children: "Perioada:"

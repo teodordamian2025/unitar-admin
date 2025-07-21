@@ -794,7 +794,7 @@ function AdminPage() {
                                         children: "\uD83C\uDFE0 Dashboard Rapoarte"
                                     }),
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
-                                        href: "/admin/rapoarte/facturi",
+                                        href: "/admin/rapoarte/proiecte",
                                         style: {
                                             display: "block",
                                             padding: "0.75rem 1rem",
@@ -836,6 +836,28 @@ function AdminPage() {
                                             e.currentTarget.style.color = "#2c3e50";
                                         },
                                         children: "\uD83D\uDC65 Management Clienți"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
+                                        href: "/admin/rapoarte/facturi",
+                                        style: {
+                                            display: "block",
+                                            padding: "0.75rem 1rem",
+                                            background: "#ecf0f1",
+                                            color: "#2c3e50",
+                                            textDecoration: "none",
+                                            borderRadius: "6px",
+                                            border: "1px solid #bdc3c7",
+                                            transition: "all 0.3s ease"
+                                        },
+                                        onMouseOver: (e)=>{
+                                            e.currentTarget.style.background = "#e67e22";
+                                            e.currentTarget.style.color = "white";
+                                        },
+                                        onMouseOut: (e)=>{
+                                            e.currentTarget.style.background = "#ecf0f1";
+                                            e.currentTarget.style.color = "#2c3e50";
+                                        },
+                                        children: "\uD83D\uDCB0 Management Facturi"
                                     })
                                 ]
                             })
@@ -875,7 +897,7 @@ function AdminPage() {
                                             fontSize: "14px",
                                             fontWeight: "bold"
                                         },
-                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
+                                        onClick: ()=>router.push("/admin/rapoarte/proiecte"),
                                         children: "+ Proiect Nou"
                                     }),
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
@@ -903,7 +925,7 @@ function AdminPage() {
                                             fontSize: "14px",
                                             fontWeight: "bold"
                                         },
-                                        onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
+                                        onClick: ()=>router.push("/admin/rapoarte/facturi"),
                                         children: "\uD83D\uDCB0 Generează Factură PDF"
                                     })
                                 ]
@@ -1019,6 +1041,9 @@ function AdminPage() {
                                             }),
                                             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
                                                 children: "Căutare avansată"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Generare facturi hibride"
                                             })
                                         ]
                                     })
@@ -1043,6 +1068,36 @@ function AdminPage() {
                                             }),
                                             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
                                                 children: "Informații contact"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Sincronizare ANAF"
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("strong", {
+                                        children: "\uD83D\uDCB0 Management Facturi:"
+                                    }),
+                                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ul", {
+                                        style: {
+                                            margin: "0.5rem 0",
+                                            paddingLeft: "1.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Generare PDF instant"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Integrare ANAF"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Dashboard statistici"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("li", {
+                                                children: "Export și tracking"
                                             })
                                         ]
                                     })

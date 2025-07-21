@@ -70,8 +70,16 @@ export default function FacturiPage() {
             </p>
           </div>
           
-          {/* Selector perioada */}
           <div className="flex items-center gap-3">
+            {/* ADĂUGAT: Buton pentru generare factură nouă */}
+            <button
+              onClick={() => window.location.href = '/admin/rapoarte/proiecte'}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 flex items-center gap-2"
+            >
+              ➕ Generează Factură Nouă
+            </button>
+            
+            {/* Selector perioada */}
             <label className="text-sm font-medium text-gray-700">Perioada:</label>
             <select
               value={perioada}
