@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
+import { toast } from 'react-toastify';
 
 interface ProiectDetails {
   ID_Proiect: string;
@@ -23,6 +24,7 @@ export default function ProiectDetailsPage() {
   const [proiect, setProiect] = useState<ProiectDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
   useEffect(() => {
     if (proiectId) {
@@ -50,6 +52,50 @@ export default function ProiectDetailsPage() {
       alert('Eroare la încărcarea detaliilor proiectului');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!proiect) return;
+    
+    setIsGeneratingInvoice(true);
+    
+    try {
+      toast.info('Se generează factura PDF...');
+      
+      const response = await fetch('/api/actions/invoices/generate-hibrid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          proiectId: proiect.ID_Proiect,
+          liniiFactura: [{
+            denumire: `Servicii proiect ${proiect.Denumire}`,
+            cantitate: 1,
+            pretUnitar: proiect.Valoare_Estimata || 0,
+            cotaTva: 19
+          }],
+          observatii: `Factură generată pentru proiectul ${proiect.ID_Proiect}`
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Factură PDF generată cu succes!');
+        
+        // Download automat
+        if (result.downloadUrl) {
+          window.open(result.downloadUrl, '_blank');
+        }
+      } else {
+        throw new Error(result.error || 'Eroare la generarea facturii');
+      }
+      
+    } catch (error) {
+      console.error('Eroare factură:', error);
+      toast.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    } finally {
+      setIsGeneratingInvoice(false);
     }
   };
 
@@ -307,19 +353,20 @@ export default function ProiectDetailsPage() {
             </button>
             
             <button
-              onClick={() => alert('Generare factură în dezvoltare')}
+              onClick={handleGenerateInvoice}
+              disabled={isGeneratingInvoice}
               style={{
                 padding: '0.75rem',
-                background: '#ffc107',
-                color: 'black',
+                background: isGeneratingInvoice ? '#6c757d' : '#ffc107',
+                color: isGeneratingInvoice ? 'white' : 'black',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: 'pointer',
+                cursor: isGeneratingInvoice ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 textAlign: 'left'
               }}
             >
-              💰 Creează Factură
+              {isGeneratingInvoice ? '⏳ Se generează...' : '💰 Generează Factură PDF'}
             </button>
             
             <button
@@ -376,4 +423,3 @@ export default function ProiectDetailsPage() {
     </div>
   );
 }
-

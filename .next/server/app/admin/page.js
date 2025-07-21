@@ -794,7 +794,7 @@ function AdminPage() {
                                         children: "\uD83C\uDFE0 Dashboard Rapoarte"
                                     }),
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_9___default()), {
-                                        href: "/admin/rapoarte/proiecte",
+                                        href: "/admin/rapoarte/facturi",
                                         style: {
                                             display: "block",
                                             padding: "0.75rem 1rem",
@@ -904,7 +904,7 @@ function AdminPage() {
                                             fontWeight: "bold"
                                         },
                                         onClick: ()=>react_toastify__WEBPACK_IMPORTED_MODULE_6__/* .toast */ .Am.info("Funcție \xeen dezvoltare!"),
-                                        children: "\uD83D\uDCB0 Creează Factură"
+                                        children: "\uD83D\uDCB0 Generează Factură PDF"
                                     })
                                 ]
                             })

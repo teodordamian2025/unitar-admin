@@ -442,7 +442,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(57114);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var react_toastify__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(7365);
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 
 
@@ -453,6 +455,7 @@ function ProiectDetailsPage() {
     const [proiect, setProiect] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(null);
     const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
     const [editing, setEditing] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const [isGeneratingInvoice, setIsGeneratingInvoice] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(()=>{
         if (proiectId) {
             fetchProiectDetails();
@@ -480,6 +483,46 @@ function ProiectDetailsPage() {
             alert("Eroare la \xeencărcarea detaliilor proiectului");
         } finally{
             setLoading(false);
+        }
+    };
+    const handleGenerateInvoice = async ()=>{
+        if (!proiect) return;
+        setIsGeneratingInvoice(true);
+        try {
+            react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.info("Se generează factura PDF...");
+            const response = await fetch("/api/actions/invoices/generate-hibrid", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    proiectId: proiect.ID_Proiect,
+                    liniiFactura: [
+                        {
+                            denumire: `Servicii proiect ${proiect.Denumire}`,
+                            cantitate: 1,
+                            pretUnitar: proiect.Valoare_Estimata || 0,
+                            cotaTva: 19
+                        }
+                    ],
+                    observatii: `Factură generată pentru proiectul ${proiect.ID_Proiect}`
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.success("Factură PDF generată cu succes!");
+                // Download automat
+                if (result.downloadUrl) {
+                    window.open(result.downloadUrl, "_blank");
+                }
+            } else {
+                throw new Error(result.error || "Eroare la generarea facturii");
+            }
+        } catch (error) {
+            console.error("Eroare factură:", error);
+            react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+        } finally{
+            setIsGeneratingInvoice(false);
         }
     };
     const renderStatus = (status)=>{
@@ -841,18 +884,19 @@ function ProiectDetailsPage() {
                                         children: "\uD83D\uDCC4 Generează Contract"
                                     }),
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
-                                        onClick: ()=>alert("Generare factură \xeen dezvoltare"),
+                                        onClick: handleGenerateInvoice,
+                                        disabled: isGeneratingInvoice,
                                         style: {
                                             padding: "0.75rem",
-                                            background: "#ffc107",
-                                            color: "black",
+                                            background: isGeneratingInvoice ? "#6c757d" : "#ffc107",
+                                            color: isGeneratingInvoice ? "white" : "black",
                                             border: "none",
                                             borderRadius: "6px",
-                                            cursor: "pointer",
+                                            cursor: isGeneratingInvoice ? "not-allowed" : "pointer",
                                             fontSize: "14px",
                                             textAlign: "left"
                                         },
-                                        children: "\uD83D\uDCB0 Creează Factură"
+                                        children: isGeneratingInvoice ? "⏳ Se generează..." : "\uD83D\uDCB0 Generează Factură PDF"
                                     }),
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
                                         onClick: ()=>alert("Trimitere email \xeen dezvoltare"),
@@ -953,7 +997,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,8313,9850,6166,6549], () => (__webpack_exec__(59039)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549], () => (__webpack_exec__(59039)));
 module.exports = __webpack_exports__;
 
 })();
