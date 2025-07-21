@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@google-cloud/bigquery": "^8.1.0",
+    "@types/pdfkit": "^0.17.1",
     "@types/puppeteer": "^7.0.4",
     "docx": "^9.5.1",
     "dotenv": "^17.2.0",

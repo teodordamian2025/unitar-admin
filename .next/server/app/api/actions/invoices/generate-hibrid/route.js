@@ -236,7 +236,14 @@ module.exports = require("worker_threads");
 
 /***/ }),
 
-/***/ 39799:
+/***/ 59796:
+/***/ ((module) => {
+
+module.exports = require("zlib");
+
+/***/ }),
+
+/***/ 37967:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 // ESM COMPAT FLAG
@@ -270,9 +277,9 @@ var route_kind = __webpack_require__(19513);
 var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: ./node_modules/@google-cloud/bigquery/build/src/index.js
 var src = __webpack_require__(63452);
-;// CONCATENATED MODULE: external "puppeteer"
-const external_puppeteer_namespaceObject = require("puppeteer");
-var external_puppeteer_default = /*#__PURE__*/__webpack_require__.n(external_puppeteer_namespaceObject);
+// EXTERNAL MODULE: ./node_modules/pdfkit/js/pdfkit.js
+var pdfkit = __webpack_require__(60553);
+var pdfkit_default = /*#__PURE__*/__webpack_require__.n(pdfkit);
 // EXTERNAL MODULE: external "path"
 var external_path_ = __webpack_require__(71017);
 var external_path_default = /*#__PURE__*/__webpack_require__.n(external_path_);
@@ -282,7 +289,7 @@ var promises_default = /*#__PURE__*/__webpack_require__.n(promises_);
 ;// CONCATENATED MODULE: ./app/api/actions/invoices/generate-hibrid/route.ts
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// DESCRIERE: Generare factură hibridă (PDF instant + ANAF background) - VERSIUNE CORECTATĂ
+// DESCRIERE: Generare factură hibridă cu PDFKit (Vercel compatible)
 // ==================================================================
 
 
@@ -342,14 +349,9 @@ async function POST(request) {
             });
         }
         const proiectData = proiectRows[0];
-        // 2. Verificare date client
-        if (!proiectData.client_cui) {
-            return next_response/* default */.Z.json({
-                error: "Clientul nu are CUI-ul completat \xeen baza de date"
-            }, {
-                status: 400
-            });
-        }
+        // 2. Verificare date client - folosește Client din proiect ca fallback
+        const clientCui = proiectData.client_cui || "N/A";
+        const clientDenumire = proiectData.client_nume_complet || proiectData.client_nume;
         // 3. Generare număr factură
         const numarFactura = await generateInvoiceNumber();
         // 4. Calculare totaluri
@@ -361,9 +363,9 @@ async function POST(request) {
             data: new Date().toISOString().split("T")[0],
             scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
             client: {
-                id: proiectData.client_id,
-                denumire: proiectData.client_nume_complet || proiectData.client_nume,
-                cui: proiectData.client_cui,
+                id: proiectData.client_id || "temp_id",
+                denumire: clientDenumire,
+                cui: clientCui,
                 nrRegCom: proiectData.client_nrc || "",
                 adresa: buildClientAddress(proiectData),
                 iban: proiectData.client_iban || "",
@@ -441,7 +443,7 @@ function buildClientAddress(proiectData) {
         proiectData.client_oras,
         proiectData.client_judet
     ].filter(Boolean);
-    return parts.join(", ");
+    return parts.length > 0 ? parts.join(", ") : "Adresă nedefinită";
 }
 async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
@@ -479,53 +481,175 @@ function calculateTotals(linii) {
         totalGeneral: subtotal + totalTva
     };
 }
-// ==================================================================
-// MODIFICARE: Înlocuiește funcția generatePDF în fișierul existent
-// ==================================================================
 async function generatePDF(factura) {
-    const html = generateInvoiceHTML(factura);
-    // VERCEL FIX: Configurare Puppeteer pentru production
-    const browser = await external_puppeteer_default().launch({
-        headless: true,
-        args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-accelerated-2d-canvas",
-            "--no-first-run",
-            "--no-zygote",
-            "--single-process",
-            "--disable-gpu"
-        ],
-        // VERCEL: Folosește Chromium bundled
-        executablePath: process.env.VERCEL_ENV ? "/usr/bin/google-chrome-stable" : undefined
+    return new Promise((resolve, reject)=>{
+        try {
+            const doc = new (pdfkit_default())({
+                margin: 50,
+                size: "A4",
+                info: {
+                    Title: `Factură ${factura.numar}`,
+                    Author: "UNITAR PROIECT TDA S.R.L.",
+                    Subject: `Factură pentru proiectul ${factura.proiect.denumire}`,
+                    Keywords: "factură, unitar, proiect"
+                }
+            });
+            const chunks = [];
+            doc.on("data", (chunk)=>chunks.push(chunk));
+            doc.on("end", ()=>resolve(Buffer.concat(chunks)));
+            doc.on("error", reject);
+            // Culori și fonturi
+            const primaryColor = "#4caf50";
+            const textColor = "#333333";
+            const grayColor = "#666666";
+            // HEADER PRINCIPAL
+            doc.fontSize(24).fillColor(primaryColor).font("Helvetica-Bold").text("UNITAR PROIECT TDA S.R.L.", 50, 50);
+            doc.fontSize(11).fillColor(textColor).font("Helvetica").text("CUI: RO39613458 | Nr. Reg. Com: J40/10789/2018", 50, 80).text("Șos. Panduri nr. 94-96, Sector 5, București", 50, 95).text("IBAN: RO49TREZ7010671234567890 | Trezoreria Statului", 50, 110);
+            // TITLU FACTURĂ (dreapta)
+            doc.fontSize(32).fillColor(primaryColor).font("Helvetica-Bold").text("FACTURĂ", 400, 50);
+            // Casetă număr factură
+            doc.rect(400, 90, 140, 25).fillAndStroke("#f8f9fa", "#ddd");
+            doc.fontSize(14).fillColor(textColor).font("Helvetica-Bold").text(`Nr: ${factura.numar}`, 410, 98);
+            doc.fontSize(11).font("Helvetica").text(`Data emiterii: ${new Date(factura.data).toLocaleDateString("ro-RO")}`, 400, 125).text(`Data scadenței: ${new Date(factura.scadenta).toLocaleDateString("ro-RO")}`, 400, 140);
+            // LINIE SEPARATOR
+            doc.moveTo(50, 170).lineTo(550, 170).strokeColor(primaryColor).lineWidth(2).stroke();
+            // SECȚIUNEA CLIENT
+            doc.fontSize(14).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83D\uDCCB CUMPĂRĂTOR", 50, 190);
+            // Casetă client
+            doc.rect(50, 210, 500, 80).fillAndStroke("#f8f9fa", "#e0e0e0");
+            doc.fontSize(12).fillColor(textColor).font("Helvetica-Bold").text(factura.client.denumire, 60, 225);
+            doc.font("Helvetica").text(`CUI: ${factura.client.cui}`, 60, 245).text(`Nr. Reg. Com: ${factura.client.nrRegCom}`, 60, 260).text(`Adresa: ${factura.client.adresa}`, 60, 275);
+            // Contact client (dreapta în casetă)
+            if (factura.client.telefon || factura.client.email) {
+                let contactY = 245;
+                if (factura.client.telefon) {
+                    doc.text(`Telefon: ${factura.client.telefon}`, 350, contactY);
+                    contactY += 15;
+                }
+                if (factura.client.email) {
+                    doc.text(`Email: ${factura.client.email}`, 350, contactY);
+                }
+            }
+            // INFORMAȚII PROIECT
+            doc.fontSize(12).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83C\uDFD7️ PROIECT:", 50, 310);
+            doc.fillColor(textColor).font("Helvetica").text(`${factura.proiect.denumire} (ID: ${factura.proiect.id})`, 130, 310);
+            if (factura.proiect.dataStart || factura.proiect.dataFinalizare) {
+                const perioada = `${factura.proiect.dataStart ? new Date(factura.proiect.dataStart).toLocaleDateString("ro-RO") : "N/A"} - ${factura.proiect.dataFinalizare ? new Date(factura.proiect.dataFinalizare).toLocaleDateString("ro-RO") : "\xcen curs"}`;
+                doc.text(`📅 Perioada: ${perioada}`, 50, 325);
+            }
+            // TABEL HEADER
+            let tableY = 360;
+            const tableHeight = 25;
+            const colWidths = [
+                40,
+                200,
+                50,
+                80,
+                80,
+                50,
+                80,
+                90
+            ];
+            let currentX = 50;
+            // Header background
+            doc.rect(50, tableY, 500, tableHeight).fill(primaryColor);
+            // Header text
+            doc.fontSize(9).fillColor("white").font("Helvetica-Bold");
+            const headers = [
+                "Nr.",
+                "Denumirea serviciilor",
+                "Cant.",
+                "Preț unit.",
+                "Valoare",
+                "TVA%",
+                "TVA",
+                "Total (RON)"
+            ];
+            headers.forEach((header, i)=>{
+                const textX = currentX + colWidths[i] / 2;
+                doc.text(header, textX - header.length * 2.5, tableY + 8, {
+                    width: colWidths[i],
+                    align: "center"
+                });
+                currentX += colWidths[i];
+            });
+            // LINII TABEL
+            tableY += tableHeight;
+            doc.fillColor(textColor).font("Helvetica");
+            factura.linii.forEach((linie, index)=>{
+                // Alternating row colors
+                if (index % 2 === 0) {
+                    doc.rect(50, tableY, 500, 20).fill("#f9f9f9");
+                }
+                currentX = 50;
+                doc.fillColor(textColor).fontSize(9);
+                const rowData = [
+                    (index + 1).toString(),
+                    linie.denumire.substring(0, 35) + (linie.denumire.length > 35 ? "..." : ""),
+                    Number(linie.cantitate).toFixed(0),
+                    Number(linie.pretUnitar).toFixed(2),
+                    Number(linie.valoare).toFixed(2),
+                    `${Number(linie.cotaTva).toFixed(0)}%`,
+                    Number(linie.valoreTva).toFixed(2),
+                    Number(linie.total).toFixed(2)
+                ];
+                rowData.forEach((data, i)=>{
+                    const align = i === 0 || i === 2 || i === 5 ? "center" : i >= 3 ? "right" : "left";
+                    const textX = align === "center" ? currentX + colWidths[i] / 2 - data.length * 2.5 : align === "right" ? currentX + colWidths[i] - 5 : currentX + 5;
+                    doc.text(data, textX, tableY + 6, {
+                        width: colWidths[i],
+                        align: align
+                    });
+                    currentX += colWidths[i];
+                });
+                tableY += 20;
+            });
+            // TABEL BORDER
+            doc.rect(50, 360, 500, tableY - 360).stroke("#ddd");
+            // TOTALURI (dreapta)
+            const totalsX = 350;
+            tableY += 30;
+            // Casetă totaluri
+            doc.rect(totalsX, tableY, 200, 80).fillAndStroke("#f0f8f0", primaryColor);
+            doc.fontSize(11).fillColor(textColor).font("Helvetica");
+            doc.text("Subtotal (fără TVA):", totalsX + 10, tableY + 15);
+            doc.text(`${Number(factura.subtotal).toFixed(2)} RON`, totalsX + 120, tableY + 15);
+            doc.text("TVA:", totalsX + 10, tableY + 35);
+            doc.text(`${Number(factura.totalTva).toFixed(2)} RON`, totalsX + 120, tableY + 35);
+            // Total final
+            doc.fontSize(14).font("Helvetica-Bold").fillColor(primaryColor);
+            doc.text("TOTAL DE PLATĂ:", totalsX + 10, tableY + 55);
+            doc.text(`${Number(factura.totalGeneral).toFixed(2)} RON`, totalsX + 120, tableY + 55);
+            // OBSERVAȚII (dacă există)
+            if (factura.observatii) {
+                tableY += 100;
+                doc.fontSize(12).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83D\uDCDD Observații:", 50, tableY);
+                doc.rect(50, tableY + 20, 500, 40).fillAndStroke("#fff3cd", "#ffc107");
+                doc.fontSize(10).fillColor(textColor).font("Helvetica").text(factura.observatii, 60, tableY + 30, {
+                    width: 480,
+                    align: "left"
+                });
+                tableY += 70;
+            }
+            // FOOTER
+            const footerY = doc.page.height - 80;
+            doc.moveTo(50, footerY - 10).lineTo(550, footerY - 10).strokeColor("#eee").lineWidth(1).stroke();
+            doc.fontSize(8).fillColor(grayColor).font("Helvetica").text("Factură generată automat de sistemul UNITAR PROIECT", 50, footerY, {
+                width: 500,
+                align: "center"
+            }).text(`Data și ora generării: ${new Date().toLocaleString("ro-RO")}`, 50, footerY + 12, {
+                width: 500,
+                align: "center"
+            }).text("Această factură este valabilă fără semnătură și ștampilă conform Legii 571/2003", 50, footerY + 24, {
+                width: 500,
+                align: "center"
+            });
+            doc.end();
+        } catch (error) {
+            console.error("PDFKit error:", error);
+            reject(error);
+        }
     });
-    try {
-        const page = await browser.newPage();
-        // Setează viewport pentru consistență
-        await page.setViewport({
-            width: 1200,
-            height: 800
-        });
-        await page.setContent(html, {
-            waitUntil: "networkidle0",
-            timeout: 30000
-        });
-        const pdf = await page.pdf({
-            format: "A4",
-            printBackground: true,
-            margin: {
-                top: "20mm",
-                bottom: "20mm",
-                left: "15mm",
-                right: "15mm"
-            },
-            timeout: 30000
-        });
-        return Buffer.from(pdf);
-    } finally{
-        await browser.close();
-    }
 }
 async function savePDF(pdfBuffer, invoiceNumber) {
     const uploadsDir = external_path_default().join(process.cwd(), "uploads", "facturi");
@@ -581,331 +705,6 @@ async function saveInvoiceToFacturiGenerate(factura, pdfPath) {
         location: "EU"
     });
 }
-function generateInvoiceHTML(factura) {
-    return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Factură ${factura.numar}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: 'Arial', sans-serif; 
-          font-size: 12px; 
-          line-height: 1.4;
-          color: #333;
-        }
-        .container { max-width: 210mm; margin: 0 auto; padding: 20px; }
-        
-        .header { 
-          display: flex; 
-          justify-content: space-between; 
-          margin-bottom: 30px; 
-          border-bottom: 3px solid #4caf50; 
-          padding-bottom: 20px; 
-        }
-        
-        .company-info { width: 48%; }
-        .invoice-info { width: 48%; text-align: right; }
-        
-        .company-logo { 
-          font-size: 22px; 
-          font-weight: bold; 
-          color: #4caf50; 
-          margin-bottom: 10px; 
-        }
-        
-        .invoice-title { 
-          font-size: 32px; 
-          font-weight: bold; 
-          color: #4caf50; 
-          margin-bottom: 15px; 
-        }
-        
-        .invoice-number {
-          font-size: 18px;
-          font-weight: bold;
-          background: #f8f9fa;
-          padding: 8px 12px;
-          border-radius: 4px;
-          display: inline-block;
-          margin-bottom: 10px;
-        }
-        
-        .client-section { 
-          margin: 30px 0; 
-          padding: 20px; 
-          background-color: #f8f9fa; 
-          border-radius: 8px;
-          border-left: 4px solid #4caf50;
-        }
-        
-        .client-title {
-          font-size: 16px;
-          font-weight: bold;
-          color: #4caf50;
-          margin-bottom: 15px;
-        }
-        
-        .project-info { 
-          margin: 20px 0; 
-          padding: 15px; 
-          background-color: #e8f5e8; 
-          border-radius: 6px; 
-        }
-        
-        .table { 
-          width: 100%; 
-          border-collapse: collapse; 
-          margin: 25px 0; 
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .table th, .table td { 
-          border: 1px solid #ddd; 
-          padding: 12px 8px; 
-          text-align: left; 
-        }
-        
-        .table th { 
-          background: linear-gradient(135deg, #4caf50, #45a049);
-          color: white; 
-          font-weight: bold; 
-          font-size: 11px;
-          text-transform: uppercase;
-        }
-        
-        .table tr:nth-child(even) { 
-          background-color: #f9f9f9; 
-        }
-        
-        .table tr:hover {
-          background-color: #f0f8f0;
-        }
-        
-        .table td.number { 
-          text-align: right; 
-          font-weight: 500;
-        }
-        
-        .table td.center { 
-          text-align: center; 
-        }
-        
-        .total-section { 
-          margin-top: 30px; 
-          display: flex;
-          justify-content: flex-end;
-        }
-        
-        .total-box {
-          background: white;
-          border: 2px solid #4caf50;
-          border-radius: 8px;
-          padding: 20px;
-          min-width: 300px;
-        }
-        
-        .total-row { 
-          display: flex; 
-          justify-content: space-between; 
-          margin: 8px 0; 
-          padding: 5px 0;
-        }
-        
-        .total-label { 
-          font-weight: 600; 
-          color: #555;
-        }
-        
-        .total-value { 
-          font-weight: bold; 
-          color: #333;
-        }
-        
-        .final-total { 
-          border-top: 2px solid #4caf50; 
-          padding-top: 15px; 
-          margin-top: 15px;
-          font-size: 18px;
-        }
-        
-        .final-total .total-value {
-          color: #4caf50;
-          font-size: 20px;
-        }
-        
-        .observatii {
-          margin-top: 30px;
-          padding: 15px;
-          background: #fff3cd;
-          border-left: 4px solid #ffc107;
-          border-radius: 4px;
-        }
-        
-        .footer { 
-          margin-top: 50px; 
-          font-size: 10px; 
-          color: #666; 
-          text-align: center;
-          border-top: 1px solid #eee;
-          padding-top: 20px;
-        }
-        
-        .info-row {
-          margin: 5px 0;
-        }
-        
-        .info-label {
-          font-weight: 600;
-          color: #555;
-          display: inline-block;
-          min-width: 100px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <!-- Header cu informații firmă și factură -->
-        <div class="header">
-          <div class="company-info">
-            <div class="company-logo">${factura.furnizor.denumire}</div>
-            <div class="info-row">
-              <span class="info-label">CUI:</span> ${factura.furnizor.cui}
-            </div>
-            <div class="info-row">
-              <span class="info-label">Nr. Reg. Com:</span> ${factura.furnizor.nrRegCom}
-            </div>
-            <div class="info-row">
-              <span class="info-label">Adresa:</span> ${factura.furnizor.adresa}
-            </div>
-            <div class="info-row">
-              <span class="info-label">IBAN:</span> ${factura.furnizor.iban}
-            </div>
-            <div class="info-row">
-              <span class="info-label">Banca:</span> ${factura.furnizor.banca}
-            </div>
-          </div>
-          
-          <div class="invoice-info">
-            <div class="invoice-title">FACTURĂ</div>
-            <div class="invoice-number">Nr: ${factura.numar}</div>
-            <div class="info-row">
-              <span class="info-label">Data emiterii:</span> 
-              ${new Date(factura.data).toLocaleDateString("ro-RO")}
-            </div>
-            <div class="info-row">
-              <span class="info-label">Data scadenței:</span> 
-              ${new Date(factura.scadenta).toLocaleDateString("ro-RO")}
-            </div>
-          </div>
-        </div>
-
-        <!-- Informații client -->
-        <div class="client-section">
-          <div class="client-title">📋 Cumpărător</div>
-          <div style="display: flex; justify-content: space-between;">
-            <div style="width: 48%;">
-              <div class="info-row">
-                <span class="info-label">Denumire:</span> 
-                <strong>${factura.client.denumire}</strong>
-              </div>
-              <div class="info-row">
-                <span class="info-label">CUI:</span> ${factura.client.cui}
-              </div>
-              <div class="info-row">
-                <span class="info-label">Nr. Reg. Com:</span> ${factura.client.nrRegCom}
-              </div>
-              <div class="info-row">
-                <span class="info-label">Adresa:</span> ${factura.client.adresa}
-              </div>
-            </div>
-            <div style="width: 48%;">
-              ${factura.client.telefon ? `<div class="info-row"><span class="info-label">Telefon:</span> ${factura.client.telefon}</div>` : ""}
-              ${factura.client.email ? `<div class="info-row"><span class="info-label">Email:</span> ${factura.client.email}</div>` : ""}
-              ${factura.client.iban ? `<div class="info-row"><span class="info-label">IBAN:</span> ${factura.client.iban}</div>` : ""}
-              ${factura.client.banca ? `<div class="info-row"><span class="info-label">Banca:</span> ${factura.client.banca}</div>` : ""}
-            </div>
-          </div>
-        </div>
-
-        <!-- Informații proiect -->
-        <div class="project-info">
-          <strong>🏗️ Proiect:</strong> ${factura.proiect.denumire} (ID: ${factura.proiect.id})<br>
-          <strong>📅 Perioada:</strong> 
-          ${factura.proiect.dataStart ? new Date(factura.proiect.dataStart).toLocaleDateString("ro-RO") : "N/A"} - 
-          ${factura.proiect.dataFinalizare ? new Date(factura.proiect.dataFinalizare).toLocaleDateString("ro-RO") : "\xcen curs"}
-          ${factura.proiect.valoareEstimata ? `<br><strong>💰 Valoare estimată:</strong> ${Number(factura.proiect.valoareEstimata).toFixed(2)} RON` : ""}
-        </div>
-
-        <!-- Tabel servicii/produse -->
-        <table class="table">
-          <thead>
-            <tr>
-              <th style="width: 50px;">Nr.</th>
-              <th>Denumirea produselor sau serviciilor</th>
-              <th style="width: 80px;">Cant.</th>
-              <th style="width: 100px;">Preț unit. (RON)</th>
-              <th style="width: 100px;">Valoare (RON)</th>
-              <th style="width: 80px;">TVA %</th>
-              <th style="width: 100px;">TVA (RON)</th>
-              <th style="width: 120px;">Total (RON)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${factura.linii.map((linie, index)=>`
-              <tr>
-                <td class="center">${index + 1}</td>
-                <td>${linie.denumire}</td>
-                <td class="center">${Number(linie.cantitate).toFixed(0)}</td>
-                <td class="number">${Number(linie.pretUnitar).toFixed(2)}</td>
-                <td class="number">${Number(linie.valoare).toFixed(2)}</td>
-                <td class="center">${Number(linie.cotaTva).toFixed(0)}%</td>
-                <td class="number">${Number(linie.valoreTva).toFixed(2)}</td>
-                <td class="number"><strong>${Number(linie.total).toFixed(2)}</strong></td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-
-        <!-- Totaluri -->
-        <div class="total-section">
-          <div class="total-box">
-            <div class="total-row">
-              <div class="total-label">Total fără TVA:</div>
-              <div class="total-value">${Number(factura.subtotal).toFixed(2)} RON</div>
-            </div>
-            <div class="total-row">
-              <div class="total-label">TVA:</div>
-              <div class="total-value">${Number(factura.totalTva).toFixed(2)} RON</div>
-            </div>
-            <div class="total-row final-total">
-              <div class="total-label">TOTAL DE PLATĂ:</div>
-              <div class="total-value">${Number(factura.totalGeneral).toFixed(2)} RON</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Observații -->
-        ${factura.observatii ? `
-          <div class="observatii">
-            <h4 style="color: #856404; margin-bottom: 10px;">📝 Observații:</h4>
-            <p>${factura.observatii}</p>
-          </div>
-        ` : ""}
-
-        <!-- Footer -->
-        <div class="footer">
-          <p><strong>Factură generată automat de sistemul UNITAR PROIECT</strong></p>
-          <p>Data și ora generării: ${new Date().toLocaleString("ro-RO")}</p>
-          <p>Această factură este valabilă fără semnătură și ștampilă conform Legii 571/2003</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
 
 ;// CONCATENATED MODULE: ./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?page=%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&name=app%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&pagePath=private-next-app-dir%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute.ts&appDir=%2Fhome%2Fteodor%2FPM1-2025-07-17%2Funitar-admin%2Fapp&appPaths=%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
 
@@ -948,7 +747,7 @@ const originalPathname = "/api/actions/invoices/generate-hibrid/route";
 var __webpack_require__ = require("../../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,7256,6641,6115], () => (__webpack_exec__(39799)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,7256,6641,6115,553], () => (__webpack_exec__(37967)));
 module.exports = __webpack_exports__;
 
 })();
