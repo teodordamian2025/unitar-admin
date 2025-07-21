@@ -261,7 +261,7 @@ export default function AdminPage() {
             </Link>
             
             <Link 
-              href="/admin/rapoarte/proiecte" 
+              href="/admin/rapoarte/facturi" 
               style={{ 
                 display: 'block',
                 padding: '0.75rem 1rem',
@@ -367,7 +367,7 @@ export default function AdminPage() {
               }}
               onClick={() => toast.info('Funcție în dezvoltare!')}
             >
-              💰 Creează Factură
+              💰 Generează Factură PDF
             </button>
           </div>
         </div>
