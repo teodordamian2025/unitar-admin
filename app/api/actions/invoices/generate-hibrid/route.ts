@@ -240,30 +240,60 @@ function calculateTotals(linii: any[]) {
   };
 }
 
+// ==================================================================
+// MODIFICARE: Înlocuiește funcția generatePDF în fișierul existent
+// ==================================================================
+
 async function generatePDF(factura: any): Promise<Buffer> {
   const html = generateInvoiceHTML(factura);
   
+  // VERCEL FIX: Configurare Puppeteer pentru production
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process', // Important pentru Vercel
+      '--disable-gpu'
+    ],
+    // VERCEL: Folosește Chromium bundled
+    executablePath: process.env.VERCEL_ENV 
+      ? '/usr/bin/google-chrome-stable' 
+      : undefined
   });
   
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: 'networkidle0' });
-  
-  const pdf = await page.pdf({
-    format: 'A4',
-    printBackground: true,
-    margin: {
-      top: '20mm',
-      bottom: '20mm',
-      left: '15mm',
-      right: '15mm'
-    }
-  });
-  
-  await browser.close();
-  return Buffer.from(pdf);
+  try {
+    const page = await browser.newPage();
+    
+    // Setează viewport pentru consistență
+    await page.setViewport({ width: 1200, height: 800 });
+    
+    await page.setContent(html, { 
+      waitUntil: 'networkidle0',
+      timeout: 30000 
+    });
+    
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20mm',
+        bottom: '20mm',
+        left: '15mm',
+        right: '15mm'
+      },
+      timeout: 30000
+    });
+    
+    return Buffer.from(pdf);
+    
+  } finally {
+    await browser.close();
+  }
 }
 
 async function savePDF(pdfBuffer: Buffer, invoiceNumber: string): Promise<string> {
