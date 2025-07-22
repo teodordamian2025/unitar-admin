@@ -232,6 +232,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       console.log('6. Creating temporary DOM element...');
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = htmlContent;
+      tempDiv.id = 'pdf-content'; // ID unic pentru selector
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.top = '-9999px';
@@ -239,6 +240,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
       tempDiv.style.fontSize = '12px';
+      
+      // Extrage doar conținutul din interiorul <body>
+      const parser = new DOMParser();
+      const htmlDoc = parser.parseFromString(htmlContent, 'text/html');
+      const bodyContent = htmlDoc.body;
+      
+      if (bodyContent) {
+        tempDiv.innerHTML = bodyContent.innerHTML;
+        console.log('6.1 Using body content:', bodyContent.innerHTML.substring(0, 200));
+      } else {
+        console.log('6.1 No body found, using full HTML');
+      }
       
       document.body.appendChild(tempDiv);
       console.log('7. Element added to DOM');
@@ -261,11 +274,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       // Verifică din nou după timeout
       console.log('12. Post-timeout content check:', tempDiv.textContent?.substring(0, 200));
 
-      // Generează PDF cu jsPDF
+      // Generează PDF cu jsPDF folosind selector specific
       console.log('13. Starting PDF generation...');
       const pdf = new window.jsPDF('p', 'mm', 'a4');
       
-      await pdf.html(tempDiv, {
+      // Folosește elementul specific, nu întreaga pagină
+      const targetElement = document.getElementById('pdf-content');
+      console.log('13.1 Target element found:', !!targetElement);
+      console.log('13.2 Target element content:', targetElement?.textContent?.substring(0, 200));
+      
+      await pdf.html(targetElement || tempDiv, {
         callback: function (pdf: any) {
           console.log('14. PDF generation callback called');
           
@@ -301,12 +319,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           backgroundColor: '#ffffff',
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
-            const clonedElement = clonedDoc.querySelector('div');
+            const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              console.log('20. Cloned element found');
-              console.log('21. Cloned content:', clonedElement.textContent?.substring(0, 200));
+              console.log('20. Cloned PDF element found');
+              console.log('21. Cloned PDF content:', clonedElement.textContent?.substring(0, 200));
+              console.log('21.1 Cloned PDF HTML:', clonedElement.innerHTML.substring(0, 200));
             } else {
-              console.log('20. ERROR: Cloned element not found!');
+              console.log('20. ERROR: Cloned PDF element not found!');
+              // Fallback pentru debugging
+              const anyDiv = clonedDoc.querySelector('div');
+              console.log('20.1 Found any div:', anyDiv?.textContent?.substring(0, 100));
             }
           }
           // ELIMINAT onrendered care cauza eroarea
