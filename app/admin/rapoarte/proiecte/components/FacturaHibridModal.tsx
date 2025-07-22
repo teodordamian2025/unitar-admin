@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DESCRIERE: Modal pentru generarea facturii hibride cu preluare ANAF
+// MODIFICAT: Adăugat procesarea HTML → PDF cu jsPDF
 // ==================================================================
 
 'use client';
@@ -45,6 +45,15 @@ interface ClientInfo {
   platitorTva?: string;
 }
 
+// Tipuri pentru librăriile PDF
+declare global {
+  interface Window {
+    jsPDF: any;
+    html2canvas: any;
+    jspdf: any;
+  }
+}
+
 export default function FacturaHibridModal({ proiect, onClose, onSuccess }: FacturaHibridModalProps) {
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>([
     { 
@@ -61,6 +70,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [isLoadingANAF, setIsLoadingANAF] = useState(false);
   const [cuiInput, setCuiInput] = useState('');
   const [anafError, setAnafError] = useState<string | null>(null);
+  const [isProcessingPDF, setIsProcessingPDF] = useState(false);
 
   // Auto-load client info pe baza numelui
   useEffect(() => {
@@ -162,6 +172,94 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     };
   };
 
+  // NOUĂ FUNCȚIE: Încarcă librăriile PDF
+  const loadPDFLibraries = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // Verifică dacă sunt deja încărcate
+      if (window.jsPDF && window.html2canvas) {
+        resolve();
+        return;
+      }
+
+      // Încarcă jsPDF
+      const jsPDFScript = document.createElement('script');
+      jsPDFScript.src = 'https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js';
+      jsPDFScript.onload = () => {
+        // Setează referința globală
+        window.jsPDF = (window as any).jspdf.jsPDF;
+        
+        // Încarcă html2canvas
+        const html2canvasScript = document.createElement('script');
+        html2canvasScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        html2canvasScript.onload = () => {
+          window.html2canvas = (window as any).html2canvas;
+          resolve();
+        };
+        html2canvasScript.onerror = reject;
+        document.head.appendChild(html2canvasScript);
+      };
+      jsPDFScript.onerror = reject;
+      document.head.appendChild(jsPDFScript);
+    });
+  };
+
+  // NOUĂ FUNCȚIE: Procesează HTML în PDF
+  const processPDF = async (htmlContent: string, fileName: string) => {
+    try {
+      setIsProcessingPDF(true);
+      toast.info('🔄 Se procesează HTML-ul în PDF...');
+
+      // Încarcă librăriile dacă nu sunt disponibile
+      await loadPDFLibraries();
+
+      // Creează un element temporar cu HTML-ul
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.width = '210mm'; // A4 width
+      tempDiv.style.backgroundColor = 'white';
+      document.body.appendChild(tempDiv);
+
+      // Generează PDF cu jsPDF
+      const pdf = new window.jsPDF('p', 'mm', 'a4');
+      
+      await pdf.html(tempDiv, {
+        callback: function (pdf: any) {
+          // Curăță elementul temporar
+          document.body.removeChild(tempDiv);
+          
+          // Salvează PDF-ul
+          pdf.save(fileName);
+          
+          toast.success('✅ PDF generat și descărcat cu succes!');
+          
+          // Apelează callback-ul de succes
+          onSuccess(fileName.replace('.pdf', ''), `#generated-${fileName}`);
+          
+          setIsProcessingPDF(false);
+        },
+        margin: [10, 10, 10, 10],
+        autoPaging: 'text',
+        html2canvas: {
+          allowTaint: true,
+          dpi: 300,
+          letterRendering: true,
+          logging: false,
+          scale: 0.8,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        }
+      });
+
+    } catch (error) {
+      setIsProcessingPDF(false);
+      console.error('Eroare la procesarea PDF:', error);
+      toast.error(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  };
+
   const handleGenereazaFactura = async () => {
     // Validări
     if (!clientInfo?.cui) {
@@ -182,6 +280,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setIsGenerating(true);
     
     try {
+      toast.info('🔄 Se generează template-ul facturii...');
+      
       const response = await fetch('/api/actions/invoices/generate-hibrid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,20 +294,28 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       
       const result = await response.json();
       
-      if (result.success) {
-        toast.success(`🎉 Factura ${result.invoiceId} a fost generată cu succes!`);
-        onSuccess(result.invoiceId, result.downloadUrl);
+      if (result.success && result.htmlContent) {
+        toast.success('✅ Template generat! Se procesează PDF-ul...');
+        
+        // Procesează HTML-ul în PDF
+        await processPDF(result.htmlContent, result.fileName);
+        
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || 'Eroare la generarea template-ului');
       }
     } catch (error) {
       toast.error(`❌ Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
-    } finally {
       setIsGenerating(false);
+    } finally {
+      if (!isProcessingPDF) {
+        setIsGenerating(false);
+      }
     }
   };
 
   const totals = calculateTotals();
+
+  const isLoading = isGenerating || isProcessingPDF;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -219,19 +327,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               💰 Generare Factură Hibridă
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              PDF instant + integrare ANAF în fundal • Proiect: {proiect.ID_Proiect}
+              PDF instant cu jsPDF + integrare ANAF în fundal • Proiect: {proiect.ID_Proiect}
             </p>
           </div>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-2xl p-1"
-            disabled={isGenerating}
+            disabled={isLoading}
           >
             ✕
           </button>
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Loading Overlay */}
+          {isLoading && (
+            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-lg font-medium">
+                    {isGenerating && !isProcessingPDF && '🔄 Se generează template-ul...'}
+                    {isProcessingPDF && '📄 Se procesează PDF-ul...'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Informații Proiect */}
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -478,24 +601,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           {/* Butoane */}
           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              ℹ️ Factura PDF va fi disponibilă instant. Integrarea ANAF se va procesa în fundal.
+              ℹ️ Factura PDF va fi generată instant cu jsPDF. Integrarea ANAF se va procesa în fundal.
             </div>
             
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                disabled={isGenerating}
+                disabled={isLoading}
                 className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50"
               >
                 Anulează
               </button>
               <button
                 onClick={handleGenereazaFactura}
-                disabled={isGenerating || !clientInfo?.cui || !clientInfo?.denumire}
+                disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
                 className="bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isGenerating ? (
-                  <>⏳ Se generează...</>
+                {isLoading ? (
+                  <>⏳ {isProcessingPDF ? 'Se generează PDF...' : 'Se procesează...'}</>
                 ) : (
                   <>💰 Generează Factură PDF</>
                 )}
