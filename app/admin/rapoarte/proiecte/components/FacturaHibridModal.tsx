@@ -730,20 +730,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           {/* Butoane */}
           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              ℹ️ Factura PDF va fi generată instant cu jsPDF. Integrarea ANAF se va procesa în fundal.
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                disabled={isLoading}
-                className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50"
-              >
-                Anulează
-              </button>
-              <button
-                onClick={handleGenereazaFactura}
-                disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
+!clientInfo?.denumire}
                 className="bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isLoading ? (
