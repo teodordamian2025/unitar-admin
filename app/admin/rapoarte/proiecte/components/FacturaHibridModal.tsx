@@ -231,7 +231,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       // Creează un element temporar cu HTML-ul
       console.log('6. Creating temporary DOM element...');
       const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = htmlContent;
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
@@ -240,17 +239,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
       tempDiv.style.fontSize = '12px';
+      tempDiv.style.color = '#333';
+      tempDiv.style.lineHeight = '1.4';
+      tempDiv.style.padding = '40px';
       
-      // Extrage doar conținutul din interiorul <body>
+      // Extrage CSS și conținut separat
       const parser = new DOMParser();
       const htmlDoc = parser.parseFromString(htmlContent, 'text/html');
+      
+      // Extrage CSS-ul din <style>
+      const styleElement = htmlDoc.querySelector('style');
+      const cssRules = styleElement ? styleElement.textContent || '' : '';
+      console.log('6.1 CSS extracted:', cssRules.substring(0, 200));
+      
+      // Extrage conținutul din <body>
       const bodyContent = htmlDoc.body;
       
       if (bodyContent) {
-        tempDiv.innerHTML = bodyContent.innerHTML;
-        console.log('6.1 Using body content:', bodyContent.innerHTML.substring(0, 200));
+        // Adaugă CSS-ul inline în element
+        const styleTag = document.createElement('style');
+        styleTag.textContent = cssRules;
+        tempDiv.appendChild(styleTag);
+        
+        // Adaugă conținutul HTML
+        tempDiv.innerHTML += bodyContent.innerHTML;
+        console.log('6.2 Using body content with CSS');
       } else {
-        console.log('6.1 No body found, using full HTML');
+        tempDiv.innerHTML = htmlContent;
+        console.log('6.2 Using full HTML as fallback');
       }
       
       document.body.appendChild(tempDiv);
@@ -311,12 +327,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         autoPaging: 'text',
         html2canvas: {
           allowTaint: true,
-          dpi: 150, // Redus pentru debugging
+          dpi: 200, // Crescut pentru calitate mai bună
           letterRendering: true,
           logging: true, // Activat pentru debugging
-          scale: 0.5, // Redus pentru debugging
+          scale: 1, // Mărit la 1 pentru text mai clar
           useCORS: true,
           backgroundColor: '#ffffff',
+          height: 1000, // Forțează înălțimea
+          width: 800,   // Forțează lățimea
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
@@ -324,6 +342,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               console.log('20. Cloned PDF element found');
               console.log('21. Cloned PDF content:', clonedElement.textContent?.substring(0, 200));
               console.log('21.1 Cloned PDF HTML:', clonedElement.innerHTML.substring(0, 200));
+              
+              // Verifică dacă CSS-ul se aplică
+              const computedStyle = clonedDoc.defaultView.getComputedStyle(clonedElement);
+              console.log('21.2 Computed background:', computedStyle.backgroundColor);
+              console.log('21.3 Computed color:', computedStyle.color);
+              console.log('21.4 Computed font:', computedStyle.fontFamily);
             } else {
               console.log('20. ERROR: Cloned PDF element not found!');
               // Fallback pentru debugging
