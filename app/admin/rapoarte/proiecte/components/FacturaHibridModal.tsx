@@ -159,16 +159,25 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     let totalTva = 0;
     
     liniiFactura.forEach(linie => {
-      const valoare = linie.cantitate * linie.pretUnitar;
-      const tva = valoare * (linie.cotaTva / 100);
+      // Verificări sigure pentru tipuri
+      const cantitate = Number(linie.cantitate) || 0;
+      const pretUnitar = Number(linie.pretUnitar) || 0;
+      const cotaTva = Number(linie.cotaTva) || 0;
+      
+      const valoare = cantitate * pretUnitar;
+      const tva = valoare * (cotaTva / 100);
+      
       subtotal += valoare;
       totalTva += tva;
     });
     
+    // Funcție sigură pentru formatare
+    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+    
     return {
-      subtotal: subtotal.toFixed(2),
-      totalTva: totalTva.toFixed(2),
-      totalGeneral: (subtotal + totalTva).toFixed(2)
+      subtotal: safeFixed(subtotal),
+      totalTva: safeFixed(totalTva),
+      totalGeneral: safeFixed(subtotal + totalTva)
     };
   };
 
@@ -495,9 +504,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 </thead>
                 <tbody>
                   {liniiFactura.map((linie, index) => {
-                    const valoare = linie.cantitate * linie.pretUnitar;
-                    const tva = valoare * (linie.cotaTva / 100);
+                    // Verificări sigure pentru calcule
+                    const cantitate = Number(linie.cantitate) || 0;
+                    const pretUnitar = Number(linie.pretUnitar) || 0;
+                    const cotaTva = Number(linie.cotaTva) || 0;
+                    
+                    const valoare = cantitate * pretUnitar;
+                    const tva = valoare * (cotaTva / 100);
                     const total = valoare + tva;
+                    
+                    // Funcție sigură pentru formatare
+                    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                     
                     return (
                       <tr key={index} className="hover:bg-gray-50">
@@ -544,7 +561,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </select>
                         </td>
                         <td className="border border-gray-300 p-2 text-right font-semibold">
-                          {total.toFixed(2)}
+                          {safeFixed(total)}
                         </td>
                         <td className="border border-gray-300 p-2 text-center">
                           <button
