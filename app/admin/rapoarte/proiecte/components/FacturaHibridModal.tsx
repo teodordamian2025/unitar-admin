@@ -256,14 +256,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const bodyContent = htmlDoc.body;
       
       if (bodyContent) {
-        // Adaugă CSS-ul inline în element
-        const styleTag = document.createElement('style');
-        styleTag.textContent = cssRules;
-        tempDiv.appendChild(styleTag);
+        // Adaugă conținutul HTML ÎNAINTE de CSS
+        tempDiv.innerHTML = bodyContent.innerHTML;
         
-        // Adaugă conținutul HTML
-        tempDiv.innerHTML += bodyContent.innerHTML;
-        console.log('6.2 Using body content with CSS');
+        // Adaugă CSS-ul ca stylesheet în document head pentru clone
+        const globalStyle = document.createElement('style');
+        globalStyle.id = 'pdf-styles';
+        globalStyle.textContent = cssRules;
+        
+        // Verifică dacă nu există deja
+        if (!document.getElementById('pdf-styles')) {
+          document.head.appendChild(globalStyle);
+        }
+        
+        console.log('6.2 Using body content with global CSS');
+        console.log('6.3 Body content preview:', bodyContent.innerHTML.substring(0, 300));
       } else {
         tempDiv.innerHTML = htmlContent;
         console.log('6.2 Using full HTML as fallback');
@@ -305,7 +312,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           
           // Curăță elementul temporar
           document.body.removeChild(tempDiv);
-          console.log('15. Temporary element removed');
+          
+          // Curăță CSS-ul global
+          const globalStyle = document.getElementById('pdf-styles');
+          if (globalStyle) {
+            document.head.removeChild(globalStyle);
+          }
+          
+          console.log('15. Temporary elements removed');
           
           // Verifică PDF-ul generat
           const pdfOutput = pdf.output('datauristring');
