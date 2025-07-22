@@ -308,17 +308,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             } else {
               console.log('20. ERROR: Cloned element not found!');
             }
-          },
-          onrendered: (canvas: any) => {
-            console.log('22. html2canvas onrendered called');
-            console.log('23. Canvas dimensions:', canvas.width, 'x', canvas.height);
-            
-            // Verifică dacă canvas-ul are conținut
-            const context = canvas.getContext('2d');
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const hasContent = imageData.data.some((pixel: number) => pixel !== 0);
-            console.log('24. Canvas has content:', hasContent);
           }
+          // ELIMINAT onrendered care cauza eroarea
         }
       });
 
