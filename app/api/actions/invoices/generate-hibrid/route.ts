@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import PDFDocument from 'pdfkit';
 import { BigQuery } from '@google-cloud/bigquery';
-import { Readable } from 'stream';
 
 // Inițializare BigQuery
 const bigquery = new BigQuery({
@@ -20,173 +18,313 @@ export async function POST(request: NextRequest) {
 
     console.log('Generez factură pentru:', { proiectId, clientData, invoiceData });
 
-    // Generează numele fișierului
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `factura-${proiectId}-${timestamp}.pdf`;
-
-    // Creează documentul PDF în memorie - FĂRĂ font explicit
-    const doc = new PDFDocument({ margin: 50 });
-    const chunks: Buffer[] = [];
-
-    // NU setăm nici un font explicit - lăsăm PDFKit să folosească fontul intern
-
-    // Colectează chunk-urile PDF în memorie
-    doc.on('data', (chunk) => chunks.push(chunk));
-    
-    const pdfPromise = new Promise<Buffer>((resolve) => {
-      doc.on('end', () => {
-        const pdfBuffer = Buffer.concat(chunks);
-        resolve(pdfBuffer);
-      });
-    });
-
-    // HEADER - Informații furnizor
-    doc.fontSize(24)
-       .text('FACTURĂ', 50, 50, { align: 'center' });
-
-    doc.moveDown(1);
-
-    // Informații furnizor (stânga)
-    doc.fontSize(11)
-       .text('Furnizor:', 50, 120)
-       .text('UNITAR PROIECT SRL', 50, 135)
-       .text('CUI: RO12345678', 50, 150)
-       .text('Nr. Reg. Com.: J40/1234/2024', 50, 165)
-       .text('Adresa: Str. Exemplu Nr. 1, București', 50, 180)
-       .text('Telefon: 0721234567', 50, 195)
-       .text('Email: contact@unitarproiect.ro', 50, 210);
-
-    // Informații client (dreapta)
-    doc.text('Client:', 350, 120)
-       .text(clientData.nume || 'Client Necunoscut', 350, 135)
-       .text(`CUI: ${clientData.cui || 'N/A'}`, 350, 150)
-       .text(`Nr. Reg. Com.: ${clientData.nr_reg_com || 'N/A'}`, 350, 165)
-       .text(`Adresa: ${clientData.adresa || 'N/A'}`, 350, 180)
-       .text(`Telefon: ${clientData.telefon || 'N/A'}`, 350, 195)
-       .text(`Email: ${clientData.email || 'N/A'}`, 350, 210);
-
-    // Informații factură
-    doc.fontSize(32)
-       .text(`Factura nr: ${invoiceData.numarFactura}`, 50, 250);
-    
-    doc.fontSize(14)
-       .text(`Data: ${new Date().toLocaleDateString('ro-RO')}`, 50, 285)
-       .text(`Proiect: ${invoiceData.denumireProiect || `Proiect #${proiectId}`}`, 50, 305);
-
-    // Linie separator
-    doc.moveTo(50, 340)
-       .lineTo(550, 340)
-       .stroke();
-
-    // TABEL - Header
-    const tableTop = 360;
-    doc.fontSize(11)
-       .text('Nr.', 50, tableTop, { width: 30, align: 'center' })
-       .text('Descriere', 90, tableTop, { width: 250 })
-       .text('Cantitate', 350, tableTop, { width: 60, align: 'center' })
-       .text('Preț Unitar', 420, tableTop, { width: 60, align: 'right' })
-       .text('Total', 490, tableTop, { width: 60, align: 'right' });
-
-    // Linie după header
-    doc.moveTo(50, tableTop + 20)
-       .lineTo(550, tableTop + 20)
-       .stroke();
-
-    // TABEL - Conținut
-    let currentY = tableTop + 30;
+    // Calculează valorile
     const subtotal = invoiceData.subtotal || 0;
     const tva = invoiceData.tva || 0;
     const total = invoiceData.total || subtotal;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `factura-${proiectId}-${timestamp}.pdf`;
 
-    doc.fontSize(14)
-       .text('1', 50, currentY, { width: 30, align: 'center' })
-       .text(invoiceData.descriere || 'Servicii de consultanță și dezvoltare proiect', 90, currentY, { width: 250 })
-       .text('1', 350, currentY, { width: 60, align: 'center' })
-       .text(`${subtotal.toFixed(2)} RON`, 420, currentY, { width: 60, align: 'right' })
-       .text(`${subtotal.toFixed(2)} RON`, 490, currentY, { width: 60, align: 'right' });
+    // Creează HTML template pentru factură
+    const htmlTemplate = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Factură ${invoiceData.numarFactura}</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                line-height: 1.4;
+                color: #333;
+                padding: 40px;
+                background: white;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .header h1 {
+                font-size: 28px;
+                color: #2c3e50;
+                margin-bottom: 10px;
+            }
+            .company-info {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 30px;
+                gap: 40px;
+            }
+            .company-left, .company-right {
+                flex: 1;
+            }
+            .company-left h3, .company-right h3 {
+                font-size: 14px;
+                color: #34495e;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #bdc3c7;
+                padding-bottom: 4px;
+            }
+            .info-line {
+                margin-bottom: 4px;
+                font-size: 11px;
+            }
+            .invoice-details {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 5px;
+                margin-bottom: 30px;
+            }
+            .invoice-number {
+                font-size: 24px;
+                font-weight: bold;
+                color: #e74c3c;
+                margin-bottom: 10px;
+            }
+            .invoice-meta {
+                display: flex;
+                gap: 30px;
+            }
+            .table-container {
+                margin-bottom: 30px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            th {
+                background: #34495e;
+                color: white;
+                padding: 12px 8px;
+                text-align: left;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            td {
+                padding: 10px 8px;
+                border-bottom: 1px solid #ecf0f1;
+                font-size: 11px;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .totals-section {
+                margin-top: 20px;
+                margin-left: auto;
+                width: 300px;
+            }
+            .totals-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px solid #ecf0f1;
+            }
+            .totals-row.final {
+                border-top: 2px solid #34495e;
+                border-bottom: 2px solid #34495e;
+                font-weight: bold;
+                font-size: 14px;
+                background: #f8f9fa;
+                padding: 12px 0;
+            }
+            .payment-info {
+                margin-top: 40px;
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 5px;
+            }
+            .payment-info h4 {
+                color: #34495e;
+                margin-bottom: 10px;
+                font-size: 13px;
+            }
+            .bank-details {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-top: 15px;
+            }
+            .signatures {
+                margin-top: 50px;
+                display: flex;
+                justify-content: space-between;
+            }
+            .signature-box {
+                text-align: center;
+                width: 200px;
+            }
+            .signature-line {
+                border-top: 1px solid #34495e;
+                margin-top: 40px;
+                padding-top: 8px;
+                font-size: 11px;
+            }
+            .footer {
+                margin-top: 60px;
+                text-align: center;
+                font-size: 10px;
+                color: #7f8c8d;
+                border-top: 1px solid #ecf0f1;
+                padding-top: 20px;
+            }
+            .footer .generated-info {
+                margin-bottom: 10px;
+                font-size: 11px;
+                color: #34495e;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>FACTURĂ</h1>
+        </div>
 
-    currentY += 40;
+        <div class="company-info">
+            <div class="company-left">
+                <h3>FURNIZOR</h3>
+                <div class="info-line"><strong>UNITAR PROIECT SRL</strong></div>
+                <div class="info-line">CUI: RO12345678</div>
+                <div class="info-line">Nr. Reg. Com.: J40/1234/2024</div>
+                <div class="info-line">Adresa: Str. Exemplu Nr. 1, București</div>
+                <div class="info-line">Telefon: 0721234567</div>
+                <div class="info-line">Email: contact@unitarproiect.ro</div>
+            </div>
+            <div class="company-right">
+                <h3>CLIENT</h3>
+                <div class="info-line"><strong>${clientData.nume || 'Client Necunoscut'}</strong></div>
+                <div class="info-line">CUI: ${clientData.cui || 'N/A'}</div>
+                <div class="info-line">Nr. Reg. Com.: ${clientData.nr_reg_com || 'N/A'}</div>
+                <div class="info-line">Adresa: ${clientData.adresa || 'N/A'}</div>
+                <div class="info-line">Telefon: ${clientData.telefon || 'N/A'}</div>
+                <div class="info-line">Email: ${clientData.email || 'N/A'}</div>
+            </div>
+        </div>
 
-    // Linie separator
-    doc.moveTo(350, currentY)
-       .lineTo(550, currentY)
-       .stroke();
+        <div class="invoice-details">
+            <div class="invoice-number">Factura nr: ${invoiceData.numarFactura}</div>
+            <div class="invoice-meta">
+                <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
+                <div><strong>Proiect:</strong> ${invoiceData.denumireProiect || `Proiect #${proiectId}`}</div>
+            </div>
+        </div>
 
-    currentY += 15;
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">Nr.</th>
+                        <th style="width: 300px;">Descriere</th>
+                        <th style="width: 60px;" class="text-center">Cant.</th>
+                        <th style="width: 80px;" class="text-right">Preț Unitar</th>
+                        <th style="width: 80px;" class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>${invoiceData.descriere || 'Servicii de consultanță și dezvoltare proiect'}</td>
+                        <td class="text-center">1</td>
+                        <td class="text-right">${subtotal.toFixed(2)} RON</td>
+                        <td class="text-right">${subtotal.toFixed(2)} RON</td>
+                    </tr>
+                </tbody>
+            </table>
 
-    // TOTALURI
-    doc.fontSize(11)
-       .text('Subtotal:', 420, currentY, { width: 60, align: 'right' })
-       .text(`${subtotal.toFixed(2)} RON`, 490, currentY, { width: 60, align: 'right' });
+            <div class="totals-section">
+                <div class="totals-row">
+                    <span>Subtotal:</span>
+                    <span>${subtotal.toFixed(2)} RON</span>
+                </div>
+                ${tva > 0 ? `
+                <div class="totals-row">
+                    <span>TVA 19%:</span>
+                    <span>${tva.toFixed(2)} RON</span>
+                </div>
+                ` : ''}
+                <div class="totals-row final">
+                    <span>TOTAL DE PLATĂ:</span>
+                    <span>${total.toFixed(2)} RON</span>
+                </div>
+            </div>
+        </div>
 
-    currentY += 20;
+        <div class="payment-info">
+            <h4>Condiții de plată</h4>
+            <div class="info-line">Termen de plată: ${invoiceData.termenPlata || '30 zile'}</div>
+            <div class="info-line">Metoda de plată: Transfer bancar</div>
+            
+            <div class="bank-details">
+                <div>
+                    <h4>Informații bancare</h4>
+                    <div class="info-line">Banca: BCR</div>
+                    <div class="info-line">IBAN: RO49RNCB0082004530120001</div>
+                    <div class="info-line">SWIFT: RNCBROBU</div>
+                </div>
+            </div>
+        </div>
 
-    if (tva > 0) {
-      doc.text('TVA 19%:', 420, currentY, { width: 60, align: 'right' })
-         .text(`${tva.toFixed(2)} RON`, 490, currentY, { width: 60, align: 'right' });
-      currentY += 20;
-    }
+        <div class="signatures">
+            <div class="signature-box">
+                <div>Furnizor</div>
+                <div class="signature-line">Semnătură și ștampilă</div>
+            </div>
+            <div class="signature-box">
+                <div>Client</div>
+                <div class="signature-line">Semnătură și ștampilă</div>
+            </div>
+        </div>
 
-    // Linie groasă pentru total
-    doc.moveTo(420, currentY)
-       .lineTo(550, currentY)
-       .lineWidth(2)
-       .stroke()
-       .lineWidth(1);
+        <div class="footer">
+            <div class="generated-info">
+                <strong>Factură generată automat de sistemul UNITAR PROIECT</strong><br>
+                Data generării: ${new Date().toLocaleString('ro-RO')}
+            </div>
+            <div>
+                Această factură a fost generată electronic și nu necesită semnătură fizică.<br>
+                Pentru întrebări contactați: contact@unitarproiect.ro | 0721234567
+            </div>
+        </div>
 
-    currentY += 10;
+        <!-- jsPDF Script pentru generare -->
+        <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script>
+            window.jsPDF = window.jspdf.jsPDF;
+            
+            // Auto-generează PDF când se încarcă pagina
+            window.onload = function() {
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const element = document.body;
+                
+                pdf.html(element, {
+                    callback: function (pdf) {
+                        // Returnează ca blob pentru server
+                        const pdfBlob = pdf.output('blob');
+                        window.pdfGenerated = pdfBlob;
+                    },
+                    margin: [10, 10, 10, 10],
+                    autoPaging: 'text',
+                    html2canvas: {
+                        allowTaint: true,
+                        dpi: 300,
+                        letterRendering: true,
+                        logging: false,
+                        scale: 0.8
+                    }
+                });
+            };
+        </script>
+    </body>
+    </html>`;
 
-    doc.fontSize(14)
-       .text('TOTAL:', 420, currentY, { width: 60, align: 'right' })
-       .text(`${total.toFixed(2)} RON`, 490, currentY, { width: 60, align: 'right' });
-
-    // FOOTER
-    currentY += 80;
-
-    // Folosim fontul implicit al PDFKit compatibil cu Vercel
-    doc.fontSize(12)
-       .text('Condiții de plată:', 50, currentY)
-       .text(`Termen de plată: ${invoiceData.termenPlata || '30 zile'}`, 50, currentY + 15)
-       .text('Metoda de plată: Transfer bancar', 50, currentY + 30);
-
-    currentY += 60;
-
-    doc.fontSize(9)
-       .text('Informații bancare:', 50, currentY)
-       .text('Banca: BCR', 50, currentY + 15)
-       .text('IBAN: RO49RNCB0082004530120001', 50, currentY + 30)
-       .text('SWIFT: RNCBROBU', 50, currentY + 45);
-
-    // Semnături
-    currentY += 80;
-    doc.fontSize(11)
-       .text('Furnizor', 50, currentY, { align: 'center', width: 200 })
-       .text('Client', 350, currentY, { align: 'center', width: 200 });
-
-    doc.text('_________________', 50, currentY + 40, { align: 'center', width: 200 })
-       .text('_________________', 350, currentY + 40, { align: 'center', width: 200 });
-
-    // Footer final
-    currentY += 100;
-    doc.fontSize(14)
-       .text(`Factură generată automat de sistemul UNITAR PROIECT`, 50, currentY, { align: 'center' });
-
-    doc.fontSize(12)
-       .text(`Data generării: ${new Date().toLocaleString('ro-RO')}`, 50, currentY + 20, { align: 'center' });
-
-    doc.fontSize(10)
-       .text('Această factură a fost generată electronic și nu necesită semnătură fizică.', 50, currentY + 40, { align: 'center' });
-
-    doc.fontSize(8)
-       .text('Pentru întrebări contactați: contact@unitarproiect.ro | 0721234567', 50, currentY + 60, { align: 'center' });
-
-    // Finalizează documentul
-    doc.end();
-
-    // Așteaptă ca PDF-ul să fie generat
-    const pdfBuffer = await pdfPromise;
-
-    // Salvează în BigQuery (doar metadata)
+    // Salvează în BigQuery
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
@@ -203,24 +341,23 @@ export async function POST(request: NextRequest) {
         total: total,
         status: 'generata',
         data_generare: new Date().toISOString(),
-        cale_fisier: fileName, // Doar numele, nu calea fizică
-        tip_factura: 'hibrid'
+        cale_fisier: fileName,
+        tip_factura: 'hibrid_html'
       }];
 
       await table.insert(facturaData);
       console.log('Metadata factură salvată în BigQuery');
     } catch (bgError) {
       console.error('Eroare la salvarea în BigQuery:', bgError);
-      // Nu oprești procesul pentru că PDF-ul s-a generat cu succes
     }
 
-    // Returnează PDF-ul ca stream
-    return new NextResponse(pdfBuffer, {
+    // Returnează HTML-ul pentru generarea PDF pe client
+    return new NextResponse(htmlTemplate, {
       status: 200,
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': pdfBuffer.length.toString(),
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `inline; filename="${fileName.replace('.pdf', '.html')}"`,
+        'X-PDF-Filename': fileName,
       },
     });
 
