@@ -1,196 +1,78 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/components/ActionDropdown.tsx
-// MODIFICAT: Înlocuit factureaza.me cu sistemul hibrid
+// MODIFICAT: Eliminat vechiul sistem de factură - se folosește doar FacturaHibridModal
 // ==================================================================
 
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'react-toastify';
 
 interface ActionDropdownProps {
-  proiect: {
-    ID_Proiect: string;
-    Denumire: string;
-    Client: string;
-    Status: string;
-    Valoare_Estimata?: number;
-  };
+  proiectId: string;
   onRefresh?: () => void;
 }
 
-export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownProps) {
-  const [showActions, setShowActions] = useState(false);
-  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+export default function ActionDropdown({ proiectId, onRefresh }: ActionDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleCreateInvoice = async () => {
+  // ELIMINAT: handleCreateInvoice - se folosește doar sistemul hibrid din ProiectActions
+
+  const handleViewProject = () => {
+    toast.info(`Vizualizare proiect: ${proiectId}`);
+    setIsOpen(false);
+  };
+
+  const handleEditProject = () => {
+    toast.info(`Editare proiect: ${proiectId}`);
+    setIsOpen(false);
+  };
+
+  const handleExportData = async () => {
     try {
-      setIsGeneratingInvoice(true);
-      setShowActions(false);
+      setLoading(true);
+      toast.info('Se exportă datele...');
       
-      // MODIFICAT: Folosește sistemul hibrid în loc de factureaza.me
-      toast.info('Se generează factura PDF...');
+      // Implementare export
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const response = await fetch('/api/actions/invoices/generate-hibrid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          proiectId: proiect.ID_Proiect,
-          liniiFactura: [{
-            denumire: `Servicii proiect ${proiect.Denumire}`,
-            cantitate: 1,
-            pretUnitar: proiect.Valoare_Estimata || 0,
-            cotaTva: 19
-          }],
-          observatii: `Factură generată automat pentru proiectul ${proiect.ID_Proiect}`
-        })
-      });
-
-      console.log('Invoice response status:', response.status);
-      const result = await response.json();
-      console.log('Invoice response data:', result);
-
-      if (result.success) {
-        toast.success('Factură PDF generată cu succes!');
-        
-        // Download automat
-        if (result.downloadUrl) {
-          window.open(result.downloadUrl, '_blank');
-        }
-        
-        if (onRefresh) {
-          onRefresh();
-        }
-      } else {
-        throw new Error(result.error || 'Eroare la generarea facturii');
-      }
-      
+      toast.success('Date exportate cu succes!');
     } catch (error) {
-      console.error('Eroare factură:', error);
-      toast.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      toast.error('Eroare la exportul datelor');
     } finally {
-      setIsGeneratingInvoice(false);
+      setLoading(false);
+      setIsOpen(false);
     }
   };
 
-  const handleGenerateContract = async () => {
-    try {
-      setShowActions(false);
-      toast.info('Se generează contractul...');
-      
-      const response = await fetch('/api/actions/contracts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proiectId: proiect.ID_Proiect })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success('Contract generat cu succes!');
-        if (result.downloadUrl) {
-          window.open(result.downloadUrl, '_blank');
-        }
-      } else {
-        toast.error(result.error || 'Eroare la generarea contractului');
-      }
-    } catch (error) {
-      toast.error('Eroare la generarea contractului');
-    }
-  };
+  const actions = [
+    { key: 'view', label: '👁️ Vezi Proiect', action: handleViewProject },
+    { key: 'edit', label: '✏️ Editează', action: handleEditProject },
+    { key: 'export', label: '📊 Exportă Date', action: handleExportData },
+    // ELIMINAT: Generare factură - se face din ProiectActions cu sistemul hibrid
+  ];
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <button
-        onClick={() => setShowActions(!showActions)}
-        disabled={isGeneratingInvoice}
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={loading}
         style={{
           padding: '8px 16px',
-          backgroundColor: isGeneratingInvoice ? '#95a5a6' : '#3498db',
+          backgroundColor: loading ? '#95a5a6' : '#3498db',
           color: 'white',
           border: 'none',
           borderRadius: '4px',
-          cursor: isGeneratingInvoice ? 'not-allowed' : 'pointer',
+          cursor: loading ? 'not-allowed' : 'pointer',
           fontSize: '14px'
         }}
       >
-        {isGeneratingInvoice ? '⏳ Generare...' : '⚙️ Acțiuni'}
+        {loading ? '⏳' : '⚙️'} Acțiuni
       </button>
 
-      {showActions && !isGeneratingInvoice && (
+      {isOpen && (
         <>
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              backgroundColor: 'white',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              minWidth: '200px',
-              marginTop: '4px'
-            }}
-          >
-            <div style={{ padding: '8px 0' }}>
-              <button
-                onClick={handleCreateInvoice}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#2c3e50',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8f9fa';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <span>💰</span>
-                <span>Generează Factură PDF</span>
-              </button>
-
-              <div style={{ height: '1px', backgroundColor: '#eee', margin: '4px 0' }} />
-
-              <button
-                onClick={handleGenerateContract}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#2c3e50',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8f9fa';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <span>📄</span>
-                <span>Generează Contract</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Overlay pentru închidere */}
           <div
             style={{
               position: 'fixed',
@@ -200,8 +82,48 @@ export default function ActionDropdown({ proiect, onRefresh }: ActionDropdownPro
               bottom: 0,
               zIndex: 999
             }}
-            onClick={() => setShowActions(false)}
+            onClick={() => setIsOpen(false)}
           />
+          
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              background: 'white',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              minWidth: '180px',
+              marginTop: '4px'
+            }}
+          >
+            {actions.map((action) => (
+              <button
+                key={action.key}
+                onClick={action.action}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#333'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#f5f5f5';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>

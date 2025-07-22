@@ -14,40 +14,55 @@ const bigquery = new BigQuery({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { proiectId, clientData, invoiceData } = body;
+    const { proiectId, liniiFactura, observatii } = body;
 
-    console.log('Date primite:', { proiectId, clientData, invoiceData });
-    console.log('Body complet:', body);
+    console.log('Date primite:', { proiectId, liniiFactura, observatii });
 
     // Validări și defaults
     if (!proiectId) {
       return NextResponse.json({ error: 'Lipsește proiectId' }, { status: 400 });
     }
 
-    // Setează defaults pentru datele lipsă
+    if (!liniiFactura || !Array.isArray(liniiFactura) || liniiFactura.length === 0) {
+      return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
+    }
+
+    // Calculează totalurile din liniiFactura
+    let subtotal = 0;
+    let totalTva = 0;
+    
+    liniiFactura.forEach((linie: any) => {
+      const valoare = linie.cantitate * linie.pretUnitar;
+      const tva = valoare * (linie.cotaTva / 100);
+      subtotal += valoare;
+      totalTva += tva;
+    });
+    
+    const total = subtotal + totalTva;
+
+    // Extrage informații despre client din prima linie (temporar - până implementăm clientInfo din modal)
+    const primeaLinie = liniiFactura[0];
+    const descrierePrincipala = primeaLinie.denumire || 'Servicii de consultanță';
+    
+    // Setează defaults pentru datele lipsă - va fi înlocuit cu datele reale din modal
     const safeClientData = {
-      nume: clientData?.nume || 'Client Necunoscut',
-      cui: clientData?.cui || 'N/A',
-      nr_reg_com: clientData?.nr_reg_com || 'N/A',
-      adresa: clientData?.adresa || 'N/A',
-      telefon: clientData?.telefon || 'N/A',
-      email: clientData?.email || 'N/A'
+      nume: 'Client din Proiect', // Va veni din clientInfo din modal
+      cui: 'RO00000000',
+      nr_reg_com: 'J40/0000/2024',
+      adresa: 'Adresa client',
+      telefon: 'N/A',
+      email: 'N/A'
     };
 
     const safeInvoiceData = {
-      numarFactura: invoiceData?.numarFactura || `INV-${Date.now()}`,
-      denumireProiect: invoiceData?.denumireProiect || `Proiect #${proiectId}`,
-      descriere: invoiceData?.descriere || 'Servicii de consultanță și dezvoltare proiect',
-      subtotal: Number(invoiceData?.subtotal) || 1000,
-      tva: Number(invoiceData?.tva) || 0,
-      total: Number(invoiceData?.total) || Number(invoiceData?.subtotal) || 1000,
-      termenPlata: invoiceData?.termenPlata || '30 zile'
+      numarFactura: `INV-${proiectId}-${Date.now()}`,
+      denumireProiect: `Proiect #${proiectId}`,
+      descriere: descrierePrincipala,
+      subtotal: Number(subtotal.toFixed(2)),
+      tva: Number(totalTva.toFixed(2)),
+      total: Number(total.toFixed(2)),
+      termenPlata: '30 zile'
     };
-
-    // Calculează valorile
-    const subtotal = safeInvoiceData.subtotal;
-    const tva = safeInvoiceData.tva;
-    const total = safeInvoiceData.total;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
 
@@ -253,13 +268,20 @@ export async function POST(request: NextRequest) {
                     </tr>
                 </thead>
                 <tbody>
+                    ${liniiFactura.map((linie, index) => {
+                      const valoare = linie.cantitate * linie.pretUnitar;
+                      const tva = valoare * (linie.cotaTva / 100);
+                      const totalLinie = valoare + tva;
+                      
+                      return `
                     <tr>
-                        <td class="text-center">1</td>
-                        <td>${safeInvoiceData.descriere}</td>
-                        <td class="text-center">1</td>
-                        <td class="text-right">${subtotal.toFixed(2)} RON</td>
-                        <td class="text-right">${subtotal.toFixed(2)} RON</td>
-                    </tr>
+                        <td class="text-center">${index + 1}</td>
+                        <td>${linie.denumire}</td>
+                        <td class="text-center">${linie.cantitate}</td>
+                        <td class="text-right">${linie.pretUnitar.toFixed(2)} RON</td>
+                        <td class="text-right">${valoare.toFixed(2)} RON</td>
+                    </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
 
@@ -268,10 +290,10 @@ export async function POST(request: NextRequest) {
                     <span>Subtotal:</span>
                     <span>${subtotal.toFixed(2)} RON</span>
                 </div>
-                ${tva > 0 ? `
+                ${totalTva > 0 ? `
                 <div class="totals-row">
-                    <span>TVA 19%:</span>
-                    <span>${tva.toFixed(2)} RON</span>
+                    <span>TVA:</span>
+                    <span>${totalTva.toFixed(2)} RON</span>
                 </div>
                 ` : ''}
                 <div class="totals-row final">
@@ -331,9 +353,9 @@ export async function POST(request: NextRequest) {
         numar_factura: safeInvoiceData.numarFactura,
         client_nume: safeClientData.nume,
         client_cui: safeClientData.cui,
-        descriere: safeInvoiceData.descriere,
+        descriere: descrierePrincipala,
         subtotal: subtotal,
-        tva: tva,
+        tva: totalTva,
         total: total,
         status: 'generata',
         data_generare: new Date().toISOString(),
