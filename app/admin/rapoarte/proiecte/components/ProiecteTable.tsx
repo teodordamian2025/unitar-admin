@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import ActionDropdown from '../../components/ActionDropdown';
+import ProiectActions from './ProiectActions';
 import ProiectNouModal from './ProiectNouModal';
 
 interface Proiect {
@@ -512,7 +512,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                       textAlign: 'center',
                       position: 'relative' // Important pentru dropdown positioning
                     }}>
-                      <ActionDropdown 
+                      <ProiectActions 
                         proiect={proiect} 
                         onRefresh={handleRefresh}
                       />
