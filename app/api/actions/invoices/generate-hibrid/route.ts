@@ -27,13 +27,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
     }
 
-    // Calculează totalurile din liniiFactura
+    // Calculează totalurile din liniiFactura cu verificări sigure
     let subtotal = 0;
     let totalTva = 0;
     
     liniiFactura.forEach((linie: any) => {
-      const valoare = linie.cantitate * linie.pretUnitar;
-      const tva = valoare * (linie.cotaTva / 100);
+      const cantitate = Number(linie.cantitate) || 0;
+      const pretUnitar = Number(linie.pretUnitar) || 0;
+      const cotaTva = Number(linie.cotaTva) || 0;
+      
+      const valoare = cantitate * pretUnitar;
+      const tva = valoare * (cotaTva / 100);
+      
       subtotal += valoare;
       totalTva += tva;
     });
@@ -63,6 +68,9 @@ export async function POST(request: NextRequest) {
       total: Number(total.toFixed(2)),
       termenPlata: '30 zile'
     };
+
+    // Funcție sigură pentru formatare numerică în template
+    const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
 
@@ -269,17 +277,25 @@ export async function POST(request: NextRequest) {
                 </thead>
                 <tbody>
                     ${liniiFactura.map((linie, index) => {
-                      const valoare = linie.cantitate * linie.pretUnitar;
-                      const tva = valoare * (linie.cotaTva / 100);
+                      // Verificări sigure pentru tipuri
+                      const cantitate = Number(linie.cantitate) || 0;
+                      const pretUnitar = Number(linie.pretUnitar) || 0;
+                      const cotaTva = Number(linie.cotaTva) || 0;
+                      
+                      const valoare = cantitate * pretUnitar;
+                      const tva = valoare * (cotaTva / 100);
                       const totalLinie = valoare + tva;
+                      
+                      // Funcție sigură pentru formatare
+                      const safeFixed = (num) => (Number(num) || 0).toFixed(2);
                       
                       return `
                     <tr>
                         <td class="text-center">${index + 1}</td>
-                        <td>${linie.denumire}</td>
-                        <td class="text-center">${linie.cantitate}</td>
-                        <td class="text-right">${linie.pretUnitar.toFixed(2)} RON</td>
-                        <td class="text-right">${valoare.toFixed(2)} RON</td>
+                        <td>${linie.denumire || 'N/A'}</td>
+                        <td class="text-center">${safeFixed(cantitate)}</td>
+                        <td class="text-right">${safeFixed(pretUnitar)} RON</td>
+                        <td class="text-right">${safeFixed(valoare)} RON</td>
                     </tr>`;
                     }).join('')}
                 </tbody>
@@ -288,17 +304,17 @@ export async function POST(request: NextRequest) {
             <div class="totals-section">
                 <div class="totals-row">
                     <span>Subtotal:</span>
-                    <span>${subtotal.toFixed(2)} RON</span>
+                    <span>${safeFormat(subtotal)} RON</span>
                 </div>
                 ${totalTva > 0 ? `
                 <div class="totals-row">
                     <span>TVA:</span>
-                    <span>${totalTva.toFixed(2)} RON</span>
+                    <span>${safeFormat(totalTva)} RON</span>
                 </div>
                 ` : ''}
                 <div class="totals-row final">
                     <span>TOTAL DE PLATĂ:</span>
-                    <span>${total.toFixed(2)} RON</span>
+                    <span>${safeFormat(total)} RON</span>
                 </div>
             </div>
         </div>
@@ -354,9 +370,9 @@ export async function POST(request: NextRequest) {
         client_nume: safeClientData.nume,
         client_cui: safeClientData.cui,
         descriere: descrierePrincipala,
-        subtotal: subtotal,
-        tva: totalTva,
-        total: total,
+        subtotal: Number(subtotal.toFixed(2)),
+        tva: Number(totalTva.toFixed(2)),
+        total: Number(total.toFixed(2)),
         status: 'generata',
         data_generare: new Date().toISOString(),
         cale_fisier: fileName,
