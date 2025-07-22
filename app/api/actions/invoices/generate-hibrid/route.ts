@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
 import { BigQuery } from '@google-cloud/bigquery';
+import { Readable } from 'stream';
 
 // Inițializare BigQuery
 const bigquery = new BigQuery({
@@ -21,20 +20,23 @@ export async function POST(request: NextRequest) {
 
     console.log('Generez factură pentru:', { proiectId, clientData, invoiceData });
 
-    // Crează directorul pentru facturi dacă nu există
-    const facturesDir = path.join(process.cwd(), 'uploads', 'facturi');
-    if (!fs.existsSync(facturesDir)) {
-      fs.mkdirSync(facturesDir, { recursive: true });
-    }
-
     // Generează numele fișierului
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
-    const filePath = path.join(facturesDir, fileName);
 
-    // Creează documentul PDF
+    // Creează documentul PDF în memorie
     const doc = new PDFDocument({ margin: 50 });
-    doc.pipe(fs.createWriteStream(filePath));
+    const chunks: Buffer[] = [];
+
+    // Colectează chunk-urile PDF în memorie
+    doc.on('data', (chunk) => chunks.push(chunk));
+    
+    const pdfPromise = new Promise<Buffer>((resolve) => {
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        resolve(pdfBuffer);
+      });
+    });
 
     // HEADER - Informații furnizor
     doc.fontSize(24)
@@ -139,9 +141,7 @@ export async function POST(request: NextRequest) {
     // FOOTER
     currentY += 80;
 
-    // ELIMINĂ LINIA PROBLEMATICĂ: doc.font('Helvetica')
-    // Folosim fontul implicit al PDFKit care este compatibil cu Vercel
-    
+    // Folosim fontul implicit al PDFKit compatibil cu Vercel
     doc.fontSize(12)
        .text('Condiții de plată:', 50, currentY)
        .text(`Termen de plată: ${invoiceData.termenPlata || '30 zile'}`, 50, currentY + 15)
@@ -181,35 +181,45 @@ export async function POST(request: NextRequest) {
     // Finalizează documentul
     doc.end();
 
-    // Salvează în BigQuery
-    const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('FacturiGenerate');
+    // Așteaptă ca PDF-ul să fie generat
+    const pdfBuffer = await pdfPromise;
 
-    const facturaData = [{
-      id: crypto.randomUUID(),
-      proiect_id: proiectId,
-      numar_factura: invoiceData.numarFactura,
-      client_nume: clientData.nume,
-      client_cui: clientData.cui,
-      descriere: invoiceData.descriere || 'Servicii de consultanță',
-      subtotal: subtotal,
-      tva: tva,
-      total: total,
-      status: 'generata',
-      data_generare: new Date().toISOString(),
-      cale_fisier: fileName,
-      tip_factura: 'hibrid'
-    }];
+    // Salvează în BigQuery (doar metadata)
+    try {
+      const dataset = bigquery.dataset('PanouControlUnitar');
+      const table = dataset.table('FacturiGenerate');
 
-    await table.insert(facturaData);
+      const facturaData = [{
+        id: crypto.randomUUID(),
+        proiect_id: proiectId,
+        numar_factura: invoiceData.numarFactura,
+        client_nume: clientData.nume,
+        client_cui: clientData.cui,
+        descriere: invoiceData.descriere || 'Servicii de consultanță',
+        subtotal: subtotal,
+        tva: tva,
+        total: total,
+        status: 'generata',
+        data_generare: new Date().toISOString(),
+        cale_fisier: fileName, // Doar numele, nu calea fizică
+        tip_factura: 'hibrid'
+      }];
 
-    console.log('Factură generată cu succes:', fileName);
+      await table.insert(facturaData);
+      console.log('Metadata factură salvată în BigQuery');
+    } catch (bgError) {
+      console.error('Eroare la salvarea în BigQuery:', bgError);
+      // Nu oprești procesul pentru că PDF-ul s-a generat cu succes
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Factură generată cu succes',
-      fileName: fileName,
-      filePath: `/uploads/facturi/${fileName}`
+    // Returnează PDF-ul ca stream
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.length.toString(),
+      },
     });
 
   } catch (error) {
