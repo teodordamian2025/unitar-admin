@@ -317,36 +317,6 @@ export async function POST(request: NextRequest) {
                 Pentru întrebări contactați: contact@unitarproiect.ro | 0721234567
             </div>
         </div>
-
-        <!-- jsPDF Script pentru generare -->
-        <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-        <script>
-            window.jsPDF = window.jspdf.jsPDF;
-            
-            // Auto-generează PDF când se încarcă pagina
-            window.onload = function() {
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const element = document.body;
-                
-                pdf.html(element, {
-                    callback: function (pdf) {
-                        // Returnează ca blob pentru server
-                        const pdfBlob = pdf.output('blob');
-                        window.pdfGenerated = pdfBlob;
-                    },
-                    margin: [10, 10, 10, 10],
-                    autoPaging: 'text',
-                    html2canvas: {
-                        allowTaint: true,
-                        dpi: 300,
-                        letterRendering: true,
-                        logging: false,
-                        scale: 0.8
-                    }
-                });
-            };
-        </script>
     </body>
     </html>`;
 
@@ -377,14 +347,17 @@ export async function POST(request: NextRequest) {
       console.error('Eroare la salvarea în BigQuery:', bgError);
     }
 
-    // Returnează HTML-ul pentru generarea PDF pe client
-    return new NextResponse(htmlTemplate, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="${fileName.replace('.pdf', '.html')}"`,
-        'X-PDF-Filename': fileName,
-      },
+    // Returnează JSON cu HTML pentru generarea PDF pe client
+    return NextResponse.json({
+      success: true,
+      message: 'Factură pregătită pentru generare',
+      fileName: fileName,
+      htmlContent: htmlTemplate,
+      invoiceData: {
+        numarFactura: safeInvoiceData.numarFactura,
+        total: total,
+        client: safeClientData.nume
+      }
     });
 
   } catch (error) {
