@@ -373,7 +373,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <div><strong>ID:</strong> {proiect.ID_Proiect}</div>
               <div><strong>Status:</strong> <span className="text-green-600">{proiect.Status}</span></div>
               <div><strong>Denumire:</strong> {proiect.Denumire}</div>
-              <div><strong>Valoare estimată:</strong> {proiect.Valoare_Estimata?.toFixed(2) || 'N/A'} RON</div>
+              <div><strong>Valoare estimată:</strong> {proiect.Valoare_Estimata ? (Number(proiect.Valoare_Estimata) || 0).toFixed(2) : 'N/A'} RON</div>
             </div>
           </div>
 
