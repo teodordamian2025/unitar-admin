@@ -212,16 +212,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     });
   };
 
-  // NOUĂ FUNCȚIE: Procesează HTML în PDF
+  // NOUĂ FUNCȚIE: Procesează HTML în PDF cu debugging complet
   const processPDF = async (htmlContent: string, fileName: string) => {
     try {
       setIsProcessingPDF(true);
       toast.info('🔄 Se procesează HTML-ul în PDF...');
 
+      console.log('=== DEBUGGING PDF GENERATION ===');
+      console.log('1. HTML Content length:', htmlContent.length);
+      console.log('2. HTML Content preview:', htmlContent.substring(0, 500));
+      console.log('3. File name:', fileName);
+
       // Încarcă librăriile dacă nu sunt disponibile
+      console.log('4. Loading PDF libraries...');
       await loadPDFLibraries();
+      console.log('5. Libraries loaded successfully');
 
       // Creează un element temporar cu HTML-ul
+      console.log('6. Creating temporary DOM element...');
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = htmlContent;
       tempDiv.style.position = 'absolute';
@@ -229,18 +237,50 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       tempDiv.style.top = '-9999px';
       tempDiv.style.width = '210mm'; // A4 width
       tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.fontSize = '12px';
+      
       document.body.appendChild(tempDiv);
+      console.log('7. Element added to DOM');
+      console.log('8. Element content check:', tempDiv.textContent?.substring(0, 200));
+      console.log('9. Element HTML check:', tempDiv.innerHTML.substring(0, 200));
+
+      // Verifică dimensiunile elementului
+      const rect = tempDiv.getBoundingClientRect();
+      console.log('10. Element dimensions:', {
+        width: rect.width,
+        height: rect.height,
+        left: rect.left,
+        top: rect.top
+      });
+
+      // Așteaptă să se randeze complet
+      console.log('11. Waiting for render...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verifică din nou după timeout
+      console.log('12. Post-timeout content check:', tempDiv.textContent?.substring(0, 200));
 
       // Generează PDF cu jsPDF
+      console.log('13. Starting PDF generation...');
       const pdf = new window.jsPDF('p', 'mm', 'a4');
       
       await pdf.html(tempDiv, {
         callback: function (pdf: any) {
+          console.log('14. PDF generation callback called');
+          
           // Curăță elementul temporar
           document.body.removeChild(tempDiv);
+          console.log('15. Temporary element removed');
+          
+          // Verifică PDF-ul generat
+          const pdfOutput = pdf.output('datauristring');
+          console.log('16. PDF output length:', pdfOutput.length);
+          console.log('17. PDF output preview:', pdfOutput.substring(0, 100));
           
           // Salvează PDF-ul
           pdf.save(fileName);
+          console.log('18. PDF saved successfully');
           
           toast.success('✅ PDF generat și descărcat cu succes!');
           
@@ -253,18 +293,39 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         autoPaging: 'text',
         html2canvas: {
           allowTaint: true,
-          dpi: 300,
+          dpi: 150, // Redus pentru debugging
           letterRendering: true,
-          logging: false,
-          scale: 0.8,
+          logging: true, // Activat pentru debugging
+          scale: 0.5, // Redus pentru debugging
           useCORS: true,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          onclone: (clonedDoc: any) => {
+            console.log('19. html2canvas onclone called');
+            const clonedElement = clonedDoc.querySelector('div');
+            if (clonedElement) {
+              console.log('20. Cloned element found');
+              console.log('21. Cloned content:', clonedElement.textContent?.substring(0, 200));
+            } else {
+              console.log('20. ERROR: Cloned element not found!');
+            }
+          },
+          onrendered: (canvas: any) => {
+            console.log('22. html2canvas onrendered called');
+            console.log('23. Canvas dimensions:', canvas.width, 'x', canvas.height);
+            
+            // Verifică dacă canvas-ul are conținut
+            const context = canvas.getContext('2d');
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const hasContent = imageData.data.some((pixel: number) => pixel !== 0);
+            console.log('24. Canvas has content:', hasContent);
+          }
         }
       });
 
     } catch (error) {
       setIsProcessingPDF(false);
-      console.error('Eroare la procesarea PDF:', error);
+      console.error('ERROR in PDF processing:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
       toast.error(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
     }
   };

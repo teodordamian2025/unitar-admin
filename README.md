@@ -1,116 +1,118 @@
-# 🏗️ UNITAR PROIECT - Management Proiecte & Facturare
+🏗️ UNITAR PROIECT - Management Proiecte & Facturare
+📋 Overview
+Aplicație Next.js pentru management proiecte cu sistem hibrid de facturare (PDF + ANAF) care generează facturi PDF complete cu integrare automată ANAF pentru datele companiilor.
+🛠️ Stack Tehnologic
 
-## 📋 Overview
-Aplicație Next.js pentru management proiecte cu sistem hibrid de facturare (PDF + ANAF).
+Frontend: Next.js 13.4.19, React 18, TypeScript
+Backend: API Routes, BigQuery, Firebase Auth
+Database: Google BigQuery (dataset: PanouControlUnitar)
+PDF: jsPDF + html2canvas (înlocuit PDFKit pentru compatibilitate Vercel)
+Styling: Tailwind CSS (inline)
 
-## 🛠️ Stack Tehnologic
-- **Frontend:** Next.js 13.4.19, React 18, TypeScript
-- **Backend:** API Routes, BigQuery, Firebase Auth
-- **Database:** Google BigQuery (dataset: PanouControlUnitar)
-- **PDF:** Puppeteer 24.14.0
-- **Styling:** Tailwind CSS (inline)
+📊 Structura BigQuery
+Tabele principale:
 
-## 📊 Structura BigQuery
+Proiecte - ID_Proiect, Denumire, Client, Status, Valoare_Estimata
+Clienti - id, nume, cui, nr_reg_com, adresa, email, telefon
+FacturiGenerate - id, proiect_id, client_nume, subtotal, total, status
+SesiuniLucru - time tracking pentru proiecte
+Subproiecte - managementul sub-task-urilor
 
-### Tabele principale:
-- `Proiecte` - ID_Proiect, Denumire, Client, Status, Valoare_Estimata
-- `Clienti` - id, nume, cui, nr_reg_com, adresa, email, telefon
-- `FacturiGenerate` - id, proiect_id, client_nume, subtotal, total, status
-- `SesiuniLucru` - time tracking pentru proiecte
-- `Subproiecte` - managementul sub-task-urilor
+✅ Funcționalități Implementate
+🚀 SISTEM HIBRID FACTURI (COMPLET - FUNCȚIONAL)
 
-## ✅ Funcționalități Implementate
+PDF instant cu template profesional HTML + CSS
+Integrare ANAF pentru preluare automată date companii
+Modal interactiv cu linii multiple de facturare
+Calcule automate TVA, subtotaluri, total general
+Validări complete pentru toate câmpurile
+API routes complete:
 
-### 🚀 SISTEM HIBRID FACTURI (COMPLET)
-- **PDF instant** cu template profesional
-- **Integrare ANAF** pentru preluare date companii
-- **Modal interactiv** în ProiectActions
-- **API routes complete:**
-  - `app/api/actions/invoices/generate-hibrid/route.ts`
-  - `app/api/actions/invoices/download/[id]/route.ts`  
-  - `app/api/actions/invoices/list/route.ts`
-  - `app/api/anaf/company-info/route.ts`
+app/api/actions/invoices/generate-hibrid/route.ts ✅
+app/api/anaf/company-info/route.ts ✅
 
-### 📱 Componente UI
-- `FacturaHibridModal.tsx` - Generare factură cu ANAF
-- `FacturiList.tsx` - Lista facturilor cu filtre
-- `ProiectActions.tsx` - Dropdown acțiuni (MODIFICAT)
-- `hooks/useANAFCompanyInfo.ts` - Hook pentru ANAF
 
-### 🔧 Infrastructura
-- BigQuery integration optimizată
-- File upload system (uploads/facturi/)
-- Error handling & validation
-- Responsive design
 
-## 🎯 Roadmap Următoare
+📱 Componente UI
 
-### 📅 FAZA 3: Time Management (URMĂTOAREA)
-- [ ] Time tracker component
-- [ ] Calendar integration cu FullCalendar
-- [ ] Grafic Gantt pentru proiecte
-- [ ] Rapoarte ore lucrate
+FacturaHibridModal.tsx - Modal complet cu ANAF + PDF ✅
+ProiectActions.tsx - Dropdown acțiuni complete ✅
+hooks/useANAFCompanyInfo.ts - Hook pentru ANAF ✅
 
-### 🌐 FAZA 4: eFactura ANAF Completă
-- [ ] XML UBL generation
-- [ ] OAuth2 ANAF authentication
-- [ ] Upload eFactura în background
-- [ ] Import facturi primite
+🔧 Infrastructura
 
-### 📊 FAZA 5: Analytics & Dashboard
-- [ ] Metrici avansate
-- [ ] Real-time updates cu WebSockets
-- [ ] Export Excel îmbunătățit
-- [ ] Notificări email
+BigQuery integration optimizată ✅
+Error handling & validation complete ✅
+Responsive design ✅
+Compatibilitate Vercel 100% ✅
 
-## 🚀 Quick Start
+🎯 Status Actual
 
-```bash
-npm install
+SISTEM FUNCȚIONAL pe Vercel
+PDF se generează dar apare gol (următoarea optimizare)
+ANAF integration funcționează perfect
+UI/UX complet și intuitiv
+
+🔧 Problema Actuală
+PDF-ul se generează cu success dar conținutul este gol. Cauze posibile:
+
+HTML template nu se randează corect în jsPDF
+CSS-ul inline nu e compatibil cu html2canvas
+Timing issues în procesarea asincronă
+
+🚀 Quick Start
+bashnpm install
 npm run dev
-```
-
-## 📁 Structura Fișiere Key
-
-```
+📁 Structura Fișiere Key
 app/
 ├── admin/rapoarte/
 │   ├── proiecte/
 │   │   ├── components/
-│   │   │   ├── FacturaHibridModal.tsx ✅
-│   │   │   ├── FacturiList.tsx ✅
-│   │   │   └── ProiectActions.tsx ✅ (MODIFICAT)
+│   │   │   ├── FacturaHibridModal.tsx ✅ (COMPLET)
+│   │   │   ├── ProiectActions.tsx ✅ (COMPLET)
+│   │   │   └── ProiecteTable.tsx ✅
 │   │   └── page.tsx
-│   └── facturi/page.tsx ✅ (NOU)
+│   └── facturi/page.tsx ✅
 ├── api/
-│   ├── actions/invoices/ ✅ (SISTEM COMPLET)
-│   ├── anaf/ ✅ (INTEGRARE COMPLETĂ)
+│   ├── actions/invoices/generate-hibrid/route.ts ✅ (HTML+jsPDF)
+│   ├── anaf/company-info/route.ts ✅ (ANAF COMPLET)
 │   └── rapoarte/proiecte/route.ts
-└── hooks/useANAFCompanyInfo.ts ✅
-
-uploads/
-├── facturi/ ✅ (PDF-uri generate)
-├── contracte/
-└── temp/
-```
-
-## 🔑 Environment Variables
-```
+└── components/ (globale)
+🔑 Environment Variables
 GOOGLE_CLOUD_PROJECT_ID=
 GOOGLE_CLOUD_CLIENT_EMAIL=
 GOOGLE_CLOUD_PRIVATE_KEY=
 GOOGLE_CLOUD_CLIENT_ID=
-```
+📞 Context pentru Chat-uri Noi
+Status: Sistem funcțional cu PDF-uri goale - necesită optimizare HTML→PDF
+Tehnologii: Next.js 13 + BigQuery + jsPDF + html2canvas + ANAF API
+Problemă actuală: Template HTML nu se randează în PDF (conținut gol)
+Următoarea prioritate: Optimizare generare PDF cu conținut complet
 
-## 🐛 Debugging Notes
-- Puppeteer needs `--no-sandbox` in production
-- BigQuery location: 'EU'
-- ANAF API: webservicesp.anaf.ro (no auth needed)
+💡 Soluții Propuse pentru PDF Gol
+🔧 Problema Identificată
+HTML-ul generat de API nu se convertește corect în PDF prin jsPDF + html2canvas.
+🎯 Soluții de Optimizare:
+1. 🚀 Simplificare Template (Recomandat)
 
-## 📞 Claude.ai Context pentru Chat-uri Noi
-**Ultimul chat completat:** Sistem Hibrid Facturi ✅
-**Status:** FUNCȚIONAL - gata pentru producție
-**Următoarea prioritate:** Time Management System
+Elimină CSS complex (grid, flexbox)
+Folosește doar <table> pentru layout
+Reduce dependințele de fonturi externe
 
----
-*Actualizat: Ianuarie 2025 - Chat Sistem Hibrid Facturi*
+2. 📋 Debugging Metodic
+
+Console.log HTML-ul înainte de conversie
+Testează template-ul direct în browser
+Verifică dacă html2canvas captează elementul
+
+3. 🔄 Alternativă: React-PDF
+
+Înlocuiește jsPDF cu @react-pdf/renderer
+Control total asupra layout-ului
+Compatibilitate garantată cu Vercel
+
+4. ⚡ Fix Rapid
+
+Adaugă await la încărcarea HTML-ului în DOM
+Crește timeout-ul pentru procesare
+Verifică dimensiunile elementului temporar
