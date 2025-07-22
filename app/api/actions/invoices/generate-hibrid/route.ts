@@ -24,15 +24,11 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
 
-    // Creează documentul PDF în memorie cu font explicit compatibil Vercel
-    const doc = new PDFDocument({ 
-      margin: 50,
-      font: 'Times-Roman' // Font garantat disponibil în mediul serverless
-    });
+    // Creează documentul PDF în memorie - FĂRĂ font explicit
+    const doc = new PDFDocument({ margin: 50 });
     const chunks: Buffer[] = [];
 
-    // Setează fontul explicit pentru tot documentul
-    doc.font('Times-Roman');
+    // NU setăm nici un font explicit - lăsăm PDFKit să folosească fontul intern
 
     // Colectează chunk-urile PDF în memorie
     doc.on('data', (chunk) => chunks.push(chunk));
