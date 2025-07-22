@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Factură ${invoiceData.numarFactura}</title>
+        <title>Factură ${safeInvoiceData.numarFactura}</title>
         <style>
             * {
                 margin: 0;
