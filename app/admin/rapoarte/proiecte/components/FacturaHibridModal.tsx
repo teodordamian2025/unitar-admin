@@ -305,9 +305,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       // Verifică din nou după timeout
       console.log('12. Post-timeout content check:', tempDiv.textContent?.substring(0, 200));
 
-      // Generează PDF cu jsPDF folosind selector specific
+      // Generează PDF cu jsPDF folosind soluția verificată din forumuri
       console.log('13. Starting PDF generation...');
-      const pdf = new window.jsPDF('p', 'mm', 'a4');
+      const pdf = new window.jsPDF('p', 'pt', 'a4');
+      
+      // SOLUȚIA VERIFICATĂ: Calculează dimensiunile A4 în puncte
+      const pageWidth = pdf.internal.pageSize.getWidth(); // 595.28 pt
+      const pageHeight = pdf.internal.pageSize.getHeight(); // 841.89 pt
+      
+      console.log('13.1 PDF page dimensions:', pageWidth, 'x', pageHeight);
       
       // Folosește elementul specific, nu întreaga pagină
       const targetElement = document.getElementById('pdf-content');
@@ -346,21 +352,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           setIsProcessingPDF(false);
         },
         margin: [10, 10, 10, 10],
+        width: pageWidth - 20, // SOLUȚIA #2: Setează width explicit
+        windowWidth: pageWidth - 20, // SOLUȚIA #2: windowWidth pentru forțare
         autoPaging: 'text',
         html2canvas: {
           allowTaint: true,
-          dpi: 96, // DPI standard pentru web
+          dpi: 96,
           letterRendering: true,
-          logging: false, // Redus logging-ul acum că funcționează
-          scale: 0.6, // Scale foarte redus pentru compresie maximă
+          logging: false,
+          scale: 0.3, // SOLUȚIA #3: Scale 0.3 din forumuri
           useCORS: true,
           backgroundColor: '#ffffff',
-          height: 1122, // Înălțime A4 fix
-          width: 794,   // Lățime A4 fix
+          height: pageHeight - 20, // Înălțime limitată la A4
+          width: pageWidth - 20,   // Lățime limitată la A4
           scrollX: 0,
           scrollY: 0,
-          windowWidth: 794,
-          windowHeight: 1122,
+          windowWidth: pageWidth - 20, // FORȚEAZĂ lățimea viewport
+          windowHeight: pageHeight - 20,
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
