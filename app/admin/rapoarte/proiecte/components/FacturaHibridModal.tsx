@@ -233,23 +233,26 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
       
-      // SCHIMBARE CRUCIALĂ: Element ULTRA-compact pentru A4
+      // SCHIMBARE CRUCIALĂ: Element optimizat pentru A4 COMPLET
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
       tempDiv.style.width = '794px'; // A4 width în pixeli
-      tempDiv.style.height = '1122px'; // A4 height fix
+      tempDiv.style.height = '1000px'; // MĂRIT de la auto la înălțime forțată
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
       tempDiv.style.fontSize = '4px'; // Font ÎNJUMĂTĂȚIT (de la 8px la 4px)
       tempDiv.style.color = '#333';
       tempDiv.style.lineHeight = '1.0'; // Line-height minimal
-      tempDiv.style.padding = '8px'; // Padding și mai mic
+      tempDiv.style.padding = '15px'; // MĂRIT padding pentru mai mult spațiu
       tempDiv.style.zIndex = '-1000'; // În spatele tuturor
       tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
       tempDiv.style.transform = 'scale(1)'; // Scale normal
       tempDiv.style.overflow = 'hidden'; // Evită overflow
       tempDiv.style.boxSizing = 'border-box';
+      tempDiv.style.display = 'flex'; // ADĂUGAT: Flex pentru control layout
+      tempDiv.style.flexDirection = 'column'; // ADĂUGAT: Coloană pentru înălțime
+      tempDiv.style.justifyContent = 'space-between'; // ADĂUGAT: Distribuie pe înălțime
       
       // Extrage CSS și conținut separat
       const parser = new DOMParser();
@@ -363,12 +366,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           scale: 0.5, // MĂRIT de la 0.3 la 0.5 pentru a ocupa mai mult din pagină
           useCORS: true,
           backgroundColor: '#ffffff',
-          height: pageHeight - 20, // Înălțime limitată la A4
+          height: 1000, // FORȚEAZĂ înălțimea să fie mai mare
           width: pageWidth - 20,   // Lățime limitată la A4
           scrollX: 0,
           scrollY: 0,
           windowWidth: pageWidth - 20, // FORȚEAZĂ lățimea viewport
-          windowHeight: pageHeight - 20,
+          windowHeight: 1000, // MĂRIT înălțimea viewport
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');

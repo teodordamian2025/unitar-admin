@@ -90,25 +90,29 @@ export async function POST(request: NextRequest) {
             body {
                 font-family: Arial, sans-serif;
                 font-size: 3px; /* MĂRIT DE LA 12px LA 3px */
-                line-height: 0.8; /* REDUS DE LA 1.4 LA 0.8 */
+                line-height: 1.2; /* MĂRIT DE LA 0.8 LA 1.2 pentru mai mult spațiu */
                 color: #333;
-                padding: 5px; /* REDUS DE LA 40px LA 5px */
+                padding: 15px; /* MĂRIT DE LA 5px LA 15px */
                 background: white;
+                min-height: 1000px; /* ADĂUGAT: Înălțime minimă */
+                display: flex; /* ADĂUGAT: Flex layout */
+                flex-direction: column; /* ADĂUGAT: Coloană */
+                justify-content: space-between; /* ADĂUGAT: Distribuie pe înălțime */
             }
             .header {
                 text-align: center;
-                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
+                margin-bottom: 20px; /* MĂRIT DE LA 2px LA 20px */
             }
             .header h1 {
-                font-size: 6px; /* REDUS DE LA 28px LA 6px */
+                font-size: 12px; /* MĂRIT DE LA 6px LA 12px */
                 color: #2c3e50;
-                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
+                margin-bottom: 10px; /* MĂRIT DE LA 1px LA 10px */
             }
             .company-info {
                 display: flex;
                 justify-content: space-between;
-                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
-                gap: 5px; /* REDUS DE LA 40px LA 5px */
+                margin-bottom: 20px; /* MĂRIT DE LA 2px LA 20px */
+                gap: 20px; /* MĂRIT DE LA 5px LA 20px */
             }
             .company-left, .company-right {
                 flex: 1;
@@ -126,22 +130,23 @@ export async function POST(request: NextRequest) {
             }
             .invoice-details {
                 background: #f8f9fa;
-                padding: 2px; /* REDUS DE LA 20px LA 2px */
-                border-radius: 1px; /* REDUS DE LA 5px LA 1px */
-                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
+                padding: 15px; /* MĂRIT DE LA 2px LA 15px */
+                border-radius: 3px; /* MĂRIT DE LA 1px LA 3px */
+                margin-bottom: 20px; /* MĂRIT DE LA 2px LA 20px */
             }
             .invoice-number {
-                font-size: 6px; /* REDUS DE LA 24px LA 6px */
+                font-size: 10px; /* MĂRIT DE LA 6px LA 10px */
                 font-weight: bold;
                 color: #e74c3c;
-                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
+                margin-bottom: 8px; /* MĂRIT DE LA 1px LA 8px */
             }
             .invoice-meta {
                 display: flex;
                 gap: 3px; /* REDUS DE LA 30px LA 3px */
             }
             .table-container {
-                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
+                margin-bottom: 20px; /* MĂRIT DE LA 2px LA 20px */
+                flex-grow: 1; /* ADĂUGAT: Ocupă spațiul disponibil */
             }
             table {
                 width: 100%;
@@ -153,15 +158,15 @@ export async function POST(request: NextRequest) {
             th {
                 background: #34495e;
                 color: white;
-                padding: 1px; /* REDUS DE LA 12px LA 1px */
+                padding: 8px 4px; /* MĂRIT DE LA 1px LA 8px */
                 text-align: left;
-                font-size: 2.5px; /* REDUS DE LA 11px LA 2.5px */
+                font-size: 4px; /* MĂRIT DE LA 2.5px LA 4px */
                 font-weight: bold;
             }
             td {
-                padding: 0.5px; /* REDUS DE LA 10px LA 0.5px */
+                padding: 6px 4px; /* MĂRIT DE LA 0.5px LA 6px */
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 2.5px; /* REDUS DE LA 11px LA 2.5px */
+                font-size: 4px; /* MĂRIT DE LA 2.5px LA 4px */
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
