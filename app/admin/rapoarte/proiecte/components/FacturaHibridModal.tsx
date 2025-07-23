@@ -233,21 +233,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
       
-      // SCHIMBARE CRUCIALĂ: Element vizibil pentru html2canvas
+      // SCHIMBARE CRUCIALĂ: Element optimizat pentru A4
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
-      tempDiv.style.width = '210mm'; // A4 width
+      tempDiv.style.width = '794px'; // A4 width în pixeli
       tempDiv.style.height = 'auto';
+      tempDiv.style.maxHeight = '1122px'; // A4 height în pixeli
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
-      tempDiv.style.fontSize = '12px';
+      tempDiv.style.fontSize = '10px'; // Font mai mic pentru a încăpea
       tempDiv.style.color = '#333';
-      tempDiv.style.lineHeight = '1.4';
-      tempDiv.style.padding = '40px';
+      tempDiv.style.lineHeight = '1.2'; // Line-height mai compact
+      tempDiv.style.padding = '20px'; // Padding redus
       tempDiv.style.zIndex = '-1000'; // În spatele tuturor
       tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
       tempDiv.style.transform = 'scale(1)'; // Scale normal
+      tempDiv.style.overflow = 'hidden'; // Evită overflow
       
       // Extrage CSS și conținut separat
       const parser = new DOMParser();
@@ -347,42 +349,50 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         autoPaging: 'text',
         html2canvas: {
           allowTaint: true,
-          dpi: 200, // Crescut pentru calitate mai bună
+          dpi: 96, // DPI standard pentru web
           letterRendering: true,
-          logging: true, // Activat pentru debugging
-          scale: 1, // Scale normal
+          logging: false, // Redus logging-ul acum că funcționează
+          scale: 0.75, // Scale redus pentru a încăpea pe o pagină
           useCORS: true,
           backgroundColor: '#ffffff',
-          height: null, // Auto height
-          width: null,  // Auto width
+          height: 1122, // Înălțime A4 în pixeli (la 96 DPI)
+          width: 794,   // Lățime A4 în pixeli (la 96 DPI)
           scrollX: 0,
           scrollY: 0,
-          windowWidth: window.innerWidth,
-          windowHeight: window.innerHeight,
+          windowWidth: 794,
+          windowHeight: 1122,
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              console.log('20. Cloned PDF element found');
-              console.log('21. Cloned PDF content:', clonedElement.textContent?.substring(0, 200));
-              console.log('21.1 Cloned PDF HTML:', clonedElement.innerHTML.substring(0, 200));
+              // Ajustează fonturile pentru a încăpea pe o pagină
+              clonedElement.style.fontSize = '10px';
+              clonedElement.style.lineHeight = '1.2';
+              clonedElement.style.padding = '20px';
               
-              // Verifică dacă CSS-ul se aplică
-              const computedStyle = clonedDoc.defaultView.getComputedStyle(clonedElement);
-              console.log('21.2 Computed background:', computedStyle.backgroundColor);
-              console.log('21.3 Computed color:', computedStyle.color);
-              console.log('21.4 Computed font:', computedStyle.fontFamily);
-              console.log('21.5 Element position:', computedStyle.position);
-              console.log('21.6 Element visibility:', computedStyle.visibility);
-              console.log('21.7 Element display:', computedStyle.display);
-            } else {
-              console.log('20. ERROR: Cloned PDF element not found!');
-              // Fallback pentru debugging
-              const anyDiv = clonedDoc.querySelector('div');
-              console.log('20.1 Found any div:', anyDiv?.textContent?.substring(0, 100));
+              // Reduce spațiul între secțiuni
+              const headers = clonedElement.querySelectorAll('.header, .invoice-details');
+              headers.forEach((header: any) => {
+                header.style.marginBottom = '10px';
+              });
+              
+              // Optimizează tabelul
+              const tables = clonedElement.querySelectorAll('table');
+              tables.forEach((table: any) => {
+                table.style.fontSize = '9px';
+                table.style.marginBottom = '10px';
+              });
+              
+              // Reduce padding-ul general
+              const sections = clonedElement.querySelectorAll('.company-info, .payment-info, .signatures');
+              sections.forEach((section: any) => {
+                section.style.margin = '10px 0';
+                section.style.padding = '10px';
+              });
+              
+              console.log('20. PDF element optimized for single page');
             }
           }
-          // ELIMINAT onrendered care cauza eroarea
         }
       });
 
