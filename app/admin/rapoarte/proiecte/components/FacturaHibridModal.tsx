@@ -233,7 +233,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
       
-      // SCHIMBARE CRUCIALĂ: Element ultra-compact pentru A4
+      // SCHIMBARE CRUCIALĂ: Element ULTRA-compact pentru A4
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
@@ -241,10 +241,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       tempDiv.style.height = '1122px'; // A4 height fix
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
-      tempDiv.style.fontSize = '8px'; // Font foarte mic
+      tempDiv.style.fontSize = '4px'; // Font ÎNJUMĂTĂȚIT (de la 8px la 4px)
       tempDiv.style.color = '#333';
-      tempDiv.style.lineHeight = '1.1'; // Line-height minimal
-      tempDiv.style.padding = '15px'; // Padding foarte mic
+      tempDiv.style.lineHeight = '1.0'; // Line-height minimal
+      tempDiv.style.padding = '8px'; // Padding și mai mic
       tempDiv.style.zIndex = '-1000'; // În spatele tuturor
       tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
       tempDiv.style.transform = 'scale(1)'; // Scale normal
@@ -365,33 +365,33 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              // Compresie AGRESIVĂ pentru toate elementele
-              clonedElement.style.fontSize = '7px';
-              clonedElement.style.lineHeight = '1.0';
-              clonedElement.style.padding = '10px';
+              // Compresie ULTRA-AGRESIVĂ - ÎNJUMĂTĂȚIRE COMPLETĂ
+              clonedElement.style.fontSize = '3.5px'; // ÎNJUMĂTĂȚIT de la 7px
+              clonedElement.style.lineHeight = '0.9';
+              clonedElement.style.padding = '5px'; // La 25% din 20px = 5px
               clonedElement.style.margin = '0';
               
-              // Compresie HEADER
+              // Compresie HEADER - mai mici ca înainte
               const headers = clonedElement.querySelectorAll('h1, h2, h3, h4');
               headers.forEach((header: any) => {
-                header.style.fontSize = '10px';
-                header.style.margin = '2px 0';
-                header.style.padding = '2px 0';
-                header.style.lineHeight = '1.0';
+                header.style.fontSize = '5px'; // ÎNJUMĂTĂȚIT de la 10px
+                header.style.margin = '0.5px 0'; // La 25% din 2px
+                header.style.padding = '0.5px 0'; // La 25% din 2px
+                header.style.lineHeight = '0.9';
               });
               
-              // Compresie DIVURI
+              // Compresie DIVURI - spații ultra-mici
               const divs = clonedElement.querySelectorAll('div');
               divs.forEach((div: any) => {
-                div.style.margin = '1px 0';
-                div.style.padding = '1px 0';
+                div.style.margin = '0.25px 0'; // La 25% din 1px
+                div.style.padding = '0.25px 0'; // La 25% din 1px
               });
               
-              // Compresie TABELE - FOARTE AGRESIV
+              // Compresie TABELE - ULTRA AGRESIV
               const tables = clonedElement.querySelectorAll('table');
               tables.forEach((table: any) => {
-                table.style.fontSize = '6px';
-                table.style.margin = '3px 0';
+                table.style.fontSize = '3px'; // ÎNJUMĂTĂȚIT de la 6px
+                table.style.margin = '0.75px 0'; // La 25% din 3px
                 table.style.padding = '0';
                 table.style.borderSpacing = '0';
                 table.style.borderCollapse = 'collapse';
@@ -399,31 +399,48 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 // Compresie celule
                 const cells = table.querySelectorAll('td, th');
                 cells.forEach((cell: any) => {
-                  cell.style.padding = '2px';
+                  cell.style.padding = '0.5px'; // La 25% din 2px
                   cell.style.margin = '0';
-                  cell.style.lineHeight = '1.0';
+                  cell.style.lineHeight = '0.9';
                 });
               });
               
-              // Compresie SECȚIUNI
+              // Compresie SECȚIUNI - spații minime
               const sections = clonedElement.querySelectorAll('.company-info, .payment-info, .signatures, .invoice-details, .totals-section');
               sections.forEach((section: any) => {
-                section.style.margin = '3px 0';
-                section.style.padding = '3px';
+                section.style.margin = '0.75px 0'; // La 25% din 3px
+                section.style.padding = '0.75px'; // La 25% din 3px
               });
               
-              // Elimină toate margin-urile bottom mari
+              // COMPRESIE SPECIALĂ pentru "Factură nr:" - LA 25%
+              const invoiceNumbers = clonedElement.querySelectorAll('.invoice-number, h1');
+              invoiceNumbers.forEach((el: any) => {
+                if (el.textContent && el.textContent.includes('Factura nr')) {
+                  el.style.fontSize = '2.5px'; // 25% din font normal (10px -> 2.5px)
+                  el.style.margin = '0.25px 0';
+                  el.style.padding = '0.25px 0';
+                }
+              });
+              
+              // Elimină TOATE margin-urile și padding-urile mari
               const allElements = clonedElement.querySelectorAll('*');
               allElements.forEach((el: any) => {
-                if (el.style.marginBottom && parseInt(el.style.marginBottom) > 5) {
-                  el.style.marginBottom = '2px';
+                // Resetează orice margin > 1px la 0.25px
+                if (el.style.marginBottom && parseFloat(el.style.marginBottom) > 1) {
+                  el.style.marginBottom = '0.25px';
                 }
-                if (el.style.marginTop && parseInt(el.style.marginTop) > 5) {
-                  el.style.marginTop = '2px';
+                if (el.style.marginTop && parseFloat(el.style.marginTop) > 1) {
+                  el.style.marginTop = '0.25px';
+                }
+                if (el.style.paddingBottom && parseFloat(el.style.paddingBottom) > 1) {
+                  el.style.paddingBottom = '0.25px';
+                }
+                if (el.style.paddingTop && parseFloat(el.style.paddingTop) > 1) {
+                  el.style.paddingTop = '0.25px';
                 }
               });
               
-              console.log('20. PDF element compressed to ultra-compact mode');
+              console.log('20. PDF element compressed to ULTRA-MICRO mode');
             }
           }
         }
