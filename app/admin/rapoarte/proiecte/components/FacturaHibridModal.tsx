@@ -233,23 +233,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
       
-      // SCHIMBARE CRUCIALĂ: Element optimizat pentru A4
+      // SCHIMBARE CRUCIALĂ: Element ultra-compact pentru A4
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
       tempDiv.style.width = '794px'; // A4 width în pixeli
-      tempDiv.style.height = 'auto';
-      tempDiv.style.maxHeight = '1122px'; // A4 height în pixeli
+      tempDiv.style.height = '1122px'; // A4 height fix
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
-      tempDiv.style.fontSize = '10px'; // Font mai mic pentru a încăpea
+      tempDiv.style.fontSize = '8px'; // Font foarte mic
       tempDiv.style.color = '#333';
-      tempDiv.style.lineHeight = '1.2'; // Line-height mai compact
-      tempDiv.style.padding = '20px'; // Padding redus
+      tempDiv.style.lineHeight = '1.1'; // Line-height minimal
+      tempDiv.style.padding = '15px'; // Padding foarte mic
       tempDiv.style.zIndex = '-1000'; // În spatele tuturor
       tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
       tempDiv.style.transform = 'scale(1)'; // Scale normal
       tempDiv.style.overflow = 'hidden'; // Evită overflow
+      tempDiv.style.boxSizing = 'border-box';
       
       // Extrage CSS și conținut separat
       const parser = new DOMParser();
@@ -352,11 +352,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           dpi: 96, // DPI standard pentru web
           letterRendering: true,
           logging: false, // Redus logging-ul acum că funcționează
-          scale: 0.75, // Scale redus pentru a încăpea pe o pagină
+          scale: 0.6, // Scale foarte redus pentru compresie maximă
           useCORS: true,
           backgroundColor: '#ffffff',
-          height: 1122, // Înălțime A4 în pixeli (la 96 DPI)
-          width: 794,   // Lățime A4 în pixeli (la 96 DPI)
+          height: 1122, // Înălțime A4 fix
+          width: 794,   // Lățime A4 fix
           scrollX: 0,
           scrollY: 0,
           windowWidth: 794,
@@ -365,32 +365,65 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              // Ajustează fonturile pentru a încăpea pe o pagină
-              clonedElement.style.fontSize = '10px';
-              clonedElement.style.lineHeight = '1.2';
-              clonedElement.style.padding = '20px';
+              // Compresie AGRESIVĂ pentru toate elementele
+              clonedElement.style.fontSize = '7px';
+              clonedElement.style.lineHeight = '1.0';
+              clonedElement.style.padding = '10px';
+              clonedElement.style.margin = '0';
               
-              // Reduce spațiul între secțiuni
-              const headers = clonedElement.querySelectorAll('.header, .invoice-details');
+              // Compresie HEADER
+              const headers = clonedElement.querySelectorAll('h1, h2, h3, h4');
               headers.forEach((header: any) => {
-                header.style.marginBottom = '10px';
+                header.style.fontSize = '10px';
+                header.style.margin = '2px 0';
+                header.style.padding = '2px 0';
+                header.style.lineHeight = '1.0';
               });
               
-              // Optimizează tabelul
+              // Compresie DIVURI
+              const divs = clonedElement.querySelectorAll('div');
+              divs.forEach((div: any) => {
+                div.style.margin = '1px 0';
+                div.style.padding = '1px 0';
+              });
+              
+              // Compresie TABELE - FOARTE AGRESIV
               const tables = clonedElement.querySelectorAll('table');
               tables.forEach((table: any) => {
-                table.style.fontSize = '9px';
-                table.style.marginBottom = '10px';
+                table.style.fontSize = '6px';
+                table.style.margin = '3px 0';
+                table.style.padding = '0';
+                table.style.borderSpacing = '0';
+                table.style.borderCollapse = 'collapse';
+                
+                // Compresie celule
+                const cells = table.querySelectorAll('td, th');
+                cells.forEach((cell: any) => {
+                  cell.style.padding = '2px';
+                  cell.style.margin = '0';
+                  cell.style.lineHeight = '1.0';
+                });
               });
               
-              // Reduce padding-ul general
-              const sections = clonedElement.querySelectorAll('.company-info, .payment-info, .signatures');
+              // Compresie SECȚIUNI
+              const sections = clonedElement.querySelectorAll('.company-info, .payment-info, .signatures, .invoice-details, .totals-section');
               sections.forEach((section: any) => {
-                section.style.margin = '10px 0';
-                section.style.padding = '10px';
+                section.style.margin = '3px 0';
+                section.style.padding = '3px';
               });
               
-              console.log('20. PDF element optimized for single page');
+              // Elimină toate margin-urile bottom mari
+              const allElements = clonedElement.querySelectorAll('*');
+              allElements.forEach((el: any) => {
+                if (el.style.marginBottom && parseInt(el.style.marginBottom) > 5) {
+                  el.style.marginBottom = '2px';
+                }
+                if (el.style.marginTop && parseInt(el.style.marginTop) > 5) {
+                  el.style.marginTop = '2px';
+                }
+              });
+              
+              console.log('20. PDF element compressed to ultra-compact mode');
             }
           }
         }
