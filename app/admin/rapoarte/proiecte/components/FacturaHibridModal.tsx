@@ -232,16 +232,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       console.log('6. Creating temporary DOM element...');
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content'; // ID unic pentru selector
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '-9999px';
+      
+      // SCHIMBARE CRUCIALĂ: Element vizibil pentru html2canvas
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '0px';
+      tempDiv.style.top = '0px';
       tempDiv.style.width = '210mm'; // A4 width
+      tempDiv.style.height = 'auto';
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
       tempDiv.style.fontSize = '12px';
       tempDiv.style.color = '#333';
       tempDiv.style.lineHeight = '1.4';
       tempDiv.style.padding = '40px';
+      tempDiv.style.zIndex = '-1000'; // În spatele tuturor
+      tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
+      tempDiv.style.transform = 'scale(1)'; // Scale normal
       
       // Extrage CSS și conținut separat
       const parser = new DOMParser();
@@ -344,11 +350,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           dpi: 200, // Crescut pentru calitate mai bună
           letterRendering: true,
           logging: true, // Activat pentru debugging
-          scale: 1, // Mărit la 1 pentru text mai clar
+          scale: 1, // Scale normal
           useCORS: true,
           backgroundColor: '#ffffff',
-          height: 1000, // Forțează înălțimea
-          width: 800,   // Forțează lățimea
+          height: null, // Auto height
+          width: null,  // Auto width
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight,
           onclone: (clonedDoc: any) => {
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
@@ -362,6 +372,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               console.log('21.2 Computed background:', computedStyle.backgroundColor);
               console.log('21.3 Computed color:', computedStyle.color);
               console.log('21.4 Computed font:', computedStyle.fontFamily);
+              console.log('21.5 Element position:', computedStyle.position);
+              console.log('21.6 Element visibility:', computedStyle.visibility);
+              console.log('21.7 Element display:', computedStyle.display);
             } else {
               console.log('20. ERROR: Cloned PDF element not found!');
               // Fallback pentru debugging
