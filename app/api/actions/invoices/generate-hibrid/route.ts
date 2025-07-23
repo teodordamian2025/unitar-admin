@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Factură ${safeInvoiceData.numarFactura}</title>
+        <title>Factura ${safeInvoiceData.numarFactura}</title>
         <style>
             * {
                 margin: 0;
@@ -89,161 +89,163 @@ export async function POST(request: NextRequest) {
             }
             body {
                 font-family: Arial, sans-serif;
-                font-size: 12px;
-                line-height: 1.4;
+                font-size: 3px; /* MĂRIT DE LA 12px LA 3px */
+                line-height: 0.8; /* REDUS DE LA 1.4 LA 0.8 */
                 color: #333;
-                padding: 40px;
+                padding: 5px; /* REDUS DE LA 40px LA 5px */
                 background: white;
             }
             .header {
                 text-align: center;
-                margin-bottom: 30px;
+                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
             }
             .header h1 {
-                font-size: 28px;
+                font-size: 6px; /* REDUS DE LA 28px LA 6px */
                 color: #2c3e50;
-                margin-bottom: 10px;
+                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
             }
             .company-info {
                 display: flex;
                 justify-content: space-between;
-                margin-bottom: 30px;
-                gap: 40px;
+                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
+                gap: 5px; /* REDUS DE LA 40px LA 5px */
             }
             .company-left, .company-right {
                 flex: 1;
             }
             .company-left h3, .company-right h3 {
-                font-size: 14px;
+                font-size: 3.5px; /* REDUS DE LA 14px LA 3.5px */
                 color: #34495e;
-                margin-bottom: 8px;
+                margin-bottom: 0.5px; /* REDUS DE LA 8px LA 0.5px */
                 border-bottom: 1px solid #bdc3c7;
-                padding-bottom: 4px;
+                padding-bottom: 0.25px; /* REDUS DE LA 4px LA 0.25px */
             }
             .info-line {
-                margin-bottom: 4px;
-                font-size: 11px;
+                margin-bottom: 0.25px; /* REDUS DE LA 4px LA 0.25px */
+                font-size: 3px; /* REDUS DE LA 11px LA 3px */
             }
             .invoice-details {
                 background: #f8f9fa;
-                padding: 20px;
-                border-radius: 5px;
-                margin-bottom: 30px;
+                padding: 2px; /* REDUS DE LA 20px LA 2px */
+                border-radius: 1px; /* REDUS DE LA 5px LA 1px */
+                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
             }
             .invoice-number {
-                font-size: 24px;
+                font-size: 6px; /* REDUS DE LA 24px LA 6px */
                 font-weight: bold;
                 color: #e74c3c;
-                margin-bottom: 10px;
+                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
             }
             .invoice-meta {
                 display: flex;
-                gap: 30px;
+                gap: 3px; /* REDUS DE LA 30px LA 3px */
             }
             .table-container {
-                margin-bottom: 30px;
+                margin-bottom: 2px; /* REDUS DE LA 30px LA 2px */
             }
             table {
                 width: 100%;
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-size: 2.5px; /* ADĂUGAT - font foarte mic pentru tabele */
             }
             th {
                 background: #34495e;
                 color: white;
-                padding: 12px 8px;
+                padding: 1px; /* REDUS DE LA 12px LA 1px */
                 text-align: left;
-                font-size: 11px;
+                font-size: 2.5px; /* REDUS DE LA 11px LA 2.5px */
                 font-weight: bold;
             }
             td {
-                padding: 10px 8px;
+                padding: 0.5px; /* REDUS DE LA 10px LA 0.5px */
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 11px;
+                font-size: 2.5px; /* REDUS DE LA 11px LA 2.5px */
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
             .totals-section {
-                margin-top: 20px;
+                margin-top: 2px; /* REDUS DE LA 20px LA 2px */
                 margin-left: auto;
-                width: 300px;
+                width: 150px; /* REDUS DE LA 300px LA 150px */
             }
             .totals-row {
                 display: flex;
                 justify-content: space-between;
-                padding: 8px 0;
+                padding: 0.5px 0; /* REDUS DE LA 8px LA 0.5px */
                 border-bottom: 1px solid #ecf0f1;
+                font-size: 3px; /* ADĂUGAT - font mic pentru totaluri */
             }
             .totals-row.final {
                 border-top: 2px solid #34495e;
                 border-bottom: 2px solid #34495e;
                 font-weight: bold;
-                font-size: 14px;
+                font-size: 3.5px; /* REDUS DE LA 14px LA 3.5px */
                 background: #f8f9fa;
-                padding: 12px 0;
+                padding: 1px 0; /* REDUS DE LA 12px LA 1px */
             }
             .payment-info {
-                margin-top: 40px;
+                margin-top: 3px; /* REDUS DE LA 40px LA 3px */
                 background: #f8f9fa;
-                padding: 20px;
-                border-radius: 5px;
+                padding: 2px; /* REDUS DE LA 20px LA 2px */
+                border-radius: 1px; /* REDUS DE LA 5px LA 1px */
             }
             .payment-info h4 {
                 color: #34495e;
-                margin-bottom: 10px;
-                font-size: 13px;
+                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
+                font-size: 3px; /* REDUS DE LA 13px LA 3px */
             }
             .bank-details {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 20px;
-                margin-top: 15px;
+                gap: 2px; /* REDUS DE LA 20px LA 2px */
+                margin-top: 1px; /* REDUS DE LA 15px LA 1px */
             }
             .signatures {
-                margin-top: 50px;
+                margin-top: 4px; /* REDUS DE LA 50px LA 4px */
                 display: flex;
                 justify-content: space-between;
             }
             .signature-box {
                 text-align: center;
-                width: 200px;
+                width: 50px; /* REDUS DE LA 200px LA 50px */
             }
             .signature-line {
                 border-top: 1px solid #34495e;
-                margin-top: 40px;
-                padding-top: 8px;
-                font-size: 11px;
+                margin-top: 3px; /* REDUS DE LA 40px LA 3px */
+                padding-top: 0.5px; /* REDUS DE LA 8px LA 0.5px */
+                font-size: 3px; /* REDUS DE LA 11px LA 3px */
             }
             .footer {
-                margin-top: 60px;
+                margin-top: 5px; /* REDUS DE LA 60px LA 5px */
                 text-align: center;
-                font-size: 10px;
+                font-size: 2.5px; /* REDUS DE LA 10px LA 2.5px */
                 color: #7f8c8d;
                 border-top: 1px solid #ecf0f1;
-                padding-top: 20px;
+                padding-top: 2px; /* REDUS DE LA 20px LA 2px */
             }
             .footer .generated-info {
-                margin-bottom: 10px;
-                font-size: 11px;
+                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
+                font-size: 3px; /* REDUS DE LA 11px LA 3px */
                 color: #34495e;
             }
         </style>
     </head>
     <body>
         <div class="header">
-            <h1>FACTURĂ</h1>
+            <h1>FACTURA</h1>
         </div>
 
         <div class="company-info">
             <div class="company-left">
                 <h3>FURNIZOR</h3>
-                <div class="info-line"><strong>UNITAR PROIECT SRL</strong></div>
+                <div class="info-line"><strong>UNITAR PROIECT TDA SRL</strong></div>
                 <div class="info-line">CUI: RO12345678</div>
                 <div class="info-line">Nr. Reg. Com.: J40/1234/2024</div>
-                <div class="info-line">Adresa: Str. Exemplu Nr. 1, București</div>
+                <div class="info-line">Adresa: Str. Exemplu Nr. 1, Bucuresti</div>
                 <div class="info-line">Telefon: 0721234567</div>
-                <div class="info-line">Email: contact@unitarproiect.ro</div>
+                <div class="info-line">Email: contact@unitarproiecttda.ro</div>
             </div>
             <div class="company-right">
                 <h3>CLIENT</h3>
@@ -320,13 +322,13 @@ export async function POST(request: NextRequest) {
         </div>
 
         <div class="payment-info">
-            <h4>Condiții de plată</h4>
-            <div class="info-line">Termen de plată: ${safeInvoiceData.termenPlata}</div>
-            <div class="info-line">Metoda de plată: Transfer bancar</div>
+            <h4>Conditii de plata</h4>
+            <div class="info-line">Termen de plata: ${safeInvoiceData.termenPlata}</div>
+            <div class="info-line">Metoda de plata: Transfer bancar</div>
             
             <div class="bank-details">
                 <div>
-                    <h4>Informații bancare</h4>
+                    <h4>Informatii bancare</h4>
                     <div class="info-line">Banca: BCR</div>
                     <div class="info-line">IBAN: RO49RNCB0082004530120001</div>
                     <div class="info-line">SWIFT: RNCBROBU</div>
@@ -337,22 +339,22 @@ export async function POST(request: NextRequest) {
         <div class="signatures">
             <div class="signature-box">
                 <div>Furnizor</div>
-                <div class="signature-line">Semnătură și ștampilă</div>
+                <div class="signature-line">Semnatura si stampila</div>
             </div>
             <div class="signature-box">
                 <div>Client</div>
-                <div class="signature-line">Semnătură și ștampilă</div>
+                <div class="signature-line">Semnatura si stampila</div>
             </div>
         </div>
 
         <div class="footer">
             <div class="generated-info">
-                <strong>Factură generată automat de sistemul UNITAR PROIECT</strong><br>
-                Data generării: ${new Date().toLocaleString('ro-RO')}
+                <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
+                Data generarii: ${new Date().toLocaleString('ro-RO')}
             </div>
             <div>
-                Această factură a fost generată electronic și nu necesită semnătură fizică.<br>
-                Pentru întrebări contactați: contact@unitarproiect.ro | 0721234567
+                Aceasta factura a fost generata electronic si nu necesita semnatura fizica.<br>
+                Pentru intrebari contactati: contact@unitarproiecttda.ro | 0721234567
             </div>
         </div>
     </body>

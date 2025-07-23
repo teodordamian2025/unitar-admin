@@ -360,7 +360,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           dpi: 96,
           letterRendering: true,
           logging: false,
-          scale: 0.3, // SOLUȚIA #3: Scale 0.3 din forumuri
+          scale: 0.5, // MĂRIT de la 0.3 la 0.5 pentru a ocupa mai mult din pagină
           useCORS: true,
           backgroundColor: '#ffffff',
           height: pageHeight - 20, // Înălțime limitată la A4
