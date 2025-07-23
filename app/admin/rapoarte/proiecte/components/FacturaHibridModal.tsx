@@ -365,82 +365,114 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             console.log('19. html2canvas onclone called');
             const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              // Compresie ULTRA-AGRESIVĂ - ÎNJUMĂTĂȚIRE COMPLETĂ
-              clonedElement.style.fontSize = '3.5px'; // ÎNJUMĂTĂȚIT de la 7px
-              clonedElement.style.lineHeight = '0.9';
-              clonedElement.style.padding = '5px'; // La 25% din 20px = 5px
-              clonedElement.style.margin = '0';
+              // COMPRESIE GLOBALĂ FORȚATĂ - TOATE ELEMENTELE
               
-              // Compresie HEADER - mai mici ca înainte
-              const headers = clonedElement.querySelectorAll('h1, h2, h3, h4');
-              headers.forEach((header: any) => {
-                header.style.fontSize = '5px'; // ÎNJUMĂTĂȚIT de la 10px
-                header.style.margin = '0.5px 0'; // La 25% din 2px
-                header.style.padding = '0.5px 0'; // La 25% din 2px
-                header.style.lineHeight = '0.9';
-              });
-              
-              // Compresie DIVURI - spații ultra-mici
-              const divs = clonedElement.querySelectorAll('div');
-              divs.forEach((div: any) => {
-                div.style.margin = '0.25px 0'; // La 25% din 1px
-                div.style.padding = '0.25px 0'; // La 25% din 1px
-              });
-              
-              // Compresie TABELE - ULTRA AGRESIV
-              const tables = clonedElement.querySelectorAll('table');
-              tables.forEach((table: any) => {
-                table.style.fontSize = '3px'; // ÎNJUMĂTĂȚIT de la 6px
-                table.style.margin = '0.75px 0'; // La 25% din 3px
-                table.style.padding = '0';
-                table.style.borderSpacing = '0';
-                table.style.borderCollapse = 'collapse';
-                
-                // Compresie celule
-                const cells = table.querySelectorAll('td, th');
-                cells.forEach((cell: any) => {
-                  cell.style.padding = '0.5px'; // La 25% din 2px
-                  cell.style.margin = '0';
-                  cell.style.lineHeight = '0.9';
-                });
-              });
-              
-              // Compresie SECȚIUNI - spații minime
-              const sections = clonedElement.querySelectorAll('.company-info, .payment-info, .signatures, .invoice-details, .totals-section');
-              sections.forEach((section: any) => {
-                section.style.margin = '0.75px 0'; // La 25% din 3px
-                section.style.padding = '0.75px'; // La 25% din 3px
-              });
-              
-              // COMPRESIE SPECIALĂ pentru "Factură nr:" - LA 25%
-              const invoiceNumbers = clonedElement.querySelectorAll('.invoice-number, h1');
-              invoiceNumbers.forEach((el: any) => {
-                if (el.textContent && el.textContent.includes('Factura nr')) {
-                  el.style.fontSize = '2.5px'; // 25% din font normal (10px -> 2.5px)
-                  el.style.margin = '0.25px 0';
-                  el.style.padding = '0.25px 0';
-                }
-              });
-              
-              // Elimină TOATE margin-urile și padding-urile mari
+              // 1. RESETARE COMPLETĂ - toate elementele la font mic
               const allElements = clonedElement.querySelectorAll('*');
               allElements.forEach((el: any) => {
-                // Resetează orice margin > 1px la 0.25px
-                if (el.style.marginBottom && parseFloat(el.style.marginBottom) > 1) {
-                  el.style.marginBottom = '0.25px';
-                }
-                if (el.style.marginTop && parseFloat(el.style.marginTop) > 1) {
-                  el.style.marginTop = '0.25px';
-                }
-                if (el.style.paddingBottom && parseFloat(el.style.paddingBottom) > 1) {
-                  el.style.paddingBottom = '0.25px';
-                }
-                if (el.style.paddingTop && parseFloat(el.style.paddingTop) > 1) {
-                  el.style.paddingTop = '0.25px';
-                }
+                // Font la jumătate pentru TOATE elementele
+                el.style.fontSize = '3px';
+                el.style.lineHeight = '0.8';
+                el.style.margin = '0.25px';
+                el.style.padding = '0.25px';
+                
+                // Forțează toate spațiile la minim
+                el.style.marginTop = '0.25px';
+                el.style.marginBottom = '0.25px';
+                el.style.paddingTop = '0.25px';
+                el.style.paddingBottom = '0.25px';
               });
               
-              console.log('20. PDF element compressed to ULTRA-MICRO mode');
+              // 2. COMPRESIE SPECIFICĂ per tip de element
+              
+              // Headers și titluri
+              const headers = clonedElement.querySelectorAll('h1, h2, h3, h4, .header h1');
+              headers.forEach((header: any) => {
+                header.style.fontSize = '4px'; // Puțin mai mare pentru lizibilitate
+                header.style.margin = '0.5px 0';
+                header.style.padding = '0.5px 0';
+                header.style.fontWeight = 'bold';
+              });
+              
+              // Textele mari cu roșu (Factură nr)
+              const largeTexts = clonedElement.querySelectorAll('.invoice-number');
+              largeTexts.forEach((text: any) => {
+                text.style.fontSize = '6px'; // Mărit puțin pentru vizibilitate
+                text.style.margin = '1px 0';
+                text.style.fontWeight = 'bold';
+              });
+              
+              // Tabele - compresie maximă
+              const tables = clonedElement.querySelectorAll('table, th, td');
+              tables.forEach((table: any) => {
+                table.style.fontSize = '2.5px'; // Foarte mic pentru tabele
+                table.style.padding = '0.25px';
+                table.style.margin = '0';
+                table.style.borderSpacing = '0';
+                table.style.borderCollapse = 'collapse';
+                table.style.lineHeight = '0.8';
+              });
+              
+              // Div-uri cu clase specifice
+              const sections = clonedElement.querySelectorAll('div');
+              sections.forEach((section: any) => {
+                section.style.margin = '0.25px 0';
+                section.style.padding = '0.25px';
+              });
+              
+              // Text normal în paragrafe
+              const textElements = clonedElement.querySelectorAll('p, span, .info-line, strong');
+              textElements.forEach((text: any) => {
+                text.style.fontSize = '3px';
+                text.style.lineHeight = '0.8';
+                text.style.margin = '0.25px 0';
+                text.style.padding = '0.25px 0';
+              });
+              
+              // 3. FORȚARE CSS INLINE pentru elementele mari rămase
+              
+              // Căută și reduce elementele care au încă text mare
+              const walker = clonedDoc.createTreeWalker(
+                clonedElement,
+                NodeFilter.SHOW_ELEMENT,
+                null,
+                false
+              );
+              
+              let node;
+              while (node = walker.nextNode()) {
+                const el = node as HTMLElement;
+                const computedStyle = clonedDoc.defaultView.getComputedStyle(el);
+                const fontSize = parseFloat(computedStyle.fontSize);
+                
+                // Dacă fontul e încă prea mare, forțează-l la mic
+                if (fontSize > 4) {
+                  el.style.fontSize = '3px !important';
+                  el.style.setProperty('font-size', '3px', 'important');
+                }
+                
+                // Reduce toate spațiile mari
+                if (parseFloat(computedStyle.marginTop) > 2) {
+                  el.style.marginTop = '0.5px !important';
+                }
+                if (parseFloat(computedStyle.marginBottom) > 2) {
+                  el.style.marginBottom = '0.5px !important';
+                }
+                if (parseFloat(computedStyle.paddingTop) > 2) {
+                  el.style.paddingTop = '0.25px !important';
+                }
+                if (parseFloat(computedStyle.paddingBottom) > 2) {
+                  el.style.paddingBottom = '0.25px !important';
+                }
+              }
+              
+              // 4. OVERRIDE FINAL - aplică stiluri direct pe element principal
+              clonedElement.style.fontSize = '3px !important';
+              clonedElement.style.lineHeight = '0.8 !important';
+              clonedElement.style.padding = '5px !important';
+              clonedElement.style.margin = '0 !important';
+              
+              console.log('20. PDF element compressed with FORCED global compression');
             }
           }
         }
