@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
             }
             body {
                 font-family: Arial, sans-serif;
-                font-size: 3px; /* MĂRIT DE LA 12px LA 3px */
+                font-size: 10px; /* MĂRIT DE LA 3px LA 10px */
                 line-height: 1.2; /* MĂRIT DE LA 0.8 LA 1.2 pentru mai mult spațiu */
                 color: #333;
                 padding: 15px; /* MĂRIT DE LA 5px LA 15px */
@@ -118,15 +118,15 @@ export async function POST(request: NextRequest) {
                 flex: 1;
             }
             .company-left h3, .company-right h3 {
-                font-size: 3.5px; /* REDUS DE LA 14px LA 3.5px */
+                font-size: 12px; /* MĂRIT DE LA 3.5px LA 12px */
                 color: #34495e;
-                margin-bottom: 0.5px; /* REDUS DE LA 8px LA 0.5px */
+                margin-bottom: 8px; /* MĂRIT DE LA 0.5px LA 8px */
                 border-bottom: 1px solid #bdc3c7;
-                padding-bottom: 0.25px; /* REDUS DE LA 4px LA 0.25px */
+                padding-bottom: 4px; /* MĂRIT DE LA 0.25px LA 4px */
             }
             .info-line {
-                margin-bottom: 0.25px; /* REDUS DE LA 4px LA 0.25px */
-                font-size: 3px; /* REDUS DE LA 11px LA 3px */
+                margin-bottom: 4px; /* MĂRIT DE LA 0.25px LA 4px */
+                font-size: 10px; /* MĂRIT DE LA 3px LA 10px */
             }
             .invoice-details {
                 background: #f8f9fa;
@@ -142,7 +142,8 @@ export async function POST(request: NextRequest) {
             }
             .invoice-meta {
                 display: flex;
-                gap: 3px; /* REDUS DE LA 30px LA 3px */
+                gap: 30px; /* MĂRIT DE LA 3px LA 30px */
+                font-size: 10px; /* ADĂUGAT: Font explicit */
             }
             .table-container {
                 margin-bottom: 20px; /* MĂRIT DE LA 2px LA 20px */
@@ -153,20 +154,20 @@ export async function POST(request: NextRequest) {
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                font-size: 2.5px; /* ADĂUGAT - font foarte mic pentru tabele */
+                font-size: 10px; /* MĂRIT DE LA 2.5px LA 10px */
             }
             th {
                 background: #34495e;
                 color: white;
                 padding: 8px 4px; /* MĂRIT DE LA 1px LA 8px */
                 text-align: left;
-                font-size: 4px; /* MĂRIT DE LA 2.5px LA 4px */
+                font-size: 10px; /* MĂRIT DE LA 4px LA 10px */
                 font-weight: bold;
             }
             td {
                 padding: 6px 4px; /* MĂRIT DE LA 0.5px LA 6px */
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 4px; /* MĂRIT DE LA 2.5px LA 4px */
+                font-size: 10px; /* MĂRIT DE LA 4px LA 10px */
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
@@ -178,17 +179,17 @@ export async function POST(request: NextRequest) {
             .totals-row {
                 display: flex;
                 justify-content: space-between;
-                padding: 0.5px 0; /* REDUS DE LA 8px LA 0.5px */
+                padding: 4px 0; /* MĂRIT DE LA 0.5px LA 4px */
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 3px; /* ADĂUGAT - font mic pentru totaluri */
+                font-size: 10px; /* MĂRIT DE LA 3px LA 10px */
             }
             .totals-row.final {
                 border-top: 2px solid #34495e;
                 border-bottom: 2px solid #34495e;
                 font-weight: bold;
-                font-size: 3.5px; /* REDUS DE LA 14px LA 3.5px */
+                font-size: 12px; /* MĂRIT DE LA 3.5px LA 12px */
                 background: #f8f9fa;
-                padding: 1px 0; /* REDUS DE LA 12px LA 1px */
+                padding: 6px 0; /* MĂRIT DE LA 1px LA 6px */
             }
             .payment-info {
                 margin-top: 3px; /* REDUS DE LA 40px LA 3px */
@@ -198,8 +199,8 @@ export async function POST(request: NextRequest) {
             }
             .payment-info h4 {
                 color: #34495e;
-                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
-                font-size: 3px; /* REDUS DE LA 13px LA 3px */
+                margin-bottom: 8px; /* MĂRIT DE LA 1px LA 8px */
+                font-size: 10px; /* MĂRIT DE LA 3px LA 10px */
             }
             .bank-details {
                 display: grid;
@@ -218,21 +219,21 @@ export async function POST(request: NextRequest) {
             }
             .signature-line {
                 border-top: 1px solid #34495e;
-                margin-top: 3px; /* REDUS DE LA 40px LA 3px */
-                padding-top: 0.5px; /* REDUS DE LA 8px LA 0.5px */
-                font-size: 3px; /* REDUS DE LA 11px LA 3px */
+                margin-top: 20px; /* MĂRIT DE LA 3px LA 20px */
+                padding-top: 4px; /* MĂRIT DE LA 0.5px LA 4px */
+                font-size: 10px; /* MĂRIT DE LA 3px LA 10px */
             }
             .footer {
-                margin-top: 5px; /* REDUS DE LA 60px LA 5px */
+                margin-top: 20px; /* MĂRIT DE LA 5px LA 20px */
                 text-align: center;
-                font-size: 2.5px; /* REDUS DE LA 10px LA 2.5px */
+                font-size: 8px; /* MĂRIT DE LA 2.5px LA 8px */
                 color: #7f8c8d;
                 border-top: 1px solid #ecf0f1;
-                padding-top: 2px; /* REDUS DE LA 20px LA 2px */
+                padding-top: 10px; /* MĂRIT DE LA 2px LA 10px */
             }
             .footer .generated-info {
-                margin-bottom: 1px; /* REDUS DE LA 10px LA 1px */
-                font-size: 3px; /* REDUS DE LA 11px LA 3px */
+                margin-bottom: 8px; /* MĂRIT DE LA 1px LA 8px */
+                font-size: 9px; /* MĂRIT DE LA 3px LA 9px */
                 color: #34495e;
             }
         </style>
