@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Corecție scalare PDF - de la 65% la 100% pagină A4
+// MODIFICAT: Păstrăm logica funcțională + ajustare scalare pentru 100% A4
 // ==================================================================
 
 'use client';
@@ -212,288 +212,278 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     });
   };
 
-  // FUNCȚIE OPTIMIZATĂ: Procesează HTML în PDF cu scalare 100%
+  // FUNCȚIE ORIGINALĂ FUNCȚIONALĂ: Păstrăm ce mergea + ajustare scalare
   const processPDF = async (htmlContent: string, fileName: string) => {
     try {
       setIsProcessingPDF(true);
       toast.info('🔄 Se procesează HTML-ul în PDF...');
 
-      console.log('=== PDF GENERATION - OPTIMIZED FOR 100% SCALE ===');
-      
-      // Încarcă librăriile dacă nu sunt disponibile
-      await loadPDFLibraries();
-      console.log('✅ Libraries loaded successfully');
+      console.log('=== DEBUGGING PDF GENERATION - PĂSTRĂM FUNCȚIONALUL ===');
+      console.log('1. HTML Content length:', htmlContent.length);
+      console.log('2. HTML Content preview:', htmlContent.substring(0, 500));
+      console.log('3. File name:', fileName);
 
-      // ====== SOLUȚIA OPTIMIZATĂ PENTRU 100% SCALARE ======
-      
-      // Creează un element temporar optimizat pentru A4
+      // Încarcă librăriile dacă nu sunt disponibile
+      console.log('4. Loading PDF libraries...');
+      await loadPDFLibraries();
+      console.log('5. Libraries loaded successfully');
+
+      // Creează un element temporar cu HTML-ul - PĂSTRĂM SISTEMUL ORIGINAL
+      console.log('6. Creating temporary DOM element...');
       const tempDiv = document.createElement('div');
-      tempDiv.id = 'pdf-content-full-scale';
+      tempDiv.id = 'pdf-content'; // ID unic pentru selector
       
-      // DIMENSIUNI EXACTE A4 în pixeli (96 DPI)
-      const A4_WIDTH = 794;   // 210mm × 3.78 = 794px
-      const A4_HEIGHT = 1123; // 297mm × 3.78 = 1123px
-      
-      // Stiluri OPTIMIZATE pentru ocuparea completă a paginii
+      // PĂSTRĂM STILURILE CARE FUNCȚIONAU
       tempDiv.style.position = 'fixed';
-      tempDiv.style.left = '-9999px'; // Ascuns complet din viewport
+      tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
-      tempDiv.style.width = `${A4_WIDTH}px`; // Lățime exactă A4
-      tempDiv.style.height = `${A4_HEIGHT}px`; // Înălțime exactă A4
+      tempDiv.style.width = '794px'; // A4 width în pixeli
+      tempDiv.style.height = '1000px'; // PĂSTRĂM înălțimea care funcționa
       tempDiv.style.backgroundColor = 'white';
       tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.fontSize = '4px'; // PĂSTRĂM font-size care funcționa
       tempDiv.style.color = '#333';
+      tempDiv.style.lineHeight = '1.0'; // PĂSTRĂM line-height care funcționa
+      tempDiv.style.padding = '15px'; // PĂSTRĂM padding care funcționa
+      tempDiv.style.zIndex = '-1000'; // În spatele tuturor
+      tempDiv.style.opacity = '1'; // Complet vizibil pentru html2canvas
+      tempDiv.style.transform = 'scale(1)'; // Scale normal
+      tempDiv.style.overflow = 'hidden'; // Evită overflow
       tempDiv.style.boxSizing = 'border-box';
-      tempDiv.style.overflow = 'hidden';
-      tempDiv.style.padding = '20px'; // Padding optim pentru conținut
-      tempDiv.style.fontSize = '12px'; // Font normal pentru lizibilitate
-      tempDiv.style.lineHeight = '1.4'; // Line-height normal
-      tempDiv.style.zIndex = '-9999'; // În spatele a tot
+      tempDiv.style.display = 'flex'; // PĂSTRĂM flex layout care funcționa
+      tempDiv.style.flexDirection = 'column'; // PĂSTRĂM coloană
+      tempDiv.style.justifyContent = 'space-between'; // PĂSTRĂM distribuirea
       
-      // Extrage și procesează conținutul HTML
+      // Extrage CSS și conținut separat - PĂSTRĂM LOGICA ORIGINALĂ
       const parser = new DOMParser();
       const htmlDoc = parser.parseFromString(htmlContent, 'text/html');
       
-      // Extrage CSS-ul și aplică-l global
+      // Extrage CSS-ul din <style>
       const styleElement = htmlDoc.querySelector('style');
-      if (styleElement) {
-        const globalStyle = document.createElement('style');
-        globalStyle.id = 'pdf-styles-optimized';
-        
-        // CSS OPTIMIZAT pentru scalare 100%
-        globalStyle.textContent = `
-          #pdf-content-full-scale * {
-            font-family: Arial, sans-serif !important;
-            box-sizing: border-box !important;
-          }
-          
-          #pdf-content-full-scale {
-            font-size: 12px !important;
-            line-height: 1.4 !important;
-            color: #333 !important;
-          }
-          
-          #pdf-content-full-scale .header h1 {
-            font-size: 20px !important;
-            margin-bottom: 15px !important;
-            text-align: center !important;
-          }
-          
-          #pdf-content-full-scale .company-info {
-            display: flex !important;
-            justify-content: space-between !important;
-            margin-bottom: 20px !important;
-            gap: 20px !important;
-          }
-          
-          #pdf-content-full-scale .company-left,
-          #pdf-content-full-scale .company-right {
-            flex: 1 !important;
-          }
-          
-          #pdf-content-full-scale .company-left h3,
-          #pdf-content-full-scale .company-right h3 {
-            font-size: 14px !important;
-            margin-bottom: 10px !important;
-            border-bottom: 1px solid #bdc3c7 !important;
-            padding-bottom: 5px !important;
-          }
-          
-          #pdf-content-full-scale .info-line {
-            margin-bottom: 5px !important;
-            font-size: 11px !important;
-          }
-          
-          #pdf-content-full-scale .invoice-details {
-            background: #f8f9fa !important;
-            padding: 15px !important;
-            margin-bottom: 20px !important;
-            border-radius: 5px !important;
-          }
-          
-          #pdf-content-full-scale .invoice-number {
-            font-size: 16px !important;
-            font-weight: bold !important;
-            color: #e74c3c !important;
-            margin-bottom: 10px !important;
-          }
-          
-          #pdf-content-full-scale table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            margin-bottom: 20px !important;
-            font-size: 11px !important;
-          }
-          
-          #pdf-content-full-scale th {
-            background: #34495e !important;
-            color: white !important;
-            padding: 8px 4px !important;
-            font-size: 11px !important;
-            font-weight: bold !important;
-          }
-          
-          #pdf-content-full-scale td {
-            padding: 6px 4px !important;
-            border-bottom: 1px solid #ecf0f1 !important;
-            font-size: 10px !important;
-          }
-          
-          #pdf-content-full-scale .totals-section {
-            margin-left: auto !important;
-            width: 300px !important;
-            margin-bottom: 20px !important;
-          }
-          
-          #pdf-content-full-scale .totals-row {
-            display: flex !important;
-            justify-content: space-between !important;
-            padding: 5px 0 !important;
-            border-bottom: 1px solid #ecf0f1 !important;
-            font-size: 12px !important;
-          }
-          
-          #pdf-content-full-scale .totals-row.final {
-            border-top: 2px solid #34495e !important;
-            border-bottom: 2px solid #34495e !important;
-            font-weight: bold !important;
-            font-size: 14px !important;
-            background: #f8f9fa !important;
-            padding: 8px 0 !important;
-          }
-          
-          #pdf-content-full-scale .payment-info {
-            background: #f8f9fa !important;
-            padding: 15px !important;
-            border-radius: 5px !important;
-            margin-bottom: 20px !important;
-          }
-          
-          #pdf-content-full-scale .signatures {
-            display: flex !important;
-            justify-content: space-between !important;
-            margin-bottom: 20px !important;
-          }
-          
-          #pdf-content-full-scale .signature-box {
-            text-align: center !important;
-            width: 200px !important;
-          }
-          
-          #pdf-content-full-scale .signature-line {
-            border-top: 1px solid #34495e !important;
-            margin-top: 30px !important;
-            padding-top: 5px !important;
-            font-size: 10px !important;
-          }
-          
-          #pdf-content-full-scale .footer {
-            text-align: center !important;
-            font-size: 10px !important;
-            color: #7f8c8d !important;
-            border-top: 1px solid #ecf0f1 !important;
-            padding-top: 15px !important;
-          }
-        `;
-        
-        document.head.appendChild(globalStyle);
-      }
+      const cssRules = styleElement ? styleElement.textContent || '' : '';
+      console.log('6.1 CSS extracted:', cssRules.substring(0, 200));
       
-      // Adaugă conținutul HTML
+      // Extrage conținutul din <body>
       const bodyContent = htmlDoc.body;
+      
       if (bodyContent) {
+        // Adaugă conținutul HTML ÎNAINTE de CSS
         tempDiv.innerHTML = bodyContent.innerHTML;
+        
+        // Adaugă CSS-ul ca stylesheet în document head pentru clone
+        const globalStyle = document.createElement('style');
+        globalStyle.id = 'pdf-styles';
+        globalStyle.textContent = cssRules;
+        
+        // Verifică dacă nu există deja
+        if (!document.getElementById('pdf-styles')) {
+          document.head.appendChild(globalStyle);
+        }
+        
+        console.log('6.2 Using body content with global CSS');
+        console.log('6.3 Body content preview:', bodyContent.innerHTML.substring(0, 300));
+      } else {
+        tempDiv.innerHTML = htmlContent;
+        console.log('6.2 Using full HTML as fallback');
       }
       
       document.body.appendChild(tempDiv);
-      console.log('✅ Element added to DOM with A4 dimensions');
+      console.log('7. Element added to DOM');
+      console.log('8. Element content check:', tempDiv.textContent?.substring(0, 200));
+      console.log('9. Element HTML check:', tempDiv.innerHTML.substring(0, 200));
 
-      // Așteaptă renderizarea
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // ====== CONFIGURARE OPTIMIZATĂ jsPDF ======
-      const pdf = new window.jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4',
-        compress: true
+      // Verifică dimensiunile elementului
+      const rect = tempDiv.getBoundingClientRect();
+      console.log('10. Element dimensions:', {
+        width: rect.width,
+        height: rect.height,
+        left: rect.left,
+        top: rect.top
       });
+
+      // Așteaptă să se randeze complet
+      console.log('11. Waiting for render...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verifică din nou după timeout
+      console.log('12. Post-timeout content check:', tempDiv.textContent?.substring(0, 200));
+
+      // PĂSTRĂM GENERAREA PDF CARE FUNCȚIONA - cu ajustare scalare
+      console.log('13. Starting PDF generation...');
+      const pdf = new window.jsPDF('p', 'pt', 'a4');
       
-      // Dimensiuni PDF A4 în puncte
-      const pdfWidth = pdf.internal.pageSize.getWidth();   // 595.28 pt
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // 841.89 pt
+      // PĂSTRĂM CALCULELE CARE FUNCȚIONAU
+      const pageWidth = pdf.internal.pageSize.getWidth(); // 595.28 pt
+      const pageHeight = pdf.internal.pageSize.getHeight(); // 841.89 pt
       
-      console.log('📄 PDF dimensions:', pdfWidth, 'x', pdfHeight);
+      console.log('13.1 PDF page dimensions:', pageWidth, 'x', pageHeight);
       
-      // ====== GENERARE PDF CU PARAMETRI OPTIMIZAȚI ======
-      await pdf.html(tempDiv, {
+      // Folosește elementul specific, nu întreaga pagină
+      const targetElement = document.getElementById('pdf-content');
+      console.log('13.1 Target element found:', !!targetElement);
+      console.log('13.2 Target element content:', targetElement?.textContent?.substring(0, 200));
+      
+      await pdf.html(targetElement || tempDiv, {
         callback: function (pdf: any) {
-          console.log('✅ PDF generation completed');
+          console.log('14. PDF generation callback called');
           
-          // Curăță elementele temporare
+          // Curăță elementul temporar
           document.body.removeChild(tempDiv);
-          const globalStyle = document.getElementById('pdf-styles-optimized');
+          
+          // Curăță CSS-ul global
+          const globalStyle = document.getElementById('pdf-styles');
           if (globalStyle) {
             document.head.removeChild(globalStyle);
           }
           
+          console.log('15. Temporary elements removed');
+          
+          // Verifică PDF-ul generat
+          const pdfOutput = pdf.output('datauristring');
+          console.log('16. PDF output length:', pdfOutput.length);
+          console.log('17. PDF output preview:', pdfOutput.substring(0, 100));
+          
           // Salvează PDF-ul
           pdf.save(fileName);
-          toast.success('✅ PDF generat și descărcat cu succes la 100% scalare!');
+          console.log('18. PDF saved successfully');
           
-          // Callback de succes
+          toast.success('✅ PDF generat și descărcat cu succes!');
+          
+          // Apelează callback-ul de succes
           onSuccess(fileName.replace('.pdf', ''), `#generated-${fileName}`);
+          
           setIsProcessingPDF(false);
         },
-        
-        // ====== PARAMETRI CRITICI PENTRU 100% SCALARE ======
-        margin: [20, 20, 20, 20], // Margini optime în puncte
-        
-        // Forțează dimensiunile să se potrivească cu A4
-        width: pdfWidth - 40,    // Lățime minus marginile
-        windowWidth: A4_WIDTH,   // Folosește lățimea A4 în pixeli
-        
-        // Configurare avansată
+        margin: [10, 10, 10, 10],
+        width: pageWidth - 20, // PĂSTRĂM setarea width
+        windowWidth: pageWidth - 20, // PĂSTRĂM windowWidth pentru forțare
         autoPaging: 'text',
-        x: 0,
-        y: 0,
-        
-        // ====== html2canvas OPTIMIZAT ======
         html2canvas: {
           allowTaint: true,
-          backgroundColor: '#ffffff',
-          
-          // PARAMETRI CRITICI pentru scalare 100%
-          scale: 1.0,              // Scale 1:1 (NU 0.5 ca înainte!)
-          dpi: 96,                 // DPI standard
-          width: A4_WIDTH,         // Lățime exactă A4
-          height: A4_HEIGHT,       // Înălțime exactă A4
-          
-          // Viewport optim
-          windowWidth: A4_WIDTH,   // Viewport lățime
-          windowHeight: A4_HEIGHT, // Viewport înălțime
-          
-          // Optimizări
-          useCORS: true,
+          dpi: 96,
           letterRendering: true,
           logging: false,
+          scale: 0.75, // ✅ AJUSTARE SCALARE: 0.75 în loc de 0.5 (mai mare ca să ocupe mai mult din pagină)
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          height: 1000, // PĂSTRĂM înălțimea
+          width: pageWidth - 20,   // PĂSTRĂM lățimea
           scrollX: 0,
           scrollY: 0,
-          
-          // Callback pentru optimizări finale
+          windowWidth: pageWidth - 20, // PĂSTRĂM windowWidth
+          windowHeight: 1000, // PĂSTRĂM windowHeight
           onclone: (clonedDoc: any) => {
-            console.log('🔧 html2canvas clone optimization...');
-            const clonedElement = clonedDoc.getElementById('pdf-content-full-scale');
-            
+            console.log('19. html2canvas onclone called');
+            const clonedElement = clonedDoc.getElementById('pdf-content');
             if (clonedElement) {
-              // Asigură-te că elementul folosește întreg spațiul
-              clonedElement.style.width = `${A4_WIDTH}px`;
-              clonedElement.style.height = `${A4_HEIGHT}px`;
-              clonedElement.style.padding = '20px';
-              clonedElement.style.boxSizing = 'border-box';
-              clonedElement.style.overflow = 'visible';
+              // PĂSTRĂM SISTEMUL DE COMPRESIE CARE FUNCȚIONA
               
-              console.log('✅ Clone optimized for full A4 coverage');
+              // 1. RESETARE COMPLETĂ - toate elementele la font mic
+              const allElements = clonedElement.querySelectorAll('*');
+              allElements.forEach((el: any) => {
+                // Font la jumătate pentru TOATE elementele
+                el.style.fontSize = '3px';
+                el.style.lineHeight = '0.8';
+                el.style.margin = '0.25px';
+                el.style.padding = '0.25px';
+                
+                // Forțează toate spațiile la minim
+                el.style.marginTop = '0.25px';
+                el.style.marginBottom = '0.25px';
+                el.style.paddingTop = '0.25px';
+                el.style.paddingBottom = '0.25px';
+              });
+              
+              // 2. COMPRESIE SPECIFICĂ per tip de element
+              
+              // Headers și titluri
+              const headers = clonedElement.querySelectorAll('h1, h2, h3, h4, .header h1');
+              headers.forEach((header: any) => {
+                header.style.fontSize = '4px'; // Puțin mai mare pentru lizibilitate
+                header.style.margin = '0.5px 0';
+                header.style.padding = '0.5px 0';
+                header.style.fontWeight = 'bold';
+              });
+              
+              // Textele mari cu roșu (Factură nr)
+              const largeTexts = clonedElement.querySelectorAll('.invoice-number');
+              largeTexts.forEach((text: any) => {
+                text.style.fontSize = '6px'; // Mărit puțin pentru vizibilitate
+                text.style.margin = '1px 0';
+                text.style.fontWeight = 'bold';
+              });
+              
+              // Tabele - compresie maximă
+              const tables = clonedElement.querySelectorAll('table, th, td');
+              tables.forEach((table: any) => {
+                table.style.fontSize = '2.5px'; // Foarte mic pentru tabele
+                table.style.padding = '0.25px';
+                table.style.margin = '0';
+                table.style.borderSpacing = '0';
+                table.style.borderCollapse = 'collapse';
+                table.style.lineHeight = '0.8';
+              });
+              
+              // Div-uri cu clase specifice
+              const sections = clonedElement.querySelectorAll('div');
+              sections.forEach((section: any) => {
+                section.style.margin = '0.25px 0';
+                section.style.padding = '0.25px';
+              });
+              
+              // Text normal în paragrafe
+              const textElements = clonedElement.querySelectorAll('p, span, .info-line, strong');
+              textElements.forEach((text: any) => {
+                text.style.fontSize = '3px';
+                text.style.lineHeight = '0.8';
+                text.style.margin = '0.25px 0';
+                text.style.padding = '0.25px 0';
+              });
+              
+              // 3. FORȚARE CSS INLINE pentru elementele mari rămase
+              
+              // Căută și reduce elementele care au încă text mare
+              const walker = clonedDoc.createTreeWalker(
+                clonedElement,
+                NodeFilter.SHOW_ELEMENT,
+                null,
+                false
+              );
+              
+              let node;
+              while (node = walker.nextNode()) {
+                const el = node as HTMLElement;
+                const computedStyle = clonedDoc.defaultView.getComputedStyle(el);
+                const fontSize = parseFloat(computedStyle.fontSize);
+                
+                // Dacă fontul e încă prea mare, forțează-l la mic
+                if (fontSize > 4) {
+                  el.style.fontSize = '3px !important';
+                  el.style.setProperty('font-size', '3px', 'important');
+                }
+                
+                // Reduce toate spațiile mari
+                if (parseFloat(computedStyle.marginTop) > 2) {
+                  el.style.marginTop = '0.5px !important';
+                }
+                if (parseFloat(computedStyle.marginBottom) > 2) {
+                  el.style.marginBottom = '0.5px !important';
+                }
+                if (parseFloat(computedStyle.paddingTop) > 2) {
+                  el.style.paddingTop = '0.25px !important';
+                }
+                if (parseFloat(computedStyle.paddingBottom) > 2) {
+                  el.style.paddingBottom = '0.25px !important';
+                }
+              }
+              
+              // 4. OVERRIDE FINAL - aplică stiluri direct pe element principal
+              clonedElement.style.fontSize = '3px !important';
+              clonedElement.style.lineHeight = '0.8 !important';
+              clonedElement.style.padding = '5px !important';
+              clonedElement.style.margin = '0 !important';
+              
+              console.log('20. PDF element compressed with FORCED global compression');
             }
           }
         }
@@ -501,7 +491,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
     } catch (error) {
       setIsProcessingPDF(false);
-      console.error('❌ PDF processing error:', error);
+      console.error('ERROR in PDF processing:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
       toast.error(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
     }
   };
@@ -541,9 +532,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const result = await response.json();
       
       if (result.success && result.htmlContent) {
-        toast.success('✅ Template generat! Se procesează PDF-ul la 100% scalare...');
+        toast.success('✅ Template generat! Se procesează PDF-ul...');
         
-        // Procesează HTML-ul în PDF cu scalare optimizată
+        // Procesează HTML-ul în PDF
         await processPDF(result.htmlContent, result.fileName);
         
       } else {
@@ -573,7 +564,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               💰 Generare Factură Hibridă
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              PDF la 100% scalare A4 cu jsPDF + integrare ANAF • Proiect: {proiect.ID_Proiect}
+              PDF optimizat scale 0.75 cu jsPDF + integrare ANAF • Proiect: {proiect.ID_Proiect}
             </p>
           </div>
           <button
@@ -594,7 +585,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   <span className="text-lg font-medium">
                     {isGenerating && !isProcessingPDF && '🔄 Se generează template-ul...'}
-                    {isProcessingPDF && '📄 Se procesează PDF-ul la 100% scalare...'}
+                    {isProcessingPDF && '📄 Se procesează PDF-ul cu scale 0.75...'}
                   </span>
                 </div>
               </div>
@@ -855,7 +846,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           {/* Butoane */}
           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              ℹ️ Factura PDF va fi generată la 100% scalare A4. Integrarea ANAF se va procesa în fundal.
+              ℹ️ Factura PDF va fi generată cu scale optimizat 0.75. Integrarea ANAF se va procesa în fundal.
             </div>
             
             <div className="flex gap-3">
@@ -872,9 +863,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 className="bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isLoading ? (
-                  <>⏳ {isProcessingPDF ? 'Se generează PDF la 100%...' : 'Se procesează...'}</>
+                  <>⏳ {isProcessingPDF ? 'Se generează PDF scale 0.75...' : 'Se procesează...'}</>
                 ) : (
-                  <>💰 Generează Factură PDF 100%</>
+                  <>💰 Generează Factură PDF Optimizat</>
                 )}
               </button>
             </div>
