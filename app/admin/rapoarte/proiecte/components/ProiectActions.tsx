@@ -61,7 +61,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     if (document.body.contains(toastEl)) {
       document.body.removeChild(toastEl);
     }
-  }, type === 'success' || type === 'error' ? 4000 : 6000);
+  }, type === 'success' ? 4000 : type === 'error' ? 5000 : type === 'info' && message.length > 200 ? 10000 : 6000);
 };
 
 export default function ProiectActions({ proiect, onRefresh }: ProiectActionsProps) {

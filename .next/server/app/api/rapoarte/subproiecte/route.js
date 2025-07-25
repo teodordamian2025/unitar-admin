@@ -286,7 +286,7 @@ const table = "Subproiecte";
 async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        // ✅ FIX: Query simplificat fără câmp 'activ' (care poate să nu existe)
+        // ✅ FIX: Query cu câmpuri existente în tabelul Subproiecte
         let query = `
       SELECT 
         s.*,
@@ -295,6 +295,7 @@ async function GET(request) {
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` s
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
         ON s.ID_Proiect = p.ID_Proiect
+      WHERE s.activ = true
     `;
         const conditions = [];
         const params = {};
@@ -396,7 +397,7 @@ async function POST(request) {
             Data_Start: "DATE",
             Data_Final: "DATE",
             Status: "STRING",
-            Valoare_Estimata: "FLOAT64"
+            Valoare_Estimata: "NUMERIC"
         };
         console.log("Insert subproiect params:", params); // Debug
         console.log("Insert subproiect types:", types); // Debug
@@ -448,7 +449,7 @@ async function PUT(request) {
             "Data_Start": "DATE",
             "Data_Final": "DATE",
             "Status": "STRING",
-            "Valoare_Estimata": "FLOAT64"
+            "Valoare_Estimata": "NUMERIC"
         };
         Object.entries(updateData).forEach(([key, value])=>{
             if (value !== undefined && key !== "id" && fieldTypes[key]) {
@@ -506,18 +507,21 @@ async function DELETE(request) {
                 status: 400
             });
         }
-        // ✅ FIX: Delete direct fără soft delete pentru simplitate
+        // ✅ FIX: Soft delete folosind câmpul activ existent
         const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SET activ = false, data_actualizare = @data_actualizare
       WHERE ID_Subproiect = @id
     `;
         await bigquery.query({
             query: deleteQuery,
             params: {
-                id
+                id,
+                data_actualizare: new Date().toISOString()
             },
             types: {
-                id: "STRING"
+                id: "STRING",
+                data_actualizare: "TIMESTAMP"
             },
             location: "EU"
         });

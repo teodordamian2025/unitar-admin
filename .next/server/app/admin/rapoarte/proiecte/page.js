@@ -1896,7 +1896,7 @@ const ProiectActions_showToast = (message, type = "info")=>{
         if (document.body.contains(toastEl)) {
             document.body.removeChild(toastEl);
         }
-    }, type === "success" || type === "error" ? 4000 : 6000);
+    }, type === "success" ? 4000 : type === "error" ? 5000 : type === "info" && message.length > 200 ? 10000 : 6000);
 };
 function ProiectActions({ proiect, onRefresh }) {
     const [showFacturaModal, setShowFacturaModal] = react_experimental_default().useState(false);

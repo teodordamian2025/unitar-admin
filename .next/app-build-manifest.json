@@ -19,16 +19,6 @@
       "static/chunks/main-app-c55efb12a7fbb29b.js",
       "static/chunks/app/layout-d1e67a4881032d7a.js"
     ],
-    "/login/page": [
-      "static/chunks/webpack-e9030dbe222bb8f7.js",
-      "static/chunks/bf6a786c-fab7ff33e738c63b.js",
-      "static/chunks/114-c1269d89c4b71755.js",
-      "static/chunks/main-app-c55efb12a7fbb29b.js",
-      "static/chunks/bc9e92e6-13f7a14f8a5eb3f7.js",
-      "static/chunks/7c86ec74-4f3d135f122d6068.js",
-      "static/chunks/464-13423f6dba99668b.js",
-      "static/chunks/app/login/page-a6e88391827596b3.js"
-    ],
     "/logout/page": [
       "static/chunks/webpack-e9030dbe222bb8f7.js",
       "static/chunks/bf6a786c-fab7ff33e738c63b.js",
@@ -38,6 +28,16 @@
       "static/chunks/7c86ec74-4f3d135f122d6068.js",
       "static/chunks/464-13423f6dba99668b.js",
       "static/chunks/app/logout/page-f515d5a59d85aca3.js"
+    ],
+    "/login/page": [
+      "static/chunks/webpack-e9030dbe222bb8f7.js",
+      "static/chunks/bf6a786c-fab7ff33e738c63b.js",
+      "static/chunks/114-c1269d89c4b71755.js",
+      "static/chunks/main-app-c55efb12a7fbb29b.js",
+      "static/chunks/bc9e92e6-13f7a14f8a5eb3f7.js",
+      "static/chunks/7c86ec74-4f3d135f122d6068.js",
+      "static/chunks/464-13423f6dba99668b.js",
+      "static/chunks/app/login/page-a6e88391827596b3.js"
     ],
     "/profil/page": [
       "static/chunks/webpack-e9030dbe222bb8f7.js",
@@ -119,7 +119,7 @@
       "static/chunks/main-app-c55efb12a7fbb29b.js",
       "static/chunks/259-dbc2ff61c2098c86.js",
       "static/chunks/811-2646a16f95da280c.js",
-      "static/chunks/app/admin/rapoarte/proiecte/page-d28ec1a2230266d9.js"
+      "static/chunks/app/admin/rapoarte/proiecte/page-622f417e3aa976de.js"
     ],
     "/admin/rapoarte/proiecte/[id]/page": [
       "static/chunks/webpack-e9030dbe222bb8f7.js",

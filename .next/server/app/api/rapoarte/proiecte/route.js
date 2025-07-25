@@ -331,13 +331,13 @@ async function GET(request) {
         if (valoareMin && !isNaN(Number(valoareMin))) {
             conditions.push("CAST(COALESCE(Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin");
             params.valoareMin = Number(valoareMin);
-            types.valoareMin = "FLOAT64";
+            types.valoareMin = "NUMERIC";
         }
         const valoareMax = searchParams.get("valoare_max");
         if (valoareMax && !isNaN(Number(valoareMax))) {
             conditions.push("CAST(COALESCE(Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax");
             params.valoareMax = Number(valoareMax);
-            types.valoareMax = "FLOAT64";
+            types.valoareMax = "NUMERIC";
         }
         // Adaugă condiții la query
         if (conditions.length > 0) {
@@ -416,7 +416,7 @@ async function POST(request) {
             Data_Start: "DATE",
             Data_Final: "DATE",
             Status: "STRING",
-            Valoare_Estimata: "FLOAT64",
+            Valoare_Estimata: "NUMERIC",
             Responsabil: "STRING",
             Observatii: "STRING"
         };
@@ -488,7 +488,7 @@ async function PUT(request) {
             "Descriere": "STRING",
             "Data_Start": "DATE",
             "Data_Final": "DATE",
-            "Valoare_Estimata": "FLOAT64",
+            "Valoare_Estimata": "NUMERIC",
             "Responsabil": "STRING",
             "Observatii": "STRING"
         };
