@@ -435,7 +435,6 @@ __webpack_require__.d(__webpack_exports__, {
 var jsx_runtime_ = __webpack_require__(76931);
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
 var react_experimental_ = __webpack_require__(17640);
-var react_experimental_default = /*#__PURE__*/__webpack_require__.n(react_experimental_);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
 var navigation = __webpack_require__(57114);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/components/FilterBar.tsx
@@ -738,690 +737,490 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
     });
 }
 
-// EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs + 1 modules
-var dist = __webpack_require__(7365);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/chevron-down.js
+var chevron_down = __webpack_require__(19458);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/chevron-right.js
+var chevron_right = __webpack_require__(11922);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/building-2.js
+var building_2 = __webpack_require__(13482);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/users.js
+var users = __webpack_require__(91672);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/download.js
+var download = __webpack_require__(85574);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/refresh-cw.js
+var refresh_cw = __webpack_require__(20644);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/search.js
+var search = __webpack_require__(69518);
+// EXTERNAL MODULE: ./node_modules/react-hot-toast/dist/index.mjs + 1 modules
+var dist = __webpack_require__(10345);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/ellipsis-vertical.js
+var ellipsis_vertical = __webpack_require__(33581);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/file-text.js
+var file_text = __webpack_require__(39546);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/eye.js
+var eye = __webpack_require__(28626);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/pen.js
+var pen = __webpack_require__(90391);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/plus.js
+var plus = __webpack_require__(22385);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/trash-2.js
+var trash_2 = __webpack_require__(26303);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/x.js
+var x = __webpack_require__(56206);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/calculator.js
+var calculator = __webpack_require__(77974);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/map-pin.js
+var map_pin = __webpack_require__(87094);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// ==================================================================
-// CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Auto-completare client din BD + subproiecte selector + fix URL redirect
-// ==================================================================
+// app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
+
+
+
+
+
+
+
+
 function FacturaHibridModal({ proiect, onClose, onSuccess }) {
+    const [loading, setLoading] = (0,react_experimental_.useState)(false);
+    const [loadingANAF, setLoadingANAF] = (0,react_experimental_.useState)(false);
+    const [loadingSubproiecte, setLoadingSubproiecte] = (0,react_experimental_.useState)(false);
+    const [subproiecte, setSubproiecte] = (0,react_experimental_.useState)([]);
+    const [clientBD, setClientBD] = (0,react_experimental_.useState)(null);
+    const [formData, setFormData] = (0,react_experimental_.useState)({
+        // Date firmă (precompletate)
+        numarFactura: "",
+        dataFactura: new Date().toISOString().split("T")[0],
+        // Date client (auto-completare din BD + ANAF)
+        numeClient: proiect.Client || "",
+        cuiClient: "",
+        nrRegComClient: "",
+        adresaClient: proiect.Adresa || "",
+        emailClient: "",
+        telefonClient: "",
+        // Setări factură
+        rataTVA: "19",
+        observatii: ""
+    });
     const [liniiFactura, setLiniiFactura] = (0,react_experimental_.useState)([
         {
-            denumire: proiect.Denumire,
+            id: "1",
+            descriere: proiect.Denumire || "",
             cantitate: 1,
-            pretUnitar: proiect.Valoare_Estimata || 0,
-            cotaTva: 19,
-            tip: "proiect"
+            pretUnitarFaraTVA: proiect.Valoare_Estimata || 0,
+            totalFaraTVA: proiect.Valoare_Estimata || 0
         }
     ]);
-    const [observatii, setObservatii] = (0,react_experimental_.useState)("");
-    const [clientInfo, setClientInfo] = (0,react_experimental_.useState)(null);
-    const [isGenerating, setIsGenerating] = (0,react_experimental_.useState)(false);
-    const [isLoadingANAF, setIsLoadingANAF] = (0,react_experimental_.useState)(false);
-    const [isLoadingClient, setIsLoadingClient] = (0,react_experimental_.useState)(false);
-    const [isLoadingSubproiecte, setIsLoadingSubproiecte] = (0,react_experimental_.useState)(false);
-    const [cuiInput, setCuiInput] = (0,react_experimental_.useState)("");
-    const [anafError, setAnafError] = (0,react_experimental_.useState)(null);
-    const [isProcessingPDF, setIsProcessingPDF] = (0,react_experimental_.useState)(false);
-    const [subproiecteDisponibile, setSubproiecteDisponibile] = (0,react_experimental_.useState)([]);
-    const [showSubproiecteSelector, setShowSubproiecteSelector] = (0,react_experimental_.useState)(false);
+    // Încărcare subproiecte la deschiderea modalului
     (0,react_experimental_.useEffect)(()=>{
-        loadClientFromDatabase();
         loadSubproiecte();
+        loadClientFromDB();
     }, [
-        proiect
+        proiect.ID_Proiect
     ]);
-    const loadClientFromDatabase = async ()=>{
-        if (!proiect.Client) return;
-        setIsLoadingClient(true);
-        try {
-            const response = await fetch(`/api/rapoarte/clienti?search=${encodeURIComponent(proiect.Client)}`);
-            const result = await response.json();
-            if (result.success && result.data && result.data.length > 0) {
-                const clientData = result.data[0];
-                setClientInfo({
-                    id: clientData.id,
-                    denumire: clientData.nume,
-                    cui: clientData.cui || "",
-                    nrRegCom: clientData.nr_reg_com || "",
-                    adresa: clientData.adresa || "",
-                    judet: clientData.judet,
-                    localitate: clientData.oras,
-                    telefon: clientData.telefon,
-                    email: clientData.email
-                });
-                if (clientData.cui) {
-                    setCuiInput(clientData.cui);
-                }
-                dist/* toast */.Am.success(`✅ Date client preluate din BD: ${clientData.nume}`);
-            } else {
-                setClientInfo({
-                    denumire: proiect.Client,
-                    cui: "",
-                    nrRegCom: "",
-                    adresa: ""
-                });
-                dist/* toast */.Am.info(`ℹ️ Client "${proiect.Client}" nu găsit în BD. Completează manual datele.`);
-            }
-        } catch (error) {
-            console.error("Eroare la \xeencărcarea clientului din BD:", error);
-            setClientInfo({
-                denumire: proiect.Client,
-                cui: "",
-                nrRegCom: "",
-                adresa: ""
-            });
-            dist/* toast */.Am.warning("⚠️ Nu s-au putut prelua datele clientului din BD");
-        } finally{
-            setIsLoadingClient(false);
-        }
-    };
     const loadSubproiecte = async ()=>{
-        setIsLoadingSubproiecte(true);
+        setLoadingSubproiecte(true);
         try {
             const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             const result = await response.json();
-            if (result.success && result.data) {
-                const subproiecteFormatate = result.data.map((sub)=>({
-                        ID_Subproiect: sub.ID_Subproiect,
-                        Denumire: sub.Denumire,
-                        Valoare_Estimata: sub.Valoare_Estimata,
-                        Status: sub.Status,
-                        adaugat: false
-                    }));
-                setSubproiecteDisponibile(subproiecteFormatate);
-                if (subproiecteFormatate.length > 0) {
-                    dist/* toast */.Am.info(`📋 Găsite ${subproiecteFormatate.length} subproiecte disponibile pentru factură`);
-                }
+            if (result.success) {
+                setSubproiecte(result.subproiecte || []);
+                console.log("Subproiecte \xeencărcate:", result.subproiecte);
+            } else {
+                console.warn("Nu s-au putut \xeencărca subproiectele:", result.error);
             }
         } catch (error) {
             console.error("Eroare la \xeencărcarea subproiectelor:", error);
-            dist/* toast */.Am.warning("⚠️ Nu s-au putut \xeencărca subproiectele");
+        // Nu afișăm toast error pentru că subproiectele sunt opționale
         } finally{
-            setIsLoadingSubproiecte(false);
+            setLoadingSubproiecte(false);
         }
     };
-    const addLine = ()=>{
-        setLiniiFactura([
-            ...liniiFactura,
-            {
-                denumire: "",
-                cantitate: 1,
-                pretUnitar: 0,
-                cotaTva: 19
+    const loadClientFromDB = async ()=>{
+        try {
+            const response = await fetch(`/api/rapoarte/clienti?search=${encodeURIComponent(proiect.Client)}`);
+            if (!response.ok) return;
+            const result = await response.json();
+            if (result.success && result.clienti && result.clienti.length > 0) {
+                const client = result.clienti[0];
+                setClientBD(client);
+                // Auto-completare date client din BD
+                setFormData((prev)=>({
+                        ...prev,
+                        cuiClient: client.cui || "",
+                        nrRegComClient: client.nr_reg_com || "",
+                        adresaClient: client.adresa || prev.adresaClient,
+                        emailClient: client.email || "",
+                        telefonClient: client.telefon || ""
+                    }));
+                dist/* toast */.Am.success("\uD83D\uDCCA Date client preluate din baza de date!", {
+                    duration: 3000,
+                    icon: "\uD83D\uDD17"
+                });
             }
-        ]);
+        } catch (error) {
+            console.error("Eroare la căutarea clientului \xeen BD:", error);
+        }
     };
-    const removeLine = (index)=>{
+    const handleInputChange = (e)=>{
+        const { name, value } = e.target;
+        setFormData((prev)=>({
+                ...prev,
+                [name]: value
+            }));
+    };
+    const handleLinieChange = (id, field, value)=>{
+        setLiniiFactura((prev)=>prev.map((linie)=>{
+                if (linie.id === id) {
+                    const updatedLinie = {
+                        ...linie,
+                        [field]: value
+                    };
+                    // Recalculare total pentru linia curentă
+                    if (field === "cantitate" || field === "pretUnitarFaraTVA") {
+                        updatedLinie.totalFaraTVA = Number(updatedLinie.cantitate) * Number(updatedLinie.pretUnitarFaraTVA);
+                    }
+                    return updatedLinie;
+                }
+                return linie;
+            }));
+    };
+    const addLinie = ()=>{
+        const newId = (liniiFactura.length + 1).toString();
+        setLiniiFactura((prev)=>[
+                ...prev,
+                {
+                    id: newId,
+                    descriere: "",
+                    cantitate: 1,
+                    pretUnitarFaraTVA: 0,
+                    totalFaraTVA: 0
+                }
+            ]);
+    };
+    const removeLinie = (id)=>{
         if (liniiFactura.length > 1) {
-            const linieSteasa = liniiFactura[index];
-            if (linieSteasa.tip === "subproiect" && linieSteasa.subproiect_id) {
-                setSubproiecteDisponibile((prev)=>prev.map((sub)=>sub.ID_Subproiect === linieSteasa.subproiect_id ? {
-                            ...sub,
-                            adaugat: false
-                        } : sub));
-            }
-            setLiniiFactura(liniiFactura.filter((_, i)=>i !== index));
+            setLiniiFactura((prev)=>prev.filter((linie)=>linie.id !== id));
         }
-    };
-    const updateLine = (index, field, value)=>{
-        const newLines = [
-            ...liniiFactura
-        ];
-        newLines[index] = {
-            ...newLines[index],
-            [field]: value
-        };
-        setLiniiFactura(newLines);
     };
     const addSubproiectToFactura = (subproiect)=>{
-        const nouaLinie = {
-            denumire: `${subproiect.Denumire} (Subproiect)`,
+        const newId = `sub_${subproiect.ID_Subproiect}`;
+        // Verificăm dacă subproiectul nu e deja adăugat
+        const existingLinie = liniiFactura.find((linie)=>linie.id === newId);
+        if (existingLinie) {
+            dist/* toast */.Am.error("Subproiectul este deja adăugat \xeen factură!");
+            return;
+        }
+        const newLinie = {
+            id: newId,
+            descriere: `Subproiect: ${subproiect.Denumire}`,
             cantitate: 1,
-            pretUnitar: subproiect.Valoare_Estimata || 0,
-            cotaTva: 19,
-            tip: "subproiect",
-            subproiect_id: subproiect.ID_Subproiect
+            pretUnitarFaraTVA: subproiect.Valoare_Estimata || 0,
+            totalFaraTVA: subproiect.Valoare_Estimata || 0
         };
         setLiniiFactura((prev)=>[
                 ...prev,
-                nouaLinie
+                newLinie
             ]);
-        setSubproiecteDisponibile((prev)=>prev.map((sub)=>sub.ID_Subproiect === subproiect.ID_Subproiect ? {
-                    ...sub,
-                    adaugat: true
-                } : sub));
-        dist/* toast */.Am.success(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură`);
+        dist/* toast */.Am.success(`Subproiectul "${subproiect.Denumire}" a fost adăugat în factură!`);
     };
-    const handlePreluareDateANAF = async ()=>{
-        if (!cuiInput.trim()) {
-            dist/* toast */.Am.error("Introduceți CUI-ul clientului");
+    const validateANAF = async ()=>{
+        if (!formData.cuiClient) {
+            dist/* toast */.Am.error("Introduceți CUI-ul pentru validare ANAF");
             return;
         }
-        setIsLoadingANAF(true);
-        setAnafError(null);
+        setLoadingANAF(true);
         try {
-            const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cuiInput)}`);
-            const result = await response.json();
-            if (result.success) {
-                const anafData = result.data;
-                setClientInfo({
-                    ...clientInfo,
-                    denumire: anafData.denumire,
-                    cui: anafData.cui,
-                    nrRegCom: anafData.nrRegCom,
-                    adresa: anafData.adresa,
-                    judet: anafData.judet,
-                    localitate: anafData.localitate,
-                    telefon: anafData.telefon,
-                    status: anafData.status,
-                    platitorTva: anafData.platitorTva
-                });
-                dist/* toast */.Am.success("✅ Datele au fost actualizate cu informațiile de la ANAF!");
-                if (anafData.status === "Inactiv") {
-                    dist/* toast */.Am.warning("⚠️ Atenție: Compania este inactivă conform ANAF!");
-                }
-                if (anafData.platitorTva === "Nu") {
-                    dist/* toast */.Am.info("ℹ️ Compania nu este plătitoare de TVA");
-                }
-            } else {
-                setAnafError(result.error);
-                dist/* toast */.Am.error(`❌ ${result.error}`);
-            }
-        } catch (error) {
-            const errorMsg = "Eroare la comunicarea cu ANAF";
-            setAnafError(errorMsg);
-            dist/* toast */.Am.error(errorMsg);
-        } finally{
-            setIsLoadingANAF(false);
-        }
-    };
-    const calculateTotals = ()=>{
-        let subtotal = 0;
-        let totalTva = 0;
-        liniiFactura.forEach((linie)=>{
-            const cantitate = Number(linie.cantitate) || 0;
-            const pretUnitar = Number(linie.pretUnitar) || 0;
-            const cotaTva = Number(linie.cotaTva) || 0;
-            const valoare = cantitate * pretUnitar;
-            const tva = valoare * (cotaTva / 100);
-            subtotal += valoare;
-            totalTva += tva;
-        });
-        const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
-        return {
-            subtotal: safeFixed(subtotal),
-            totalTva: safeFixed(totalTva),
-            totalGeneral: safeFixed(subtotal + totalTva)
-        };
-    };
-    const loadPDFLibraries = ()=>{
-        return new Promise((resolve, reject)=>{
-            if (window.jsPDF && window.html2canvas) {
-                resolve();
-                return;
-            }
-            const jsPDFScript = document.createElement("script");
-            jsPDFScript.src = "https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js";
-            jsPDFScript.onload = ()=>{
-                window.jsPDF = window.jspdf.jsPDF;
-                const html2canvasScript = document.createElement("script");
-                html2canvasScript.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-                html2canvasScript.onload = ()=>{
-                    window.html2canvas = window.html2canvas;
-                    resolve();
-                };
-                html2canvasScript.onerror = reject;
-                document.head.appendChild(html2canvasScript);
-            };
-            jsPDFScript.onerror = reject;
-            document.head.appendChild(jsPDFScript);
-        });
-    };
-    const processPDF = async (htmlContent, fileName)=>{
-        try {
-            setIsProcessingPDF(true);
-            dist/* toast */.Am.info("\uD83D\uDD04 Se procesează HTML-ul \xeen PDF...");
-            await loadPDFLibraries();
-            const tempDiv = document.createElement("div");
-            tempDiv.id = "pdf-content";
-            tempDiv.style.position = "fixed";
-            tempDiv.style.left = "0px";
-            tempDiv.style.top = "0px";
-            tempDiv.style.width = "794px";
-            tempDiv.style.height = "1000px";
-            tempDiv.style.backgroundColor = "white";
-            tempDiv.style.fontFamily = "Arial, sans-serif";
-            tempDiv.style.fontSize = "4px";
-            tempDiv.style.color = "#333";
-            tempDiv.style.lineHeight = "1.0";
-            tempDiv.style.padding = "15px";
-            tempDiv.style.zIndex = "-1000";
-            tempDiv.style.opacity = "1";
-            tempDiv.style.transform = "scale(1)";
-            tempDiv.style.overflow = "hidden";
-            tempDiv.style.boxSizing = "border-box";
-            tempDiv.style.display = "flex";
-            tempDiv.style.flexDirection = "column";
-            tempDiv.style.justifyContent = "space-between";
-            const parser = new DOMParser();
-            const htmlDoc = parser.parseFromString(htmlContent, "text/html");
-            const styleElement = htmlDoc.querySelector("style");
-            const cssRules = styleElement ? styleElement.textContent || "" : "";
-            const bodyContent = htmlDoc.body;
-            if (bodyContent) {
-                tempDiv.innerHTML = bodyContent.innerHTML;
-                const globalStyle = document.createElement("style");
-                globalStyle.id = "pdf-styles";
-                globalStyle.textContent = cssRules;
-                if (!document.getElementById("pdf-styles")) {
-                    document.head.appendChild(globalStyle);
-                }
-            } else {
-                tempDiv.innerHTML = htmlContent;
-            }
-            document.body.appendChild(tempDiv);
-            await new Promise((resolve)=>setTimeout(resolve, 1000));
-            const pdf = new window.jsPDF("p", "pt", "a4");
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const targetElement = document.getElementById("pdf-content");
-            await pdf.html(targetElement || tempDiv, {
-                callback: function(pdf) {
-                    document.body.removeChild(tempDiv);
-                    const globalStyle = document.getElementById("pdf-styles");
-                    if (globalStyle) {
-                        document.head.removeChild(globalStyle);
-                    }
-                    pdf.save(fileName);
-                    dist/* toast */.Am.success("✅ PDF generat și descărcat cu succes!");
-                    onSuccess(fileName.replace(".pdf", ""), "");
-                    setIsProcessingPDF(false);
-                },
-                margin: [
-                    10,
-                    10,
-                    10,
-                    10
-                ],
-                width: pageWidth - 20,
-                windowWidth: pageWidth - 20,
-                autoPaging: "text",
-                html2canvas: {
-                    allowTaint: true,
-                    dpi: 96,
-                    letterRendering: true,
-                    logging: false,
-                    scale: 0.75,
-                    useCORS: true,
-                    backgroundColor: "#ffffff",
-                    height: 1000,
-                    width: pageWidth - 20,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: pageWidth - 20,
-                    windowHeight: 1000,
-                    onclone: (clonedDoc)=>{
-                        const clonedElement = clonedDoc.getElementById("pdf-content");
-                        if (clonedElement) {
-                            const allElements = clonedElement.querySelectorAll("*");
-                            allElements.forEach((el)=>{
-                                el.style.fontSize = "3px";
-                                el.style.lineHeight = "0.8";
-                                el.style.margin = "0.25px";
-                                el.style.padding = "0.25px";
-                                el.style.marginTop = "0.25px";
-                                el.style.marginBottom = "0.25px";
-                                el.style.paddingTop = "0.25px";
-                                el.style.paddingBottom = "0.25px";
-                            });
-                            const headers = clonedElement.querySelectorAll("h1, h2, h3, h4, .header h1");
-                            headers.forEach((header)=>{
-                                header.style.fontSize = "4px";
-                                header.style.margin = "0.5px 0";
-                                header.style.padding = "0.5px 0";
-                                header.style.fontWeight = "bold";
-                            });
-                            const largeTexts = clonedElement.querySelectorAll(".invoice-number");
-                            largeTexts.forEach((text)=>{
-                                text.style.fontSize = "6px";
-                                text.style.margin = "1px 0";
-                                text.style.fontWeight = "bold";
-                            });
-                            const tables = clonedElement.querySelectorAll("table, th, td");
-                            tables.forEach((table)=>{
-                                table.style.fontSize = "2.5px";
-                                table.style.padding = "0.25px";
-                                table.style.margin = "0";
-                                table.style.borderSpacing = "0";
-                                table.style.borderCollapse = "collapse";
-                                table.style.lineHeight = "0.8";
-                            });
-                            const sections = clonedElement.querySelectorAll("div");
-                            sections.forEach((section)=>{
-                                section.style.margin = "0.25px 0";
-                                section.style.padding = "0.25px";
-                            });
-                            const textElements = clonedElement.querySelectorAll("p, span, .info-line, strong");
-                            textElements.forEach((text)=>{
-                                text.style.fontSize = "3px";
-                                text.style.lineHeight = "0.8";
-                                text.style.margin = "0.25px 0";
-                                text.style.padding = "0.25px 0";
-                            });
-                            const walker = clonedDoc.createTreeWalker(clonedElement, NodeFilter.SHOW_ELEMENT, null, false);
-                            let node;
-                            while(node = walker.nextNode()){
-                                const el = node;
-                                const computedStyle = clonedDoc.defaultView.getComputedStyle(el);
-                                const fontSize = parseFloat(computedStyle.fontSize);
-                                if (fontSize > 4) {
-                                    el.style.fontSize = "3px !important";
-                                    el.style.setProperty("font-size", "3px", "important");
-                                }
-                                if (parseFloat(computedStyle.marginTop) > 2) {
-                                    el.style.marginTop = "0.5px !important";
-                                }
-                                if (parseFloat(computedStyle.marginBottom) > 2) {
-                                    el.style.marginBottom = "0.5px !important";
-                                }
-                                if (parseFloat(computedStyle.paddingTop) > 2) {
-                                    el.style.paddingTop = "0.25px !important";
-                                }
-                                if (parseFloat(computedStyle.paddingBottom) > 2) {
-                                    el.style.paddingBottom = "0.25px !important";
-                                }
-                            }
-                            clonedElement.style.fontSize = "3px !important";
-                            clonedElement.style.lineHeight = "0.8 !important";
-                            clonedElement.style.padding = "5px !important";
-                            clonedElement.style.margin = "0 !important";
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            setIsProcessingPDF(false);
-            console.error("❌ PDF processing error:", error);
-            dist/* toast */.Am.error(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
-        }
-    };
-    const handleGenereazaFactura = async ()=>{
-        if (!clientInfo?.cui) {
-            dist/* toast */.Am.error("CUI-ul clientului este obligatoriu");
-            return;
-        }
-        if (liniiFactura.some((linie)=>!linie.denumire.trim() || linie.pretUnitar <= 0)) {
-            dist/* toast */.Am.error("Toate liniile trebuie să aibă denumire și preț valid");
-            return;
-        }
-        if (!clientInfo.denumire.trim()) {
-            dist/* toast */.Am.error("Denumirea clientului este obligatorie");
-            return;
-        }
-        setIsGenerating(true);
-        try {
-            dist/* toast */.Am.info("\uD83D\uDD04 Se generează template-ul facturii...");
-            const response = await fetch("/api/actions/invoices/generate-hibrid", {
+            const response = await fetch("/api/anaf/company-info", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    proiectId: proiect.ID_Proiect,
-                    liniiFactura,
-                    observatii,
-                    clientInfo
+                    cui: formData.cuiClient
                 })
             });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             const result = await response.json();
-            if (result.success && result.htmlContent) {
-                dist/* toast */.Am.success("✅ Template generat! Se procesează PDF-ul...");
-                await processPDF(result.htmlContent, result.fileName);
+            if (result.success && result.data) {
+                const anafData = result.data;
+                setFormData((prev)=>({
+                        ...prev,
+                        numeClient: anafData.denumire || prev.numeClient,
+                        nrRegComClient: anafData.nrRegCom || prev.nrRegComClient,
+                        adresaClient: anafData.adresa || prev.adresaClient
+                    }));
+                dist/* toast */.Am.success("✅ Date validate și completate din ANAF!");
             } else {
-                throw new Error(result.error || "Eroare la generarea template-ului");
+                dist/* toast */.Am.error("Nu s-au găsit date \xeen ANAF pentru acest CUI");
             }
         } catch (error) {
-            dist/* toast */.Am.error(`❌ Eroare: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
-            setIsGenerating(false);
+            console.error("Eroare ANAF:", error);
+            dist/* toast */.Am.error("Eroare la validarea cu ANAF");
         } finally{
-            if (!isProcessingPDF) {
-                setIsGenerating(false);
-            }
+            setLoadingANAF(false);
         }
     };
-    const totals = calculateTotals();
-    const isLoading = isGenerating || isProcessingPDF;
+    // Calculare totale
+    const subtotal = liniiFactura.reduce((sum, linie)=>sum + Number(linie.totalFaraTVA), 0);
+    const rataTVANumber = Number(formData.rataTVA);
+    const totalTVA = subtotal * (rataTVANumber / 100);
+    const total = subtotal + totalTVA;
+    const generateInvoice = async ()=>{
+        // Validări
+        if (!formData.numarFactura.trim()) {
+            dist/* toast */.Am.error("Numărul facturii este obligatoriu");
+            return;
+        }
+        if (!formData.numeClient.trim() || !formData.cuiClient.trim()) {
+            dist/* toast */.Am.error("Numele și CUI-ul clientului sunt obligatorii");
+            return;
+        }
+        if (liniiFactura.some((linie)=>!linie.descriere.trim())) {
+            dist/* toast */.Am.error("Toate liniile trebuie să aibă o descriere");
+            return;
+        }
+        setLoading(true);
+        try {
+            const facturaData = {
+                // Date proiect
+                proiect: {
+                    id: proiect.ID_Proiect,
+                    denumire: proiect.Denumire,
+                    client: proiect.Client
+                },
+                // Date factură
+                numarFactura: formData.numarFactura,
+                dataFactura: formData.dataFactura,
+                // Date client
+                client: {
+                    nume: formData.numeClient,
+                    cui: formData.cuiClient,
+                    nrRegCom: formData.nrRegComClient,
+                    adresa: formData.adresaClient,
+                    email: formData.emailClient,
+                    telefon: formData.telefonClient,
+                    id: clientBD?.id || null
+                },
+                // Linii factură
+                linii: liniiFactura,
+                // Totale
+                subtotal,
+                rataTVA: rataTVANumber,
+                totalTVA,
+                total,
+                // Observații
+                observatii: formData.observatii
+            };
+            console.log("Generare factură cu datele:", facturaData);
+            const response = await fetch("/api/actions/invoices/generate-hibrid", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(facturaData)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            const blob = await response.blob();
+            // Download PDF
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Factura_${formData.numarFactura.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            dist/* toast */.Am.success("\uD83D\uDCC4 Factura PDF a fost generată și descărcată!");
+            onSuccess();
+        } catch (error) {
+            console.error("Eroare la generarea facturii:", error);
+            dist/* toast */.Am.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+        } finally{
+            setLoading(false);
+        }
+    };
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
+        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4",
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-            className: "bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[95vh] overflow-y-auto",
+            className: "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto",
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-green-50",
+                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50",
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                    className: "text-2xl font-bold text-gray-800 flex items-center gap-2",
-                                    children: "\uD83D\uDCB0 Generare Factură Hibridă"
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h2", {
+                                    className: "text-xl font-semibold text-gray-900",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(file_text/* default */.Z, {
+                                            className: "w-5 h-5 inline mr-2"
+                                        }),
+                                        "Generare Factură Hibridă"
+                                    ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                                     className: "text-sm text-gray-600 mt-1",
                                     children: [
-                                        "Auto-completare client din BD + subproiecte • Proiect: ",
-                                        proiect.ID_Proiect
+                                        "Proiect: ",
+                                        proiect.Denumire
                                     ]
                                 })
                             ]
                         }),
                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                             onClick: onClose,
-                            className: "text-gray-500 hover:text-gray-700 text-2xl p-1",
-                            disabled: isLoading,
-                            children: "✕"
+                            className: "text-gray-400 hover:text-gray-600 transition-colors",
+                            children: /*#__PURE__*/ jsx_runtime_.jsx(x/* default */.Z, {
+                                className: "w-6 h-6"
+                            })
                         })
                     ]
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "p-6 space-y-6",
+                    className: "p-6 space-y-8",
                     children: [
-                        isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50",
-                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                className: "bg-white p-6 rounded-lg shadow-lg",
-                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex items-center gap-3",
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                            className: "text-lg font-medium",
-                                            children: [
-                                                isGenerating && !isProcessingPDF && "\uD83D\uDD04 Se generează template-ul...",
-                                                isProcessingPDF && "\uD83D\uDCC4 Se procesează PDF-ul cu date din BD..."
-                                            ]
-                                        })
-                                    ]
-                                })
-                            })
-                        }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-blue-50 p-4 rounded-lg border border-blue-200",
+                            className: "bg-gray-50 p-4 rounded-lg",
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                    className: "text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2",
-                                    children: "\uD83C\uDFD7️ Informații Proiect"
+                                    className: "text-lg font-medium mb-4 text-gray-900",
+                                    children: "\uD83D\uDCCB Date Factură"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                    className: "grid grid-cols-1 md:grid-cols-3 gap-4",
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "ID:"
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: "Număr Factură *"
                                                 }),
-                                                " ",
-                                                proiect.ID_Proiect
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Status:"
-                                                }),
-                                                " ",
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    className: "text-green-600",
-                                                    children: proiect.Status
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    name: "numarFactura",
+                                                    value: formData.numarFactura,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                    placeholder: "ex: 2025-001",
+                                                    required: true
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Denumire:"
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: "Data Factură *"
                                                 }),
-                                                " ",
-                                                proiect.Denumire
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Valoare estimată:"
-                                                }),
-                                                " ",
-                                                proiect.Valoare_Estimata ? (Number(proiect.Valoare_Estimata) || 0).toFixed(2) : "N/A",
-                                                " RON"
-                                            ]
-                                        })
-                                    ]
-                                }),
-                                subproiecteDisponibile.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "mt-4 pt-3 border-t border-blue-200",
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex items-center justify-between mb-2",
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("h4", {
-                                                    className: "font-medium text-gray-700",
-                                                    children: "\uD83D\uDCCB Subproiecte disponibile:"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                                    onClick: ()=>setShowSubproiecteSelector(!showSubproiecteSelector),
-                                                    className: "bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600",
-                                                    children: [
-                                                        showSubproiecteSelector ? "Ascunde" : "Afișează",
-                                                        " (",
-                                                        subproiecteDisponibile.length,
-                                                        ")"
-                                                    ]
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "date",
+                                                    name: "dataFactura",
+                                                    value: formData.dataFactura,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                    required: true
                                                 })
                                             ]
                                         }),
-                                        showSubproiecteSelector && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "space-y-2 max-h-40 overflow-y-auto",
-                                            children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                    className: "flex items-center justify-between bg-white p-2 rounded border",
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: "Rată TVA"
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
+                                                    name: "rataTVA",
+                                                    value: formData.rataTVA,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
                                                     children: [
-                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                            className: "flex-1",
-                                                            children: [
-                                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                                    className: "font-medium text-sm",
-                                                                    children: subproiect.Denumire
-                                                                }),
-                                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                    className: "text-xs text-gray-500",
-                                                                    children: [
-                                                                        subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toFixed(2)} RON` : "Fără valoare",
-                                                                        "• Status: ",
-                                                                        subproiect.Status
-                                                                    ]
-                                                                })
-                                                            ]
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                            value: "19",
+                                                            children: "19%"
                                                         }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                            onClick: ()=>addSubproiectToFactura(subproiect),
-                                                            disabled: subproiect.adaugat,
-                                                            className: `px-3 py-1 rounded text-sm ${subproiect.adaugat ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-green-500 text-white hover:bg-green-600"}`,
-                                                            children: subproiect.adaugat ? "✓ Adăugat" : "+ Adaugă"
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                            value: "21",
+                                                            children: "21%"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                            value: "9",
+                                                            children: "9%"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                            value: "5",
+                                                            children: "5%"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                            value: "0",
+                                                            children: "0%"
                                                         })
                                                     ]
-                                                }, subproiect.ID_Subproiect))
+                                                })
+                                            ]
                                         })
                                     ]
                                 })
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-gray-50 p-4 rounded-lg border border-gray-200",
+                            className: "bg-blue-50 p-4 rounded-lg",
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     className: "flex items-center justify-between mb-4",
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
-                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
+                                            className: "text-lg font-medium text-gray-900",
                                             children: [
-                                                "\uD83D\uDC64 Informații Client",
-                                                isLoadingClient && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    className: "text-sm text-blue-600",
-                                                    children: "⏳ Se \xeencarcă din BD..."
+                                                /*#__PURE__*/ jsx_runtime_.jsx(building_2/* default */.Z, {
+                                                    className: "w-5 h-5 inline mr-2"
+                                                }),
+                                                "Date Client",
+                                                clientBD && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    className: "ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded",
+                                                    children: "Din BD"
                                                 })
                                             ]
                                         }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex items-center gap-2",
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                            onClick: validateANAF,
+                                            disabled: loadingANAF || !formData.cuiClient,
+                                            className: "px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1",
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: cuiInput,
-                                                    onChange: (e)=>setCuiInput(e.target.value),
-                                                    placeholder: "Introduceți CUI (ex: RO12345678)",
-                                                    className: "px-3 py-2 border border-gray-300 rounded text-sm w-48"
+                                                /*#__PURE__*/ jsx_runtime_.jsx(search/* default */.Z, {
+                                                    className: "w-4 h-4"
                                                 }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                    onClick: handlePreluareDateANAF,
-                                                    disabled: isLoadingANAF || !cuiInput.trim(),
-                                                    className: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium",
-                                                    children: isLoadingANAF ? "⏳ Se preiau..." : "\uD83D\uDCE1 Preluare ANAF"
-                                                })
+                                                loadingANAF ? "Validez..." : "Validare ANAF"
                                             ]
                                         })
                                     ]
                                 }),
-                                anafError && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "bg-red-50 border border-red-200 rounded p-3 mb-4",
-                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                        className: "text-red-800 text-sm",
-                                        children: [
-                                            "❌ ",
-                                            anafError
-                                        ]
-                                    })
-                                }),
-                                clientInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "grid grid-cols-1 md:grid-cols-2 gap-4",
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
-                                                    children: "Denumire *"
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: "Nume Client *"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                     type: "text",
-                                                    value: clientInfo.denumire,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            denumire: e.target.value
-                                                        }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    name: "numeClient",
+                                                    value: formData.numeClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
                                                     required: true
                                                 })
                                             ]
@@ -1429,17 +1228,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
                                                     children: "CUI *"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                     type: "text",
-                                                    value: clientInfo.cui,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            cui: e.target.value
-                                                        }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    name: "cuiClient",
+                                                    value: formData.cuiClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                    placeholder: "ex: RO12345678",
                                                     required: true
                                                 })
                                             ]
@@ -1447,352 +1245,366 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
                                                     children: "Nr. Reg. Com."
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                     type: "text",
-                                                    value: clientInfo.nrRegCom,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            nrRegCom: e.target.value
+                                                    name: "nrRegComClient",
+                                                    value: formData.nrRegComClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: [
+                                                        /*#__PURE__*/ jsx_runtime_.jsx(map_pin/* default */.Z, {
+                                                            className: "w-4 h-4 inline mr-1"
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                        "Adresă"
+                                                    ]
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    name: "adresaClient",
+                                                    value: formData.adresaClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                                    children: "Email"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "email",
+                                                    name: "emailClient",
+                                                    value: formData.emailClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-sm font-medium text-gray-700 mb-2",
                                                     children: "Telefon"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.telefon || "",
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            telefon: e.target.value
-                                                        }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                    type: "tel",
+                                                    name: "telefonClient",
+                                                    value: formData.telefonClient,
+                                                    onChange: handleInputChange,
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 })
                                             ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "col-span-2",
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
-                                                    children: "Adresa *"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.adresa,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            adresa: e.target.value
-                                                        }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
-                                                    required: true
-                                                })
-                                            ]
-                                        }),
-                                        (clientInfo.status || clientInfo.platitorTva) && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "col-span-2 flex gap-4 text-xs",
-                                            children: [
-                                                clientInfo.status && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: `px-2 py-1 rounded ${clientInfo.status === "Activ" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`,
-                                                    children: [
-                                                        "Status ANAF: ",
-                                                        clientInfo.status
-                                                    ]
-                                                }),
-                                                clientInfo.platitorTva && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: `px-2 py-1 rounded ${clientInfo.platitorTva === "Da" ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}`,
-                                                    children: [
-                                                        "TVA: ",
-                                                        clientInfo.platitorTva
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        clientInfo.id && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "col-span-2",
-                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                className: "bg-green-100 border border-green-200 rounded p-2 text-xs",
-                                                children: [
-                                                    "✅ ",
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                        children: "Date preluate din BD:"
-                                                    }),
-                                                    " Client ID ",
-                                                    clientInfo.id
-                                                ]
-                                            })
                                         })
                                     ]
                                 })
                             ]
                         }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        subproiecte.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "bg-green-50 p-4 rounded-lg",
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     className: "flex items-center justify-between mb-4",
                                     children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
-                                            children: "\uD83D\uDCCB Servicii/Produse"
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                                            className: "text-lg font-medium text-gray-900",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx(users/* default */.Z, {
+                                                    className: "w-5 h-5 inline mr-2"
+                                                }),
+                                                "Subproiecte Disponibile"
+                                            ]
                                         }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                            onClick: addLine,
-                                            className: "bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm",
-                                            children: "+ Adaugă linie"
+                                        loadingSubproiecte && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                            className: "text-sm text-gray-500",
+                                            children: "Se \xeencarcă..."
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "overflow-x-auto",
-                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
-                                        className: "w-full border-collapse border border-gray-300 text-sm",
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("thead", {
-                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                    className: "bg-gray-100",
-                                                    children: [
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-left",
-                                                            children: "Denumire serviciu/produs *"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-20",
-                                                            children: "Cant."
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-32",
-                                                            children: "Pret unit. (RON)"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-20",
-                                                            children: "TVA %"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-32",
-                                                            children: "Total (RON)"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-16",
-                                                            children: "Acț."
-                                                        })
-                                                    ]
-                                                })
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
-                                                children: liniiFactura.map((linie, index)=>{
-                                                    const cantitate = Number(linie.cantitate) || 0;
-                                                    const pretUnitar = Number(linie.pretUnitar) || 0;
-                                                    const cotaTva = Number(linie.cotaTva) || 0;
-                                                    const valoare = cantitate * pretUnitar;
-                                                    const tva = valoare * (cotaTva / 100);
-                                                    const total = valoare + tva;
-                                                    const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
-                                                    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                        className: `hover:bg-gray-50 ${linie.tip === "subproiect" ? "bg-blue-50" : ""}`,
+                                    className: "grid grid-cols-1 md:grid-cols-2 gap-3",
+                                    children: subproiecte.map((subproiect)=>{
+                                        const isAdded = liniiFactura.some((linie)=>linie.id === `sub_${subproiect.ID_Subproiect}`);
+                                        return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: `p-3 rounded-lg border-2 transition-all ${isAdded ? "border-green-300 bg-green-100" : "border-gray-200 bg-white hover:border-blue-300"}`,
+                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                className: "flex items-start justify-between",
+                                                children: [
+                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                        className: "flex-1",
                                                         children: [
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
-                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                    className: "flex items-center gap-2",
-                                                                    children: [
-                                                                        linie.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                            className: "bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold",
-                                                                            children: "SUB"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                            type: "text",
-                                                                            value: linie.denumire,
-                                                                            onChange: (e)=>updateLine(index, "denumire", e.target.value),
-                                                                            className: "flex-1 p-1 border rounded text-sm",
-                                                                            placeholder: "Descrierea serviciului sau produsului...",
-                                                                            required: true
-                                                                        })
-                                                                    ]
-                                                                })
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("h4", {
+                                                                className: "font-medium text-sm text-gray-900 mb-1",
+                                                                children: subproiect.Denumire
                                                             }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                    type: "number",
-                                                                    value: linie.cantitate,
-                                                                    onChange: (e)=>updateLine(index, "cantitate", parseFloat(e.target.value) || 0),
-                                                                    className: "w-full p-1 border rounded text-center text-sm",
-                                                                    min: "0",
-                                                                    step: "0.01"
-                                                                })
+                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                className: "text-xs text-gray-600 mb-2",
+                                                                children: [
+                                                                    "Valoare: ",
+                                                                    subproiect.Valoare_Estimata?.toLocaleString("ro-RO"),
+                                                                    " LEI"
+                                                                ]
                                                             }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                    type: "number",
-                                                                    value: linie.pretUnitar,
-                                                                    onChange: (e)=>updateLine(index, "pretUnitar", parseFloat(e.target.value) || 0),
-                                                                    className: "w-full p-1 border rounded text-right text-sm",
-                                                                    min: "0",
-                                                                    step: "0.01"
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
-                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                                                    value: linie.cotaTva,
-                                                                    onChange: (e)=>updateLine(index, "cotaTva", parseFloat(e.target.value)),
-                                                                    className: "w-full p-1 border rounded text-center text-sm",
-                                                                    children: [
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 0,
-                                                                            children: "0%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 5,
-                                                                            children: "5%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 9,
-                                                                            children: "9%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 19,
-                                                                            children: "19%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 21,
-                                                                            children: "21%"
-                                                                        })
-                                                                    ]
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2 text-right font-semibold",
-                                                                children: safeFixed(total)
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2 text-center",
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                                    onClick: ()=>removeLine(index),
-                                                                    disabled: liniiFactura.length === 1,
-                                                                    className: "text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed",
-                                                                    title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
-                                                                    children: "\uD83D\uDDD1️"
-                                                                })
+                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                className: "text-xs text-gray-500",
+                                                                children: [
+                                                                    "Status: ",
+                                                                    subproiect.Status
+                                                                ]
                                                             })
                                                         ]
-                                                    }, index);
-                                                })
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                        onClick: ()=>addSubproiectToFactura(subproiect),
+                                                        disabled: isAdded,
+                                                        className: `ml-2 p-1 rounded transition-colors ${isAdded ? "text-green-600 cursor-not-allowed" : "text-blue-600 hover:bg-blue-100"}`,
+                                                        title: isAdded ? "Deja adăugat" : "Adaugă \xeen factură",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx(plus/* default */.Z, {
+                                                            className: "w-4 h-4"
+                                                        })
+                                                    })
+                                                ]
                                             })
-                                        ]
+                                        }, subproiect.ID_Subproiect);
                                     })
                                 })
                             ]
                         }),
-                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                            className: "flex justify-end",
-                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                className: "w-96 bg-green-50 p-4 rounded-lg border border-green-200",
-                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "space-y-2",
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "bg-yellow-50 p-4 rounded-lg",
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex items-center justify-between mb-4",
                                     children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-sm",
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                                            className: "text-lg font-medium text-gray-900",
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "Subtotal (fără TVA):"
+                                                /*#__PURE__*/ jsx_runtime_.jsx(calculator/* default */.Z, {
+                                                    className: "w-5 h-5 inline mr-2"
                                                 }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "font-semibold",
-                                                    children: [
-                                                        totals.subtotal,
-                                                        " RON"
-                                                    ]
-                                                })
+                                                "Linii Factură"
                                             ]
                                         }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-sm",
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                            onClick: addLinie,
+                                            className: "px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1",
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "TVA:"
+                                                /*#__PURE__*/ jsx_runtime_.jsx(plus/* default */.Z, {
+                                                    className: "w-4 h-4"
                                                 }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "font-semibold",
-                                                    children: [
-                                                        totals.totalTva,
-                                                        " RON"
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-lg font-bold border-t pt-2 border-green-300",
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "TOTAL DE PLATA:"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "text-green-600",
-                                                    children: [
-                                                        totals.totalGeneral,
-                                                        " RON"
-                                                    ]
-                                                })
+                                                "Adaugă Linie"
                                             ]
                                         })
                                     ]
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    className: "space-y-3",
+                                    children: liniiFactura.map((linie, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "grid grid-cols-12 gap-2 items-center bg-white p-3 rounded border",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                    className: "col-span-5",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "text",
+                                                        value: linie.descriere,
+                                                        onChange: (e)=>handleLinieChange(linie.id, "descriere", e.target.value),
+                                                        className: "w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent",
+                                                        placeholder: "Descriere serviciu..."
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                    className: "col-span-2",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "number",
+                                                        value: linie.cantitate,
+                                                        onChange: (e)=>handleLinieChange(linie.id, "cantitate", Number(e.target.value)),
+                                                        className: "w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent",
+                                                        min: "0",
+                                                        step: "0.01"
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                    className: "col-span-2",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "number",
+                                                        value: linie.pretUnitarFaraTVA,
+                                                        onChange: (e)=>handleLinieChange(linie.id, "pretUnitarFaraTVA", Number(e.target.value)),
+                                                        className: "w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent",
+                                                        min: "0",
+                                                        step: "0.01"
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                    className: "col-span-2",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "number",
+                                                        value: linie.totalFaraTVA.toFixed(2),
+                                                        readOnly: true,
+                                                        className: "w-full px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50"
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                    className: "col-span-1",
+                                                    children: liniiFactura.length > 1 && /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                        onClick: ()=>removeLinie(linie.id),
+                                                        className: "p-1 text-red-600 hover:bg-red-100 rounded transition-colors",
+                                                        title: "Șterge linia",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx(x/* default */.Z, {
+                                                            className: "w-4 h-4"
+                                                        })
+                                                    })
+                                                })
+                                            ]
+                                        }, linie.id))
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "grid grid-cols-12 gap-2 mt-2 text-xs font-medium text-gray-600",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-5",
+                                            children: "Descriere"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-2",
+                                            children: "Cantitate"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-2",
+                                            children: "Preț Unit (fără TVA)"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-2",
+                                            children: "Total (fără TVA)"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-1",
+                                            children: "Acțiuni"
+                                        })
+                                    ]
                                 })
+                            ]
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                            className: "bg-gray-100 p-4 rounded-lg",
+                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                className: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center",
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                className: "text-sm text-gray-600",
+                                                children: "Subtotal (fără TVA)"
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                className: "text-lg font-semibold",
+                                                children: [
+                                                    subtotal.toLocaleString("ro-RO", {
+                                                        minimumFractionDigits: 2
+                                                    }),
+                                                    " LEI"
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                className: "text-sm text-gray-600",
+                                                children: [
+                                                    "TVA (",
+                                                    rataTVANumber,
+                                                    "%)"
+                                                ]
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                className: "text-lg font-semibold",
+                                                children: [
+                                                    totalTVA.toLocaleString("ro-RO", {
+                                                        minimumFractionDigits: 2
+                                                    }),
+                                                    " LEI"
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                className: "text-sm text-gray-600",
+                                                children: "Total"
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                className: "text-xl font-bold text-blue-600",
+                                                children: [
+                                                    total.toLocaleString("ro-RO", {
+                                                        minimumFractionDigits: 2
+                                                    }),
+                                                    " LEI"
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                className: "text-sm text-gray-600",
+                                                children: "Linii factură"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                className: "text-lg font-semibold",
+                                                children: liniiFactura.length
+                                            })
+                                        ]
+                                    })
+                                ]
                             })
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                     className: "block text-sm font-medium text-gray-700 mb-2",
-                                    children: "\uD83D\uDCDD Observații (opțional)"
+                                    children: "Observații"
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
-                                    value: observatii,
-                                    onChange: (e)=>setObservatii(e.target.value),
-                                    className: "w-full p-3 border border-gray-300 rounded-lg text-sm",
+                                    name: "observatii",
+                                    value: formData.observatii,
+                                    onChange: handleInputChange,
                                     rows: 3,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none",
                                     placeholder: "Observații suplimentare pentru factură..."
                                 })
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "flex justify-between items-center pt-4 border-t border-gray-200",
+                            className: "flex gap-3 pt-4 border-t",
                             children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "text-sm text-gray-600",
-                                    children: "ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură."
+                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                    type: "button",
+                                    onClick: onClose,
+                                    className: "flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors",
+                                    disabled: loading,
+                                    children: "Anulează"
                                 }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex gap-3",
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                    onClick: generateInvoice,
+                                    className: "flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2",
+                                    disabled: loading,
                                     children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                            onClick: onClose,
-                                            disabled: isLoading,
-                                            className: "bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50",
-                                            children: "Anulează"
+                                        /*#__PURE__*/ jsx_runtime_.jsx(file_text/* default */.Z, {
+                                            className: "w-4 h-4"
                                         }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                            onClick: handleGenereazaFactura,
-                                            disabled: isLoading || !clientInfo?.cui || !clientInfo?.denumire,
-                                            className: "bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
-                                            children: isLoading ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
-                                                children: [
-                                                    "⏳ ",
-                                                    isProcessingPDF ? "Se generează PDF cu date BD..." : "Se procesează..."
-                                                ]
-                                            }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
-                                                children: "\uD83D\uDCB0 Generează Factură din BD"
-                                            })
-                                        })
+                                        loading ? "Generez PDF..." : "Generează Factură PDF"
                                     ]
                                 })
                             ]
@@ -1804,461 +1616,200 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     });
 }
 
-;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/calendar.js
+var calendar = __webpack_require__(517);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/user.js
+var user = __webpack_require__(93680);
+// EXTERNAL MODULE: ./node_modules/lucide-react/dist/esm/icons/dollar-sign.js
+var dollar_sign = __webpack_require__(66908);
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
+// app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
-// ==================================================================
-// CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
-// ==================================================================
 
 
 
-function ProiectActions({ proiect, onRefresh }) {
-    const [showFacturaModal, setShowFacturaModal] = react_experimental_default().useState(false);
-    const [showSubproiectModal, setShowSubproiectModal] = react_experimental_default().useState(false);
-    // ✅ ACTUALIZAT: Actions cu "Adauga subproiect" doar pentru proiectele principale
-    const actions = [
-        {
-            key: "view",
-            label: "Vezi Detalii",
-            icon: "\uD83D\uDC41️",
-            color: "primary"
-        },
-        {
-            key: "edit",
-            label: "Editează",
-            icon: "✏️",
-            color: "secondary"
-        },
-        {
-            key: "duplicate",
-            label: "Duplică Proiect",
-            icon: "\uD83D\uDCCB",
-            color: "secondary"
-        },
-        // ✅ NOUĂ: Adaugă subproiect doar pentru proiectele principale
-        ...proiect.tip !== "subproiect" ? [
-            {
-                key: "add_subproject",
-                label: "Adaugă Subproiect",
-                icon: "\uD83D\uDCC2",
-                color: "success",
-                disabled: proiect.Status === "Anulat" || proiect.Status === "Arhivat"
-            }
-        ] : [],
-        {
-            key: "divider1",
-            label: "",
-            icon: "",
-            color: "primary",
-            divider: true
-        },
-        {
-            key: "generate_contract",
-            label: "Generează Contract",
-            icon: "\uD83D\uDCC4",
-            color: "success",
-            disabled: proiect.Status === "Anulat"
-        },
-        {
-            key: "generate_invoice",
-            label: "Generează Factură PDF",
-            icon: "\uD83D\uDCB0",
-            color: "warning",
-            disabled: proiect.Status !== "Activ" && proiect.Status !== "Finalizat"
-        },
-        {
-            key: "send_email",
-            label: "Trimite Email Client",
-            icon: "\uD83D\uDCE7",
-            color: "primary"
-        },
-        {
-            key: "divider2",
-            label: "",
-            icon: "",
-            color: "primary",
-            divider: true
-        },
-        {
-            key: "mark_completed",
-            label: "Marchează Finalizat",
-            icon: "✅",
-            color: "success",
-            disabled: proiect.Status === "Finalizat" || proiect.Status === "Anulat"
-        },
-        {
-            key: "suspend",
-            label: "Suspendă Proiect",
-            icon: "⏸️",
-            color: "warning",
-            disabled: proiect.Status === "Suspendat" || proiect.Status === "Finalizat"
-        },
-        {
-            key: "archive",
-            label: "Arhivează Proiect",
-            icon: "\uD83D\uDCE6",
-            color: "secondary",
-            disabled: proiect.Status === "Arhivat"
-        },
-        {
-            key: "divider3",
-            label: "",
-            icon: "",
-            color: "primary",
-            divider: true
-        },
-        {
-            key: "delete",
-            label: proiect.tip === "subproiect" ? "Șterge Subproiect" : "Șterge Proiect",
-            icon: "\uD83D\uDDD1️",
-            color: "danger"
-        }
-    ];
-    const handleAction = async (actionKey)=>{
-        try {
-            switch(actionKey){
-                case "view":
-                    await handleViewDetails();
-                    break;
-                case "edit":
-                    await handleEdit();
-                    break;
-                case "duplicate":
-                    await handleDuplicate();
-                    break;
-                case "add_subproject":
-                    // ✅ NOUĂ: Deschide modalul pentru subproiect
-                    handleAddSubproject();
-                    break;
-                case "generate_contract":
-                    await handleGenerateContract();
-                    break;
-                case "generate_invoice":
-                    handleCreateInvoiceHibrid();
-                    break;
-                case "send_email":
-                    await handleSendEmail();
-                    break;
-                case "mark_completed":
-                    await handleUpdateStatus("Finalizat");
-                    break;
-                case "suspend":
-                    await handleUpdateStatus("Suspendat");
-                    break;
-                case "archive":
-                    await handleUpdateStatus("Arhivat");
-                    break;
-                case "delete":
-                    await handleDelete();
-                    break;
-                default:
-                    dist/* toast */.Am.info("Funcție \xeen dezvoltare");
-            }
-        } catch (error) {
-            console.error(`Eroare la ${actionKey}:`, error);
-            dist/* toast */.Am.error(`Eroare la executarea acțiunii: ${actionKey}`);
-        }
-    };
-    // ✅ NOUĂ FUNCȚIE: Deschide modalul pentru adăugare subproiect
-    const handleAddSubproject = ()=>{
-        setShowSubproiectModal(true);
-    };
-    const handleCreateInvoiceHibrid = ()=>{
-        setShowFacturaModal(true);
-    };
-    const handleInvoiceSuccess = (invoiceId, downloadUrl)=>{
-        setShowFacturaModal(false);
-        dist/* toast */.Am.success(`Factura ${invoiceId} a fost generată cu succes!`);
-        if (onRefresh) {
-            onRefresh();
-        }
-    };
-    const handleViewDetails = async ()=>{
-        // ✅ IMPLEMENTAT: Afișează detalii complete în toast sau modal
-        const detalii = `
-📋 ${proiect.tip === "subproiect" ? "SUBPROIECT" : "PROIECT"}: ${proiect.ID_Proiect}
-📝 Denumire: ${proiect.Denumire}
-👤 Client: ${proiect.Client}
-📊 Status: ${proiect.Status}
-💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON` : "N/A"}
-📅 Începe: ${proiect.Data_Start || "N/A"}
-📅 Finalizare: ${proiect.Data_Final || "N/A"}
-    `.trim();
-        // Afișează în toast pentru informare rapidă
-        dist/* toast */.Am.info(detalii, {
-            autoClose: 8000,
-            style: {
-                whiteSpace: "pre-line",
-                fontSize: "13px"
-            }
-        });
-        console.log("Detalii proiect:", proiect);
-    };
-    const handleEdit = async ()=>{
-        // ✅ IMPLEMENTAT: Placeholder pentru modal de editare
-        dist/* toast */.Am.info(`🔧 Editare ${proiect.tip === "subproiect" ? "subproiect" : "proiect"} ${proiect.ID_Proiect}`);
-        // TODO: Implementează modal de editare sau redirectionează la pagină de editare
-        const editUrl = proiect.tip === "subproiect" ? `/admin/rapoarte/subproiecte/${proiect.ID_Proiect}/edit` : `/admin/rapoarte/proiecte/${proiect.ID_Proiect}/edit`;
-        console.log("Ar trebui să redirectionez la:", editUrl);
-        console.log("Date pentru editare:", proiect);
-    };
-    const handleDuplicate = async ()=>{
-        const confirmed = confirm(`Sigur vrei să duplici proiectul ${proiect.ID_Proiect}?`);
-        if (!confirmed) return;
-        try {
-            const response = await fetch("/api/rapoarte/proiecte", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    ...proiect,
-                    ID_Proiect: `${proiect.ID_Proiect}_COPY_${Date.now()}`,
-                    Denumire: `${proiect.Denumire} (Copie)`,
-                    Status: "Activ"
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                dist/* toast */.Am.success("Proiect duplicat cu succes!");
-                onRefresh?.();
-            } else {
-                dist/* toast */.Am.error(result.error || "Eroare la duplicarea proiectului");
-            }
-        } catch (error) {
-            dist/* toast */.Am.error("Eroare la duplicarea proiectului");
-        }
-    };
-    const handleGenerateContract = async ()=>{
-        try {
-            dist/* toast */.Am.info("Se generează contractul...");
-            const response = await fetch("/api/actions/contracts/generate", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    proiectId: proiect.ID_Proiect
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                dist/* toast */.Am.success("Contract generat cu succes!");
-                if (result.downloadUrl) {
-                    const link = document.createElement("a");
-                    link.href = result.downloadUrl;
-                    link.download = `Contract_${proiect.ID_Proiect}.docx`;
-                    link.click();
-                }
-            } else {
-                dist/* toast */.Am.error(result.error || "Eroare la generarea contractului");
-            }
-        } catch (error) {
-            dist/* toast */.Am.error("Eroare la generarea contractului");
-        }
-    };
-    const handleSendEmail = async ()=>{
-        try {
-            const response = await fetch("/api/actions/email/send-client", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    proiectId: proiect.ID_Proiect
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                dist/* toast */.Am.success("Email trimis cu succes!");
-            } else {
-                dist/* toast */.Am.error(result.error || "Eroare la trimiterea email-ului");
-            }
-        } catch (error) {
-            dist/* toast */.Am.error("Eroare la trimiterea email-ului");
-        }
-    };
-    const handleUpdateStatus = async (newStatus)=>{
-        try {
-            const apiEndpoint = proiect.tip === "subproiect" ? "/api/rapoarte/subproiecte" : "/api/rapoarte/proiecte";
-            const response = await fetch(apiEndpoint, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    id: proiect.ID_Proiect,
-                    Status: newStatus
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                dist/* toast */.Am.success(`Status actualizat la: ${newStatus}`);
-                onRefresh?.();
-            } else {
-                dist/* toast */.Am.error(result.error || "Eroare la actualizarea statusului");
-            }
-        } catch (error) {
-            dist/* toast */.Am.error("Eroare la actualizarea statusului");
-        }
-    };
-    const handleDelete = async ()=>{
-        const itemType = proiect.tip === "subproiect" ? "subproiectul" : "proiectul";
-        const confirmed = confirm(`Sigur vrei să ștergi ${itemType} ${proiect.ID_Proiect}?`);
-        if (!confirmed) return;
-        try {
-            const apiEndpoint = proiect.tip === "subproiect" ? `/api/rapoarte/subproiecte?id=${proiect.ID_Proiect}` : `/api/rapoarte/proiecte?id=${proiect.ID_Proiect}`;
-            const response = await fetch(apiEndpoint, {
-                method: "DELETE"
-            });
-            const result = await response.json();
-            if (result.success) {
-                dist/* toast */.Am.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
-                onRefresh?.();
-            } else {
-                dist/* toast */.Am.error(result.error || `Eroare la ștergerea ${itemType}`);
-            }
-        } catch (error) {
-            dist/* toast */.Am.error(`Eroare la ștergerea ${itemType}`);
-        }
-    };
-    const getColorClass = (color)=>{
-        switch(color){
-            case "primary":
-                return "#3498db";
-            case "secondary":
-                return "#95a5a6";
-            case "success":
-                return "#27ae60";
-            case "warning":
-                return "#f39c12";
-            case "danger":
-                return "#e74c3c";
-            default:
-                return "#3498db";
-        }
-    };
-    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
-        children: [
-            /*#__PURE__*/ jsx_runtime_.jsx(EnhancedActionDropdown, {
-                actions: actions,
-                onAction: handleAction,
-                proiect: proiect,
-                getColorClass: getColorClass
-            }),
-            showFacturaModal && /*#__PURE__*/ jsx_runtime_.jsx(FacturaHibridModal, {
-                proiect: proiect,
-                onClose: ()=>setShowFacturaModal(false),
-                onSuccess: handleInvoiceSuccess
-            }),
-            showSubproiectModal && /*#__PURE__*/ jsx_runtime_.jsx(SubproiectModal, {
-                proiectParinte: proiect,
-                onClose: ()=>setShowSubproiectModal(false),
-                onSuccess: ()=>{
-                    setShowSubproiectModal(false);
-                    dist/* toast */.Am.success("Subproiect adăugat cu succes!");
-                    onRefresh?.();
-                }
-            })
-        ]
+
+
+
+
+
+function ProiectNouModal({ isOpen, onClose, onSuccess, proiectParinte, isSubproiect = false }) {
+    const [loading, setLoading] = (0,react_experimental_.useState)(false);
+    const [formData, setFormData] = (0,react_experimental_.useState)({
+        denumire: "",
+        client: proiectParinte?.Client || "",
+        status: "Planificat",
+        valoareEstimata: "",
+        dataStart: "",
+        dataFinal: "",
+        responsabil: "",
+        adresa: proiectParinte?.Adresa || "",
+        observatii: ""
     });
-}
-function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
-    // ✅ SAFE STATE: Folosește string-uri pentru toate valorile
-    const [denumire, setDenumire] = react_experimental_default().useState("");
-    const [responsabil, setResponsabil] = react_experimental_default().useState("");
-    const [dataStart, setDataStart] = react_experimental_default().useState(new Date().toISOString().split("T")[0]);
-    const [dataFinal, setDataFinal] = react_experimental_default().useState("");
-    const [valoareEstimata, setValoareEstimata] = react_experimental_default().useState("0");
-    const [status, setStatus] = react_experimental_default().useState("Activ");
-    const [isSubmitting, setIsSubmitting] = react_experimental_default().useState(false);
+    const handleInputChange = (e)=>{
+        const { name, value } = e.target;
+        setFormData((prev)=>({
+                ...prev,
+                [name]: value
+            }));
+    };
+    const validateForm = ()=>{
+        const errors = [];
+        if (!formData.denumire.trim()) {
+            errors.push("Denumirea este obligatorie");
+        }
+        if (!formData.client.trim()) {
+            errors.push("Clientul este obligatoriu");
+        }
+        if (!formData.dataStart) {
+            errors.push("Data de start este obligatorie");
+        }
+        if (!formData.dataFinal) {
+            errors.push("Data finală este obligatorie");
+        }
+        if (formData.dataStart && formData.dataFinal && new Date(formData.dataStart) > new Date(formData.dataFinal)) {
+            errors.push("Data de start nu poate fi după data finală");
+        }
+        if (formData.valoareEstimata && isNaN(Number(formData.valoareEstimata))) {
+            errors.push("Valoarea estimată trebuie să fie un număr valid");
+        }
+        return errors;
+    };
     const handleSubmit = async (e)=>{
         e.preventDefault();
-        if (!denumire.trim()) {
-            dist/* toast */.Am.error("Denumirea subproiectului este obligatorie");
+        const errors = validateForm();
+        if (errors.length > 0) {
+            dist/* toast */.Am.error(errors.join("\n"));
             return;
         }
-        setIsSubmitting(true);
+        setLoading(true);
         try {
-            const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
-            const response = await fetch("/api/rapoarte/subproiecte", {
+            // Pregătim datele pentru API - FIX PENTRU NULL VALUES
+            const dataToSend = {
+                denumire: formData.denumire.trim(),
+                client: formData.client.trim(),
+                status: formData.status,
+                valoare_estimata: formData.valoareEstimata ? Number(formData.valoareEstimata) : 0,
+                data_start: formData.dataStart,
+                data_final: formData.dataFinal,
+                responsabil: formData.responsabil.trim() || null,
+                adresa: formData.adresa.trim() || null,
+                observatii: formData.observatii.trim() || null,
+                // Pentru subproiecte
+                ...isSubproiect && proiectParinte && {
+                    id_proiect_parinte: proiectParinte.ID_Proiect
+                }
+            };
+            console.log("Trimitere date:", dataToSend);
+            const endpoint = isSubproiect ? "/api/rapoarte/subproiecte" : "/api/rapoarte/proiecte";
+            const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    ID_Subproiect: subproiectId,
-                    ID_Proiect: proiectParinte.ID_Proiect,
-                    Denumire: denumire.trim(),
-                    Responsabil: responsabil.trim() || null,
-                    Data_Start: dataStart || null,
-                    Data_Final: dataFinal || null,
-                    Valoare_Estimata: parseFloat(valoareEstimata) || null,
-                    Status: status
-                })
+                body: JSON.stringify(dataToSend)
             });
+            console.log("Response status:", response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.log("Response error text:", errorText);
+                throw new Error(`Eroare HTTP ${response.status}: ${errorText}`);
+            }
             const result = await response.json();
+            console.log("Response data proiect:", result);
             if (result.success) {
+                dist/* toast */.Am.success(`${isSubproiect ? "Subproiectul" : "Proiectul"} a fost adăugat cu succes!`);
+                // Reset form
+                setFormData({
+                    denumire: "",
+                    client: proiectParinte?.Client || "",
+                    status: "Planificat",
+                    valoareEstimata: "",
+                    dataStart: "",
+                    dataFinal: "",
+                    responsabil: "",
+                    adresa: proiectParinte?.Adresa || "",
+                    observatii: ""
+                });
                 onSuccess();
             } else {
-                dist/* toast */.Am.error(result.error || "Eroare la adăugarea subproiectului");
+                throw new Error(result.error || `Eroare la adăugarea ${isSubproiect ? "subproiectului" : "proiectului"}`);
             }
         } catch (error) {
-            dist/* toast */.Am.error("Eroare la adăugarea subproiectului");
+            console.error("Eroare la submit:", error);
+            dist/* toast */.Am.error(`Eroare la adăugarea ${isSubproiect ? "subproiectului" : "proiectului"}: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
         } finally{
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
+    if (!isOpen) return null;
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
+        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4",
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-            className: "bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+            className: "bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto",
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50",
+                    className: "flex items-center justify-between p-6 border-b border-gray-200",
                     children: [
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                    className: "text-xl font-bold text-gray-800 flex items-center gap-2",
-                                    children: "\uD83D\uDCC2 Adaugă Subproiect Nou"
-                                }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                    className: "text-sm text-gray-600 mt-1",
-                                    children: [
-                                        "Proiect părinte: ",
-                                        proiectParinte.ID_Proiect,
-                                        " - ",
-                                        proiectParinte.Denumire
-                                    ]
-                                })
-                            ]
+                        /*#__PURE__*/ jsx_runtime_.jsx("h2", {
+                            className: "text-xl font-semibold text-gray-900",
+                            children: isSubproiect ? `Adaugă Subproiect pentru "${proiectParinte?.Denumire}"` : "Adaugă Proiect Nou"
                         }),
                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                             onClick: onClose,
-                            className: "text-gray-500 hover:text-gray-700 text-xl p-1",
-                            disabled: isSubmitting,
-                            children: "✕"
+                            className: "text-gray-400 hover:text-gray-600 transition-colors",
+                            children: /*#__PURE__*/ jsx_runtime_.jsx(x/* default */.Z, {
+                                className: "w-6 h-6"
+                            })
                         })
                     ]
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
                     onSubmit: handleSubmit,
-                    className: "p-6 space-y-4",
+                    className: "p-6 space-y-6",
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
                                     className: "block text-sm font-medium text-gray-700 mb-2",
-                                    children: "Denumire Subproiect *"
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(file_text/* default */.Z, {
+                                            className: "w-4 h-4 inline mr-1"
+                                        }),
+                                        "Denumire ",
+                                        isSubproiect ? "Subproiect" : "Proiect",
+                                        " *"
+                                    ]
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                     type: "text",
-                                    value: denumire,
-                                    onChange: (e)=>setDenumire(e.target.value),
-                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
-                                    placeholder: "Introduceți denumirea subproiectului...",
+                                    name: "denumire",
+                                    value: formData.denumire,
+                                    onChange: handleInputChange,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                    placeholder: `Introduceți denumirea ${isSubproiect ? "subproiectului" : "proiectului"}...`,
+                                    required: true
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(user/* default */.Z, {
+                                            className: "w-4 h-4 inline mr-1"
+                                        }),
+                                        "Client *"
+                                    ]
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                    type: "text",
+                                    name: "client",
+                                    value: formData.client,
+                                    onChange: handleInputChange,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                    placeholder: "Introduceți numele clientului...",
                                     required: true
                                 })
                             ]
@@ -2270,31 +1821,21 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                             className: "block text-sm font-medium text-gray-700 mb-2",
-                                            children: "Responsabil"
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                            type: "text",
-                                            value: responsabil,
-                                            onChange: (e)=>setResponsabil(e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
-                                            placeholder: "Numele responsabilului..."
-                                        })
-                                    ]
-                                }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                            className: "block text-sm font-medium text-gray-700 mb-2",
-                                            children: "Status"
+                                            children: "Status *"
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                            value: status,
-                                            onChange: (e)=>setStatus(e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            name: "status",
+                                            value: formData.status,
+                                            onChange: handleInputChange,
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                    value: "Activ",
-                                                    children: "Activ"
+                                                    value: "Planificat",
+                                                    children: "Planificat"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                    value: "In progres",
+                                                    children: "\xcen progres"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("option", {
                                                     value: "Suspendat",
@@ -2303,6 +1844,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("option", {
                                                     value: "Finalizat",
                                                     children: "Finalizat"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                    value: "Anulat",
+                                                    children: "Anulat"
                                                 })
                                             ]
                                         })
@@ -2310,31 +1855,116 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
                                             className: "block text-sm font-medium text-gray-700 mb-2",
-                                            children: "Data \xcenceput"
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx(dollar_sign/* default */.Z, {
+                                                    className: "w-4 h-4 inline mr-1"
+                                                }),
+                                                "Valoare Estimată (LEI)"
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                            type: "number",
+                                            name: "valoareEstimata",
+                                            value: formData.valoareEstimata,
+                                            onChange: handleInputChange,
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                            placeholder: "0",
+                                            min: "0",
+                                            step: "0.01"
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "grid grid-cols-1 md:grid-cols-2 gap-4",
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx(calendar/* default */.Z, {
+                                                    className: "w-4 h-4 inline mr-1"
+                                                }),
+                                                "Data Start *"
+                                            ]
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
-                                            value: dataStart,
-                                            onChange: (e)=>setDataStart(e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            name: "dataStart",
+                                            value: formData.dataStart,
+                                            onChange: handleInputChange,
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                            required: true
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
                                             className: "block text-sm font-medium text-gray-700 mb-2",
-                                            children: "Data Finalizare"
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx(calendar/* default */.Z, {
+                                                    className: "w-4 h-4 inline mr-1"
+                                                }),
+                                                "Data Finală *"
+                                            ]
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
-                                            value: dataFinal,
-                                            onChange: (e)=>setDataFinal(e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            name: "dataFinal",
+                                            value: formData.dataFinal,
+                                            onChange: handleInputChange,
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                            required: true
                                         })
                                     ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(user/* default */.Z, {
+                                            className: "w-4 h-4 inline mr-1"
+                                        }),
+                                        "Responsabil"
+                                    ]
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                    type: "text",
+                                    name: "responsabil",
+                                    value: formData.responsabil,
+                                    onChange: handleInputChange,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                    placeholder: "Nume responsabil..."
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(map_pin/* default */.Z, {
+                                            className: "w-4 h-4 inline mr-1"
+                                        }),
+                                        "Adresa ",
+                                        isSubproiect ? "Subproiect" : "Proiect"
+                                    ]
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                    type: "text",
+                                    name: "adresa",
+                                    value: formData.adresa,
+                                    onChange: handleInputChange,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                    placeholder: "Adresa unde se desfășoară lucrările..."
                                 })
                             ]
                         }),
@@ -2342,88 +1972,33 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                     className: "block text-sm font-medium text-gray-700 mb-2",
-                                    children: "Valoare Estimată (RON)"
+                                    children: "Observații"
                                 }),
-                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                    type: "number",
-                                    value: valoareEstimata,
-                                    onChange: (e)=>setValoareEstimata(e.target.value),
-                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
-                                    placeholder: "0.00",
-                                    min: "0",
-                                    step: "0.01"
+                                /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
+                                    name: "observatii",
+                                    value: formData.observatii,
+                                    onChange: handleInputChange,
+                                    rows: 3,
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none",
+                                    placeholder: "Observații suplimentare..."
                                 })
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-gray-50 p-4 rounded-lg",
-                            children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("h4", {
-                                    className: "font-medium text-gray-700 mb-2",
-                                    children: "Informații Proiect Părinte:"
-                                }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-2 gap-4 text-sm text-gray-600",
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Client:"
-                                                }),
-                                                " ",
-                                                proiectParinte.Client
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Status:"
-                                                }),
-                                                " ",
-                                                proiectParinte.Status
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Valoare:"
-                                                }),
-                                                " ",
-                                                proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata} RON` : "N/A"
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                    children: "Data start:"
-                                                }),
-                                                " ",
-                                                proiectParinte.Data_Start || "N/A"
-                                            ]
-                                        })
-                                    ]
-                                })
-                            ]
-                        }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "flex justify-end gap-3 pt-4 border-t border-gray-200",
+                            className: "flex gap-3 pt-4",
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                     type: "button",
                                     onClick: onClose,
-                                    disabled: isSubmitting,
-                                    className: "bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50",
+                                    className: "flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors",
+                                    disabled: loading,
                                     children: "Anulează"
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                     type: "submit",
-                                    disabled: isSubmitting || !denumire.trim(),
-                                    className: "bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
-                                    children: isSubmitting ? /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
-                                        children: "⏳ Se adaugă..."
-                                    }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
-                                        children: "\uD83D\uDCC2 Adaugă Subproiect"
-                                    })
+                                    className: "flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                                    disabled: loading,
+                                    children: loading ? "Se adaugă..." : `Adaugă ${isSubproiect ? "Subproiect" : "Proiect"}`
                                 })
                             ]
                         })
@@ -2433,1139 +2008,222 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         })
     });
 }
-function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }) {
-    const [isOpen, setIsOpen] = react_experimental_default().useState(false);
-    const [loading, setLoading] = react_experimental_default().useState(null);
-    const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
-    const buttonRef = react_experimental_default().useRef(null);
-    // ✅ NOUĂ: Calculează poziția dropdown-ului
-    const calculateDropdownPosition = ()=>{
-        if (buttonRef.current) {
+
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+// app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+
+
+
+
+
+
+
+
+
+function ProiectActions({ proiect, onRefresh, isSubproiect = false }) {
+    const [isOpen, setIsOpen] = (0,react_experimental_.useState)(false);
+    const [isFacturaModalOpen, setIsFacturaModalOpen] = (0,react_experimental_.useState)(false);
+    const [isSubproiectModalOpen, setIsSubproiectModalOpen] = (0,react_experimental_.useState)(false);
+    const [dropdownPosition, setDropdownPosition] = (0,react_experimental_.useState)("bottom");
+    const buttonRef = (0,react_experimental_.useRef)(null);
+    const router = (0,navigation.useRouter)();
+    // Calculează poziția dropdown-ului
+    (0,react_experimental_.useEffect)(()=>{
+        if (isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceBelow = window.innerHeight - rect.bottom;
             const spaceAbove = rect.top;
-            // Dacă nu e suficient spațiu dedesubt (sub 300px) și e mai mult spațiu deasupra
-            if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+            // Dacă nu avem suficient spațiu jos (< 200px), afișează sus
+            if (spaceBelow < 200 && spaceAbove > 200) {
                 setDropdownPosition("top");
             } else {
                 setDropdownPosition("bottom");
             }
         }
-    };
-    const handleToggleDropdown = ()=>{
-        if (!isOpen) {
-            calculateDropdownPosition();
-        }
-        setIsOpen(!isOpen);
-    };
-    const handleActionClick = async (actionKey)=>{
-        if (loading) return;
-        setLoading(actionKey);
-        setIsOpen(false);
-        try {
-            await onAction(actionKey);
-        } finally{
-            setLoading(null);
-        }
-    };
-    const getStatusColor = (status)=>{
-        switch(status){
-            case "Activ":
-                return "#27ae60";
-            case "Finalizat":
-                return "#3498db";
-            case "Suspendat":
-                return "#f39c12";
-            case "Arhivat":
-                return "#95a5a6";
-            default:
-                return "#7f8c8d";
-        }
-    };
-    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-        style: {
-            position: "relative",
-            display: "inline-block"
-        },
-        children: [
-            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                onClick: ()=>setIsOpen(!isOpen),
-                disabled: loading !== null,
-                style: {
-                    padding: "6px 12px",
-                    background: loading ? "#bdc3c7" : "#3498db",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: loading ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                    fontWeight: "bold"
-                },
-                children: [
-                    loading ? "⏳" : "⚙️",
-                    " Acțiuni"
-                ]
-            }),
-            isOpen && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
-                    position: "absolute",
-                    top: "100%",
-                    right: 0,
-                    background: "white",
-                    border: "1px solid #ddd",
-                    borderRadius: "6px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    zIndex: 9999,
-                    minWidth: "220px",
-                    marginTop: "4px"
-                },
-                children: [
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        style: {
-                            padding: "12px",
-                            borderBottom: "1px solid #eee",
-                            background: "#f8f9fa"
-                        },
-                        children: [
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    fontSize: "12px",
-                                    fontWeight: "bold",
-                                    color: "#2c3e50",
-                                    marginBottom: "4px"
-                                },
-                                children: [
-                                    proiect.ID_Proiect,
-                                    proiect.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        style: {
-                                            marginLeft: "8px",
-                                            fontSize: "10px",
-                                            background: "#3498db",
-                                            color: "white",
-                                            padding: "2px 6px",
-                                            borderRadius: "3px"
-                                        },
-                                        children: "SUB"
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    fontSize: "11px",
-                                    color: "#7f8c8d"
-                                },
-                                children: [
-                                    "Status: ",
-                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        style: {
-                                            color: getStatusColor(proiect.Status),
-                                            fontWeight: "bold"
-                                        },
-                                        children: proiect.Status
-                                    })
-                                ]
-                            })
-                        ]
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                        style: {
-                            padding: "8px 0"
-                        },
-                        children: actions.map((action)=>{
-                            if (action.divider) {
-                                return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    style: {
-                                        height: "1px",
-                                        background: "#eee",
-                                        margin: "8px 0"
-                                    }
-                                }, action.key);
-                            }
-                            return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                onClick: ()=>handleActionClick(action.key),
-                                disabled: action.disabled || loading === action.key,
-                                style: {
-                                    width: "100%",
-                                    padding: "8px 12px",
-                                    background: "transparent",
-                                    border: "none",
-                                    textAlign: "left",
-                                    cursor: action.disabled || loading === action.key ? "not-allowed" : "pointer",
-                                    fontSize: "14px",
-                                    color: action.disabled ? "#bdc3c7" : action.color === "danger" ? "#e74c3c" : "#2c3e50",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    opacity: action.disabled ? 0.5 : 1,
-                                    transition: "background-color 0.2s"
-                                },
-                                onMouseOver: (e)=>{
-                                    if (!action.disabled && loading !== action.key) {
-                                        e.currentTarget.style.background = action.color === "danger" ? "#fdf2f2" : "#f8f9fa";
-                                    }
-                                },
-                                onMouseOut: (e)=>{
-                                    e.currentTarget.style.background = "transparent";
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        style: {
-                                            minWidth: "16px"
-                                        },
-                                        children: loading === action.key ? "⏳" : action.icon
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        children: action.label
-                                    })
-                                ]
-                            }, action.key);
-                        })
-                    })
-                ]
-            }),
-            isOpen && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 9998
-                },
-                onClick: ()=>setIsOpen(false)
-            })
-        ]
-    });
-}
-
-// EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx
-var ClientNouModal = __webpack_require__(14442);
-;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// ==================================================================
-// CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// MODIFICAT: Adăugat câmp Adresa pentru proiecte
-// ==================================================================
-/* __next_internal_client_entry_do_not_use__ default auto */ 
-
-
-
-function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
-    const [loading, setLoading] = (0,react_experimental_.useState)(false);
-    const [clienti, setClienti] = (0,react_experimental_.useState)([]);
-    const [showClientModal, setShowClientModal] = (0,react_experimental_.useState)(false);
-    const [clientSearch, setClientSearch] = (0,react_experimental_.useState)("");
-    const [showClientSuggestions, setShowClientSuggestions] = (0,react_experimental_.useState)(false);
-    const [formData, setFormData] = (0,react_experimental_.useState)({
-        ID_Proiect: "",
-        Denumire: "",
-        Client: "",
-        selectedClientId: "",
-        Adresa: "",
-        Descriere: "",
-        Data_Start: "",
-        Data_Final: "",
-        Status: "Activ",
-        Valoare_Estimata: "",
-        Responsabil: "",
-        Observatii: "",
-        // Pentru subproiecte
-        subproiecte: []
-    });
-    (0,react_experimental_.useEffect)(()=>{
-        if (isOpen) {
-            loadClienti();
-            // Generează ID proiect automat
-            setFormData((prev)=>({
-                    ...prev,
-                    ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`
-                }));
-        }
     }, [
         isOpen
     ]);
-    const loadClienti = async ()=>{
+    const handleVeziDetalii = ()=>{
+        console.log("Detalii proiect:", proiect);
+        // Formatează datele pentru afișare
+        const formatDate = (dateObj)=>{
+            try {
+                return new Date(dateObj.value).toLocaleDateString("ro-RO");
+            } catch  {
+                return "N/A";
+            }
+        };
+        const detalii = `
+🏗️ DETALII PROIECT
+
+📋 Denumire: ${proiect.Denumire}
+🏢 Client: ${proiect.Client}
+📊 Status: ${proiect.Status}
+💰 Valoare Estimată: ${proiect.Valoare_Estimata?.toLocaleString("ro-RO")} LEI
+📅 Data Start: ${formatDate(proiect.Data_Start)}
+📅 Data Final: ${formatDate(proiect.Data_Final)}
+👤 Responsabil: ${proiect.Responsabil || "Neatribuit"}
+📍 Adresă: ${proiect.Adresa || "Nespecificată"}
+📝 Observații: ${proiect.Observatii || "Fără observații"}
+    `.trim();
+        dist/* toast */.Am.success(detalii, {
+            duration: 8000,
+            style: {
+                background: "#f8fafc",
+                color: "#1e293b",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                fontSize: "12px",
+                whiteSpace: "pre-line",
+                maxWidth: "500px",
+                padding: "16px"
+            }
+        });
+        setIsOpen(false);
+    };
+    const handleEditeaza = ()=>{
+        console.log("Date pentru editare:", proiect);
         try {
-            const response = await fetch("/api/rapoarte/clienti");
-            const data = await response.json();
-            if (data.success) {
-                setClienti(data.data || []);
+            // Creează URL-ul pentru editare
+            const editUrl = `/admin/rapoarte/proiecte/${encodeURIComponent(proiect.ID_Proiect)}/edit`;
+            console.log("Ar trebui să redirectionez la:", editUrl);
+            // Pentru moment, afișăm un modal de confirmare
+            const confirmare = confirm(`Vrei să editezi proiectul "${proiect.Denumire}"?\n\nNOTĂ: Funcția de editare va fi implementată în următoarea versiune.`);
+            if (confirmare) {
+                // Aici va fi implementată logica de editare
+                dist/* toast */.Am.success("Funcția de editare va fi disponibilă \xeen cur\xe2nd!", {
+                    duration: 3000,
+                    icon: "⚡"
+                });
             }
         } catch (error) {
-            console.error("Eroare la \xeencărcarea clienților:", error);
+            console.error("Eroare la editare:", error);
+            dist/* toast */.Am.error("Eroare la \xeencărcarea editorului");
         }
+        setIsOpen(false);
     };
-    const handleSubmit = async (e)=>{
-        e.preventDefault();
-        setLoading(true);
+    const handleGenerareFactura = ()=>{
+        console.log("Generare factură pentru:", proiect);
+        setIsFacturaModalOpen(true);
+        setIsOpen(false);
+    };
+    const handleAdaugaSubproiect = ()=>{
+        console.log("Adaugă subproiect pentru:", proiect);
+        setIsSubproiectModalOpen(true);
+        setIsOpen(false);
+    };
+    const handleSterge = async ()=>{
+        const confirmare = confirm(`Ești sigur că vrei să ștergi ${isSubproiect ? "subproiectul" : "proiectul"}: "${proiect.Denumire}"?`);
+        if (!confirmare) return;
         try {
-            // Validări
-            if (!formData.ID_Proiect.trim()) {
-                dist/* toast */.Am.error("ID proiect este obligatoriu");
-                setLoading(false);
-                return;
-            }
-            if (!formData.Denumire.trim()) {
-                dist/* toast */.Am.error("Denumirea proiectului este obligatorie");
-                setLoading(false);
-                return;
-            }
-            if (!formData.Client.trim()) {
-                dist/* toast */.Am.error("Clientul este obligatoriu");
-                setLoading(false);
-                return;
-            }
-            console.log("Trimitere date proiect:", formData); // Debug
-            dist/* toast */.Am.info("Se adaugă proiectul...");
-            // ✅ ACTUALIZAT: Adaugă proiectul principal cu câmpul Adresa
-            const proiectData = {
-                ID_Proiect: formData.ID_Proiect.trim(),
-                Denumire: formData.Denumire.trim(),
-                Client: formData.Client.trim(),
-                Adresa: formData.Adresa.trim(),
-                Descriere: formData.Descriere.trim(),
-                Data_Start: formData.Data_Start || null,
-                Data_Final: formData.Data_Final || null,
-                Status: formData.Status,
-                Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
-                Responsabil: formData.Responsabil.trim(),
-                Observatii: formData.Observatii.trim()
-            };
-            const response = await fetch("/api/rapoarte/proiecte", {
-                method: "POST",
+            const endpoint = isSubproiect ? "/api/rapoarte/subproiecte" : "/api/rapoarte/proiecte";
+            const response = await fetch(endpoint, {
+                method: "DELETE",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(proiectData)
+                body: JSON.stringify({
+                    id: proiect.ID_Proiect
+                })
             });
-            console.log("Response status proiect:", response.status); // Debug
+            if (!response.ok) {
+                throw new Error(`Eroare HTTP: ${response.status}`);
+            }
             const result = await response.json();
-            console.log("Response data proiect:", result); // Debug
-            if (result.success || response.ok) {
-                // Adaugă subproiectele dacă există
-                if (formData.subproiecte.length > 0) {
-                    await addSubproiecte(formData.ID_Proiect);
-                }
-                dist/* toast */.Am.success("Proiect adăugat cu succes!");
-                onProiectAdded();
-                onClose();
-                resetForm();
+            if (result.success) {
+                dist/* toast */.Am.success(`${isSubproiect ? "Subproiectul" : "Proiectul"} a fost șters cu succes!`);
+                onRefresh();
             } else {
-                console.error("Eroare API proiect:", result); // Debug
-                dist/* toast */.Am.error(`Eroare: ${result.error || "Eroare necunoscută"}`);
+                throw new Error(result.error || "Eroare la ștergere");
             }
         } catch (error) {
-            console.error("Eroare la adăugarea proiectului:", error); // Debug
-            dist/* toast */.Am.error("Eroare la adăugarea proiectului");
-        } finally{
-            setLoading(false);
+            console.error("Eroare la ștergere:", error);
+            dist/* toast */.Am.error(`Eroare la ștergerea ${isSubproiect ? "subproiectului" : "proiectului"}`);
         }
+        setIsOpen(false);
     };
-    const addSubproiecte = async (proiectId)=>{
-        for (const subproiect of formData.subproiecte){
-            try {
-                const subproiectData = {
-                    ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
-                    ID_Proiect: proiectId,
-                    Denumire: subproiect.denumire,
-                    Responsabil: subproiect.responsabil,
-                    Status: subproiect.status,
-                    Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null
-                };
-                await fetch("/api/rapoarte/subproiecte", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(subproiectData)
-                });
-            } catch (error) {
-                console.error(`Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
-            }
-        }
-    };
-    const resetForm = ()=>{
-        setFormData({
-            ID_Proiect: "",
-            Denumire: "",
-            Client: "",
-            selectedClientId: "",
-            Adresa: "",
-            Descriere: "",
-            Data_Start: "",
-            Data_Final: "",
-            Status: "Activ",
-            Valoare_Estimata: "",
-            Responsabil: "",
-            Observatii: "",
-            subproiecte: []
-        });
-        setClientSearch("");
-    };
-    const handleInputChange = (field, value)=>{
-        setFormData((prev)=>({
-                ...prev,
-                [field]: value
-            }));
-    };
-    const handleClientSearch = (value)=>{
-        setClientSearch(value);
-        setFormData((prev)=>({
-                ...prev,
-                Client: value
-            }));
-        setShowClientSuggestions(value.length > 0);
-    };
-    const selectClient = (client)=>{
-        setClientSearch(client.nume);
-        setFormData((prev)=>({
-                ...prev,
-                Client: client.nume,
-                selectedClientId: client.id
-            }));
-        setShowClientSuggestions(false);
-    };
-    const filteredClients = clienti.filter((client)=>client.nume.toLowerCase().includes(clientSearch.toLowerCase())).slice(0, 5);
-    const addSubproiect = ()=>{
-        const newSubproiect = {
-            id: Date.now().toString(),
-            denumire: "",
-            responsabil: "",
-            valoare: "",
-            status: "Planificat"
-        };
-        setFormData((prev)=>({
-                ...prev,
-                subproiecte: [
-                    ...prev.subproiecte,
-                    newSubproiect
-                ]
-            }));
-    };
-    const removeSubproiect = (id)=>{
-        setFormData((prev)=>({
-                ...prev,
-                subproiecte: prev.subproiecte.filter((sub)=>sub.id !== id)
-            }));
-    };
-    const updateSubproiect = (id, field, value)=>{
-        setFormData((prev)=>({
-                ...prev,
-                subproiecte: prev.subproiecte.map((sub)=>sub.id === id ? {
-                        ...sub,
-                        [field]: value
-                    } : sub)
-            }));
-    };
-    if (!isOpen) return null;
-    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-        style: {
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.7)",
-            zIndex: 99999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem"
-        },
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
-                    background: "white",
-                    borderRadius: "8px",
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-                    maxWidth: "900px",
-                    width: "100%",
-                    maxHeight: "90vh",
-                    overflowY: "auto"
-                },
+                className: "relative",
                 children: [
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        style: {
-                            padding: "1.5rem",
-                            borderBottom: "1px solid #dee2e6",
-                            background: "#f8f9fa",
-                            borderRadius: "8px 8px 0 0"
-                        },
-                        children: [
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                        style: {
-                                            margin: 0,
-                                            color: "#2c3e50"
-                                        },
-                                        children: "\uD83D\uDCCB Adaugă Proiect Nou"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                        onClick: onClose,
-                                        disabled: loading,
-                                        style: {
-                                            background: "transparent",
-                                            border: "none",
-                                            fontSize: "24px",
-                                            cursor: "pointer",
-                                            color: "#6c757d"
-                                        },
-                                        children: "\xd7"
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                                style: {
-                                    margin: "0.5rem 0 0 0",
-                                    color: "#7f8c8d",
-                                    fontSize: "14px"
-                                },
-                                children: "Completează informațiile pentru noul proiect și subproiectele asociate"
-                            })
-                        ]
+                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                        ref: buttonRef,
+                        onClick: ()=>setIsOpen(!isOpen),
+                        className: "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
+                        title: "Acțiuni",
+                        children: /*#__PURE__*/ jsx_runtime_.jsx(ellipsis_vertical/* default */.Z, {
+                            className: "w-4 h-4"
+                        })
                     }),
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
-                        onSubmit: handleSubmit,
-                        style: {
-                            padding: "1.5rem"
-                        },
+                    isOpen && /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
                         children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                className: "fixed inset-0 z-10",
+                                onClick: ()=>setIsOpen(false)
+                            }),
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                                    gap: "1rem",
-                                    marginBottom: "1rem"
-                                },
+                                className: `absolute right-0 z-20 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 ${dropdownPosition === "top" ? "bottom-full mb-2" : "top-full mt-2"}`,
                                 children: [
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                        onClick: handleVeziDetalii,
+                                        className: "w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2",
                                         children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                style: {
-                                                    display: "block",
-                                                    marginBottom: "0.5rem",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "ID Proiect *"
+                                            /*#__PURE__*/ jsx_runtime_.jsx(eye/* default */.Z, {
+                                                className: "w-4 h-4"
                                             }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                type: "text",
-                                                value: formData.ID_Proiect,
-                                                onChange: (e)=>handleInputChange("ID_Proiect", e.target.value),
-                                                disabled: loading,
-                                                placeholder: "P202501",
-                                                style: {
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    border: "1px solid #dee2e6",
-                                                    borderRadius: "6px",
-                                                    fontSize: "14px",
-                                                    fontFamily: "monospace",
-                                                    fontWeight: "bold"
-                                                }
-                                            })
+                                            "Vezi Detalii"
                                         ]
                                     }),
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                        onClick: handleEditeaza,
+                                        className: "w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2",
                                         children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                style: {
-                                                    display: "block",
-                                                    marginBottom: "0.5rem",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Status"
+                                            /*#__PURE__*/ jsx_runtime_.jsx(pen/* default */.Z, {
+                                                className: "w-4 h-4"
                                             }),
-                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                                value: formData.Status,
-                                                onChange: (e)=>handleInputChange("Status", e.target.value),
-                                                disabled: loading,
-                                                style: {
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    border: "1px solid #dee2e6",
-                                                    borderRadius: "6px",
-                                                    fontSize: "14px"
-                                                },
-                                                children: [
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                        value: "Activ",
-                                                        children: "\uD83D\uDFE2 Activ"
-                                                    }),
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                        value: "Planificat",
-                                                        children: "\uD83D\uDCC5 Planificat"
-                                                    }),
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                        value: "Suspendat",
-                                                        children: "⏸️ Suspendat"
-                                                    })
-                                                ]
-                                            })
-                                        ]
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Denumire Proiect *"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                        type: "text",
-                                        value: formData.Denumire,
-                                        onChange: (e)=>handleInputChange("Denumire", e.target.value),
-                                        disabled: loading,
-                                        placeholder: "Numele proiectului",
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem",
-                                            border: "1px solid #dee2e6",
-                                            borderRadius: "6px",
-                                            fontSize: "14px"
-                                        }
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem",
-                                    position: "relative"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Client *"
-                                    }),
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                        style: {
-                                            display: "flex",
-                                            gap: "0.5rem"
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                style: {
-                                                    flex: 1,
-                                                    position: "relative"
-                                                },
-                                                children: [
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                        type: "text",
-                                                        value: clientSearch,
-                                                        onChange: (e)=>handleClientSearch(e.target.value),
-                                                        disabled: loading,
-                                                        placeholder: "Caută client sau scrie numele...",
-                                                        style: {
-                                                            width: "100%",
-                                                            padding: "0.75rem",
-                                                            border: "1px solid #dee2e6",
-                                                            borderRadius: "6px",
-                                                            fontSize: "14px"
-                                                        }
-                                                    }),
-                                                    showClientSuggestions && filteredClients.length > 0 && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                        style: {
-                                                            position: "absolute",
-                                                            top: "100%",
-                                                            left: 0,
-                                                            right: 0,
-                                                            background: "white",
-                                                            border: "1px solid #dee2e6",
-                                                            borderTop: "none",
-                                                            borderRadius: "0 0 6px 6px",
-                                                            boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-                                                            zIndex: 1000,
-                                                            maxHeight: "200px",
-                                                            overflowY: "auto"
-                                                        },
-                                                        children: filteredClients.map((client)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                onClick: ()=>selectClient(client),
-                                                                style: {
-                                                                    padding: "0.75rem",
-                                                                    cursor: "pointer",
-                                                                    borderBottom: "1px solid #f1f2f6",
-                                                                    fontSize: "14px"
-                                                                },
-                                                                onMouseOver: (e)=>{
-                                                                    e.currentTarget.style.background = "#f8f9fa";
-                                                                },
-                                                                onMouseOut: (e)=>{
-                                                                    e.currentTarget.style.background = "white";
-                                                                },
-                                                                children: [
-                                                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                                        style: {
-                                                                            fontWeight: "bold"
-                                                                        },
-                                                                        children: client.nume
-                                                                    }),
-                                                                    client.cui && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        style: {
-                                                                            fontSize: "12px",
-                                                                            color: "#7f8c8d"
-                                                                        },
-                                                                        children: [
-                                                                            "CUI: ",
-                                                                            client.cui
-                                                                        ]
-                                                                    })
-                                                                ]
-                                                            }, client.id))
-                                                    })
-                                                ]
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                type: "button",
-                                                onClick: ()=>setShowClientModal(true),
-                                                disabled: loading,
-                                                style: {
-                                                    padding: "0.75rem 1rem",
-                                                    background: "#27ae60",
-                                                    color: "white",
-                                                    border: "none",
-                                                    borderRadius: "6px",
-                                                    cursor: loading ? "not-allowed" : "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "bold",
-                                                    whiteSpace: "nowrap"
-                                                },
-                                                children: "+ Client Nou"
-                                            })
-                                        ]
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Adresa Proiect"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                        type: "text",
-                                        value: formData.Adresa,
-                                        onChange: (e)=>handleInputChange("Adresa", e.target.value),
-                                        disabled: loading,
-                                        placeholder: "Adresa unde se desfășoară proiectul (ex: Str. Exemplu Nr. 1, Bucuresti)",
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem",
-                                            border: "1px solid #dee2e6",
-                                            borderRadius: "6px",
-                                            fontSize: "14px"
-                                        }
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                    gap: "1rem",
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                style: {
-                                                    display: "block",
-                                                    marginBottom: "0.5rem",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Data \xcenceput"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                type: "date",
-                                                value: formData.Data_Start,
-                                                onChange: (e)=>handleInputChange("Data_Start", e.target.value),
-                                                disabled: loading,
-                                                style: {
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    border: "1px solid #dee2e6",
-                                                    borderRadius: "6px",
-                                                    fontSize: "14px"
-                                                }
-                                            })
+                                            "Editează"
                                         ]
                                     }),
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    /*#__PURE__*/ jsx_runtime_.jsx("hr", {
+                                        className: "my-1"
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                        onClick: handleGenerareFactura,
+                                        className: "w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2",
                                         children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                style: {
-                                                    display: "block",
-                                                    marginBottom: "0.5rem",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Data Finalizare"
+                                            /*#__PURE__*/ jsx_runtime_.jsx(file_text/* default */.Z, {
+                                                className: "w-4 h-4"
                                             }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                type: "date",
-                                                value: formData.Data_Final,
-                                                onChange: (e)=>handleInputChange("Data_Final", e.target.value),
-                                                disabled: loading,
-                                                style: {
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    border: "1px solid #dee2e6",
-                                                    borderRadius: "6px",
-                                                    fontSize: "14px"
-                                                }
-                                            })
+                                            "Generare Factură"
                                         ]
                                     }),
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    !isSubproiect && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                        onClick: handleAdaugaSubproiect,
+                                        className: "w-full px-4 py-2 text-left text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2",
                                         children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                style: {
-                                                    display: "block",
-                                                    marginBottom: "0.5rem",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Valoare Estimată (RON)"
+                                            /*#__PURE__*/ jsx_runtime_.jsx(plus/* default */.Z, {
+                                                className: "w-4 h-4"
                                             }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                type: "number",
-                                                value: formData.Valoare_Estimata,
-                                                onChange: (e)=>handleInputChange("Valoare_Estimata", e.target.value),
-                                                disabled: loading,
-                                                placeholder: "15000",
-                                                style: {
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    border: "1px solid #dee2e6",
-                                                    borderRadius: "6px",
-                                                    fontSize: "14px"
-                                                }
-                                            })
-                                        ]
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Responsabil"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                        type: "text",
-                                        value: formData.Responsabil,
-                                        onChange: (e)=>handleInputChange("Responsabil", e.target.value),
-                                        disabled: loading,
-                                        placeholder: "Numele responsabilului de proiect",
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem",
-                                            border: "1px solid #dee2e6",
-                                            borderRadius: "6px",
-                                            fontSize: "14px"
-                                        }
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Descriere"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
-                                        value: formData.Descriere,
-                                        onChange: (e)=>handleInputChange("Descriere", e.target.value),
-                                        disabled: loading,
-                                        placeholder: "Descrierea detaliată a proiectului...",
-                                        rows: 3,
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem",
-                                            border: "1px solid #dee2e6",
-                                            borderRadius: "6px",
-                                            fontSize: "14px",
-                                            resize: "vertical"
-                                        }
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                        style: {
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            marginBottom: "1rem"
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("h4", {
-                                                style: {
-                                                    margin: 0,
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "\uD83D\uDCCB Subproiecte"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                type: "button",
-                                                onClick: addSubproiect,
-                                                disabled: loading,
-                                                style: {
-                                                    padding: "0.5rem 1rem",
-                                                    background: "#3498db",
-                                                    color: "white",
-                                                    border: "none",
-                                                    borderRadius: "6px",
-                                                    cursor: loading ? "not-allowed" : "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "bold"
-                                                },
-                                                children: "+ Adaugă Subproiect"
-                                            })
+                                            "Adaugă Subproiect"
                                         ]
                                     }),
-                                    formData.subproiecte.map((subproiect, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                border: "1px solid #dee2e6",
-                                                borderRadius: "6px",
-                                                padding: "1rem",
-                                                marginBottom: "1rem",
-                                                background: "#f8f9fa"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                    style: {
-                                                        display: "flex",
-                                                        justifyContent: "space-between",
-                                                        alignItems: "center",
-                                                        marginBottom: "0.5rem"
-                                                    },
-                                                    children: [
-                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h5", {
-                                                            style: {
-                                                                margin: 0,
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: [
-                                                                "Subproiect #",
-                                                                index + 1
-                                                            ]
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                            type: "button",
-                                                            onClick: ()=>removeSubproiect(subproiect.id),
-                                                            disabled: loading,
-                                                            style: {
-                                                                background: "#e74c3c",
-                                                                color: "white",
-                                                                border: "none",
-                                                                borderRadius: "4px",
-                                                                padding: "0.25rem 0.5rem",
-                                                                cursor: "pointer",
-                                                                fontSize: "12px"
-                                                            },
-                                                            children: "\uD83D\uDDD1️"
-                                                        })
-                                                    ]
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                    style: {
-                                                        display: "grid",
-                                                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                                        gap: "0.5rem"
-                                                    },
-                                                    children: [
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                            type: "text",
-                                                            value: subproiect.denumire,
-                                                            onChange: (e)=>updateSubproiect(subproiect.id, "denumire", e.target.value),
-                                                            disabled: loading,
-                                                            placeholder: "Denumire subproiect",
-                                                            style: {
-                                                                padding: "0.5rem",
-                                                                border: "1px solid #dee2e6",
-                                                                borderRadius: "4px",
-                                                                fontSize: "14px"
-                                                            }
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                            type: "text",
-                                                            value: subproiect.responsabil,
-                                                            onChange: (e)=>updateSubproiect(subproiect.id, "responsabil", e.target.value),
-                                                            disabled: loading,
-                                                            placeholder: "Responsabil",
-                                                            style: {
-                                                                padding: "0.5rem",
-                                                                border: "1px solid #dee2e6",
-                                                                borderRadius: "4px",
-                                                                fontSize: "14px"
-                                                            }
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                            type: "number",
-                                                            value: subproiect.valoare,
-                                                            onChange: (e)=>updateSubproiect(subproiect.id, "valoare", e.target.value),
-                                                            disabled: loading,
-                                                            placeholder: "Valoare (RON)",
-                                                            style: {
-                                                                padding: "0.5rem",
-                                                                border: "1px solid #dee2e6",
-                                                                borderRadius: "4px",
-                                                                fontSize: "14px"
-                                                            }
-                                                        }),
-                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                                            value: subproiect.status,
-                                                            onChange: (e)=>updateSubproiect(subproiect.id, "status", e.target.value),
-                                                            disabled: loading,
-                                                            style: {
-                                                                padding: "0.5rem",
-                                                                border: "1px solid #dee2e6",
-                                                                borderRadius: "4px",
-                                                                fontSize: "14px"
-                                                            },
-                                                            children: [
-                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                    value: "Planificat",
-                                                                    children: "\uD83D\uDCC5 Planificat"
-                                                                }),
-                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                    value: "Activ",
-                                                                    children: "\uD83D\uDFE2 Activ"
-                                                                }),
-                                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                    value: "Finalizat",
-                                                                    children: "✅ Finalizat"
-                                                                })
-                                                            ]
-                                                        })
-                                                    ]
-                                                })
-                                            ]
-                                        }, subproiect.id))
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    marginBottom: "1.5rem"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                        style: {
-                                            display: "block",
-                                            marginBottom: "0.5rem",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Observații"
+                                    /*#__PURE__*/ jsx_runtime_.jsx("hr", {
+                                        className: "my-1"
                                     }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
-                                        value: formData.Observatii,
-                                        onChange: (e)=>handleInputChange("Observatii", e.target.value),
-                                        disabled: loading,
-                                        placeholder: "Observații despre proiect...",
-                                        rows: 2,
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem",
-                                            border: "1px solid #dee2e6",
-                                            borderRadius: "6px",
-                                            fontSize: "14px",
-                                            resize: "vertical"
-                                        }
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                    gap: "1rem",
-                                    paddingTop: "1rem",
-                                    borderTop: "1px solid #dee2e6"
-                                },
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                        type: "button",
-                                        onClick: onClose,
-                                        disabled: loading,
-                                        style: {
-                                            padding: "0.75rem 1.5rem",
-                                            background: "#6c757d",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "6px",
-                                            cursor: loading ? "not-allowed" : "pointer",
-                                            fontSize: "14px",
-                                            fontWeight: "bold"
-                                        },
-                                        children: "Anulează"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                        type: "submit",
-                                        disabled: loading,
-                                        style: {
-                                            padding: "0.75rem 1.5rem",
-                                            background: loading ? "#bdc3c7" : "#27ae60",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "6px",
-                                            cursor: loading ? "not-allowed" : "pointer",
-                                            fontSize: "14px",
-                                            fontWeight: "bold"
-                                        },
-                                        children: loading ? "⏳ Se adaugă..." : "\uD83D\uDCBE Adaugă Proiect"
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                        onClick: handleSterge,
+                                        className: "w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2",
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx(trash_2/* default */.Z, {
+                                                className: "w-4 h-4"
+                                            }),
+                                            "Șterge ",
+                                            isSubproiect ? "Subproiect" : "Proiect"
+                                        ]
                                     })
                                 ]
                             })
@@ -3573,567 +2231,672 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
                     })
                 ]
             }),
-            showClientModal && /*#__PURE__*/ jsx_runtime_.jsx(ClientNouModal/* default */.Z, {
-                isOpen: showClientModal,
-                onClose: ()=>setShowClientModal(false),
-                onClientAdded: ()=>{
-                    loadClienti(); // Reîncarcă lista de clienți
-                    setShowClientModal(false);
+            isFacturaModalOpen && /*#__PURE__*/ jsx_runtime_.jsx(FacturaHibridModal, {
+                proiect: proiect,
+                onClose: ()=>setIsFacturaModalOpen(false),
+                onSuccess: ()=>{
+                    setIsFacturaModalOpen(false);
+                    onRefresh();
                 }
+            }),
+            isSubproiectModalOpen && /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
+                isOpen: isSubproiectModalOpen,
+                onClose: ()=>setIsSubproiectModalOpen(false),
+                onSuccess: ()=>{
+                    setIsSubproiectModalOpen(false);
+                    onRefresh();
+                },
+                proiectParinte: proiect,
+                isSubproiect: true
             })
         ]
     });
 }
 
+// EXTERNAL MODULE: ./node_modules/xlsx/xlsx.js
+var xlsx = __webpack_require__(30259);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+// app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+
+
+
+
+
 
 
 
 
 function ProiecteTable({ searchParams }) {
-    const [proiecte, setProiecte] = (0,react_experimental_.useState)([]);
     const [loading, setLoading] = (0,react_experimental_.useState)(true);
-    const [refreshTrigger, setRefreshTrigger] = (0,react_experimental_.useState)(0);
-    const [showProiectModal, setShowProiectModal] = (0,react_experimental_.useState)(false);
+    const [proiecte, setProiecte] = (0,react_experimental_.useState)([]);
+    const [subproiecte, setSubproiecte] = (0,react_experimental_.useState)([]);
+    const [expandedProjects, setExpandedProjects] = (0,react_experimental_.useState)(new Set());
+    const [loadingRefresh, setLoadingRefresh] = (0,react_experimental_.useState)(false);
+    // Extrage valorile din searchParams
+    const searchTerm = searchParams?.search || "";
+    const statusFilter = searchParams?.status || "";
+    const clientFilter = searchParams?.client || "";
     (0,react_experimental_.useEffect)(()=>{
-        loadProiecte();
+        loadData();
     }, [
-        searchParams,
-        refreshTrigger
+        searchTerm,
+        statusFilter,
+        clientFilter
     ]);
-    // Verifică notificări pentru statusul facturii din URL
-    (0,react_experimental_.useEffect)(()=>{
-        if (searchParams?.invoice_status && searchParams?.project_id) {
-            const status = searchParams.invoice_status;
-            const projectId = searchParams.project_id;
-            switch(status){
-                case "success":
-                    dist/* toast */.Am.success(`Factură creată cu succes pentru proiectul ${projectId}!`);
-                    break;
-                case "cancelled":
-                    dist/* toast */.Am.info(`Crearea facturii pentru proiectul ${projectId} a fost anulată.`);
-                    break;
-                default:
-                    dist/* toast */.Am.info(`Status factură pentru proiectul ${projectId}: ${status}`);
-            }
-        }
-    }, [
-        searchParams
-    ]);
-    const loadProiecte = async ()=>{
+    const loadData = async ()=>{
+        setLoading(true);
         try {
-            setLoading(true);
-            // Construiește query string din searchParams
-            const queryParams = new URLSearchParams();
-            if (searchParams) {
-                Object.entries(searchParams).forEach(([key, value])=>{
-                    if (value && key !== "invoice_status" && key !== "project_id") {
-                        queryParams.append(key, value);
-                    }
-                });
-            }
-            // Încarcă proiectele principale
-            const proiecteResponse = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
-            const proiecteData = await proiecteResponse.json();
-            // Încarcă subproiectele
-            const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
-            const subproiecteData = await subproiecteResponse.json();
-            if (proiecteData.success) {
-                // Combină proiectele și subproiectele
-                const proiecteFormatate = (proiecteData.data || []).map((p)=>({
-                        ...p,
-                        tip: "proiect"
-                    }));
-                let subproiecteFormatate = [];
-                if (subproiecteData.success) {
-                    subproiecteFormatate = (subproiecteData.data || []).map((s)=>({
-                            ID_Proiect: s.ID_Subproiect,
-                            Denumire: s.Denumire,
-                            Client: s.Client || "Subproiect",
-                            Status: s.Status,
-                            Data_Start: s.Data_Start,
-                            Data_Final: s.Data_Final,
-                            Valoare_Estimata: s.Valoare_Estimata,
-                            tip: "subproiect",
-                            ID_Proiect_Parinte: s.ID_Proiect
-                        }));
-                }
-                // Combină și sortează pentru a grupa subproiectele sub proiectele părinte
-                const toateProiectele = [];
-                proiecteFormatate.forEach((proiect)=>{
-                    toateProiectele.push(proiect);
-                    // Adaugă subproiectele pentru acest proiect
-                    const subproiecteProiect = subproiecteFormatate.filter((sub)=>sub.ID_Proiect_Parinte === proiect.ID_Proiect);
-                    toateProiectele.push(...subproiecteProiect);
-                });
-                setProiecte(toateProiectele);
-            } else {
-                dist/* toast */.Am.error("Eroare la \xeencărcarea proiectelor");
-                setProiecte([]);
-            }
+            await Promise.all([
+                loadProiecte(),
+                loadSubproiecte()
+            ]);
         } catch (error) {
-            console.error("Eroare la \xeencărcarea proiectelor:", error);
-            dist/* toast */.Am.error("Eroare de conectare");
-            setProiecte([]);
+            console.error("Eroare la \xeencărcarea datelor:", error);
+            dist/* toast */.Am.error("Eroare la \xeencărcarea datelor");
         } finally{
             setLoading(false);
         }
     };
-    const handleAddProject = async (nume, client)=>{
+    const loadProiecte = async ()=>{
         try {
-            dist/* toast */.Am.info("Se adaugă proiectul...");
-            const response = await fetch("/api/rapoarte/proiecte", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
-                    Denumire: nume,
-                    Client: client,
-                    Status: "Activ",
-                    Data_Start: new Date().toISOString().split("T")[0]
-                })
-            });
+            const params = new URLSearchParams();
+            if (searchTerm) params.append("search", searchTerm);
+            const response = await fetch(`/api/rapoarte/proiecte?${params}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             const result = await response.json();
             if (result.success) {
-                dist/* toast */.Am.success("Proiect adăugat cu succes!");
-                handleRefresh();
+                setProiecte(result.proiecte || []);
             } else {
-                dist/* toast */.Am.error(result.error || "Eroare la adăugarea proiectului");
+                throw new Error(result.error || "Eroare la \xeencărcarea proiectelor");
             }
         } catch (error) {
-            dist/* toast */.Am.error("Eroare la adăugarea proiectului");
+            console.error("Eroare la \xeencărcarea proiectelor:", error);
+            throw error;
         }
     };
-    const handleRefresh = ()=>{
-        setRefreshTrigger((prev)=>prev + 1);
-    };
-    const handleExportExcel = async ()=>{
+    const loadSubproiecte = async ()=>{
         try {
-            dist/* toast */.Am.info("Se generează fișierul Excel...");
-            // Construiește query string pentru export cu aceleași filtre
-            const queryParams = new URLSearchParams();
-            if (searchParams) {
-                Object.entries(searchParams).forEach(([key, value])=>{
-                    if (value && key !== "invoice_status" && key !== "project_id") {
-                        queryParams.append(key, value);
-                    }
-                });
+            const params = new URLSearchParams();
+            if (searchTerm) params.append("search", searchTerm);
+            const response = await fetch(`/api/rapoarte/subproiecte?${params}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
-            const response = await fetch(`/api/rapoarte/proiecte/export?${queryParams.toString()}`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                // Obține numele fișierului din header sau folosește unul default
-                const contentDisposition = response.headers.get("Content-Disposition");
-                const fileName = contentDisposition ? contentDisposition.split("filename=")[1]?.replace(/"/g, "") : `Proiecte_${new Date().toISOString().split("T")[0]}.xlsx`;
-                link.download = fileName;
-                link.click();
-                window.URL.revokeObjectURL(url);
-                dist/* toast */.Am.success("Fișier Excel descărcat cu succes!");
+            const result = await response.json();
+            if (result.success) {
+                setSubproiecte(result.subproiecte || []);
             } else {
-                const errorData = await response.json();
-                dist/* toast */.Am.error(`Eroare la export: ${errorData.error}`);
+                console.warn("Eroare la \xeencărcarea subproiectelor:", result.error);
+                setSubproiecte([]);
             }
         } catch (error) {
-            console.error("Eroare la exportul Excel:", error);
-            dist/* toast */.Am.error("Eroare la exportul Excel");
+            console.error("Eroare la \xeencărcarea subproiectelor:", error);
+            setSubproiecte([]);
         }
     };
-    const formatDate = (dateString)=>{
-        if (!dateString) return "";
+    const handleRefresh = async ()=>{
+        setLoadingRefresh(true);
         try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return "";
-            return date.toLocaleDateString("ro-RO", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit"
-            });
+            await loadData();
+            dist/* toast */.Am.success("Date actualizate!");
+        } catch (error) {
+            console.error("Eroare la refresh:", error);
+            dist/* toast */.Am.error("Eroare la actualizarea datelor");
+        } finally{
+            setLoadingRefresh(false);
+        }
+    };
+    const toggleProjectExpansion = (proiectId)=>{
+        setExpandedProjects((prev)=>{
+            const newSet = new Set(prev);
+            if (newSet.has(proiectId)) {
+                newSet.delete(proiectId);
+            } else {
+                newSet.add(proiectId);
+            }
+            return newSet;
+        });
+    };
+    const getSubproiecteForProject = (proiectId)=>{
+        return subproiecte.filter((sub)=>sub.ID_Proiect === proiectId);
+    };
+    const formatDate = (dateObj)=>{
+        try {
+            return new Date(dateObj.value).toLocaleDateString("ro-RO");
         } catch  {
-            return "";
+            return "N/A";
         }
     };
     const formatCurrency = (amount)=>{
-        if (!amount && amount !== 0) return "";
-        return new Intl.NumberFormat("ro-RO", {
-            style: "currency",
-            currency: "RON"
-        }).format(amount);
+        return amount?.toLocaleString("ro-RO", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }) + " LEI";
     };
-    const getStatusColor = (status)=>{
-        switch(status){
-            case "Activ":
-                return "#27ae60";
-            case "Finalizat":
-                return "#3498db";
-            case "Suspendat":
-                return "#f39c12";
-            case "Arhivat":
-                return "#95a5a6";
-            default:
-                return "#7f8c8d";
-        }
+    const getStatusBadge = (status)=>{
+        const statusConfig = {
+            "Planificat": "bg-blue-100 text-blue-800",
+            "In progres": "bg-yellow-100 text-yellow-800",
+            "Suspendat": "bg-red-100 text-red-800",
+            "Finalizat": "bg-green-100 text-green-800",
+            "Anulat": "bg-gray-100 text-gray-800"
+        };
+        return /*#__PURE__*/ jsx_runtime_.jsx("span", {
+            className: `px-2 py-1 text-xs font-medium rounded-full ${statusConfig[status] || "bg-gray-100 text-gray-800"}`,
+            children: status
+        });
     };
-    const getStatusIcon = (status)=>{
-        switch(status){
-            case "Activ":
-                return "\uD83D\uDFE2";
-            case "Finalizat":
-                return "✅";
-            case "Suspendat":
-                return "⏸️";
-            case "Arhivat":
-                return "\uD83D\uDCE6";
-            default:
-                return "⚪";
+    // Filtrare proiecte
+    const filteredProiecte = proiecte.filter((proiect)=>{
+        if (statusFilter && proiect.Status !== statusFilter) return false;
+        if (clientFilter && !proiect.Client.toLowerCase().includes(clientFilter.toLowerCase())) return false;
+        return true;
+    });
+    const exportToExcel = ()=>{
+        try {
+            const exportData = [];
+            filteredProiecte.forEach((proiect)=>{
+                // Adaugă proiectul principal
+                exportData.push({
+                    "Tip": "Proiect",
+                    "ID": proiect.ID_Proiect,
+                    "Denumire": proiect.Denumire,
+                    "Client": proiect.Client,
+                    "Status": proiect.Status,
+                    "Valoare Estimată (LEI)": proiect.Valoare_Estimata || 0,
+                    "Data Start": formatDate(proiect.Data_Start),
+                    "Data Final": formatDate(proiect.Data_Final),
+                    "Responsabil": proiect.Responsabil || "Neatribuit",
+                    "Adresă": proiect.Adresa || "Nespecificată"
+                });
+                // Adaugă subproiectele
+                const subproiecteProiect = getSubproiecteForProject(proiect.ID_Proiect);
+                subproiecteProiect.forEach((subproiect)=>{
+                    exportData.push({
+                        "Tip": "Subproiect",
+                        "ID": subproiect.ID_Subproiect,
+                        "Denumire": `  → ${subproiect.Denumire}`,
+                        "Client": subproiect.Client,
+                        "Status": subproiect.Status,
+                        "Valoare Estimată (LEI)": subproiect.Valoare_Estimata || 0,
+                        "Data Start": formatDate(subproiect.Data_Start),
+                        "Data Final": formatDate(subproiect.Data_Final),
+                        "Responsabil": subproiect.Responsabil || "Neatribuit",
+                        "Adresă": subproiect.Adresa || "Nespecificată"
+                    });
+                });
+            });
+            const wb = xlsx.utils.book_new();
+            const ws = xlsx.utils.json_to_sheet(exportData);
+            // Setare lățimi coloane
+            const colWidths = [
+                {
+                    wch: 12
+                },
+                {
+                    wch: 25
+                },
+                {
+                    wch: 40
+                },
+                {
+                    wch: 20
+                },
+                {
+                    wch: 12
+                },
+                {
+                    wch: 15
+                },
+                {
+                    wch: 12
+                },
+                {
+                    wch: 12
+                },
+                {
+                    wch: 15
+                },
+                {
+                    wch: 30
+                } // Adresă
+            ];
+            ws["!cols"] = colWidths;
+            xlsx.utils.book_append_sheet(wb, ws, "Proiecte & Subproiecte");
+            const filename = `Proiecte_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            xlsx.writeFile(wb, filename);
+            dist/* toast */.Am.success("\uD83D\uDCCA Export Excel realizat cu succes!");
+        } catch (error) {
+            console.error("Eroare la export:", error);
+            dist/* toast */.Am.error("Eroare la exportul Excel");
         }
     };
     if (loading) {
         return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-            style: {
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "300px",
-                fontSize: "16px",
-                color: "#7f8c8d"
-            },
-            children: "⏳ Se \xeencarcă proiectele..."
+            className: "bg-white rounded-lg shadow-sm border border-gray-200 p-8",
+            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                className: "text-center",
+                children: [
+                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        className: "animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                        className: "text-gray-600",
+                        children: "Se \xeencarcă proiectele..."
+                    })
+                ]
+            })
         });
     }
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        className: "bg-white rounded-lg shadow-sm border border-gray-200",
         children: [
-            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "1.5rem",
-                    padding: "1rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6"
-                },
-                children: [
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        children: [
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
-                                style: {
-                                    margin: 0,
-                                    color: "#2c3e50"
-                                },
-                                children: [
-                                    "\uD83D\uDCCB Proiecte găsite: ",
-                                    proiecte.filter((p)=>p.tip === "proiect").length,
-                                    proiecte.filter((p)=>p.tip === "subproiect").length > 0 && ` (+ ${proiecte.filter((p)=>p.tip === "subproiect").length} subproiecte)`
-                                ]
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                                style: {
-                                    margin: "0.25rem 0 0 0",
-                                    fontSize: "14px",
-                                    color: "#7f8c8d"
-                                },
-                                children: searchParams && Object.keys(searchParams).length > 0 ? "Rezultate filtrate" : "Toate proiectele și subproiectele"
-                            })
-                        ]
-                    }),
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        style: {
-                            display: "flex",
-                            gap: "0.5rem"
-                        },
-                        children: [
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: ()=>setShowProiectModal(true),
-                                style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#27ae60",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    fontWeight: "bold"
-                                },
-                                children: "+ Proiect Nou"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: handleRefresh,
-                                style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#3498db",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    fontWeight: "bold"
-                                },
-                                children: "\uD83D\uDD04 Re\xeemprospătează"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: handleExportExcel,
-                                style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#f39c12",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    fontWeight: "bold"
-                                },
-                                children: "\uD83D\uDCCA Export Excel"
-                            })
-                        ]
-                    })
-                ]
-            }),
-            proiecte.length === 0 ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
-                    textAlign: "center",
-                    padding: "3rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "2px dashed #dee2e6"
-                },
-                children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        style: {
-                            fontSize: "18px",
-                            color: "#7f8c8d",
-                            margin: 0
-                        },
-                        children: "\uD83D\uDCCB Nu au fost găsite proiecte"
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        style: {
-                            fontSize: "14px",
-                            color: "#bdc3c7",
-                            margin: "0.5rem 0 0 0"
-                        },
-                        children: "Verifică filtrele aplicate sau adaugă proiecte noi."
-                    })
-                ]
-            }) : /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    background: "white",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6",
-                    overflow: "visible",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                    position: "relative" // Adăugat pentru context stacking
-                },
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                className: "px-6 py-4 border-b border-gray-200 bg-gray-50",
                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    style: {
-                        overflow: "auto"
-                    },
+                    className: "flex items-center justify-between",
                     children: [
-                        " ",
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
-                            style: {
-                                width: "100%",
-                                borderCollapse: "collapse",
-                                fontSize: "14px"
-                            },
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "flex items-center gap-4",
                             children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("thead", {
-                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                        style: {
-                                            background: "#f8f9fa",
-                                            borderBottom: "2px solid #dee2e6"
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "left",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "ID Proiect"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "left",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Denumire"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "left",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Client"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Status"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Data \xcenceput"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "right",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Valoare Estimată"
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                style: {
-                                                    padding: "1rem 0.75rem",
-                                                    textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
-                                                },
-                                                children: "Acțiuni"
-                                            })
-                                        ]
-                                    })
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                                    className: "text-lg font-medium text-gray-900",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(building_2/* default */.Z, {
+                                            className: "w-5 h-5 inline mr-2"
+                                        }),
+                                        "Proiecte & Subproiecte"
+                                    ]
                                 }),
-                                /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
-                                    children: proiecte.map((proiect, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                            style: {
-                                                borderBottom: "1px solid #f1f2f6",
-                                                background: index % 2 === 0 ? "white" : "#fafbfc"
-                                            },
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex items-center gap-2 text-sm text-gray-600",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                             children: [
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        fontFamily: "monospace",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50",
-                                                        paddingLeft: proiect.tip === "subproiect" ? "2rem" : "0.75rem"
-                                                    },
-                                                    children: [
-                                                        proiect.tip === "subproiect" && "└─ ",
-                                                        proiect.ID_Proiect,
-                                                        proiect.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                            style: {
-                                                                fontSize: "10px",
-                                                                color: "#7f8c8d",
-                                                                marginLeft: "0.5rem"
-                                                            },
-                                                            children: "(Sub)"
-                                                        })
-                                                    ]
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        color: "#2c3e50",
-                                                        maxWidth: "250px",
-                                                        paddingLeft: proiect.tip === "subproiect" ? "2rem" : "0.75rem"
-                                                    },
-                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                        style: {
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis",
-                                                            whiteSpace: "nowrap",
-                                                            fontStyle: proiect.tip === "subproiect" ? "italic" : "normal"
-                                                        },
-                                                        title: proiect.Denumire,
-                                                        children: proiect.Denumire
-                                                    })
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: proiect.Client
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        textAlign: "center"
-                                                    },
-                                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                        style: {
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            gap: "0.25rem",
-                                                            padding: "0.25rem 0.5rem",
-                                                            borderRadius: "12px",
-                                                            fontSize: "12px",
-                                                            fontWeight: "bold",
-                                                            color: "white",
-                                                            background: getStatusColor(proiect.Status)
-                                                        },
-                                                        children: [
-                                                            getStatusIcon(proiect.Status),
-                                                            " ",
-                                                            proiect.Status
-                                                        ]
-                                                    })
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        textAlign: "center",
-                                                        color: "#7f8c8d",
-                                                        fontFamily: "monospace"
-                                                    },
-                                                    children: formatDate(proiect.Data_Start)
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        textAlign: "right",
-                                                        fontWeight: "bold",
-                                                        color: proiect.Valoare_Estimata ? "#27ae60" : "#bdc3c7"
-                                                    },
-                                                    children: formatCurrency(proiect.Valoare_Estimata)
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        textAlign: "center",
-                                                        position: "relative" // Important pentru dropdown positioning
-                                                    },
-                                                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
-                                                        proiect: proiect,
-                                                        onRefresh: handleRefresh
-                                                    })
-                                                })
+                                                filteredProiecte.length,
+                                                " proiecte"
                                             ]
-                                        }, `${proiect.tip}-${proiect.ID_Proiect}`))
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                            children: "•"
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                            children: [
+                                                subproiecte.length,
+                                                " subproiecte"
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "flex items-center gap-2",
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                    onClick: handleRefresh,
+                                    disabled: loadingRefresh,
+                                    className: "px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1",
+                                    title: "Actualizează datele",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(refresh_cw/* default */.Z, {
+                                            className: `w-4 h-4 ${loadingRefresh ? "animate-spin" : ""}`
+                                        }),
+                                        "Actualizează"
+                                    ]
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                    onClick: exportToExcel,
+                                    className: "px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1",
+                                    title: "Export Excel",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(download/* default */.Z, {
+                                            className: "w-4 h-4"
+                                        }),
+                                        "Export Excel"
+                                    ]
                                 })
                             ]
                         })
                     ]
                 })
             }),
-            /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
-                isOpen: showProiectModal,
-                onClose: ()=>setShowProiectModal(false),
-                onProiectAdded: handleRefresh
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                className: "overflow-x-auto",
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
+                    className: "w-full",
+                    children: [
+                        /*#__PURE__*/ jsx_runtime_.jsx("thead", {
+                            className: "bg-gray-50 border-b border-gray-200",
+                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Proiect / Subproiect"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Client"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Status"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Valoare Estimată"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Perioada"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Responsabil"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                        className: "px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider",
+                                        children: "Acțiuni"
+                                    })
+                                ]
+                            })
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
+                            className: "bg-white divide-y divide-gray-200",
+                            children: filteredProiecte.length === 0 ? /*#__PURE__*/ jsx_runtime_.jsx("tr", {
+                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
+                                    colSpan: 7,
+                                    className: "px-6 py-8 text-center text-gray-500",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx(search/* default */.Z, {
+                                            className: "w-8 h-8 mx-auto mb-2 text-gray-400"
+                                        }),
+                                        "Nu s-au găsit proiecte care să corespundă filtrelor aplicaţe."
+                                    ]
+                                })
+                            }) : filteredProiecte.map((proiect)=>{
+                                const subproiecteProiect = getSubproiecteForProject(proiect.ID_Proiect);
+                                const isExpanded = expandedProjects.has(proiect.ID_Proiect);
+                                const hasSubprojects = subproiecteProiect.length > 0;
+                                return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                            className: "hover:bg-gray-50 transition-colors",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                    className: "px-6 py-4",
+                                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                        className: "flex items-center",
+                                                        children: [
+                                                            hasSubprojects && /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                                onClick: ()=>toggleProjectExpansion(proiect.ID_Proiect),
+                                                                className: "mr-2 p-1 rounded hover:bg-gray-200 transition-colors",
+                                                                children: isExpanded ? /*#__PURE__*/ jsx_runtime_.jsx(chevron_down/* default */.Z, {
+                                                                    className: "w-4 h-4 text-gray-600"
+                                                                }) : /*#__PURE__*/ jsx_runtime_.jsx(chevron_right/* default */.Z, {
+                                                                    className: "w-4 h-4 text-gray-600"
+                                                                })
+                                                            }),
+                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                className: "flex-1",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                        className: "flex items-center gap-2",
+                                                                        children: [
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx(building_2/* default */.Z, {
+                                                                                className: "w-4 h-4 text-blue-600"
+                                                                            }),
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                                                className: "text-sm font-medium text-gray-900",
+                                                                                children: proiect.Denumire
+                                                                            })
+                                                                        ]
+                                                                    }),
+                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                        className: "text-xs text-gray-500 mt-1",
+                                                                        children: [
+                                                                            "ID: ",
+                                                                            proiect.ID_Proiect
+                                                                        ]
+                                                                    }),
+                                                                    hasSubprojects && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                        className: "text-xs text-blue-600 mt-1",
+                                                                        children: [
+                                                                            subproiecteProiect.length,
+                                                                            " subproiect",
+                                                                            subproiecteProiect.length !== 1 ? "e" : ""
+                                                                        ]
+                                                                    })
+                                                                ]
+                                                            })
+                                                        ]
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
+                                                    className: "px-6 py-4",
+                                                    children: [
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                            className: "text-sm text-gray-900",
+                                                            children: proiect.Client
+                                                        }),
+                                                        proiect.Adresa && /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                            className: "text-xs text-gray-500 mt-1",
+                                                            children: proiect.Adresa
+                                                        })
+                                                    ]
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                    className: "px-6 py-4",
+                                                    children: getStatusBadge(proiect.Status)
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                    className: "px-6 py-4",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                        className: "text-sm font-medium text-gray-900",
+                                                        children: formatCurrency(proiect.Valoare_Estimata || 0)
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
+                                                    className: "px-6 py-4",
+                                                    children: [
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                            className: "text-sm text-gray-900",
+                                                            children: formatDate(proiect.Data_Start)
+                                                        }),
+                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                            className: "text-xs text-gray-500",
+                                                            children: [
+                                                                "→ ",
+                                                                formatDate(proiect.Data_Final)
+                                                            ]
+                                                        })
+                                                    ]
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                    className: "px-6 py-4",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                        className: "text-sm text-gray-900",
+                                                        children: proiect.Responsabil || "Neatribuit"
+                                                    })
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                    className: "px-6 py-4 text-right",
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
+                                                        proiect: proiect,
+                                                        onRefresh: loadData,
+                                                        isSubproiect: false
+                                                    })
+                                                })
+                                            ]
+                                        }, proiect.ID_Proiect),
+                                        isExpanded && subproiecteProiect.map((subproiect)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                                className: "bg-blue-25 hover:bg-blue-50 transition-colors border-l-4 border-blue-200",
+                                                children: [
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                        className: "px-6 py-3",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                            className: "flex items-center ml-8",
+                                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                className: "flex-1",
+                                                                children: [
+                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                        className: "flex items-center gap-2",
+                                                                        children: [
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx(users/* default */.Z, {
+                                                                                className: "w-3 h-3 text-blue-500"
+                                                                            }),
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                                                className: "text-sm text-gray-800",
+                                                                                children: subproiect.Denumire
+                                                                            })
+                                                                        ]
+                                                                    }),
+                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                        className: "text-xs text-gray-500 mt-1",
+                                                                        children: [
+                                                                            "ID: ",
+                                                                            subproiect.ID_Subproiect
+                                                                        ]
+                                                                    })
+                                                                ]
+                                                            })
+                                                        })
+                                                    }),
+                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
+                                                        className: "px-6 py-3",
+                                                        children: [
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                                className: "text-sm text-gray-700",
+                                                                children: subproiect.Client
+                                                            }),
+                                                            subproiect.Adresa && /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                                className: "text-xs text-gray-500 mt-1",
+                                                                children: subproiect.Adresa
+                                                            })
+                                                        ]
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                        className: "px-6 py-3",
+                                                        children: getStatusBadge(subproiect.Status)
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                        className: "px-6 py-3",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                            className: "text-sm font-medium text-gray-800",
+                                                            children: formatCurrency(subproiect.Valoare_Estimata || 0)
+                                                        })
+                                                    }),
+                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
+                                                        className: "px-6 py-3",
+                                                        children: [
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                                className: "text-sm text-gray-800",
+                                                                children: formatDate(subproiect.Data_Start)
+                                                            }),
+                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                                                className: "text-xs text-gray-500",
+                                                                children: [
+                                                                    "→ ",
+                                                                    formatDate(subproiect.Data_Final)
+                                                                ]
+                                                            })
+                                                        ]
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                        className: "px-6 py-3",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                                            className: "text-sm text-gray-800",
+                                                            children: subproiect.Responsabil || "Neatribuit"
+                                                        })
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                        className: "px-6 py-3 text-right",
+                                                        children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
+                                                            proiect: {
+                                                                ID_Proiect: subproiect.ID_Subproiect,
+                                                                Denumire: subproiect.Denumire,
+                                                                Client: subproiect.Client,
+                                                                Status: subproiect.Status,
+                                                                Valoare_Estimata: subproiect.Valoare_Estimata,
+                                                                Data_Start: subproiect.Data_Start,
+                                                                Data_Final: subproiect.Data_Final,
+                                                                Responsabil: subproiect.Responsabil,
+                                                                Adresa: subproiect.Adresa,
+                                                                Observatii: subproiect.Observatii
+                                                            },
+                                                            onRefresh: loadData,
+                                                            isSubproiect: true
+                                                        })
+                                                    })
+                                                ]
+                                            }, subproiect.ID_Subproiect))
+                                    ]
+                                });
+                            })
+                        })
+                    ]
+                })
+            }),
+            filteredProiecte.length > 0 && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                className: "px-6 py-4 border-t border-gray-200 bg-gray-50",
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    className: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center",
+                    children: [
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-sm text-gray-600",
+                                    children: "Total Proiecte"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-lg font-semibold text-gray-900",
+                                    children: filteredProiecte.length
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-sm text-gray-600",
+                                    children: "Total Subproiecte"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-lg font-semibold text-blue-600",
+                                    children: subproiecte.length
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-sm text-gray-600",
+                                    children: "Valoare Totală Proiecte"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-lg font-semibold text-green-600",
+                                    children: formatCurrency(filteredProiecte.reduce((sum, p)=>sum + (p.Valoare_Estimata || 0), 0))
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-sm text-gray-600",
+                                    children: "Valoare Totală Subproiecte"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                    className: "text-lg font-semibold text-purple-600",
+                                    children: formatCurrency(subproiecte.reduce((sum, s)=>sum + (s.Valoare_Estimata || 0), 0))
+                                })
+                            ]
+                        })
+                    ]
+                })
             })
         ]
     });
@@ -4327,7 +3090,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549,4442], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,2712,8313,9850,6166,6549], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();

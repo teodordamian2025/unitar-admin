@@ -1,821 +1,276 @@
+// app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 'use client';
 
-// ==================================================================
-// CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
-// ==================================================================
-
-import React from 'react';
-import { toast } from 'react-toastify';
+import { useState, useRef, useEffect } from 'react';
+import { MoreVertical, FileText, Eye, Edit2, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import FacturaHibridModal from './FacturaHibridModal';
+import ProiectNouModal from './ProiectNouModal';
+import { useRouter } from 'next/navigation';
 
-interface ActionItem {
-  key: string;
-  label: string;
-  icon: string;
-  color: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
-  disabled?: boolean;
-  divider?: boolean;
+interface Proiect {
+  ID_Proiect: string;
+  Denumire: string;
+  Client: string;
+  Status: string;
+  Valoare_Estimata: number;
+  Data_Start: { value: string };
+  Data_Final: { value: string };
+  Responsabil?: string;
+  Adresa?: string;
+  Observatii?: string;
 }
 
 interface ProiectActionsProps {
-  proiect: {
-    ID_Proiect: string;
-    Denumire: string;
-    Client: string;
-    Status: string;
-    Valoare_Estimata?: number;
-    Data_Start?: string;
-    Data_Final?: string;
-    tip?: 'proiect' | 'subproiect'; // Pentru a diferenția tipul
-  };
-  onRefresh?: () => void;
+  proiect: Proiect;
+  onRefresh: () => void;
+  isSubproiect?: boolean;
 }
 
-export default function ProiectActions({ proiect, onRefresh }: ProiectActionsProps) {
-  const [showFacturaModal, setShowFacturaModal] = React.useState(false);
-  const [showSubproiectModal, setShowSubproiectModal] = React.useState(false);
+export default function ProiectActions({ proiect, onRefresh, isSubproiect = false }: ProiectActionsProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isFacturaModalOpen, setIsFacturaModalOpen] = useState(false);
+  const [isSubproiectModalOpen, setIsSubproiectModalOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
 
-  // ✅ ACTUALIZAT: Actions cu "Adauga subproiect" doar pentru proiectele principale
-  const actions: ActionItem[] = [
-    {
-      key: 'view',
-      label: 'Vezi Detalii',
-      icon: '👁️',
-      color: 'primary'
-    },
-    {
-      key: 'edit',
-      label: 'Editează',
-      icon: '✏️',
-      color: 'secondary'
-    },
-    {
-      key: 'duplicate',
-      label: 'Duplică Proiect',
-      icon: '📋',
-      color: 'secondary'
-    },
-    // ✅ NOUĂ: Adaugă subproiect doar pentru proiectele principale
-    ...(proiect.tip !== 'subproiect' ? [{
-      key: 'add_subproject',
-      label: 'Adaugă Subproiect',
-      icon: '📂',
-      color: 'success' as const,
-      disabled: proiect.Status === 'Anulat' || proiect.Status === 'Arhivat'
-    }] : []),
-    {
-      key: 'divider1',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'generate_contract',
-      label: 'Generează Contract',
-      icon: '📄',
-      color: 'success',
-      disabled: proiect.Status === 'Anulat'
-    },
-    {
-      key: 'generate_invoice',
-      label: 'Generează Factură PDF',
-      icon: '💰',
-      color: 'warning',
-      disabled: proiect.Status !== 'Activ' && proiect.Status !== 'Finalizat'
-    },
-    {
-      key: 'send_email',
-      label: 'Trimite Email Client',
-      icon: '📧',
-      color: 'primary'
-    },
-    {
-      key: 'divider2',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'mark_completed',
-      label: 'Marchează Finalizat',
-      icon: '✅',
-      color: 'success',
-      disabled: proiect.Status === 'Finalizat' || proiect.Status === 'Anulat'
-    },
-    {
-      key: 'suspend',
-      label: 'Suspendă Proiect',
-      icon: '⏸️',
-      color: 'warning',
-      disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
-    },
-    {
-      key: 'archive',
-      label: 'Arhivează Proiect',
-      icon: '📦',
-      color: 'secondary',
-      disabled: proiect.Status === 'Arhivat'
-    },
-    {
-      key: 'divider3',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'delete',
-      label: proiect.tip === 'subproiect' ? 'Șterge Subproiect' : 'Șterge Proiect',
-      icon: '🗑️',
-      color: 'danger'
-    }
-  ];
-
-  const handleAction = async (actionKey: string) => {
-    try {
-      switch (actionKey) {
-        case 'view':
-          await handleViewDetails();
-          break;
-        case 'edit':
-          await handleEdit();
-          break;
-        case 'duplicate':
-          await handleDuplicate();
-          break;
-        case 'add_subproject':
-          // ✅ NOUĂ: Deschide modalul pentru subproiect
-          handleAddSubproject();
-          break;
-        case 'generate_contract':
-          await handleGenerateContract();
-          break;
-        case 'generate_invoice':
-          handleCreateInvoiceHibrid();
-          break;
-        case 'send_email':
-          await handleSendEmail();
-          break;
-        case 'mark_completed':
-          await handleUpdateStatus('Finalizat');
-          break;
-        case 'suspend':
-          await handleUpdateStatus('Suspendat');
-          break;
-        case 'archive':
-          await handleUpdateStatus('Arhivat');
-          break;
-        case 'delete':
-          await handleDelete();
-          break;
-        default:
-          toast.info('Funcție în dezvoltare');
-      }
-    } catch (error) {
-      console.error(`Eroare la ${actionKey}:`, error);
-      toast.error(`Eroare la executarea acțiunii: ${actionKey}`);
-    }
-  };
-
-  // ✅ NOUĂ FUNCȚIE: Deschide modalul pentru adăugare subproiect
-  const handleAddSubproject = () => {
-    setShowSubproiectModal(true);
-  };
-
-  const handleCreateInvoiceHibrid = () => {
-    setShowFacturaModal(true);
-  };
-
-  const handleInvoiceSuccess = (invoiceId: string, downloadUrl: string) => {
-    setShowFacturaModal(false);
-    toast.success(`Factura ${invoiceId} a fost generată cu succes!`);
-    
-    if (onRefresh) {
-      onRefresh();
-    }
-  };
-
-  const handleViewDetails = async () => {
-    // ✅ IMPLEMENTAT: Afișează detalii complete în toast sau modal
-    const detalii = `
-📋 ${proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT'}: ${proiect.ID_Proiect}
-📝 Denumire: ${proiect.Denumire}
-👤 Client: ${proiect.Client}
-📊 Status: ${proiect.Status}
-💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON` : 'N/A'}
-📅 Începe: ${proiect.Data_Start || 'N/A'}
-📅 Finalizare: ${proiect.Data_Final || 'N/A'}
-    `.trim();
-    
-    // Afișează în toast pentru informare rapidă
-    toast.info(detalii, {
-      autoClose: 8000,
-      style: { whiteSpace: 'pre-line', fontSize: '13px' }
-    });
-    
-    console.log('Detalii proiect:', proiect);
-  };
-
-  const handleEdit = async () => {
-    // ✅ IMPLEMENTAT: Placeholder pentru modal de editare
-    toast.info(`🔧 Editare ${proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'} ${proiect.ID_Proiect}`);
-    
-    // TODO: Implementează modal de editare sau redirectionează la pagină de editare
-    const editUrl = proiect.tip === 'subproiect' 
-      ? `/admin/rapoarte/subproiecte/${proiect.ID_Proiect}/edit`
-      : `/admin/rapoarte/proiecte/${proiect.ID_Proiect}/edit`;
-    
-    console.log('Ar trebui să redirectionez la:', editUrl);
-    console.log('Date pentru editare:', proiect);
-  };
-
-  const handleDuplicate = async () => {
-    const confirmed = confirm(`Sigur vrei să duplici proiectul ${proiect.ID_Proiect}?`);
-    if (!confirmed) return;
-
-    try {
-      const response = await fetch('/api/rapoarte/proiecte', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...proiect,
-          ID_Proiect: `${proiect.ID_Proiect}_COPY_${Date.now()}`,
-          Denumire: `${proiect.Denumire} (Copie)`,
-          Status: 'Activ'
-        })
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        toast.success('Proiect duplicat cu succes!');
-        onRefresh?.();
-      } else {
-        toast.error(result.error || 'Eroare la duplicarea proiectului');
-      }
-    } catch (error) {
-      toast.error('Eroare la duplicarea proiectului');
-    }
-  };
-
-  const handleGenerateContract = async () => {
-    try {
-      toast.info('Se generează contractul...');
-      
-      const response = await fetch('/api/actions/contracts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proiectId: proiect.ID_Proiect })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success('Contract generat cu succes!');
-        if (result.downloadUrl) {
-          const link = document.createElement('a');
-          link.href = result.downloadUrl;
-          link.download = `Contract_${proiect.ID_Proiect}.docx`;
-          link.click();
-        }
-      } else {
-        toast.error(result.error || 'Eroare la generarea contractului');
-      }
-    } catch (error) {
-      toast.error('Eroare la generarea contractului');
-    }
-  };
-
-  const handleSendEmail = async () => {
-    try {
-      const response = await fetch('/api/actions/email/send-client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proiectId: proiect.ID_Proiect })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success('Email trimis cu succes!');
-      } else {
-        toast.error(result.error || 'Eroare la trimiterea email-ului');
-      }
-    } catch (error) {
-      toast.error('Eroare la trimiterea email-ului');
-    }
-  };
-
-  const handleUpdateStatus = async (newStatus: string) => {
-    try {
-      const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
-      
-      const response = await fetch(apiEndpoint, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: proiect.ID_Proiect, 
-          Status: newStatus 
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`Status actualizat la: ${newStatus}`);
-        onRefresh?.();
-      } else {
-        toast.error(result.error || 'Eroare la actualizarea statusului');
-      }
-    } catch (error) {
-      toast.error('Eroare la actualizarea statusului');
-    }
-  };
-
-  const handleDelete = async () => {
-    const itemType = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
-    const confirmed = confirm(`Sigur vrei să ștergi ${itemType} ${proiect.ID_Proiect}?`);
-    if (!confirmed) return;
-
-    try {
-      const apiEndpoint = proiect.tip === 'subproiect' 
-        ? `/api/rapoarte/subproiecte?id=${proiect.ID_Proiect}`
-        : `/api/rapoarte/proiecte?id=${proiect.ID_Proiect}`;
-      
-      const response = await fetch(apiEndpoint, {
-        method: 'DELETE'
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
-        onRefresh?.();
-      } else {
-        toast.error(result.error || `Eroare la ștergerea ${itemType}`);
-      }
-    } catch (error) {
-      toast.error(`Eroare la ștergerea ${itemType}`);
-    }
-  };
-
-  const getColorClass = (color: string) => {
-    switch (color) {
-      case 'primary': return '#3498db';
-      case 'secondary': return '#95a5a6';
-      case 'success': return '#27ae60';
-      case 'warning': return '#f39c12';
-      case 'danger': return '#e74c3c';
-      default: return '#3498db';
-    }
-  };
-
-  return (
-    <>
-      <EnhancedActionDropdown
-        actions={actions}
-        onAction={handleAction}
-        proiect={proiect}
-        getColorClass={getColorClass}
-      />
-      
-      {/* Modal pentru factură hibridă */}
-      {showFacturaModal && (
-        <FacturaHibridModal
-          proiect={proiect}
-          onClose={() => setShowFacturaModal(false)}
-          onSuccess={handleInvoiceSuccess}
-        />
-      )}
-
-      {/* ✅ NOUĂ: Modal pentru adăugare subproiect */}
-      {showSubproiectModal && (
-        <SubproiectModal
-          proiectParinte={proiect}
-          onClose={() => setShowSubproiectModal(false)}
-          onSuccess={() => {
-            setShowSubproiectModal(false);
-            toast.success('Subproiect adăugat cu succes!');
-            onRefresh?.();
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-// ✅ NOUĂ COMPONENTĂ: Modal pentru adăugare subproiect - VERSIUNE SAFE
-interface SubproiectModalProps {
-  proiectParinte: any;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModalProps) {
-  // ✅ SAFE STATE: Folosește string-uri pentru toate valorile
-  const [denumire, setDenumire] = React.useState('');
-  const [responsabil, setResponsabil] = React.useState('');
-  const [dataStart, setDataStart] = React.useState(new Date().toISOString().split('T')[0]);
-  const [dataFinal, setDataFinal] = React.useState('');
-  const [valoareEstimata, setValoareEstimata] = React.useState('0');
-  const [status, setStatus] = React.useState('Activ');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!denumire.trim()) {
-      toast.error('Denumirea subproiectului este obligatorie');
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
-      
-      const response = await fetch('/api/rapoarte/subproiecte', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ID_Subproiect: subproiectId,
-          ID_Proiect: proiectParinte.ID_Proiect,
-          Denumire: denumire.trim(),
-          Responsabil: responsabil.trim() || null,
-          Data_Start: dataStart || null,
-          Data_Final: dataFinal || null,
-          Valoare_Estimata: parseFloat(valoareEstimata) || null,
-          Status: status
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        onSuccess();
-      } else {
-        toast.error(result.error || 'Eroare la adăugarea subproiectului');
-      }
-    } catch (error) {
-      toast.error('Eroare la adăugarea subproiectului');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              📂 Adaugă Subproiect Nou
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Proiect părinte: {proiectParinte.ID_Proiect} - {proiectParinte.Denumire}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl p-1"
-            disabled={isSubmitting}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Denumire */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Denumire Subproiect *
-            </label>
-            <input
-              type="text"
-              value={denumire}
-              onChange={(e) => setDenumire(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Introduceți denumirea subproiectului..."
-              required
-            />
-          </div>
-
-          {/* Grid pentru câmpurile în două coloane */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Responsabil */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Responsabil
-              </label>
-              <input
-                type="text"
-                value={responsabil}
-                onChange={(e) => setResponsabil(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Numele responsabilului..."
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Activ">Activ</option>
-                <option value="Suspendat">Suspendat</option>
-                <option value="Finalizat">Finalizat</option>
-              </select>
-            </div>
-
-            {/* Data Start */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Început
-              </label>
-              <input
-                type="date"
-                value={dataStart}
-                onChange={(e) => setDataStart(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Data Final */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Finalizare
-              </label>
-              <input
-                type="date"
-                value={dataFinal}
-                onChange={(e) => setDataFinal(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Valoare Estimată */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Valoare Estimată (RON)
-            </label>
-            <input
-              type="number"
-              value={valoareEstimata}
-              onChange={(e) => setValoareEstimata(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-            />
-          </div>
-
-          {/* Info despre proiectul părinte */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium text-gray-700 mb-2">Informații Proiect Părinte:</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-              <div><strong>Client:</strong> {proiectParinte.Client}</div>
-              <div><strong>Status:</strong> {proiectParinte.Status}</div>
-              <div><strong>Valoare:</strong> {proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata} RON` : 'N/A'}</div>
-              <div><strong>Data start:</strong> {proiectParinte.Data_Start || 'N/A'}</div>
-            </div>
-          </div>
-
-          {/* Butoane */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50"
-            >
-              Anulează
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !denumire.trim()}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                <>⏳ Se adaugă...</>
-              ) : (
-                <>📂 Adaugă Subproiect</>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// Componenta dropdown rămâne neschimbată
-interface EnhancedActionDropdownProps {
-  actions: ActionItem[];
-  onAction: (actionKey: string) => void;
-  proiect: any;
-  getColorClass: (color: string) => string;
-}
-
-function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: EnhancedActionDropdownProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [loading, setLoading] = React.useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-
-  // ✅ NOUĂ: Calculează poziția dropdown-ului
-  const calculateDropdownPosition = () => {
-    if (buttonRef.current) {
+  // Calculează poziția dropdown-ului
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
       
-      // Dacă nu e suficient spațiu dedesubt (sub 300px) și e mai mult spațiu deasupra
-      if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+      // Dacă nu avem suficient spațiu jos (< 200px), afișează sus
+      if (spaceBelow < 200 && spaceAbove > 200) {
         setDropdownPosition('top');
       } else {
         setDropdownPosition('bottom');
       }
     }
-  };
+  }, [isOpen]);
 
-  const handleToggleDropdown = () => {
-    if (!isOpen) {
-      calculateDropdownPosition();
-    }
-    setIsOpen(!isOpen);
-  };
-
-  const handleActionClick = async (actionKey: string) => {
-    if (loading) return;
+  const handleVeziDetalii = () => {
+    console.log('Detalii proiect:', proiect);
     
-    setLoading(actionKey);
+    // Formatează datele pentru afișare
+    const formatDate = (dateObj: { value: string }) => {
+      try {
+        return new Date(dateObj.value).toLocaleDateString('ro-RO');
+      } catch {
+        return 'N/A';
+      }
+    };
+
+    const detalii = `
+🏗️ DETALII PROIECT
+
+📋 Denumire: ${proiect.Denumire}
+🏢 Client: ${proiect.Client}
+📊 Status: ${proiect.Status}
+💰 Valoare Estimată: ${proiect.Valoare_Estimata?.toLocaleString('ro-RO')} LEI
+📅 Data Start: ${formatDate(proiect.Data_Start)}
+📅 Data Final: ${formatDate(proiect.Data_Final)}
+👤 Responsabil: ${proiect.Responsabil || 'Neatribuit'}
+📍 Adresă: ${proiect.Adresa || 'Nespecificată'}
+📝 Observații: ${proiect.Observatii || 'Fără observații'}
+    `.trim();
+
+    toast.success(detalii, {
+      duration: 8000,
+      style: {
+        background: '#f8fafc',
+        color: '#1e293b',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
+        fontSize: '12px',
+        whiteSpace: 'pre-line',
+        maxWidth: '500px',
+        padding: '16px'
+      }
+    });
+    
     setIsOpen(false);
+  };
+
+  const handleEditeaza = () => {
+    console.log('Date pentru editare:', proiect);
     
     try {
-      await onAction(actionKey);
-    } finally {
-      setLoading(null);
+      // Creează URL-ul pentru editare
+      const editUrl = `/admin/rapoarte/proiecte/${encodeURIComponent(proiect.ID_Proiect)}/edit`;
+      console.log('Ar trebui să redirectionez la:', editUrl);
+      
+      // Pentru moment, afișăm un modal de confirmare
+      const confirmare = confirm(`Vrei să editezi proiectul "${proiect.Denumire}"?\n\nNOTĂ: Funcția de editare va fi implementată în următoarea versiune.`);
+      
+      if (confirmare) {
+        // Aici va fi implementată logica de editare
+        toast.success('Funcția de editare va fi disponibilă în curând!', {
+          duration: 3000,
+          icon: '⚡'
+        });
+      }
+      
+    } catch (error) {
+      console.error('Eroare la editare:', error);
+      toast.error('Eroare la încărcarea editorului');
     }
+    
+    setIsOpen(false);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Activ': return '#27ae60';
-      case 'Finalizat': return '#3498db';
-      case 'Suspendat': return '#f39c12';
-      case 'Arhivat': return '#95a5a6';
-      default: return '#7f8c8d';
+  const handleGenerareFactura = () => {
+    console.log('Generare factură pentru:', proiect);
+    setIsFacturaModalOpen(true);
+    setIsOpen(false);
+  };
+
+  const handleAdaugaSubproiect = () => {
+    console.log('Adaugă subproiect pentru:', proiect);
+    setIsSubproiectModalOpen(true);
+    setIsOpen(false);
+  };
+
+  const handleSterge = async () => {
+    const confirmare = confirm(`Ești sigur că vrei să ștergi ${isSubproiect ? 'subproiectul' : 'proiectul'}: "${proiect.Denumire}"?`);
+    
+    if (!confirmare) return;
+
+    try {
+      const endpoint = isSubproiect ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
+      
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: proiect.ID_Proiect }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Eroare HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`${isSubproiect ? 'Subproiectul' : 'Proiectul'} a fost șters cu succes!`);
+        onRefresh();
+      } else {
+        throw new Error(result.error || 'Eroare la ștergere');
+      }
+    } catch (error) {
+      console.error('Eroare la ștergere:', error);
+      toast.error(`Eroare la ștergerea ${isSubproiect ? 'subproiectului' : 'proiectului'}`);
     }
+    
+    setIsOpen(false);
   };
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={loading !== null}
-        style={{
-          padding: '6px 12px',
-          background: loading ? '#bdc3c7' : '#3498db',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
-          fontWeight: 'bold'
-        }}
-      >
-        {loading ? '⏳' : '⚙️'} Acțiuni
-      </button>
+    <>
+      <div className="relative">
+        <button
+          ref={buttonRef}
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Acțiuni"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
 
-      {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          background: 'white',
-          border: '1px solid #ddd',
-          borderRadius: '6px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 9999,
-          minWidth: '220px',
-          marginTop: '4px'
-        }}>
-          <div style={{
-            padding: '12px',
-            borderBottom: '1px solid #eee',
-            background: '#f8f9fa'
-          }}>
-            <div style={{ 
-              fontSize: '12px', 
-              fontWeight: 'bold',
-              color: '#2c3e50',
-              marginBottom: '4px'
-            }}>
-              {proiect.ID_Proiect}
-              {proiect.tip === 'subproiect' && (
-                <span style={{ 
-                  marginLeft: '8px',
-                  fontSize: '10px',
-                  background: '#3498db',
-                  color: 'white',
-                  padding: '2px 6px',
-                  borderRadius: '3px'
-                }}>
-                  SUB
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
-              Status: <span style={{ 
-                color: getStatusColor(proiect.Status),
-                fontWeight: 'bold'
-              }}>
-                {proiect.Status}
-              </span>
-            </div>
-          </div>
+        {isOpen && (
+          <>
+            {/* Overlay pentru a închide dropdown-ul */}
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setIsOpen(false)}
+            />
+            
+            {/* Dropdown menu */}
+            <div 
+              className={`absolute right-0 z-20 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 ${
+                dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+              }`}
+            >
+              <button
+                onClick={handleVeziDetalii}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Eye className="w-4 h-4" />
+                Vezi Detalii
+              </button>
 
-          <div style={{ padding: '8px 0' }}>
-            {actions.map((action) => {
-              if (action.divider) {
-                return (
-                  <div
-                    key={action.key}
-                    style={{
-                      height: '1px',
-                      background: '#eee',
-                      margin: '8px 0'
-                    }}
-                  />
-                );
-              }
+              <button
+                onClick={handleEditeaza}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Editează
+              </button>
 
-              return (
+              <hr className="my-1" />
+
+              <button
+                onClick={handleGenerareFactura}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Generare Factură
+              </button>
+
+              {/* Adaugă Subproiect doar pentru proiecte principale */}
+              {!isSubproiect && (
                 <button
-                  key={action.key}
-                  onClick={() => handleActionClick(action.key)}
-                  disabled={action.disabled || loading === action.key}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    background: 'transparent',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    color: action.disabled ? '#bdc3c7' : (action.color === 'danger' ? '#e74c3c' : '#2c3e50'),
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    opacity: action.disabled ? 0.5 : 1,
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    if (!action.disabled && loading !== action.key) {
-                      e.currentTarget.style.background = action.color === 'danger' ? '#fdf2f2' : '#f8f9fa';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
+                  onClick={handleAdaugaSubproiect}
+                  className="w-full px-4 py-2 text-left text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
                 >
-                  <span style={{ minWidth: '16px' }}>
-                    {loading === action.key ? '⏳' : action.icon}
-                  </span>
-                  <span>
-                    {action.label}
-                  </span>
+                  <Plus className="w-4 h-4" />
+                  Adaugă Subproiect
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              )}
 
-      {isOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9998
+              <hr className="my-1" />
+
+              <button
+                onClick={handleSterge}
+                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Șterge {isSubproiect ? 'Subproiect' : 'Proiect'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modal Factură Hibridă */}
+      {isFacturaModalOpen && (
+        <FacturaHibridModal
+          proiect={proiect}
+          onClose={() => setIsFacturaModalOpen(false)}
+          onSuccess={() => {
+            setIsFacturaModalOpen(false);
+            onRefresh();
           }}
-          onClick={() => setIsOpen(false)}
         />
       )}
-    </div>
+
+      {/* Modal Subproiect Nou - FIX PENTRU EROAREA REACT #31 */}
+      {isSubproiectModalOpen && (
+        <ProiectNouModal
+          isOpen={isSubproiectModalOpen}
+          onClose={() => setIsSubproiectModalOpen(false)}
+          onSuccess={() => {
+            setIsSubproiectModalOpen(false);
+            onRefresh();
+          }}
+          proiectParinte={proiect}
+          isSubproiect={true}
+        />
+      )}
+    </>
   );
 }
