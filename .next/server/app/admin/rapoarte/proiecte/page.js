@@ -415,11 +415,11 @@ const routeModule = new AppPageRouteModule({
 /***/ 16902:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 15151))
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 34242))
 
 /***/ }),
 
-/***/ 15151:
+/***/ 34242:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -435,6 +435,7 @@ __webpack_require__.d(__webpack_exports__, {
 var jsx_runtime_ = __webpack_require__(76931);
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
 var react_experimental_ = __webpack_require__(17640);
+var react_experimental_default = /*#__PURE__*/__webpack_require__.n(react_experimental_);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
 var navigation = __webpack_require__(57114);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/components/FilterBar.tsx
@@ -739,23 +740,431 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 
 // EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs + 1 modules
 var dist = __webpack_require__(7365);
-;// CONCATENATED MODULE: ./app/admin/rapoarte/components/ActionDropdown.tsx
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 // ==================================================================
-// CALEA: app/admin/rapoarte/components/ActionDropdown.tsx
-// MODIFICAT: Înlocuit factureaza.me cu sistemul hibrid
+// CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
+// MODIFICAT: Auto-completare client din BD + subproiecte selector + fix URL redirect
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
-function ActionDropdown({ proiect, onRefresh }) {
-    const [showActions, setShowActions] = (0,react_experimental_.useState)(false);
-    const [isGeneratingInvoice, setIsGeneratingInvoice] = (0,react_experimental_.useState)(false);
-    const handleCreateInvoice = async ()=>{
+function FacturaHibridModal({ proiect, onClose, onSuccess }) {
+    const [liniiFactura, setLiniiFactura] = (0,react_experimental_.useState)([
+        {
+            denumire: proiect.Denumire,
+            cantitate: 1,
+            pretUnitar: proiect.Valoare_Estimata || 0,
+            cotaTva: 19,
+            tip: "proiect"
+        }
+    ]);
+    const [observatii, setObservatii] = (0,react_experimental_.useState)("");
+    const [clientInfo, setClientInfo] = (0,react_experimental_.useState)(null);
+    const [isGenerating, setIsGenerating] = (0,react_experimental_.useState)(false);
+    const [isLoadingANAF, setIsLoadingANAF] = (0,react_experimental_.useState)(false);
+    const [isLoadingClient, setIsLoadingClient] = (0,react_experimental_.useState)(false);
+    const [isLoadingSubproiecte, setIsLoadingSubproiecte] = (0,react_experimental_.useState)(false);
+    const [cuiInput, setCuiInput] = (0,react_experimental_.useState)("");
+    const [anafError, setAnafError] = (0,react_experimental_.useState)(null);
+    const [isProcessingPDF, setIsProcessingPDF] = (0,react_experimental_.useState)(false);
+    const [subproiecteDisponibile, setSubproiecteDisponibile] = (0,react_experimental_.useState)([]);
+    const [showSubproiecteSelector, setShowSubproiecteSelector] = (0,react_experimental_.useState)(false);
+    (0,react_experimental_.useEffect)(()=>{
+        loadClientFromDatabase();
+        loadSubproiecte();
+    }, [
+        proiect
+    ]);
+    const loadClientFromDatabase = async ()=>{
+        if (!proiect.Client) return;
+        setIsLoadingClient(true);
         try {
-            setIsGeneratingInvoice(true);
-            setShowActions(false);
-            // MODIFICAT: Folosește sistemul hibrid în loc de factureaza.me
-            dist/* toast */.Am.info("Se generează factura PDF...");
+            const response = await fetch(`/api/rapoarte/clienti?search=${encodeURIComponent(proiect.Client)}`);
+            const result = await response.json();
+            if (result.success && result.data && result.data.length > 0) {
+                const clientData = result.data[0];
+                setClientInfo({
+                    id: clientData.id,
+                    denumire: clientData.nume,
+                    cui: clientData.cui || "",
+                    nrRegCom: clientData.nr_reg_com || "",
+                    adresa: clientData.adresa || "",
+                    judet: clientData.judet,
+                    localitate: clientData.oras,
+                    telefon: clientData.telefon,
+                    email: clientData.email
+                });
+                if (clientData.cui) {
+                    setCuiInput(clientData.cui);
+                }
+                dist/* toast */.Am.success(`✅ Date client preluate din BD: ${clientData.nume}`);
+            } else {
+                setClientInfo({
+                    denumire: proiect.Client,
+                    cui: "",
+                    nrRegCom: "",
+                    adresa: ""
+                });
+                dist/* toast */.Am.info(`ℹ️ Client "${proiect.Client}" nu găsit în BD. Completează manual datele.`);
+            }
+        } catch (error) {
+            console.error("Eroare la \xeencărcarea clientului din BD:", error);
+            setClientInfo({
+                denumire: proiect.Client,
+                cui: "",
+                nrRegCom: "",
+                adresa: ""
+            });
+            dist/* toast */.Am.warning("⚠️ Nu s-au putut prelua datele clientului din BD");
+        } finally{
+            setIsLoadingClient(false);
+        }
+    };
+    const loadSubproiecte = async ()=>{
+        setIsLoadingSubproiecte(true);
+        try {
+            const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
+            const result = await response.json();
+            if (result.success && result.data) {
+                const subproiecteFormatate = result.data.map((sub)=>({
+                        ID_Subproiect: sub.ID_Subproiect,
+                        Denumire: sub.Denumire,
+                        Valoare_Estimata: sub.Valoare_Estimata,
+                        Status: sub.Status,
+                        adaugat: false
+                    }));
+                setSubproiecteDisponibile(subproiecteFormatate);
+                if (subproiecteFormatate.length > 0) {
+                    dist/* toast */.Am.info(`📋 Găsite ${subproiecteFormatate.length} subproiecte disponibile pentru factură`);
+                }
+            }
+        } catch (error) {
+            console.error("Eroare la \xeencărcarea subproiectelor:", error);
+            dist/* toast */.Am.warning("⚠️ Nu s-au putut \xeencărca subproiectele");
+        } finally{
+            setIsLoadingSubproiecte(false);
+        }
+    };
+    const addLine = ()=>{
+        setLiniiFactura([
+            ...liniiFactura,
+            {
+                denumire: "",
+                cantitate: 1,
+                pretUnitar: 0,
+                cotaTva: 19
+            }
+        ]);
+    };
+    const removeLine = (index)=>{
+        if (liniiFactura.length > 1) {
+            const linieSteasa = liniiFactura[index];
+            if (linieSteasa.tip === "subproiect" && linieSteasa.subproiect_id) {
+                setSubproiecteDisponibile((prev)=>prev.map((sub)=>sub.ID_Subproiect === linieSteasa.subproiect_id ? {
+                            ...sub,
+                            adaugat: false
+                        } : sub));
+            }
+            setLiniiFactura(liniiFactura.filter((_, i)=>i !== index));
+        }
+    };
+    const updateLine = (index, field, value)=>{
+        const newLines = [
+            ...liniiFactura
+        ];
+        newLines[index] = {
+            ...newLines[index],
+            [field]: value
+        };
+        setLiniiFactura(newLines);
+    };
+    const addSubproiectToFactura = (subproiect)=>{
+        const nouaLinie = {
+            denumire: `${subproiect.Denumire} (Subproiect)`,
+            cantitate: 1,
+            pretUnitar: subproiect.Valoare_Estimata || 0,
+            cotaTva: 19,
+            tip: "subproiect",
+            subproiect_id: subproiect.ID_Subproiect
+        };
+        setLiniiFactura((prev)=>[
+                ...prev,
+                nouaLinie
+            ]);
+        setSubproiecteDisponibile((prev)=>prev.map((sub)=>sub.ID_Subproiect === subproiect.ID_Subproiect ? {
+                    ...sub,
+                    adaugat: true
+                } : sub));
+        dist/* toast */.Am.success(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură`);
+    };
+    const handlePreluareDateANAF = async ()=>{
+        if (!cuiInput.trim()) {
+            dist/* toast */.Am.error("Introduceți CUI-ul clientului");
+            return;
+        }
+        setIsLoadingANAF(true);
+        setAnafError(null);
+        try {
+            const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cuiInput)}`);
+            const result = await response.json();
+            if (result.success) {
+                const anafData = result.data;
+                setClientInfo({
+                    ...clientInfo,
+                    denumire: anafData.denumire,
+                    cui: anafData.cui,
+                    nrRegCom: anafData.nrRegCom,
+                    adresa: anafData.adresa,
+                    judet: anafData.judet,
+                    localitate: anafData.localitate,
+                    telefon: anafData.telefon,
+                    status: anafData.status,
+                    platitorTva: anafData.platitorTva
+                });
+                dist/* toast */.Am.success("✅ Datele au fost actualizate cu informațiile de la ANAF!");
+                if (anafData.status === "Inactiv") {
+                    dist/* toast */.Am.warning("⚠️ Atenție: Compania este inactivă conform ANAF!");
+                }
+                if (anafData.platitorTva === "Nu") {
+                    dist/* toast */.Am.info("ℹ️ Compania nu este plătitoare de TVA");
+                }
+            } else {
+                setAnafError(result.error);
+                dist/* toast */.Am.error(`❌ ${result.error}`);
+            }
+        } catch (error) {
+            const errorMsg = "Eroare la comunicarea cu ANAF";
+            setAnafError(errorMsg);
+            dist/* toast */.Am.error(errorMsg);
+        } finally{
+            setIsLoadingANAF(false);
+        }
+    };
+    const calculateTotals = ()=>{
+        let subtotal = 0;
+        let totalTva = 0;
+        liniiFactura.forEach((linie)=>{
+            const cantitate = Number(linie.cantitate) || 0;
+            const pretUnitar = Number(linie.pretUnitar) || 0;
+            const cotaTva = Number(linie.cotaTva) || 0;
+            const valoare = cantitate * pretUnitar;
+            const tva = valoare * (cotaTva / 100);
+            subtotal += valoare;
+            totalTva += tva;
+        });
+        const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
+        return {
+            subtotal: safeFixed(subtotal),
+            totalTva: safeFixed(totalTva),
+            totalGeneral: safeFixed(subtotal + totalTva)
+        };
+    };
+    const loadPDFLibraries = ()=>{
+        return new Promise((resolve, reject)=>{
+            if (window.jsPDF && window.html2canvas) {
+                resolve();
+                return;
+            }
+            const jsPDFScript = document.createElement("script");
+            jsPDFScript.src = "https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js";
+            jsPDFScript.onload = ()=>{
+                window.jsPDF = window.jspdf.jsPDF;
+                const html2canvasScript = document.createElement("script");
+                html2canvasScript.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+                html2canvasScript.onload = ()=>{
+                    window.html2canvas = window.html2canvas;
+                    resolve();
+                };
+                html2canvasScript.onerror = reject;
+                document.head.appendChild(html2canvasScript);
+            };
+            jsPDFScript.onerror = reject;
+            document.head.appendChild(jsPDFScript);
+        });
+    };
+    const processPDF = async (htmlContent, fileName)=>{
+        try {
+            setIsProcessingPDF(true);
+            dist/* toast */.Am.info("\uD83D\uDD04 Se procesează HTML-ul \xeen PDF...");
+            await loadPDFLibraries();
+            const tempDiv = document.createElement("div");
+            tempDiv.id = "pdf-content";
+            tempDiv.style.position = "fixed";
+            tempDiv.style.left = "0px";
+            tempDiv.style.top = "0px";
+            tempDiv.style.width = "794px";
+            tempDiv.style.height = "1000px";
+            tempDiv.style.backgroundColor = "white";
+            tempDiv.style.fontFamily = "Arial, sans-serif";
+            tempDiv.style.fontSize = "4px";
+            tempDiv.style.color = "#333";
+            tempDiv.style.lineHeight = "1.0";
+            tempDiv.style.padding = "15px";
+            tempDiv.style.zIndex = "-1000";
+            tempDiv.style.opacity = "1";
+            tempDiv.style.transform = "scale(1)";
+            tempDiv.style.overflow = "hidden";
+            tempDiv.style.boxSizing = "border-box";
+            tempDiv.style.display = "flex";
+            tempDiv.style.flexDirection = "column";
+            tempDiv.style.justifyContent = "space-between";
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(htmlContent, "text/html");
+            const styleElement = htmlDoc.querySelector("style");
+            const cssRules = styleElement ? styleElement.textContent || "" : "";
+            const bodyContent = htmlDoc.body;
+            if (bodyContent) {
+                tempDiv.innerHTML = bodyContent.innerHTML;
+                const globalStyle = document.createElement("style");
+                globalStyle.id = "pdf-styles";
+                globalStyle.textContent = cssRules;
+                if (!document.getElementById("pdf-styles")) {
+                    document.head.appendChild(globalStyle);
+                }
+            } else {
+                tempDiv.innerHTML = htmlContent;
+            }
+            document.body.appendChild(tempDiv);
+            await new Promise((resolve)=>setTimeout(resolve, 1000));
+            const pdf = new window.jsPDF("p", "pt", "a4");
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const targetElement = document.getElementById("pdf-content");
+            await pdf.html(targetElement || tempDiv, {
+                callback: function(pdf) {
+                    document.body.removeChild(tempDiv);
+                    const globalStyle = document.getElementById("pdf-styles");
+                    if (globalStyle) {
+                        document.head.removeChild(globalStyle);
+                    }
+                    pdf.save(fileName);
+                    dist/* toast */.Am.success("✅ PDF generat și descărcat cu succes!");
+                    onSuccess(fileName.replace(".pdf", ""), "");
+                    setIsProcessingPDF(false);
+                },
+                margin: [
+                    10,
+                    10,
+                    10,
+                    10
+                ],
+                width: pageWidth - 20,
+                windowWidth: pageWidth - 20,
+                autoPaging: "text",
+                html2canvas: {
+                    allowTaint: true,
+                    dpi: 96,
+                    letterRendering: true,
+                    logging: false,
+                    scale: 0.75,
+                    useCORS: true,
+                    backgroundColor: "#ffffff",
+                    height: 1000,
+                    width: pageWidth - 20,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: pageWidth - 20,
+                    windowHeight: 1000,
+                    onclone: (clonedDoc)=>{
+                        const clonedElement = clonedDoc.getElementById("pdf-content");
+                        if (clonedElement) {
+                            const allElements = clonedElement.querySelectorAll("*");
+                            allElements.forEach((el)=>{
+                                el.style.fontSize = "3px";
+                                el.style.lineHeight = "0.8";
+                                el.style.margin = "0.25px";
+                                el.style.padding = "0.25px";
+                                el.style.marginTop = "0.25px";
+                                el.style.marginBottom = "0.25px";
+                                el.style.paddingTop = "0.25px";
+                                el.style.paddingBottom = "0.25px";
+                            });
+                            const headers = clonedElement.querySelectorAll("h1, h2, h3, h4, .header h1");
+                            headers.forEach((header)=>{
+                                header.style.fontSize = "4px";
+                                header.style.margin = "0.5px 0";
+                                header.style.padding = "0.5px 0";
+                                header.style.fontWeight = "bold";
+                            });
+                            const largeTexts = clonedElement.querySelectorAll(".invoice-number");
+                            largeTexts.forEach((text)=>{
+                                text.style.fontSize = "6px";
+                                text.style.margin = "1px 0";
+                                text.style.fontWeight = "bold";
+                            });
+                            const tables = clonedElement.querySelectorAll("table, th, td");
+                            tables.forEach((table)=>{
+                                table.style.fontSize = "2.5px";
+                                table.style.padding = "0.25px";
+                                table.style.margin = "0";
+                                table.style.borderSpacing = "0";
+                                table.style.borderCollapse = "collapse";
+                                table.style.lineHeight = "0.8";
+                            });
+                            const sections = clonedElement.querySelectorAll("div");
+                            sections.forEach((section)=>{
+                                section.style.margin = "0.25px 0";
+                                section.style.padding = "0.25px";
+                            });
+                            const textElements = clonedElement.querySelectorAll("p, span, .info-line, strong");
+                            textElements.forEach((text)=>{
+                                text.style.fontSize = "3px";
+                                text.style.lineHeight = "0.8";
+                                text.style.margin = "0.25px 0";
+                                text.style.padding = "0.25px 0";
+                            });
+                            const walker = clonedDoc.createTreeWalker(clonedElement, NodeFilter.SHOW_ELEMENT, null, false);
+                            let node;
+                            while(node = walker.nextNode()){
+                                const el = node;
+                                const computedStyle = clonedDoc.defaultView.getComputedStyle(el);
+                                const fontSize = parseFloat(computedStyle.fontSize);
+                                if (fontSize > 4) {
+                                    el.style.fontSize = "3px !important";
+                                    el.style.setProperty("font-size", "3px", "important");
+                                }
+                                if (parseFloat(computedStyle.marginTop) > 2) {
+                                    el.style.marginTop = "0.5px !important";
+                                }
+                                if (parseFloat(computedStyle.marginBottom) > 2) {
+                                    el.style.marginBottom = "0.5px !important";
+                                }
+                                if (parseFloat(computedStyle.paddingTop) > 2) {
+                                    el.style.paddingTop = "0.25px !important";
+                                }
+                                if (parseFloat(computedStyle.paddingBottom) > 2) {
+                                    el.style.paddingBottom = "0.25px !important";
+                                }
+                            }
+                            clonedElement.style.fontSize = "3px !important";
+                            clonedElement.style.lineHeight = "0.8 !important";
+                            clonedElement.style.padding = "5px !important";
+                            clonedElement.style.margin = "0 !important";
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            setIsProcessingPDF(false);
+            console.error("❌ PDF processing error:", error);
+            dist/* toast */.Am.error(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+        }
+    };
+    const handleGenereazaFactura = async ()=>{
+        if (!clientInfo?.cui) {
+            dist/* toast */.Am.error("CUI-ul clientului este obligatoriu");
+            return;
+        }
+        if (liniiFactura.some((linie)=>!linie.denumire.trim() || linie.pretUnitar <= 0)) {
+            dist/* toast */.Am.error("Toate liniile trebuie să aibă denumire și preț valid");
+            return;
+        }
+        if (!clientInfo.denumire.trim()) {
+            dist/* toast */.Am.error("Denumirea clientului este obligatorie");
+            return;
+        }
+        setIsGenerating(true);
+        try {
+            dist/* toast */.Am.info("\uD83D\uDD04 Se generează template-ul facturii...");
             const response = await fetch("/api/actions/invoices/generate-hibrid", {
                 method: "POST",
                 headers: {
@@ -763,42 +1172,839 @@ function ActionDropdown({ proiect, onRefresh }) {
                 },
                 body: JSON.stringify({
                     proiectId: proiect.ID_Proiect,
-                    liniiFactura: [
-                        {
-                            denumire: `Servicii proiect ${proiect.Denumire}`,
-                            cantitate: 1,
-                            pretUnitar: proiect.Valoare_Estimata || 0,
-                            cotaTva: 19
-                        }
-                    ],
-                    observatii: `Factură generată automat pentru proiectul ${proiect.ID_Proiect}`
+                    liniiFactura,
+                    observatii,
+                    clientInfo
                 })
             });
-            console.log("Invoice response status:", response.status);
             const result = await response.json();
-            console.log("Invoice response data:", result);
-            if (result.success) {
-                dist/* toast */.Am.success("Factură PDF generată cu succes!");
-                // Download automat
-                if (result.downloadUrl) {
-                    window.open(result.downloadUrl, "_blank");
-                }
-                if (onRefresh) {
-                    onRefresh();
-                }
+            if (result.success && result.htmlContent) {
+                dist/* toast */.Am.success("✅ Template generat! Se procesează PDF-ul...");
+                await processPDF(result.htmlContent, result.fileName);
             } else {
-                throw new Error(result.error || "Eroare la generarea facturii");
+                throw new Error(result.error || "Eroare la generarea template-ului");
             }
         } catch (error) {
-            console.error("Eroare factură:", error);
-            dist/* toast */.Am.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+            dist/* toast */.Am.error(`❌ Eroare: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+            setIsGenerating(false);
         } finally{
-            setIsGeneratingInvoice(false);
+            if (!isProcessingPDF) {
+                setIsGenerating(false);
+            }
+        }
+    };
+    const totals = calculateTotals();
+    const isLoading = isGenerating || isProcessingPDF;
+    return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
+        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+            className: "bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[95vh] overflow-y-auto",
+            children: [
+                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-green-50",
+                    children: [
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("h2", {
+                                    className: "text-2xl font-bold text-gray-800 flex items-center gap-2",
+                                    children: "\uD83D\uDCB0 Generare Factură Hibridă"
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                    className: "text-sm text-gray-600 mt-1",
+                                    children: [
+                                        "Auto-completare client din BD + subproiecte • Proiect: ",
+                                        proiect.ID_Proiect
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                            onClick: onClose,
+                            className: "text-gray-500 hover:text-gray-700 text-2xl p-1",
+                            disabled: isLoading,
+                            children: "✕"
+                        })
+                    ]
+                }),
+                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    className: "p-6 space-y-6",
+                    children: [
+                        isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50",
+                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                className: "bg-white p-6 rounded-lg shadow-lg",
+                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex items-center gap-3",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                            className: "text-lg font-medium",
+                                            children: [
+                                                isGenerating && !isProcessingPDF && "\uD83D\uDD04 Se generează template-ul...",
+                                                isProcessingPDF && "\uD83D\uDCC4 Se procesează PDF-ul cu date din BD..."
+                                            ]
+                                        })
+                                    ]
+                                })
+                            })
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "bg-blue-50 p-4 rounded-lg border border-blue-200",
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("h3", {
+                                    className: "text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2",
+                                    children: "\uD83C\uDFD7️ Informații Proiect"
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "ID:"
+                                                }),
+                                                " ",
+                                                proiect.ID_Proiect
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Status:"
+                                                }),
+                                                " ",
+                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    className: "text-green-600",
+                                                    children: proiect.Status
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Denumire:"
+                                                }),
+                                                " ",
+                                                proiect.Denumire
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Valoare estimată:"
+                                                }),
+                                                " ",
+                                                proiect.Valoare_Estimata ? (Number(proiect.Valoare_Estimata) || 0).toFixed(2) : "N/A",
+                                                " RON"
+                                            ]
+                                        })
+                                    ]
+                                }),
+                                subproiecteDisponibile.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "mt-4 pt-3 border-t border-blue-200",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "flex items-center justify-between mb-2",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("h4", {
+                                                    className: "font-medium text-gray-700",
+                                                    children: "\uD83D\uDCCB Subproiecte disponibile:"
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                                    onClick: ()=>setShowSubproiecteSelector(!showSubproiecteSelector),
+                                                    className: "bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600",
+                                                    children: [
+                                                        showSubproiecteSelector ? "Ascunde" : "Afișează",
+                                                        " (",
+                                                        subproiecteDisponibile.length,
+                                                        ")"
+                                                    ]
+                                                })
+                                            ]
+                                        }),
+                                        showSubproiecteSelector && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "space-y-2 max-h-40 overflow-y-auto",
+                                            children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                    className: "flex items-center justify-between bg-white p-2 rounded border",
+                                                    children: [
+                                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                            className: "flex-1",
+                                                            children: [
+                                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                                    className: "font-medium text-sm",
+                                                                    children: subproiect.Denumire
+                                                                }),
+                                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                    className: "text-xs text-gray-500",
+                                                                    children: [
+                                                                        subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toFixed(2)} RON` : "Fără valoare",
+                                                                        "• Status: ",
+                                                                        subproiect.Status
+                                                                    ]
+                                                                })
+                                                            ]
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                            onClick: ()=>addSubproiectToFactura(subproiect),
+                                                            disabled: subproiect.adaugat,
+                                                            className: `px-3 py-1 rounded text-sm ${subproiect.adaugat ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-green-500 text-white hover:bg-green-600"}`,
+                                                            children: subproiect.adaugat ? "✓ Adăugat" : "+ Adaugă"
+                                                        })
+                                                    ]
+                                                }, subproiect.ID_Subproiect))
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "bg-gray-50 p-4 rounded-lg border border-gray-200",
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex items-center justify-between mb-4",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
+                                            children: [
+                                                "\uD83D\uDC64 Informații Client",
+                                                isLoadingClient && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    className: "text-sm text-blue-600",
+                                                    children: "⏳ Se \xeencarcă din BD..."
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "flex items-center gap-2",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: cuiInput,
+                                                    onChange: (e)=>setCuiInput(e.target.value),
+                                                    placeholder: "Introduceți CUI (ex: RO12345678)",
+                                                    className: "px-3 py-2 border border-gray-300 rounded text-sm w-48"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                    onClick: handlePreluareDateANAF,
+                                                    disabled: isLoadingANAF || !cuiInput.trim(),
+                                                    className: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium",
+                                                    children: isLoadingANAF ? "⏳ Se preiau..." : "\uD83D\uDCE1 Preluare ANAF"
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                }),
+                                anafError && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    className: "bg-red-50 border border-red-200 rounded p-3 mb-4",
+                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                        className: "text-red-800 text-sm",
+                                        children: [
+                                            "❌ ",
+                                            anafError
+                                        ]
+                                    })
+                                }),
+                                clientInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-gray-600 mb-1",
+                                                    children: "Denumire *"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: clientInfo.denumire,
+                                                    onChange: (e)=>setClientInfo({
+                                                            ...clientInfo,
+                                                            denumire: e.target.value
+                                                        }),
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    required: true
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-gray-600 mb-1",
+                                                    children: "CUI *"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: clientInfo.cui,
+                                                    onChange: (e)=>setClientInfo({
+                                                            ...clientInfo,
+                                                            cui: e.target.value
+                                                        }),
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    required: true
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-gray-600 mb-1",
+                                                    children: "Nr. Reg. Com."
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: clientInfo.nrRegCom,
+                                                    onChange: (e)=>setClientInfo({
+                                                            ...clientInfo,
+                                                            nrRegCom: e.target.value
+                                                        }),
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-gray-600 mb-1",
+                                                    children: "Telefon"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: clientInfo.telefon || "",
+                                                    onChange: (e)=>setClientInfo({
+                                                            ...clientInfo,
+                                                            telefon: e.target.value
+                                                        }),
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "col-span-2",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                                    className: "block text-gray-600 mb-1",
+                                                    children: "Adresa *"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                    type: "text",
+                                                    value: clientInfo.adresa,
+                                                    onChange: (e)=>setClientInfo({
+                                                            ...clientInfo,
+                                                            adresa: e.target.value
+                                                        }),
+                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    required: true
+                                                })
+                                            ]
+                                        }),
+                                        (clientInfo.status || clientInfo.platitorTva) && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "col-span-2 flex gap-4 text-xs",
+                                            children: [
+                                                clientInfo.status && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                    className: `px-2 py-1 rounded ${clientInfo.status === "Activ" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`,
+                                                    children: [
+                                                        "Status ANAF: ",
+                                                        clientInfo.status
+                                                    ]
+                                                }),
+                                                clientInfo.platitorTva && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                    className: `px-2 py-1 rounded ${clientInfo.platitorTva === "Da" ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}`,
+                                                    children: [
+                                                        "TVA: ",
+                                                        clientInfo.platitorTva
+                                                    ]
+                                                })
+                                            ]
+                                        }),
+                                        clientInfo.id && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            className: "col-span-2",
+                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                className: "bg-green-100 border border-green-200 rounded p-2 text-xs",
+                                                children: [
+                                                    "✅ ",
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                        children: "Date preluate din BD:"
+                                                    }),
+                                                    " Client ID ",
+                                                    clientInfo.id
+                                                ]
+                                            })
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex items-center justify-between mb-4",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("h3", {
+                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
+                                            children: "\uD83D\uDCCB Servicii/Produse"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                            onClick: addLine,
+                                            className: "bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm",
+                                            children: "+ Adaugă linie"
+                                        })
+                                    ]
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    className: "overflow-x-auto",
+                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
+                                        className: "w-full border-collapse border border-gray-300 text-sm",
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("thead", {
+                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                                    className: "bg-gray-100",
+                                                    children: [
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-left",
+                                                            children: "Denumire serviciu/produs *"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-center w-20",
+                                                            children: "Cant."
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-center w-32",
+                                                            children: "Pret unit. (RON)"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-center w-20",
+                                                            children: "TVA %"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-center w-32",
+                                                            children: "Total (RON)"
+                                                        }),
+                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                                            className: "border border-gray-300 p-3 text-center w-16",
+                                                            children: "Acț."
+                                                        })
+                                                    ]
+                                                })
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
+                                                children: liniiFactura.map((linie, index)=>{
+                                                    const cantitate = Number(linie.cantitate) || 0;
+                                                    const pretUnitar = Number(linie.pretUnitar) || 0;
+                                                    const cotaTva = Number(linie.cotaTva) || 0;
+                                                    const valoare = cantitate * pretUnitar;
+                                                    const tva = valoare * (cotaTva / 100);
+                                                    const total = valoare + tva;
+                                                    const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
+                                                    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                                                        className: `hover:bg-gray-50 ${linie.tip === "subproiect" ? "bg-blue-50" : ""}`,
+                                                        children: [
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2",
+                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                    className: "flex items-center gap-2",
+                                                                    children: [
+                                                                        linie.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                                            className: "bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold",
+                                                                            children: "SUB"
+                                                                        }),
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                                            type: "text",
+                                                                            value: linie.denumire,
+                                                                            onChange: (e)=>updateLine(index, "denumire", e.target.value),
+                                                                            className: "flex-1 p-1 border rounded text-sm",
+                                                                            placeholder: "Descrierea serviciului sau produsului...",
+                                                                            required: true
+                                                                        })
+                                                                    ]
+                                                                })
+                                                            }),
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2",
+                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                                    type: "number",
+                                                                    value: linie.cantitate,
+                                                                    onChange: (e)=>updateLine(index, "cantitate", parseFloat(e.target.value) || 0),
+                                                                    className: "w-full p-1 border rounded text-center text-sm",
+                                                                    min: "0",
+                                                                    step: "0.01"
+                                                                })
+                                                            }),
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2",
+                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                                    type: "number",
+                                                                    value: linie.pretUnitar,
+                                                                    onChange: (e)=>updateLine(index, "pretUnitar", parseFloat(e.target.value) || 0),
+                                                                    className: "w-full p-1 border rounded text-right text-sm",
+                                                                    min: "0",
+                                                                    step: "0.01"
+                                                                })
+                                                            }),
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2",
+                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
+                                                                    value: linie.cotaTva,
+                                                                    onChange: (e)=>updateLine(index, "cotaTva", parseFloat(e.target.value)),
+                                                                    className: "w-full p-1 border rounded text-center text-sm",
+                                                                    children: [
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                            value: 0,
+                                                                            children: "0%"
+                                                                        }),
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                            value: 5,
+                                                                            children: "5%"
+                                                                        }),
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                            value: 9,
+                                                                            children: "9%"
+                                                                        }),
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                            value: 19,
+                                                                            children: "19%"
+                                                                        })
+                                                                    ]
+                                                                })
+                                                            }),
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2 text-right font-semibold",
+                                                                children: safeFixed(total)
+                                                            }),
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
+                                                                className: "border border-gray-300 p-2 text-center",
+                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                                                    onClick: ()=>removeLine(index),
+                                                                    disabled: liniiFactura.length === 1,
+                                                                    className: "text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed",
+                                                                    title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
+                                                                    children: "\uD83D\uDDD1️"
+                                                                })
+                                                            })
+                                                        ]
+                                                    }, index);
+                                                })
+                                            })
+                                        ]
+                                    })
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                            className: "flex justify-end",
+                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                className: "w-96 bg-green-50 p-4 rounded-lg border border-green-200",
+                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "space-y-2",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "flex justify-between text-sm",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    children: "Subtotal (fără TVA):"
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                    className: "font-semibold",
+                                                    children: [
+                                                        totals.subtotal,
+                                                        " RON"
+                                                    ]
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "flex justify-between text-sm",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    children: "TVA:"
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                    className: "font-semibold",
+                                                    children: [
+                                                        totals.totalTva,
+                                                        " RON"
+                                                    ]
+                                                })
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            className: "flex justify-between text-lg font-bold border-t pt-2 border-green-300",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    children: "TOTAL DE PLATA:"
+                                                }),
+                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                    className: "text-green-600",
+                                                    children: [
+                                                        totals.totalGeneral,
+                                                        " RON"
+                                                    ]
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                })
+                            })
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: "\uD83D\uDCDD Observații (opțional)"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
+                                    value: observatii,
+                                    onChange: (e)=>setObservatii(e.target.value),
+                                    className: "w-full p-3 border border-gray-300 rounded-lg text-sm",
+                                    rows: 3,
+                                    placeholder: "Observații suplimentare pentru factură..."
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "flex justify-between items-center pt-4 border-t border-gray-200",
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    className: "text-sm text-gray-600",
+                                    children: "ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură."
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "flex gap-3",
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                            onClick: onClose,
+                                            disabled: isLoading,
+                                            className: "bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50",
+                                            children: "Anulează"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                            onClick: handleGenereazaFactura,
+                                            disabled: isLoading || !clientInfo?.cui || !clientInfo?.denumire,
+                                            className: "bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
+                                            children: isLoading ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
+                                                children: [
+                                                    "⏳ ",
+                                                    isProcessingPDF ? "Se generează PDF cu date BD..." : "Se procesează..."
+                                                ]
+                                            }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
+                                                children: "\uD83D\uDCB0 Generează Factură din BD"
+                                            })
+                                        })
+                                    ]
+                                })
+                            ]
+                        })
+                    ]
+                })
+            ]
+        })
+    });
+}
+
+;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+// MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
+// ==================================================================
+/* __next_internal_client_entry_do_not_use__ default auto */ 
+
+
+
+function ProiectActions({ proiect, onRefresh }) {
+    const [showFacturaModal, setShowFacturaModal] = react_experimental_default().useState(false);
+    const [showSubproiectModal, setShowSubproiectModal] = react_experimental_default().useState(false);
+    // ✅ ACTUALIZAT: Actions cu "Adauga subproiect" doar pentru proiectele principale
+    const actions = [
+        {
+            key: "view",
+            label: "Vezi Detalii",
+            icon: "\uD83D\uDC41️",
+            color: "primary"
+        },
+        {
+            key: "edit",
+            label: "Editează",
+            icon: "✏️",
+            color: "secondary"
+        },
+        {
+            key: "duplicate",
+            label: "Duplică Proiect",
+            icon: "\uD83D\uDCCB",
+            color: "secondary"
+        },
+        // ✅ NOUĂ: Adaugă subproiect doar pentru proiectele principale
+        ...proiect.tip !== "subproiect" ? [
+            {
+                key: "add_subproject",
+                label: "Adaugă Subproiect",
+                icon: "\uD83D\uDCC2",
+                color: "success",
+                disabled: proiect.Status === "Anulat" || proiect.Status === "Arhivat"
+            }
+        ] : [],
+        {
+            key: "divider1",
+            label: "",
+            icon: "",
+            color: "primary",
+            divider: true
+        },
+        {
+            key: "generate_contract",
+            label: "Generează Contract",
+            icon: "\uD83D\uDCC4",
+            color: "success",
+            disabled: proiect.Status === "Anulat"
+        },
+        {
+            key: "generate_invoice",
+            label: "Generează Factură PDF",
+            icon: "\uD83D\uDCB0",
+            color: "warning",
+            disabled: proiect.Status !== "Activ" && proiect.Status !== "Finalizat"
+        },
+        {
+            key: "send_email",
+            label: "Trimite Email Client",
+            icon: "\uD83D\uDCE7",
+            color: "primary"
+        },
+        {
+            key: "divider2",
+            label: "",
+            icon: "",
+            color: "primary",
+            divider: true
+        },
+        {
+            key: "mark_completed",
+            label: "Marchează Finalizat",
+            icon: "✅",
+            color: "success",
+            disabled: proiect.Status === "Finalizat" || proiect.Status === "Anulat"
+        },
+        {
+            key: "suspend",
+            label: "Suspendă Proiect",
+            icon: "⏸️",
+            color: "warning",
+            disabled: proiect.Status === "Suspendat" || proiect.Status === "Finalizat"
+        },
+        {
+            key: "archive",
+            label: "Arhivează Proiect",
+            icon: "\uD83D\uDCE6",
+            color: "secondary",
+            disabled: proiect.Status === "Arhivat"
+        },
+        {
+            key: "divider3",
+            label: "",
+            icon: "",
+            color: "primary",
+            divider: true
+        },
+        {
+            key: "delete",
+            label: proiect.tip === "subproiect" ? "Șterge Subproiect" : "Șterge Proiect",
+            icon: "\uD83D\uDDD1️",
+            color: "danger"
+        }
+    ];
+    const handleAction = async (actionKey)=>{
+        try {
+            switch(actionKey){
+                case "view":
+                    await handleViewDetails();
+                    break;
+                case "edit":
+                    await handleEdit();
+                    break;
+                case "duplicate":
+                    await handleDuplicate();
+                    break;
+                case "add_subproject":
+                    // ✅ NOUĂ: Deschide modalul pentru subproiect
+                    handleAddSubproject();
+                    break;
+                case "generate_contract":
+                    await handleGenerateContract();
+                    break;
+                case "generate_invoice":
+                    handleCreateInvoiceHibrid();
+                    break;
+                case "send_email":
+                    await handleSendEmail();
+                    break;
+                case "mark_completed":
+                    await handleUpdateStatus("Finalizat");
+                    break;
+                case "suspend":
+                    await handleUpdateStatus("Suspendat");
+                    break;
+                case "archive":
+                    await handleUpdateStatus("Arhivat");
+                    break;
+                case "delete":
+                    await handleDelete();
+                    break;
+                default:
+                    dist/* toast */.Am.info("Funcție \xeen dezvoltare");
+            }
+        } catch (error) {
+            console.error(`Eroare la ${actionKey}:`, error);
+            dist/* toast */.Am.error(`Eroare la executarea acțiunii: ${actionKey}`);
+        }
+    };
+    // ✅ NOUĂ FUNCȚIE: Deschide modalul pentru adăugare subproiect
+    const handleAddSubproject = ()=>{
+        setShowSubproiectModal(true);
+    };
+    const handleCreateInvoiceHibrid = ()=>{
+        setShowFacturaModal(true);
+    };
+    const handleInvoiceSuccess = (invoiceId, downloadUrl)=>{
+        setShowFacturaModal(false);
+        dist/* toast */.Am.success(`Factura ${invoiceId} a fost generată cu succes!`);
+        if (onRefresh) {
+            onRefresh();
+        }
+    };
+    const handleViewDetails = async ()=>{
+        dist/* toast */.Am.info(`Vizualizare detalii pentru ${proiect.ID_Proiect}`);
+    };
+    const handleEdit = async ()=>{
+        dist/* toast */.Am.info(`Editare ${proiect.tip === "subproiect" ? "subproiect" : "proiect"} ${proiect.ID_Proiect}`);
+    };
+    const handleDuplicate = async ()=>{
+        const confirmed = confirm(`Sigur vrei să duplici proiectul ${proiect.ID_Proiect}?`);
+        if (!confirmed) return;
+        try {
+            const response = await fetch("/api/rapoarte/proiecte", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    ...proiect,
+                    ID_Proiect: `${proiect.ID_Proiect}_COPY_${Date.now()}`,
+                    Denumire: `${proiect.Denumire} (Copie)`,
+                    Status: "Activ"
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Proiect duplicat cu succes!");
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la duplicarea proiectului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la duplicarea proiectului");
         }
     };
     const handleGenerateContract = async ()=>{
         try {
-            setShowActions(false);
             dist/* toast */.Am.info("Se generează contractul...");
             const response = await fetch("/api/actions/contracts/generate", {
                 method: "POST",
@@ -813,7 +2019,10 @@ function ActionDropdown({ proiect, onRefresh }) {
             if (result.success) {
                 dist/* toast */.Am.success("Contract generat cu succes!");
                 if (result.downloadUrl) {
-                    window.open(result.downloadUrl, "_blank");
+                    const link = document.createElement("a");
+                    link.href = result.downloadUrl;
+                    link.download = `Contract_${proiect.ID_Proiect}.docx`;
+                    link.click();
                 }
             } else {
                 dist/* toast */.Am.error(result.error || "Eroare la generarea contractului");
@@ -822,128 +2031,567 @@ function ActionDropdown({ proiect, onRefresh }) {
             dist/* toast */.Am.error("Eroare la generarea contractului");
         }
     };
+    const handleSendEmail = async ()=>{
+        try {
+            const response = await fetch("/api/actions/email/send-client", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    proiectId: proiect.ID_Proiect
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success("Email trimis cu succes!");
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la trimiterea email-ului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la trimiterea email-ului");
+        }
+    };
+    const handleUpdateStatus = async (newStatus)=>{
+        try {
+            const apiEndpoint = proiect.tip === "subproiect" ? "/api/rapoarte/subproiecte" : "/api/rapoarte/proiecte";
+            const response = await fetch(apiEndpoint, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    id: proiect.ID_Proiect,
+                    Status: newStatus
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success(`Status actualizat la: ${newStatus}`);
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la actualizarea statusului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la actualizarea statusului");
+        }
+    };
+    const handleDelete = async ()=>{
+        const itemType = proiect.tip === "subproiect" ? "subproiectul" : "proiectul";
+        const confirmed = confirm(`Sigur vrei să ștergi ${itemType} ${proiect.ID_Proiect}?`);
+        if (!confirmed) return;
+        try {
+            const apiEndpoint = proiect.tip === "subproiect" ? `/api/rapoarte/subproiecte?id=${proiect.ID_Proiect}` : `/api/rapoarte/proiecte?id=${proiect.ID_Proiect}`;
+            const response = await fetch(apiEndpoint, {
+                method: "DELETE"
+            });
+            const result = await response.json();
+            if (result.success) {
+                dist/* toast */.Am.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
+                onRefresh?.();
+            } else {
+                dist/* toast */.Am.error(result.error || `Eroare la ștergerea ${itemType}`);
+            }
+        } catch (error) {
+            dist/* toast */.Am.error(`Eroare la ștergerea ${itemType}`);
+        }
+    };
+    const getColorClass = (color)=>{
+        switch(color){
+            case "primary":
+                return "#3498db";
+            case "secondary":
+                return "#95a5a6";
+            case "success":
+                return "#27ae60";
+            case "warning":
+                return "#f39c12";
+            case "danger":
+                return "#e74c3c";
+            default:
+                return "#3498db";
+        }
+    };
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
+        children: [
+            /*#__PURE__*/ jsx_runtime_.jsx(EnhancedActionDropdown, {
+                actions: actions,
+                onAction: handleAction,
+                proiect: proiect,
+                getColorClass: getColorClass
+            }),
+            showFacturaModal && /*#__PURE__*/ jsx_runtime_.jsx(FacturaHibridModal, {
+                proiect: proiect,
+                onClose: ()=>setShowFacturaModal(false),
+                onSuccess: handleInvoiceSuccess
+            }),
+            showSubproiectModal && /*#__PURE__*/ jsx_runtime_.jsx(SubproiectModal, {
+                proiectParinte: proiect,
+                onClose: ()=>setShowSubproiectModal(false),
+                onSuccess: ()=>{
+                    setShowSubproiectModal(false);
+                    dist/* toast */.Am.success("Subproiect adăugat cu succes!");
+                    onRefresh?.();
+                }
+            })
+        ]
+    });
+}
+function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
+    const [formData, setFormData] = react_experimental_default().useState({
+        denumire: "",
+        responsabil: "",
+        dataStart: new Date().toISOString().split("T")[0],
+        dataFinal: "",
+        valoareEstimata: 0,
+        status: "Activ"
+    });
+    const [isSubmitting, setIsSubmitting] = react_experimental_default().useState(false);
+    const handleSubmit = async (e)=>{
+        e.preventDefault();
+        if (!formData.denumire.trim()) {
+            dist/* toast */.Am.error("Denumirea subproiectului este obligatorie");
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            // Generează ID unic pentru subproiect
+            const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
+            const response = await fetch("/api/rapoarte/subproiecte", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    ID_Subproiect: subproiectId,
+                    ID_Proiect: proiectParinte.ID_Proiect,
+                    Denumire: formData.denumire.trim(),
+                    Responsabil: formData.responsabil.trim() || null,
+                    Data_Start: formData.dataStart || null,
+                    Data_Final: formData.dataFinal || null,
+                    Valoare_Estimata: formData.valoareEstimata || null,
+                    Status: formData.status
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                onSuccess();
+            } else {
+                dist/* toast */.Am.error(result.error || "Eroare la adăugarea subproiectului");
+            }
+        } catch (error) {
+            dist/* toast */.Am.error("Eroare la adăugarea subproiectului");
+        } finally{
+            setIsSubmitting(false);
+        }
+    };
+    const updateField = (field, value)=>{
+        setFormData((prev)=>({
+                ...prev,
+                [field]: value
+            }));
+    };
+    return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
+        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+            className: "bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto",
+            children: [
+                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50",
+                    children: [
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("h2", {
+                                    className: "text-xl font-bold text-gray-800 flex items-center gap-2",
+                                    children: "\uD83D\uDCC2 Adaugă Subproiect Nou"
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                    className: "text-sm text-gray-600 mt-1",
+                                    children: [
+                                        "Proiect părinte: ",
+                                        proiectParinte.ID_Proiect,
+                                        " - ",
+                                        proiectParinte.Denumire
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                            onClick: onClose,
+                            className: "text-gray-500 hover:text-gray-700 text-xl p-1",
+                            disabled: isSubmitting,
+                            children: "✕"
+                        })
+                    ]
+                }),
+                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
+                    onSubmit: handleSubmit,
+                    className: "p-6 space-y-4",
+                    children: [
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: "Denumire Subproiect *"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                    type: "text",
+                                    value: formData.denumire,
+                                    onChange: (e)=>updateField("denumire", e.target.value),
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                    placeholder: "Introduceți denumirea subproiectului...",
+                                    required: true
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "grid grid-cols-1 md:grid-cols-2 gap-4",
+                            children: [
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            children: "Responsabil"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                            type: "text",
+                                            value: formData.responsabil,
+                                            onChange: (e)=>updateField("responsabil", e.target.value),
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            placeholder: "Numele responsabilului..."
+                                        })
+                                    ]
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            children: "Status"
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
+                                            value: formData.status,
+                                            onChange: (e)=>updateField("status", e.target.value),
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                    value: "Activ",
+                                                    children: "Activ"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                    value: "Suspendat",
+                                                    children: "Suspendat"
+                                                }),
+                                                /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                    value: "Finalizat",
+                                                    children: "Finalizat"
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            children: "Data \xcenceput"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                            type: "date",
+                                            value: formData.dataStart,
+                                            onChange: (e)=>updateField("dataStart", e.target.value),
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        })
+                                    ]
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            children: "Data Finalizare"
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                            type: "date",
+                                            value: formData.dataFinal,
+                                            onChange: (e)=>updateField("dataFinal", e.target.value),
+                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    children: "Valoare Estimată (RON)"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                    type: "number",
+                                    value: formData.valoareEstimata,
+                                    onChange: (e)=>updateField("valoareEstimata", parseFloat(e.target.value) || 0),
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                    placeholder: "0.00",
+                                    min: "0",
+                                    step: "0.01"
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "bg-gray-50 p-4 rounded-lg",
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("h4", {
+                                    className: "font-medium text-gray-700 mb-2",
+                                    children: "Informații Proiect Părinte:"
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    className: "grid grid-cols-2 gap-4 text-sm text-gray-600",
+                                    children: [
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Client:"
+                                                }),
+                                                " ",
+                                                proiectParinte.Client
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Status:"
+                                                }),
+                                                " ",
+                                                proiectParinte.Status
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Valoare:"
+                                                }),
+                                                " ",
+                                                proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata} RON` : "N/A"
+                                            ]
+                                        }),
+                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                            children: [
+                                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                                    children: "Data start:"
+                                                }),
+                                                " ",
+                                                proiectParinte.Data_Start || "N/A"
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            className: "flex justify-end gap-3 pt-4 border-t border-gray-200",
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                    type: "button",
+                                    onClick: onClose,
+                                    disabled: isSubmitting,
+                                    className: "bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50",
+                                    children: "Anulează"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                    type: "submit",
+                                    disabled: isSubmitting || !formData.denumire.trim(),
+                                    className: "bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
+                                    children: isSubmitting ? /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
+                                        children: "⏳ Se adaugă..."
+                                    }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
+                                        children: "\uD83D\uDCC2 Adaugă Subproiect"
+                                    })
+                                })
+                            ]
+                        })
+                    ]
+                })
+            ]
+        })
+    });
+}
+function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }) {
+    const [isOpen, setIsOpen] = react_experimental_default().useState(false);
+    const [loading, setLoading] = react_experimental_default().useState(null);
+    const handleActionClick = async (actionKey)=>{
+        if (loading) return;
+        setLoading(actionKey);
+        setIsOpen(false);
+        try {
+            await onAction(actionKey);
+        } finally{
+            setLoading(null);
+        }
+    };
+    const getStatusColor = (status)=>{
+        switch(status){
+            case "Activ":
+                return "#27ae60";
+            case "Finalizat":
+                return "#3498db";
+            case "Suspendat":
+                return "#f39c12";
+            case "Arhivat":
+                return "#95a5a6";
+            default:
+                return "#7f8c8d";
+        }
+    };
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
         style: {
             position: "relative",
             display: "inline-block"
         },
         children: [
-            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                onClick: ()=>setShowActions(!showActions),
-                disabled: isGeneratingInvoice,
+            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                onClick: ()=>setIsOpen(!isOpen),
+                disabled: loading !== null,
                 style: {
-                    padding: "8px 16px",
-                    backgroundColor: isGeneratingInvoice ? "#95a5a6" : "#3498db",
+                    padding: "6px 12px",
+                    background: loading ? "#bdc3c7" : "#3498db",
                     color: "white",
                     border: "none",
                     borderRadius: "4px",
-                    cursor: isGeneratingInvoice ? "not-allowed" : "pointer",
-                    fontSize: "14px"
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontSize: "14px",
+                    fontWeight: "bold"
                 },
-                children: isGeneratingInvoice ? "⏳ Generare..." : "⚙️ Acțiuni"
-            }),
-            showActions && !isGeneratingInvoice && /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
                 children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                    loading ? "⏳" : "⚙️",
+                    " Acțiuni"
+                ]
+            }),
+            isOpen && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                style: {
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    background: "white",
+                    border: "1px solid #ddd",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 9999,
+                    minWidth: "220px",
+                    marginTop: "4px"
+                },
+                children: [
+                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
-                            position: "absolute",
-                            top: "100%",
-                            right: 0,
-                            backgroundColor: "white",
-                            border: "1px solid #ddd",
-                            borderRadius: "6px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                            zIndex: 1000,
-                            minWidth: "200px",
-                            marginTop: "4px"
+                            padding: "12px",
+                            borderBottom: "1px solid #eee",
+                            background: "#f8f9fa"
                         },
-                        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            style: {
-                                padding: "8px 0"
-                            },
-                            children: [
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                    onClick: handleCreateInvoice,
-                                    style: {
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        backgroundColor: "transparent",
-                                        border: "none",
-                                        textAlign: "left",
-                                        cursor: "pointer",
-                                        fontSize: "14px",
-                                        color: "#2c3e50",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px"
-                                    },
-                                    onMouseOver: (e)=>{
-                                        e.currentTarget.style.backgroundColor = "#f8f9fa";
-                                    },
-                                    onMouseOut: (e)=>{
-                                        e.currentTarget.style.backgroundColor = "transparent";
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            children: "\uD83D\uDCB0"
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            children: "Generează Factură PDF"
-                                        })
-                                    ]
-                                }),
-                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    style: {
-                                        height: "1px",
-                                        backgroundColor: "#eee",
-                                        margin: "4px 0"
-                                    }
-                                }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                    onClick: handleGenerateContract,
-                                    style: {
-                                        width: "100%",
-                                        padding: "12px 16px",
-                                        backgroundColor: "transparent",
-                                        border: "none",
-                                        textAlign: "left",
-                                        cursor: "pointer",
-                                        fontSize: "14px",
-                                        color: "#2c3e50",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px"
-                                    },
-                                    onMouseOver: (e)=>{
-                                        e.currentTarget.style.backgroundColor = "#f8f9fa";
-                                    },
-                                    onMouseOut: (e)=>{
-                                        e.currentTarget.style.backgroundColor = "transparent";
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            children: "\uD83D\uDCC4"
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            children: "Generează Contract"
-                                        })
-                                    ]
-                                })
-                            ]
-                        })
+                        children: [
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    color: "#2c3e50",
+                                    marginBottom: "4px"
+                                },
+                                children: [
+                                    proiect.ID_Proiect,
+                                    proiect.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            marginLeft: "8px",
+                                            fontSize: "10px",
+                                            background: "#3498db",
+                                            color: "white",
+                                            padding: "2px 6px",
+                                            borderRadius: "3px"
+                                        },
+                                        children: "SUB"
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    fontSize: "11px",
+                                    color: "#7f8c8d"
+                                },
+                                children: [
+                                    "Status: ",
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            color: getStatusColor(proiect.Status),
+                                            fontWeight: "bold"
+                                        },
+                                        children: proiect.Status
+                                    })
+                                ]
+                            })
+                        ]
                     }),
                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
-                            position: "fixed",
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 999
+                            padding: "8px 0"
                         },
-                        onClick: ()=>setShowActions(false)
+                        children: actions.map((action)=>{
+                            if (action.divider) {
+                                return /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    style: {
+                                        height: "1px",
+                                        background: "#eee",
+                                        margin: "8px 0"
+                                    }
+                                }, action.key);
+                            }
+                            return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                onClick: ()=>handleActionClick(action.key),
+                                disabled: action.disabled || loading === action.key,
+                                style: {
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    background: "transparent",
+                                    border: "none",
+                                    textAlign: "left",
+                                    cursor: action.disabled || loading === action.key ? "not-allowed" : "pointer",
+                                    fontSize: "14px",
+                                    color: action.disabled ? "#bdc3c7" : action.color === "danger" ? "#e74c3c" : "#2c3e50",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    opacity: action.disabled ? 0.5 : 1,
+                                    transition: "background-color 0.2s"
+                                },
+                                onMouseOver: (e)=>{
+                                    if (!action.disabled && loading !== action.key) {
+                                        e.currentTarget.style.background = action.color === "danger" ? "#fdf2f2" : "#f8f9fa";
+                                    }
+                                },
+                                onMouseOut: (e)=>{
+                                    e.currentTarget.style.background = "transparent";
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            minWidth: "16px"
+                                        },
+                                        children: loading === action.key ? "⏳" : action.icon
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        children: action.label
+                                    })
+                                ]
+                            }, action.key);
+                        })
                     })
                 ]
+            }),
+            isOpen && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 9998
+                },
+                onClick: ()=>setIsOpen(false)
             })
         ]
     });
@@ -2390,7 +4038,7 @@ function ProiecteTable({ searchParams }) {
                                                         textAlign: "center",
                                                         position: "relative" // Important pentru dropdown positioning
                                                     },
-                                                    children: /*#__PURE__*/ jsx_runtime_.jsx(ActionDropdown, {
+                                                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
                                                         proiect: proiect,
                                                         onRefresh: handleRefresh
                                                     })

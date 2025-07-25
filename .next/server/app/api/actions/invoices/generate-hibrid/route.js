@@ -54,13 +54,6 @@ module.exports = require("fs");
 
 /***/ }),
 
-/***/ 73292:
-/***/ ((module) => {
-
-module.exports = require("fs/promises");
-
-/***/ }),
-
 /***/ 13685:
 /***/ ((module) => {
 
@@ -236,13 +229,6 @@ module.exports = require("worker_threads");
 
 /***/ }),
 
-/***/ 59796:
-/***/ ((module) => {
-
-module.exports = require("zlib");
-
-/***/ }),
-
 /***/ 37967:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
@@ -277,25 +263,14 @@ var route_kind = __webpack_require__(19513);
 var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: ./node_modules/@google-cloud/bigquery/build/src/index.js
 var src = __webpack_require__(63452);
-// EXTERNAL MODULE: ./node_modules/pdfkit/js/pdfkit.js
-var pdfkit = __webpack_require__(60553);
-var pdfkit_default = /*#__PURE__*/__webpack_require__.n(pdfkit);
-// EXTERNAL MODULE: external "path"
-var external_path_ = __webpack_require__(71017);
-var external_path_default = /*#__PURE__*/__webpack_require__.n(external_path_);
-// EXTERNAL MODULE: external "fs/promises"
-var promises_ = __webpack_require__(73292);
-var promises_default = /*#__PURE__*/__webpack_require__.n(promises_);
 ;// CONCATENATED MODULE: ./app/api/actions/invoices/generate-hibrid/route.ts
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// DESCRIERE: Generare factură hibridă cu PDFKit (Vercel compatible)
+// MODIFICAT: Îmbunătățit cu client_id lookup din BD + metadata completa
 // ==================================================================
 
 
-
-
-
+// Inițializare BigQuery
 const bigquery = new src.BigQuery({
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
     credentials: {
@@ -304,129 +279,500 @@ const bigquery = new src.BigQuery({
         client_id: process.env.GOOGLE_CLOUD_CLIENT_ID
     }
 });
-const dataset = "PanouControlUnitar";
 async function POST(request) {
     try {
         const body = await request.json();
-        // 1. Preluare date proiect + client din BigQuery
-        const proiectQuery = `
-      SELECT 
-        p.ID_Proiect,
-        p.Denumire as proiect_denumire,
-        p.Client as client_nume,
-        p.Valoare_Estimata,
-        p.Data_Start,
-        p.Data_Final,
-        p.Status,
-        c.id as client_id,
-        c.nume as client_nume_complet,
-        c.cui as client_cui,
-        c.nr_reg_com as client_nrc,
-        c.adresa as client_adresa,
-        c.judet as client_judet,
-        c.oras as client_oras,
-        c.iban as client_iban,
-        c.banca as client_banca,
-        c.telefon as client_telefon,
-        c.email as client_email
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\` c 
-        ON p.Client = c.nume
-      WHERE p.ID_Proiect = @proiectId
-    `;
-        const [proiectRows] = await bigquery.query({
-            query: proiectQuery,
-            params: {
-                proiectId: body.proiectId
-            },
-            location: "EU"
+        const { proiectId, liniiFactura, observatii, clientInfo } = body;
+        console.log("Date primite pentru factură hibridă:", {
+            proiectId,
+            liniiFactura,
+            observatii,
+            clientInfo
         });
-        if (proiectRows.length === 0) {
+        // Validări și defaults
+        if (!proiectId) {
             return next_response/* default */.Z.json({
-                error: "Proiectul nu a fost găsit"
+                error: "Lipsește proiectId"
             }, {
-                status: 404
+                status: 400
             });
         }
-        const proiectData = proiectRows[0];
-        // 2. Verificare date client - folosește Client din proiect ca fallback
-        const clientCui = proiectData.client_cui || "N/A";
-        const clientDenumire = proiectData.client_nume_complet || proiectData.client_nume;
-        // 3. Generare număr factură
-        const numarFactura = await generateInvoiceNumber();
-        // 4. Calculare totaluri
-        const { subtotal, totalTva, totalGeneral } = calculateTotals(body.liniiFactura);
-        // 5. Structura factură completă
-        const facturaCompleta = {
-            id: numarFactura,
-            numar: numarFactura,
-            data: new Date().toISOString().split("T")[0],
-            scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-            client: {
-                id: proiectData.client_id || "temp_id",
-                denumire: clientDenumire,
-                cui: clientCui,
-                nrRegCom: proiectData.client_nrc || "",
-                adresa: buildClientAddress(proiectData),
-                iban: proiectData.client_iban || "",
-                banca: proiectData.client_banca || "",
-                telefon: proiectData.client_telefon || "",
-                email: proiectData.client_email || ""
-            },
-            furnizor: {
-                denumire: "UNITAR PROIECT TDA S.R.L.",
-                cui: "RO39613458",
-                nrRegCom: "J40/10789/2018",
-                adresa: "Șos. Panduri nr. 94-96, Sector 5, București",
-                iban: "RO49TREZ7010671234567890",
-                banca: "Trezoreria Statului"
-            },
-            proiect: {
-                id: proiectData.ID_Proiect,
-                denumire: proiectData.proiect_denumire,
-                dataStart: proiectData.Data_Start,
-                dataFinalizare: proiectData.Data_Final,
-                valoareEstimata: proiectData.Valoare_Estimata
-            },
-            linii: body.liniiFactura.map((linie)=>{
-                // FIX: Convertește toate valorile la numere
-                const cantitate = Number(linie.cantitate) || 0;
-                const pretUnitar = Number(linie.pretUnitar) || 0;
-                const cotaTva = Number(linie.cotaTva) || 0;
-                const valoare = cantitate * pretUnitar;
-                const valoreTva = valoare * (cotaTva / 100);
-                return {
-                    denumire: linie.denumire,
-                    cantitate,
-                    pretUnitar,
-                    cotaTva,
-                    valoare,
-                    valoreTva,
-                    total: valoare + valoreTva
-                };
-            }),
-            subtotal,
-            totalTva,
-            totalGeneral,
-            observatii: body.observatii || ""
+        if (!liniiFactura || !Array.isArray(liniiFactura) || liniiFactura.length === 0) {
+            return next_response/* default */.Z.json({
+                error: "Lipsesc liniile facturii"
+            }, {
+                status: 400
+            });
+        }
+        if (!clientInfo || !clientInfo.denumire || !clientInfo.cui) {
+            return next_response/* default */.Z.json({
+                error: "Informațiile clientului sunt incomplete"
+            }, {
+                status: 400
+            });
+        }
+        // ✅ NOUĂ: Caută client_id în BD pe baza CUI-ului
+        let clientId = null;
+        try {
+            const clientQuery = `
+        SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+        WHERE activ = true AND cui = @cui
+        LIMIT 1
+      `;
+            const [clientRows] = await bigquery.query({
+                query: clientQuery,
+                params: {
+                    cui: clientInfo.cui
+                },
+                location: "EU"
+            });
+            if (clientRows.length > 0) {
+                clientId = clientRows[0].id;
+                console.log("✅ Client găsit \xeen BD:", clientId);
+            } else {
+                console.log("⚠️ Client nu găsit \xeen BD pentru CUI:", clientInfo.cui);
+            }
+        } catch (error) {
+            console.error("Eroare la căutarea clientului \xeen BD:", error);
+        }
+        // ✅ NOUĂ: Încarcă informații complete despre proiect din BD
+        let proiectInfo = null;
+        try {
+            const proiectQuery = `
+        SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+        WHERE ID_Proiect = @proiectId
+        LIMIT 1
+      `;
+            const [proiectRows] = await bigquery.query({
+                query: proiectQuery,
+                params: {
+                    proiectId
+                },
+                location: "EU"
+            });
+            if (proiectRows.length > 0) {
+                proiectInfo = proiectRows[0];
+                console.log("✅ Proiect găsit \xeen BD:", proiectInfo.Denumire);
+            }
+        } catch (error) {
+            console.error("Eroare la \xeencărcarea proiectului din BD:", error);
+        }
+        // Calculează totalurile din liniiFactura cu verificări sigure
+        let subtotal = 0;
+        let totalTva = 0;
+        liniiFactura.forEach((linie)=>{
+            const cantitate = Number(linie.cantitate) || 0;
+            const pretUnitar = Number(linie.pretUnitar) || 0;
+            const cotaTva = Number(linie.cotaTva) || 0;
+            const valoare = cantitate * pretUnitar;
+            const tva = valoare * (cotaTva / 100);
+            subtotal += valoare;
+            totalTva += tva;
+        });
+        const total = subtotal + totalTva;
+        // Folosește clientInfo din modal
+        const safeClientData = {
+            nume: clientInfo.denumire,
+            cui: clientInfo.cui,
+            nr_reg_com: clientInfo.nrRegCom || "",
+            adresa: clientInfo.adresa,
+            telefon: clientInfo.telefon || "N/A",
+            email: clientInfo.email || "N/A"
         };
-        // 6. Generare PDF
-        const pdfBuffer = await generatePDF(facturaCompleta);
-        // 7. Salvare PDF
-        const pdfPath = await savePDF(pdfBuffer, numarFactura);
-        // 8. Salvare în BigQuery (tabelul FacturiGenerate)
-        await saveInvoiceToFacturiGenerate(facturaCompleta, pdfPath);
-        // 9. Procesare ANAF în background (viitoarea implementare)
-        // processANAFBackground(facturaCompleta);
+        // ✅ ÎMBUNĂTĂȚIT: Folosește informațiile reale din proiect
+        const safeInvoiceData = {
+            numarFactura: `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+            denumireProiect: proiectInfo?.Denumire || `Proiect #${proiectId}`,
+            descriere: liniiFactura[0]?.denumire || "Servicii de consultanță",
+            subtotal: Number(subtotal.toFixed(2)),
+            tva: Number(totalTva.toFixed(2)),
+            total: Number(total.toFixed(2)),
+            termenPlata: "30 zile"
+        };
+        // Funcție sigură pentru formatare numerică în template
+        const safeFormat = (num)=>(Number(num) || 0).toFixed(2);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const fileName = `factura-${safeInvoiceData.numarFactura}-${timestamp}.pdf`;
+        // ✅ TEMPLATE HTML FINAL - optimizat și corectat
+        const htmlTemplate = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Factura ${safeInvoiceData.numarFactura}</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 10px;
+                line-height: 1.2;
+                color: #333;
+                padding: 15px;
+                background: white;
+                min-height: 1000px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .header h1 {
+                font-size: 16px;
+                color: #2c3e50;
+                margin-bottom: 10px;
+                font-weight: bold;
+            }
+            .company-info {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 20px;
+                gap: 20px;
+            }
+            .company-left, .company-right {
+                flex: 1;
+            }
+            .company-left h3, .company-right h3 {
+                font-size: 14px;
+                color: #34495e;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #bdc3c7;
+                padding-bottom: 4px;
+                font-weight: bold;
+            }
+            .info-line {
+                margin-bottom: 4px;
+                font-size: 10px;
+            }
+            .invoice-details {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 3px;
+                margin-bottom: 20px;
+            }
+            .invoice-number {
+                font-size: 12px;
+                font-weight: bold;
+                color: #e74c3c;
+                margin-bottom: 8px;
+            }
+            .invoice-meta {
+                display: flex;
+                gap: 30px;
+                font-size: 10px;
+            }
+            .table-container {
+                margin-bottom: 20px;
+                flex-grow: 1;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-size: 10px;
+            }
+            th {
+                background: #34495e;
+                color: white;
+                padding: 8px 4px;
+                text-align: left;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            td {
+                padding: 6px 4px;
+                border-bottom: 1px solid #ecf0f1;
+                font-size: 10px;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .totals-section {
+                margin-top: 2px;
+                margin-left: auto;
+                width: 150px;
+            }
+            .totals-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 4px 0;
+                border-bottom: 1px solid #ecf0f1;
+                font-size: 10px;
+            }
+            .totals-row.final {
+                border-top: 2px solid #34495e;
+                border-bottom: 2px solid #34495e;
+                font-weight: bold;
+                font-size: 12px;
+                background: #f8f9fa;
+                padding: 6px 0;
+            }
+            .payment-info {
+                margin-top: 15px;
+                background: #f8f9fa;
+                padding: 12px;
+                border-radius: 3px;
+            }
+            .payment-info h4 {
+                color: #34495e;
+                margin-bottom: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            .bank-details {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                margin-top: 8px;
+            }
+            .bank-section {
+                border: 1px solid #dee2e6;
+                padding: 8px;
+                border-radius: 3px;
+                background: white;
+            }
+            .bank-section h5 {
+                font-size: 10px;
+                font-weight: bold;
+                color: #34495e;
+                margin-bottom: 5px;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 2px;
+            }
+            .signatures {
+                margin-top: 25px;
+                display: flex;
+                justify-content: space-between;
+            }
+            .signature-box {
+                text-align: center;
+                width: 120px;
+            }
+            .signature-line {
+                border-top: 1px solid #34495e;
+                margin-top: 20px;
+                padding-top: 4px;
+                font-size: 9px;
+            }
+            .footer {
+                margin-top: 20px;
+                text-align: center;
+                font-size: 8px;
+                color: #7f8c8d;
+                border-top: 1px solid #ecf0f1;
+                padding-top: 10px;
+            }
+            .footer .generated-info {
+                margin-bottom: 8px;
+                font-size: 9px;
+                color: #34495e;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>FACTURA</h1>
+        </div>
+
+        <div class="company-info">
+            <div class="company-left">
+                <h3>FURNIZOR</h3>
+                <div class="info-line"><strong>UNITAR PROIECT TDA SRL</strong></div>
+                <div class="info-line">CUI: RO35639210</div>
+                <div class="info-line">Nr. Reg. Com.: J2016002024405</div>
+                <div class="info-line">Adresa: Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01, mun. Bucuresti, sector 4</div>
+                <div class="info-line">Telefon: 0765486044</div>
+                <div class="info-line">Email: contact@unitarproiect.eu</div>
+            </div>
+            <div class="company-right">
+                <h3>CLIENT</h3>
+                <div class="info-line"><strong>${safeClientData.nume}</strong></div>
+                <div class="info-line">CUI: ${safeClientData.cui}</div>
+                <div class="info-line">Nr. Reg. Com.: ${safeClientData.nr_reg_com}</div>
+                <div class="info-line">Adresa: ${safeClientData.adresa}</div>
+                <div class="info-line">Telefon: ${safeClientData.telefon}</div>
+                <div class="info-line">Email: ${safeClientData.email}</div>
+            </div>
+        </div>
+
+        <div class="invoice-details">
+            <div class="invoice-number">Factura nr: ${safeInvoiceData.numarFactura}</div>
+            <div class="invoice-meta">
+                <div><strong>Data:</strong> ${new Date().toLocaleDateString("ro-RO")}</div>
+                <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">Nr.</th>
+                        <th style="width: 300px;">Descriere</th>
+                        <th style="width: 60px;" class="text-center">Cant.</th>
+                        <th style="width: 80px;" class="text-right">Pret Unitar</th>
+                        <th style="width: 80px;" class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${liniiFactura.map((linie, index)=>{
+            const cantitate = Number(linie.cantitate) || 0;
+            const pretUnitar = Number(linie.pretUnitar) || 0;
+            const cotaTva = Number(linie.cotaTva) || 0;
+            const valoare = cantitate * pretUnitar;
+            const tva = valoare * (cotaTva / 100);
+            const totalLinie = valoare + tva;
+            const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
+            return `
+                    <tr>
+                        <td class="text-center">${index + 1}</td>
+                        <td>${linie.denumire || "N/A"}${linie.tip === "subproiect" ? " (Subproiect)" : ""}</td>
+                        <td class="text-center">${safeFixed(cantitate)}</td>
+                        <td class="text-right">${safeFixed(pretUnitar)} RON</td>
+                        <td class="text-right">${safeFixed(valoare)} RON</td>
+                    </tr>`;
+        }).join("")}
+                </tbody>
+            </table>
+
+            <div class="totals-section">
+                <div class="totals-row">
+                    <span>Subtotal:</span>
+                    <span>${safeFormat(subtotal)} RON</span>
+                </div>
+                ${totalTva > 0 ? `
+                <div class="totals-row">
+                    <span>TVA:</span>
+                    <span>${safeFormat(totalTva)} RON</span>
+                </div>
+                ` : ""}
+                <div class="totals-row final">
+                    <span>TOTAL DE PLATA:</span>
+                    <span>${safeFormat(total)} RON</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="payment-info">
+            <h4>Conditii de plata</h4>
+            <div class="info-line">Termen de plata: ${safeInvoiceData.termenPlata}</div>
+            <div class="info-line">Metoda de plata: Transfer bancar</div>
+            
+            <div class="bank-details">
+                <div class="bank-section">
+                    <h5>CONT PRINCIPAL</h5>
+                    <div class="info-line">Banca: ING</div>
+                    <div class="info-line">IBAN: RO82INGB0000999905667533</div>
+                </div>
+                <div class="bank-section">
+                    <h5>CONT TREZORERIE</h5>
+                    <div class="info-line">IBAN: RO29TREZ7035069XXX018857</div>
+                    <div class="info-line">Trezoreria sectorului 3 Bucuresti</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="signatures">
+            <div class="signature-box">
+                <div>Furnizor</div>
+                <div class="signature-line">Semnatura si stampila</div>
+            </div>
+            <div class="signature-box">
+                <div>Client</div>
+                <div class="signature-line">Semnatura si stampila</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="generated-info">
+                <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
+                Data generarii: ${new Date().toLocaleString("ro-RO")}
+            </div>
+            <div>
+                Aceasta factura a fost generata electronic si nu necesita semnatura fizica.<br>
+                Pentru intrebari contactati: contact@unitarproiect.eu | 0765486044
+            </div>
+        </div>
+    </body>
+    </html>`;
+        // ✅ SALVARE COMPLETĂ și OPTIMIZATĂ în BigQuery
+        try {
+            const dataset = bigquery.dataset("PanouControlUnitar");
+            const table = dataset.table("FacturiGenerate");
+            // ✅ Calculează data scadentă (30 zile)
+            const dataScadenta = new Date();
+            dataScadenta.setDate(dataScadenta.getDate() + 30);
+            const facturaData = [
+                {
+                    id: crypto.randomUUID(),
+                    proiect_id: proiectId,
+                    serie: "INV",
+                    numar: safeInvoiceData.numarFactura,
+                    data_factura: new Date().toISOString().split("T")[0],
+                    data_scadenta: dataScadenta.toISOString().split("T")[0],
+                    id_factura_externa: null,
+                    url_publica: null,
+                    url_download: null,
+                    client_id: clientId,
+                    client_nume: safeClientData.nume,
+                    client_cui: safeClientData.cui,
+                    subtotal: Number(subtotal.toFixed(2)),
+                    total_tva: Number(totalTva.toFixed(2)),
+                    total: Number(total.toFixed(2)),
+                    valoare_platita: 0,
+                    status: "generata",
+                    data_trimitere: null,
+                    data_plata: null,
+                    date_complete_json: JSON.stringify({
+                        liniiFactura,
+                        observatii,
+                        clientInfo: safeClientData,
+                        proiectInfo: proiectInfo ? {
+                            id: proiectInfo.ID_Proiect,
+                            denumire: proiectInfo.Denumire,
+                            client: proiectInfo.Client,
+                            valoare_estimata: proiectInfo.Valoare_Estimata
+                        } : null,
+                        metadata: {
+                            user_agent: request.headers.get("user-agent"),
+                            timestamp: new Date().toISOString(),
+                            version: "2.0_hibrid"
+                        }
+                    }),
+                    data_creare: new Date().toISOString(),
+                    data_actualizare: new Date().toISOString()
+                }
+            ];
+            await table.insert(facturaData);
+            console.log("✅ Factură salvată complet \xeen BigQuery FacturiGenerate cu client_id:", clientId);
+        } catch (bgError) {
+            console.error("❌ Eroare la salvarea \xeen BigQuery:", bgError);
+        // Nu oprește procesul, doar loghează eroarea
+        }
+        // Returnează JSON cu HTML pentru generarea PDF pe client
         return next_response/* default */.Z.json({
             success: true,
-            invoiceId: numarFactura,
-            pdfPath: `/api/actions/invoices/download/${numarFactura}`,
-            downloadUrl: `/api/actions/invoices/download/${numarFactura}`,
-            message: "Factura a fost generată cu succes! PDF disponibil instant."
+            message: "Factură pregătită pentru generare",
+            fileName: fileName,
+            htmlContent: htmlTemplate,
+            invoiceData: {
+                numarFactura: safeInvoiceData.numarFactura,
+                total: total,
+                client: safeClientData.nume,
+                clientId: clientId,
+                proiectInfo: proiectInfo ? {
+                    denumire: proiectInfo.Denumire,
+                    client: proiectInfo.Client
+                } : null
+            }
         });
     } catch (error) {
-        console.error("Eroare generare factură hibridă:", error);
+        console.error("Eroare la generarea facturii hibride:", error);
         return next_response/* default */.Z.json({
             error: "Eroare la generarea facturii",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
@@ -434,276 +780,6 @@ async function POST(request) {
             status: 500
         });
     }
-}
-// Helper Functions
-// ================================================================
-function buildClientAddress(proiectData) {
-    const parts = [
-        proiectData.client_adresa,
-        proiectData.client_oras,
-        proiectData.client_judet
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join(", ") : "Adresă nedefinită";
-}
-async function generateInvoiceNumber() {
-    const year = new Date().getFullYear();
-    const countQuery = `
-    SELECT COUNT(*) as count 
-    FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\` 
-    WHERE EXTRACT(YEAR FROM data_factura) = @year
-  `;
-    const [rows] = await bigquery.query({
-        query: countQuery,
-        params: {
-            year
-        },
-        location: "EU"
-    });
-    const count = (rows[0]?.count || 0) + 1;
-    return `UNI${year}${count.toString().padStart(4, "0")}`;
-}
-function calculateTotals(linii) {
-    let subtotal = 0;
-    let totalTva = 0;
-    linii.forEach((linie)=>{
-        // FIX: Asigură-te că toate valorile sunt numere
-        const cantitate = Number(linie.cantitate) || 0;
-        const pretUnitar = Number(linie.pretUnitar) || 0;
-        const cotaTva = Number(linie.cotaTva) || 0;
-        const valoare = cantitate * pretUnitar;
-        const tva = valoare * (cotaTva / 100);
-        subtotal += valoare;
-        totalTva += tva;
-    });
-    return {
-        subtotal,
-        totalTva,
-        totalGeneral: subtotal + totalTva
-    };
-}
-async function generatePDF(factura) {
-    return new Promise((resolve, reject)=>{
-        try {
-            const doc = new (pdfkit_default())({
-                margin: 50,
-                size: "A4",
-                info: {
-                    Title: `Factură ${factura.numar}`,
-                    Author: "UNITAR PROIECT TDA S.R.L.",
-                    Subject: `Factură pentru proiectul ${factura.proiect.denumire}`,
-                    Keywords: "factură, unitar, proiect"
-                }
-            });
-            const chunks = [];
-            doc.on("data", (chunk)=>chunks.push(chunk));
-            doc.on("end", ()=>resolve(Buffer.concat(chunks)));
-            doc.on("error", reject);
-            // Culori și fonturi
-            const primaryColor = "#4caf50";
-            const textColor = "#333333";
-            const grayColor = "#666666";
-            // HEADER PRINCIPAL
-            doc.fontSize(24).fillColor(primaryColor).font("Helvetica-Bold").text("UNITAR PROIECT TDA S.R.L.", 50, 50);
-            doc.fontSize(11).fillColor(textColor).font("Helvetica").text("CUI: RO39613458 | Nr. Reg. Com: J40/10789/2018", 50, 80).text("Șos. Panduri nr. 94-96, Sector 5, București", 50, 95).text("IBAN: RO49TREZ7010671234567890 | Trezoreria Statului", 50, 110);
-            // TITLU FACTURĂ (dreapta)
-            doc.fontSize(32).fillColor(primaryColor).font("Helvetica-Bold").text("FACTURĂ", 400, 50);
-            // Casetă număr factură
-            doc.rect(400, 90, 140, 25).fillAndStroke("#f8f9fa", "#ddd");
-            doc.fontSize(14).fillColor(textColor).font("Helvetica-Bold").text(`Nr: ${factura.numar}`, 410, 98);
-            doc.fontSize(11).font("Helvetica").text(`Data emiterii: ${new Date(factura.data).toLocaleDateString("ro-RO")}`, 400, 125).text(`Data scadenței: ${new Date(factura.scadenta).toLocaleDateString("ro-RO")}`, 400, 140);
-            // LINIE SEPARATOR
-            doc.moveTo(50, 170).lineTo(550, 170).strokeColor(primaryColor).lineWidth(2).stroke();
-            // SECȚIUNEA CLIENT
-            doc.fontSize(14).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83D\uDCCB CUMPĂRĂTOR", 50, 190);
-            // Casetă client
-            doc.rect(50, 210, 500, 80).fillAndStroke("#f8f9fa", "#e0e0e0");
-            doc.fontSize(12).fillColor(textColor).font("Helvetica-Bold").text(factura.client.denumire, 60, 225);
-            doc.font("Helvetica").text(`CUI: ${factura.client.cui}`, 60, 245).text(`Nr. Reg. Com: ${factura.client.nrRegCom}`, 60, 260).text(`Adresa: ${factura.client.adresa}`, 60, 275);
-            // Contact client (dreapta în casetă)
-            if (factura.client.telefon || factura.client.email) {
-                let contactY = 245;
-                if (factura.client.telefon) {
-                    doc.text(`Telefon: ${factura.client.telefon}`, 350, contactY);
-                    contactY += 15;
-                }
-                if (factura.client.email) {
-                    doc.text(`Email: ${factura.client.email}`, 350, contactY);
-                }
-            }
-            // INFORMAȚII PROIECT
-            doc.fontSize(12).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83C\uDFD7️ PROIECT:", 50, 310);
-            doc.fillColor(textColor).font("Helvetica").text(`${factura.proiect.denumire} (ID: ${factura.proiect.id})`, 130, 310);
-            if (factura.proiect.dataStart || factura.proiect.dataFinalizare) {
-                const perioada = `${factura.proiect.dataStart ? new Date(factura.proiect.dataStart).toLocaleDateString("ro-RO") : "N/A"} - ${factura.proiect.dataFinalizare ? new Date(factura.proiect.dataFinalizare).toLocaleDateString("ro-RO") : "\xcen curs"}`;
-                doc.text(`📅 Perioada: ${perioada}`, 50, 325);
-            }
-            // TABEL HEADER
-            let tableY = 360;
-            const tableHeight = 25;
-            const colWidths = [
-                40,
-                200,
-                50,
-                80,
-                80,
-                50,
-                80,
-                90
-            ];
-            let currentX = 50;
-            // Header background
-            doc.rect(50, tableY, 500, tableHeight).fill(primaryColor);
-            // Header text
-            doc.fontSize(9).fillColor("white").font("Helvetica-Bold");
-            const headers = [
-                "Nr.",
-                "Denumirea serviciilor",
-                "Cant.",
-                "Preț unit.",
-                "Valoare",
-                "TVA%",
-                "TVA",
-                "Total (RON)"
-            ];
-            headers.forEach((header, i)=>{
-                const textX = currentX + colWidths[i] / 2;
-                doc.text(header, textX - header.length * 2.5, tableY + 8, {
-                    width: colWidths[i],
-                    align: "center"
-                });
-                currentX += colWidths[i];
-            });
-            // LINII TABEL
-            tableY += tableHeight;
-            doc.fillColor(textColor).font("Helvetica");
-            factura.linii.forEach((linie, index)=>{
-                // Alternating row colors
-                if (index % 2 === 0) {
-                    doc.rect(50, tableY, 500, 20).fill("#f9f9f9");
-                }
-                currentX = 50;
-                doc.fillColor(textColor).fontSize(9);
-                const rowData = [
-                    (index + 1).toString(),
-                    linie.denumire.substring(0, 35) + (linie.denumire.length > 35 ? "..." : ""),
-                    Number(linie.cantitate).toFixed(0),
-                    Number(linie.pretUnitar).toFixed(2),
-                    Number(linie.valoare).toFixed(2),
-                    `${Number(linie.cotaTva).toFixed(0)}%`,
-                    Number(linie.valoreTva).toFixed(2),
-                    Number(linie.total).toFixed(2)
-                ];
-                rowData.forEach((data, i)=>{
-                    const align = i === 0 || i === 2 || i === 5 ? "center" : i >= 3 ? "right" : "left";
-                    const textX = align === "center" ? currentX + colWidths[i] / 2 - data.length * 2.5 : align === "right" ? currentX + colWidths[i] - 5 : currentX + 5;
-                    doc.text(data, textX, tableY + 6, {
-                        width: colWidths[i],
-                        align: align
-                    });
-                    currentX += colWidths[i];
-                });
-                tableY += 20;
-            });
-            // TABEL BORDER
-            doc.rect(50, 360, 500, tableY - 360).stroke("#ddd");
-            // TOTALURI (dreapta)
-            const totalsX = 350;
-            tableY += 30;
-            // Casetă totaluri
-            doc.rect(totalsX, tableY, 200, 80).fillAndStroke("#f0f8f0", primaryColor);
-            doc.fontSize(11).fillColor(textColor).font("Helvetica");
-            doc.text("Subtotal (fără TVA):", totalsX + 10, tableY + 15);
-            doc.text(`${Number(factura.subtotal).toFixed(2)} RON`, totalsX + 120, tableY + 15);
-            doc.text("TVA:", totalsX + 10, tableY + 35);
-            doc.text(`${Number(factura.totalTva).toFixed(2)} RON`, totalsX + 120, tableY + 35);
-            // Total final
-            doc.fontSize(14).font("Helvetica-Bold").fillColor(primaryColor);
-            doc.text("TOTAL DE PLATĂ:", totalsX + 10, tableY + 55);
-            doc.text(`${Number(factura.totalGeneral).toFixed(2)} RON`, totalsX + 120, tableY + 55);
-            // OBSERVAȚII (dacă există)
-            if (factura.observatii) {
-                tableY += 100;
-                doc.fontSize(12).fillColor(primaryColor).font("Helvetica-Bold").text("\uD83D\uDCDD Observații:", 50, tableY);
-                doc.rect(50, tableY + 20, 500, 40).fillAndStroke("#fff3cd", "#ffc107");
-                doc.fontSize(10).fillColor(textColor).font("Helvetica").text(factura.observatii, 60, tableY + 30, {
-                    width: 480,
-                    align: "left"
-                });
-                tableY += 70;
-            }
-            // FOOTER
-            const footerY = doc.page.height - 80;
-            doc.moveTo(50, footerY - 10).lineTo(550, footerY - 10).strokeColor("#eee").lineWidth(1).stroke();
-            doc.fontSize(8).fillColor(grayColor).font("Helvetica").text("Factură generată automat de sistemul UNITAR PROIECT", 50, footerY, {
-                width: 500,
-                align: "center"
-            }).text(`Data și ora generării: ${new Date().toLocaleString("ro-RO")}`, 50, footerY + 12, {
-                width: 500,
-                align: "center"
-            }).text("Această factură este valabilă fără semnătură și ștampilă conform Legii 571/2003", 50, footerY + 24, {
-                width: 500,
-                align: "center"
-            });
-            doc.end();
-        } catch (error) {
-            console.error("PDFKit error:", error);
-            reject(error);
-        }
-    });
-}
-async function savePDF(pdfBuffer, invoiceNumber) {
-    const uploadsDir = external_path_default().join(process.cwd(), "uploads", "facturi");
-    await promises_default().mkdir(uploadsDir, {
-        recursive: true
-    });
-    const fileName = `${invoiceNumber}.pdf`;
-    const filePath = external_path_default().join(uploadsDir, fileName);
-    await promises_default().writeFile(filePath, pdfBuffer);
-    return `/uploads/facturi/${fileName}`;
-}
-async function saveInvoiceToFacturiGenerate(factura, pdfPath) {
-    const insertQuery = `
-    INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\`
-    (
-      id, proiect_id, serie, numar, data_factura, data_scadenta,
-      client_id, client_nume, client_cui, subtotal, total_tva, total,
-      status, data_creare, data_actualizare, date_complete_json
-    )
-    VALUES (
-      @id, @proiect_id, @serie, @numar, @data_factura, @data_scadenta,
-      @client_id, @client_nume, @client_cui, @subtotal, @total_tva, @total,
-      @status, @data_creare, @data_actualizare, @date_complete_json
-    )
-  `;
-    const params = {
-        id: factura.id,
-        proiect_id: factura.proiect.id,
-        serie: "UNI",
-        numar: factura.numar,
-        data_factura: factura.data,
-        data_scadenta: factura.scadenta,
-        client_id: factura.client.id,
-        client_nume: factura.client.denumire,
-        client_cui: factura.client.cui,
-        subtotal: factura.subtotal,
-        total_tva: factura.totalTva,
-        total: factura.totalGeneral,
-        status: "pdf_generated",
-        data_creare: new Date().toISOString(),
-        data_actualizare: new Date().toISOString(),
-        date_complete_json: JSON.stringify({
-            pdfPath,
-            linii: factura.linii,
-            observatii: factura.observatii,
-            furnizor: factura.furnizor,
-            client: factura.client
-        })
-    };
-    await bigquery.query({
-        query: insertQuery,
-        params,
-        location: "EU"
-    });
 }
 
 ;// CONCATENATED MODULE: ./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?page=%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&name=app%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&pagePath=private-next-app-dir%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute.ts&appDir=%2Fhome%2Fteodor%2FPM1-2025-07-17%2Funitar-admin%2Fapp&appPaths=%2Fapi%2Factions%2Finvoices%2Fgenerate-hibrid%2Froute&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
@@ -747,7 +823,7 @@ const originalPathname = "/api/actions/invoices/generate-hibrid/route";
 var __webpack_require__ = require("../../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,7256,6641,6115,553], () => (__webpack_exec__(37967)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335,7507,7256,6641,6115], () => (__webpack_exec__(37967)));
 module.exports = __webpack_exports__;
 
 })();
