@@ -39,13 +39,6 @@
       "static/chunks/464-364cd61d445a4ad1.js",
       "static/chunks/app/logout/page-aed329d4953f648d.js"
     ],
-    "/test-page/page": [
-      "static/chunks/webpack-b6e09ecdadc03a2a.js",
-      "static/chunks/bf6a786c-fac6a0c26c7747df.js",
-      "static/chunks/114-7b74cbd4b9d3d51a.js",
-      "static/chunks/main-app-c55efb12a7fbb29b.js",
-      "static/chunks/app/test-page/page-283ec69fba103701.js"
-    ],
     "/profil/page": [
       "static/chunks/webpack-b6e09ecdadc03a2a.js",
       "static/chunks/bf6a786c-fac6a0c26c7747df.js",
@@ -55,6 +48,13 @@
       "static/chunks/7c86ec74-4f3d135f122d6068.js",
       "static/chunks/464-364cd61d445a4ad1.js",
       "static/chunks/app/profil/page-c7e187d2c1afa258.js"
+    ],
+    "/test-page/page": [
+      "static/chunks/webpack-b6e09ecdadc03a2a.js",
+      "static/chunks/bf6a786c-fac6a0c26c7747df.js",
+      "static/chunks/114-7b74cbd4b9d3d51a.js",
+      "static/chunks/main-app-c55efb12a7fbb29b.js",
+      "static/chunks/app/test-page/page-283ec69fba103701.js"
     ],
     "/admin/page": [
       "static/chunks/webpack-b6e09ecdadc03a2a.js",
@@ -119,7 +119,7 @@
       "static/chunks/main-app-c55efb12a7fbb29b.js",
       "static/chunks/259-c7ad190c0e837254.js",
       "static/chunks/811-ce7f87a4b1158c0a.js",
-      "static/chunks/app/admin/rapoarte/proiecte/page-2dcf49073f736e17.js"
+      "static/chunks/app/admin/rapoarte/proiecte/page-bee1c85419bd8595.js"
     ],
     "/admin/rapoarte/proiecte/[id]/page": [
       "static/chunks/webpack-b6e09ecdadc03a2a.js",

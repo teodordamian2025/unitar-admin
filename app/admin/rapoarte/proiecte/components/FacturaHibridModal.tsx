@@ -1,21 +1,21 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Fix types compatibility + păstrare funcționalitate originală
+// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ✅ FIX: Interfață compatibilă cu formatul de date din ProiectActions
+// Interfețe compatibile cu formatul de date din ProiectActions
 interface ProiectData {
   ID_Proiect: string;
   Denumire: string;
   Client: string;
   Status: string;
   Valoare_Estimata?: number;
-  Data_Start?: string | { value: string }; // ✅ FIX: Support pentru ambele formate
-  Data_Final?: string | { value: string }; // ✅ FIX: Support pentru ambele formate
+  Data_Start?: string | { value: string };
+  Data_Final?: string | { value: string };
   tip?: 'proiect' | 'subproiect';
   Responsabil?: string;
   Adresa?: string;
@@ -67,32 +67,47 @@ declare global {
   }
 }
 
-// ✅ FIX: Toast system propriu pentru consistență
+// ✅ Toast system Glassmorphism Premium
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
-    z-index: 10000;
-    font-family: Arial, sans-serif;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+    padding: 16px 20px;
+    border-radius: 16px;
+    z-index: 16000;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
+  // Smooth entrance animation
   setTimeout(() => {
-    if (document.body.contains(toastEl)) {
-      document.body.removeChild(toastEl);
-    }
+    toastEl.style.transform = 'translateY(0)';
+    toastEl.style.opacity = '1';
+  }, 10);
+  
+  setTimeout(() => {
+    toastEl.style.transform = 'translateY(-10px)';
+    toastEl.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toastEl)) {
+        document.body.removeChild(toastEl);
+      }
+    }, 300);
   }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
@@ -120,7 +135,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [subproiecteDisponibile, setSubproiecteDisponibile] = useState<SubproiectInfo[]>([]);
   const [showSubproiecteSelector, setShowSubproiecteSelector] = useState(false);
 
-  // ✅ FIX: Helper pentru formatarea datelor cu support dual
+  // Helper pentru formatarea datelor cu support dual
   const formatDate = (date?: string | { value: string }): string => {
     if (!date) return '';
     const dateValue = typeof date === 'string' ? date : date.value;
@@ -141,6 +156,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     loadSubproiecte();
   }, [proiect]);
 
+  // Funcțiile existente rămân neschimbate - doar stilizarea se modifică
   const loadClientFromDatabase = async () => {
     if (!proiect.Client) return;
     
@@ -349,6 +365,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     };
   };
 
+  // Funcțiile pentru PDF processing rămân neschimbate
   const loadPDFLibraries = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (window.jsPDF && window.html2canvas) {
@@ -629,118 +646,380 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isLoading = isGenerating || isProcessingPDF;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-5xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
-        {/* Header îmbunătățit */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50">
+    <div style={{
+      position: 'fixed' as const,
+      inset: '0',
+      background: 'rgba(0, 0, 0, 0.3)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 13000, // ✅ Mai mare decât dropdown (10999) și subproiect modal (12000)
+      padding: '1rem'
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '20px',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '95vh',
+        overflowY: 'auto',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        position: 'relative' as const
+      }}>
+        {/* ✅ Header Glassmorphism Premium */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '2rem',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
+          borderRadius: '20px 20px 0 0'
+        }}>
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <h2 style={{
+              fontSize: '1.75rem',
+              fontWeight: '700',
+              color: '#2c3e50',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
               💰 Generare Factură Hibridă
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              📊 Auto-completare client din BD + selector subproiecte • Proiect: {proiect.ID_Proiect}
+            <p style={{
+              fontSize: '14px',
+              color: '#7f8c8d',
+              margin: '0.5rem 0 0 0',
+              fontWeight: '500'
+            }}>
+              📊 Auto-completare client din BD + selector subproiecte • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors"
             disabled={isLoading}
+            style={{
+              background: 'rgba(231, 76, 60, 0.1)',
+              color: '#e74c3c',
+              border: 'none',
+              borderRadius: '12px',
+              width: '48px',
+              height: '48px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontSize: '20px',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }
+            }}
           >
             ✕
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* ✅ Loading Overlay Glassmorphism */}
           {isLoading && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <span className="text-lg font-medium">
+            <div style={{
+              position: 'fixed' as const,
+              inset: '0',
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 14000 // ✅ Peste modalul principal
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                padding: '2rem',
+                borderRadius: '20px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: '#2c3e50'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    border: '3px solid #3498db',
+                    borderTop: '3px solid transparent',
+                    animation: 'spin 1s linear infinite'
+                  }}>
+                  </div>
+                  <span>
                     {isGenerating && !isProcessingPDF && '🔄 Se generează template-ul...'}
                     {isProcessingPDF && '📄 Se procesează PDF-ul cu date din BD...'}
                   </span>
                 </div>
+                <style>
+                  {`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}
+                </style>
               </div>
             </div>
           )}
 
-          {/* Secțiune informații proiect îmbunătățită */}
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          {/* ✅ Secțiune informații proiect Glassmorphism */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.05) 0%, rgba(52, 152, 219, 0.1) 100%)',
+            padding: '2rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(52, 152, 219, 0.1)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
               🏗️ Informații Proiect
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="bg-white p-3 rounded border">
-                <div className="text-gray-600 text-xs uppercase tracking-wide">ID Proiect</div>
-                <div className="font-mono font-bold text-gray-900">{proiect.ID_Proiect}</div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem'
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID Proiect</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#2c3e50', marginTop: '0.25rem', fontFamily: 'monospace' }}>{proiect.ID_Proiect}</div>
               </div>
-              <div className="bg-white p-3 rounded border">
-                <div className="text-gray-600 text-xs uppercase tracking-wide">Status</div>
-                <div className="font-semibold text-green-600">{proiect.Status}</div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>{proiect.Status}</div>
               </div>
-              <div className="bg-white p-3 rounded border md:col-span-2">
-                <div className="text-gray-600 text-xs uppercase tracking-wide">Denumire</div>
-                <div className="font-medium text-gray-900">{proiect.Denumire}</div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)',
+                gridColumn: 'span 2'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Denumire</div>
+                <div style={{ fontSize: '14px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiect.Denumire}</div>
               </div>
-              <div className="bg-white p-3 rounded border">
-                <div className="text-gray-600 text-xs uppercase tracking-wide">Valoare Estimată</div>
-                <div className="font-bold text-green-600">
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Estimată</div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
                   {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} RON` : 'N/A'}
                 </div>
               </div>
-              <div className="bg-white p-3 rounded border">
-                <div className="text-gray-600 text-xs uppercase tracking-wide">Perioada</div>
-                <div className="text-sm text-gray-900">
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Perioada</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>
                   {formatDate(proiect.Data_Start)} → {formatDate(proiect.Data_Final)}
                 </div>
               </div>
             </div>
             
-            {/* Secțiunea subproiecte îmbunătățită */}
+            {/* ✅ Secțiunea subproiecte Glassmorphism */}
             {subproiecteDisponibile.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-blue-200">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+              <div style={{
+                marginTop: '2rem',
+                paddingTop: '1.5rem',
+                borderTop: '1px solid rgba(52, 152, 219, 0.2)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '1rem'
+                }}>
+                  <h4 style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    margin: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
                     📋 Subproiecte Disponibile ({subproiecteDisponibile.length})
                   </h4>
                   <button
                     onClick={() => setShowSubproiecteSelector(!showSubproiecteSelector)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-1"
+                    style={{
+                      background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
+                    }}
                   >
                     {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
                   </button>
                 </div>
                 
                 {showSubproiecteSelector && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: '1rem',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    padding: '0.5rem'
+                  }}>
                     {subproiecteDisponibile.map((subproiect) => (
                       <div 
                         key={subproiect.ID_Subproiect} 
-                        className={`p-4 rounded-lg border-2 transition-all ${
-                          subproiect.adaugat 
-                            ? 'border-green-300 bg-green-50' 
-                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
-                        }`}
+                        style={{
+                          background: subproiect.adaugat ? 
+                            'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)' : 
+                            'rgba(255, 255, 255, 0.8)',
+                          border: subproiect.adaugat ? 
+                            '2px solid rgba(39, 174, 96, 0.3)' : 
+                            '1px solid rgba(0, 0, 0, 0.1)',
+                          borderRadius: '12px',
+                          padding: '1rem',
+                          transition: 'all 0.3s ease',
+                          backdropFilter: 'blur(10px)'
+                        }}
+                        onMouseOver={(e) => {
+                          if (!subproiect.adaugat) {
+                            e.currentTarget.style.border = '2px solid rgba(52, 152, 219, 0.3)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (!subproiect.adaugat) {
+                            e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm text-gray-900 mb-1">
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              color: '#2c3e50',
+                              marginBottom: '0.5rem'
+                            }}>
                               📋 {subproiect.Denumire}
                             </div>
-                            <div className="text-xs text-gray-600 space-y-1">
-                              <div>💰 Valoare: {subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</div>
-                              <div>📊 Status: <span className="font-medium">{subproiect.Status}</span></div>
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#7f8c8d',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.25rem'
+                            }}>
+                              <div>💰 Valoare: <span style={{ fontWeight: '600', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span></div>
+                              <div>📊 Status: <span style={{ fontWeight: '600' }}>{subproiect.Status}</span></div>
                             </div>
                           </div>
                           <button
                             onClick={() => addSubproiectToFactura(subproiect)}
                             disabled={subproiect.adaugat}
-                            className={`ml-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              subproiect.adaugat 
-                                ? 'bg-green-100 text-green-700 cursor-not-allowed' 
-                                : 'bg-green-500 text-white hover:bg-green-600'
-                            }`}
+                            style={{
+                              marginLeft: '1rem',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '8px',
+                              border: 'none',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: subproiect.adaugat ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.3s ease',
+                              background: subproiect.adaugat ? 
+                                'rgba(39, 174, 96, 0.2)' : 
+                                'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                              color: subproiect.adaugat ? '#27ae60' : 'white',
+                              boxShadow: subproiect.adaugat ? 'none' : '0 2px 8px rgba(39, 174, 96, 0.3)'
+                            }}
+                            onMouseOver={(e) => {
+                              if (!subproiect.adaugat) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (!subproiect.adaugat) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(39, 174, 96, 0.3)';
+                              }
+                            }}
                           >
                             {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
                           </button>
@@ -753,24 +1032,86 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+          {/* ✅ Secțiune Client Glassmorphism */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            padding: '2rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
                 👤 Informații Client
-                {isLoadingClient && <span className="text-sm text-blue-600">⏳ Se încarcă din BD...</span>}
+                {isLoadingClient && <span style={{ fontSize: '14px', color: '#3498db', fontWeight: '500' }}>⏳ Se încarcă din BD...</span>}
               </h3>
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <input
                   type="text"
                   value={cuiInput}
                   onChange={(e) => setCuiInput(e.target.value)}
                   placeholder="Introduceți CUI (ex: RO12345678)"
-                  className="px-3 py-2 border border-gray-300 rounded text-sm w-48"
+                  style={{
+                    padding: '0.75rem',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    width: '220px',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.border = '2px solid #3498db';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 />
                 <button
                   onClick={handlePreluareDateANAF}
                   disabled={isLoadingANAF || !cuiInput.trim()}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  style={{
+                    background: isLoadingANAF || !cuiInput.trim() ? 
+                      'rgba(149, 165, 166, 0.3)' : 
+                      'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '0.75rem 1.25rem',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: (isLoadingANAF || !cuiInput.trim()) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: (isLoadingANAF || !cuiInput.trim()) ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isLoadingANAF && cuiInput.trim()) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isLoadingANAF && cuiInput.trim()) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
+                    }
+                  }}
                 >
                   {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
                 </button>
@@ -778,71 +1119,190 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
             
             {anafError && (
-              <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
-                <p className="text-red-800 text-sm">❌ {anafError}</p>
+              <div style={{
+                background: 'rgba(231, 76, 60, 0.1)',
+                border: '1px solid rgba(231, 76, 60, 0.2)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <p style={{ fontSize: '14px', color: '#e74c3c', margin: 0, fontWeight: '500' }}>❌ {anafError}</p>
               </div>
             )}
             
             {clientInfo && (
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '1rem'
+              }}>
                 <div>
-                  <label className="block text-gray-600 mb-1">Denumire *</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '0.5rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Denumire *
+                  </label>
                   <input
                     type="text"
                     value={clientInfo.denumire}
                     onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      transition: 'all 0.3s ease',
+                      boxSizing: 'border-box'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1">CUI *</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '0.5rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    CUI *
+                  </label>
                   <input
                     type="text"
                     value={clientInfo.cui}
                     onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      transition: 'all 0.3s ease',
+                      boxSizing: 'border-box'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1">Nr. Reg. Com.</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '0.5rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Nr. Reg. Com.
+                  </label>
                   <input
                     type="text"
                     value={clientInfo.nrRegCom}
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      transition: 'all 0.3s ease',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1">Telefon</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '0.5rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Telefon
+                  </label>
                   <input
                     type="text"
                     value={clientInfo.telefon || ''}
                     onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      transition: 'all 0.3s ease',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-gray-600 mb-1">Adresa *</label>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '0.5rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Adresa *
+                  </label>
                   <input
                     type="text"
                     value={clientInfo.adresa}
                     onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      transition: 'all 0.3s ease',
+                      boxSizing: 'border-box'
+                    }}
                     required
                   />
                 </div>
                 
                 {(clientInfo.status || clientInfo.platitorTva) && (
-                  <div className="col-span-2 flex gap-4 text-xs">
+                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                     {clientInfo.status && (
-                      <span className={`px-2 py-1 rounded ${clientInfo.status === 'Activ' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        background: clientInfo.status === 'Activ' ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)',
+                        color: clientInfo.status === 'Activ' ? '#27ae60' : '#e74c3c'
+                      }}>
                         Status ANAF: {clientInfo.status}
                       </span>
                     )}
                     {clientInfo.platitorTva && (
-                      <span className={`px-2 py-1 rounded ${clientInfo.platitorTva === 'Da' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        background: clientInfo.platitorTva === 'Da' ? 'rgba(52, 152, 219, 0.2)' : 'rgba(243, 156, 18, 0.2)',
+                        color: clientInfo.platitorTva === 'Da' ? '#3498db' : '#f39c12'
+                      }}>
                         TVA: {clientInfo.platitorTva}
                       </span>
                     )}
@@ -850,8 +1310,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 )}
                 
                 {clientInfo.id && (
-                  <div className="col-span-2">
-                    <div className="bg-green-100 border border-green-200 rounded p-2 text-xs">
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{
+                      background: 'rgba(39, 174, 96, 0.1)',
+                      border: '1px solid rgba(39, 174, 96, 0.2)',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      fontSize: '12px'
+                    }}>
                       ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
                     </div>
                   </div>
@@ -860,29 +1326,135 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+          {/* ✅ Secțiune Servicii/Produse Glassmorphism */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            padding: '2rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
                 📋 Servicii/Produse
               </h3>
               <button
                 onClick={addLine}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.75rem 1.25rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                }}
               >
                 + Adaugă linie
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300 text-sm">
+            <div style={{ overflowX: 'auto', borderRadius: '12px', overflow: 'hidden' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)'
+              }}>
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 p-3 text-left">Denumire serviciu/produs *</th>
-                    <th className="border border-gray-300 p-3 text-center w-20">Cant.</th>
-                    <th className="border border-gray-300 p-3 text-center w-32">Pret unit. (RON)</th>
-                    <th className="border border-gray-300 p-3 text-center w-20">TVA %</th>
-                    <th className="border border-gray-300 p-3 text-center w-32">Total (RON)</th>
-                    <th className="border border-gray-300 p-3 text-center w-16">Acț.</th>
+                  <tr style={{
+                    background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(233, 236, 239, 0.9) 100%)'
+                  }}>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Denumire serviciu/produs *</th>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '80px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Cant.</th>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '130px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Preț unit. (RON)</th>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '80px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>TVA %</th>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '130px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Total (RON)</th>
+                    <th style={{
+                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '60px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#2c3e50',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Acț.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -898,11 +1470,39 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                     
                     return (
-                      <tr key={index} className={`hover:bg-gray-50 ${linie.tip === 'subproiect' ? 'bg-blue-50' : ''}`}>
-                        <td className="border border-gray-300 p-2">
-                          <div className="flex items-center gap-2">
+                      <tr key={index} style={{
+                        background: linie.tip === 'subproiect' ? 
+                          'rgba(52, 152, 219, 0.05)' : 
+                          index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(52, 152, 219, 0.08)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = linie.tip === 'subproiect' ? 
+                          'rgba(52, 152, 219, 0.05)' : 
+                          index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)';
+                      }}
+                      >
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}>
                             {linie.tip === 'subproiect' && (
-                              <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold">
+                              <span style={{
+                                background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '700'
+                              }}>
                                 SUB
                               </span>
                             )}
@@ -910,37 +1510,81 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               type="text"
                               value={linie.denumire}
                               onChange={(e) => updateLine(index, 'denumire', e.target.value)}
-                              className="flex-1 p-1 border rounded text-sm"
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                border: '1px solid rgba(0, 0, 0, 0.1)',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                background: 'rgba(255, 255, 255, 0.8)',
+                                transition: 'all 0.3s ease'
+                              }}
                               placeholder="Descrierea serviciului sau produsului..."
                               required
                             />
                           </div>
                         </td>
-                        <td className="border border-gray-300 p-2">
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem'
+                        }}>
                           <input
                             type="number"
                             value={linie.cantitate}
                             onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
-                            className="w-full p-1 border rounded text-center text-sm"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              borderRadius: '8px',
+                              textAlign: 'center',
+                              fontSize: '14px',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              transition: 'all 0.3s ease'
+                            }}
                             min="0"
                             step="0.01"
                           />
                         </td>
-                        <td className="border border-gray-300 p-2">
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem'
+                        }}>
                           <input
                             type="number"
                             value={linie.pretUnitar}
                             onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
-                            className="w-full p-1 border rounded text-right text-sm"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              borderRadius: '8px',
+                              textAlign: 'right',
+                              fontSize: '14px',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              transition: 'all 0.3s ease'
+                            }}
                             min="0"
                             step="0.01"
                           />
                         </td>
-                        <td className="border border-gray-300 p-2">
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem'
+                        }}>
                           <select
                             value={linie.cotaTva}
                             onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
-                            className="w-full p-1 border rounded text-center text-sm"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              borderRadius: '8px',
+                              textAlign: 'center',
+                              fontSize: '14px',
+                              background: 'rgba(255, 255, 255, 0.8)',
+                              transition: 'all 0.3s ease'
+                            }}
                           >
                             <option value={0}>0%</option>
                             <option value={5}>5%</option>
@@ -949,15 +1593,51 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             <option value={21}>21%</option>
                           </select>
                         </td>
-                        <td className="border border-gray-300 p-2 text-right font-semibold">
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#27ae60'
+                        }}>
                           {safeFixed(total)}
                         </td>
-                        <td className="border border-gray-300 p-2 text-center">
+                        <td style={{
+                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          padding: '0.75rem',
+                          textAlign: 'center'
+                        }}>
                           <button
                             onClick={() => removeLine(index)}
                             disabled={liniiFactura.length === 1}
-                            className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                            style={{
+                              background: liniiFactura.length === 1 ? 'rgba(149, 165, 166, 0.3)' : 'rgba(231, 76, 60, 0.1)',
+                              color: liniiFactura.length === 1 ? '#95a5a6' : '#e74c3c',
+                              border: 'none',
+                              borderRadius: '8px',
+                              width: '32px',
+                              height: '32px',
+                              cursor: liniiFactura.length === 1 ? 'not-allowed' : 'pointer',
+                              fontSize: '14px',
+                              transition: 'all 0.3s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
                             title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
+                            onMouseOver={(e) => {
+                              if (liniiFactura.length > 1) {
+                                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)';
+                                e.currentTarget.style.transform = 'scale(1.1)';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              if (liniiFactura.length > 1) {
+                                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }
+                            }}
                           >
                             🗑️
                           </button>
@@ -970,55 +1650,181 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <div className="w-96 bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+          {/* ✅ Secțiune Totaluri Glassmorphism */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{
+              width: '400px',
+              background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(39, 174, 96, 0.1) 100%)',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: '1px solid rgba(39, 174, 96, 0.2)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
                   <span>Subtotal (fără TVA):</span>
-                  <span className="font-semibold">{totals.subtotal} RON</span>
+                  <span style={{ fontWeight: '600' }}>{totals.subtotal} RON</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
                   <span>TVA:</span>
-                  <span className="font-semibold">{totals.totalTva} RON</span>
+                  <span style={{ fontWeight: '600' }}>{totals.totalTva} RON</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold border-t pt-2 border-green-300">
-                  <span>TOTAL DE PLATA:</span>
-                  <span className="text-green-600">{totals.totalGeneral} RON</span>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  paddingTop: '1rem',
+                  borderTop: '2px solid rgba(39, 174, 96, 0.3)',
+                  color: '#27ae60'
+                }}>
+                  <span>TOTAL DE PLATĂ:</span>
+                  <span>{totals.totalGeneral} RON</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              📝 Observații (opțional)
+          {/* ✅ Secțiune Observații Glassmorphism */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            padding: '2rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              marginBottom: '1rem'
+            }}>
+              <span style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                📝 Observații (opțional)
+              </span>
             </label>
             <textarea
               value={observatii}
               onChange={(e) => setObservatii(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+              style={{
+                width: '100%',
+                padding: '1rem',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '12px',
+                fontSize: '14px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                resize: 'vertical',
+                boxSizing: 'border-box'
+              }}
               rows={3}
               placeholder="Observații suplimentare pentru factură..."
+              onFocus={(e) => {
+                e.currentTarget.style.border = '2px solid #3498db';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
-          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-600">
+          {/* ✅ Footer Buttons Glassmorphism */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(0, 0, 0, 0.08)'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              color: '#7f8c8d',
+              fontWeight: '500'
+            }}>
               ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură.
             </div>
             
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={onClose}
                 disabled={isLoading}
-                className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50"
+                style={{
+                  background: 'rgba(149, 165, 166, 0.1)',
+                  color: '#7f8c8d',
+                  border: '1px solid rgba(149, 165, 166, 0.2)',
+                  borderRadius: '12px',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onMouseOver={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = 'rgba(149, 165, 166, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = 'rgba(149, 165, 166, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }
+                }}
               >
                 Anulează
               </button>
               <button
                 onClick={handleGenereazaFactura}
                 disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
-                className="bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                style={{
+                  background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 
+                    'rgba(149, 165, 166, 0.3)' : 
+                    'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.75rem 2rem',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'none' : '0 4px 12px rgba(39, 174, 96, 0.4)'
+                }}
+                onMouseOver={(e) => {
+                  if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
               >
                 {isLoading ? (
                   <>⏳ {isProcessingPDF ? 'Se generează PDF cu date BD...' : 'Se procesează...'}</>

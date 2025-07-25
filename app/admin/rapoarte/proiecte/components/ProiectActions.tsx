@@ -2,7 +2,7 @@
 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Fix React Error #31 + buton "Mai adaugă subproiect" + toast optimizat
+// MODIFICAT: Glassmorphism Premium + Dropdown Inteligent + Workflow îmbunătățit
 // ==================================================================
 
 import React from 'react';
@@ -24,8 +24,8 @@ interface ProiectActionsProps {
     Client: string;
     Status: string;
     Valoare_Estimata?: number;
-    Data_Start?: string | { value: string }; // ✅ FIX: Support pentru ambele formate
-    Data_Final?: string | { value: string }; // ✅ FIX: Support pentru ambele formate
+    Data_Start?: string | { value: string };
+    Data_Final?: string | { value: string };
     tip?: 'proiect' | 'subproiect';
     Responsabil?: string;
     Adresa?: string;
@@ -34,34 +34,48 @@ interface ProiectActionsProps {
   onRefresh?: () => void;
 }
 
-// ✅ FIX: Toast simple fără dependențe externe cu durată optimizată
+// ✅ Toast system Glassmorphism Premium
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
-    z-index: 10000;
-    font-family: Arial, sans-serif;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+    padding: 16px 20px;
+    border-radius: 16px;
+    z-index: 15000;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
     white-space: pre-line;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
-  // ✅ FIX: Durată optimizată - mai mult pentru mesaje lungi
+  // Smooth entrance animation
   setTimeout(() => {
-    if (document.body.contains(toastEl)) {
-      document.body.removeChild(toastEl);
-    }
+    toastEl.style.transform = 'translateY(0)';
+    toastEl.style.opacity = '1';
+  }, 10);
+  
+  setTimeout(() => {
+    toastEl.style.transform = 'translateY(-10px)';
+    toastEl.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toastEl)) {
+        document.body.removeChild(toastEl);
+      }
+    }, 300);
   }, type === 'success' ? 4000 : type === 'error' ? 5000 : type === 'info' && message.length > 200 ? 10000 : 6000);
 };
 
@@ -69,7 +83,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   const [showFacturaModal, setShowFacturaModal] = React.useState(false);
   const [showSubproiectModal, setShowSubproiectModal] = React.useState(false);
 
-  // ✅ FIX: Helper pentru formatarea datelor
+  // Helper pentru formatarea datelor
   const formatDate = (date?: string | { value: string }): string => {
     if (!date) return 'N/A';
     const dateValue = typeof date === 'string' ? date : date.value;
@@ -93,7 +107,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
       icon: '✏️',
       color: 'secondary'
     },
-    // ✅ FIX: Adaugă subproiect doar pentru proiectele principale
+    // Adaugă subproiect doar pentru proiectele principale
     ...(proiect.tip !== 'subproiect' ? [{
       key: 'add_subproject',
       label: 'Adaugă Subproiect',
@@ -184,7 +198,6 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     }
   };
 
-  // ✅ FIX: Deschide modalul pentru adăugare subproiect
   const handleAddSubproject = () => {
     setShowSubproiectModal(true);
   };
@@ -203,7 +216,6 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   const handleViewDetails = async () => {
-    // ✅ FIX: Afișează detalii complete în toast
     const detalii = `📋 ${proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT'}: ${proiect.ID_Proiect}
 
 📝 Denumire: ${proiect.Denumire}
@@ -221,7 +233,6 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   const handleEdit = async () => {
-    // ✅ FIX: Modal de confirmare pentru editare
     const confirmare = confirm(`Vrei să editezi ${proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul'} "${proiect.Denumire}"?\n\nNOTĂ: Funcția de editare va fi implementată în următoarea versiune.`);
     
     if (confirmare) {
@@ -309,13 +320,12 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
         />
       )}
 
-      {/* ✅ FIX: Modal pentru adăugare subproiect - VERSIUNE SAFE cu buton "Mai adaugă" */}
+      {/* ✅ Modal Glassmorphism pentru adăugare subproiect */}
       {showSubproiectModal && (
         <SubproiectModal
           proiectParinte={proiect}
           onClose={() => setShowSubproiectModal(false)}
           onSuccess={() => {
-            // ✅ NOUĂ: Nu închide modalul automat, doar refreshează datele
             showToast('✅ Subproiect adăugat cu succes!', 'success');
             onRefresh?.();
             showToast('💡 Poți adăuga încă un subproiect sau închide modalul!', 'info');
@@ -326,7 +336,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   );
 }
 
-// ✅ FIX: Modal pentru adăugare subproiect - SAFE IMPLEMENTATION cu buton "Mai adaugă"
+// ✅ Modal Glassmorphism Premium pentru adăugare subproiect
 interface SubproiectModalProps {
   proiectParinte: any;
   onClose: () => void;
@@ -334,7 +344,6 @@ interface SubproiectModalProps {
 }
 
 function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModalProps) {
-  // ✅ FIX: State safe cu strings pentru toate valorile
   const [formData, setFormData] = React.useState({
     denumire: '',
     responsabil: '',
@@ -345,7 +354,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // ✅ FIX: Handler safe pentru input changes
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -353,7 +361,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
     }));
   };
 
-  // ✅ NOUĂ: Funcție pentru resetarea formularului
   const resetForm = () => {
     setFormData({
       denumire: '',
@@ -402,8 +409,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
       console.log('Răspuns subproiect:', result);
 
       if (result.success) {
-        onSuccess(); // Trigger refresh fără închiderea modalului
-        // Reset formular pentru următorul subproiect
+        onSuccess();
         resetForm();
       } else {
         showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
@@ -417,74 +423,222 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        {/* Header îmbunătățit */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50">
+    <div style={{
+      position: 'fixed' as const,
+      inset: '0',
+      background: 'rgba(0, 0, 0, 0.3)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 12000,
+      padding: '1rem'
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '20px',
+        maxWidth: '800px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        position: 'relative' as const
+      }}>
+        {/* ✅ Header Glassmorphism */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '2rem',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
+          borderRadius: '20px 20px 0 0'
+        }}>
           <div>
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#2c3e50',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
               📂 Adaugă Subproiect Nou
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              🏗️ Proiect părinte: <span className="font-mono font-semibold">{proiectParinte.ID_Proiect}</span>
+            <p style={{
+              fontSize: '14px',
+              color: '#7f8c8d',
+              margin: '0.5rem 0 0 0',
+              fontWeight: '500'
+            }}>
+              🏗️ Proiect părinte: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiectParinte.ID_Proiect}</span>
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p style={{
+              fontSize: '12px',
+              color: '#95a5a6',
+              margin: '0.25rem 0 0 0'
+            }}>
               {proiectParinte.Denumire}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl p-2 hover:bg-gray-100 rounded-full transition-colors"
             disabled={isSubmitting}
+            style={{
+              background: 'rgba(231, 76, 60, 0.1)',
+              color: '#e74c3c',
+              border: 'none',
+              borderRadius: '12px',
+              width: '48px',
+              height: '48px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontSize: '20px',
+              fontWeight: '600',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              if (!isSubmitting) {
+                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)';
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!isSubmitting) {
+                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
+                e.currentTarget.style.transform = 'scale(1)';
+              }
+            }}
           >
             ✕
           </button>
         </div>
 
-        {/* Form îmbunătățit */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Denumire cu design îmbunătățit */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+        {/* ✅ Form Glassmorphism */}
+        <form onSubmit={handleSubmit} style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Denumire cu design Glassmorphism */}
+          <div style={{
+            background: 'rgba(52, 152, 219, 0.05)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(52, 152, 219, 0.1)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              marginBottom: '0.75rem'
+            }}>
               📝 Denumire Subproiect *
             </label>
             <input
               type="text"
               value={formData.denumire}
               onChange={(e) => handleInputChange('denumire', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+              style={{
+                width: '100%',
+                padding: '1rem',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '12px',
+                fontSize: '16px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                boxSizing: 'border-box'
+              }}
               placeholder="Introduceți denumirea subproiectului..."
               required
               disabled={isSubmitting}
+              onFocus={(e) => {
+                e.currentTarget.style.border = '2px solid #3498db';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             />
           </div>
 
-          {/* Grid pentru câmpurile în două coloane */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Grid pentru câmpuri în două coloane */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1.5rem'
+          }}>
             {/* Responsabil */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.6)',
+              padding: '1.25rem',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '0.75rem'
+              }}>
                 👤 Responsabil
               </label>
               <input
                 type="text"
                 value={formData.responsabil}
                 onChange={(e) => handleInputChange('responsabil', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  transition: 'all 0.3s ease',
+                  boxSizing: 'border-box'
+                }}
                 placeholder="Numele responsabilului..."
                 disabled={isSubmitting}
               />
             </div>
 
             {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.6)',
+              padding: '1.25rem',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '0.75rem'
+              }}>
                 📊 Status
               </label>
               <select
                 value={formData.status}
                 onChange={(e) => handleInputChange('status', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  transition: 'all 0.3s ease',
+                  boxSizing: 'border-box'
+                }}
                 disabled={isSubmitting}
               >
                 <option value="Activ">🟢 Activ</option>
@@ -495,44 +649,108 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </div>
 
             {/* Data Start */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.6)',
+              padding: '1.25rem',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '0.75rem'
+              }}>
                 📅 Data Început
               </label>
               <input
                 type="date"
                 value={formData.dataStart}
                 onChange={(e) => handleInputChange('dataStart', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  transition: 'all 0.3s ease',
+                  boxSizing: 'border-box'
+                }}
                 disabled={isSubmitting}
               />
             </div>
 
             {/* Data Final */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.6)',
+              padding: '1.25rem',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '0.75rem'
+              }}>
                 🏁 Data Finalizare
               </label>
               <input
                 type="date"
                 value={formData.dataFinal}
                 onChange={(e) => handleInputChange('dataFinal', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  transition: 'all 0.3s ease',
+                  boxSizing: 'border-box'
+                }}
                 disabled={isSubmitting}
               />
             </div>
           </div>
 
           {/* Valoare Estimată */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div style={{
+            background: 'rgba(46, 204, 113, 0.05)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(46, 204, 113, 0.1)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              marginBottom: '0.75rem'
+            }}>
               💰 Valoare Estimată (RON)
             </label>
             <input
               type="number"
               value={formData.valoareEstimata}
               onChange={(e) => handleInputChange('valoareEstimata', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              style={{
+                width: '100%',
+                padding: '1rem',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '12px',
+                fontSize: '16px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease',
+                boxSizing: 'border-box'
+              }}
               placeholder="0.00"
               min="0"
               step="0.01"
@@ -540,49 +758,145 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             />
           </div>
 
-          {/* Info despre proiectul părinte îmbunătățit */}
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200">
-            <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          {/* Info despre proiectul părinte Glassmorphism */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(149, 165, 166, 0.1) 0%, rgba(52, 152, 219, 0.1) 100%)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            border: '1px solid rgba(149, 165, 166, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h4 style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#2c3e50',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
               🏗️ Informații Proiect Părinte
             </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="bg-white p-2 rounded border">
-                <div className="text-gray-600 text-xs">CLIENT</div>
-                <div className="font-medium">{proiectParinte.Client}</div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem'
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CLIENT</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Client}</div>
               </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-gray-600 text-xs">STATUS</div>
-                <div className="font-medium">{proiectParinte.Status}</div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>STATUS</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Status}</div>
               </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-gray-600 text-xs">VALOARE</div>
-                <div className="font-medium">
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>VALOARE</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>
                   {proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'N/A'}
                 </div>
               </div>
-              <div className="bg-white p-2 rounded border">
-                <div className="text-gray-600 text-xs">ADRESĂ</div>
-                <div className="font-medium text-xs">{proiectParinte.Adresa || 'Nespecificată'}</div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}>
+                <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ADRESĂ</div>
+                <div style={{ fontSize: '12px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Adresa || 'Nespecificată'}</div>
               </div>
             </div>
           </div>
 
-          {/* ✅ NOUĂ: Butoane îmbunătățite cu "Mai adaugă" */}
-          <div className="flex justify-between items-center gap-3 pt-4 border-t border-gray-200">
+          {/* ✅ Butoane Glassmorphism cu workflow îmbunătățit */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid rgba(0, 0, 0, 0.08)'
+          }}>
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50 transition-colors"
+              style={{
+                background: 'rgba(149, 165, 166, 0.1)',
+                color: '#7f8c8d',
+                border: '1px solid rgba(149, 165, 166, 0.2)',
+                borderRadius: '12px',
+                padding: '0.75rem 1.5rem',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                backdropFilter: 'blur(10px)'
+              }}
+              onMouseOver={(e) => {
+                if (!isSubmitting) {
+                  e.currentTarget.style.background = 'rgba(149, 165, 166, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!isSubmitting) {
+                  e.currentTarget.style.background = 'rgba(149, 165, 166, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
             >
               ✕ Închide
             </button>
             
-            <div className="flex gap-2">
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 type="submit"
                 disabled={isSubmitting || !formData.denumire.trim()}
-                className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                style={{
+                  background: isSubmitting || !formData.denumire.trim() ? 
+                    'rgba(149, 165, 166, 0.3)' : 
+                    'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: (isSubmitting || !formData.denumire.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: (isSubmitting || !formData.denumire.trim()) ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
+                }}
+                onMouseOver={(e) => {
+                  if (!isSubmitting && formData.denumire.trim()) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isSubmitting && formData.denumire.trim()) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
+                  }
+                }}
               >
                 {isSubmitting ? (
                   <>⏳ Se adaugă...</>
@@ -591,15 +905,41 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 )}
               </button>
               
-              {/* ✅ NOUĂ: Butonul "Mai adaugă subproiect" */}
+              {/* ✅ Butonul "Resetează" înlocuiește "Mai adaugă" pentru UX mai bun */}
               <button
                 type="button"
                 onClick={resetForm}
                 disabled={isSubmitting}
-                className="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 flex items-center gap-1 transition-colors"
+                style={{
+                  background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.75rem 1rem',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  boxShadow: isSubmitting ? 'none' : '0 4px 12px rgba(39, 174, 96, 0.4)'
+                }}
                 title="Resetează formularul pentru a adăuga alt subproiect"
+                onMouseOver={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isSubmitting) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
+                  }
+                }}
               >
-                ➕ Mai adaugă
+                🔄 Resetează
               </button>
             </div>
           </div>
@@ -609,7 +949,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   );
 }
 
-// ✅ FIX: Componenta dropdown simplificată și stabilă
+// ✅ Dropdown Glassmorphism Premium cu poziționare inteligentă
 interface EnhancedActionDropdownProps {
   actions: ActionItem[];
   onAction: (actionKey: string) => void;
@@ -619,6 +959,35 @@ interface EnhancedActionDropdownProps {
 function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDropdownProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [loading, setLoading] = React.useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
+  // ✅ FIX: Calculează poziționarea inteligentă pentru ultimele 3 rânduri
+  const calculateDropdownPosition = () => {
+    if (!buttonRef.current) return;
+
+    const buttonRect = buttonRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 400; // Estimare înălțime dropdown
+    const spaceBelow = viewportHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
+
+    // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      setDropdownPosition('top');
+    } else {
+      setDropdownPosition('bottom');
+    }
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      calculateDropdownPosition();
+      // Recalculează la resize
+      window.addEventListener('resize', calculateDropdownPosition);
+      return () => window.removeEventListener('resize', calculateDropdownPosition);
+    }
+  }, [isOpen]);
 
   const handleActionClick = async (actionKey: string) => {
     if (loading) return;
@@ -643,20 +1012,51 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   };
 
+  const getActionColor = (color: string) => {
+    switch (color) {
+      case 'primary': return '#3498db';
+      case 'secondary': return '#95a5a6';
+      case 'success': return '#27ae60';
+      case 'warning': return '#f39c12';
+      case 'danger': return '#e74c3c';
+      default: return '#7f8c8d';
+    }
+  };
+
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ position: 'relative' as const, display: 'inline-block' }}>
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading !== null}
         style={{
-          padding: '6px 12px',
-          background: loading ? '#bdc3c7' : '#3498db',
+          background: loading ? 
+            'rgba(189, 195, 199, 0.3)' : 
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white',
           border: 'none',
-          borderRadius: '4px',
+          borderRadius: '12px',
+          padding: '0.5rem 1rem',
           cursor: loading ? 'not-allowed' : 'pointer',
           fontSize: '14px',
-          fontWeight: 'bold'
+          fontWeight: '600',
+          boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+          transition: 'all 0.3s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}
+        onMouseOver={(e) => {
+          if (!loading) {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+          }
+        }}
+        onMouseOut={(e) => {
+          if (!loading) {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+          }
         }}
       >
         {loading ? '⏳' : '⚙️'} Acțiuni
@@ -664,52 +1064,75 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
       {isOpen && (
         <>
-          {/* Overlay pentru a închide dropdown-ul */}
+          {/* Overlay Glassmorphism */}
           <div
             style={{
-              position: 'fixed',
+              position: 'fixed' as const,
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              zIndex: 9998
+              background: 'rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 10998
             }}
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Dropdown menu */}
+          {/* ✅ Dropdown Glassmorphism cu poziționare inteligentă */}
           <div style={{
-            position: 'absolute',
-            top: '100%',
+            position: 'absolute' as const,
+            [dropdownPosition]: '100%',
             right: 0,
-            background: 'white',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 9999,
-            minWidth: '220px',
-            marginTop: '4px'
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            minWidth: '260px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            zIndex: 10999,
+            marginTop: dropdownPosition === 'bottom' ? '8px' : '0',
+            marginBottom: dropdownPosition === 'top' ? '8px' : '0',
+            overflow: 'hidden' as const,
+            transform: 'scale(0.95)',
+            opacity: 0,
+            animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
           }}>
+            <style>
+              {`
+                @keyframes dropdownAppear {
+                  to {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
+                }
+              `}
+            </style>
+
+            {/* Header Glassmorphism */}
             <div style={{
-              padding: '12px',
-              borderBottom: '1px solid #eee',
-              background: '#f8f9fa'
+              padding: '1rem',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.8) 0%, rgba(233, 236, 239, 0.8) 100%)',
+              backdropFilter: 'blur(10px)'
             }}>
               <div style={{ 
                 fontSize: '12px', 
-                fontWeight: 'bold',
+                fontWeight: '700',
                 color: '#2c3e50',
-                marginBottom: '4px'
+                marginBottom: '0.5rem',
+                fontFamily: 'monospace'
               }}>
                 {proiect.ID_Proiect}
                 {proiect.tip === 'subproiect' && (
                   <span style={{ 
                     marginLeft: '8px',
                     fontSize: '10px',
-                    background: '#3498db',
+                    background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
                     color: 'white',
                     padding: '2px 6px',
-                    borderRadius: '3px'
+                    borderRadius: '6px',
+                    fontWeight: '600'
                   }}>
                     SUB
                   </span>
@@ -718,14 +1141,15 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                 Status: <span style={{ 
                   color: getStatusColor(proiect.Status),
-                  fontWeight: 'bold'
+                  fontWeight: '600'
                 }}>
                   {proiect.Status}
                 </span>
               </div>
             </div>
 
-            <div style={{ padding: '8px 0' }}>
+            {/* Actions cu Glassmorphism */}
+            <div style={{ padding: '0.5rem 0' }}>
               {actions.map((action) => {
                 if (action.divider) {
                   return (
@@ -733,8 +1157,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                       key={action.key}
                       style={{
                         height: '1px',
-                        background: '#eee',
-                        margin: '8px 0'
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
+                        margin: '0.5rem 0'
                       }}
                     />
                   );
@@ -747,29 +1171,39 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                     disabled={action.disabled || loading === action.key}
                     style={{
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: '0.75rem 1rem',
                       background: 'transparent',
                       border: 'none',
                       textAlign: 'left',
                       cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
-                      color: action.disabled ? '#bdc3c7' : (action.color === 'danger' ? '#e74c3c' : '#2c3e50'),
+                      color: action.disabled ? '#bdc3c7' : '#2c3e50',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '0.75rem',
                       opacity: action.disabled ? 0.5 : 1,
-                      transition: 'background-color 0.2s'
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
                     }}
                     onMouseOver={(e) => {
                       if (!action.disabled && loading !== action.key) {
-                        e.currentTarget.style.background = action.color === 'danger' ? '#fdf2f2' : '#f8f9fa';
+                        e.currentTarget.style.background = `linear-gradient(135deg, ${getActionColor(action.color)}15 0%, ${getActionColor(action.color)}08 100%)`;
+                        e.currentTarget.style.color = getActionColor(action.color);
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                        e.currentTarget.style.backdropFilter = 'blur(10px)';
                       }
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = action.disabled ? '#bdc3c7' : '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                      e.currentTarget.style.backdropFilter = 'none';
                     }}
                   >
-                    <span style={{ minWidth: '16px' }}>
+                    <span style={{ 
+                      minWidth: '20px',
+                      fontSize: '16px'
+                    }}>
                       {loading === action.key ? '⏳' : action.icon}
                     </span>
                     <span>

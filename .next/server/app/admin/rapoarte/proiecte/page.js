@@ -741,35 +741,49 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Fix types compatibility + păstrare funcționalitate originală
+// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
-// ✅ FIX: Toast system propriu pentru consistență
+// ✅ Toast system Glassmorphism Premium
 const showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
     toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
-    z-index: 10000;
-    font-family: Arial, sans-serif;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
+    padding: 16px 20px;
+    border-radius: 16px;
+    z-index: 16000;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
     toastEl.textContent = message;
     document.body.appendChild(toastEl);
+    // Smooth entrance animation
     setTimeout(()=>{
-        if (document.body.contains(toastEl)) {
-            document.body.removeChild(toastEl);
-        }
+        toastEl.style.transform = "translateY(0)";
+        toastEl.style.opacity = "1";
+    }, 10);
+    setTimeout(()=>{
+        toastEl.style.transform = "translateY(-10px)";
+        toastEl.style.opacity = "0";
+        setTimeout(()=>{
+            if (document.body.contains(toastEl)) {
+                document.body.removeChild(toastEl);
+            }
+        }, 300);
     }, type === "success" || type === "error" ? 4000 : 6000);
 };
 function FacturaHibridModal({ proiect, onClose, onSuccess }) {
@@ -793,7 +807,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     const [isProcessingPDF, setIsProcessingPDF] = (0,react_experimental_.useState)(false);
     const [subproiecteDisponibile, setSubproiecteDisponibile] = (0,react_experimental_.useState)([]);
     const [showSubproiecteSelector, setShowSubproiecteSelector] = (0,react_experimental_.useState)(false);
-    // ✅ FIX: Helper pentru formatarea datelor cu support dual
+    // Helper pentru formatarea datelor cu support dual
     const formatDate = (date)=>{
         if (!date) return "";
         const dateValue = typeof date === "string" ? date : date.value;
@@ -813,6 +827,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     }, [
         proiect
     ]);
+    // Funcțiile existente rămân neschimbate - doar stilizarea se modifică
     const loadClientFromDatabase = async ()=>{
         if (!proiect.Client) return;
         setIsLoadingClient(true);
@@ -997,6 +1012,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
             totalGeneral: safeFixed(subtotal + totalTva)
         };
     };
+    // Funcțiile pentru PDF processing rămân neschimbate
     const loadPDFLibraries = ()=>{
         return new Promise((resolve, reject)=>{
             if (window.jsPDF && window.html2canvas) {
@@ -1234,131 +1250,356 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     const totals = calculateTotals();
     const isLoading = isGenerating || isProcessingPDF;
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4",
+        style: {
+            position: "fixed",
+            inset: "0",
+            background: "rgba(0, 0, 0, 0.3)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 13000,
+            padding: "1rem"
+        },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-            className: "bg-white rounded-lg max-w-5xl w-full max-h-[95vh] overflow-y-auto shadow-2xl",
+            style: {
+                background: "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(20px)",
+                borderRadius: "20px",
+                maxWidth: "1200px",
+                width: "100%",
+                maxHeight: "95vh",
+                overflowY: "auto",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                position: "relative"
+            },
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50",
+                    style: {
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "2rem",
+                        borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)",
+                        borderRadius: "20px 20px 0 0"
+                    },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                    className: "text-2xl font-bold text-gray-800 flex items-center gap-2",
+                                    style: {
+                                        fontSize: "1.75rem",
+                                        fontWeight: "700",
+                                        color: "#2c3e50",
+                                        margin: 0,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.5rem"
+                                    },
                                     children: "\uD83D\uDCB0 Generare Factură Hibridă"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                    className: "text-sm text-gray-600 mt-1",
+                                    style: {
+                                        fontSize: "14px",
+                                        color: "#7f8c8d",
+                                        margin: "0.5rem 0 0 0",
+                                        fontWeight: "500"
+                                    },
                                     children: [
                                         "\uD83D\uDCCA Auto-completare client din BD + selector subproiecte • Proiect: ",
-                                        proiect.ID_Proiect
+                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                            style: {
+                                                fontFamily: "monospace",
+                                                fontWeight: "600",
+                                                color: "#3498db"
+                                            },
+                                            children: proiect.ID_Proiect
+                                        })
                                     ]
                                 })
                             ]
                         }),
                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                             onClick: onClose,
-                            className: "text-gray-500 hover:text-gray-700 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors",
                             disabled: isLoading,
+                            style: {
+                                background: "rgba(231, 76, 60, 0.1)",
+                                color: "#e74c3c",
+                                border: "none",
+                                borderRadius: "12px",
+                                width: "48px",
+                                height: "48px",
+                                cursor: isLoading ? "not-allowed" : "pointer",
+                                fontSize: "20px",
+                                fontWeight: "600",
+                                transition: "all 0.3s ease",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            },
+                            onMouseOver: (e)=>{
+                                if (!isLoading) {
+                                    e.currentTarget.style.background = "rgba(231, 76, 60, 0.2)";
+                                    e.currentTarget.style.transform = "scale(1.05)";
+                                }
+                            },
+                            onMouseOut: (e)=>{
+                                if (!isLoading) {
+                                    e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                    e.currentTarget.style.transform = "scale(1)";
+                                }
+                            },
                             children: "✕"
                         })
                     ]
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "p-6 space-y-6",
+                    style: {
+                        padding: "2rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "2rem"
+                    },
                     children: [
                         isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                            className: "fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50",
-                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                className: "bg-white p-6 rounded-lg shadow-lg",
-                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex items-center gap-3",
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                            className: "text-lg font-medium",
-                                            children: [
-                                                isGenerating && !isProcessingPDF && "\uD83D\uDD04 Se generează template-ul...",
-                                                isProcessingPDF && "\uD83D\uDCC4 Se procesează PDF-ul cu date din BD..."
-                                            ]
-                                        })
-                                    ]
-                                })
+                            style: {
+                                position: "fixed",
+                                inset: "0",
+                                background: "rgba(0, 0, 0, 0.3)",
+                                backdropFilter: "blur(8px)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 14000 // ✅ Peste modalul principal
+                            },
+                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    background: "rgba(255, 255, 255, 0.95)",
+                                    backdropFilter: "blur(20px)",
+                                    padding: "2rem",
+                                    borderRadius: "20px",
+                                    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+                                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                                    textAlign: "center"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "1rem",
+                                            fontSize: "18px",
+                                            fontWeight: "600",
+                                            color: "#2c3e50"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    width: "32px",
+                                                    height: "32px",
+                                                    borderRadius: "50%",
+                                                    border: "3px solid #3498db",
+                                                    borderTop: "3px solid transparent",
+                                                    animation: "spin 1s linear infinite"
+                                                }
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                children: [
+                                                    isGenerating && !isProcessingPDF && "\uD83D\uDD04 Se generează template-ul...",
+                                                    isProcessingPDF && "\uD83D\uDCC4 Se procesează PDF-ul cu date din BD..."
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("style", {
+                                        children: `
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `
+                                    })
+                                ]
                             })
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 shadow-sm",
+                            style: {
+                                background: "linear-gradient(135deg, rgba(52, 152, 219, 0.05) 0%, rgba(52, 152, 219, 0.1) 100%)",
+                                padding: "2rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(52, 152, 219, 0.1)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                    className: "text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2",
+                                    style: {
+                                        fontSize: "18px",
+                                        fontWeight: "600",
+                                        color: "#2c3e50",
+                                        marginBottom: "1.5rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.5rem"
+                                    },
                                     children: "\uD83C\uDFD7️ Informații Proiect"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-1 md:grid-cols-2 gap-4 text-sm",
+                                    style: {
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                                        gap: "1rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-3 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                                backdropFilter: "blur(10px)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs uppercase tracking-wide",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "ID Proiect"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-mono font-bold text-gray-900",
+                                                    style: {
+                                                        fontSize: "16px",
+                                                        fontWeight: "700",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem",
+                                                        fontFamily: "monospace"
+                                                    },
                                                     children: proiect.ID_Proiect
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-3 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                                backdropFilter: "blur(10px)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs uppercase tracking-wide",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Status"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-semibold text-green-600",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        color: "#27ae60",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiect.Status
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-3 rounded border md:col-span-2",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                                backdropFilter: "blur(10px)",
+                                                gridColumn: "span 2"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs uppercase tracking-wide",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Denumire"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-medium text-gray-900",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: "500",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiect.Denumire
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-3 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                                backdropFilter: "blur(10px)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs uppercase tracking-wide",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Valoare Estimată"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-bold text-green-600",
+                                                    style: {
+                                                        fontSize: "16px",
+                                                        fontWeight: "700",
+                                                        color: "#27ae60",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString("ro-RO")} RON` : "N/A"
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-3 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                                backdropFilter: "blur(10px)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs uppercase tracking-wide",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Perioada"
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                    className: "text-sm text-gray-900",
+                                                    style: {
+                                                        fontSize: "13px",
+                                                        fontWeight: "500",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: [
                                                         formatDate(proiect.Data_Start),
                                                         " → ",
@@ -1370,13 +1611,30 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     ]
                                 }),
                                 subproiecteDisponibile.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "mt-6 pt-4 border-t border-blue-200",
+                                    style: {
+                                        marginTop: "2rem",
+                                        paddingTop: "1.5rem",
+                                        borderTop: "1px solid rgba(52, 152, 219, 0.2)"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex items-center justify-between mb-3",
+                                            style: {
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                marginBottom: "1rem"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h4", {
-                                                    className: "font-semibold text-gray-700 flex items-center gap-2",
+                                                    style: {
+                                                        fontSize: "16px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        margin: 0,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "0.5rem"
+                                                    },
                                                     children: [
                                                         "\uD83D\uDCCB Subproiecte Disponibile (",
                                                         subproiecteDisponibile.length,
@@ -1385,7 +1643,29 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
                                                     onClick: ()=>setShowSubproiecteSelector(!showSubproiecteSelector),
-                                                    className: "bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-1",
+                                                    style: {
+                                                        background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                        color: "white",
+                                                        border: "none",
+                                                        borderRadius: "12px",
+                                                        padding: "0.5rem 1rem",
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        cursor: "pointer",
+                                                        transition: "all 0.3s ease",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "0.5rem",
+                                                        boxShadow: "0 4px 12px rgba(52, 152, 219, 0.4)"
+                                                    },
+                                                    onMouseOver: (e)=>{
+                                                        e.currentTarget.style.transform = "translateY(-2px)";
+                                                        e.currentTarget.style.boxShadow = "0 6px 16px rgba(52, 152, 219, 0.5)";
+                                                    },
+                                                    onMouseOut: (e)=>{
+                                                        e.currentTarget.style.transform = "translateY(0)";
+                                                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.4)";
+                                                    },
                                                     children: [
                                                         showSubproiecteSelector ? "\uD83D\uDC41️ Ascunde" : "\uD83D\uDC40 Afișează",
                                                         " Lista"
@@ -1394,36 +1674,89 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             ]
                                         }),
                                         showSubproiecteSelector && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto",
+                                            style: {
+                                                display: "grid",
+                                                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                                                gap: "1rem",
+                                                maxHeight: "300px",
+                                                overflowY: "auto",
+                                                padding: "0.5rem"
+                                            },
                                             children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: `p-4 rounded-lg border-2 transition-all ${subproiect.adaugat ? "border-green-300 bg-green-50" : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-md"}`,
+                                                    style: {
+                                                        background: subproiect.adaugat ? "linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)" : "rgba(255, 255, 255, 0.8)",
+                                                        border: subproiect.adaugat ? "2px solid rgba(39, 174, 96, 0.3)" : "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        padding: "1rem",
+                                                        transition: "all 0.3s ease",
+                                                        backdropFilter: "blur(10px)"
+                                                    },
+                                                    onMouseOver: (e)=>{
+                                                        if (!subproiect.adaugat) {
+                                                            e.currentTarget.style.border = "2px solid rgba(52, 152, 219, 0.3)";
+                                                            e.currentTarget.style.transform = "translateY(-2px)";
+                                                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
+                                                        }
+                                                    },
+                                                    onMouseOut: (e)=>{
+                                                        if (!subproiect.adaugat) {
+                                                            e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                                            e.currentTarget.style.transform = "translateY(0)";
+                                                            e.currentTarget.style.boxShadow = "none";
+                                                        }
+                                                    },
                                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                        className: "flex items-start justify-between",
+                                                        style: {
+                                                            display: "flex",
+                                                            alignItems: "flex-start",
+                                                            justifyContent: "space-between"
+                                                        },
                                                         children: [
                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                className: "flex-1",
+                                                                style: {
+                                                                    flex: 1
+                                                                },
                                                                 children: [
                                                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        className: "font-medium text-sm text-gray-900 mb-1",
+                                                                        style: {
+                                                                            fontSize: "14px",
+                                                                            fontWeight: "600",
+                                                                            color: "#2c3e50",
+                                                                            marginBottom: "0.5rem"
+                                                                        },
                                                                         children: [
                                                                             "\uD83D\uDCCB ",
                                                                             subproiect.Denumire
                                                                         ]
                                                                     }),
                                                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        className: "text-xs text-gray-600 space-y-1",
+                                                                        style: {
+                                                                            fontSize: "12px",
+                                                                            color: "#7f8c8d",
+                                                                            display: "flex",
+                                                                            flexDirection: "column",
+                                                                            gap: "0.25rem"
+                                                                        },
                                                                         children: [
                                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                                 children: [
                                                                                     "\uD83D\uDCB0 Valoare: ",
-                                                                                    subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "Fără valoare"
+                                                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                                                        style: {
+                                                                                            fontWeight: "600",
+                                                                                            color: "#27ae60"
+                                                                                        },
+                                                                                        children: subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "Fără valoare"
+                                                                                    })
                                                                                 ]
                                                                             }),
                                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                                 children: [
                                                                                     "\uD83D\uDCCA Status: ",
                                                                                     /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                                        className: "font-medium",
+                                                                                        style: {
+                                                                                            fontWeight: "600"
+                                                                                        },
                                                                                         children: subproiect.Status
                                                                                     })
                                                                                 ]
@@ -1435,7 +1768,31 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                                 onClick: ()=>addSubproiectToFactura(subproiect),
                                                                 disabled: subproiect.adaugat,
-                                                                className: `ml-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${subproiect.adaugat ? "bg-green-100 text-green-700 cursor-not-allowed" : "bg-green-500 text-white hover:bg-green-600"}`,
+                                                                style: {
+                                                                    marginLeft: "1rem",
+                                                                    padding: "0.5rem 1rem",
+                                                                    borderRadius: "8px",
+                                                                    border: "none",
+                                                                    fontSize: "12px",
+                                                                    fontWeight: "600",
+                                                                    cursor: subproiect.adaugat ? "not-allowed" : "pointer",
+                                                                    transition: "all 0.3s ease",
+                                                                    background: subproiect.adaugat ? "rgba(39, 174, 96, 0.2)" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                                    color: subproiect.adaugat ? "#27ae60" : "white",
+                                                                    boxShadow: subproiect.adaugat ? "none" : "0 2px 8px rgba(39, 174, 96, 0.3)"
+                                                                },
+                                                                onMouseOver: (e)=>{
+                                                                    if (!subproiect.adaugat) {
+                                                                        e.currentTarget.style.transform = "translateY(-2px)";
+                                                                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.4)";
+                                                                    }
+                                                                },
+                                                                onMouseOut: (e)=>{
+                                                                    if (!subproiect.adaugat) {
+                                                                        e.currentTarget.style.transform = "translateY(0)";
+                                                                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(39, 174, 96, 0.3)";
+                                                                    }
+                                                                },
                                                                 children: subproiect.adaugat ? "✓ Adăugat" : "+ Adaugă"
                                                             })
                                                         ]
@@ -1447,35 +1804,102 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-gray-50 p-4 rounded-lg border border-gray-200",
+                            style: {
+                                background: "rgba(255, 255, 255, 0.6)",
+                                padding: "2rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex items-center justify-between mb-4",
+                                    style: {
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        marginBottom: "1.5rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
-                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
+                                            style: {
+                                                fontSize: "18px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                margin: 0,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem"
+                                            },
                                             children: [
                                                 "\uD83D\uDC64 Informații Client",
                                                 isLoadingClient && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    className: "text-sm text-blue-600",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        color: "#3498db",
+                                                        fontWeight: "500"
+                                                    },
                                                     children: "⏳ Se \xeencarcă din BD..."
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex items-center gap-2",
+                                            style: {
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.75rem"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                     type: "text",
                                                     value: cuiInput,
                                                     onChange: (e)=>setCuiInput(e.target.value),
                                                     placeholder: "Introduceți CUI (ex: RO12345678)",
-                                                    className: "px-3 py-2 border border-gray-300 rounded text-sm w-48"
+                                                    style: {
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        width: "220px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        backdropFilter: "blur(10px)",
+                                                        transition: "all 0.3s ease"
+                                                    },
+                                                    onFocus: (e)=>{
+                                                        e.currentTarget.style.border = "2px solid #3498db";
+                                                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
+                                                    },
+                                                    onBlur: (e)=>{
+                                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                                        e.currentTarget.style.boxShadow = "none";
+                                                    }
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                     onClick: handlePreluareDateANAF,
                                                     disabled: isLoadingANAF || !cuiInput.trim(),
-                                                    className: "bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium",
+                                                    style: {
+                                                        background: isLoadingANAF || !cuiInput.trim() ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                        color: "white",
+                                                        border: "none",
+                                                        borderRadius: "12px",
+                                                        padding: "0.75rem 1.25rem",
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        cursor: isLoadingANAF || !cuiInput.trim() ? "not-allowed" : "pointer",
+                                                        transition: "all 0.3s ease",
+                                                        boxShadow: isLoadingANAF || !cuiInput.trim() ? "none" : "0 4px 12px rgba(52, 152, 219, 0.4)"
+                                                    },
+                                                    onMouseOver: (e)=>{
+                                                        if (!isLoadingANAF && cuiInput.trim()) {
+                                                            e.currentTarget.style.transform = "translateY(-2px)";
+                                                            e.currentTarget.style.boxShadow = "0 6px 16px rgba(52, 152, 219, 0.5)";
+                                                        }
+                                                    },
+                                                    onMouseOut: (e)=>{
+                                                        if (!isLoadingANAF && cuiInput.trim()) {
+                                                            e.currentTarget.style.transform = "translateY(0)";
+                                                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.4)";
+                                                        }
+                                                    },
                                                     children: isLoadingANAF ? "⏳ Se preiau..." : "\uD83D\uDCE1 Preluare ANAF"
                                                 })
                                             ]
@@ -1483,9 +1907,20 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     ]
                                 }),
                                 anafError && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "bg-red-50 border border-red-200 rounded p-3 mb-4",
+                                    style: {
+                                        background: "rgba(231, 76, 60, 0.1)",
+                                        border: "1px solid rgba(231, 76, 60, 0.2)",
+                                        borderRadius: "12px",
+                                        padding: "1rem",
+                                        marginBottom: "1.5rem"
+                                    },
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                        className: "text-red-800 text-sm",
+                                        style: {
+                                            fontSize: "14px",
+                                            color: "#e74c3c",
+                                            margin: 0,
+                                            fontWeight: "500"
+                                        },
                                         children: [
                                             "❌ ",
                                             anafError
@@ -1493,12 +1928,24 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     })
                                 }),
                                 clientInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                    style: {
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                                        gap: "1rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    style: {
+                                                        display: "block",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginBottom: "0.5rem",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Denumire *"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -1508,7 +1955,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             denumire: e.target.value
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    style: {
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        transition: "all 0.3s ease",
+                                                        boxSizing: "border-box"
+                                                    },
                                                     required: true
                                                 })
                                             ]
@@ -1516,7 +1972,15 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    style: {
+                                                        display: "block",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginBottom: "0.5rem",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "CUI *"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -1526,7 +1990,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             cui: e.target.value
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    style: {
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        transition: "all 0.3s ease",
+                                                        boxSizing: "border-box"
+                                                    },
                                                     required: true
                                                 })
                                             ]
@@ -1534,7 +2007,15 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    style: {
+                                                        display: "block",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginBottom: "0.5rem",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Nr. Reg. Com."
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -1544,14 +2025,31 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             nrRegCom: e.target.value
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                    style: {
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        transition: "all 0.3s ease",
+                                                        boxSizing: "border-box"
+                                                    }
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    style: {
+                                                        display: "block",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginBottom: "0.5rem",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Telefon"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -1561,15 +2059,34 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             telefon: e.target.value
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded"
+                                                    style: {
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        transition: "all 0.3s ease",
+                                                        boxSizing: "border-box"
+                                                    }
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "col-span-2",
+                                            style: {
+                                                gridColumn: "span 2"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    className: "block text-gray-600 mb-1",
+                                                    style: {
+                                                        display: "block",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginBottom: "0.5rem",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "Adresa *"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -1579,23 +2096,51 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             adresa: e.target.value
                                                         }),
-                                                    className: "w-full px-3 py-2 border border-gray-300 rounded",
+                                                    style: {
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: "12px",
+                                                        fontSize: "14px",
+                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        transition: "all 0.3s ease",
+                                                        boxSizing: "border-box"
+                                                    },
                                                     required: true
                                                 })
                                             ]
                                         }),
                                         (clientInfo.status || clientInfo.platitorTva) && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "col-span-2 flex gap-4 text-xs",
+                                            style: {
+                                                gridColumn: "span 2",
+                                                display: "flex",
+                                                gap: "1rem",
+                                                marginTop: "0.5rem"
+                                            },
                                             children: [
                                                 clientInfo.status && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: `px-2 py-1 rounded ${clientInfo.status === "Activ" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`,
+                                                    style: {
+                                                        padding: "0.5rem 1rem",
+                                                        borderRadius: "12px",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        background: clientInfo.status === "Activ" ? "rgba(39, 174, 96, 0.2)" : "rgba(231, 76, 60, 0.2)",
+                                                        color: clientInfo.status === "Activ" ? "#27ae60" : "#e74c3c"
+                                                    },
                                                     children: [
                                                         "Status ANAF: ",
                                                         clientInfo.status
                                                     ]
                                                 }),
                                                 clientInfo.platitorTva && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: `px-2 py-1 rounded ${clientInfo.platitorTva === "Da" ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}`,
+                                                    style: {
+                                                        padding: "0.5rem 1rem",
+                                                        borderRadius: "12px",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        background: clientInfo.platitorTva === "Da" ? "rgba(52, 152, 219, 0.2)" : "rgba(243, 156, 18, 0.2)",
+                                                        color: clientInfo.platitorTva === "Da" ? "#3498db" : "#f39c12"
+                                                    },
                                                     children: [
                                                         "TVA: ",
                                                         clientInfo.platitorTva
@@ -1604,9 +2149,17 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             ]
                                         }),
                                         clientInfo.id && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            className: "col-span-2",
+                                            style: {
+                                                gridColumn: "span 2"
+                                            },
                                             children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                className: "bg-green-100 border border-green-200 rounded p-2 text-xs",
+                                                style: {
+                                                    background: "rgba(39, 174, 96, 0.1)",
+                                                    border: "1px solid rgba(39, 174, 96, 0.2)",
+                                                    borderRadius: "12px",
+                                                    padding: "1rem",
+                                                    fontSize: "12px"
+                                                },
                                                 children: [
                                                     "✅ ",
                                                     /*#__PURE__*/ jsx_runtime_.jsx("strong", {
@@ -1622,52 +2175,162 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                background: "rgba(255, 255, 255, 0.6)",
+                                padding: "2rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex items-center justify-between mb-4",
+                                    style: {
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        marginBottom: "1.5rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                            className: "text-lg font-semibold text-gray-700 flex items-center gap-2",
+                                            style: {
+                                                fontSize: "18px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                margin: 0,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem"
+                                            },
                                             children: "\uD83D\uDCCB Servicii/Produse"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             onClick: addLine,
-                                            className: "bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm",
+                                            style: {
+                                                background: "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "12px",
+                                                padding: "0.75rem 1.25rem",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                cursor: "pointer",
+                                                transition: "all 0.3s ease",
+                                                boxShadow: "0 4px 12px rgba(39, 174, 96, 0.4)"
+                                            },
+                                            onMouseOver: (e)=>{
+                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                e.currentTarget.style.boxShadow = "0 6px 16px rgba(39, 174, 96, 0.5)";
+                                            },
+                                            onMouseOut: (e)=>{
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.4)";
+                                            },
                                             children: "+ Adaugă linie"
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "overflow-x-auto",
+                                    style: {
+                                        overflowX: "auto",
+                                        borderRadius: "12px",
+                                        overflow: "hidden"
+                                    },
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
-                                        className: "w-full border-collapse border border-gray-300 text-sm",
+                                        style: {
+                                            width: "100%",
+                                            borderCollapse: "collapse",
+                                            fontSize: "14px",
+                                            background: "rgba(255, 255, 255, 0.8)",
+                                            backdropFilter: "blur(10px)"
+                                        },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("thead", {
                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                    className: "bg-gray-100",
+                                                    style: {
+                                                        background: "linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(233, 236, 239, 0.9) 100%)"
+                                                    },
                                                     children: [
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-left",
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "left",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
                                                             children: "Denumire serviciu/produs *"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-20",
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "center",
+                                                                width: "80px",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
                                                             children: "Cant."
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-32",
-                                                            children: "Pret unit. (RON)"
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "center",
+                                                                width: "130px",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
+                                                            children: "Preț unit. (RON)"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-20",
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "center",
+                                                                width: "80px",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
                                                             children: "TVA %"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-32",
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "center",
+                                                                width: "130px",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
                                                             children: "Total (RON)"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            className: "border border-gray-300 p-3 text-center w-16",
+                                                            style: {
+                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                padding: "1rem",
+                                                                textAlign: "center",
+                                                                width: "60px",
+                                                                fontSize: "12px",
+                                                                fontWeight: "700",
+                                                                color: "#2c3e50",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.5px"
+                                                            },
                                                             children: "Acț."
                                                         })
                                                     ]
@@ -1683,22 +2346,53 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     const total = valoare + tva;
                                                     const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
                                                     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                        className: `hover:bg-gray-50 ${linie.tip === "subproiect" ? "bg-blue-50" : ""}`,
+                                                        style: {
+                                                            background: linie.tip === "subproiect" ? "rgba(52, 152, 219, 0.05)" : index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)",
+                                                            transition: "all 0.3s ease"
+                                                        },
+                                                        onMouseOver: (e)=>{
+                                                            e.currentTarget.style.background = "rgba(52, 152, 219, 0.08)";
+                                                        },
+                                                        onMouseOut: (e)=>{
+                                                            e.currentTarget.style.background = linie.tip === "subproiect" ? "rgba(52, 152, 219, 0.05)" : index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)";
+                                                        },
                                                         children: [
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem"
+                                                                },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                    className: "flex items-center gap-2",
+                                                                    style: {
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "0.5rem"
+                                                                    },
                                                                     children: [
                                                                         linie.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                            className: "bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold",
+                                                                            style: {
+                                                                                background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                                                color: "white",
+                                                                                padding: "0.25rem 0.5rem",
+                                                                                borderRadius: "6px",
+                                                                                fontSize: "10px",
+                                                                                fontWeight: "700"
+                                                                            },
                                                                             children: "SUB"
                                                                         }),
                                                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                                             type: "text",
                                                                             value: linie.denumire,
                                                                             onChange: (e)=>updateLine(index, "denumire", e.target.value),
-                                                                            className: "flex-1 p-1 border rounded text-sm",
+                                                                            style: {
+                                                                                flex: 1,
+                                                                                padding: "0.5rem",
+                                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                                borderRadius: "8px",
+                                                                                fontSize: "14px",
+                                                                                background: "rgba(255, 255, 255, 0.8)",
+                                                                                transition: "all 0.3s ease"
+                                                                            },
                                                                             placeholder: "Descrierea serviciului sau produsului...",
                                                                             required: true
                                                                         })
@@ -1706,33 +2400,69 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                 })
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem"
+                                                                },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                                     type: "number",
                                                                     value: linie.cantitate,
                                                                     onChange: (e)=>updateLine(index, "cantitate", parseFloat(e.target.value) || 0),
-                                                                    className: "w-full p-1 border rounded text-center text-sm",
+                                                                    style: {
+                                                                        width: "100%",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        borderRadius: "8px",
+                                                                        textAlign: "center",
+                                                                        fontSize: "14px",
+                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        transition: "all 0.3s ease"
+                                                                    },
                                                                     min: "0",
                                                                     step: "0.01"
                                                                 })
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem"
+                                                                },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                                     type: "number",
                                                                     value: linie.pretUnitar,
                                                                     onChange: (e)=>updateLine(index, "pretUnitar", parseFloat(e.target.value) || 0),
-                                                                    className: "w-full p-1 border rounded text-right text-sm",
+                                                                    style: {
+                                                                        width: "100%",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        borderRadius: "8px",
+                                                                        textAlign: "right",
+                                                                        fontSize: "14px",
+                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        transition: "all 0.3s ease"
+                                                                    },
                                                                     min: "0",
                                                                     step: "0.01"
                                                                 })
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem"
+                                                                },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
                                                                     value: linie.cotaTva,
                                                                     onChange: (e)=>updateLine(index, "cotaTva", parseFloat(e.target.value)),
-                                                                    className: "w-full p-1 border rounded text-center text-sm",
+                                                                    style: {
+                                                                        width: "100%",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        borderRadius: "8px",
+                                                                        textAlign: "center",
+                                                                        fontSize: "14px",
+                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        transition: "all 0.3s ease"
+                                                                    },
                                                                     children: [
                                                                         /*#__PURE__*/ jsx_runtime_.jsx("option", {
                                                                             value: 0,
@@ -1758,16 +2488,52 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                 })
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2 text-right font-semibold",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem",
+                                                                    textAlign: "right",
+                                                                    fontSize: "14px",
+                                                                    fontWeight: "600",
+                                                                    color: "#27ae60"
+                                                                },
                                                                 children: safeFixed(total)
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                className: "border border-gray-300 p-2 text-center",
+                                                                style: {
+                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    padding: "0.75rem",
+                                                                    textAlign: "center"
+                                                                },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                                     onClick: ()=>removeLine(index),
                                                                     disabled: liniiFactura.length === 1,
-                                                                    className: "text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed",
+                                                                    style: {
+                                                                        background: liniiFactura.length === 1 ? "rgba(149, 165, 166, 0.3)" : "rgba(231, 76, 60, 0.1)",
+                                                                        color: liniiFactura.length === 1 ? "#95a5a6" : "#e74c3c",
+                                                                        border: "none",
+                                                                        borderRadius: "8px",
+                                                                        width: "32px",
+                                                                        height: "32px",
+                                                                        cursor: liniiFactura.length === 1 ? "not-allowed" : "pointer",
+                                                                        fontSize: "14px",
+                                                                        transition: "all 0.3s ease",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        justifyContent: "center"
+                                                                    },
                                                                     title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
+                                                                    onMouseOver: (e)=>{
+                                                                        if (liniiFactura.length > 1) {
+                                                                            e.currentTarget.style.background = "rgba(231, 76, 60, 0.2)";
+                                                                            e.currentTarget.style.transform = "scale(1.1)";
+                                                                        }
+                                                                    },
+                                                                    onMouseOut: (e)=>{
+                                                                        if (liniiFactura.length > 1) {
+                                                                            e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                                                            e.currentTarget.style.transform = "scale(1)";
+                                                                        }
+                                                                    },
                                                                     children: "\uD83D\uDDD1️"
                                                                 })
                                                             })
@@ -1781,20 +2547,41 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                            className: "flex justify-end",
+                            style: {
+                                display: "flex",
+                                justifyContent: "flex-end"
+                            },
                             children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                className: "w-96 bg-green-50 p-4 rounded-lg border border-green-200",
+                                style: {
+                                    width: "400px",
+                                    background: "linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(39, 174, 96, 0.1) 100%)",
+                                    padding: "2rem",
+                                    borderRadius: "16px",
+                                    border: "1px solid rgba(39, 174, 96, 0.2)",
+                                    backdropFilter: "blur(10px)"
+                                },
                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "space-y-2",
+                                    style: {
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "1rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-sm",
+                                            style: {
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                fontSize: "14px",
+                                                color: "#2c3e50"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                                     children: "Subtotal (fără TVA):"
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "font-semibold",
+                                                    style: {
+                                                        fontWeight: "600"
+                                                    },
                                                     children: [
                                                         totals.subtotal,
                                                         " RON"
@@ -1803,13 +2590,20 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-sm",
+                                            style: {
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                fontSize: "14px",
+                                                color: "#2c3e50"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                                     children: "TVA:"
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "font-semibold",
+                                                    style: {
+                                                        fontWeight: "600"
+                                                    },
                                                     children: [
                                                         totals.totalTva,
                                                         " RON"
@@ -1818,13 +2612,20 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "flex justify-between text-lg font-bold border-t pt-2 border-green-300",
+                                            style: {
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                fontSize: "18px",
+                                                fontWeight: "700",
+                                                paddingTop: "1rem",
+                                                borderTop: "2px solid rgba(39, 174, 96, 0.3)",
+                                                color: "#27ae60"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "TOTAL DE PLATA:"
+                                                    children: "TOTAL DE PLATĂ:"
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    className: "text-green-600",
                                                     children: [
                                                         totals.totalGeneral,
                                                         " RON"
@@ -1837,40 +2638,141 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             })
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                background: "rgba(255, 255, 255, 0.6)",
+                                padding: "2rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(255, 255, 255, 0.3)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                    className: "block text-sm font-medium text-gray-700 mb-2",
-                                    children: "\uD83D\uDCDD Observații (opțional)"
+                                    style: {
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#2c3e50",
+                                        marginBottom: "1rem"
+                                    },
+                                    children: /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.5rem"
+                                        },
+                                        children: "\uD83D\uDCDD Observații (opțional)"
+                                    })
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
                                     value: observatii,
                                     onChange: (e)=>setObservatii(e.target.value),
-                                    className: "w-full p-3 border border-gray-300 rounded-lg text-sm",
+                                    style: {
+                                        width: "100%",
+                                        padding: "1rem",
+                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        borderRadius: "12px",
+                                        fontSize: "14px",
+                                        background: "rgba(255, 255, 255, 0.8)",
+                                        backdropFilter: "blur(10px)",
+                                        transition: "all 0.3s ease",
+                                        resize: "vertical",
+                                        boxSizing: "border-box"
+                                    },
                                     rows: 3,
-                                    placeholder: "Observații suplimentare pentru factură..."
+                                    placeholder: "Observații suplimentare pentru factură...",
+                                    onFocus: (e)=>{
+                                        e.currentTarget.style.border = "2px solid #3498db";
+                                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
+                                    },
+                                    onBlur: (e)=>{
+                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                        e.currentTarget.style.boxShadow = "none";
+                                    }
                                 })
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "flex justify-between items-center pt-4 border-t border-gray-200",
+                            style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                paddingTop: "1.5rem",
+                                borderTop: "1px solid rgba(0, 0, 0, 0.08)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    className: "text-sm text-gray-600",
+                                    style: {
+                                        fontSize: "14px",
+                                        color: "#7f8c8d",
+                                        fontWeight: "500"
+                                    },
                                     children: "ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură."
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex gap-3",
+                                    style: {
+                                        display: "flex",
+                                        gap: "1rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             onClick: onClose,
                                             disabled: isLoading,
-                                            className: "bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 disabled:opacity-50",
+                                            style: {
+                                                background: "rgba(149, 165, 166, 0.1)",
+                                                color: "#7f8c8d",
+                                                border: "1px solid rgba(149, 165, 166, 0.2)",
+                                                borderRadius: "12px",
+                                                padding: "0.75rem 1.5rem",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                cursor: isLoading ? "not-allowed" : "pointer",
+                                                transition: "all 0.3s ease",
+                                                backdropFilter: "blur(10px)"
+                                            },
+                                            onMouseOver: (e)=>{
+                                                if (!isLoading) {
+                                                    e.currentTarget.style.background = "rgba(149, 165, 166, 0.2)";
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                }
+                                            },
+                                            onMouseOut: (e)=>{
+                                                if (!isLoading) {
+                                                    e.currentTarget.style.background = "rgba(149, 165, 166, 0.1)";
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                }
+                                            },
                                             children: "Anulează"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             onClick: handleGenereazaFactura,
                                             disabled: isLoading || !clientInfo?.cui || !clientInfo?.denumire,
-                                            className: "bg-green-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
+                                            style: {
+                                                background: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "12px",
+                                                padding: "0.75rem 2rem",
+                                                fontSize: "16px",
+                                                fontWeight: "700",
+                                                cursor: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "not-allowed" : "pointer",
+                                                transition: "all 0.3s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem",
+                                                boxShadow: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "none" : "0 4px 12px rgba(39, 174, 96, 0.4)"
+                                            },
+                                            onMouseOver: (e)=>{
+                                                if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(39, 174, 96, 0.5)";
+                                                }
+                                            },
+                                            onMouseOut: (e)=>{
+                                                if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.4)";
+                                                }
+                                            },
                                             children: isLoading ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
                                                 children: [
                                                     "⏳ ",
@@ -1895,43 +2797,56 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Fix React Error #31 + buton "Mai adaugă subproiect" + toast optimizat
+// MODIFICAT: Glassmorphism Premium + Dropdown Inteligent + Workflow îmbunătățit
 // ==================================================================
 
 
-// ✅ FIX: Toast simple fără dependențe externe cu durată optimizată
+// ✅ Toast system Glassmorphism Premium
 const ProiectActions_showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
     toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
-    z-index: 10000;
-    font-family: Arial, sans-serif;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
+    padding: 16px 20px;
+    border-radius: 16px;
+    z-index: 15000;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
     white-space: pre-line;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
     toastEl.textContent = message;
     document.body.appendChild(toastEl);
-    // ✅ FIX: Durată optimizată - mai mult pentru mesaje lungi
+    // Smooth entrance animation
     setTimeout(()=>{
-        if (document.body.contains(toastEl)) {
-            document.body.removeChild(toastEl);
-        }
+        toastEl.style.transform = "translateY(0)";
+        toastEl.style.opacity = "1";
+    }, 10);
+    setTimeout(()=>{
+        toastEl.style.transform = "translateY(-10px)";
+        toastEl.style.opacity = "0";
+        setTimeout(()=>{
+            if (document.body.contains(toastEl)) {
+                document.body.removeChild(toastEl);
+            }
+        }, 300);
     }, type === "success" ? 4000 : type === "error" ? 5000 : type === "info" && message.length > 200 ? 10000 : 6000);
 };
 function ProiectActions({ proiect, onRefresh }) {
     const [showFacturaModal, setShowFacturaModal] = react_experimental_default().useState(false);
     const [showSubproiectModal, setShowSubproiectModal] = react_experimental_default().useState(false);
-    // ✅ FIX: Helper pentru formatarea datelor
+    // Helper pentru formatarea datelor
     const formatDate = (date)=>{
         if (!date) return "N/A";
         const dateValue = typeof date === "string" ? date : date.value;
@@ -1954,7 +2869,7 @@ function ProiectActions({ proiect, onRefresh }) {
             icon: "✏️",
             color: "secondary"
         },
-        // ✅ FIX: Adaugă subproiect doar pentru proiectele principale
+        // Adaugă subproiect doar pentru proiectele principale
         ...proiect.tip !== "subproiect" ? [
             {
                 key: "add_subproject",
@@ -2045,7 +2960,6 @@ function ProiectActions({ proiect, onRefresh }) {
             ProiectActions_showToast(`Eroare la executarea acțiunii: ${actionKey}`, "error");
         }
     };
-    // ✅ FIX: Deschide modalul pentru adăugare subproiect
     const handleAddSubproject = ()=>{
         setShowSubproiectModal(true);
     };
@@ -2060,7 +2974,6 @@ function ProiectActions({ proiect, onRefresh }) {
         }
     };
     const handleViewDetails = async ()=>{
-        // ✅ FIX: Afișează detalii complete în toast
         const detalii = `📋 ${proiect.tip === "subproiect" ? "SUBPROIECT" : "PROIECT"}: ${proiect.ID_Proiect}
 
 📝 Denumire: ${proiect.Denumire}
@@ -2076,7 +2989,6 @@ function ProiectActions({ proiect, onRefresh }) {
         console.log("Detalii proiect:", proiect);
     };
     const handleEdit = async ()=>{
-        // ✅ FIX: Modal de confirmare pentru editare
         const confirmare = confirm(`Vrei să editezi ${proiect.tip === "subproiect" ? "subproiectul" : "proiectul"} "${proiect.Denumire}"?\n\nNOTĂ: Funcția de editare va fi implementată în următoarea versiune.`);
         if (confirmare) {
             ProiectActions_showToast("Funcția de editare va fi disponibilă \xeen cur\xe2nd!", "info");
@@ -2147,7 +3059,6 @@ function ProiectActions({ proiect, onRefresh }) {
                 proiectParinte: proiect,
                 onClose: ()=>setShowSubproiectModal(false),
                 onSuccess: ()=>{
-                    // ✅ NOUĂ: Nu închide modalul automat, doar refreshează datele
                     ProiectActions_showToast("✅ Subproiect adăugat cu succes!", "success");
                     onRefresh?.();
                     ProiectActions_showToast("\uD83D\uDCA1 Poți adăuga \xeencă un subproiect sau \xeenchide modalul!", "info");
@@ -2157,7 +3068,6 @@ function ProiectActions({ proiect, onRefresh }) {
     });
 }
 function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
-    // ✅ FIX: State safe cu strings pentru toate valorile
     const [formData, setFormData] = react_experimental_default().useState({
         denumire: "",
         responsabil: "",
@@ -2167,14 +3077,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         status: "Activ"
     });
     const [isSubmitting, setIsSubmitting] = react_experimental_default().useState(false);
-    // ✅ FIX: Handler safe pentru input changes
     const handleInputChange = (field, value)=>{
         setFormData((prev)=>({
                 ...prev,
                 [field]: value
             }));
     };
-    // ✅ NOUĂ: Funcție pentru resetarea formularului
     const resetForm = ()=>{
         setFormData({
             denumire: "",
@@ -2216,8 +3124,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
             const result = await response.json();
             console.log("Răspuns subproiect:", result);
             if (result.success) {
-                onSuccess(); // Trigger refresh fără închiderea modalului
-                // Reset formular pentru următorul subproiect
+                onSuccess();
                 resetForm();
             } else {
                 ProiectActions_showToast(result.error || "Eroare la adăugarea subproiectului", "error");
@@ -2230,94 +3137,253 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         }
     };
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4",
+        style: {
+            position: "fixed",
+            inset: "0",
+            background: "rgba(0, 0, 0, 0.3)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 12000,
+            padding: "1rem"
+        },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-            className: "bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl",
+            style: {
+                background: "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(20px)",
+                borderRadius: "20px",
+                maxWidth: "800px",
+                width: "100%",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                position: "relative"
+            },
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                    className: "flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50",
+                    style: {
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "2rem",
+                        borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)",
+                        borderRadius: "20px 20px 0 0"
+                    },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h2", {
-                                    className: "text-xl font-bold text-gray-800 flex items-center gap-2",
+                                    style: {
+                                        fontSize: "1.5rem",
+                                        fontWeight: "700",
+                                        color: "#2c3e50",
+                                        margin: 0,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.5rem"
+                                    },
                                     children: "\uD83D\uDCC2 Adaugă Subproiect Nou"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                    className: "text-sm text-gray-600 mt-1",
+                                    style: {
+                                        fontSize: "14px",
+                                        color: "#7f8c8d",
+                                        margin: "0.5rem 0 0 0",
+                                        fontWeight: "500"
+                                    },
                                     children: [
                                         "\uD83C\uDFD7️ Proiect părinte: ",
                                         /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            className: "font-mono font-semibold",
+                                            style: {
+                                                fontFamily: "monospace",
+                                                fontWeight: "600",
+                                                color: "#3498db"
+                                            },
                                             children: proiectParinte.ID_Proiect
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                                    className: "text-xs text-gray-500 mt-1",
+                                    style: {
+                                        fontSize: "12px",
+                                        color: "#95a5a6",
+                                        margin: "0.25rem 0 0 0"
+                                    },
                                     children: proiectParinte.Denumire
                                 })
                             ]
                         }),
                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                             onClick: onClose,
-                            className: "text-gray-500 hover:text-gray-700 text-xl p-2 hover:bg-gray-100 rounded-full transition-colors",
                             disabled: isSubmitting,
+                            style: {
+                                background: "rgba(231, 76, 60, 0.1)",
+                                color: "#e74c3c",
+                                border: "none",
+                                borderRadius: "12px",
+                                width: "48px",
+                                height: "48px",
+                                cursor: isSubmitting ? "not-allowed" : "pointer",
+                                fontSize: "20px",
+                                fontWeight: "600",
+                                transition: "all 0.3s ease",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            },
+                            onMouseOver: (e)=>{
+                                if (!isSubmitting) {
+                                    e.currentTarget.style.background = "rgba(231, 76, 60, 0.2)";
+                                    e.currentTarget.style.transform = "scale(1.05)";
+                                }
+                            },
+                            onMouseOut: (e)=>{
+                                if (!isSubmitting) {
+                                    e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                    e.currentTarget.style.transform = "scale(1)";
+                                }
+                            },
                             children: "✕"
                         })
                     ]
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
                     onSubmit: handleSubmit,
-                    className: "p-6 space-y-6",
+                    style: {
+                        padding: "2rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "1.5rem"
+                    },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-blue-50 p-4 rounded-lg border border-blue-200",
+                            style: {
+                                background: "rgba(52, 152, 219, 0.05)",
+                                padding: "1.5rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(52, 152, 219, 0.1)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                    className: "block text-sm font-semibold text-gray-700 mb-2",
+                                    style: {
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#2c3e50",
+                                        marginBottom: "0.75rem"
+                                    },
                                     children: "\uD83D\uDCDD Denumire Subproiect *"
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                     type: "text",
                                     value: formData.denumire,
                                     onChange: (e)=>handleInputChange("denumire", e.target.value),
-                                    className: "w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg",
+                                    style: {
+                                        width: "100%",
+                                        padding: "1rem",
+                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        borderRadius: "12px",
+                                        fontSize: "16px",
+                                        background: "rgba(255, 255, 255, 0.8)",
+                                        backdropFilter: "blur(10px)",
+                                        transition: "all 0.3s ease",
+                                        boxSizing: "border-box"
+                                    },
                                     placeholder: "Introduceți denumirea subproiectului...",
                                     required: true,
-                                    disabled: isSubmitting
+                                    disabled: isSubmitting,
+                                    onFocus: (e)=>{
+                                        e.currentTarget.style.border = "2px solid #3498db";
+                                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
+                                    },
+                                    onBlur: (e)=>{
+                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                        e.currentTarget.style.boxShadow = "none";
+                                    }
                                 })
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "grid grid-cols-1 md:grid-cols-2 gap-6",
+                            style: {
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                                gap: "1.5rem"
+                            },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    style: {
+                                        background: "rgba(255, 255, 255, 0.6)",
+                                        padding: "1.25rem",
+                                        borderRadius: "16px",
+                                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                                        backdropFilter: "blur(10px)"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            style: {
+                                                display: "block",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                marginBottom: "0.75rem"
+                                            },
                                             children: "\uD83D\uDC64 Responsabil"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "text",
                                             value: formData.responsabil,
                                             onChange: (e)=>handleInputChange("responsabil", e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            style: {
+                                                width: "100%",
+                                                padding: "0.75rem",
+                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                borderRadius: "12px",
+                                                fontSize: "14px",
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                transition: "all 0.3s ease",
+                                                boxSizing: "border-box"
+                                            },
                                             placeholder: "Numele responsabilului...",
                                             disabled: isSubmitting
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    style: {
+                                        background: "rgba(255, 255, 255, 0.6)",
+                                        padding: "1.25rem",
+                                        borderRadius: "16px",
+                                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                                        backdropFilter: "blur(10px)"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            style: {
+                                                display: "block",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                marginBottom: "0.75rem"
+                                            },
                                             children: "\uD83D\uDCCA Status"
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
                                             value: formData.status,
                                             onChange: (e)=>handleInputChange("status", e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            style: {
+                                                width: "100%",
+                                                padding: "0.75rem",
+                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                borderRadius: "12px",
+                                                fontSize: "14px",
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                transition: "all 0.3s ease",
+                                                boxSizing: "border-box"
+                                            },
                                             disabled: isSubmitting,
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("option", {
@@ -2341,31 +3407,75 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    style: {
+                                        background: "rgba(255, 255, 255, 0.6)",
+                                        padding: "1.25rem",
+                                        borderRadius: "16px",
+                                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                                        backdropFilter: "blur(10px)"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            style: {
+                                                display: "block",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                marginBottom: "0.75rem"
+                                            },
                                             children: "\uD83D\uDCC5 Data \xcenceput"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
                                             value: formData.dataStart,
                                             onChange: (e)=>handleInputChange("dataStart", e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            style: {
+                                                width: "100%",
+                                                padding: "0.75rem",
+                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                borderRadius: "12px",
+                                                fontSize: "14px",
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                transition: "all 0.3s ease",
+                                                boxSizing: "border-box"
+                                            },
                                             disabled: isSubmitting
                                         })
                                     ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    style: {
+                                        background: "rgba(255, 255, 255, 0.6)",
+                                        padding: "1.25rem",
+                                        borderRadius: "16px",
+                                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                                        backdropFilter: "blur(10px)"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                            className: "block text-sm font-medium text-gray-700 mb-2",
+                                            style: {
+                                                display: "block",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                color: "#2c3e50",
+                                                marginBottom: "0.75rem"
+                                            },
                                             children: "\uD83C\uDFC1 Data Finalizare"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
                                             value: formData.dataFinal,
                                             onChange: (e)=>handleInputChange("dataFinal", e.target.value),
-                                            className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                            style: {
+                                                width: "100%",
+                                                padding: "0.75rem",
+                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                borderRadius: "12px",
+                                                fontSize: "14px",
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                transition: "all 0.3s ease",
+                                                boxSizing: "border-box"
+                                            },
                                             disabled: isSubmitting
                                         })
                                     ]
@@ -2373,16 +3483,39 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                background: "rgba(46, 204, 113, 0.05)",
+                                padding: "1.5rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(46, 204, 113, 0.1)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                    className: "block text-sm font-medium text-gray-700 mb-2",
+                                    style: {
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        color: "#2c3e50",
+                                        marginBottom: "0.75rem"
+                                    },
                                     children: "\uD83D\uDCB0 Valoare Estimată (RON)"
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                     type: "number",
                                     value: formData.valoareEstimata,
                                     onChange: (e)=>handleInputChange("valoareEstimata", e.target.value),
-                                    className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                    style: {
+                                        width: "100%",
+                                        padding: "1rem",
+                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        borderRadius: "12px",
+                                        fontSize: "16px",
+                                        background: "rgba(255, 255, 255, 0.8)",
+                                        backdropFilter: "blur(10px)",
+                                        transition: "all 0.3s ease",
+                                        boxSizing: "border-box"
+                                    },
                                     placeholder: "0.00",
                                     min: "0",
                                     step: "0.01",
@@ -2391,63 +3524,145 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200",
+                            style: {
+                                background: "linear-gradient(135deg, rgba(149, 165, 166, 0.1) 0%, rgba(52, 152, 219, 0.1) 100%)",
+                                padding: "1.5rem",
+                                borderRadius: "16px",
+                                border: "1px solid rgba(149, 165, 166, 0.2)",
+                                backdropFilter: "blur(10px)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h4", {
-                                    className: "font-semibold text-gray-700 mb-3 flex items-center gap-2",
+                                    style: {
+                                        fontSize: "16px",
+                                        fontWeight: "600",
+                                        color: "#2c3e50",
+                                        marginBottom: "1rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.5rem"
+                                    },
                                     children: "\uD83C\uDFD7️ Informații Proiect Părinte"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "grid grid-cols-2 gap-4 text-sm",
+                                    style: {
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                        gap: "1rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-2 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "CLIENT"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-medium",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiectParinte.Client
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-2 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "STATUS"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-medium",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiectParinte.Status
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-2 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "VALOARE"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-medium",
+                                                    style: {
+                                                        fontSize: "14px",
+                                                        fontWeight: "600",
+                                                        color: "#27ae60",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "N/A"
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            className: "bg-white p-2 rounded border",
+                                            style: {
+                                                background: "rgba(255, 255, 255, 0.8)",
+                                                padding: "1rem",
+                                                borderRadius: "12px",
+                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                            },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "text-gray-600 text-xs",
+                                                    style: {
+                                                        fontSize: "11px",
+                                                        color: "#7f8c8d",
+                                                        fontWeight: "600",
+                                                        textTransform: "uppercase",
+                                                        letterSpacing: "0.5px"
+                                                    },
                                                     children: "ADRESĂ"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    className: "font-medium text-xs",
+                                                    style: {
+                                                        fontSize: "12px",
+                                                        fontWeight: "500",
+                                                        color: "#2c3e50",
+                                                        marginTop: "0.25rem"
+                                                    },
                                                     children: proiectParinte.Adresa || "Nespecificată"
                                                 })
                                             ]
@@ -2457,22 +3672,81 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                             ]
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            className: "flex justify-between items-center gap-3 pt-4 border-t border-gray-200",
+                            style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: "1rem",
+                                paddingTop: "1rem",
+                                borderTop: "1px solid rgba(0, 0, 0, 0.08)"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                     type: "button",
                                     onClick: onClose,
                                     disabled: isSubmitting,
-                                    className: "bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50 transition-colors",
+                                    style: {
+                                        background: "rgba(149, 165, 166, 0.1)",
+                                        color: "#7f8c8d",
+                                        border: "1px solid rgba(149, 165, 166, 0.2)",
+                                        borderRadius: "12px",
+                                        padding: "0.75rem 1.5rem",
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        cursor: isSubmitting ? "not-allowed" : "pointer",
+                                        transition: "all 0.3s ease",
+                                        backdropFilter: "blur(10px)"
+                                    },
+                                    onMouseOver: (e)=>{
+                                        if (!isSubmitting) {
+                                            e.currentTarget.style.background = "rgba(149, 165, 166, 0.2)";
+                                            e.currentTarget.style.transform = "translateY(-2px)";
+                                        }
+                                    },
+                                    onMouseOut: (e)=>{
+                                        if (!isSubmitting) {
+                                            e.currentTarget.style.background = "rgba(149, 165, 166, 0.1)";
+                                            e.currentTarget.style.transform = "translateY(0)";
+                                        }
+                                    },
                                     children: "✕ \xcenchide"
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    className: "flex gap-2",
+                                    style: {
+                                        display: "flex",
+                                        gap: "0.75rem"
+                                    },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             type: "submit",
                                             disabled: isSubmitting || !formData.denumire.trim(),
-                                            className: "bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors",
+                                            style: {
+                                                background: isSubmitting || !formData.denumire.trim() ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "12px",
+                                                padding: "0.75rem 1.5rem",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                cursor: isSubmitting || !formData.denumire.trim() ? "not-allowed" : "pointer",
+                                                transition: "all 0.3s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem",
+                                                boxShadow: isSubmitting || !formData.denumire.trim() ? "none" : "0 4px 12px rgba(52, 152, 219, 0.4)"
+                                            },
+                                            onMouseOver: (e)=>{
+                                                if (!isSubmitting && formData.denumire.trim()) {
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(52, 152, 219, 0.5)";
+                                                }
+                                            },
+                                            onMouseOut: (e)=>{
+                                                if (!isSubmitting && formData.denumire.trim()) {
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.4)";
+                                                }
+                                            },
                                             children: isSubmitting ? /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
                                                 children: "⏳ Se adaugă..."
                                             }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
@@ -2483,9 +3757,35 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             type: "button",
                                             onClick: resetForm,
                                             disabled: isSubmitting,
-                                            className: "bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 flex items-center gap-1 transition-colors",
+                                            style: {
+                                                background: "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "12px",
+                                                padding: "0.75rem 1rem",
+                                                fontSize: "14px",
+                                                fontWeight: "600",
+                                                cursor: isSubmitting ? "not-allowed" : "pointer",
+                                                transition: "all 0.3s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem",
+                                                boxShadow: isSubmitting ? "none" : "0 4px 12px rgba(39, 174, 96, 0.4)"
+                                            },
                                             title: "Resetează formularul pentru a adăuga alt subproiect",
-                                            children: "➕ Mai adaugă"
+                                            onMouseOver: (e)=>{
+                                                if (!isSubmitting) {
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(39, 174, 96, 0.5)";
+                                                }
+                                            },
+                                            onMouseOut: (e)=>{
+                                                if (!isSubmitting) {
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.4)";
+                                                }
+                                            },
+                                            children: "\uD83D\uDD04 Resetează"
                                         })
                                     ]
                                 })
@@ -2500,6 +3800,33 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
 function EnhancedActionDropdown({ actions, onAction, proiect }) {
     const [isOpen, setIsOpen] = react_experimental_default().useState(false);
     const [loading, setLoading] = react_experimental_default().useState(null);
+    const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
+    const buttonRef = react_experimental_default().useRef(null);
+    // ✅ FIX: Calculează poziționarea inteligentă pentru ultimele 3 rânduri
+    const calculateDropdownPosition = ()=>{
+        if (!buttonRef.current) return;
+        const buttonRect = buttonRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = 400; // Estimare înălțime dropdown
+        const spaceBelow = viewportHeight - buttonRect.bottom;
+        const spaceAbove = buttonRect.top;
+        // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
+        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+            setDropdownPosition("top");
+        } else {
+            setDropdownPosition("bottom");
+        }
+    };
+    react_experimental_default().useEffect(()=>{
+        if (isOpen) {
+            calculateDropdownPosition();
+            // Recalculează la resize
+            window.addEventListener("resize", calculateDropdownPosition);
+            return ()=>window.removeEventListener("resize", calculateDropdownPosition);
+        }
+    }, [
+        isOpen
+    ]);
     const handleActionClick = async (actionKey)=>{
         if (loading) return;
         setLoading(actionKey);
@@ -2524,6 +3851,22 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                 return "#7f8c8d";
         }
     };
+    const getActionColor = (color)=>{
+        switch(color){
+            case "primary":
+                return "#3498db";
+            case "secondary":
+                return "#95a5a6";
+            case "success":
+                return "#27ae60";
+            case "warning":
+                return "#f39c12";
+            case "danger":
+                return "#e74c3c";
+            default:
+                return "#7f8c8d";
+        }
+    };
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
         style: {
             position: "relative",
@@ -2531,17 +3874,35 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
         },
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                ref: buttonRef,
                 onClick: ()=>setIsOpen(!isOpen),
                 disabled: loading !== null,
                 style: {
-                    padding: "6px 12px",
-                    background: loading ? "#bdc3c7" : "#3498db",
+                    background: loading ? "rgba(189, 195, 199, 0.3)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                     color: "white",
                     border: "none",
-                    borderRadius: "4px",
+                    borderRadius: "12px",
+                    padding: "0.5rem 1rem",
                     cursor: loading ? "not-allowed" : "pointer",
                     fontSize: "14px",
-                    fontWeight: "bold"
+                    fontWeight: "600",
+                    boxShadow: loading ? "none" : "0 4px 12px rgba(102, 126, 234, 0.4)",
+                    transition: "all 0.3s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem"
+                },
+                onMouseOver: (e)=>{
+                    if (!loading) {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = "0 6px 16px rgba(102, 126, 234, 0.5)";
+                    }
+                },
+                onMouseOut: (e)=>{
+                    if (!loading) {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                    }
                 },
                 children: [
                     loading ? "⏳" : "⚙️",
@@ -2557,37 +3918,57 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            zIndex: 9998
+                            background: "rgba(0, 0, 0, 0.1)",
+                            backdropFilter: "blur(2px)",
+                            zIndex: 10998
                         },
                         onClick: ()=>setIsOpen(false)
                     }),
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
                             position: "absolute",
-                            top: "100%",
+                            [dropdownPosition]: "100%",
                             right: 0,
-                            background: "white",
-                            border: "1px solid #ddd",
-                            borderRadius: "6px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                            zIndex: 9999,
-                            minWidth: "220px",
-                            marginTop: "4px"
+                            background: "rgba(255, 255, 255, 0.95)",
+                            backdropFilter: "blur(20px)",
+                            borderRadius: "16px",
+                            minWidth: "260px",
+                            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            zIndex: 10999,
+                            marginTop: dropdownPosition === "bottom" ? "8px" : "0",
+                            marginBottom: dropdownPosition === "top" ? "8px" : "0",
+                            overflow: "hidden",
+                            transform: "scale(0.95)",
+                            opacity: 0,
+                            animation: "dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards"
                         },
                         children: [
+                            /*#__PURE__*/ jsx_runtime_.jsx("style", {
+                                children: `
+                @keyframes dropdownAppear {
+                  to {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
+                }
+              `
+                            }),
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
-                                    padding: "12px",
-                                    borderBottom: "1px solid #eee",
-                                    background: "#f8f9fa"
+                                    padding: "1rem",
+                                    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                    background: "linear-gradient(135deg, rgba(248, 249, 250, 0.8) 0%, rgba(233, 236, 239, 0.8) 100%)",
+                                    backdropFilter: "blur(10px)"
                                 },
                                 children: [
                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                         style: {
                                             fontSize: "12px",
-                                            fontWeight: "bold",
+                                            fontWeight: "700",
                                             color: "#2c3e50",
-                                            marginBottom: "4px"
+                                            marginBottom: "0.5rem",
+                                            fontFamily: "monospace"
                                         },
                                         children: [
                                             proiect.ID_Proiect,
@@ -2595,10 +3976,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                                                 style: {
                                                     marginLeft: "8px",
                                                     fontSize: "10px",
-                                                    background: "#3498db",
+                                                    background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
                                                     color: "white",
                                                     padding: "2px 6px",
-                                                    borderRadius: "3px"
+                                                    borderRadius: "6px",
+                                                    fontWeight: "600"
                                                 },
                                                 children: "SUB"
                                             })
@@ -2614,7 +3996,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                                             /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                                 style: {
                                                     color: getStatusColor(proiect.Status),
-                                                    fontWeight: "bold"
+                                                    fontWeight: "600"
                                                 },
                                                 children: proiect.Status
                                             })
@@ -2624,15 +4006,15 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             }),
                             /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                 style: {
-                                    padding: "8px 0"
+                                    padding: "0.5rem 0"
                                 },
                                 children: actions.map((action)=>{
                                     if (action.divider) {
                                         return /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                             style: {
                                                 height: "1px",
-                                                background: "#eee",
-                                                margin: "8px 0"
+                                                background: "linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)",
+                                                margin: "0.5rem 0"
                                             }
                                         }, action.key);
                                     }
@@ -2641,31 +4023,39 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                                         disabled: action.disabled || loading === action.key,
                                         style: {
                                             width: "100%",
-                                            padding: "8px 12px",
+                                            padding: "0.75rem 1rem",
                                             background: "transparent",
                                             border: "none",
                                             textAlign: "left",
                                             cursor: action.disabled || loading === action.key ? "not-allowed" : "pointer",
                                             fontSize: "14px",
-                                            color: action.disabled ? "#bdc3c7" : action.color === "danger" ? "#e74c3c" : "#2c3e50",
+                                            color: action.disabled ? "#bdc3c7" : "#2c3e50",
                                             display: "flex",
                                             alignItems: "center",
-                                            gap: "8px",
+                                            gap: "0.75rem",
                                             opacity: action.disabled ? 0.5 : 1,
-                                            transition: "background-color 0.2s"
+                                            transition: "all 0.3s ease",
+                                            fontWeight: "500"
                                         },
                                         onMouseOver: (e)=>{
                                             if (!action.disabled && loading !== action.key) {
-                                                e.currentTarget.style.background = action.color === "danger" ? "#fdf2f2" : "#f8f9fa";
+                                                e.currentTarget.style.background = `linear-gradient(135deg, ${getActionColor(action.color)}15 0%, ${getActionColor(action.color)}08 100%)`;
+                                                e.currentTarget.style.color = getActionColor(action.color);
+                                                e.currentTarget.style.transform = "translateX(4px)";
+                                                e.currentTarget.style.backdropFilter = "blur(10px)";
                                             }
                                         },
                                         onMouseOut: (e)=>{
                                             e.currentTarget.style.background = "transparent";
+                                            e.currentTarget.style.color = action.disabled ? "#bdc3c7" : "#2c3e50";
+                                            e.currentTarget.style.transform = "translateX(0)";
+                                            e.currentTarget.style.backdropFilter = "none";
                                         },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                                 style: {
-                                                    minWidth: "16px"
+                                                    minWidth: "20px",
+                                                    fontSize: "16px"
                                                 },
                                                 children: loading === action.key ? "⏳" : action.icon
                                             }),
@@ -3637,31 +5027,45 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
 
 
 
-// ✅ Toast system pentru feedback
+// ✅ Toast system optimizat cu Glassmorphism
 const ProiecteTable_showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
     toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
+    padding: 16px 20px;
+    border-radius: 16px;
     z-index: 10000;
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
     toastEl.textContent = message;
     document.body.appendChild(toastEl);
+    // Smooth entrance animation
     setTimeout(()=>{
-        if (document.body.contains(toastEl)) {
-            document.body.removeChild(toastEl);
-        }
+        toastEl.style.transform = "translateY(0)";
+        toastEl.style.opacity = "1";
+    }, 10);
+    setTimeout(()=>{
+        toastEl.style.transform = "translateY(-10px)";
+        toastEl.style.opacity = "0";
+        setTimeout(()=>{
+            if (document.body.contains(toastEl)) {
+                document.body.removeChild(toastEl);
+            }
+        }, 300);
     }, type === "success" || type === "error" ? 4000 : 6000);
 };
 function ProiecteTable({ searchParams }) {
@@ -3870,6 +5274,12 @@ function ProiecteTable({ searchParams }) {
                 return "⚪";
         }
     };
+    // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele
+    const calculateTotalValue = ()=>{
+        const totalProiecte = proiecte.reduce((sum, p)=>sum + (p.Valoare_Estimata || 0), 0);
+        const totalSubproiecte = subproiecte.reduce((sum, s)=>sum + (s.Valoare_Estimata || 0), 0);
+        return totalProiecte + totalSubproiecte;
+    };
     if (loading) {
         return /*#__PURE__*/ jsx_runtime_.jsx("div", {
             style: {
@@ -3878,7 +5288,11 @@ function ProiecteTable({ searchParams }) {
                 alignItems: "center",
                 height: "300px",
                 fontSize: "16px",
-                color: "#7f8c8d"
+                color: "#7f8c8d",
+                background: "rgba(255, 255, 255, 0.1)",
+                backdropFilter: "blur(20px)",
+                borderRadius: "16px",
+                border: "1px solid rgba(255, 255, 255, 0.2)"
             },
             children: "⏳ Se \xeencarcă proiectele..."
         });
@@ -3891,10 +5305,12 @@ function ProiecteTable({ searchParams }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     marginBottom: "1.5rem",
-                    padding: "1rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6"
+                    padding: "1.5rem",
+                    background: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    borderRadius: "16px",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
                 },
                 children: [
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -3902,7 +5318,9 @@ function ProiecteTable({ searchParams }) {
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
                                 style: {
                                     margin: 0,
-                                    color: "#2c3e50"
+                                    color: "#2c3e50",
+                                    fontSize: "1.4rem",
+                                    fontWeight: "600"
                                 },
                                 children: [
                                     "\uD83D\uDCCB Proiecte găsite: ",
@@ -3912,9 +5330,10 @@ function ProiecteTable({ searchParams }) {
                             }),
                             /*#__PURE__*/ jsx_runtime_.jsx("p", {
                                 style: {
-                                    margin: "0.25rem 0 0 0",
+                                    margin: "0.5rem 0 0 0",
                                     fontSize: "14px",
-                                    color: "#7f8c8d"
+                                    color: "#7f8c8d",
+                                    opacity: 0.8
                                 },
                                 children: searchParams && Object.keys(searchParams).length > 0 ? "Rezultate filtrate" : "Toate proiectele și subproiectele"
                             })
@@ -3923,48 +5342,78 @@ function ProiecteTable({ searchParams }) {
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
                             display: "flex",
-                            gap: "0.5rem"
+                            gap: "0.75rem"
                         },
                         children: [
                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                 onClick: ()=>setShowProiectModal(true),
                                 style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#27ae60",
+                                    padding: "0.75rem 1.25rem",
+                                    background: "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
                                     color: "white",
                                     border: "none",
-                                    borderRadius: "6px",
+                                    borderRadius: "12px",
                                     cursor: "pointer",
                                     fontSize: "14px",
-                                    fontWeight: "bold"
+                                    fontWeight: "600",
+                                    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.4)",
+                                    transition: "all 0.3s ease"
+                                },
+                                onMouseOver: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(39, 174, 96, 0.5)";
+                                },
+                                onMouseOut: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.4)";
                                 },
                                 children: "+ Proiect Nou"
                             }),
                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                 onClick: handleRefresh,
                                 style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#3498db",
+                                    padding: "0.75rem 1.25rem",
+                                    background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
                                     color: "white",
                                     border: "none",
-                                    borderRadius: "6px",
+                                    borderRadius: "12px",
                                     cursor: "pointer",
                                     fontSize: "14px",
-                                    fontWeight: "bold"
+                                    fontWeight: "600",
+                                    boxShadow: "0 4px 12px rgba(52, 152, 219, 0.4)",
+                                    transition: "all 0.3s ease"
+                                },
+                                onMouseOver: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(52, 152, 219, 0.5)";
+                                },
+                                onMouseOut: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.4)";
                                 },
                                 children: "\uD83D\uDD04 Re\xeemprospătează"
                             }),
                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                 onClick: handleExportExcel,
                                 style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#f39c12",
+                                    padding: "0.75rem 1.25rem",
+                                    background: "linear-gradient(135deg, #f39c12 0%, #f5b041 100%)",
                                     color: "white",
                                     border: "none",
-                                    borderRadius: "6px",
+                                    borderRadius: "12px",
                                     cursor: "pointer",
                                     fontSize: "14px",
-                                    fontWeight: "bold"
+                                    fontWeight: "600",
+                                    boxShadow: "0 4px 12px rgba(243, 156, 18, 0.4)",
+                                    transition: "all 0.3s ease"
+                                },
+                                onMouseOver: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 6px 16px rgba(243, 156, 18, 0.5)";
+                                },
+                                onMouseOut: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(243, 156, 18, 0.4)";
                                 },
                                 children: "\uD83D\uDCCA Export Excel"
                             })
@@ -3976,9 +5425,10 @@ function ProiecteTable({ searchParams }) {
                 style: {
                     textAlign: "center",
                     padding: "3rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "2px dashed #dee2e6"
+                    background: "rgba(255, 255, 255, 0.1)",
+                    backdropFilter: "blur(20px)",
+                    borderRadius: "16px",
+                    border: "2px dashed rgba(255, 255, 255, 0.3)"
                 },
                 children: [
                     /*#__PURE__*/ jsx_runtime_.jsx("p", {
@@ -4000,11 +5450,12 @@ function ProiecteTable({ searchParams }) {
                 ]
             }) : /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
-                    background: "white",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6",
+                    background: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    borderRadius: "16px",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
                     overflow: "visible",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
                     position: "relative"
                 },
                 children: [
@@ -4022,16 +5473,20 @@ function ProiecteTable({ searchParams }) {
                                 /*#__PURE__*/ jsx_runtime_.jsx("thead", {
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                         style: {
-                                            background: "#f8f9fa",
-                                            borderBottom: "2px solid #dee2e6"
+                                            background: "rgba(248, 249, 250, 0.8)",
+                                            backdropFilter: "blur(10px)",
+                                            borderBottom: "1px solid rgba(0, 0, 0, 0.08)"
                                         },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "left",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Proiect / Subproiect"
                                             }),
@@ -4039,8 +5494,11 @@ function ProiecteTable({ searchParams }) {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "left",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Client"
                                             }),
@@ -4048,8 +5506,11 @@ function ProiecteTable({ searchParams }) {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Status"
                                             }),
@@ -4057,8 +5518,11 @@ function ProiecteTable({ searchParams }) {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Data \xcenceput"
                                             }),
@@ -4066,8 +5530,11 @@ function ProiecteTable({ searchParams }) {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "right",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Valoare Estimată"
                                             }),
@@ -4075,8 +5542,11 @@ function ProiecteTable({ searchParams }) {
                                                 style: {
                                                     padding: "1rem 0.75rem",
                                                     textAlign: "center",
-                                                    fontWeight: "bold",
-                                                    color: "#2c3e50"
+                                                    fontWeight: "600",
+                                                    color: "#2c3e50",
+                                                    fontSize: "13px",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.5px"
                                                 },
                                                 children: "Acțiuni"
                                             })
@@ -4092,20 +5562,31 @@ function ProiecteTable({ searchParams }) {
                                             children: [
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                                     style: {
-                                                        borderBottom: "1px solid #f1f2f6",
-                                                        background: index % 2 === 0 ? "white" : "#fafbfc"
+                                                        borderBottom: "1px solid rgba(0, 0, 0, 0.05)",
+                                                        background: index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)",
+                                                        transition: "all 0.3s ease"
+                                                    },
+                                                    onMouseOver: (e)=>{
+                                                        e.currentTarget.style.background = "rgba(102, 126, 234, 0.08)";
+                                                        e.currentTarget.style.transform = "translateX(4px)";
+                                                    },
+                                                    onMouseOut: (e)=>{
+                                                        e.currentTarget.style.background = index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)";
+                                                        e.currentTarget.style.transform = "translateX(0)";
                                                     },
                                                     children: [
                                                         /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                             style: {
                                                                 padding: "0.75rem",
                                                                 color: "#2c3e50",
-                                                                maxWidth: "300px"
+                                                                // ✅ FIX: Removed maxWidth constraint and enabled text wrapping
+                                                                width: "300px",
+                                                                minWidth: "250px"
                                                             },
                                                             children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                 style: {
                                                                     display: "flex",
-                                                                    alignItems: "center",
+                                                                    alignItems: "flex-start",
                                                                     gap: "0.5rem"
                                                                 },
                                                                 children: [
@@ -4117,14 +5598,23 @@ function ProiecteTable({ searchParams }) {
                                                                             cursor: "pointer",
                                                                             padding: "0.25rem",
                                                                             fontSize: "12px",
-                                                                            color: "#3498db"
+                                                                            color: "#3498db",
+                                                                            borderRadius: "4px",
+                                                                            transition: "all 0.2s ease"
                                                                         },
                                                                         title: isExpanded ? "Ascunde subproiectele" : "Afișează subproiectele",
+                                                                        onMouseOver: (e)=>{
+                                                                            e.currentTarget.style.background = "rgba(52, 152, 219, 0.1)";
+                                                                        },
+                                                                        onMouseOut: (e)=>{
+                                                                            e.currentTarget.style.background = "none";
+                                                                        },
                                                                         children: isExpanded ? "\uD83D\uDCC2" : "\uD83D\uDCC1"
                                                                     }),
                                                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                         style: {
-                                                                            flex: 1
+                                                                            flex: 1,
+                                                                            minWidth: 0
                                                                         },
                                                                         children: [
                                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -4133,7 +5623,10 @@ function ProiecteTable({ searchParams }) {
                                                                                     fontWeight: "bold",
                                                                                     fontSize: "12px",
                                                                                     color: "#2c3e50",
-                                                                                    marginBottom: "0.25rem"
+                                                                                    marginBottom: "0.25rem",
+                                                                                    display: "flex",
+                                                                                    alignItems: "center",
+                                                                                    gap: "0.5rem"
                                                                                 },
                                                                                 children: [
                                                                                     "\uD83C\uDFD7️ ",
@@ -4143,18 +5636,23 @@ function ProiecteTable({ searchParams }) {
                                                                             /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                                                 style: {
                                                                                     color: "#2c3e50",
-                                                                                    overflow: "hidden",
-                                                                                    textOverflow: "ellipsis",
-                                                                                    whiteSpace: "nowrap"
+                                                                                    whiteSpace: "normal",
+                                                                                    wordBreak: "break-word",
+                                                                                    lineHeight: "1.4",
+                                                                                    fontSize: "14px",
+                                                                                    fontWeight: "500"
                                                                                 },
-                                                                                title: proiect.Denumire,
                                                                                 children: proiect.Denumire
                                                                             }),
                                                                             hasSubprojects && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                                 style: {
                                                                                     fontSize: "11px",
                                                                                     color: "#3498db",
-                                                                                    marginTop: "0.25rem"
+                                                                                    marginTop: "0.5rem",
+                                                                                    padding: "0.25rem 0.5rem",
+                                                                                    background: "rgba(52, 152, 219, 0.1)",
+                                                                                    borderRadius: "6px",
+                                                                                    display: "inline-block"
                                                                                 },
                                                                                 children: [
                                                                                     "\uD83D\uDCCB ",
@@ -4176,14 +5674,19 @@ function ProiecteTable({ searchParams }) {
                                                             children: [
                                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                                     style: {
-                                                                        fontWeight: "bold"
+                                                                        fontWeight: "600",
+                                                                        fontSize: "14px"
                                                                     },
                                                                     children: proiect.Client
                                                                 }),
                                                                 proiect.Responsabil && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                     style: {
                                                                         fontSize: "12px",
-                                                                        color: "#7f8c8d"
+                                                                        color: "#7f8c8d",
+                                                                        marginTop: "0.25rem",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "0.25rem"
                                                                     },
                                                                     children: [
                                                                         "\uD83D\uDC64 ",
@@ -4201,13 +5704,14 @@ function ProiecteTable({ searchParams }) {
                                                                 style: {
                                                                     display: "inline-flex",
                                                                     alignItems: "center",
-                                                                    gap: "0.25rem",
-                                                                    padding: "0.25rem 0.5rem",
-                                                                    borderRadius: "12px",
+                                                                    gap: "0.5rem",
+                                                                    padding: "0.5rem 0.75rem",
+                                                                    borderRadius: "16px",
                                                                     fontSize: "12px",
-                                                                    fontWeight: "bold",
+                                                                    fontWeight: "600",
                                                                     color: "white",
-                                                                    background: getStatusColor(proiect.Status)
+                                                                    background: `linear-gradient(135deg, ${getStatusColor(proiect.Status)} 0%, ${getStatusColor(proiect.Status)}dd 100%)`,
+                                                                    boxShadow: `0 2px 8px ${getStatusColor(proiect.Status)}40`
                                                                 },
                                                                 children: [
                                                                     getStatusIcon(proiect.Status),
@@ -4221,7 +5725,9 @@ function ProiecteTable({ searchParams }) {
                                                                 padding: "0.75rem",
                                                                 textAlign: "center",
                                                                 color: "#7f8c8d",
-                                                                fontFamily: "monospace"
+                                                                fontFamily: "monospace",
+                                                                fontSize: "13px",
+                                                                fontWeight: "500"
                                                             },
                                                             children: formatDate(proiect.Data_Start)
                                                         }),
@@ -4229,8 +5735,9 @@ function ProiecteTable({ searchParams }) {
                                                             style: {
                                                                 padding: "0.75rem",
                                                                 textAlign: "right",
-                                                                fontWeight: "bold",
-                                                                color: proiect.Valoare_Estimata ? "#27ae60" : "#bdc3c7"
+                                                                fontWeight: "700",
+                                                                color: proiect.Valoare_Estimata ? "#27ae60" : "#bdc3c7",
+                                                                fontSize: "14px"
                                                             },
                                                             children: formatCurrency(proiect.Valoare_Estimata)
                                                         }),
@@ -4252,9 +5759,18 @@ function ProiecteTable({ searchParams }) {
                                                 }),
                                                 isExpanded && subproiecteProiect.map((subproiect, subIndex)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                                         style: {
-                                                            background: "#f8f9ff",
+                                                            background: "rgba(52, 152, 219, 0.05)",
                                                             borderLeft: "4px solid #3498db",
-                                                            borderBottom: "1px solid #e3f2fd"
+                                                            borderBottom: "1px solid rgba(52, 152, 219, 0.1)",
+                                                            transition: "all 0.3s ease"
+                                                        },
+                                                        onMouseOver: (e)=>{
+                                                            e.currentTarget.style.background = "rgba(52, 152, 219, 0.1)";
+                                                            e.currentTarget.style.transform = "translateX(8px)";
+                                                        },
+                                                        onMouseOut: (e)=>{
+                                                            e.currentTarget.style.background = "rgba(52, 152, 219, 0.05)";
+                                                            e.currentTarget.style.transform = "translateX(0)";
                                                         },
                                                         children: [
                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
@@ -4270,7 +5786,10 @@ function ProiecteTable({ searchParams }) {
                                                                             fontWeight: "bold",
                                                                             fontSize: "11px",
                                                                             color: "#3498db",
-                                                                            marginBottom: "0.25rem"
+                                                                            marginBottom: "0.25rem",
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "0.5rem"
                                                                         },
                                                                         children: [
                                                                             "└─ \uD83D\uDCCB ",
@@ -4281,7 +5800,8 @@ function ProiecteTable({ searchParams }) {
                                                                         style: {
                                                                             color: "#2c3e50",
                                                                             fontStyle: "italic",
-                                                                            fontSize: "13px"
+                                                                            fontSize: "13px",
+                                                                            fontWeight: "500"
                                                                         },
                                                                         children: subproiect.Denumire
                                                                     })
@@ -4295,14 +5815,19 @@ function ProiecteTable({ searchParams }) {
                                                                 children: [
                                                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                                         style: {
-                                                                            fontSize: "13px"
+                                                                            fontSize: "13px",
+                                                                            fontWeight: "500"
                                                                         },
                                                                         children: subproiect.Client || proiect.Client
                                                                     }),
                                                                     subproiect.Responsabil && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                         style: {
                                                                             fontSize: "11px",
-                                                                            color: "#7f8c8d"
+                                                                            color: "#7f8c8d",
+                                                                            marginTop: "0.25rem",
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "0.25rem"
                                                                         },
                                                                         children: [
                                                                             "\uD83D\uDC64 ",
@@ -4321,12 +5846,13 @@ function ProiecteTable({ searchParams }) {
                                                                         display: "inline-flex",
                                                                         alignItems: "center",
                                                                         gap: "0.25rem",
-                                                                        padding: "0.2rem 0.4rem",
-                                                                        borderRadius: "8px",
+                                                                        padding: "0.3rem 0.6rem",
+                                                                        borderRadius: "12px",
                                                                         fontSize: "11px",
-                                                                        fontWeight: "bold",
+                                                                        fontWeight: "600",
                                                                         color: "white",
-                                                                        background: getStatusColor(subproiect.Status)
+                                                                        background: `linear-gradient(135deg, ${getStatusColor(subproiect.Status)} 0%, ${getStatusColor(subproiect.Status)}dd 100%)`,
+                                                                        boxShadow: `0 2px 6px ${getStatusColor(subproiect.Status)}30`
                                                                     },
                                                                     children: [
                                                                         getStatusIcon(subproiect.Status),
@@ -4349,7 +5875,7 @@ function ProiecteTable({ searchParams }) {
                                                                 style: {
                                                                     padding: "0.5rem 0.75rem",
                                                                     textAlign: "right",
-                                                                    fontWeight: "bold",
+                                                                    fontWeight: "600",
                                                                     color: subproiect.Valoare_Estimata ? "#3498db" : "#bdc3c7",
                                                                     fontSize: "13px"
                                                                 },
@@ -4387,9 +5913,10 @@ function ProiecteTable({ searchParams }) {
                     }),
                     proiecte.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
-                            padding: "1rem",
-                            borderTop: "1px solid #dee2e6",
-                            background: "#f8f9fa",
+                            padding: "1.5rem",
+                            borderTop: "1px solid rgba(0, 0, 0, 0.08)",
+                            background: "rgba(248, 249, 250, 0.8)",
+                            backdropFilter: "blur(10px)",
                             display: "grid",
                             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                             gap: "1rem",
@@ -4397,78 +5924,102 @@ function ProiecteTable({ searchParams }) {
                         },
                         children: [
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    background: "rgba(255, 255, 255, 0.7)",
+                                    padding: "1rem",
+                                    borderRadius: "12px",
+                                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)"
+                                },
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
                                             fontSize: "12px",
-                                            color: "#7f8c8d"
+                                            color: "#7f8c8d",
+                                            fontWeight: "500",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.5px"
                                         },
                                         children: "Total Proiecte"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
-                                            fontSize: "18px",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
+                                            fontSize: "20px",
+                                            fontWeight: "700",
+                                            color: "#2c3e50",
+                                            marginTop: "0.25rem"
                                         },
                                         children: proiecte.length
                                     })
                                 ]
                             }),
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    background: "rgba(255, 255, 255, 0.7)",
+                                    padding: "1rem",
+                                    borderRadius: "12px",
+                                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)"
+                                },
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
                                             fontSize: "12px",
-                                            color: "#7f8c8d"
+                                            color: "#7f8c8d",
+                                            fontWeight: "500",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.5px"
                                         },
                                         children: "Total Subproiecte"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
-                                            fontSize: "18px",
-                                            fontWeight: "bold",
-                                            color: "#3498db"
+                                            fontSize: "20px",
+                                            fontWeight: "700",
+                                            color: "#3498db",
+                                            marginTop: "0.25rem"
                                         },
                                         children: subproiecte.length
                                     })
                                 ]
                             }),
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    background: "linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)",
+                                    padding: "1rem",
+                                    borderRadius: "12px",
+                                    border: "1px solid rgba(39, 174, 96, 0.2)",
+                                    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.1)",
+                                    gridColumn: "span 2"
+                                },
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
                                             fontSize: "12px",
-                                            color: "#7f8c8d"
+                                            color: "#27ae60",
+                                            fontWeight: "600",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.5px"
                                         },
-                                        children: "Valoare Proiecte"
+                                        children: "Valoare Totală Portofoliu"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
-                                            fontSize: "16px",
-                                            fontWeight: "bold",
-                                            color: "#27ae60"
+                                            fontSize: "24px",
+                                            fontWeight: "700",
+                                            color: "#27ae60",
+                                            marginTop: "0.25rem"
                                         },
-                                        children: formatCurrency(proiecte.reduce((sum, p)=>sum + (p.Valoare_Estimata || 0), 0))
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                        style: {
-                                            fontSize: "12px",
-                                            color: "#7f8c8d"
-                                        },
-                                        children: "Valoare Subproiecte"
+                                        children: formatCurrency(calculateTotalValue())
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
-                                            fontSize: "16px",
-                                            fontWeight: "bold",
-                                            color: "#3498db"
+                                            fontSize: "11px",
+                                            color: "#7f8c8d",
+                                            marginTop: "0.25rem",
+                                            opacity: 0.8
                                         },
-                                        children: formatCurrency(subproiecte.reduce((sum, s)=>sum + (s.Valoare_Estimata || 0), 0))
+                                        children: "Proiecte + Subproiecte combinate"
                                     })
                                 ]
                             })
@@ -4486,6 +6037,10 @@ function ProiecteTable({ searchParams }) {
 }
 
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/page.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/page.tsx
+// MODIFICAT: Glassmorphism Premium Layout + Z-index Management + Enhanced UX + TypeScript Fix
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
@@ -4539,139 +6094,264 @@ function ProiectePage() {
     };
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
         style: {
-            padding: "1.5rem"
+            padding: "2rem",
+            minHeight: "100vh",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            position: "relative"
         },
         children: [
+            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: `
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%)
+        `,
+                    pointerEvents: "none",
+                    zIndex: 1
+                }
+            }),
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "2rem",
-                    borderBottom: "2px solid #e9ecef",
-                    paddingBottom: "1rem"
+                    position: "relative",
+                    zIndex: 2
                 },
                 children: [
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                        style: {
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "2rem",
+                            padding: "2rem",
+                            background: "rgba(255, 255, 255, 0.95)",
+                            backdropFilter: "blur(20px)",
+                            borderRadius: "20px",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
+                        },
                         children: [
-                            /*#__PURE__*/ jsx_runtime_.jsx("h1", {
-                                style: {
-                                    margin: 0,
-                                    color: "#2c3e50",
-                                    fontSize: "2rem",
-                                    fontWeight: "bold"
-                                },
-                                children: "\uD83D\uDCCB Management Proiecte"
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("h1", {
+                                        style: {
+                                            margin: 0,
+                                            color: "#2c3e50",
+                                            fontSize: "2.5rem",
+                                            fontWeight: "700",
+                                            background: "linear-gradient(135deg, #2c3e50 0%, #4a6741 100%)",
+                                            backgroundClip: "text",
+                                            WebkitBackgroundClip: "text",
+                                            WebkitTextFillColor: "transparent"
+                                        },
+                                        children: "\uD83D\uDCCB Management Proiecte"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                                        style: {
+                                            margin: "0.75rem 0 0 0",
+                                            color: "#7f8c8d",
+                                            fontSize: "1.1rem",
+                                            fontWeight: "500"
+                                        },
+                                        children: "Gestionează și monitorizează toate proiectele din portofoliu"
+                                    })
+                                ]
                             }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                onClick: ()=>setShowProiectModal(true),
                                 style: {
-                                    margin: "0.5rem 0 0 0",
-                                    color: "#7f8c8d",
-                                    fontSize: "1.1rem"
+                                    padding: "1rem 2rem",
+                                    background: "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "16px",
+                                    cursor: "pointer",
+                                    fontSize: "16px",
+                                    fontWeight: "700",
+                                    boxShadow: "0 8px 24px rgba(39, 174, 96, 0.4)",
+                                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                                    position: "relative",
+                                    overflow: "hidden"
                                 },
-                                children: "Gestionează și monitorizează toate proiectele din portofoliu"
+                                onMouseOver: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(-4px) scale(1.02)";
+                                    e.currentTarget.style.boxShadow = "0 12px 32px rgba(39, 174, 96, 0.5)";
+                                },
+                                onMouseOut: (e)=>{
+                                    e.currentTarget.style.transform = "translateY(0) scale(1)";
+                                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(39, 174, 96, 0.4)";
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            position: "relative",
+                                            zIndex: 1
+                                        },
+                                        children: "+ Proiect Nou"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                        style: {
+                                            position: "absolute",
+                                            top: 0,
+                                            left: "-100%",
+                                            width: "100%",
+                                            height: "100%",
+                                            background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)",
+                                            transition: "left 0.5s ease"
+                                        }
+                                    })
+                                ]
                             })
                         ]
                     }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                        onClick: ()=>setShowProiectModal(true),
+                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
-                            padding: "0.75rem 1.5rem",
-                            background: "#27ae60",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            fontSize: "16px",
-                            fontWeight: "bold",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                            transition: "background-color 0.2s"
+                            marginBottom: "2rem",
+                            background: "rgba(255, 255, 255, 0.95)",
+                            backdropFilter: "blur(20px)",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            borderRadius: "20px",
+                            padding: "2rem",
+                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
                         },
-                        onMouseOver: (e)=>{
-                            e.currentTarget.style.background = "#229954";
+                        children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
+                            fallback: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    padding: "3rem",
+                                    textAlign: "center",
+                                    color: "#7f8c8d",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                        style: {
+                                            width: "24px",
+                                            height: "24px",
+                                            borderRadius: "50%",
+                                            border: "3px solid #3498db",
+                                            borderTop: "3px solid transparent",
+                                            animation: "spin 1s linear infinite"
+                                        }
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            fontSize: "16px",
+                                            fontWeight: "500"
+                                        },
+                                        children: "⏳ Se \xeencarcă filtrele..."
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("style", {
+                                        children: `
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `
+                                    })
+                                ]
+                            }),
+                            children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectFilters, {
+                                values: filters,
+                                onChange: handleFilterChange,
+                                onReset: handleFilterReset
+                            })
+                        })
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        style: {
+                            background: "rgba(255, 255, 255, 0.95)",
+                            backdropFilter: "blur(20px)",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            borderRadius: "20px",
+                            overflow: "hidden",
+                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+                            marginBottom: "2rem"
                         },
-                        onMouseOut: (e)=>{
-                            e.currentTarget.style.background = "#27ae60";
+                        children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
+                            fallback: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    padding: "4rem",
+                                    textAlign: "center",
+                                    color: "#7f8c8d",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                        style: {
+                                            width: "32px",
+                                            height: "32px",
+                                            borderRadius: "50%",
+                                            border: "4px solid #3498db",
+                                            borderTop: "4px solid transparent",
+                                            animation: "spin 1s linear infinite"
+                                        }
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                        style: {
+                                            fontSize: "18px",
+                                            fontWeight: "500"
+                                        },
+                                        children: "⏳ Se \xeencarcă proiectele..."
+                                    })
+                                ]
+                            }),
+                            children: /*#__PURE__*/ jsx_runtime_.jsx(ProiecteTable, {
+                                searchParams: tableSearchParams
+                            })
+                        })
+                    }),
+                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        style: {
+                            padding: "1.5rem",
+                            background: "rgba(255, 255, 255, 0.8)",
+                            backdropFilter: "blur(20px)",
+                            borderRadius: "16px",
+                            border: "1px solid rgba(255, 255, 255, 0.3)",
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
+                            textAlign: "center"
                         },
-                        children: "+ Proiect Nou"
+                        children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                            style: {
+                                margin: 0,
+                                fontSize: "14px",
+                                color: "#6c757d",
+                                fontWeight: "500",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "0.5rem"
+                            },
+                            children: [
+                                "\uD83D\uDCA1 ",
+                                /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                    children: "Tip:"
+                                }),
+                                ' Folosește filtrele pentru a găsi rapid proiectele dorite. Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.'
+                            ]
+                        })
+                    }),
+                    showProiectModal && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                        style: {
+                            zIndex: 11000
+                        },
+                        children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
+                            isOpen: showProiectModal,
+                            onClose: ()=>setShowProiectModal(false),
+                            onProiectAdded: handleProiectAdded
+                        })
                     })
                 ]
-            }),
-            /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    marginBottom: "1.5rem",
-                    background: "white",
-                    border: "1px solid #dee2e6",
-                    borderRadius: "8px",
-                    padding: "1.5rem",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                },
-                children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
-                    fallback: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                        style: {
-                            padding: "2rem",
-                            textAlign: "center",
-                            color: "#7f8c8d"
-                        },
-                        children: "⏳ Se \xeencarcă filtrele..."
-                    }),
-                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectFilters, {
-                        values: filters,
-                        onChange: handleFilterChange,
-                        onReset: handleFilterReset
-                    })
-                })
-            }),
-            /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    background: "white",
-                    border: "1px solid #dee2e6",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                },
-                children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
-                    fallback: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                        style: {
-                            padding: "3rem",
-                            textAlign: "center",
-                            color: "#7f8c8d"
-                        },
-                        children: "⏳ Se \xeencarcă proiectele..."
-                    }),
-                    children: /*#__PURE__*/ jsx_runtime_.jsx(ProiecteTable, {
-                        searchParams: tableSearchParams
-                    })
-                })
-            }),
-            /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    marginTop: "2rem",
-                    padding: "1rem",
-                    background: "#f8f9fa",
-                    borderRadius: "6px",
-                    border: "1px solid #e9ecef"
-                },
-                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                    style: {
-                        margin: 0,
-                        fontSize: "14px",
-                        color: "#6c757d",
-                        textAlign: "center"
-                    },
-                    children: [
-                        "\uD83D\uDCA1 ",
-                        /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                            children: "Tip:"
-                        }),
-                        ' Folosește filtrele pentru a găsi rapid proiectele dorite. Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.'
-                    ]
-                })
-            }),
-            /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
-                isOpen: showProiectModal,
-                onClose: ()=>setShowProiectModal(false),
-                onProiectAdded: handleProiectAdded
             })
         ]
     });
