@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Înlocuit handleCreateInvoice cu sistemul hibrid
+// MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
 // ==================================================================
 
 'use client';
@@ -27,13 +27,26 @@ interface ProiectActionsProps {
     Valoare_Estimata?: number;
     Data_Start?: string;
     Data_Final?: string;
+    tip?: 'proiect' | 'subproiect'; // Pentru a diferenția tipul
   };
   onRefresh?: () => void;
 }
 
+// ✅ NOUĂ: Interfață pentru datele subproiectului
+interface SubproiectData {
+  denumire: string;
+  responsabil: string;
+  dataStart: string;
+  dataFinal: string;
+  valoareEstimata: number;
+  status: string;
+}
+
 export default function ProiectActions({ proiect, onRefresh }: ProiectActionsProps) {
   const [showFacturaModal, setShowFacturaModal] = React.useState(false);
+  const [showSubproiectModal, setShowSubproiectModal] = React.useState(false);
 
+  // ✅ ACTUALIZAT: Actions cu "Adauga subproiect" doar pentru proiectele principale
   const actions: ActionItem[] = [
     {
       key: 'view',
@@ -53,6 +66,14 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
       icon: '📋',
       color: 'secondary'
     },
+    // ✅ NOUĂ: Adaugă subproiect doar pentru proiectele principale
+    ...(proiect.tip !== 'subproiect' ? [{
+      key: 'add_subproject',
+      label: 'Adaugă Subproiect',
+      icon: '📂',
+      color: 'success' as const,
+      disabled: proiect.Status === 'Anulat' || proiect.Status === 'Arhivat'
+    }] : []),
     {
       key: 'divider1',
       label: '',
@@ -117,7 +138,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     },
     {
       key: 'delete',
-      label: 'Șterge Proiect',
+      label: proiect.tip === 'subproiect' ? 'Șterge Subproiect' : 'Șterge Proiect',
       icon: '🗑️',
       color: 'danger'
     }
@@ -135,11 +156,14 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
         case 'duplicate':
           await handleDuplicate();
           break;
+        case 'add_subproject':
+          // ✅ NOUĂ: Deschide modalul pentru subproiect
+          handleAddSubproject();
+          break;
         case 'generate_contract':
           await handleGenerateContract();
           break;
         case 'generate_invoice':
-          // MODIFICAT: Folosește sistemul hibrid
           handleCreateInvoiceHibrid();
           break;
         case 'send_email':
@@ -166,7 +190,11 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     }
   };
 
-  // NOUĂ FUNCȚIE: Pentru sistemul hibrid
+  // ✅ NOUĂ FUNCȚIE: Deschide modalul pentru adăugare subproiect
+  const handleAddSubproject = () => {
+    setShowSubproiectModal(true);
+  };
+
   const handleCreateInvoiceHibrid = () => {
     setShowFacturaModal(true);
   };
@@ -175,15 +203,8 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     setShowFacturaModal(false);
     toast.success(`Factura ${invoiceId} a fost generată cu succes!`);
     
-    // Refresh lista de proiecte
     if (onRefresh) {
       onRefresh();
-    }
-    
-    // Opțional: download automat
-    const shouldDownload = window.confirm('Vrei să descarci factura acum?');
-    if (shouldDownload) {
-      window.open(downloadUrl, '_blank');
     }
   };
 
@@ -192,7 +213,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   const handleEdit = async () => {
-    toast.info(`Editare proiect ${proiect.ID_Proiect}`);
+    toast.info(`Editare ${proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'} ${proiect.ID_Proiect}`);
   };
 
   const handleDuplicate = async () => {
@@ -273,7 +294,9 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
 
   const handleUpdateStatus = async (newStatus: string) => {
     try {
-      const response = await fetch('/api/rapoarte/proiecte', {
+      const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
+      
+      const response = await fetch(apiEndpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -296,24 +319,29 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   const handleDelete = async () => {
-    const confirmed = confirm(`Sigur vrei să ștergi proiectul ${proiect.ID_Proiect}?`);
+    const itemType = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
+    const confirmed = confirm(`Sigur vrei să ștergi ${itemType} ${proiect.ID_Proiect}?`);
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte?id=${proiect.ID_Proiect}`, {
+      const apiEndpoint = proiect.tip === 'subproiect' 
+        ? `/api/rapoarte/subproiecte?id=${proiect.ID_Proiect}`
+        : `/api/rapoarte/proiecte?id=${proiect.ID_Proiect}`;
+      
+      const response = await fetch(apiEndpoint, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Proiect șters cu succes!');
+        toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
         onRefresh?.();
       } else {
-        toast.error(result.error || 'Eroare la ștergerea proiectului');
+        toast.error(result.error || `Eroare la ștergerea ${itemType}`);
       }
     } catch (error) {
-      toast.error('Eroare la ștergerea proiectului');
+      toast.error(`Eroare la ștergerea ${itemType}`);
     }
   };
 
@@ -337,7 +365,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
         getColorClass={getColorClass}
       />
       
-      {/* NOUĂ: Modal pentru factură hibridă */}
+      {/* Modal pentru factură hibridă */}
       {showFacturaModal && (
         <FacturaHibridModal
           proiect={proiect}
@@ -345,7 +373,239 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
           onSuccess={handleInvoiceSuccess}
         />
       )}
+
+      {/* ✅ NOUĂ: Modal pentru adăugare subproiect */}
+      {showSubproiectModal && (
+        <SubproiectModal
+          proiectParinte={proiect}
+          onClose={() => setShowSubproiectModal(false)}
+          onSuccess={() => {
+            setShowSubproiectModal(false);
+            toast.success('Subproiect adăugat cu succes!');
+            onRefresh?.();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// ✅ NOUĂ COMPONENTĂ: Modal pentru adăugare subproiect
+interface SubproiectModalProps {
+  proiectParinte: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModalProps) {
+  const [formData, setFormData] = React.useState<SubproiectData>({
+    denumire: '',
+    responsabil: '',
+    dataStart: new Date().toISOString().split('T')[0],
+    dataFinal: '',
+    valoareEstimata: 0,
+    status: 'Activ'
+  });
+  
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.denumire.trim()) {
+      toast.error('Denumirea subproiectului este obligatorie');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // Generează ID unic pentru subproiect
+      const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
+      
+      const response = await fetch('/api/rapoarte/subproiecte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ID_Subproiect: subproiectId,
+          ID_Proiect: proiectParinte.ID_Proiect,
+          Denumire: formData.denumire.trim(),
+          Responsabil: formData.responsabil.trim() || null,
+          Data_Start: formData.dataStart || null,
+          Data_Final: formData.dataFinal || null,
+          Valoare_Estimata: formData.valoareEstimata || null,
+          Status: formData.status
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        onSuccess();
+      } else {
+        toast.error(result.error || 'Eroare la adăugarea subproiectului');
+      }
+    } catch (error) {
+      toast.error('Eroare la adăugarea subproiectului');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const updateField = (field: keyof SubproiectData, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              📂 Adaugă Subproiect Nou
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Proiect părinte: {proiectParinte.ID_Proiect} - {proiectParinte.Denumire}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-xl p-1"
+            disabled={isSubmitting}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Denumire */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Denumire Subproiect *
+            </label>
+            <input
+              type="text"
+              value={formData.denumire}
+              onChange={(e) => updateField('denumire', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Introduceți denumirea subproiectului..."
+              required
+            />
+          </div>
+
+          {/* Grid pentru câmpurile în două coloane */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Responsabil */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Responsabil
+              </label>
+              <input
+                type="text"
+                value={formData.responsabil}
+                onChange={(e) => updateField('responsabil', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Numele responsabilului..."
+              />
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => updateField('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="Activ">Activ</option>
+                <option value="Suspendat">Suspendat</option>
+                <option value="Finalizat">Finalizat</option>
+              </select>
+            </div>
+
+            {/* Data Start */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Început
+              </label>
+              <input
+                type="date"
+                value={formData.dataStart}
+                onChange={(e) => updateField('dataStart', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Data Final */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Finalizare
+              </label>
+              <input
+                type="date"
+                value={formData.dataFinal}
+                onChange={(e) => updateField('dataFinal', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Valoare Estimată */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Valoare Estimată (RON)
+            </label>
+            <input
+              type="number"
+              value={formData.valoareEstimata}
+              onChange={(e) => updateField('valoareEstimata', parseFloat(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          {/* Info despre proiectul părinte */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="font-medium text-gray-700 mb-2">Informații Proiect Părinte:</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div><strong>Client:</strong> {proiectParinte.Client}</div>
+              <div><strong>Status:</strong> {proiectParinte.Status}</div>
+              <div><strong>Valoare:</strong> {proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata} RON` : 'N/A'}</div>
+              <div><strong>Data start:</strong> {proiectParinte.Data_Start || 'N/A'}</div>
+            </div>
+          </div>
+
+          {/* Butoane */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50"
+            >
+              Anulează
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !formData.denumire.trim()}
+              className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <>⏳ Se adaugă...</>
+              ) : (
+                <>📂 Adaugă Subproiect</>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -428,6 +688,18 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: E
               marginBottom: '4px'
             }}>
               {proiect.ID_Proiect}
+              {proiect.tip === 'subproiect' && (
+                <span style={{ 
+                  marginLeft: '8px',
+                  fontSize: '10px',
+                  background: '#3498db',
+                  color: 'white',
+                  padding: '2px 6px',
+                  borderRadius: '3px'
+                }}>
+                  SUB
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
               Status: <span style={{ 

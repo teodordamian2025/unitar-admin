@@ -1,118 +1,209 @@
-🏗️ UNITAR PROIECT - Management Proiecte & Facturare
-📋 Overview
-Aplicație Next.js pentru management proiecte cu sistem hibrid de facturare (PDF + ANAF) care generează facturi PDF complete cu integrare automată ANAF pentru datele companiilor.
-🛠️ Stack Tehnologic
+# 🏗️ UNITAR PROIECT - Management Proiecte & Facturare
 
-Frontend: Next.js 13.4.19, React 18, TypeScript
-Backend: API Routes, BigQuery, Firebase Auth
-Database: Google BigQuery (dataset: PanouControlUnitar)
-PDF: jsPDF + html2canvas (înlocuit PDFKit pentru compatibilitate Vercel)
-Styling: Tailwind CSS (inline)
+## 📋 Overview
+Aplicație Next.js pentru management proiecte cu sistem hibrid de facturare (PDF + ANAF) care generează facturi PDF complete cu integrare automată ANAF pentru datele companiilor. Include management complet al subproiectelor și auto-completare date client din baza de date.
 
-📊 Structura BigQuery
-Tabele principale:
+## 🛠️ Stack Tehnologic
+- **Frontend:** Next.js 13.4.19, React 18, TypeScript
+- **Backend:** API Routes, BigQuery, Firebase Auth
+- **Database:** Google BigQuery (dataset: PanouControlUnitar)
+- **PDF:** jsPDF + html2canvas (optimizat pentru Vercel)
+- **Styling:** Tailwind CSS (inline)
+- **External APIs:** ANAF API pentru validare date companii
 
-Proiecte - ID_Proiect, Denumire, Client, Status, Valoare_Estimata
-Clienti - id, nume, cui, nr_reg_com, adresa, email, telefon
-FacturiGenerate - id, proiect_id, client_nume, subtotal, total, status
-SesiuniLucru - time tracking pentru proiecte
-Subproiecte - managementul sub-task-urilor
+## 📊 Structura BigQuery
 
-✅ Funcționalități Implementate
-🚀 SISTEM HIBRID FACTURI (COMPLET - FUNCȚIONAL)
+### Tabele principale:
+- **Proiecte** - ID_Proiect, Denumire, Client, Status, Valoare_Estimata, Data_Start, Data_Final
+- **Clienti** - id, nume, cui, nr_reg_com, adresa, email, telefon, banca, iban
+- **Subproiecte** - ID_Subproiect, ID_Proiect, Denumire, Responsabil, Status, Valoare_Estimata
+- **FacturiGenerate** - id, proiect_id, client_id, serie, numar, subtotal, total_tva, total, status
+- **SesiuniLucru** - time tracking pentru proiecte
 
-PDF instant cu template profesional HTML + CSS
-Integrare ANAF pentru preluare automată date companii
-Modal interactiv cu linii multiple de facturare
-Calcule automate TVA, subtotaluri, total general
-Validări complete pentru toate câmpurile
-API routes complete:
+### 🗑️ Tabel eliminat:
+- ~~**FacturiEmise**~~ - înlocuit cu FacturiGenerate (mai complet)
 
-app/api/actions/invoices/generate-hibrid/route.ts ✅
-app/api/anaf/company-info/route.ts ✅
+## ✅ Funcționalități Implementate
 
+### 🚀 SISTEM HIBRID FACTURI (COMPLET - FUNCȚIONAL)
+- ✅ **PDF instant** cu template profesional HTML + CSS
+- ✅ **Scalare optimizată** - PDF ocupă 100% din pagina A4
+- ✅ **Integrare ANAF** pentru preluare automată date companii
+- ✅ **Auto-completare client** din baza de date
+- ✅ **Management subproiecte** - adăugare și includere în facturi
+- ✅ **Modal interactiv** cu linii multiple de facturare
+- ✅ **Calcule automate** TVA, subtotaluri, total general
+- ✅ **Validări complete** pentru toate câmpurile
+- ✅ **Fără diacritice** în PDF pentru compatibilitate maximă
+- ✅ **Date firmă actualizate** - CUI, adrese, conturi bancare complete
 
+### 📂 MANAGEMENT SUBPROIECTE (NOU - COMPLET)
+- ✅ **Buton "Adauga subproiect"** în ProiectActions
+- ✅ **Modal creare subproiect** cu toate câmpurile
+- ✅ **Afișare ierarhică** în ProiecteTable
+- ✅ **Selector subproiecte** în factură
+- ✅ **Adăugare automată** la liniile facturii
+- ✅ **Diferențiere vizuală** proiecte vs subproiecte
 
-📱 Componente UI
+### 🔗 AUTO-COMPLETARE DIN BD (NOU - COMPLET)
+- ✅ **Căutare automată client** pe baza numelui din proiect
+- ✅ **Pre-completare toate câmpurile** (CUI, adresă, telefon)
+- ✅ **Client ID lookup** pentru legătura cu BD
+- ✅ **Indicator vizual** când datele sunt din BD
+- ✅ **Fallback inteligent** dacă clientul nu e găsit
 
-FacturaHibridModal.tsx - Modal complet cu ANAF + PDF ✅
-ProiectActions.tsx - Dropdown acțiuni complete ✅
-hooks/useANAFCompanyInfo.ts - Hook pentru ANAF ✅
+### 🔧 ÎMBUNĂTĂȚIRI INFRASTRUCTURĂ
+- ✅ **BigQuery integration** optimizată cu JOIN-uri
+- ✅ **Error handling** & validation complete
+- ✅ **Responsive design** pentru toate componentele
+- ✅ **Compatibilitate Vercel** 100%
+- ✅ **Fix URL redirect** - nu mai redirecționează după download
+- ✅ **Loading states** pentru toate operațiunile
+- ✅ **Toast notifications** informative
 
-🔧 Infrastructura
+## 🎯 Status Actual
 
-BigQuery integration optimizată ✅
-Error handling & validation complete ✅
-Responsive design ✅
-Compatibilitate Vercel 100% ✅
+### ✅ SISTEM COMPLET FUNCȚIONAL
+- **PDF generare** - Scale optimizat la 100% A4
+- **ANAF integration** - Funcționează perfect
+- **Auto-completare BD** - Client data preluată automat
+- **Subproiecte** - Management complet implementat
+- **UI/UX** - Complet și intuitiv cu loading states
+- **BigQuery** - Salvare completă în FacturiGenerate
 
-🎯 Status Actual
+## 🚀 Quick Start
 
-SISTEM FUNCȚIONAL pe Vercel
-PDF se generează dar apare gol (următoarea optimizare)
-ANAF integration funcționează perfect
-UI/UX complet și intuitiv
-
-🔧 Problema Actuală
-PDF-ul se generează cu success dar conținutul este gol. Cauze posibile:
-
-HTML template nu se randează corect în jsPDF
-CSS-ul inline nu e compatibil cu html2canvas
-Timing issues în procesarea asincronă
-
-🚀 Quick Start
-bashnpm install
+```bash
+npm install
 npm run dev
-📁 Structura Fișiere Key
+```
+
+Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
+
+## 📁 Structura Fișiere Key
+
+```
 app/
 ├── admin/rapoarte/
 │   ├── proiecte/
 │   │   ├── components/
-│   │   │   ├── FacturaHibridModal.tsx ✅ (COMPLET)
-│   │   │   ├── ProiectActions.tsx ✅ (COMPLET)
-│   │   │   └── ProiecteTable.tsx ✅
-│   │   └── page.tsx
-│   └── facturi/page.tsx ✅
+│   │   │   ├── FacturaHibridModal.tsx ✅ (COMPLET + Auto-completare + Subproiecte)
+│   │   │   ├── ProiectActions.tsx ✅ (COMPLET + Buton Adauga Subproiect + Modal)
+│   │   │   ├── ProiecteTable.tsx ✅ (COMPLET + Afișare ierarhică subproiecte)
+│   │   │   ├── ProiectFilters.tsx ✅ (Filtrare avansată)
+│   │   │   └── ProiectNouModal.tsx ✅ (Creare proiecte noi)
+│   │   └── page.tsx ✅ (Layout principal cu filtre și tabel)
+│   └── facturi/page.tsx ✅ (Management facturi generate)
 ├── api/
-│   ├── actions/invoices/generate-hibrid/route.ts ✅ (HTML+jsPDF)
-│   ├── anaf/company-info/route.ts ✅ (ANAF COMPLET)
-│   └── rapoarte/proiecte/route.ts
+│   ├── actions/invoices/
+│   │   └── generate-hibrid/route.ts ✅ (HTML+jsPDF + Client lookup + Metadata)
+│   ├── anaf/
+│   │   └── company-info/route.ts ✅ (ANAF API integration completă)
+│   └── rapoarte/
+│       ├── proiecte/route.ts ✅ (CRUD complet proiecte)
+│       ├── subproiecte/route.ts ✅ (CRUD complet subproiecte cu JOIN)
+│       └── clienti/route.ts ✅ (CRUD complet clienti)
 └── components/ (globale)
-🔑 Environment Variables
-GOOGLE_CLOUD_PROJECT_ID=
-GOOGLE_CLOUD_CLIENT_EMAIL=
-GOOGLE_CLOUD_PRIVATE_KEY=
-GOOGLE_CLOUD_CLIENT_ID=
-📞 Context pentru Chat-uri Noi
-Status: Sistem funcțional cu PDF-uri goale - necesită optimizare HTML→PDF
-Tehnologii: Next.js 13 + BigQuery + jsPDF + html2canvas + ANAF API
-Problemă actuală: Template HTML nu se randează în PDF (conținut gol)
-Următoarea prioritate: Optimizare generare PDF cu conținut complet
+```
 
-💡 Soluții Propuse pentru PDF Gol
-🔧 Problema Identificată
-HTML-ul generat de API nu se convertește corect în PDF prin jsPDF + html2canvas.
-🎯 Soluții de Optimizare:
-1. 🚀 Simplificare Template (Recomandat)
+### 📋 Descriere Componente Cheie
 
-Elimină CSS complex (grid, flexbox)
-Folosește doar <table> pentru layout
-Reduce dependințele de fonturi externe
+#### 🎯 **FacturaHibridModal.tsx**
+- **Auto-completare client** din BD pe baza numelui proiectului
+- **Selector subproiecte** cu adăugare automată la factură
+- **Integrare ANAF** pentru verificare date companii
+- **Generare PDF** cu scalare optimizată (jsPDF + html2canvas)
+- **Validări complete** și error handling
+- **UI responsive** cu loading states și toast notifications
 
-2. 📋 Debugging Metodic
+#### ⚙️ **ProiectActions.tsx**
+- **Dropdown acțiuni** complete pentru proiecte și subproiecte
+- **Buton "Adauga subproiect"** (doar pentru proiecte principale)
+- **Modal creare subproiect** cu toate câmpurile necesare
+- **Generare factură hibridă** cu un click
+- **Acțiuni diferențiate** pentru proiecte vs subproiecte
+- **Status management** integrat
 
-Console.log HTML-ul înainte de conversie
-Testează template-ul direct în browser
-Verifică dacă html2canvas captează elementul
+#### 📊 **ProiecteTable.tsx**
+- **Afișare ierarhică** proiecte și subproiecte
+- **Încărcare automată** din multiple API endpoints
+- **Diferențiere vizuală** cu indentare pentru subproiecte
+- **Filtrare avansată** și export Excel
+- **Refresh automat** după operațiuni
 
-3. 🔄 Alternativă: React-PDF
+#### 🔗 **API Routes**
+- **`/api/actions/invoices/generate-hibrid`** - Generare facturi cu client lookup și metadata
+- **`/api/rapoarte/proiecte`** - CRUD complet proiecte
+- **`/api/rapoarte/subproiecte`** - CRUD subproiecte cu JOIN către proiecte
+- **`/api/rapoarte/clienti`** - CRUD clienti cu validări și căutare
+- **`/api/anaf/company-info`** - Integrare ANAF pentru validare companii
 
-Înlocuiește jsPDF cu @react-pdf/renderer
-Control total asupra layout-ului
-Compatibilitate garantată cu Vercel
+## 🔑 Environment Variables
 
-4. ⚡ Fix Rapid
+```env
+GOOGLE_CLOUD_PROJECT_ID=your-project-id
+GOOGLE_CLOUD_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+GOOGLE_CLOUD_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+GOOGLE_CLOUD_CLIENT_ID=your-client-id
+```
 
-Adaugă await la încărcarea HTML-ului în DOM
-Crește timeout-ul pentru procesare
-Verifică dimensiunile elementului temporar
+## 🏢 Configurare Firmă
+
+### Date Actualizate în Template:
+- **Denumire:** UNITAR PROIECT TDA SRL
+- **CUI:** RO35639210
+- **Nr. Reg. Com.:** J2016002024405
+- **Adresa:** Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01, mun. Bucuresti, sector 4
+- **Telefon:** 0765486044
+- **Email:** contact@unitarproiect.eu
+
+### Conturi Bancare:
+- **Cont Principal ING:** RO82INGB0000999905667533
+- **Cont Trezorerie:** RO29TREZ7035069XXX018857 (Trezoreria sectorului 3 Bucuresti)
+
+## 🎉 Funcționalități Avansate
+
+### 💰 **Sistem Facturare Hibrid**
+1. **Template HTML** cu CSS optimizat pentru PDF
+2. **Conversie PDF** cu jsPDF + html2canvas
+3. **Scalare 100%** pe pagina A4
+4. **Salvare metadata** completă în BigQuery
+5. **Client lookup** automat pentru legătura cu BD
+
+### 📂 **Management Subproiecte**
+1. **Creare subproiecte** din ProiectActions
+2. **Afișare ierarhică** în tabel cu indentare
+3. **Includere în facturi** cu selector dedicat
+4. **Tracking separat** pentru costuri și progres
+
+### 🔗 **Auto-completare Inteligentă**
+1. **Căutare client** automată în BD
+2. **Pre-completare toate câmpurile** din profil client
+3. **Validare ANAF** pentru verificare date
+4. **Fallback manual** dacă datele nu sunt găsite
+
+## 📊 Metrici și Raportare
+
+- **Proiecte active/finalizate/suspendate**
+- **Facturi generate/plătite/în așteptare**
+- **Valori financiare** pe proiecte și subproiecte
+- **Export Excel** cu filtrare avansată
+- **Time tracking** pe sesiuni de lucru
+
+## 🔮 Dezvoltări Viitoare
+
+- [ ] **Dashboard analitic** cu grafice și KPI-uri
+- [ ] **Sincronizare automată** cu sisteme de contabilitate
+- [ ] **Notificări email** pentru deadline-uri și facturi
+- [ ] **Mobile app** pentru time tracking
+- [ ] **API public** pentru integrări externe
+
+## 📞 Support
+
+Pentru întrebări tehnice sau probleme:
+- **Email:** contact@unitarproiect.eu
+- **Telefon:** 0765486044
+
+---
+
+**Status:** ✅ **COMPLET FUNCȚIONAL** - Sistem hibrid de facturare cu management proiecte și subproiecte implementat integral.
