@@ -412,7 +412,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.denumire.trim()) {
+    if (!formData.denumire?.trim()) {
       toast.error('Denumirea subproiectului este obligatorie');
       return;
     }
@@ -429,12 +429,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
         body: JSON.stringify({
           ID_Subproiect: subproiectId,
           ID_Proiect: proiectParinte.ID_Proiect,
-          Denumire: formData.denumire.trim(),
-          Responsabil: formData.responsabil.trim() || null,
+          Denumire: formData.denumire?.trim() || '',
+          Responsabil: formData.responsabil?.trim() || null,
           Data_Start: formData.dataStart || null,
           Data_Final: formData.dataFinal || null,
           Valoare_Estimata: formData.valoareEstimata || null,
-          Status: formData.status
+          Status: formData.status || 'Activ'
         })
       });
 
@@ -487,7 +487,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </label>
             <input
               type="text"
-              value={formData.denumire}
+              value={formData.denumire || ''}
               onChange={(e) => updateField('denumire', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Introduceți denumirea subproiectului..."
@@ -504,7 +504,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="text"
-                value={formData.responsabil}
+                value={formData.responsabil || ''}
                 onChange={(e) => updateField('responsabil', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Numele responsabilului..."
@@ -517,7 +517,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 Status
               </label>
               <select
-                value={formData.status}
+                value={formData.status || 'Activ'}
                 onChange={(e) => updateField('status', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
@@ -534,7 +534,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="date"
-                value={formData.dataStart}
+                value={formData.dataStart || ''}
                 onChange={(e) => updateField('dataStart', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
@@ -547,7 +547,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="date"
-                value={formData.dataFinal}
+                value={formData.dataFinal || ''}
                 onChange={(e) => updateField('dataFinal', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
