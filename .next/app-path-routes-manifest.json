@@ -1,7 +1,7 @@
 {
   "/page": "/",
-  "/login/page": "/login",
   "/logout/page": "/logout",
+  "/login/page": "/login",
   "/profil/page": "/profil",
   "/test-page/page": "/test-page",
   "/admin/page": "/admin",

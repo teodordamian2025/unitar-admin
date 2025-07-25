@@ -1,3 +1,8 @@
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
+// MODIFICAT: Adăugat câmp Adresa pentru proiecte
+// ==================================================================
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -29,6 +34,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     Denumire: '',
     Client: '',
     selectedClientId: '',
+    Adresa: '', // ✅ NOUĂ: Câmp Adresa
     Descriere: '',
     Data_Start: '',
     Data_Final: '',
@@ -96,11 +102,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       console.log('Trimitere date proiect:', formData); // Debug
       toast.info('Se adaugă proiectul...');
 
-      // Adaugă proiectul principal
+      // ✅ ACTUALIZAT: Adaugă proiectul principal cu câmpul Adresa
       const proiectData = {
         ID_Proiect: formData.ID_Proiect.trim(),
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
+        Adresa: formData.Adresa.trim(), // ✅ NOUĂ: Include Adresa
         Descriere: formData.Descriere.trim(),
         Data_Start: formData.Data_Start || null,
         Data_Final: formData.Data_Final || null,
@@ -171,6 +178,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       Denumire: '',
       Client: '',
       selectedClientId: '',
+      Adresa: '', // ✅ NOUĂ: Reset Adresa
       Descriere: '',
       Data_Start: '',
       Data_Final: '',
@@ -457,6 +465,27 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 + Client Nou
               </button>
             </div>
+          </div>
+
+          {/* ✅ NOUĂ: Câmp Adresa */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Adresa Proiect
+            </label>
+            <input
+              type="text"
+              value={formData.Adresa}
+              onChange={(e) => handleInputChange('Adresa', e.target.value)}
+              disabled={loading}
+              placeholder="Adresa unde se desfășoară proiectul (ex: Str. Exemplu Nr. 1, Bucuresti)"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
           </div>
 
           {/* Grid pentru date și valori */}

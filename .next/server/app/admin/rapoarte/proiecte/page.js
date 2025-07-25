@@ -1662,6 +1662,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                         /*#__PURE__*/ jsx_runtime_.jsx("option", {
                                                                             value: 19,
                                                                             children: "19%"
+                                                                        }),
+                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
+                                                                            value: 21,
+                                                                            children: "21%"
                                                                         })
                                                                     ]
                                                                 })
@@ -1801,11 +1805,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
 }
 
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
+/* __next_internal_client_entry_do_not_use__ default auto */ 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 // MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
 // ==================================================================
-/* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
 
@@ -1971,10 +1975,33 @@ function ProiectActions({ proiect, onRefresh }) {
         }
     };
     const handleViewDetails = async ()=>{
-        dist/* toast */.Am.info(`Vizualizare detalii pentru ${proiect.ID_Proiect}`);
+        // ✅ IMPLEMENTAT: Afișează detalii complete în toast sau modal
+        const detalii = `
+📋 ${proiect.tip === "subproiect" ? "SUBPROIECT" : "PROIECT"}: ${proiect.ID_Proiect}
+📝 Denumire: ${proiect.Denumire}
+👤 Client: ${proiect.Client}
+📊 Status: ${proiect.Status}
+💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON` : "N/A"}
+📅 Începe: ${proiect.Data_Start || "N/A"}
+📅 Finalizare: ${proiect.Data_Final || "N/A"}
+    `.trim();
+        // Afișează în toast pentru informare rapidă
+        dist/* toast */.Am.info(detalii, {
+            autoClose: 8000,
+            style: {
+                whiteSpace: "pre-line",
+                fontSize: "13px"
+            }
+        });
+        console.log("Detalii proiect:", proiect);
     };
     const handleEdit = async ()=>{
-        dist/* toast */.Am.info(`Editare ${proiect.tip === "subproiect" ? "subproiect" : "proiect"} ${proiect.ID_Proiect}`);
+        // ✅ IMPLEMENTAT: Placeholder pentru modal de editare
+        dist/* toast */.Am.info(`🔧 Editare ${proiect.tip === "subproiect" ? "subproiect" : "proiect"} ${proiect.ID_Proiect}`);
+        // TODO: Implementează modal de editare sau redirectionează la pagină de editare
+        const editUrl = proiect.tip === "subproiect" ? `/admin/rapoarte/subproiecte/${proiect.ID_Proiect}/edit` : `/admin/rapoarte/proiecte/${proiect.ID_Proiect}/edit`;
+        console.log("Ar trebui să redirectionez la:", editUrl);
+        console.log("Date pentru editare:", proiect);
     };
     const handleDuplicate = async ()=>{
         const confirmed = confirm(`Sigur vrei să duplici proiectul ${proiect.ID_Proiect}?`);
@@ -2138,24 +2165,22 @@ function ProiectActions({ proiect, onRefresh }) {
     });
 }
 function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
-    const [formData, setFormData] = react_experimental_default().useState({
-        denumire: "",
-        responsabil: "",
-        dataStart: new Date().toISOString().split("T")[0],
-        dataFinal: "",
-        valoareEstimata: 0,
-        status: "Activ"
-    });
+    // ✅ SAFE STATE: Folosește string-uri pentru toate valorile
+    const [denumire, setDenumire] = react_experimental_default().useState("");
+    const [responsabil, setResponsabil] = react_experimental_default().useState("");
+    const [dataStart, setDataStart] = react_experimental_default().useState(new Date().toISOString().split("T")[0]);
+    const [dataFinal, setDataFinal] = react_experimental_default().useState("");
+    const [valoareEstimata, setValoareEstimata] = react_experimental_default().useState("0");
+    const [status, setStatus] = react_experimental_default().useState("Activ");
     const [isSubmitting, setIsSubmitting] = react_experimental_default().useState(false);
     const handleSubmit = async (e)=>{
         e.preventDefault();
-        if (!formData.denumire?.trim()) {
+        if (!denumire.trim()) {
             dist/* toast */.Am.error("Denumirea subproiectului este obligatorie");
             return;
         }
         setIsSubmitting(true);
         try {
-            // Generează ID unic pentru subproiect
             const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
             const response = await fetch("/api/rapoarte/subproiecte", {
                 method: "POST",
@@ -2165,12 +2190,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                 body: JSON.stringify({
                     ID_Subproiect: subproiectId,
                     ID_Proiect: proiectParinte.ID_Proiect,
-                    Denumire: formData.denumire?.trim() || "",
-                    Responsabil: formData.responsabil?.trim() || null,
-                    Data_Start: formData.dataStart || null,
-                    Data_Final: formData.dataFinal || null,
-                    Valoare_Estimata: formData.valoareEstimata || null,
-                    Status: formData.status || "Activ"
+                    Denumire: denumire.trim(),
+                    Responsabil: responsabil.trim() || null,
+                    Data_Start: dataStart || null,
+                    Data_Final: dataFinal || null,
+                    Valoare_Estimata: parseFloat(valoareEstimata) || null,
+                    Status: status
                 })
             });
             const result = await response.json();
@@ -2184,12 +2209,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         } finally{
             setIsSubmitting(false);
         }
-    };
-    const updateField = (field, value)=>{
-        setFormData((prev)=>({
-                ...prev,
-                [field]: value
-            }));
     };
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
         className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
@@ -2236,8 +2255,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                     type: "text",
-                                    value: formData.denumire || "",
-                                    onChange: (e)=>updateField("denumire", e.target.value),
+                                    value: denumire,
+                                    onChange: (e)=>setDenumire(e.target.value),
                                     className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
                                     placeholder: "Introduceți denumirea subproiectului...",
                                     required: true
@@ -2255,8 +2274,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "text",
-                                            value: formData.responsabil || "",
-                                            onChange: (e)=>updateField("responsabil", e.target.value),
+                                            value: responsabil,
+                                            onChange: (e)=>setResponsabil(e.target.value),
                                             className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
                                             placeholder: "Numele responsabilului..."
                                         })
@@ -2269,8 +2288,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             children: "Status"
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                            value: formData.status || "Activ",
-                                            onChange: (e)=>updateField("status", e.target.value),
+                                            value: status,
+                                            onChange: (e)=>setStatus(e.target.value),
                                             className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("option", {
@@ -2297,8 +2316,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
-                                            value: formData.dataStart || "",
-                                            onChange: (e)=>updateField("dataStart", e.target.value),
+                                            value: dataStart,
+                                            onChange: (e)=>setDataStart(e.target.value),
                                             className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         })
                                     ]
@@ -2311,8 +2330,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                             type: "date",
-                                            value: formData.dataFinal || "",
-                                            onChange: (e)=>updateField("dataFinal", e.target.value),
+                                            value: dataFinal,
+                                            onChange: (e)=>setDataFinal(e.target.value),
                                             className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         })
                                     ]
@@ -2327,8 +2346,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                     type: "number",
-                                    value: formData.valoareEstimata || "",
-                                    onChange: (e)=>updateField("valoareEstimata", parseFloat(e.target.value) || 0),
+                                    value: valoareEstimata,
+                                    onChange: (e)=>setValoareEstimata(e.target.value),
                                     className: "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
                                     placeholder: "0.00",
                                     min: "0",
@@ -2398,7 +2417,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                     type: "submit",
-                                    disabled: isSubmitting || !formData.denumire.trim(),
+                                    disabled: isSubmitting || !denumire.trim(),
                                     className: "bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
                                     children: isSubmitting ? /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
                                         children: "⏳ Se adaugă..."
@@ -2417,6 +2436,29 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
 function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }) {
     const [isOpen, setIsOpen] = react_experimental_default().useState(false);
     const [loading, setLoading] = react_experimental_default().useState(null);
+    const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
+    const buttonRef = react_experimental_default().useRef(null);
+    // ✅ NOUĂ: Calculează poziția dropdown-ului
+    const calculateDropdownPosition = ()=>{
+        if (buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            // Dacă nu e suficient spațiu dedesubt (sub 300px) și e mai mult spațiu deasupra
+            if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+                setDropdownPosition("top");
+            } else {
+                setDropdownPosition("bottom");
+            }
+        }
+    };
+    const handleToggleDropdown = ()=>{
+        if (!isOpen) {
+            calculateDropdownPosition();
+        }
+        setIsOpen(!isOpen);
+    };
     const handleActionClick = async (actionKey)=>{
         if (loading) return;
         setLoading(actionKey);
@@ -2600,6 +2642,10 @@ function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }) {
 // EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx
 var ClientNouModal = __webpack_require__(14442);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
+// MODIFICAT: Adăugat câmp Adresa pentru proiecte
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
@@ -2615,6 +2661,7 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
         Denumire: "",
         Client: "",
         selectedClientId: "",
+        Adresa: "",
         Descriere: "",
         Data_Start: "",
         Data_Final: "",
@@ -2670,11 +2717,12 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
             }
             console.log("Trimitere date proiect:", formData); // Debug
             dist/* toast */.Am.info("Se adaugă proiectul...");
-            // Adaugă proiectul principal
+            // ✅ ACTUALIZAT: Adaugă proiectul principal cu câmpul Adresa
             const proiectData = {
                 ID_Proiect: formData.ID_Proiect.trim(),
                 Denumire: formData.Denumire.trim(),
                 Client: formData.Client.trim(),
+                Adresa: formData.Adresa.trim(),
                 Descriere: formData.Descriere.trim(),
                 Data_Start: formData.Data_Start || null,
                 Data_Final: formData.Data_Final || null,
@@ -2742,6 +2790,7 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
             Denumire: "",
             Client: "",
             selectedClientId: "",
+            Adresa: "",
             Descriere: "",
             Data_Start: "",
             Data_Final: "",
@@ -3105,6 +3154,36 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
                                                 children: "+ Client Nou"
                                             })
                                         ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("label", {
+                                        style: {
+                                            display: "block",
+                                            marginBottom: "0.5rem",
+                                            fontWeight: "bold",
+                                            color: "#2c3e50"
+                                        },
+                                        children: "Adresa Proiect"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                        type: "text",
+                                        value: formData.Adresa,
+                                        onChange: (e)=>handleInputChange("Adresa", e.target.value),
+                                        disabled: loading,
+                                        placeholder: "Adresa unde se desfășoară proiectul (ex: Str. Exemplu Nr. 1, Bucuresti)",
+                                        style: {
+                                            width: "100%",
+                                            padding: "0.75rem",
+                                            border: "1px solid #dee2e6",
+                                            borderRadius: "6px",
+                                            fontSize: "14px"
+                                        }
                                     })
                                 ]
                             }),

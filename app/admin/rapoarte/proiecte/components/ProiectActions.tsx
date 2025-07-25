@@ -1,9 +1,9 @@
+'use client';
+
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 // MODIFICAT: Adăugat "Adauga subproiect" + modal pentru subproiecte
 // ==================================================================
-
-'use client';
 
 import React from 'react';
 import { toast } from 'react-toastify';
@@ -30,16 +30,6 @@ interface ProiectActionsProps {
     tip?: 'proiect' | 'subproiect'; // Pentru a diferenția tipul
   };
   onRefresh?: () => void;
-}
-
-// ✅ NOUĂ: Interfață pentru datele subproiectului
-interface SubproiectData {
-  denumire: string;
-  responsabil: string;
-  dataStart: string;
-  dataFinal: string;
-  valoareEstimata: number;
-  status: string;
 }
 
 export default function ProiectActions({ proiect, onRefresh }: ProiectActionsProps) {
@@ -209,11 +199,37 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   };
 
   const handleViewDetails = async () => {
-    toast.info(`Vizualizare detalii pentru ${proiect.ID_Proiect}`);
+    // ✅ IMPLEMENTAT: Afișează detalii complete în toast sau modal
+    const detalii = `
+📋 ${proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT'}: ${proiect.ID_Proiect}
+📝 Denumire: ${proiect.Denumire}
+👤 Client: ${proiect.Client}
+📊 Status: ${proiect.Status}
+💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON` : 'N/A'}
+📅 Începe: ${proiect.Data_Start || 'N/A'}
+📅 Finalizare: ${proiect.Data_Final || 'N/A'}
+    `.trim();
+    
+    // Afișează în toast pentru informare rapidă
+    toast.info(detalii, {
+      autoClose: 8000,
+      style: { whiteSpace: 'pre-line', fontSize: '13px' }
+    });
+    
+    console.log('Detalii proiect:', proiect);
   };
 
   const handleEdit = async () => {
-    toast.info(`Editare ${proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'} ${proiect.ID_Proiect}`);
+    // ✅ IMPLEMENTAT: Placeholder pentru modal de editare
+    toast.info(`🔧 Editare ${proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'} ${proiect.ID_Proiect}`);
+    
+    // TODO: Implementează modal de editare sau redirectionează la pagină de editare
+    const editUrl = proiect.tip === 'subproiect' 
+      ? `/admin/rapoarte/subproiecte/${proiect.ID_Proiect}/edit`
+      : `/admin/rapoarte/proiecte/${proiect.ID_Proiect}/edit`;
+    
+    console.log('Ar trebui să redirectionez la:', editUrl);
+    console.log('Date pentru editare:', proiect);
   };
 
   const handleDuplicate = async () => {
@@ -390,7 +406,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   );
 }
 
-// ✅ NOUĂ COMPONENTĂ: Modal pentru adăugare subproiect
+// ✅ NOUĂ COMPONENTĂ: Modal pentru adăugare subproiect - VERSIUNE SAFE
 interface SubproiectModalProps {
   proiectParinte: any;
   onClose: () => void;
@@ -398,21 +414,19 @@ interface SubproiectModalProps {
 }
 
 function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModalProps) {
-  const [formData, setFormData] = React.useState<SubproiectData>({
-    denumire: '',
-    responsabil: '',
-    dataStart: new Date().toISOString().split('T')[0],
-    dataFinal: '',
-    valoareEstimata: 0,
-    status: 'Activ'
-  });
-  
+  // ✅ SAFE STATE: Folosește string-uri pentru toate valorile
+  const [denumire, setDenumire] = React.useState('');
+  const [responsabil, setResponsabil] = React.useState('');
+  const [dataStart, setDataStart] = React.useState(new Date().toISOString().split('T')[0]);
+  const [dataFinal, setDataFinal] = React.useState('');
+  const [valoareEstimata, setValoareEstimata] = React.useState('0');
+  const [status, setStatus] = React.useState('Activ');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.denumire?.trim()) {
+    if (!denumire.trim()) {
       toast.error('Denumirea subproiectului este obligatorie');
       return;
     }
@@ -420,7 +434,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
     setIsSubmitting(true);
     
     try {
-      // Generează ID unic pentru subproiect
       const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
       
       const response = await fetch('/api/rapoarte/subproiecte', {
@@ -429,12 +442,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
         body: JSON.stringify({
           ID_Subproiect: subproiectId,
           ID_Proiect: proiectParinte.ID_Proiect,
-          Denumire: formData.denumire?.trim() || '',
-          Responsabil: formData.responsabil?.trim() || null,
-          Data_Start: formData.dataStart || null,
-          Data_Final: formData.dataFinal || null,
-          Valoare_Estimata: formData.valoareEstimata || null,
-          Status: formData.status || 'Activ'
+          Denumire: denumire.trim(),
+          Responsabil: responsabil.trim() || null,
+          Data_Start: dataStart || null,
+          Data_Final: dataFinal || null,
+          Valoare_Estimata: parseFloat(valoareEstimata) || null,
+          Status: status
         })
       });
 
@@ -450,10 +463,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const updateField = (field: keyof SubproiectData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -487,8 +496,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </label>
             <input
               type="text"
-              value={formData.denumire || ''}
-              onChange={(e) => updateField('denumire', e.target.value)}
+              value={denumire}
+              onChange={(e) => setDenumire(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Introduceți denumirea subproiectului..."
               required
@@ -504,8 +513,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="text"
-                value={formData.responsabil || ''}
-                onChange={(e) => updateField('responsabil', e.target.value)}
+                value={responsabil}
+                onChange={(e) => setResponsabil(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Numele responsabilului..."
               />
@@ -517,8 +526,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 Status
               </label>
               <select
-                value={formData.status || 'Activ'}
-                onChange={(e) => updateField('status', e.target.value)}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="Activ">Activ</option>
@@ -534,8 +543,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="date"
-                value={formData.dataStart || ''}
-                onChange={(e) => updateField('dataStart', e.target.value)}
+                value={dataStart}
+                onChange={(e) => setDataStart(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -547,8 +556,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               </label>
               <input
                 type="date"
-                value={formData.dataFinal || ''}
-                onChange={(e) => updateField('dataFinal', e.target.value)}
+                value={dataFinal}
+                onChange={(e) => setDataFinal(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -561,8 +570,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </label>
             <input
               type="number"
-              value={formData.valoareEstimata || ''}
-              onChange={(e) => updateField('valoareEstimata', parseFloat(e.target.value) || 0)}
+              value={valoareEstimata}
+              onChange={(e) => setValoareEstimata(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="0.00"
               min="0"
@@ -593,7 +602,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !formData.denumire.trim()}
+              disabled={isSubmitting || !denumire.trim()}
               className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting ? (
@@ -620,6 +629,32 @@ interface EnhancedActionDropdownProps {
 function EnhancedActionDropdown({ actions, onAction, proiect, getColorClass }: EnhancedActionDropdownProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [loading, setLoading] = React.useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
+  // ✅ NOUĂ: Calculează poziția dropdown-ului
+  const calculateDropdownPosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // Dacă nu e suficient spațiu dedesubt (sub 300px) și e mai mult spațiu deasupra
+      if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+        setDropdownPosition('top');
+      } else {
+        setDropdownPosition('bottom');
+      }
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!isOpen) {
+      calculateDropdownPosition();
+    }
+    setIsOpen(!isOpen);
+  };
 
   const handleActionClick = async (actionKey: string) => {
     if (loading) return;
