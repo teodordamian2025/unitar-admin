@@ -1,522 +1,536 @@
-// app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Building2, Users, Download, RefreshCw, Search } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import ProiectActions from './ProiectActions';
-import * as XLSX from 'xlsx';
+import ProiectNouModal from './ProiectNouModal';
 
 interface Proiect {
   ID_Proiect: string;
   Denumire: string;
   Client: string;
   Status: string;
-  Valoare_Estimata: number;
-  Data_Start: { value: string };
-  Data_Final: { value: string };
-  Responsabil?: string;
-  Adresa?: string;
-  Observatii?: string;
-}
-
-interface Subproiect {
-  ID_Subproiect: string;
-  ID_Proiect: string;
-  Denumire: string;
-  Responsabil?: string;
-  Status: string;
-  Valoare_Estimata: number;
-  Data_Start: { value: string };
-  Data_Final: { value: string };
-  Client: string;
-  Adresa?: string;
-  Observatii?: string;
+  Data_Start?: string;
+  Data_Final?: string;
+  Valoare_Estimata?: number;
+  tip?: 'proiect' | 'subproiect'; // Pentru diferențiere vizuală
+  ID_Proiect_Parinte?: string; // Pentru subproiecte
 }
 
 interface ProiecteTableProps {
-  searchParams: { [k: string]: any };
+  searchParams?: { [key: string]: string | undefined };
 }
 
 export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
-  const [loading, setLoading] = useState(true);
   const [proiecte, setProiecte] = useState<Proiect[]>([]);
-  const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [loadingRefresh, setLoadingRefresh] = useState(false);
-
-  // Extrage valorile din searchParams
-  const searchTerm = searchParams?.search || '';
-  const statusFilter = searchParams?.status || '';
-  const clientFilter = searchParams?.client || '';
+  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showProiectModal, setShowProiectModal] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, [searchTerm, statusFilter, clientFilter]);
+    loadProiecte();
+  }, [searchParams, refreshTrigger]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Verifică notificări pentru statusul facturii din URL
+  useEffect(() => {
+    if (searchParams?.invoice_status && searchParams?.project_id) {
+      const status = searchParams.invoice_status;
+      const projectId = searchParams.project_id;
+      
+      switch (status) {
+        case 'success':
+          toast.success(`Factură creată cu succes pentru proiectul ${projectId}!`);
+          break;
+        case 'cancelled':
+          toast.info(`Crearea facturii pentru proiectul ${projectId} a fost anulată.`);
+          break;
+        default:
+          toast.info(`Status factură pentru proiectul ${projectId}: ${status}`);
+      }
+    }
+  }, [searchParams]);
+
+  const loadProiecte = async () => {
     try {
-      await Promise.all([loadProiecte(), loadSubproiecte()]);
+      setLoading(true);
+      
+      // Construiește query string din searchParams
+      const queryParams = new URLSearchParams();
+      if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+          if (value && key !== 'invoice_status' && key !== 'project_id') {
+            queryParams.append(key, value);
+          }
+        });
+      }
+
+      // Încarcă proiectele principale
+      const proiecteResponse = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+      const proiecteData = await proiecteResponse.json();
+
+      // Încarcă subproiectele
+      const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+      const subproiecteData = await subproiecteResponse.json();
+
+      if (proiecteData.success) {
+        // Combină proiectele și subproiectele
+        const proiecteFormatate = (proiecteData.data || []).map((p: any) => ({
+          ...p,
+          tip: 'proiect' as const
+        }));
+
+        let subproiecteFormatate: Proiect[] = [];
+        if (subproiecteData.success) {
+          subproiecteFormatate = (subproiecteData.data || []).map((s: any) => ({
+            ID_Proiect: s.ID_Subproiect,
+            Denumire: s.Denumire,
+            Client: s.Client || 'Subproiect',
+            Status: s.Status,
+            Data_Start: s.Data_Start,
+            Data_Final: s.Data_Final,
+            Valoare_Estimata: s.Valoare_Estimata,
+            tip: 'subproiect' as const,
+            ID_Proiect_Parinte: s.ID_Proiect
+          }));
+        }
+
+        // Combină și sortează pentru a grupa subproiectele sub proiectele părinte
+        const toateProiectele: Proiect[] = [];
+        proiecteFormatate.forEach(proiect => {
+          toateProiectele.push(proiect);
+          // Adaugă subproiectele pentru acest proiect
+          const subproiecteProiect = subproiecteFormatate.filter(
+            sub => sub.ID_Proiect_Parinte === proiect.ID_Proiect
+          );
+          toateProiectele.push(...subproiecteProiect);
+        });
+
+        setProiecte(toateProiectele);
+      } else {
+        toast.error('Eroare la încărcarea proiectelor');
+        setProiecte([]);
+      }
     } catch (error) {
-      console.error('Eroare la încărcarea datelor:', error);
-      toast.error('Eroare la încărcarea datelor');
+      console.error('Eroare la încărcarea proiectelor:', error);
+      toast.error('Eroare de conectare');
+      setProiecte([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadProiecte = async () => {
+  const handleAddProject = async (nume: string, client: string) => {
     try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-
-      const response = await fetch(`/api/rapoarte/proiecte?${params}`);
+      toast.info('Se adaugă proiectul...');
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setProiecte(result.proiecte || []);
-      } else {
-        throw new Error(result.error || 'Eroare la încărcarea proiectelor');
-      }
-    } catch (error) {
-      console.error('Eroare la încărcarea proiectelor:', error);
-      throw error;
-    }
-  };
-
-  const loadSubproiecte = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-
-      const response = await fetch(`/api/rapoarte/subproiecte?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setSubproiecte(result.subproiecte || []);
-      } else {
-        console.warn('Eroare la încărcarea subproiectelor:', result.error);
-        setSubproiecte([]);
-      }
-    } catch (error) {
-      console.error('Eroare la încărcarea subproiectelor:', error);
-      setSubproiecte([]);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setLoadingRefresh(true);
-    try {
-      await loadData();
-      toast.success('Date actualizate!');
-    } catch (error) {
-      console.error('Eroare la refresh:', error);
-      toast.error('Eroare la actualizarea datelor');
-    } finally {
-      setLoadingRefresh(false);
-    }
-  };
-
-  const toggleProjectExpansion = (proiectId: string) => {
-    setExpandedProjects(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(proiectId)) {
-        newSet.delete(proiectId);
-      } else {
-        newSet.add(proiectId);
-      }
-      return newSet;
-    });
-  };
-
-  const getSubproiecteForProject = (proiectId: string): Subproiect[] => {
-    return subproiecte.filter(sub => sub.ID_Proiect === proiectId);
-  };
-
-  const formatDate = (dateObj: { value: string }) => {
-    try {
-      return new Date(dateObj.value).toLocaleDateString('ro-RO');
-    } catch {
-      return 'N/A';
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return amount?.toLocaleString('ro-RO', { 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: 0 
-    }) + ' LEI';
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      'Planificat': 'bg-blue-100 text-blue-800',
-      'In progres': 'bg-yellow-100 text-yellow-800',
-      'Suspendat': 'bg-red-100 text-red-800',
-      'Finalizat': 'bg-green-100 text-green-800',
-      'Anulat': 'bg-gray-100 text-gray-800'
-    };
-
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig[status as keyof typeof statusConfig] || 'bg-gray-100 text-gray-800'}`}>
-        {status}
-      </span>
-    );
-  };
-
-  // Filtrare proiecte
-  const filteredProiecte = proiecte.filter(proiect => {
-    if (statusFilter && proiect.Status !== statusFilter) return false;
-    if (clientFilter && !proiect.Client.toLowerCase().includes(clientFilter.toLowerCase())) return false;
-    return true;
-  });
-
-  const exportToExcel = () => {
-    try {
-      const exportData: any[] = [];
-
-      filteredProiecte.forEach(proiect => {
-        // Adaugă proiectul principal
-        exportData.push({
-          'Tip': 'Proiect',
-          'ID': proiect.ID_Proiect,
-          'Denumire': proiect.Denumire,
-          'Client': proiect.Client,
-          'Status': proiect.Status,
-          'Valoare Estimată (LEI)': proiect.Valoare_Estimata || 0,
-          'Data Start': formatDate(proiect.Data_Start),
-          'Data Final': formatDate(proiect.Data_Final),
-          'Responsabil': proiect.Responsabil || 'Neatribuit',
-          'Adresă': proiect.Adresa || 'Nespecificată'
-        });
-
-        // Adaugă subproiectele
-        const subproiecteProiect = getSubproiecteForProject(proiect.ID_Proiect);
-        subproiecteProiect.forEach(subproiect => {
-          exportData.push({
-            'Tip': 'Subproiect',
-            'ID': subproiect.ID_Subproiect,
-            'Denumire': `  → ${subproiect.Denumire}`,
-            'Client': subproiect.Client,
-            'Status': subproiect.Status,
-            'Valoare Estimată (LEI)': subproiect.Valoare_Estimata || 0,
-            'Data Start': formatDate(subproiect.Data_Start),
-            'Data Final': formatDate(subproiect.Data_Final),
-            'Responsabil': subproiect.Responsabil || 'Neatribuit',
-            'Adresă': subproiect.Adresa || 'Nespecificată'
-          });
-        });
+      const response = await fetch('/api/rapoarte/proiecte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
+          Denumire: nume,
+          Client: client,
+          Status: 'Activ',
+          Data_Start: new Date().toISOString().split('T')[0]
+        })
       });
 
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
+      const result = await response.json();
 
-      // Setare lățimi coloane
-      const colWidths = [
-        { wch: 12 }, // Tip
-        { wch: 25 }, // ID
-        { wch: 40 }, // Denumire
-        { wch: 20 }, // Client
-        { wch: 12 }, // Status
-        { wch: 15 }, // Valoare
-        { wch: 12 }, // Data Start
-        { wch: 12 }, // Data Final
-        { wch: 15 }, // Responsabil
-        { wch: 30 }  // Adresă
-      ];
-      ws['!cols'] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Proiecte & Subproiecte');
-
-      const filename = `Proiecte_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      XLSX.writeFile(wb, filename);
-
-      toast.success('📊 Export Excel realizat cu succes!');
+      if (result.success) {
+        toast.success('Proiect adăugat cu succes!');
+        handleRefresh();
+      } else {
+        toast.error(result.error || 'Eroare la adăugarea proiectului');
+      }
     } catch (error) {
-      console.error('Eroare la export:', error);
+      toast.error('Eroare la adăugarea proiectului');
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      toast.info('Se generează fișierul Excel...');
+      
+      // Construiește query string pentru export cu aceleași filtre
+      const queryParams = new URLSearchParams();
+      if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+          if (value && key !== 'invoice_status' && key !== 'project_id') {
+            queryParams.append(key, value);
+          }
+        });
+      }
+
+      const response = await fetch(`/api/rapoarte/proiecte/export?${queryParams.toString()}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Obține numele fișierului din header sau folosește unul default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const fileName = contentDisposition 
+          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+          : `Proiecte_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        link.download = fileName;
+        link.click();
+        
+        window.URL.revokeObjectURL(url);
+        toast.success('Fișier Excel descărcat cu succes!');
+      } else {
+        const errorData = await response.json();
+        toast.error(`Eroare la export: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Eroare la exportul Excel:', error);
       toast.error('Eroare la exportul Excel');
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toLocaleDateString('ro-RO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  const formatCurrency = (amount?: number) => {
+    if (!amount && amount !== 0) return '';
+    return new Intl.NumberFormat('ro-RO', {
+      style: 'currency',
+      currency: 'RON'
+    }).format(amount);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Activ': return '#27ae60';
+      case 'Finalizat': return '#3498db';
+      case 'Suspendat': return '#f39c12';
+      case 'Arhivat': return '#95a5a6';
+      default: return '#7f8c8d';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Activ': return '🟢';
+      case 'Finalizat': return '✅';
+      case 'Suspendat': return '⏸️';
+      case 'Arhivat': return '📦';
+      default: return '⚪';
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Se încarcă proiectele...</p>
-        </div>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '300px',
+        fontSize: '16px',
+        color: '#7f8c8d'
+      }}>
+        ⏳ Se încarcă proiectele...
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div>
       {/* Header cu acțiuni */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              <Building2 className="w-5 h-5 inline mr-2" />
-              Proiecte & Subproiecte
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>{filteredProiecte.length} proiecte</span>
-              <span>•</span>
-              <span>{subproiecte.length} subproiecte</span>
-            </div>
-          </div>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '1.5rem',
+        padding: '1rem',
+        background: '#f8f9fa',
+        borderRadius: '8px',
+        border: '1px solid #dee2e6'
+      }}>
+        <div>
+          <h3 style={{ margin: 0, color: '#2c3e50' }}>
+            📋 Proiecte găsite: {proiecte.filter(p => p.tip === 'proiect').length} 
+            {proiecte.filter(p => p.tip === 'subproiect').length > 0 && 
+              ` (+ ${proiecte.filter(p => p.tip === 'subproiect').length} subproiecte)`
+            }
+          </h3>
+          <p style={{ margin: '0.25rem 0 0 0', fontSize: '14px', color: '#7f8c8d' }}>
+            {searchParams && Object.keys(searchParams).length > 0 
+              ? 'Rezultate filtrate' 
+              : 'Toate proiectele și subproiectele'
+            }
+          </p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => setShowProiectModal(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#27ae60',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            + Proiect Nou
+          </button>
           
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRefresh}
-              disabled={loadingRefresh}
-              className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-              title="Actualizează datele"
-            >
-              <RefreshCw className={`w-4 h-4 ${loadingRefresh ? 'animate-spin' : ''}`} />
-              Actualizează
-            </button>
-            
-            <button
-              onClick={exportToExcel}
-              className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
-              title="Export Excel"
-            >
-              <Download className="w-4 h-4" />
-              Export Excel
-            </button>
-          </div>
+          <button
+            onClick={handleRefresh}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            🔄 Reîmprospătează
+          </button>
+          
+          <button
+            onClick={handleExportExcel}
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#f39c12',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            📊 Export Excel
+          </button>
         </div>
       </div>
 
       {/* Tabel */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Proiect / Subproiect
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Client
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Valoare Estimată
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Perioada
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Responsabil
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acțiuni
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredProiecte.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                  <Search className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                  Nu s-au găsit proiecte care să corespundă filtrelor aplicaţe.
-                </td>
-              </tr>
-            ) : (
-              filteredProiecte.map((proiect) => {
-                const subproiecteProiect = getSubproiecteForProject(proiect.ID_Proiect);
-                const isExpanded = expandedProjects.has(proiect.ID_Proiect);
-                const hasSubprojects = subproiecteProiect.length > 0;
-
-                return (
-                  <>
-                    {/* Rândul proiectului principal */}
-                    <tr key={proiect.ID_Proiect} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          {hasSubprojects && (
-                            <button
-                              onClick={() => toggleProjectExpansion(proiect.ID_Proiect)}
-                              className="mr-2 p-1 rounded hover:bg-gray-200 transition-colors"
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="w-4 h-4 text-gray-600" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-gray-600" />
-                              )}
-                            </button>
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Building2 className="w-4 h-4 text-blue-600" />
-                              <p className="text-sm font-medium text-gray-900">
-                                {proiect.Denumire}
-                              </p>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              ID: {proiect.ID_Proiect}
-                            </p>
-                            {hasSubprojects && (
-                              <p className="text-xs text-blue-600 mt-1">
-                                {subproiecteProiect.length} subproiect{subproiecteProiect.length !== 1 ? 'e' : ''}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">{proiect.Client}</p>
-                        {proiect.Adresa && (
-                          <p className="text-xs text-gray-500 mt-1">{proiect.Adresa}</p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {getStatusBadge(proiect.Status)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(proiect.Valoare_Estimata || 0)}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">
-                          {formatDate(proiect.Data_Start)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          → {formatDate(proiect.Data_Final)}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">
-                          {proiect.Responsabil || 'Neatribuit'}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <ProiectActions
-                          proiect={proiect}
-                          onRefresh={loadData}
-                          isSubproiect={false}
-                        />
-                      </td>
-                    </tr>
-
-                    {/* Rândurile subproiectelor (dacă sunt expandate) */}
-                    {isExpanded && subproiecteProiect.map((subproiect) => (
-                      <tr 
-                        key={subproiect.ID_Subproiect} 
-                        className="bg-blue-25 hover:bg-blue-50 transition-colors border-l-4 border-blue-200"
-                      >
-                        <td className="px-6 py-3">
-                          <div className="flex items-center ml-8">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Users className="w-3 h-3 text-blue-500" />
-                                <p className="text-sm text-gray-800">
-                                  {subproiect.Denumire}
-                                </p>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-1">
-                                ID: {subproiect.ID_Subproiect}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-3">
-                          <p className="text-sm text-gray-700">{subproiect.Client}</p>
-                          {subproiect.Adresa && (
-                            <p className="text-xs text-gray-500 mt-1">{subproiect.Adresa}</p>
-                          )}
-                        </td>
-                        <td className="px-6 py-3">
-                          {getStatusBadge(subproiect.Status)}
-                        </td>
-                        <td className="px-6 py-3">
-                          <p className="text-sm font-medium text-gray-800">
-                            {formatCurrency(subproiect.Valoare_Estimata || 0)}
-                          </p>
-                        </td>
-                        <td className="px-6 py-3">
-                          <p className="text-sm text-gray-800">
-                            {formatDate(subproiect.Data_Start)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            → {formatDate(subproiect.Data_Final)}
-                          </p>
-                        </td>
-                        <td className="px-6 py-3">
-                          <p className="text-sm text-gray-800">
-                            {subproiect.Responsabil || 'Neatribuit'}
-                          </p>
-                        </td>
-                        <td className="px-6 py-3 text-right">
-                          <ProiectActions
-                            proiect={{
-                              ID_Proiect: subproiect.ID_Subproiect,
-                              Denumire: subproiect.Denumire,
-                              Client: subproiect.Client,
-                              Status: subproiect.Status,
-                              Valoare_Estimata: subproiect.Valoare_Estimata,
-                              Data_Start: subproiect.Data_Start,
-                              Data_Final: subproiect.Data_Final,
-                              Responsabil: subproiect.Responsabil,
-                              Adresa: subproiect.Adresa,
-                              Observatii: subproiect.Observatii
-                            }}
-                            onRefresh={loadData}
-                            isSubproiect={true}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer cu statistici */}
-      {filteredProiecte.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-sm text-gray-600">Total Proiecte</p>
-              <p className="text-lg font-semibold text-gray-900">{filteredProiecte.length}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Subproiecte</p>
-              <p className="text-lg font-semibold text-blue-600">{subproiecte.length}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Valoare Totală Proiecte</p>
-              <p className="text-lg font-semibold text-green-600">
-                {formatCurrency(filteredProiecte.reduce((sum, p) => sum + (p.Valoare_Estimata || 0), 0))}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Valoare Totală Subproiecte</p>
-              <p className="text-lg font-semibold text-purple-600">
-                {formatCurrency(subproiecte.reduce((sum, s) => sum + (s.Valoare_Estimata || 0), 0))}
-              </p>
-            </div>
+      {proiecte.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '3rem',
+          background: '#f8f9fa',
+          borderRadius: '8px',
+          border: '2px dashed #dee2e6'
+        }}>
+          <p style={{ fontSize: '18px', color: '#7f8c8d', margin: 0 }}>
+            📋 Nu au fost găsite proiecte
+          </p>
+          <p style={{ fontSize: '14px', color: '#bdc3c7', margin: '0.5rem 0 0 0' }}>
+            Verifică filtrele aplicate sau adaugă proiecte noi.
+          </p>
+        </div>
+      ) : (
+        <div style={{ 
+          background: 'white',
+          borderRadius: '8px',
+          border: '1px solid #dee2e6',
+          overflow: 'visible', // Schimbat din 'hidden' în 'visible'
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          position: 'relative' // Adăugat pentru context stacking
+        }}>
+          <div style={{ overflow: 'auto' }}> {/* Wrapper pentru scroll doar pe tabel */}
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              fontSize: '14px'
+            }}>
+              <thead>
+                <tr style={{ 
+                  background: '#f8f9fa',
+                  borderBottom: '2px solid #dee2e6'
+                }}>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    ID Proiect
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Denumire
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Client
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Status
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Data Început
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'right',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Valoare Estimată
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                  }}>
+                    Acțiuni
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {proiecte.map((proiect, index) => (
+                  <tr 
+                    key={`${proiect.tip}-${proiect.ID_Proiect}`}
+                    style={{ 
+                      borderBottom: '1px solid #f1f2f6',
+                      background: index % 2 === 0 ? 'white' : '#fafbfc'
+                    }}
+                  >
+                    <td style={{ 
+                      padding: '0.75rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      color: '#2c3e50',
+                      paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
+                    }}>
+                      {proiect.tip === 'subproiect' && '└─ '}
+                      {proiect.ID_Proiect}
+                      {proiect.tip === 'subproiect' && (
+                        <span style={{ fontSize: '10px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                          (Sub)
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      color: '#2c3e50',
+                      maxWidth: '250px',
+                      paddingLeft: proiect.tip === 'subproiect' ? '2rem' : '0.75rem'
+                    }}>
+                      <div style={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontStyle: proiect.tip === 'subproiect' ? 'italic' : 'normal'
+                      }} title={proiect.Denumire}>
+                        {proiect.Denumire}
+                      </div>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      color: '#2c3e50'
+                    }}>
+                      {proiect.Client}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center'
+                    }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        background: getStatusColor(proiect.Status)
+                      }}>
+                        {getStatusIcon(proiect.Status)} {proiect.Status}
+                      </span>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      color: '#7f8c8d',
+                      fontFamily: 'monospace'
+                    }}>
+                      {formatDate(proiect.Data_Start)}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'right',
+                      fontWeight: 'bold',
+                      color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7'
+                    }}>
+                      {formatCurrency(proiect.Valoare_Estimata)}
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      position: 'relative' // Important pentru dropdown positioning
+                    }}>
+                      <ProiectActions 
+                        proiect={proiect} 
+                        onRefresh={handleRefresh}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
+      {/* Modal Proiect Nou */}
+      <ProiectNouModal
+        isOpen={showProiectModal}
+        onClose={() => setShowProiectModal(false)}
+        onProiectAdded={handleRefresh}
+      />
     </div>
   );
 }

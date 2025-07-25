@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProiectFilters from './components/ProiectFilters';
 import ProiecteTable from './components/ProiecteTable';
+import ProiectNouModal from './components/ProiectNouModal';
 
 interface FilterValues {
   search: string;
@@ -18,6 +19,7 @@ interface FilterValues {
 export default function ProiectePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [showProiectModal, setShowProiectModal] = useState(false);
   
   // Inițializează filtrele din URL
   const [filters, setFilters] = useState<FilterValues>({
@@ -68,29 +70,64 @@ export default function ProiectePage() {
     router.push('/admin/rapoarte/proiecte');
   };
 
+  const handleProiectAdded = () => {
+    // Trigger refresh în ProiecteTable prin schimbarea unui parametru
+    window.location.reload();
+  };
+
   return (
     <div style={{ padding: '1.5rem' }}>
-      {/* Header */}
+      {/* Header cu Butonul Proiect Nou */}
       <div style={{ 
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: '2rem',
         borderBottom: '2px solid #e9ecef',
         paddingBottom: '1rem'
       }}>
-        <h1 style={{ 
-          margin: 0, 
-          color: '#2c3e50',
-          fontSize: '2rem',
-          fontWeight: 'bold'
-        }}>
-          📋 Management Proiecte
-        </h1>
-        <p style={{ 
-          margin: '0.5rem 0 0 0', 
-          color: '#7f8c8d',
-          fontSize: '1.1rem'
-        }}>
-          Gestionează și monitorizează toate proiectele din portofoliu
-        </p>
+        <div>
+          <h1 style={{ 
+            margin: 0, 
+            color: '#2c3e50',
+            fontSize: '2rem',
+            fontWeight: 'bold'
+          }}>
+            📋 Management Proiecte
+          </h1>
+          <p style={{ 
+            margin: '0.5rem 0 0 0', 
+            color: '#7f8c8d',
+            fontSize: '1.1rem'
+          }}>
+            Gestionează și monitorizează toate proiectele din portofoliu
+          </p>
+        </div>
+        
+        {/* Butonul Proiect Nou - READĂUGAT */}
+        <button
+          onClick={() => setShowProiectModal(true)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#27ae60',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = '#229954';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = '#27ae60';
+          }}
+        >
+          + Proiect Nou
+        </button>
       </div>
 
       {/* Filtre */}
@@ -160,6 +197,13 @@ export default function ProiectePage() {
           Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.
         </p>
       </div>
+
+      {/* Modal Proiect Nou - READĂUGAT */}
+      <ProiectNouModal
+        isOpen={showProiectModal}
+        onClose={() => setShowProiectModal(false)}
+        onProiectAdded={handleProiectAdded}
+      />
     </div>
   );
 }
