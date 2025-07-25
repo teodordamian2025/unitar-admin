@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // ✅ FIX: Query simplificat fără câmp 'activ' (care poate să nu existe)
+    // ✅ FIX: Query cu câmpuri existente în tabelul Subproiecte
     let query = `
       SELECT 
         s.*,
@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` s
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
         ON s.ID_Proiect = p.ID_Proiect
+      WHERE s.activ = true
     `;
     
     const conditions: string[] = [];
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       Data_Start: 'DATE',
       Data_Final: 'DATE',
       Status: 'STRING',
-      Valoare_Estimata: 'FLOAT64'
+      Valoare_Estimata: 'NUMERIC'
     };
 
     console.log('Insert subproiect params:', params); // Debug
@@ -205,7 +206,7 @@ export async function PUT(request: NextRequest) {
       'Data_Start': 'DATE',
       'Data_Final': 'DATE',
       'Status': 'STRING',
-      'Valoare_Estimata': 'FLOAT64'
+      'Valoare_Estimata': 'NUMERIC'
     };
 
     Object.entries(updateData).forEach(([key, value]) => {
@@ -267,16 +268,23 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Delete direct fără soft delete pentru simplitate
+    // ✅ FIX: Soft delete folosind câmpul activ existent
     const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SET activ = false, data_actualizare = @data_actualizare
       WHERE ID_Subproiect = @id
     `;
 
     await bigquery.query({
       query: deleteQuery,
-      params: { id },
-      types: { id: 'STRING' }, // ✅ FIX: Adăugat types
+      params: { 
+        id,
+        data_actualizare: new Date().toISOString()
+      },
+      types: { 
+        id: 'STRING',
+        data_actualizare: 'TIMESTAMP'
+      },
       location: 'EU',
     });
 
