@@ -106,6 +106,148 @@ app/
 └── components/ (globale)
 ```
 
+find | sed 's|[^/]*/|- |g'
+.
+- .env.local
+- package-lock.json
+- package.json
+- README.md
+- lib
+- - firebaseConfig.ts
+- tsconfig.json
+- .gitignore
+- pages
+- - api
+- - - queryBigQuery.ts
+- - - chat.ts
+- next.config.js
+- app
+- - login
+- - - page.tsx
+- - test-page
+- - - page.tsx
+- - admin
+- - - layout.tsx
+- - - rapoarte
+- - - - layout.tsx
+- - - - clienti
+- - - - - page.tsx
+- - - - - components
+- - - - - - ClientNouModal.tsx
+- - - - page.tsx
+- - - - facturi
+- - - - - page.tsx
+- - - - proiecte
+- - - - - [id]
+- - - - - - page.tsx
+- - - - - page.tsx
+- - - - - components
+- - - - - - ProiectActions.tsx
+- - - - - - ProiectNouModal.tsx
+- - - - - - ProiecteTable.tsx
+- - - - - - FacturaHibridModal.tsx
+- - - - - - ProiectFilters.tsx
+- - - - - - FacturiList.tsx
+- - - - components
+- - - - - ActionDropdown.tsx
+- - - - - FilterBar.tsx
+- - - - - BaseTable.tsx
+- - - page.tsx
+- - layout.tsx
+- - api
+- - - actions
+- - - - invoices
+- - - - - webhook
+- - - - - - route.ts
+- - - - - generate-hibrid
+- - - - - - route.ts
+- - - - - download
+- - - - - - [id]
+- - - - - - - route.ts
+- - - - - list
+- - - - - - route.ts
+- - - - contracts
+- - - - - generate
+- - - - - - route.ts
+- - - - clients
+- - - - - sync-factureaza
+- - - - - - route.ts
+- - - - email
+- - - - - send-client
+- - - - - - route.ts
+- - - user-role
+- - - - route.ts
+- - - proceseaza-upload
+- - - - docx
+- - - - - route.ts
+- - - - xlsx
+- - - - - route.ts
+- - - - txt
+- - - - - route.ts
+- - - - pdf
+- - - - - route.ts
+- - - user-database
+- - - - route.ts
+- - - anaf
+- - - - company-info
+- - - - - route.ts
+- - - rapoarte
+- - - - subproiecte
+- - - - - route.ts
+- - - - clienti
+- - - - - route.ts
+- - - - proiecte
+- - - - - export
+- - - - - - route.ts
+- - - - - route.ts
+- - - - - [id]
+- - - - - - route.ts
+- - - - dashboard
+- - - - - route.ts
+- - - queryOpenAI
+- - - - route.ts
+- - - verify-recaptcha
+- - - - route.ts
+- - - genereaza
+- - - - docx
+- - - - - route.ts
+- - - - xlsx
+- - - - - route.ts
+- - - - txt
+- - - - - route.ts
+- - - - pdf
+- - - - - route.ts
+- - - bigquery
+- - - - route.ts
+- - - ai-database
+- - - - route.ts
+- - - verify-anaf
+- - - - route.ts
+- - page.tsx
+- - components
+- - - UserChatbot.tsx
+- - - UserDashboard.tsx
+- - profil
+- - - page.tsx
+- - logout
+- - - page.tsx
+- components
+- - ProtectedRoute.tsx
+- - Chatbot.tsx
+- - FileUploader.tsx
+- scripts
+- - setup-uploads.js
+- next-env.d.ts
+- hooks
+- - useANAFCompanyInfo.ts
+- node_modules
+- uploads
+- - temp
+- - contracte
+- - facturi
+- git-filter-repo.py
+
+
 ### 📋 Descriere Componente Cheie
 
 #### 🎯 **FacturaHibridModal.tsx**

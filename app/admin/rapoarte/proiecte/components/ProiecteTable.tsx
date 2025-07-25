@@ -36,32 +36,47 @@ interface ProiecteTableProps {
   searchParams?: { [key: string]: string | undefined };
 }
 
-// ✅ Toast system pentru feedback
+// ✅ Toast system optimizat cu Glassmorphism
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    color: white;
-    padding: 12px 20px;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+    padding: 16px 20px;
+    border-radius: 16px;
     z-index: 10000;
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
+  // Smooth entrance animation
   setTimeout(() => {
-    if (document.body.contains(toastEl)) {
-      document.body.removeChild(toastEl);
-    }
+    toastEl.style.transform = 'translateY(0)';
+    toastEl.style.opacity = '1';
+  }, 10);
+  
+  setTimeout(() => {
+    toastEl.style.transform = 'translateY(-10px)';
+    toastEl.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toastEl)) {
+        document.body.removeChild(toastEl);
+      }
+    }, 300);
   }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
@@ -284,6 +299,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
+  // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele
+  const calculateTotalValue = () => {
+    const totalProiecte = proiecte.reduce((sum, p) => sum + (p.Valoare_Estimata || 0), 0);
+    const totalSubproiecte = subproiecte.reduce((sum, s) => sum + (s.Valoare_Estimata || 0), 0);
+    return totalProiecte + totalSubproiecte;
+  };
+
   if (loading) {
     return (
       <div style={{ 
@@ -292,7 +314,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         alignItems: 'center', 
         height: '300px',
         fontSize: '16px',
-        color: '#7f8c8d'
+        color: '#7f8c8d',
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255, 255, 255, 0.2)'
       }}>
         ⏳ Se încarcă proiectele...
       </div>
@@ -301,23 +327,35 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   return (
     <div>
-      {/* Header cu acțiuni */}
+      {/* ✅ Header cu acțiuni - Glassmorphism Premium */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
         marginBottom: '1.5rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        border: '1px solid #dee2e6'
+        padding: '1.5rem',
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
       }}>
         <div>
-          <h3 style={{ margin: 0, color: '#2c3e50' }}>
+          <h3 style={{ 
+            margin: 0, 
+            color: '#2c3e50',
+            fontSize: '1.4rem',
+            fontWeight: '600'
+          }}>
             📋 Proiecte găsite: {proiecte.length} 
             {subproiecte.length > 0 && ` (+ ${subproiecte.length} subproiecte)`}
           </h3>
-          <p style={{ margin: '0.25rem 0 0 0', fontSize: '14px', color: '#7f8c8d' }}>
+          <p style={{ 
+            margin: '0.5rem 0 0 0', 
+            fontSize: '14px', 
+            color: '#7f8c8d',
+            opacity: 0.8
+          }}>
             {searchParams && Object.keys(searchParams).length > 0 
               ? 'Rezultate filtrate' 
               : 'Toate proiectele și subproiectele'
@@ -325,18 +363,28 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           </p>
         </div>
         
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
             onClick={() => setShowProiectModal(true)}
             style={{
-              padding: '0.5rem 1rem',
-              background: '#27ae60',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontSize: '14px',
-              fontWeight: 'bold'
+              fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
             }}
           >
             + Proiect Nou
@@ -345,14 +393,24 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           <button
             onClick={handleRefresh}
             style={{
-              padding: '0.5rem 1rem',
-              background: '#3498db',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontSize: '14px',
-              fontWeight: 'bold'
+              fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
             }}
           >
             🔄 Reîmprospătează
@@ -361,14 +419,24 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           <button
             onClick={handleExportExcel}
             style={{
-              padding: '0.5rem 1rem',
-              background: '#f39c12',
+              padding: '0.75rem 1.25rem',
+              background: 'linear-gradient(135deg, #f39c12 0%, #f5b041 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '12px',
               cursor: 'pointer',
               fontSize: '14px',
-              fontWeight: 'bold'
+              fontWeight: '600',
+              boxShadow: '0 4px 12px rgba(243, 156, 18, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.5)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.4)';
             }}
           >
             📊 Export Excel
@@ -381,9 +449,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         <div style={{ 
           textAlign: 'center', 
           padding: '3rem',
-          background: '#f8f9fa',
-          borderRadius: '8px',
-          border: '2px dashed #dee2e6'
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '16px',
+          border: '2px dashed rgba(255, 255, 255, 0.3)'
         }}>
           <p style={{ fontSize: '18px', color: '#7f8c8d', margin: 0 }}>
             📋 Nu au fost găsite proiecte
@@ -394,12 +463,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       ) : (
         <div style={{ 
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '16px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
           overflow: 'visible',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          position: 'relative'
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          position: 'relative' as const
         }}>
           <div style={{ overflow: 'auto' }}>
             <table style={{ 
@@ -409,54 +479,73 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             }}>
               <thead>
                 <tr style={{ 
-                  background: '#f8f9fa',
-                  borderBottom: '2px solid #dee2e6'
+                  background: 'rgba(248, 249, 250, 0.8)',
+                  backdropFilter: 'blur(10px)',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
                 }}>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'left',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Proiect / Subproiect
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'left',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Client
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Status
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Data Început
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'right',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Valoare Estimată
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: '#2c3e50'
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
                     Acțiuni
                   </th>
@@ -472,15 +561,27 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                     <Fragment key={proiect.ID_Proiect}>
                       {/* Rândul proiectului principal */}
                       <tr style={{ 
-                        borderBottom: '1px solid #f1f2f6',
-                        background: index % 2 === 0 ? 'white' : '#fafbfc'
-                      }}>
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.08)';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                      >
                         <td style={{ 
                           padding: '0.75rem',
                           color: '#2c3e50',
-                          maxWidth: '300px'
+                          // ✅ FIX: Removed maxWidth constraint and enabled text wrapping
+                          width: '300px',
+                          minWidth: '250px'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                             {/* Expand/Collapse Button */}
                             {hasSubprojects && (
                               <button
@@ -491,37 +592,55 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                   cursor: 'pointer',
                                   padding: '0.25rem',
                                   fontSize: '12px',
-                                  color: '#3498db'
+                                  color: '#3498db',
+                                  borderRadius: '4px',
+                                  transition: 'all 0.2s ease'
                                 }}
                                 title={isExpanded ? 'Ascunde subproiectele' : 'Afișează subproiectele'}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = 'rgba(52, 152, 219, 0.1)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = 'none';
+                                }}
                               >
                                 {isExpanded ? '📂' : '📁'}
                               </button>
                             )}
                             
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ 
                                 fontFamily: 'monospace',
                                 fontWeight: 'bold',
                                 fontSize: '12px',
                                 color: '#2c3e50',
-                                marginBottom: '0.25rem'
+                                marginBottom: '0.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
                               }}>
                                 🏗️ {proiect.ID_Proiect}
                               </div>
+                              {/* ✅ FIX: Text wrapping enabled with proper height adjustment */}
                               <div style={{ 
                                 color: '#2c3e50',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }} title={proiect.Denumire}>
+                                whiteSpace: 'normal', // Changed from 'nowrap'
+                                wordBreak: 'break-word',
+                                lineHeight: '1.4',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                              }}>
                                 {proiect.Denumire}
                               </div>
                               {hasSubprojects && (
                                 <div style={{ 
                                   fontSize: '11px', 
                                   color: '#3498db',
-                                  marginTop: '0.25rem'
+                                  marginTop: '0.5rem',
+                                  padding: '0.25rem 0.5rem',
+                                  background: 'rgba(52, 152, 219, 0.1)',
+                                  borderRadius: '6px',
+                                  display: 'inline-block'
                                 }}>
                                   📋 {subproiecteProiect.length} subproiect{subproiecteProiect.length !== 1 ? 'e' : ''}
                                 </div>
@@ -533,9 +652,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           padding: '0.75rem',
                           color: '#2c3e50'
                         }}>
-                          <div style={{ fontWeight: 'bold' }}>{proiect.Client}</div>
+                          <div style={{ fontWeight: '600', fontSize: '14px' }}>{proiect.Client}</div>
                           {proiect.Responsabil && (
-                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: '#7f8c8d',
+                              marginTop: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}>
                               👤 {proiect.Responsabil}
                             </div>
                           )}
@@ -547,13 +673,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '12px',
+                            gap: '0.5rem',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '16px',
                             fontSize: '12px',
-                            fontWeight: 'bold',
+                            fontWeight: '600',
                             color: 'white',
-                            background: getStatusColor(proiect.Status)
+                            background: `linear-gradient(135deg, ${getStatusColor(proiect.Status)} 0%, ${getStatusColor(proiect.Status)}dd 100%)`,
+                            boxShadow: `0 2px 8px ${getStatusColor(proiect.Status)}40`
                           }}>
                             {getStatusIcon(proiect.Status)} {proiect.Status}
                           </span>
@@ -562,22 +689,25 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           padding: '0.75rem',
                           textAlign: 'center',
                           color: '#7f8c8d',
-                          fontFamily: 'monospace'
+                          fontFamily: 'monospace',
+                          fontSize: '13px',
+                          fontWeight: '500'
                         }}>
                           {formatDate(proiect.Data_Start)}
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
                           textAlign: 'right',
-                          fontWeight: 'bold',
-                          color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7'
+                          fontWeight: '700',
+                          color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7',
+                          fontSize: '14px'
                         }}>
                           {formatCurrency(proiect.Valoare_Estimata)}
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
-                          textAlign: 'center',
-                          position: 'relative'
+                          textAlign: 'center' as const,
+                          position: 'relative' as const
                         }}>
                           <ProiectActions 
                             proiect={{
@@ -594,9 +724,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         <tr 
                           key={subproiect.ID_Subproiect}
                           style={{ 
-                            background: '#f8f9ff',
+                            background: 'rgba(52, 152, 219, 0.05)',
                             borderLeft: '4px solid #3498db',
-                            borderBottom: '1px solid #e3f2fd'
+                            borderBottom: '1px solid rgba(52, 152, 219, 0.1)',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = 'rgba(52, 152, 219, 0.1)';
+                            e.currentTarget.style.transform = 'translateX(8px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'rgba(52, 152, 219, 0.05)';
+                            e.currentTarget.style.transform = 'translateX(0)';
                           }}
                         >
                           <td style={{ 
@@ -609,14 +748,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               fontWeight: 'bold',
                               fontSize: '11px',
                               color: '#3498db',
-                              marginBottom: '0.25rem'
+                              marginBottom: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
                             }}>
                               └─ 📋 {subproiect.ID_Subproiect}
                             </div>
                             <div style={{ 
                               color: '#2c3e50',
                               fontStyle: 'italic',
-                              fontSize: '13px'
+                              fontSize: '13px',
+                              fontWeight: '500'
                             }}>
                               {subproiect.Denumire}
                             </div>
@@ -625,9 +768,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             padding: '0.5rem 0.75rem',
                             color: '#2c3e50'
                           }}>
-                            <div style={{ fontSize: '13px' }}>{subproiect.Client || proiect.Client}</div>
+                            <div style={{ fontSize: '13px', fontWeight: '500' }}>{subproiect.Client || proiect.Client}</div>
                             {subproiect.Responsabil && (
-                              <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: '#7f8c8d',
+                                marginTop: '0.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
                                 👤 {subproiect.Responsabil}
                               </div>
                             )}
@@ -640,12 +790,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.25rem',
-                              padding: '0.2rem 0.4rem',
-                              borderRadius: '8px',
+                              padding: '0.3rem 0.6rem',
+                              borderRadius: '12px',
                               fontSize: '11px',
-                              fontWeight: 'bold',
+                              fontWeight: '600',
                               color: 'white',
-                              background: getStatusColor(subproiect.Status)
+                              background: `linear-gradient(135deg, ${getStatusColor(subproiect.Status)} 0%, ${getStatusColor(subproiect.Status)}dd 100%)`,
+                              boxShadow: `0 2px 6px ${getStatusColor(subproiect.Status)}30`
                             }}>
                               {getStatusIcon(subproiect.Status)} {subproiect.Status}
                             </span>
@@ -662,7 +813,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'right',
-                            fontWeight: 'bold',
+                            fontWeight: '600',
                             color: subproiect.Valoare_Estimata ? '#3498db' : '#bdc3c7',
                             fontSize: '13px'
                           }}>
@@ -670,8 +821,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
-                            textAlign: 'center',
-                            position: 'relative'
+                            textAlign: 'center' as const,
+                            position: 'relative' as const
                           }}>
                             <ProiectActions 
                               proiect={{
@@ -697,39 +848,57 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* Footer cu statistici */}
+          {/* ✅ Footer cu statistici - Glassmorphism Premium cu total combinat */}
           {proiecte.length > 0 && (
             <div style={{
-              padding: '1rem',
-              borderTop: '1px solid #dee2e6',
-              background: '#f8f9fa',
+              padding: '1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'rgba(248, 249, 250, 0.8)',
+              backdropFilter: 'blur(10px)',
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '1rem',
               textAlign: 'center'
             }}>
-              <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Total Proiecte</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Proiecte</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: '#2c3e50', marginTop: '0.25rem' }}>
                   {proiecte.length}
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Total Subproiecte</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#3498db' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Subproiecte</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: '#3498db', marginTop: '0.25rem' }}>
                   {subproiecte.length}
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Valoare Proiecte</div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>
-                  {formatCurrency(proiecte.reduce((sum, p) => sum + (p.Valoare_Estimata || 0), 0))}
+              {/* ✅ FIX: Total combinat în loc de valori separate */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(39, 174, 96, 0.2)',
+                boxShadow: '0 4px 12px rgba(39, 174, 96, 0.1)',
+                gridColumn: 'span 2'
+              }}>
+                <div style={{ fontSize: '12px', color: '#27ae60', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Totală Portofoliu</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
+                  {formatCurrency(calculateTotalValue())}
                 </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d' }}>Valoare Subproiecte</div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3498db' }}>
-                  {formatCurrency(subproiecte.reduce((sum, s) => sum + (s.Valoare_Estimata || 0), 0))}
+                <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
+                  Proiecte + Subproiecte combinate
                 </div>
               </div>
             </div>
