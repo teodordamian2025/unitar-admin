@@ -2,7 +2,7 @@
 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Fix React Error #31 + toast în loc de react-toastify
+// MODIFICAT: Fix React Error #31 + buton "Mai adaugă subproiect" + toast optimizat
 // ==================================================================
 
 import React from 'react';
@@ -34,7 +34,7 @@ interface ProiectActionsProps {
   onRefresh?: () => void;
 }
 
-// ✅ FIX: Toast simple fără dependențe externe
+// ✅ FIX: Toast simple fără dependențe externe cu durată optimizată
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -57,6 +57,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
+  // ✅ FIX: Durată optimizată - mai mult pentru mesaje lungi
   setTimeout(() => {
     if (document.body.contains(toastEl)) {
       document.body.removeChild(toastEl);
@@ -308,15 +309,16 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
         />
       )}
 
-      {/* ✅ FIX: Modal pentru adăugare subproiect - VERSIUNE SAFE */}
+      {/* ✅ FIX: Modal pentru adăugare subproiect - VERSIUNE SAFE cu buton "Mai adaugă" */}
       {showSubproiectModal && (
         <SubproiectModal
           proiectParinte={proiect}
           onClose={() => setShowSubproiectModal(false)}
           onSuccess={() => {
-            setShowSubproiectModal(false);
-            showToast('Subproiect adăugat cu succes!', 'success');
+            // ✅ NOUĂ: Nu închide modalul automat, doar refreshează datele
+            showToast('✅ Subproiect adăugat cu succes!', 'success');
             onRefresh?.();
+            showToast('💡 Poți adăuga încă un subproiect sau închide modalul!', 'info');
           }}
         />
       )}
@@ -324,7 +326,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   );
 }
 
-// ✅ FIX: Modal pentru adăugare subproiect - SAFE IMPLEMENTATION
+// ✅ FIX: Modal pentru adăugare subproiect - SAFE IMPLEMENTATION cu buton "Mai adaugă"
 interface SubproiectModalProps {
   proiectParinte: any;
   onClose: () => void;
@@ -349,6 +351,19 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
       ...prev,
       [field]: value
     }));
+  };
+
+  // ✅ NOUĂ: Funcție pentru resetarea formularului
+  const resetForm = () => {
+    setFormData({
+      denumire: '',
+      responsabil: '',
+      dataStart: new Date().toISOString().split('T')[0],
+      dataFinal: '',
+      valoareEstimata: '0',
+      status: 'Activ'
+    });
+    showToast('📋 Formular resetat pentru noul subproiect!', 'info');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -387,7 +402,9 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
       console.log('Răspuns subproiect:', result);
 
       if (result.success) {
-        onSuccess();
+        onSuccess(); // Trigger refresh fără închiderea modalului
+        // Reset formular pentru următorul subproiect
+        resetForm();
       } else {
         showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
       }
@@ -400,39 +417,42 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-blue-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        {/* Header îmbunătățit */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50">
           <div>
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
               📂 Adaugă Subproiect Nou
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Proiect părinte: {proiectParinte.ID_Proiect} - {proiectParinte.Denumire}
+              🏗️ Proiect părinte: <span className="font-mono font-semibold">{proiectParinte.ID_Proiect}</span>
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {proiectParinte.Denumire}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl p-1"
+            className="text-gray-500 hover:text-gray-700 text-xl p-2 hover:bg-gray-100 rounded-full transition-colors"
             disabled={isSubmitting}
           >
             ✕
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Denumire */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Denumire Subproiect *
+        {/* Form îmbunătățit */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Denumire cu design îmbunătățit */}
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              📝 Denumire Subproiect *
             </label>
             <input
               type="text"
               value={formData.denumire}
               onChange={(e) => handleInputChange('denumire', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
               placeholder="Introduceți denumirea subproiectului..."
               required
               disabled={isSubmitting}
@@ -440,11 +460,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
           </div>
 
           {/* Grid pentru câmpurile în două coloane */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Responsabil */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Responsabil
+                👤 Responsabil
               </label>
               <input
                 type="text"
@@ -459,7 +479,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
+                📊 Status
               </label>
               <select
                 value={formData.status}
@@ -467,17 +487,17 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={isSubmitting}
               >
-                <option value="Activ">Activ</option>
-                <option value="Planificat">Planificat</option>
-                <option value="Suspendat">Suspendat</option>
-                <option value="Finalizat">Finalizat</option>
+                <option value="Activ">🟢 Activ</option>
+                <option value="Planificat">📅 Planificat</option>
+                <option value="Suspendat">⏸️ Suspendat</option>
+                <option value="Finalizat">✅ Finalizat</option>
               </select>
             </div>
 
             {/* Data Start */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Început
+                📅 Data Început
               </label>
               <input
                 type="date"
@@ -491,7 +511,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             {/* Data Final */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Finalizare
+                🏁 Data Finalizare
               </label>
               <input
                 type="date"
@@ -506,7 +526,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
           {/* Valoare Estimată */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Valoare Estimată (RON)
+              💰 Valoare Estimată (RON)
             </label>
             <input
               type="number"
@@ -520,38 +540,68 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             />
           </div>
 
-          {/* Info despre proiectul părinte */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-medium text-gray-700 mb-2">Informații Proiect Părinte:</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-              <div><strong>Client:</strong> {proiectParinte.Client}</div>
-              <div><strong>Status:</strong> {proiectParinte.Status}</div>
-              <div><strong>Valoare:</strong> {proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'N/A'}</div>
-              <div><strong>Adresă:</strong> {proiectParinte.Adresa || 'Nespecificată'}</div>
+          {/* Info despre proiectul părinte îmbunătățit */}
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200">
+            <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              🏗️ Informații Proiect Părinte
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-600 text-xs">CLIENT</div>
+                <div className="font-medium">{proiectParinte.Client}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-600 text-xs">STATUS</div>
+                <div className="font-medium">{proiectParinte.Status}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-600 text-xs">VALOARE</div>
+                <div className="font-medium">
+                  {proiectParinte.Valoare_Estimata ? `${proiectParinte.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'N/A'}
+                </div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-600 text-xs">ADRESĂ</div>
+                <div className="font-medium text-xs">{proiectParinte.Adresa || 'Nespecificată'}</div>
+              </div>
             </div>
           </div>
 
-          {/* Butoane */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          {/* ✅ NOUĂ: Butoane îmbunătățite cu "Mai adaugă" */}
+          <div className="flex justify-between items-center gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50"
+              className="bg-gray-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-gray-600 disabled:opacity-50 transition-colors"
             >
-              Anulează
+              ✕ Închide
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !formData.denumire.trim()}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                <>⏳ Se adaugă...</>
-              ) : (
-                <>📂 Adaugă Subproiect</>
-              )}
-            </button>
+            
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || !formData.denumire.trim()}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                {isSubmitting ? (
+                  <>⏳ Se adaugă...</>
+                ) : (
+                  <>📂 Adaugă Subproiect</>
+                )}
+              </button>
+              
+              {/* ✅ NOUĂ: Butonul "Mai adaugă subproiect" */}
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={isSubmitting}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 flex items-center gap-1 transition-colors"
+                title="Resetează formularul pentru a adăuga alt subproiect"
+              >
+                ➕ Mai adaugă
+              </button>
+            </div>
           </div>
         </form>
       </div>

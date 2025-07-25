@@ -629,20 +629,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isLoading = isGenerating || isProcessingPDF;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[95vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-green-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-5xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+        {/* Header îmbunătățit */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50">
           <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               💰 Generare Factură Hibridă
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Auto-completare client din BD + subproiecte • Proiect: {proiect.ID_Proiect}
+              📊 Auto-completare client din BD + selector subproiecte • Proiect: {proiect.ID_Proiect}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl p-1"
+            className="text-gray-500 hover:text-gray-700 text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors"
             disabled={isLoading}
           >
             ✕
@@ -664,53 +665,86 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          {/* Secțiune informații proiect îmbunătățită */}
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
               🏗️ Informații Proiect
             </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><strong>ID:</strong> {proiect.ID_Proiect}</div>
-              <div><strong>Status:</strong> <span className="text-green-600">{proiect.Status}</span></div>
-              <div><strong>Denumire:</strong> {proiect.Denumire}</div>
-              <div><strong>Valoare estimată:</strong> {proiect.Valoare_Estimata ? (Number(proiect.Valoare_Estimata) || 0).toFixed(2) : 'N/A'} RON</div>
-              <div><strong>Data start:</strong> {formatDate(proiect.Data_Start)}</div>
-              <div><strong>Data final:</strong> {formatDate(proiect.Data_Final)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="bg-white p-3 rounded border">
+                <div className="text-gray-600 text-xs uppercase tracking-wide">ID Proiect</div>
+                <div className="font-mono font-bold text-gray-900">{proiect.ID_Proiect}</div>
+              </div>
+              <div className="bg-white p-3 rounded border">
+                <div className="text-gray-600 text-xs uppercase tracking-wide">Status</div>
+                <div className="font-semibold text-green-600">{proiect.Status}</div>
+              </div>
+              <div className="bg-white p-3 rounded border md:col-span-2">
+                <div className="text-gray-600 text-xs uppercase tracking-wide">Denumire</div>
+                <div className="font-medium text-gray-900">{proiect.Denumire}</div>
+              </div>
+              <div className="bg-white p-3 rounded border">
+                <div className="text-gray-600 text-xs uppercase tracking-wide">Valoare Estimată</div>
+                <div className="font-bold text-green-600">
+                  {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} RON` : 'N/A'}
+                </div>
+              </div>
+              <div className="bg-white p-3 rounded border">
+                <div className="text-gray-600 text-xs uppercase tracking-wide">Perioada</div>
+                <div className="text-sm text-gray-900">
+                  {formatDate(proiect.Data_Start)} → {formatDate(proiect.Data_Final)}
+                </div>
+              </div>
             </div>
             
+            {/* Secțiunea subproiecte îmbunătățită */}
             {subproiecteDisponibile.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-blue-200">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-gray-700">📋 Subproiecte disponibile:</h4>
+              <div className="mt-6 pt-4 border-t border-blue-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+                    📋 Subproiecte Disponibile ({subproiecteDisponibile.length})
+                  </h4>
                   <button
                     onClick={() => setShowSubproiecteSelector(!showSubproiecteSelector)}
-                    className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-1"
                   >
-                    {showSubproiecteSelector ? 'Ascunde' : 'Afișează'} ({subproiecteDisponibile.length})
+                    {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
                   </button>
                 </div>
                 
                 {showSubproiecteSelector && (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
                     {subproiecteDisponibile.map((subproiect) => (
-                      <div key={subproiect.ID_Subproiect} className="flex items-center justify-between bg-white p-2 rounded border">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{subproiect.Denumire}</div>
-                          <div className="text-xs text-gray-500">
-                            {subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toFixed(2)} RON` : 'Fără valoare'} 
-                            • Status: {subproiect.Status}
+                      <div 
+                        key={subproiect.ID_Subproiect} 
+                        className={`p-4 rounded-lg border-2 transition-all ${
+                          subproiect.adaugat 
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-gray-900 mb-1">
+                              📋 {subproiect.Denumire}
+                            </div>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div>💰 Valoare: {subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</div>
+                              <div>📊 Status: <span className="font-medium">{subproiect.Status}</span></div>
+                            </div>
                           </div>
+                          <button
+                            onClick={() => addSubproiectToFactura(subproiect)}
+                            disabled={subproiect.adaugat}
+                            className={`ml-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              subproiect.adaugat 
+                                ? 'bg-green-100 text-green-700 cursor-not-allowed' 
+                                : 'bg-green-500 text-white hover:bg-green-600'
+                            }`}
+                          >
+                            {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => addSubproiectToFactura(subproiect)}
-                          disabled={subproiect.adaugat}
-                          className={`px-3 py-1 rounded text-sm ${
-                            subproiect.adaugat 
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                              : 'bg-green-500 text-white hover:bg-green-600'
-                          }`}
-                        >
-                          {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
-                        </button>
                       </div>
                     ))}
                   </div>
