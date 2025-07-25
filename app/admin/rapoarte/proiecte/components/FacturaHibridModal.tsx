@@ -861,6 +861,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             <option value={5}>5%</option>
                             <option value={9}>9%</option>
                             <option value={19}>19%</option>
+                            <option value={21}>21%</option>
                           </select>
                         </td>
                         <td className="border border-gray-300 p-2 text-right font-semibold">

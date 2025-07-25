@@ -267,6 +267,10 @@ var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: ./node_modules/@google-cloud/bigquery/build/src/index.js
 var src = __webpack_require__(63452);
 ;// CONCATENATED MODULE: ./app/api/rapoarte/proiecte/route.ts
+// ==================================================================
+// CALEA: app/api/rapoarte/proiecte/route.ts
+// MODIFICAT: Adăugat suport pentru câmpul Adresa
+// ==================================================================
 
 
 const bigquery = new src.BigQuery({
@@ -292,7 +296,8 @@ async function GET(request) {
             conditions.push(`(
         LOWER(ID_Proiect) LIKE LOWER(@search) OR 
         LOWER(Denumire) LIKE LOWER(@search) OR 
-        LOWER(Client) LIKE LOWER(@search)
+        LOWER(Client) LIKE LOWER(@search) OR
+        LOWER(Adresa) LIKE LOWER(@search)
       )`);
             params.search = `%${search}%`;
         }
@@ -357,7 +362,7 @@ async function GET(request) {
 async function POST(request) {
     try {
         const body = await request.json();
-        const { ID_Proiect, Denumire, Client, Data_Start, Data_Final, Status = "Activ", Valoare_Estimata } = body;
+        const { ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final, Status = "Activ", Valoare_Estimata, Responsabil, Observatii } = body;
         // Validări
         if (!ID_Proiect || !Denumire || !Client) {
             return next_response/* default */.Z.json({
@@ -366,10 +371,13 @@ async function POST(request) {
                 status: 400
             });
         }
+        // ✅ ACTUALIZAT: Query cu câmpul Adresa
         const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (ID_Proiect, Denumire, Client, Data_Start, Data_Final, Status, Valoare_Estimata)
-      VALUES (@ID_Proiect, @Denumire, @Client, @Data_Start, @Data_Final, @Status, @Valoare_Estimata)
+      (ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final, 
+       Status, Valoare_Estimata, Responsabil, Observatii)
+      VALUES (@ID_Proiect, @Denumire, @Client, @Adresa, @Descriere, @Data_Start, 
+              @Data_Final, @Status, @Valoare_Estimata, @Responsabil, @Observatii)
     `;
         await bigquery.query({
             query: insertQuery,
@@ -377,10 +385,14 @@ async function POST(request) {
                 ID_Proiect,
                 Denumire,
                 Client,
+                Adresa: Adresa || null,
+                Descriere: Descriere || null,
                 Data_Start: Data_Start || null,
                 Data_Final: Data_Final || null,
                 Status,
-                Valoare_Estimata: Valoare_Estimata || null
+                Valoare_Estimata: Valoare_Estimata || null,
+                Responsabil: Responsabil || null,
+                Observatii: Observatii || null
             },
             location: "EU"
         });
@@ -418,9 +430,21 @@ async function PUT(request) {
             updateFields.push("Status = @status");
             params.status = status;
         }
+        // ✅ ACTUALIZAT: Include Adresa în câmpurile actualizabile
+        const allowedFields = [
+            "Denumire",
+            "Client",
+            "Adresa",
+            "Descriere",
+            "Data_Start",
+            "Data_Final",
+            "Valoare_Estimata",
+            "Responsabil",
+            "Observatii"
+        ];
         // Adaugă alte câmpuri de actualizat
         Object.entries(updateData).forEach(([key, value])=>{
-            if (value !== undefined && key !== "id") {
+            if (value !== undefined && key !== "id" && allowedFields.includes(key)) {
                 updateFields.push(`${key} = @${key}`);
                 params[key] = value;
             }

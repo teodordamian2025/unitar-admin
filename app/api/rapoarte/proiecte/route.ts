@@ -1,3 +1,8 @@
+// ==================================================================
+// CALEA: app/api/rapoarte/proiecte/route.ts
+// MODIFICAT: Adăugat suport pentru câmpul Adresa
+// ==================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
@@ -28,7 +33,8 @@ export async function GET(request: NextRequest) {
       conditions.push(`(
         LOWER(ID_Proiect) LIKE LOWER(@search) OR 
         LOWER(Denumire) LIKE LOWER(@search) OR 
-        LOWER(Client) LIKE LOWER(@search)
+        LOWER(Client) LIKE LOWER(@search) OR
+        LOWER(Adresa) LIKE LOWER(@search)
       )`);
       params.search = `%${search}%`;
     }
@@ -107,10 +113,14 @@ export async function POST(request: NextRequest) {
       ID_Proiect, 
       Denumire, 
       Client, 
+      Adresa, // ✅ NOUĂ: Câmp Adresa
+      Descriere,
       Data_Start, 
       Data_Final, 
       Status = 'Activ', 
-      Valoare_Estimata 
+      Valoare_Estimata,
+      Responsabil,
+      Observatii
     } = body;
 
     // Validări
@@ -120,10 +130,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ✅ ACTUALIZAT: Query cu câmpul Adresa
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (ID_Proiect, Denumire, Client, Data_Start, Data_Final, Status, Valoare_Estimata)
-      VALUES (@ID_Proiect, @Denumire, @Client, @Data_Start, @Data_Final, @Status, @Valoare_Estimata)
+      (ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final, 
+       Status, Valoare_Estimata, Responsabil, Observatii)
+      VALUES (@ID_Proiect, @Denumire, @Client, @Adresa, @Descriere, @Data_Start, 
+              @Data_Final, @Status, @Valoare_Estimata, @Responsabil, @Observatii)
     `;
 
     await bigquery.query({
@@ -132,10 +145,14 @@ export async function POST(request: NextRequest) {
         ID_Proiect,
         Denumire,
         Client,
+        Adresa: Adresa || null, // ✅ NOUĂ: Include Adresa
+        Descriere: Descriere || null,
         Data_Start: Data_Start || null,
         Data_Final: Data_Final || null,
         Status,
-        Valoare_Estimata: Valoare_Estimata || null
+        Valoare_Estimata: Valoare_Estimata || null,
+        Responsabil: Responsabil || null,
+        Observatii: Observatii || null
       },
       location: 'EU',
     });
@@ -174,9 +191,12 @@ export async function PUT(request: NextRequest) {
       params.status = status;
     }
 
+    // ✅ ACTUALIZAT: Include Adresa în câmpurile actualizabile
+    const allowedFields = ['Denumire', 'Client', 'Adresa', 'Descriere', 'Data_Start', 'Data_Final', 'Valoare_Estimata', 'Responsabil', 'Observatii'];
+    
     // Adaugă alte câmpuri de actualizat
     Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined && key !== 'id') {
+      if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
         updateFields.push(`${key} = @${key}`);
         params[key] = value;
       }
@@ -249,4 +269,3 @@ export async function DELETE(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
