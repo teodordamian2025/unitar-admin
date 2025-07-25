@@ -267,126 +267,184 @@ var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: ./node_modules/@google-cloud/bigquery/build/src/index.js
 var src = __webpack_require__(63452);
 ;// CONCATENATED MODULE: ./app/api/rapoarte/subproiecte/route.ts
+// app/api/rapoarte/subproiecte/route.ts
 
 
+// Configurare BigQuery
 const bigquery = new src.BigQuery({
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    keyFilename: undefined,
     credentials: {
         client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
         private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, "\n"),
         client_id: process.env.GOOGLE_CLOUD_CLIENT_ID
     }
 });
-const dataset = "PanouControlUnitar";
-const table = "Subproiecte";
+const dataset = bigquery.dataset("PanouControlUnitar");
+// GET - Obține toate subproiectele
 async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        // Construire query cu filtre
+        const search = searchParams.get("search");
+        const proiectId = searchParams.get("proiect_id");
         let query = `
       SELECT 
-        s.*,
+        s.ID_Subproiect,
+        s.ID_Proiect,
+        s.Denumire,
+        s.Responsabil,
+        s.Status,
+        COALESCE(s.Valoare_Estimata, 0) as Valoare_Estimata,
+        s.Data_Start,
+        s.Data_Final,
+        s.Observatii,
         p.Client,
-        p.Denumire as Proiect_Denumire
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` s
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
-        ON s.ID_Proiect = p.ID_Proiect
-      WHERE s.activ = true
+        p.Adresa
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` s
+      JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
+      ON s.ID_Proiect = p.ID_Proiect
     `;
+        const params = [];
+        const types = [];
         const conditions = [];
-        const params = {};
-        // Filtre
-        const search = searchParams.get("search");
+        if (proiectId) {
+            conditions.push("s.ID_Proiect = @proiect_id");
+            params.push(proiectId);
+            types.push("STRING");
+        }
         if (search) {
             conditions.push(`(
-        LOWER(s.ID_Subproiect) LIKE LOWER(@search) OR 
         LOWER(s.Denumire) LIKE LOWER(@search) OR 
-        LOWER(s.Responsabil) LIKE LOWER(@search) OR
+        LOWER(COALESCE(s.Responsabil, '')) LIKE LOWER(@search) OR
         LOWER(p.Client) LIKE LOWER(@search)
       )`);
-            params.search = `%${search}%`;
+            params.push(`%${search}%`);
+            types.push("STRING");
         }
-        const status = searchParams.get("status");
-        if (status) {
-            conditions.push("s.Status = @status");
-            params.status = status;
-        }
-        const proiectId = searchParams.get("proiect_id");
-        if (proiectId) {
-            conditions.push("s.ID_Proiect = @proiectId");
-            params.proiectId = proiectId;
-        }
-        // Adaugă condiții la query
         if (conditions.length > 0) {
-            query += " AND " + conditions.join(" AND ");
+            query += ` WHERE ${conditions.join(" AND ")}`;
         }
-        // Sortare
-        query += " ORDER BY s.ID_Proiect, s.Data_Start DESC";
-        console.log("Executing subproiecte query:", query);
-        console.log("With params:", params);
-        const [rows] = await bigquery.query({
-            query: query,
-            params: params,
-            location: "EU"
-        });
+        query += ` ORDER BY s.Data_Start DESC`;
+        const options = {
+            query,
+            params,
+            types
+        };
+        console.log("Query subproiecte:", options);
+        const [rows] = await bigquery.query(options);
         return next_response/* default */.Z.json({
             success: true,
-            data: rows,
-            count: rows.length
+            subproiecte: rows
         });
     } catch (error) {
-        console.error("Eroare la \xeencărcarea subproiectelor:", error);
+        console.error("Eroare la obținerea subproiectelor:", error);
         return next_response/* default */.Z.json({
-            error: "Eroare la \xeencărcarea subproiectelor",
+            success: false,
+            error: "Eroare la obținerea subproiectelor",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
         }, {
             status: 500
         });
     }
 }
+// POST - Adaugă subproiect nou
 async function POST(request) {
     try {
         const body = await request.json();
-        const { ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, Status = "Activ", Valoare_Estimata } = body;
+        console.log("Date primite pentru subproiect nou:", body);
         // Validări
-        if (!ID_Subproiect || !ID_Proiect || !Denumire) {
+        if (!body.denumire || !body.client || !body.data_start || !body.data_final) {
             return next_response/* default */.Z.json({
-                error: "C\xe2mpurile ID_Subproiect, ID_Proiect și Denumire sunt obligatorii"
+                success: false,
+                error: "C\xe2mpurile denumire, client, data_start și data_final sunt obligatorii"
             }, {
                 status: 400
             });
         }
-        const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, 
-       Status, Valoare_Estimata, data_creare, data_actualizare, activ)
-      VALUES (@ID_Subproiect, @ID_Proiect, @Denumire, @Responsabil, @Data_Start, 
-              @Data_Final, @Status, @Valoare_Estimata, @data_creare, @data_actualizare, @activ)
+        if (!body.id_proiect_parinte) {
+            return next_response/* default */.Z.json({
+                success: false,
+                error: "ID-ul proiectului părinte este obligatoriu pentru subproiecte"
+            }, {
+                status: 400
+            });
+        }
+        // Verificăm dacă proiectul părinte există
+        const checkParentQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      WHERE ID_Proiect = @parent_id
     `;
-        await bigquery.query({
-            query: insertQuery,
+        const checkOptions = {
+            query: checkParentQuery,
             params: {
-                ID_Subproiect,
-                ID_Proiect,
-                Denumire,
-                Responsabil: Responsabil || null,
-                Data_Start: Data_Start || null,
-                Data_Final: Data_Final || null,
-                Status,
-                Valoare_Estimata: Valoare_Estimata || null,
-                data_creare: new Date().toISOString(),
-                data_actualizare: new Date().toISOString(),
-                activ: true
+                parent_id: body.id_proiect_parinte
             },
-            location: "EU"
-        });
+            types: {
+                parent_id: "STRING"
+            }
+        };
+        const [checkRows] = await bigquery.query(checkOptions);
+        if (checkRows[0].count === 0) {
+            return next_response/* default */.Z.json({
+                success: false,
+                error: "Proiectul părinte nu a fost găsit"
+            }, {
+                status: 404
+            });
+        }
+        // Generare ID unic pentru subproiect
+        const timestamp = Date.now();
+        const clientPrefix = body.client.substring(0, 8).replace(/[^a-zA-Z0-9]/g, "");
+        const randomNum = Math.floor(Math.random() * 1000);
+        const subproiectId = `SUB_${clientPrefix}_${timestamp}_${randomNum}`;
+        // Pregătire date cu handling explicit pentru null values
+        const rowData = {
+            ID_Subproiect: subproiectId,
+            ID_Proiect: body.id_proiect_parinte,
+            Denumire: body.denumire,
+            Responsabil: body.responsabil || null,
+            Status: body.status || "Planificat",
+            Valoare_Estimata: body.valoare_estimata || 0,
+            Data_Start: body.data_start,
+            Data_Final: body.data_final,
+            Observatii: body.observatii || null
+        };
+        console.log("Date pregătite pentru subproiect \xeen BigQuery:", rowData);
+        // INSERT cu types specificate pentru null values
+        const query = `
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Status, Valoare_Estimata, Data_Start, Data_Final, Observatii)
+      VALUES (@ID_Subproiect, @ID_Proiect, @Denumire, @Responsabil, @Status, @Valoare_Estimata, @Data_Start, @Data_Final, @Observatii)
+    `;
+        const options = {
+            query,
+            params: rowData,
+            types: {
+                ID_Subproiect: "STRING",
+                ID_Proiect: "STRING",
+                Denumire: "STRING",
+                Responsabil: "STRING",
+                Status: "STRING",
+                Valoare_Estimata: "FLOAT64",
+                Data_Start: "DATE",
+                Data_Final: "DATE",
+                Observatii: "STRING"
+            }
+        };
+        console.log("Opțiuni query BigQuery pentru subproiect:", options);
+        const [job] = await bigquery.createQueryJob(options);
+        await job.getQueryResults();
+        console.log("Subproiect adăugat cu succes \xeen BigQuery");
         return next_response/* default */.Z.json({
             success: true,
-            message: "Subproiect adăugat cu succes"
+            message: "Subproiectul a fost adăugat cu succes",
+            subproiectId: subproiectId
         });
     } catch (error) {
         console.error("Eroare la adăugarea subproiectului:", error);
         return next_response/* default */.Z.json({
+            success: false,
             error: "Eroare la adăugarea subproiectului",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
         }, {
@@ -394,55 +452,91 @@ async function POST(request) {
         });
     }
 }
+// PUT - Actualizează subproiect
 async function PUT(request) {
     try {
         const body = await request.json();
-        const { id, ...updateData } = body;
-        if (!id) {
+        console.log("Date primite pentru actualizare subproiect:", body);
+        if (!body.id) {
             return next_response/* default */.Z.json({
-                error: "ID subproiect necesar pentru actualizare"
+                success: false,
+                error: "ID-ul subproiectului este obligatoriu pentru actualizare"
             }, {
                 status: 400
             });
         }
-        // Construire query UPDATE dinamic
+        // Construim query-ul de UPDATE dinamic
         const updateFields = [];
         const params = {
-            id
+            id: body.id
         };
-        Object.entries(updateData).forEach(([key, value])=>{
-            if (value !== undefined && key !== "id") {
-                updateFields.push(`${key} = @${key}`);
-                params[key] = value;
-            }
-        });
+        const types = {
+            id: "STRING"
+        };
+        if (body.denumire !== undefined) {
+            updateFields.push("Denumire = @denumire");
+            params.denumire = body.denumire;
+            types.denumire = "STRING";
+        }
+        if (body.responsabil !== undefined) {
+            updateFields.push("Responsabil = @responsabil");
+            params.responsabil = body.responsabil || null;
+            types.responsabil = "STRING";
+        }
+        if (body.status !== undefined) {
+            updateFields.push("Status = @status");
+            params.status = body.status;
+            types.status = "STRING";
+        }
+        if (body.valoare_estimata !== undefined) {
+            updateFields.push("Valoare_Estimata = @valoare_estimata");
+            params.valoare_estimata = body.valoare_estimata || 0;
+            types.valoare_estimata = "FLOAT64";
+        }
+        if (body.data_start !== undefined) {
+            updateFields.push("Data_Start = @data_start");
+            params.data_start = body.data_start;
+            types.data_start = "DATE";
+        }
+        if (body.data_final !== undefined) {
+            updateFields.push("Data_Final = @data_final");
+            params.data_final = body.data_final;
+            types.data_final = "DATE";
+        }
+        if (body.observatii !== undefined) {
+            updateFields.push("Observatii = @observatii");
+            params.observatii = body.observatii || null;
+            types.observatii = "STRING";
+        }
         if (updateFields.length === 0) {
             return next_response/* default */.Z.json({
-                error: "Nu există c\xe2mpuri de actualizat"
+                success: false,
+                error: "Nu au fost furnizate c\xe2mpuri pentru actualizare"
             }, {
                 status: 400
             });
         }
-        // Adaugă data_actualizare
-        updateFields.push("data_actualizare = @data_actualizare");
-        params.data_actualizare = new Date().toISOString();
-        const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        const query = `
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
       SET ${updateFields.join(", ")}
       WHERE ID_Subproiect = @id
     `;
-        await bigquery.query({
-            query: updateQuery,
-            params: params,
-            location: "EU"
-        });
+        const options = {
+            query,
+            params,
+            types
+        };
+        console.log("Query UPDATE subproiect:", options);
+        const [job] = await bigquery.createQueryJob(options);
+        await job.getQueryResults();
         return next_response/* default */.Z.json({
             success: true,
-            message: "Subproiect actualizat cu succes"
+            message: "Subproiectul a fost actualizat cu succes"
         });
     } catch (error) {
         console.error("Eroare la actualizarea subproiectului:", error);
         return next_response/* default */.Z.json({
+            success: false,
             error: "Eroare la actualizarea subproiectului",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
         }, {
@@ -450,38 +544,67 @@ async function PUT(request) {
         });
     }
 }
+// DELETE - Șterge subproiect
 async function DELETE(request) {
     try {
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get("id");
-        if (!id) {
+        const body = await request.json();
+        console.log("Ștergere subproiect:", body);
+        if (!body.id) {
             return next_response/* default */.Z.json({
-                error: "ID subproiect necesar pentru ștergere"
+                success: false,
+                error: "ID-ul subproiectului este obligatoriu pentru ștergere"
             }, {
                 status: 400
             });
         }
-        // Soft delete
-        const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      SET activ = false, data_actualizare = @data_actualizare
+        // Verificăm întâi dacă subproiectul există
+        const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
       WHERE ID_Subproiect = @id
     `;
-        await bigquery.query({
+        const checkOptions = {
+            query: checkQuery,
+            params: {
+                id: body.id
+            },
+            types: {
+                id: "STRING"
+            }
+        };
+        const [checkRows] = await bigquery.query(checkOptions);
+        if (checkRows[0].count === 0) {
+            return next_response/* default */.Z.json({
+                success: false,
+                error: "Subproiectul nu a fost găsit"
+            }, {
+                status: 404
+            });
+        }
+        // Ștergem subproiectul
+        const deleteQuery = `
+      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      WHERE ID_Subproiect = @id
+    `;
+        const deleteOptions = {
             query: deleteQuery,
             params: {
-                id,
-                data_actualizare: new Date().toISOString()
+                id: body.id
             },
-            location: "EU"
-        });
+            types: {
+                id: "STRING"
+            }
+        };
+        const [job] = await bigquery.createQueryJob(deleteOptions);
+        await job.getQueryResults();
         return next_response/* default */.Z.json({
             success: true,
-            message: "Subproiect șters cu succes"
+            message: "Subproiectul a fost șters cu succes"
         });
     } catch (error) {
         console.error("Eroare la ștergerea subproiectului:", error);
         return next_response/* default */.Z.json({
+            success: false,
             error: "Eroare la ștergerea subproiectului",
             details: error instanceof Error ? error.message : "Eroare necunoscută"
         }, {
