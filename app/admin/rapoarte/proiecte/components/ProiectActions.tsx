@@ -561,7 +561,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </label>
             <input
               type="number"
-              value={formData.valoareEstimata}
+              value={formData.valoareEstimata || ''}
               onChange={(e) => updateField('valoareEstimata', parseFloat(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="0.00"
