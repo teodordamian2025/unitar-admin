@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// COMPLET REGENERAT: Fix Transparență + Design Compact + Toate Funcționalitățile
+// FIX FINAL: Modelul ProiectNouModal + Design Compact + Toate Funcționalitățile
 // ==================================================================
 
 'use client';
@@ -148,22 +148,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (!date) return '';
     return typeof date === 'string' ? date : date.value;
   };
-
-  // ✅ BODY LOCK EFFECT - Blochează scroll-ul și interacțiunile din spate
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    const originalPointerEvents = document.body.style.pointerEvents;
-    
-    // Blochează toate interacțiunile cu pagina din spate
-    document.body.style.overflow = 'hidden';
-    document.body.style.pointerEvents = 'none';
-    
-    // Cleanup la unmount
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.pointerEvents = originalPointerEvents;
-    };
-  }, []);
 
   useEffect(() => {
     loadClientFromDatabase();
@@ -656,136 +640,80 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF;
-  // ✅ RENDER JSX - Cu Fix Transparență Complet
+  // ✅ RENDER JSX - EXACT ca ProiectNouModal (FĂRĂ interferențe)
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100vw',
-        height: '100vh',
-        background: '#000000', // ✅ NEGRU COMPLET SOLID - ZERO TRANSPARENȚĂ
-        opacity: 0.85, // ✅ Control exact al opacității
-        zIndex: 13000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backdropFilter: 'blur(15px) saturate(0.2)', // ✅ Blur puternic + desaturare
-        WebkitBackdropFilter: 'blur(15px) saturate(0.2)',
-        padding: '1rem',
-        pointerEvents: 'auto' // ✅ Permite interacțiuni
-      }}
-      onClick={(e) => {
-        // ✅ Click pe overlay închide modalul
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      {/* ✅ CONTAINER MODAL PRINCIPAL */}
-      <div
-        style={{
-          background: '#ffffff', // ✅ BACKGROUND SOLID COMPLET OPAC
-          borderRadius: '16px',
-          maxWidth: '1000px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.8)', // ✅ Shadow foarte puternic
-          border: '2px solid #d0d0d0', // ✅ Border gros pentru separare clară
-          position: 'relative',
-          pointerEvents: 'auto' // ✅ Asigură funcționalitatea modalului
-        }}
-        onClick={(e) => {
-          // ✅ Previne închiderea când click pe modal
-          e.stopPropagation();
-        }}
-      >
-        {/* Header Modal */}
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.7)', // ✅ EXACT ca ProiectNouModal
+      zIndex: 99999, // ✅ EXACT ca ProiectNouModal
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }}>
+      <div style={{
+        background: 'white', // ✅ EXACT ca ProiectNouModal
+        borderRadius: '8px', // ✅ EXACT ca ProiectNouModal
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)', // ✅ EXACT ca ProiectNouModal
+        maxWidth: '1000px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }}>
+        {/* ✅ Header EXACT ca ProiectNouModal */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           padding: '1.5rem',
-          borderBottom: '1px solid #e0e0e0',
-          background: '#e3f2fd',
-          borderRadius: '16px 16px 0 0'
+          borderBottom: '1px solid #dee2e6',
+          background: '#f8f9fa',
+          borderRadius: '8px 8px 0 0'
         }}>
-          <div>
-            <h2 style={{
-              fontSize: '1.75rem',
-              fontWeight: '700',
-              color: '#2c3e50',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, color: '#2c3e50' }}>
               💰 Generare Factură Hibridă
             </h2>
-            <p style={{
-              fontSize: '14px',
-              color: '#7f8c8d',
-              margin: '0.5rem 0 0 0',
-              fontWeight: '500'
-            }}>
-              📊 Auto-completare client din BD + selector subproiecte • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
-            </p>
+            <button
+              onClick={onClose}
+              disabled={isLoading}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                color: '#6c757d'
+              }}
+            >
+              ×
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            style={{
-              background: 'rgba(231, 76, 60, 0.1)',
-              color: '#e74c3c',
-              border: 'none',
-              borderRadius: '12px',
-              width: '48px',
-              height: '48px',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '20px',
-              fontWeight: '600',
-              transition: 'all 0.3s ease',
+          <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
+            📊 Auto-completare client din BD + selector subproiecte • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+          </p>
+        </div>
+
+        <div style={{ padding: '1.5rem' }}>
+          {/* ✅ LOADING OVERLAY - Model ProiectNouModal */}
+          {isLoading && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.8)', // ✅ EXACT ca ProiectNouModal
+              zIndex: 99999, // ✅ EXACT ca ProiectNouModal
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* ✅ LOADING OVERLAY - COMPLET OPAC */}
-          {isLoading && (
-            <div 
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                width: '100vw',
-                height: '100vh',
-                background: '#000000', // ✅ NEGRU SOLID pentru loading
-                opacity: 0.9, // ✅ Opacitate mare pentru loading
-                zIndex: 14000,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)'
-              }}
-            >
+            }}>
               <div style={{
-                background: '#ffffff',
+                background: 'white',
                 padding: '2rem',
-                borderRadius: '20px',
-                boxShadow: '0 30px 60px rgba(0, 0, 0, 0.6)',
-                border: '2px solid #e0e0e0',
+                borderRadius: '8px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                 textAlign: 'center'
               }}>
                 <div style={{
@@ -822,19 +750,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-          {/* Secțiune informații proiect - COMPACTAT */}
+          {/* Secțiune informații proiect */}
           <div style={{
-            background: '#f0f8ff',
+            background: '#f8f9fa',
             padding: '1rem',
-            borderRadius: '12px',
-            border: '1px solid #cce7ff',
-            boxShadow: '0 4px 12px rgba(52, 152, 219, 0.15)'
+            borderRadius: '6px',
+            border: '1px solid #dee2e6',
+            marginBottom: '1rem'
           }}>
             <h3 style={{
               fontSize: '16px',
-              fontWeight: '600',
+              fontWeight: 'bold',
               color: '#2c3e50',
-              marginBottom: '0.75rem',
+              marginBottom: '1rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -844,60 +772,61 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '0.5rem'
+              gap: '1rem'
             }}>
-              <div style={{
-                background: '#ffffff',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID Proiect</div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#2c3e50', marginTop: '0.25rem', fontFamily: 'monospace' }}>{proiect.ID_Proiect}</div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>ID Proiect</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold'
+                }}>{proiect.ID_Proiect}</div>
               </div>
-              <div style={{
-                background: '#ffffff',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>{proiect.Status}</div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Status</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  color: '#27ae60',
+                  fontWeight: 'bold'
+                }}>{proiect.Status}</div>
               </div>
-              <div style={{
-                background: '#ffffff',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-                gridColumn: 'span 2'
-              }}>
-                <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Denumire</div>
-                <div style={{ fontSize: '12px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiect.Denumire}</div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Denumire</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px'
+                }}>{proiect.Denumire}</div>
               </div>
-              <div style={{
-                background: '#ffffff',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Estimată</div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Valoare Estimată</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  color: '#27ae60',
+                  fontWeight: 'bold'
+                }}>
                   {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} RON` : 'N/A'}
                 </div>
               </div>
-              <div style={{
-                background: '#ffffff',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Perioada</div>
-                <div style={{ fontSize: '11px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Perioada</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
                   {formatDate(proiect.Data_Start)} → {formatDate(proiect.Data_Final)}
                 </div>
               </div>
@@ -907,42 +836,31 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             {subproiecteDisponibile.length > 0 && (
               <div style={{
                 marginTop: '1rem',
-                paddingTop: '0.75rem',
-                borderTop: '1px solid #cce7ff'
+                paddingTop: '1rem',
+                borderTop: '1px solid #dee2e6'
               }}>
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '0.5rem'
+                  alignItems: 'center',
+                  marginBottom: '1rem'
                 }}>
-                  <h4 style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
+                  <h4 style={{ margin: 0, color: '#2c3e50' }}>
                     📋 Subproiecte Disponibile ({subproiecteDisponibile.length})
                   </h4>
                   <button
+                    type="button"
                     onClick={() => setShowSubproiecteSelector(!showSubproiecteSelector)}
+                    disabled={isLoading}
                     style={{
-                      background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                      padding: '0.5rem 1rem',
+                      background: '#3498db',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.375rem 0.75rem',
+                      borderRadius: '6px',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
                       fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)'
+                      fontWeight: 'bold'
                     }}
                   >
                     {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
@@ -955,61 +873,51 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                     gap: '0.5rem',
                     maxHeight: '200px',
-                    overflowY: 'auto',
-                    padding: '0.25rem'
+                    overflowY: 'auto'
                   }}>
                     {subproiecteDisponibile.map((subproiect) => (
                       <div 
                         key={subproiect.ID_Subproiect} 
                         style={{
-                          background: subproiect.adaugat ? '#e8f8e8' : '#ffffff',
-                          border: subproiect.adaugat ? '2px solid #4ade80' : '1px solid #e0e0e0',
-                          borderRadius: '8px',
-                          padding: '0.75rem',
-                          transition: 'all 0.3s ease',
-                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+                          border: '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          padding: '1rem',
+                          background: subproiect.adaugat ? '#d4edda' : 'white'
                         }}
                       >
                         <div style={{
                           display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'space-between'
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
                         }}>
                           <div style={{ flex: 1 }}>
                             <div style={{
-                              fontSize: '12px',
-                              fontWeight: '600',
+                              fontWeight: 'bold',
                               color: '#2c3e50',
-                              marginBottom: '0.25rem'
+                              marginBottom: '0.5rem'
                             }}>
                               📋 {subproiect.Denumire}
                             </div>
-                            <div style={{
-                              fontSize: '10px',
-                              color: '#7f8c8d',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.125rem'
-                            }}>
-                              <div>💰 Valoare: <span style={{ fontWeight: '600', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span></div>
-                              <div>📊 Status: <span style={{ fontWeight: '600' }}>{subproiect.Status}</span></div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
                             </div>
                           </div>
                           <button
                             onClick={() => addSubproiectToFactura(subproiect)}
-                            disabled={subproiect.adaugat}
+                            disabled={subproiect.adaugat || isLoading}
                             style={{
-                              marginLeft: '0.75rem',
-                              padding: '0.375rem 0.75rem',
-                              borderRadius: '6px',
+                              marginLeft: '1rem',
+                              padding: '0.5rem 1rem',
+                              background: subproiect.adaugat ? '#27ae60' : '#3498db',
+                              color: 'white',
                               border: 'none',
-                              fontSize: '10px',
-                              fontWeight: '600',
-                              cursor: subproiect.adaugat ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.3s ease',
-                              background: subproiect.adaugat ? '#d4edda' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                              color: subproiect.adaugat ? '#155724' : 'white',
-                              boxShadow: subproiect.adaugat ? 'none' : '0 2px 8px rgba(39, 174, 96, 0.3)'
+                              borderRadius: '6px',
+                              cursor: (subproiect.adaugat || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
                             }}
                           >
                             {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
@@ -1024,61 +932,45 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
 
           {/* Secțiune Client */}
-          <div style={{
-            background: '#ffffff',
-            padding: '1rem',
-            borderRadius: '12px',
-            border: '1px solid #e0e0e0',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div style={{ marginBottom: '1rem' }}>
             <div style={{
               display: 'flex',
-              alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '0.75rem'
+              alignItems: 'center',
+              marginBottom: '1rem'
             }}>
-              <h3 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>
                 👤 Informații Client
-                {isLoadingClient && <span style={{ fontSize: '12px', color: '#3498db', fontWeight: '500' }}>⏳ Se încarcă din BD...</span>}
+                {isLoadingClient && <span style={{ fontSize: '12px', color: '#3498db', fontWeight: '500' }}> ⏳ Se încarcă din BD...</span>}
               </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input
                   type="text"
                   value={cuiInput}
                   onChange={(e) => setCuiInput(e.target.value)}
+                  disabled={isLoading}
                   placeholder="Introduceți CUI (ex: RO12345678)"
                   style={{
-                    padding: '0.5rem',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    width: '180px',
-                    background: '#ffffff',
-                    transition: 'all 0.3s ease'
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    width: '200px'
                   }}
                 />
                 <button
                   onClick={handlePreluareDateANAF}
-                  disabled={isLoadingANAF || !cuiInput.trim()}
+                  disabled={isLoadingANAF || !cuiInput.trim() || isLoading}
                   style={{
-                    background: isLoadingANAF || !cuiInput.trim() ? '#f8f9fa' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                    color: isLoadingANAF || !cuiInput.trim() ? '#6c757d' : 'white',
+                    padding: '0.75rem 1rem',
+                    background: (isLoadingANAF || !cuiInput.trim() || isLoading) ? '#bdc3c7' : '#3498db',
+                    color: 'white',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.5rem 0.75rem',
+                    borderRadius: '6px',
+                    cursor: (isLoadingANAF || !cuiInput.trim() || isLoading) ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: (isLoadingANAF || !cuiInput.trim()) ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: (isLoadingANAF || !cuiInput.trim()) ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
@@ -1090,11 +982,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <div style={{
                 background: '#f8d7da',
                 border: '1px solid #f5c6cb',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 padding: '0.75rem',
-                marginBottom: '0.75rem'
+                marginBottom: '1rem',
+                fontSize: '14px',
+                color: '#721c24'
               }}>
-                <p style={{ fontSize: '12px', color: '#721c24', margin: 0, fontWeight: '500' }}>❌ {anafError}</p>
+                ❌ {anafError}
               </div>
             )}
             
@@ -1102,160 +996,110 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '0.5rem'
+                gap: '1rem'
               }}>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '0.25rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                     Denumire *
                   </label>
                   <input
                     type="text"
                     value={clientInfo.denumire}
                     onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
+                    disabled={isLoading}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      background: '#ffffff',
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                     required
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '0.25rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                     CUI *
                   </label>
                   <input
                     type="text"
                     value={clientInfo.cui}
                     onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
+                    disabled={isLoading}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      background: '#ffffff',
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                     required
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '0.25rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                     Nr. Reg. Com.
                   </label>
                   <input
                     type="text"
                     value={clientInfo.nrRegCom}
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
+                    disabled={isLoading}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      background: '#ffffff',
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '0.25rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                     Telefon
                   </label>
                   <input
                     type="text"
                     value={clientInfo.telefon || ''}
                     onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
+                    disabled={isLoading}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      background: '#ffffff',
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   />
                 </div>
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '0.25rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                     Adresa *
                   </label>
                   <input
                     type="text"
                     value={clientInfo.adresa}
                     onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
+                    disabled={isLoading}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      background: '#ffffff',
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                     required
                   />
                 </div>
                 
                 {(clientInfo.status || clientInfo.platitorTva) && (
-                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                     {clientInfo.status && (
                       <span style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '8px',
-                        fontSize: '10px',
-                        fontWeight: '600',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
                         background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da',
                         color: clientInfo.status === 'Activ' ? '#155724' : '#721c24'
                       }}>
@@ -1264,10 +1108,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     )}
                     {clientInfo.platitorTva && (
                       <span style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '8px',
-                        fontSize: '10px',
-                        fontWeight: '600',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
                         background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd',
                         color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404'
                       }}>
@@ -1282,9 +1126,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <div style={{
                       background: '#d4edda',
                       border: '1px solid #c3e6cb',
-                      borderRadius: '8px',
-                      padding: '0.5rem',
-                      fontSize: '10px'
+                      borderRadius: '6px',
+                      padding: '0.75rem',
+                      fontSize: '12px'
                     }}>
                       ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
                     </div>
@@ -1295,123 +1139,86 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
 
           {/* Secțiune Servicii/Produse */}
-          <div style={{
-            background: '#ffffff',
-            padding: '1rem',
-            borderRadius: '12px',
-            border: '1px solid #e0e0e0',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div style={{ marginBottom: '1rem' }}>
             <div style={{
               display: 'flex',
-              alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '0.75rem'
+              alignItems: 'center',
+              marginBottom: '1rem'
             }}>
-              <h3 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                📋 Servicii/Produse
-              </h3>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Servicii/Produse</h3>
               <button
                 onClick={addLine}
+                disabled={isLoading}
                 style={{
-                  background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  padding: '0.5rem 1rem',
+                  background: '#27ae60',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.5rem 0.75rem',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
                   fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)'
+                  fontWeight: 'bold'
                 }}
               >
                 + Adaugă linie
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
               <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
-                fontSize: '12px',
-                background: '#ffffff',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+                fontSize: '14px'
               }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'left',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>Denumire serviciu/produs *</th>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'center',
-                      width: '60px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      width: '80px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>Cant.</th>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'center',
-                      width: '100px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      width: '120px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>Preț unit. (RON)</th>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'center',
-                      width: '60px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      width: '80px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>TVA %</th>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'center',
-                      width: '100px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      width: '120px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>Total (RON)</th>
                     <th style={{
-                      border: '1px solid #e0e0e0',
-                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
                       textAlign: 'center',
-                      width: '40px',
-                      fontSize: '10px',
-                      fontWeight: '700',
-                      color: '#2c3e50',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      width: '60px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
                     }}>Acț.</th>
                   </tr>
                 </thead>
@@ -1429,26 +1236,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     
                     return (
                       <tr key={index} style={{
-                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? '#ffffff' : '#f8f9fa',
-                        transition: 'all 0.3s ease'
+                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
                       }}>
-                        <td style={{
-                          border: '1px solid #e0e0e0',
-                          padding: '0.5rem'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {linie.tip === 'subproiect' && (
                               <span style={{
-                                background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                                background: '#3498db',
                                 color: 'white',
-                                padding: '0.125rem 0.25rem',
+                                padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
-                                fontSize: '8px',
-                                fontWeight: '700'
+                                fontSize: '10px',
+                                fontWeight: 'bold'
                               }}>
                                 SUB
                               </span>
@@ -1457,71 +1256,67 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               type="text"
                               value={linie.denumire}
                               onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                              disabled={isLoading}
                               style={{
                                 flex: 1,
-                                padding: '0.375rem',
-                                border: '1px solid #e0e0e0',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                background: '#ffffff',
-                                transition: 'all 0.3s ease'
+                                padding: '0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '14px'
                               }}
                               placeholder="Descrierea serviciului sau produsului..."
                               required
                             />
                           </div>
                         </td>
-                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
                             value={linie.cantitate}
                             onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
                             style={{
                               width: '100%',
-                              padding: '0.25rem',
-                              border: '1px solid #e0e0e0',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
                               borderRadius: '4px',
                               textAlign: 'center',
-                              fontSize: '11px',
-                              background: '#ffffff',
-                              transition: 'all 0.3s ease'
+                              fontSize: '14px'
                             }}
                             min="0"
                             step="0.01"
                           />
                         </td>
-                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
                             value={linie.pretUnitar}
                             onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
                             style={{
                               width: '100%',
-                              padding: '0.25rem',
-                              border: '1px solid #e0e0e0',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
                               borderRadius: '4px',
                               textAlign: 'right',
-                              fontSize: '11px',
-                              background: '#ffffff',
-                              transition: 'all 0.3s ease'
+                              fontSize: '14px'
                             }}
                             min="0"
                             step="0.01"
                           />
                         </td>
-                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <select
                             value={linie.cotaTva}
                             onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                            disabled={isLoading}
                             style={{
                               width: '100%',
-                              padding: '0.25rem',
-                              border: '1px solid #e0e0e0',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
                               borderRadius: '4px',
                               textAlign: 'center',
-                              fontSize: '11px',
-                              background: '#ffffff',
-                              transition: 'all 0.3s ease'
+                              fontSize: '14px'
                             }}
                           >
                             <option value={0}>0%</option>
@@ -1532,36 +1327,27 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </select>
                         </td>
                         <td style={{
-                          border: '1px solid #e0e0e0',
+                          border: '1px solid #dee2e6',
                           padding: '0.5rem',
                           textAlign: 'right',
-                          fontSize: '11px',
-                          fontWeight: '600',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
                           color: '#27ae60'
                         }}>
                           {safeFixed(total)}
                         </td>
-                        <td style={{
-                          border: '1px solid #e0e0e0',
-                          padding: '0.5rem',
-                          textAlign: 'center'
-                        }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
                           <button
                             onClick={() => removeLine(index)}
-                            disabled={liniiFactura.length === 1}
+                            disabled={liniiFactura.length === 1 || isLoading}
                             style={{
-                              background: liniiFactura.length === 1 ? '#f8f9fa' : '#f8d7da',
-                              color: liniiFactura.length === 1 ? '#6c757d' : '#721c24',
+                              background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
+                              color: 'white',
                               border: 'none',
                               borderRadius: '4px',
-                              width: '24px',
-                              height: '24px',
-                              cursor: liniiFactura.length === 1 ? 'not-allowed' : 'pointer',
-                              fontSize: '10px',
-                              transition: 'all 0.3s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
+                              padding: '0.5rem',
+                              cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px'
                             }}
                             title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
                           >
@@ -1577,42 +1363,41 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
 
           {/* Secțiune Totaluri */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
             <div style={{
               width: '300px',
-              background: '#e8f8e8',
+              background: '#f8f9fa',
               padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid #c3e6cb',
-              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.15)'
+              borderRadius: '6px',
+              border: '1px solid #dee2e6'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '12px',
+                  fontSize: '14px',
                   color: '#2c3e50'
                 }}>
                   <span>Subtotal (fără TVA):</span>
-                  <span style={{ fontWeight: '600' }}>{totals.subtotal} RON</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
                 </div>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '12px',
+                  fontSize: '14px',
                   color: '#2c3e50'
                 }}>
                   <span>TVA:</span>
-                  <span style={{ fontWeight: '600' }}>{totals.totalTva} RON</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
                 </div>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   fontSize: '16px',
-                  fontWeight: '700',
+                  fontWeight: 'bold',
                   paddingTop: '0.5rem',
-                  borderTop: '2px solid #28a745',
-                  color: '#155724'
+                  borderTop: '2px solid #27ae60',
+                  color: '#27ae60'
                 }}>
                   <span>TOTAL DE PLATĂ:</span>
                   <span>{totals.totalGeneral} RON</span>
@@ -1622,54 +1407,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
 
           {/* Secțiune Observații */}
-          <div style={{
-            background: '#ffffff',
-            padding: '1rem',
-            borderRadius: '12px',
-            border: '1px solid #e0e0e0',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-          }}>
-            <label style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: '#2c3e50',
-              marginBottom: '0.5rem'
-            }}>
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                📝 Observații (opțional)
-              </span>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              📝 Observații (opțional)
             </label>
             <textarea
               value={observatii}
               onChange={(e) => setObservatii(e.target.value)}
+              disabled={isLoading}
               style={{
                 width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                fontSize: '12px',
-                background: '#ffffff',
-                transition: 'all 0.3s ease',
-                resize: 'vertical',
-                boxSizing: 'border-box'
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
               }}
               rows={2}
               placeholder="Observații suplimentare pentru factură..."
             />
           </div>
 
-          {/* Footer Buttons */}
-          <div style={{
-            display: 'flex',
+          {/* Butoane finale */}
+          <div style={{ 
+            display: 'flex', 
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingTop: '0.75rem',
-            borderTop: '1px solid #e0e0e0'
+            paddingTop: '1rem',
+            borderTop: '1px solid #dee2e6'
           }}>
             <div style={{
               fontSize: '12px',
@@ -1679,42 +1444,36 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură.
             </div>
             
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={onClose}
                 disabled={isLoading}
                 style={{
-                  background: '#f8f9fa',
-                  color: '#6c757d',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem',
-                  fontSize: '12px',
-                  fontWeight: '600',
+                  padding: '0.75rem 1.5rem',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease'
+                  fontSize: '14px',
+                  fontWeight: 'bold'
                 }}
               >
                 Anulează
               </button>
+              
               <button
                 onClick={handleGenereazaFactura}
                 disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
                 style={{
-                  background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 
-                    '#f8f9fa' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                  color: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#6c757d' : 'white',
+                  padding: '0.75rem 1.5rem',
+                  background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#bdc3c7' : '#27ae60',
+                  color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1.5rem',
-                  fontSize: '14px',
-                  fontWeight: '700',
+                  borderRadius: '6px',
                   cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'none' : '0 4px 12px rgba(39, 174, 96, 0.4)'
+                  fontSize: '14px',
+                  fontWeight: 'bold'
                 }}
               >
                 {isLoading ? (

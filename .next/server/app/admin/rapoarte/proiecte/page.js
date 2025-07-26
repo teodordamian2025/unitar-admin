@@ -741,7 +741,7 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// COMPLET REGENERAT: Fix Transparență + Design Compact + Toate Funcționalitățile
+// FIX FINAL: Modelul ProiectNouModal + Design Compact + Toate Funcționalitățile
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
@@ -819,19 +819,6 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         if (!date) return "";
         return typeof date === "string" ? date : date.value;
     };
-    // ✅ BODY LOCK EFFECT - Blochează scroll-ul și interacțiunile din spate
-    (0,react_experimental_.useEffect)(()=>{
-        const originalOverflow = document.body.style.overflow;
-        const originalPointerEvents = document.body.style.pointerEvents;
-        // Blochează toate interacțiunile cu pagina din spate
-        document.body.style.overflow = "hidden";
-        document.body.style.pointerEvents = "none";
-        // Cleanup la unmount
-        return ()=>{
-            document.body.style.overflow = originalOverflow;
-            document.body.style.pointerEvents = originalPointerEvents;
-        };
-    }, []);
     (0,react_experimental_.useEffect)(()=>{
         loadClientFromDatabase();
         loadSubproiecte();
@@ -1258,7 +1245,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     };
     const totals = calculateTotals();
     const isLoading = isGenerating || isProcessingPDF;
-    // ✅ RENDER JSX - Cu Fix Transparență Complet
+    // ✅ RENDER JSX - EXACT ca ProiectNouModal (FĂRĂ interferențe)
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
         style: {
             position: "fixed",
@@ -1266,117 +1253,83 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
             left: 0,
             right: 0,
             bottom: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "#000000",
-            opacity: 0.85,
-            zIndex: 13000,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 99999,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backdropFilter: "blur(15px) saturate(0.2)",
-            WebkitBackdropFilter: "blur(15px) saturate(0.2)",
-            padding: "1rem",
-            pointerEvents: "auto" // ✅ Permite interacțiuni
-        },
-        onClick: (e)=>{
-            // ✅ Click pe overlay închide modalul
-            if (e.target === e.currentTarget) {
-                onClose();
-            }
+            padding: "1rem"
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "#ffffff",
-                borderRadius: "16px",
+                background: "white",
+                borderRadius: "8px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
                 maxWidth: "1000px",
                 width: "100%",
                 maxHeight: "90vh",
-                overflowY: "auto",
-                boxShadow: "0 25px 50px rgba(0, 0, 0, 0.8)",
-                border: "2px solid #d0d0d0",
-                position: "relative",
-                pointerEvents: "auto" // ✅ Asigură funcționalitatea modalului
-            },
-            onClick: (e)=>{
-                // ✅ Previne închiderea când click pe modal
-                e.stopPropagation();
+                overflowY: "auto"
             },
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     style: {
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
                         padding: "1.5rem",
-                        borderBottom: "1px solid #e0e0e0",
-                        background: "#e3f2fd",
-                        borderRadius: "16px 16px 0 0"
+                        borderBottom: "1px solid #dee2e6",
+                        background: "#f8f9fa",
+                        borderRadius: "8px 8px 0 0"
                     },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h2", {
                                     style: {
-                                        fontSize: "1.75rem",
-                                        fontWeight: "700",
-                                        color: "#2c3e50",
                                         margin: 0,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.5rem"
+                                        color: "#2c3e50"
                                     },
                                     children: "\uD83D\uDCB0 Generare Factură Hibridă"
                                 }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
+                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                                    onClick: onClose,
+                                    disabled: isLoading,
                                     style: {
-                                        fontSize: "14px",
-                                        color: "#7f8c8d",
-                                        margin: "0.5rem 0 0 0",
-                                        fontWeight: "500"
+                                        background: "transparent",
+                                        border: "none",
+                                        fontSize: "24px",
+                                        cursor: isLoading ? "not-allowed" : "pointer",
+                                        color: "#6c757d"
                                     },
-                                    children: [
-                                        "\uD83D\uDCCA Auto-completare client din BD + selector subproiecte • Proiect: ",
-                                        /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                            style: {
-                                                fontFamily: "monospace",
-                                                fontWeight: "600",
-                                                color: "#3498db"
-                                            },
-                                            children: proiect.ID_Proiect
-                                        })
-                                    ]
+                                    children: "\xd7"
                                 })
                             ]
                         }),
-                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                            onClick: onClose,
-                            disabled: isLoading,
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                             style: {
-                                background: "rgba(231, 76, 60, 0.1)",
-                                color: "#e74c3c",
-                                border: "none",
-                                borderRadius: "12px",
-                                width: "48px",
-                                height: "48px",
-                                cursor: isLoading ? "not-allowed" : "pointer",
-                                fontSize: "20px",
-                                fontWeight: "600",
-                                transition: "all 0.3s ease",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center"
+                                margin: "0.5rem 0 0 0",
+                                color: "#7f8c8d",
+                                fontSize: "14px"
                             },
-                            children: "✕"
+                            children: [
+                                "\uD83D\uDCCA Auto-completare client din BD + selector subproiecte • Proiect: ",
+                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                    style: {
+                                        fontFamily: "monospace",
+                                        fontWeight: "600",
+                                        color: "#3498db"
+                                    },
+                                    children: proiect.ID_Proiect
+                                })
+                            ]
                         })
                     ]
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     style: {
-                        padding: "0.75rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.75rem"
+                        padding: "1.5rem"
                     },
                     children: [
                         isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -1386,24 +1339,18 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                width: "100vw",
-                                height: "100vh",
-                                background: "#000000",
-                                opacity: 0.9,
-                                zIndex: 14000,
+                                background: "rgba(0,0,0,0.8)",
+                                zIndex: 99999,
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                backdropFilter: "blur(20px)",
-                                WebkitBackdropFilter: "blur(20px)"
+                                justifyContent: "center"
                             },
                             children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
-                                    background: "#ffffff",
+                                    background: "white",
                                     padding: "2rem",
-                                    borderRadius: "20px",
-                                    boxShadow: "0 30px 60px rgba(0, 0, 0, 0.6)",
-                                    border: "2px solid #e0e0e0",
+                                    borderRadius: "8px",
+                                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
                                     textAlign: "center"
                                 },
                                 children: [
@@ -1448,19 +1395,19 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "#f0f8ff",
+                                background: "#f8f9fa",
                                 padding: "1rem",
-                                borderRadius: "12px",
-                                border: "1px solid #cce7ff",
-                                boxShadow: "0 4px 12px rgba(52, 152, 219, 0.15)"
+                                borderRadius: "6px",
+                                border: "1px solid #dee2e6",
+                                marginBottom: "1rem"
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h3", {
                                     style: {
                                         fontSize: "16px",
-                                        fontWeight: "600",
+                                        fontWeight: "bold",
                                         color: "#2c3e50",
-                                        marginBottom: "0.75rem",
+                                        marginBottom: "1rem",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: "0.5rem"
@@ -1471,65 +1418,52 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     style: {
                                         display: "grid",
                                         gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                        gap: "0.5rem"
+                                        gap: "1rem"
                                     },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                background: "#ffffff",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e0e0e0",
-                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
-                                            },
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
-                                                        fontSize: "10px",
-                                                        color: "#7f8c8d",
-                                                        fontWeight: "600",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        display: "block",
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "ID Proiect"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        fontSize: "14px",
-                                                        fontWeight: "700",
-                                                        color: "#2c3e50",
-                                                        marginTop: "0.25rem",
-                                                        fontFamily: "monospace"
+                                                        padding: "0.75rem",
+                                                        background: "white",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontFamily: "monospace",
+                                                        fontWeight: "bold"
                                                     },
                                                     children: proiect.ID_Proiect
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                background: "#ffffff",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e0e0e0",
-                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
-                                            },
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
-                                                        fontSize: "10px",
-                                                        color: "#7f8c8d",
-                                                        fontWeight: "600",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        display: "block",
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Status"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        fontSize: "12px",
-                                                        fontWeight: "600",
+                                                        padding: "0.75rem",
+                                                        background: "white",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
                                                         color: "#27ae60",
-                                                        marginTop: "0.25rem"
+                                                        fontWeight: "bold"
                                                     },
                                                     children: proiect.Status
                                                 })
@@ -1537,90 +1471,71 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "#ffffff",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e0e0e0",
-                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
                                                 gridColumn: "span 2"
                                             },
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
-                                                        fontSize: "10px",
-                                                        color: "#7f8c8d",
-                                                        fontWeight: "600",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        display: "block",
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Denumire"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        fontSize: "12px",
-                                                        fontWeight: "500",
-                                                        color: "#2c3e50",
-                                                        marginTop: "0.25rem"
+                                                        padding: "0.75rem",
+                                                        background: "white",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px"
                                                     },
                                                     children: proiect.Denumire
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                background: "#ffffff",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e0e0e0",
-                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
-                                            },
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
-                                                        fontSize: "10px",
-                                                        color: "#7f8c8d",
-                                                        fontWeight: "600",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        display: "block",
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Valoare Estimată"
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        fontSize: "14px",
-                                                        fontWeight: "700",
+                                                        padding: "0.75rem",
+                                                        background: "white",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
                                                         color: "#27ae60",
-                                                        marginTop: "0.25rem"
+                                                        fontWeight: "bold"
                                                     },
                                                     children: proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString("ro-RO")} RON` : "N/A"
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                background: "#ffffff",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e0e0e0",
-                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
-                                            },
                                             children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
-                                                        fontSize: "10px",
-                                                        color: "#7f8c8d",
-                                                        fontWeight: "600",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        display: "block",
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Perioada"
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                     style: {
-                                                        fontSize: "11px",
-                                                        fontWeight: "500",
-                                                        color: "#2c3e50",
-                                                        marginTop: "0.25rem"
+                                                        padding: "0.75rem",
+                                                        background: "white",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     },
                                                     children: [
                                                         formatDate(proiect.Data_Start),
@@ -1635,27 +1550,22 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 subproiecteDisponibile.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         marginTop: "1rem",
-                                        paddingTop: "0.75rem",
-                                        borderTop: "1px solid #cce7ff"
+                                        paddingTop: "1rem",
+                                        borderTop: "1px solid #dee2e6"
                                     },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
                                                 display: "flex",
-                                                alignItems: "center",
                                                 justifyContent: "space-between",
-                                                marginBottom: "0.5rem"
+                                                alignItems: "center",
+                                                marginBottom: "1rem"
                                             },
                                             children: [
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h4", {
                                                     style: {
-                                                        fontSize: "14px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
                                                         margin: 0,
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "0.5rem"
+                                                        color: "#2c3e50"
                                                     },
                                                     children: [
                                                         "\uD83D\uDCCB Subproiecte Disponibile (",
@@ -1664,21 +1574,18 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     ]
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
+                                                    type: "button",
                                                     onClick: ()=>setShowSubproiecteSelector(!showSubproiecteSelector),
+                                                    disabled: isLoading,
                                                     style: {
-                                                        background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                        padding: "0.5rem 1rem",
+                                                        background: "#3498db",
                                                         color: "white",
                                                         border: "none",
-                                                        borderRadius: "8px",
-                                                        padding: "0.375rem 0.75rem",
+                                                        borderRadius: "6px",
+                                                        cursor: isLoading ? "not-allowed" : "pointer",
                                                         fontSize: "12px",
-                                                        fontWeight: "600",
-                                                        cursor: "pointer",
-                                                        transition: "all 0.3s ease",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "0.5rem",
-                                                        boxShadow: "0 4px 12px rgba(52, 152, 219, 0.4)"
+                                                        fontWeight: "bold"
                                                     },
                                                     children: [
                                                         showSubproiecteSelector ? "\uD83D\uDC41️ Ascunde" : "\uD83D\uDC40 Afișează",
@@ -1693,23 +1600,20 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
                                                 gap: "0.5rem",
                                                 maxHeight: "200px",
-                                                overflowY: "auto",
-                                                padding: "0.25rem"
+                                                overflowY: "auto"
                                             },
                                             children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        background: subproiect.adaugat ? "#e8f8e8" : "#ffffff",
-                                                        border: subproiect.adaugat ? "2px solid #4ade80" : "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        padding: "0.75rem",
-                                                        transition: "all 0.3s ease",
-                                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        padding: "1rem",
+                                                        background: subproiect.adaugat ? "#d4edda" : "white"
                                                     },
                                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                         style: {
                                                             display: "flex",
-                                                            alignItems: "flex-start",
-                                                            justifyContent: "space-between"
+                                                            justifyContent: "space-between",
+                                                            alignItems: "flex-start"
                                                         },
                                                         children: [
                                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1719,10 +1623,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                 children: [
                                                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                         style: {
-                                                                            fontSize: "12px",
-                                                                            fontWeight: "600",
+                                                                            fontWeight: "bold",
                                                                             color: "#2c3e50",
-                                                                            marginBottom: "0.25rem"
+                                                                            marginBottom: "0.5rem"
                                                                         },
                                                                         children: [
                                                                             "\uD83D\uDCCB ",
@@ -1731,35 +1634,32 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     }),
                                                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                         style: {
-                                                                            fontSize: "10px",
-                                                                            color: "#7f8c8d",
-                                                                            display: "flex",
-                                                                            flexDirection: "column",
-                                                                            gap: "0.125rem"
+                                                                            fontSize: "12px",
+                                                                            color: "#7f8c8d"
                                                                         },
                                                                         children: [
-                                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                                children: [
-                                                                                    "\uD83D\uDCB0 Valoare: ",
-                                                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                                        style: {
-                                                                                            fontWeight: "600",
-                                                                                            color: "#27ae60"
-                                                                                        },
-                                                                                        children: subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "Fără valoare"
-                                                                                    })
-                                                                                ]
-                                                                            }),
-                                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                                children: [
-                                                                                    "\uD83D\uDCCA Status: ",
-                                                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                                        style: {
-                                                                                            fontWeight: "600"
-                                                                                        },
-                                                                                        children: subproiect.Status
-                                                                                    })
-                                                                                ]
+                                                                            "\uD83D\uDCB0 Valoare: ",
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                                                style: {
+                                                                                    fontWeight: "bold",
+                                                                                    color: "#27ae60"
+                                                                                },
+                                                                                children: subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "Fără valoare"
+                                                                            })
+                                                                        ]
+                                                                    }),
+                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                                        style: {
+                                                                            fontSize: "12px",
+                                                                            color: "#7f8c8d"
+                                                                        },
+                                                                        children: [
+                                                                            "\uD83D\uDCCA Status: ",
+                                                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                                                style: {
+                                                                                    fontWeight: "bold"
+                                                                                },
+                                                                                children: subproiect.Status
                                                                             })
                                                                         ]
                                                                     })
@@ -1767,19 +1667,17 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                                 onClick: ()=>addSubproiectToFactura(subproiect),
-                                                                disabled: subproiect.adaugat,
+                                                                disabled: subproiect.adaugat || isLoading,
                                                                 style: {
-                                                                    marginLeft: "0.75rem",
-                                                                    padding: "0.375rem 0.75rem",
-                                                                    borderRadius: "6px",
+                                                                    marginLeft: "1rem",
+                                                                    padding: "0.5rem 1rem",
+                                                                    background: subproiect.adaugat ? "#27ae60" : "#3498db",
+                                                                    color: "white",
                                                                     border: "none",
-                                                                    fontSize: "10px",
-                                                                    fontWeight: "600",
-                                                                    cursor: subproiect.adaugat ? "not-allowed" : "pointer",
-                                                                    transition: "all 0.3s ease",
-                                                                    background: subproiect.adaugat ? "#d4edda" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
-                                                                    color: subproiect.adaugat ? "#155724" : "white",
-                                                                    boxShadow: subproiect.adaugat ? "none" : "0 2px 8px rgba(39, 174, 96, 0.3)"
+                                                                    borderRadius: "6px",
+                                                                    cursor: subproiect.adaugat || isLoading ? "not-allowed" : "pointer",
+                                                                    fontSize: "12px",
+                                                                    fontWeight: "bold"
                                                                 },
                                                                 children: subproiect.adaugat ? "✓ Adăugat" : "+ Adaugă"
                                                             })
@@ -1793,30 +1691,21 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "#ffffff",
-                                padding: "1rem",
-                                borderRadius: "12px",
-                                border: "1px solid #e0e0e0",
-                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)"
+                                marginBottom: "1rem"
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         display: "flex",
-                                        alignItems: "center",
                                         justifyContent: "space-between",
-                                        marginBottom: "0.75rem"
+                                        alignItems: "center",
+                                        marginBottom: "1rem"
                                     },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
                                             style: {
-                                                fontSize: "16px",
-                                                fontWeight: "600",
-                                                color: "#2c3e50",
                                                 margin: 0,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem"
+                                                color: "#2c3e50"
                                             },
                                             children: [
                                                 "\uD83D\uDC64 Informații Client",
@@ -1826,14 +1715,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         color: "#3498db",
                                                         fontWeight: "500"
                                                     },
-                                                    children: "⏳ Se \xeencarcă din BD..."
+                                                    children: " ⏳ Se \xeencarcă din BD..."
                                                 })
                                             ]
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
                                                 display: "flex",
-                                                alignItems: "center",
                                                 gap: "0.5rem"
                                             },
                                             children: [
@@ -1841,31 +1729,29 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     type: "text",
                                                     value: cuiInput,
                                                     onChange: (e)=>setCuiInput(e.target.value),
+                                                    disabled: isLoading,
                                                     placeholder: "Introduceți CUI (ex: RO12345678)",
                                                     style: {
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        width: "180px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px",
+                                                        width: "200px"
                                                     }
                                                 }),
                                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                     onClick: handlePreluareDateANAF,
-                                                    disabled: isLoadingANAF || !cuiInput.trim(),
+                                                    disabled: isLoadingANAF || !cuiInput.trim() || isLoading,
                                                     style: {
-                                                        background: isLoadingANAF || !cuiInput.trim() ? "#f8f9fa" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
-                                                        color: isLoadingANAF || !cuiInput.trim() ? "#6c757d" : "white",
+                                                        padding: "0.75rem 1rem",
+                                                        background: isLoadingANAF || !cuiInput.trim() || isLoading ? "#bdc3c7" : "#3498db",
+                                                        color: "white",
                                                         border: "none",
-                                                        borderRadius: "8px",
-                                                        padding: "0.5rem 0.75rem",
+                                                        borderRadius: "6px",
+                                                        cursor: isLoadingANAF || !cuiInput.trim() || isLoading ? "not-allowed" : "pointer",
                                                         fontSize: "12px",
-                                                        fontWeight: "600",
-                                                        cursor: isLoadingANAF || !cuiInput.trim() ? "not-allowed" : "pointer",
-                                                        transition: "all 0.3s ease",
-                                                        boxShadow: isLoadingANAF || !cuiInput.trim() ? "none" : "0 4px 12px rgba(52, 152, 219, 0.4)"
+                                                        fontWeight: "bold",
+                                                        whiteSpace: "nowrap"
                                                     },
                                                     children: isLoadingANAF ? "⏳ Se preiau..." : "\uD83D\uDCE1 Preluare ANAF"
                                                 })
@@ -1873,32 +1759,26 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         })
                                     ]
                                 }),
-                                anafError && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                anafError && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         background: "#f8d7da",
                                         border: "1px solid #f5c6cb",
-                                        borderRadius: "8px",
+                                        borderRadius: "6px",
                                         padding: "0.75rem",
-                                        marginBottom: "0.75rem"
+                                        marginBottom: "1rem",
+                                        fontSize: "14px",
+                                        color: "#721c24"
                                     },
-                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
-                                        style: {
-                                            fontSize: "12px",
-                                            color: "#721c24",
-                                            margin: 0,
-                                            fontWeight: "500"
-                                        },
-                                        children: [
-                                            "❌ ",
-                                            anafError
-                                        ]
-                                    })
+                                    children: [
+                                        "❌ ",
+                                        anafError
+                                    ]
                                 }),
                                 clientInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         display: "grid",
                                         gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                        gap: "0.5rem"
+                                        gap: "1rem"
                                     },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1906,12 +1786,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
                                                         display: "block",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
-                                                        marginBottom: "0.25rem",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Denumire *"
                                                 }),
@@ -1922,15 +1799,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             denumire: e.target.value
                                                         }),
+                                                    disabled: isLoading,
                                                     style: {
                                                         width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease",
-                                                        boxSizing: "border-box"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     },
                                                     required: true
                                                 })
@@ -1941,12 +1816,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
                                                         display: "block",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
-                                                        marginBottom: "0.25rem",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "CUI *"
                                                 }),
@@ -1957,15 +1829,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             cui: e.target.value
                                                         }),
+                                                    disabled: isLoading,
                                                     style: {
                                                         width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease",
-                                                        boxSizing: "border-box"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     },
                                                     required: true
                                                 })
@@ -1976,12 +1846,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
                                                         display: "block",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
-                                                        marginBottom: "0.25rem",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Nr. Reg. Com."
                                                 }),
@@ -1992,15 +1859,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             nrRegCom: e.target.value
                                                         }),
+                                                    disabled: isLoading,
                                                     style: {
                                                         width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease",
-                                                        boxSizing: "border-box"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     }
                                                 })
                                             ]
@@ -2010,12 +1875,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
                                                         display: "block",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
-                                                        marginBottom: "0.25rem",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Telefon"
                                                 }),
@@ -2026,15 +1888,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             telefon: e.target.value
                                                         }),
+                                                    disabled: isLoading,
                                                     style: {
                                                         width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease",
-                                                        boxSizing: "border-box"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     }
                                                 })
                                             ]
@@ -2047,12 +1907,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                                     style: {
                                                         display: "block",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
-                                                        color: "#2c3e50",
-                                                        marginBottom: "0.25rem",
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.5px"
+                                                        marginBottom: "0.5rem",
+                                                        fontWeight: "bold",
+                                                        color: "#2c3e50"
                                                     },
                                                     children: "Adresa *"
                                                 }),
@@ -2063,15 +1920,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             ...clientInfo,
                                                             adresa: e.target.value
                                                         }),
+                                                    disabled: isLoading,
                                                     style: {
                                                         width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "1px solid #e0e0e0",
-                                                        borderRadius: "8px",
-                                                        fontSize: "12px",
-                                                        background: "#ffffff",
-                                                        transition: "all 0.3s ease",
-                                                        boxSizing: "border-box"
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #dee2e6",
+                                                        borderRadius: "6px",
+                                                        fontSize: "14px"
                                                     },
                                                     required: true
                                                 })
@@ -2081,16 +1936,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             style: {
                                                 gridColumn: "span 2",
                                                 display: "flex",
-                                                gap: "0.5rem",
-                                                marginTop: "0.25rem"
+                                                gap: "1rem",
+                                                marginTop: "0.5rem"
                                             },
                                             children: [
                                                 clientInfo.status && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                                     style: {
-                                                        padding: "0.25rem 0.5rem",
-                                                        borderRadius: "8px",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
+                                                        padding: "0.5rem 1rem",
+                                                        borderRadius: "6px",
+                                                        fontSize: "12px",
+                                                        fontWeight: "bold",
                                                         background: clientInfo.status === "Activ" ? "#d4edda" : "#f8d7da",
                                                         color: clientInfo.status === "Activ" ? "#155724" : "#721c24"
                                                     },
@@ -2101,10 +1956,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 }),
                                                 clientInfo.platitorTva && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                                     style: {
-                                                        padding: "0.25rem 0.5rem",
-                                                        borderRadius: "8px",
-                                                        fontSize: "10px",
-                                                        fontWeight: "600",
+                                                        padding: "0.5rem 1rem",
+                                                        borderRadius: "6px",
+                                                        fontSize: "12px",
+                                                        fontWeight: "bold",
                                                         background: clientInfo.platitorTva === "Da" ? "#cce7ff" : "#fff3cd",
                                                         color: clientInfo.platitorTva === "Da" ? "#004085" : "#856404"
                                                     },
@@ -2123,9 +1978,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 style: {
                                                     background: "#d4edda",
                                                     border: "1px solid #c3e6cb",
-                                                    borderRadius: "8px",
-                                                    padding: "0.5rem",
-                                                    fontSize: "10px"
+                                                    borderRadius: "6px",
+                                                    padding: "0.75rem",
+                                                    fontSize: "12px"
                                                 },
                                                 children: [
                                                     "✅ ",
@@ -2143,46 +1998,36 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "#ffffff",
-                                padding: "1rem",
-                                borderRadius: "12px",
-                                border: "1px solid #e0e0e0",
-                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)"
+                                marginBottom: "1rem"
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         display: "flex",
-                                        alignItems: "center",
                                         justifyContent: "space-between",
-                                        marginBottom: "0.75rem"
+                                        alignItems: "center",
+                                        marginBottom: "1rem"
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("h3", {
                                             style: {
-                                                fontSize: "16px",
-                                                fontWeight: "600",
-                                                color: "#2c3e50",
                                                 margin: 0,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem"
+                                                color: "#2c3e50"
                                             },
                                             children: "\uD83D\uDCCB Servicii/Produse"
                                         }),
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             onClick: addLine,
+                                            disabled: isLoading,
                                             style: {
-                                                background: "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                padding: "0.5rem 1rem",
+                                                background: "#27ae60",
                                                 color: "white",
                                                 border: "none",
-                                                borderRadius: "8px",
-                                                padding: "0.5rem 0.75rem",
+                                                borderRadius: "6px",
+                                                cursor: isLoading ? "not-allowed" : "pointer",
                                                 fontSize: "12px",
-                                                fontWeight: "600",
-                                                cursor: "pointer",
-                                                transition: "all 0.3s ease",
-                                                boxShadow: "0 4px 12px rgba(39, 174, 96, 0.4)"
+                                                fontWeight: "bold"
                                             },
                                             children: "+ Adaugă linie"
                                         })
@@ -2190,17 +2035,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                     style: {
-                                        overflowX: "auto",
-                                        borderRadius: "8px",
-                                        overflow: "hidden"
+                                        overflowX: "auto"
                                     },
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
                                         style: {
                                             width: "100%",
                                             borderCollapse: "collapse",
-                                            fontSize: "12px",
-                                            background: "#ffffff",
-                                            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                                            fontSize: "14px"
                                         },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("thead", {
@@ -2211,84 +2052,66 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     children: [
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "left",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "Denumire serviciu/produs *"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                width: "60px",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                width: "80px",
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "Cant."
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                width: "100px",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                width: "120px",
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "Preț unit. (RON)"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                width: "60px",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                width: "80px",
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "TVA %"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                width: "100px",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                width: "120px",
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "Total (RON)"
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid #e0e0e0",
-                                                                padding: "0.5rem",
+                                                                border: "1px solid #dee2e6",
+                                                                padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                width: "40px",
-                                                                fontSize: "10px",
-                                                                fontWeight: "700",
-                                                                color: "#2c3e50",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.5px"
+                                                                width: "60px",
+                                                                fontWeight: "bold",
+                                                                color: "#2c3e50"
                                                             },
                                                             children: "Acț."
                                                         })
@@ -2306,30 +2129,29 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
                                                     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                                         style: {
-                                                            background: linie.tip === "subproiect" ? "#f0f8ff" : index % 2 === 0 ? "#ffffff" : "#f8f9fa",
-                                                            transition: "all 0.3s ease"
+                                                            background: linie.tip === "subproiect" ? "#f0f8ff" : index % 2 === 0 ? "white" : "#f8f9fa"
                                                         },
                                                         children: [
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem"
                                                                 },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                                     style: {
                                                                         display: "flex",
                                                                         alignItems: "center",
-                                                                        gap: "0.25rem"
+                                                                        gap: "0.5rem"
                                                                     },
                                                                     children: [
                                                                         linie.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                                                             style: {
-                                                                                background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                                                background: "#3498db",
                                                                                 color: "white",
-                                                                                padding: "0.125rem 0.25rem",
+                                                                                padding: "0.25rem 0.5rem",
                                                                                 borderRadius: "4px",
-                                                                                fontSize: "8px",
-                                                                                fontWeight: "700"
+                                                                                fontSize: "10px",
+                                                                                fontWeight: "bold"
                                                                             },
                                                                             children: "SUB"
                                                                         }),
@@ -2337,14 +2159,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                             type: "text",
                                                                             value: linie.denumire,
                                                                             onChange: (e)=>updateLine(index, "denumire", e.target.value),
+                                                                            disabled: isLoading,
                                                                             style: {
                                                                                 flex: 1,
-                                                                                padding: "0.375rem",
-                                                                                border: "1px solid #e0e0e0",
-                                                                                borderRadius: "6px",
-                                                                                fontSize: "11px",
-                                                                                background: "#ffffff",
-                                                                                transition: "all 0.3s ease"
+                                                                                padding: "0.5rem",
+                                                                                border: "1px solid #dee2e6",
+                                                                                borderRadius: "4px",
+                                                                                fontSize: "14px"
                                                                             },
                                                                             placeholder: "Descrierea serviciului sau produsului...",
                                                                             required: true
@@ -2354,22 +2175,21 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem"
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                                     type: "number",
                                                                     value: linie.cantitate,
                                                                     onChange: (e)=>updateLine(index, "cantitate", parseFloat(e.target.value) || 0),
+                                                                    disabled: isLoading,
                                                                     style: {
                                                                         width: "100%",
-                                                                        padding: "0.25rem",
-                                                                        border: "1px solid #e0e0e0",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid #dee2e6",
                                                                         borderRadius: "4px",
                                                                         textAlign: "center",
-                                                                        fontSize: "11px",
-                                                                        background: "#ffffff",
-                                                                        transition: "all 0.3s ease"
+                                                                        fontSize: "14px"
                                                                     },
                                                                     min: "0",
                                                                     step: "0.01"
@@ -2377,22 +2197,21 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem"
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
                                                                     type: "number",
                                                                     value: linie.pretUnitar,
                                                                     onChange: (e)=>updateLine(index, "pretUnitar", parseFloat(e.target.value) || 0),
+                                                                    disabled: isLoading,
                                                                     style: {
                                                                         width: "100%",
-                                                                        padding: "0.25rem",
-                                                                        border: "1px solid #e0e0e0",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid #dee2e6",
                                                                         borderRadius: "4px",
                                                                         textAlign: "right",
-                                                                        fontSize: "11px",
-                                                                        background: "#ffffff",
-                                                                        transition: "all 0.3s ease"
+                                                                        fontSize: "14px"
                                                                     },
                                                                     min: "0",
                                                                     step: "0.01"
@@ -2400,21 +2219,20 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem"
                                                                 },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
                                                                     value: linie.cotaTva,
                                                                     onChange: (e)=>updateLine(index, "cotaTva", parseFloat(e.target.value)),
+                                                                    disabled: isLoading,
                                                                     style: {
                                                                         width: "100%",
-                                                                        padding: "0.25rem",
-                                                                        border: "1px solid #e0e0e0",
+                                                                        padding: "0.5rem",
+                                                                        border: "1px solid #dee2e6",
                                                                         borderRadius: "4px",
                                                                         textAlign: "center",
-                                                                        fontSize: "11px",
-                                                                        background: "#ffffff",
-                                                                        transition: "all 0.3s ease"
+                                                                        fontSize: "14px"
                                                                     },
                                                                     children: [
                                                                         /*#__PURE__*/ jsx_runtime_.jsx("option", {
@@ -2442,37 +2260,32 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem",
                                                                     textAlign: "right",
-                                                                    fontSize: "11px",
-                                                                    fontWeight: "600",
+                                                                    fontSize: "14px",
+                                                                    fontWeight: "bold",
                                                                     color: "#27ae60"
                                                                 },
                                                                 children: safeFixed(total)
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid #e0e0e0",
+                                                                    border: "1px solid #dee2e6",
                                                                     padding: "0.5rem",
                                                                     textAlign: "center"
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                                                     onClick: ()=>removeLine(index),
-                                                                    disabled: liniiFactura.length === 1,
+                                                                    disabled: liniiFactura.length === 1 || isLoading,
                                                                     style: {
-                                                                        background: liniiFactura.length === 1 ? "#f8f9fa" : "#f8d7da",
-                                                                        color: liniiFactura.length === 1 ? "#6c757d" : "#721c24",
+                                                                        background: liniiFactura.length === 1 || isLoading ? "#bdc3c7" : "#e74c3c",
+                                                                        color: "white",
                                                                         border: "none",
                                                                         borderRadius: "4px",
-                                                                        width: "24px",
-                                                                        height: "24px",
-                                                                        cursor: liniiFactura.length === 1 ? "not-allowed" : "pointer",
-                                                                        fontSize: "10px",
-                                                                        transition: "all 0.3s ease",
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        justifyContent: "center"
+                                                                        padding: "0.5rem",
+                                                                        cursor: liniiFactura.length === 1 || isLoading ? "not-allowed" : "pointer",
+                                                                        fontSize: "12px"
                                                                     },
                                                                     title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
                                                                     children: "\uD83D\uDDD1️"
@@ -2490,16 +2303,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 display: "flex",
-                                justifyContent: "flex-end"
+                                justifyContent: "flex-end",
+                                marginBottom: "1rem"
                             },
                             children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                 style: {
                                     width: "300px",
-                                    background: "#e8f8e8",
+                                    background: "#f8f9fa",
                                     padding: "1rem",
-                                    borderRadius: "12px",
-                                    border: "1px solid #c3e6cb",
-                                    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.15)"
+                                    borderRadius: "6px",
+                                    border: "1px solid #dee2e6"
                                 },
                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
@@ -2512,7 +2325,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             style: {
                                                 display: "flex",
                                                 justifyContent: "space-between",
-                                                fontSize: "12px",
+                                                fontSize: "14px",
                                                 color: "#2c3e50"
                                             },
                                             children: [
@@ -2521,7 +2334,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                                     style: {
-                                                        fontWeight: "600"
+                                                        fontWeight: "bold"
                                                     },
                                                     children: [
                                                         totals.subtotal,
@@ -2534,7 +2347,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             style: {
                                                 display: "flex",
                                                 justifyContent: "space-between",
-                                                fontSize: "12px",
+                                                fontSize: "14px",
                                                 color: "#2c3e50"
                                             },
                                             children: [
@@ -2543,7 +2356,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 }),
                                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                                     style: {
-                                                        fontWeight: "600"
+                                                        fontWeight: "bold"
                                                     },
                                                     children: [
                                                         totals.totalTva,
@@ -2557,10 +2370,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 display: "flex",
                                                 justifyContent: "space-between",
                                                 fontSize: "16px",
-                                                fontWeight: "700",
+                                                fontWeight: "bold",
                                                 paddingTop: "0.5rem",
-                                                borderTop: "2px solid #28a745",
-                                                color: "#155724"
+                                                borderTop: "2px solid #27ae60",
+                                                color: "#27ae60"
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("span", {
@@ -2580,43 +2393,29 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "#ffffff",
-                                padding: "1rem",
-                                borderRadius: "12px",
-                                border: "1px solid #e0e0e0",
-                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)"
+                                marginBottom: "1.5rem"
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
                                     style: {
                                         display: "block",
-                                        fontSize: "12px",
-                                        fontWeight: "600",
-                                        color: "#2c3e50",
-                                        marginBottom: "0.5rem"
+                                        marginBottom: "0.5rem",
+                                        fontWeight: "bold",
+                                        color: "#2c3e50"
                                     },
-                                    children: /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                        style: {
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.5rem"
-                                        },
-                                        children: "\uD83D\uDCDD Observații (opțional)"
-                                    })
+                                    children: "\uD83D\uDCDD Observații (opțional)"
                                 }),
                                 /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
                                     value: observatii,
                                     onChange: (e)=>setObservatii(e.target.value),
+                                    disabled: isLoading,
                                     style: {
                                         width: "100%",
-                                        padding: "0.5rem",
-                                        border: "1px solid #e0e0e0",
-                                        borderRadius: "8px",
-                                        fontSize: "12px",
-                                        background: "#ffffff",
-                                        transition: "all 0.3s ease",
-                                        resize: "vertical",
-                                        boxSizing: "border-box"
+                                        padding: "0.75rem",
+                                        border: "1px solid #dee2e6",
+                                        borderRadius: "6px",
+                                        fontSize: "14px",
+                                        resize: "vertical"
                                     },
                                     rows: 2,
                                     placeholder: "Observații suplimentare pentru factură..."
@@ -2628,8 +2427,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
-                                paddingTop: "0.75rem",
-                                borderTop: "1px solid #e0e0e0"
+                                paddingTop: "1rem",
+                                borderTop: "1px solid #dee2e6"
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -2643,22 +2442,21 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         display: "flex",
-                                        gap: "0.5rem"
+                                        gap: "1rem"
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("button", {
                                             onClick: onClose,
                                             disabled: isLoading,
                                             style: {
-                                                background: "#f8f9fa",
-                                                color: "#6c757d",
-                                                border: "1px solid #e0e0e0",
-                                                borderRadius: "8px",
-                                                padding: "0.5rem 1rem",
-                                                fontSize: "12px",
-                                                fontWeight: "600",
+                                                padding: "0.75rem 1.5rem",
+                                                background: "#6c757d",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "6px",
                                                 cursor: isLoading ? "not-allowed" : "pointer",
-                                                transition: "all 0.3s ease"
+                                                fontSize: "14px",
+                                                fontWeight: "bold"
                                             },
                                             children: "Anulează"
                                         }),
@@ -2666,19 +2464,14 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             onClick: handleGenereazaFactura,
                                             disabled: isLoading || !clientInfo?.cui || !clientInfo?.denumire,
                                             style: {
-                                                background: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "#f8f9fa" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
-                                                color: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "#6c757d" : "white",
+                                                padding: "0.75rem 1.5rem",
+                                                background: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "#bdc3c7" : "#27ae60",
+                                                color: "white",
                                                 border: "none",
-                                                borderRadius: "8px",
-                                                padding: "0.5rem 1.5rem",
-                                                fontSize: "14px",
-                                                fontWeight: "700",
+                                                borderRadius: "6px",
                                                 cursor: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "not-allowed" : "pointer",
-                                                transition: "all 0.3s ease",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem",
-                                                boxShadow: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "none" : "0 4px 12px rgba(39, 174, 96, 0.4)"
+                                                fontSize: "14px",
+                                                fontWeight: "bold"
                                             },
                                             children: isLoading ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
                                                 children: [
