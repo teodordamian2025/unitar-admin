@@ -1124,142 +1124,32 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-            transform: 'scale(0.95)',
-            opacity: 0, // ✅ Start cu 0 pentru animație (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-            animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+          {/* ✅ Dropdown OPACITATE FIXATĂ COMPLET - ELIMINAT TOATE ANIMAȚIILE CARE RESETEAZĂ OPACITY */}
+          <div style={{
+            position: 'absolute' as const,
+            ...(dropdownPosition === 'bottom' 
+              ? { top: '100%', marginTop: '8px' }
+              : { bottom: '100%', marginBottom: '8px' }
+            ),
+            right: 0,
+            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC (LUAT DE LA DROPDOWN-UL CARE URCĂ)
+            opacity: 1, // ✅ OPACITATE 100% FIXĂ - FĂRĂ ANIMAȚII
+            borderRadius: '16px',
+            minWidth: '260px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)', // ✅ Shadow puternic pentru separare (LUAT DE LA DROPDOWN-UL CARE URCĂ)
+            border: '1px solid #e0e0e0', // ✅ Border solid pentru delimitare clară (LUAT DE LA DROPDOWN-UL CARE URCĂ)
+            zIndex: 10999,
+            overflow: 'hidden' as const,
+            transform: 'scale(1)' // ✅ SCALE STATIC - FĂRĂ ANIMAȚII
+            // ✅ ELIMINAT COMPLET: animation, transition, toate proprietățile care pot reseta opacity
           }}>
-            <style>
-              {`
-                @keyframes dropdownAppear {
-                  to {
-                    transform: scale(1);
-                    opacity: 1; /* ✅ FINAL opacity 100% COMPLETĂ (LUAT DE LA DROPDOWN-UL CARE URCĂ) */
-                  }
-                }
-              `}
-            </style>
+            {/* ✅ ELIMINAT COMPLET: @keyframes și style cu animații care resetează opacity */}
 
             {/* Header OPACITATE FIXATĂ COMPLET */}
             <div style={{
               padding: '1rem',
               borderBottom: '1px solid #e0e0e0', // ✅ Border solid gri (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-              background: '#f8f9fa', // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-            }}>
-              <div style={{ 
-                fontSize: '12px', 
-                fontWeight: '700',
-                color: '#2c3e50',
-                marginBottom: '0.5rem',
-                fontFamily: 'monospace'
-              }}>
-                {proiect.ID_Proiect}
-                {proiect.tip === 'subproiect' && (
-                  <span style={{ 
-                    marginLeft: '8px',
-                    fontSize: '10px',
-                    background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                    color: 'white',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    fontWeight: '600'
-                  }}>
-                    SUB
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
-                Status: <span style={{ 
-                  color: getStatusColor(proiect.Status),
-                  fontWeight: '600'
-                }}>
-                  {proiect.Status}
-                </span>
-              </div>
-            </div>
-
-            {/* Actions cu Glassmorphism OPACITATE FIXATĂ COMPLET */}
-            <div style={{ padding: '0.5rem 0' }}>
-              {actions.map((action) => {
-                if (action.divider) {
-                  return (
-                    <div
-                      key={action.key}
-                      style={{
-                        height: '1px',
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
-                        margin: '0.5rem 0'
-                      }}
-                    />
-                  );
-                }
-
-                return (
-                  <button
-                    key={action.key}
-                    onClick={() => handleActionClick(action.key)}
-                    disabled={action.disabled || loading === action.key}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      background: 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      color: action.disabled ? '#bdc3c7' : '#2c3e50',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      opacity: action.disabled ? 0.5 : 1,
-                      transition: 'all 0.3s ease',
-                      fontWeight: '500'
-                    }}
-                    onMouseOver={(e) => {
-                      if (!action.disabled && loading !== action.key) {
-                        e.currentTarget.style.background = `${getActionColor(action.color)}15`; // ✅ BACKGROUND SOLID cu transparență redusă (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-                        e.currentTarget.style.color = getActionColor(action.color);
-                        e.currentTarget.style.transform = 'translateX(4px)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = action.disabled ? '#bdc3c7' : '#2c3e50';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                    }}
-                  >
-                    <span style={{ 
-                      minWidth: '20px',
-                      fontSize: '16px'
-                    }}>
-                      {loading === action.key ? '⏳' : action.icon}
-                    </span>
-                    <span>
-                      {action.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>'scale(0.95)',
-            opacity: 0, // ✅ Start cu 0 pentru animație (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-            animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
-          }}>
-            <style>
-              {`
-                @keyframes dropdownAppear {
-                  to {
-                    transform: scale(1);
-                    opacity: 1; /* ✅ FINAL opacity 100% COMPLETĂ (LUAT DE LA DROPDOWN-UL CARE URCĂ) */
-                  }
-                }
-              `}
-            </style>
-
-            {/* Header OPACITATE FIXATĂ COMPLET */}
-            <div style={{
-              padding: '1rem',
-              borderBottom: '1px solid #e0e0e0', // ✅ Border solid gri (LUAT DE LA DROPDOWN-UL CARE URCĂ)
-              background: '#f8f9fa', // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC (LUAT DE LA DROPDOWN-UL CARE URCĂ)
+              background: '#f8f9fa' // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC (LUAT DE LA DROPDOWN-UL CARE URCĂ)
             }}>
               <div style={{ 
                 fontSize: '12px', 

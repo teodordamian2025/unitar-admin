@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced + OPACITATE FIXATĂ
+// CORECTAT: Syntaxă JSX Completă + Glassmorphism Premium + Design Compact + Toate Funcționalitățile
 // ==================================================================
 
 'use client';
@@ -67,34 +67,32 @@ declare global {
   }
 }
 
-// ✅ Toast system Glassmorphism Premium
+// ✅ Toast system Premium cu design solid
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
+    background: #ffffff;
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
-    border-radius: 16px;
+    border-radius: 12px;
     z-index: 16000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+    border: 1px solid #e0e0e0;
     max-width: 400px;
     word-wrap: break-word;
     transform: translateY(-10px);
     opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
   `;
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
-  // Smooth entrance animation
   setTimeout(() => {
     toastEl.style.transform = 'translateY(0)';
     toastEl.style.opacity = '1';
@@ -156,7 +154,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     loadSubproiecte();
   }, [proiect]);
 
-  // Funcțiile existente rămân neschimbate - doar stilizarea se modifică
   const loadClientFromDatabase = async () => {
     if (!proiect.Client) return;
     
@@ -365,7 +362,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     };
   };
 
-  // Funcțiile pentru PDF processing rămân neschimbate
   const loadPDFLibraries = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (window.jsPDF && window.html2canvas) {
@@ -647,9 +643,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   return (
     <div style={{
-      position: 'fixed' as const,
+      position: 'fixed',
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.6)', // ✅ Overlay puternic pentru blocare
+      background: 'rgba(0, 0, 0, 0.6)',
       backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
@@ -658,27 +654,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLEȚI OPAC
+        background: '#ffffff',
         borderRadius: '16px',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic pentru separare
-        border: '1px solid #d0d0d0', // ✅ Border solid pentru delimitare clară
-        position: 'relative' as const,
-        // ✅ ELIMINAT orice animație sau proprietate care poate afecta opacitatea
-        transform: 'scale(1)',
-        opacity: 1 // ✅ OPACITATE 100% - COMPLETĂ
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)',
+        border: '1px solid #d0d0d0',
+        position: 'relative'
       }}>
-        {/* Header SOLID pentru modal factură */}
+        {/* Header Modal */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '1.5rem',
-          borderBottom: '1px solid #e0e0e0', // ✅ Border solid
-          background: '#e3f2fd', // ✅ Background solid albastru deschis - COMPLET OPAC
+          borderBottom: '1px solid #e0e0e0',
+          background: '#e3f2fd',
           borderRadius: '16px 16px 0 0'
         }}>
           <div>
@@ -720,42 +713,30 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            onMouseOver={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }
-            }}
           >
             ✕
           </button>
         </div>
 
-        <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}> {/* ✅ COMPACTAT: padding redus de la 1.5rem la 0.75rem, gap redus de la 1.5rem la 0.75rem */}
-          {/* ✅ Loading Overlay Glassmorphism COMPLET OPAC */}
+        <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Loading Overlay */}
           {isLoading && (
             <div style={{
-              position: 'fixed' as const,
+              position: 'fixed',
               inset: '0',
-              background: 'rgba(0, 0, 0, 0.6)', // ✅ Background semi-transparent puternic
+              background: 'rgba(0, 0, 0, 0.6)',
               backdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 14000 // ✅ Peste modalul principal
+              zIndex: 14000
             }}>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLETĂ OPACITATE
+                background: '#ffffff',
                 padding: '2rem',
                 borderRadius: '20px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)', // ✅ Shadow puternic pentru separare
-                border: '1px solid #e0e0e0', // ✅ Border solid pentru delimitare
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+                border: '1px solid #e0e0e0',
                 textAlign: 'center'
               }}>
                 <div style={{
@@ -792,19 +773,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-          {/* ✅ Secțiune informații proiect Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Secțiune informații proiect - COMPACTAT */}
           <div style={{
-            background: '#f0f8ff', // ✅ BACKGROUND SOLID albastru foarte deschis - COMPLET OPAC
-            padding: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-            borderRadius: '12px', // ✅ COMPACTAT: redus de la 16px la 12px
-            border: '1px solid #cce7ff', // ✅ Border solid albastru deschis
-            boxShadow: '0 4px 12px rgba(52, 152, 219, 0.15)' // ✅ Shadow subtil
+            background: '#f0f8ff',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #cce7ff',
+            boxShadow: '0 4px 12px rgba(52, 152, 219, 0.15)'
           }}>
             <h3 style={{
-              fontSize: '16px', // ✅ COMPACTAT: redus de la 18px la 16px
+              fontSize: '16px',
               fontWeight: '600',
               color: '#2c3e50',
-              marginBottom: '0.75rem', // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
+              marginBottom: '0.75rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
@@ -813,46 +794,46 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </h3>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', // ✅ COMPACTAT: redus de la 250px la 200px
-              gap: '0.5rem' // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '0.5rem'
             }}>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+                background: '#ffffff',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
               }}>
                 <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID Proiect</div>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#2c3e50', marginTop: '0.25rem', fontFamily: 'monospace' }}>{proiect.ID_Proiect}</div>
               </div>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+                background: '#ffffff',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
               }}>
                 <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>{proiect.Status}</div>
               </div>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)', // ✅ Shadow subtil
+                background: '#ffffff',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
                 gridColumn: 'span 2'
               }}>
                 <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Denumire</div>
                 <div style={{ fontSize: '12px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiect.Denumire}</div>
               </div>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+                background: '#ffffff',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
               }}>
                 <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Estimată</div>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
@@ -860,11 +841,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 </div>
               </div>
               <div style={{
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+                background: '#ffffff',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e0e0e0',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
               }}>
                 <div style={{ fontSize: '10px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Perioada</div>
                 <div style={{ fontSize: '11px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>
@@ -873,21 +854,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* ✅ Secțiunea subproiecte Glassmorphism COMPLET OPAC - COMPACTAT */}
+            {/* Secțiunea subproiecte */}
             {subproiecteDisponibile.length > 0 && (
               <div style={{
-                marginTop: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-                paddingTop: '0.75rem', // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
-                borderTop: '1px solid #cce7ff' // ✅ Border solid albastru deschis
+                marginTop: '1rem',
+                paddingTop: '0.75rem',
+                borderTop: '1px solid #cce7ff'
               }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '0.5rem' // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                  marginBottom: '0.5rem'
                 }}>
                   <h4 style={{
-                    fontSize: '14px', // ✅ COMPACTAT: redus de la 16px la 14px
+                    fontSize: '14px',
                     fontWeight: '600',
                     color: '#2c3e50',
                     margin: 0,
@@ -903,9 +884,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      padding: '0.375rem 0.75rem', // ✅ COMPACTAT: redus de la 0.5rem 1rem la 0.375rem 0.75rem
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                      borderRadius: '8px',
+                      padding: '0.375rem 0.75rem',
+                      fontSize: '12px',
                       fontWeight: '600',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
@@ -913,14 +894,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       alignItems: 'center',
                       gap: '0.5rem',
                       boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
                     }}
                   >
                     {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
@@ -930,38 +903,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 {showSubproiecteSelector && (
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', // ✅ COMPACTAT: redus de la 300px la 250px
-                    gap: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
-                    maxHeight: '200px', // ✅ COMPACTAT: redus de la 300px la 200px
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                    gap: '0.5rem',
+                    maxHeight: '200px',
                     overflowY: 'auto',
-                    padding: '0.25rem' // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    padding: '0.25rem'
                   }}>
                     {subproiecteDisponibile.map((subproiect) => (
                       <div 
                         key={subproiect.ID_Subproiect} 
                         style={{
-                          background: subproiect.adaugat ? 
-                            '#e8f8e8' : '#ffffff', // ✅ BACKGROUND SOLID - verde foarte deschis sau alb - COMPLET OPAC
-                          border: subproiect.adaugat ? 
-                            '2px solid #4ade80' : '1px solid #e0e0e0', // ✅ Border solid
-                          borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                          padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
+                          background: subproiect.adaugat ? '#e8f8e8' : '#ffffff',
+                          border: subproiect.adaugat ? '2px solid #4ade80' : '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          padding: '0.75rem',
                           transition: 'all 0.3s ease',
-                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
-                        }}
-                        onMouseOver={(e) => {
-                          if (!subproiect.adaugat) {
-                            e.currentTarget.style.border = '2px solid #3498db';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (!subproiect.adaugat) {
-                            e.currentTarget.style.border = '1px solid #e0e0e0';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
-                          }
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
                         }}
                       >
                         <div style={{
@@ -971,19 +928,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                         }}>
                           <div style={{ flex: 1 }}>
                             <div style={{
-                              fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                              fontSize: '12px',
                               fontWeight: '600',
                               color: '#2c3e50',
-                              marginBottom: '0.25rem' // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                              marginBottom: '0.25rem'
                             }}>
                               📋 {subproiect.Denumire}
                             </div>
                             <div style={{
-                              fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                              fontSize: '10px',
                               color: '#7f8c8d',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '0.125rem' // ✅ COMPACTAT: redus de la 0.25rem la 0.125rem
+                              gap: '0.125rem'
                             }}>
                               <div>💰 Valoare: <span style={{ fontWeight: '600', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span></div>
                               <div>📊 Status: <span style={{ fontWeight: '600' }}>{subproiect.Status}</span></div>
@@ -993,30 +950,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             onClick={() => addSubproiectToFactura(subproiect)}
                             disabled={subproiect.adaugat}
                             style={{
-                              marginLeft: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                              padding: '0.375rem 0.75rem', // ✅ COMPACTAT: redus de la 0.5rem 1rem la 0.375rem 0.75rem
-                              borderRadius: '6px', // ✅ COMPACTAT: redus de la 8px la 6px
+                              marginLeft: '0.75rem',
+                              padding: '0.375rem 0.75rem',
+                              borderRadius: '6px',
                               border: 'none',
-                              fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                              fontSize: '10px',
                               fontWeight: '600',
                               cursor: subproiect.adaugat ? 'not-allowed' : 'pointer',
                               transition: 'all 0.3s ease',
-                              background: subproiect.adaugat ? 
-                                '#d4edda' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)', // ✅ BACKGROUND SOLID verde foarte deschis sau gradient
-                              color: subproiect.adaugat ? '#155724' : 'white', // ✅ CULORI SOLIDE
+                              background: subproiect.adaugat ? '#d4edda' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                              color: subproiect.adaugat ? '#155724' : 'white',
                               boxShadow: subproiect.adaugat ? 'none' : '0 2px 8px rgba(39, 174, 96, 0.3)'
-                            }}
-                            onMouseOver={(e) => {
-                              if (!subproiect.adaugat) {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
-                              }
-                            }}
-                            onMouseOut={(e) => {
-                              if (!subproiect.adaugat) {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(39, 174, 96, 0.3)';
-                              }
                             }}
                           >
                             {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
@@ -1030,22 +974,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* ✅ Secțiune Client Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Secțiune Client */}
           <div style={{
-            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-            padding: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-            borderRadius: '12px', // ✅ COMPACTAT: redus de la 16px la 12px
-            border: '1px solid #e0e0e0', // ✅ Border solid
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+            background: '#ffffff',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e0e0e0',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '0.75rem' // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
+              marginBottom: '0.75rem'
             }}>
               <h3 style={{
-                fontSize: '16px', // ✅ COMPACTAT: redus de la 18px la 16px
+                fontSize: '16px',
                 fontWeight: '600',
                 color: '#2c3e50',
                 margin: 0,
@@ -1063,50 +1007,29 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   onChange={(e) => setCuiInput(e.target.value)}
                   placeholder="Introduceți CUI (ex: RO12345678)"
                   style={{
-                    padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                    border: '1px solid #e0e0e0', // ✅ Border solid
-                    borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                    fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                    width: '180px', // ✅ COMPACTAT: redus de la 220px la 180px
-                    background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                    padding: '0.5rem',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    width: '180px',
+                    background: '#ffffff',
                     transition: 'all 0.3s ease'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.border = '2px solid #3498db';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.border = '1px solid #e0e0e0';
-                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
                 <button
                   onClick={handlePreluareDateANAF}
                   disabled={isLoadingANAF || !cuiInput.trim()}
                   style={{
-                    background: isLoadingANAF || !cuiInput.trim() ? 
-                      '#f8f9fa' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)', // ✅ BACKGROUND SOLID gri deschis sau gradient
-                    color: isLoadingANAF || !cuiInput.trim() ? '#6c757d' : 'white', // ✅ CULORI SOLIDE
+                    background: isLoadingANAF || !cuiInput.trim() ? '#f8f9fa' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                    color: isLoadingANAF || !cuiInput.trim() ? '#6c757d' : 'white',
                     border: 'none',
-                    borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                    padding: '0.5rem 0.75rem', // ✅ COMPACTAT: redus de la 0.75rem 1.25rem la 0.5rem 0.75rem
-                    fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '12px',
                     fontWeight: '600',
                     cursor: (isLoadingANAF || !cuiInput.trim()) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.3s ease',
                     boxShadow: (isLoadingANAF || !cuiInput.trim()) ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
-                  }}
-                  onMouseOver={(e) => {
-                    if (!isLoadingANAF && cuiInput.trim()) {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!isLoadingANAF && cuiInput.trim()) {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
-                    }
                   }}
                 >
                   {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
@@ -1116,11 +1039,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             
             {anafError && (
               <div style={{
-                background: '#f8d7da', // ✅ BACKGROUND SOLID roșu foarte deschis - COMPLET OPAC
-                border: '1px solid #f5c6cb', // ✅ Border solid roșu deschis
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                padding: '0.75rem', // ✅ COMPACTAT: redus de la 1rem la 0.75rem
-                marginBottom: '0.75rem' // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
+                background: '#f8d7da',
+                border: '1px solid #f5c6cb',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                marginBottom: '0.75rem'
               }}>
                 <p style={{ fontSize: '12px', color: '#721c24', margin: 0, fontWeight: '500' }}>❌ {anafError}</p>
               </div>
@@ -1129,16 +1052,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             {clientInfo && (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', // ✅ COMPACTAT: redus de la 250px la 200px
-                gap: '0.5rem' // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '0.5rem'
               }}>
                 <div>
                   <label style={{
                     display: 'block',
-                    fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                    fontSize: '10px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -1150,11 +1073,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
                     style={{
                       width: '100%',
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: '#ffffff',
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1164,10 +1087,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div>
                   <label style={{
                     display: 'block',
-                    fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                    fontSize: '10px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -1179,11 +1102,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
                     style={{
                       width: '100%',
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: '#ffffff',
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1193,10 +1116,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div>
                   <label style={{
                     display: 'block',
-                    fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                    fontSize: '10px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -1208,11 +1131,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
                     style={{
                       width: '100%',
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: '#ffffff',
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1221,10 +1144,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div>
                   <label style={{
                     display: 'block',
-                    fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                    fontSize: '10px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -1236,11 +1159,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
                     style={{
                       width: '100%',
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: '#ffffff',
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1249,10 +1172,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={{
                     display: 'block',
-                    fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                    fontSize: '10px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
+                    marginBottom: '0.25rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
@@ -1264,11 +1187,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
                     style={{
                       width: '100%',
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      background: '#ffffff',
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1280,24 +1203,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   <div style={{ gridColumn: 'span 2', display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                     {clientInfo.status && (
                       <span style={{
-                        padding: '0.25rem 0.5rem', // ✅ COMPACTAT: redus de la 0.5rem 1rem la 0.25rem 0.5rem
-                        borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                        fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '8px',
+                        fontSize: '10px',
                         fontWeight: '600',
-                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da', // ✅ BACKGROUND SOLID - verde sau roșu foarte deschis
-                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24' // ✅ CULORI SOLIDE
+                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da',
+                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24'
                       }}>
                         Status ANAF: {clientInfo.status}
                       </span>
                     )}
                     {clientInfo.platitorTva && (
                       <span style={{
-                        padding: '0.25rem 0.5rem', // ✅ COMPACTAT: redus de la 0.5rem 1rem la 0.25rem 0.5rem
-                        borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                        fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '8px',
+                        fontSize: '10px',
                         fontWeight: '600',
-                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd', // ✅ BACKGROUND SOLID - albastru sau galben foarte deschis
-                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404' // ✅ CULORI SOLIDE
+                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd',
+                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404'
                       }}>
                         TVA: {clientInfo.platitorTva}
                       </span>
@@ -1308,77 +1231,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 {clientInfo.id && (
                   <div style={{ gridColumn: 'span 2' }}>
                     <div style={{
-                      background: '#d4edda', // ✅ BACKGROUND SOLID verde foarte deschis - COMPLET OPAC
-                      border: '1px solid #c3e6cb', // ✅ Border solid verde deschis
-                      borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
-                      fontSize: '10px' // ✅ COMPACTAT: redus de la 12px la 10px
-                    }}>
-                      ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>px'
-                  }}>
-                    Adresa *
-                  </label>
-                  <input
-                    type="text"
-                    value={clientInfo.adresa}
-                    onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                      transition: 'all 0.3s ease',
-                      boxSizing: 'border-box'
-                    }}
-                    required
-                  />
-                </div>
-                
-                {(clientInfo.status || clientInfo.platitorTva) && (
-                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                    {clientInfo.status && (
-                      <span style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da', // ✅ BACKGROUND SOLID - verde sau roșu foarte deschis
-                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24' // ✅ CULORI SOLIDE
-                      }}>
-                        Status ANAF: {clientInfo.status}
-                      </span>
-                    )}
-                    {clientInfo.platitorTva && (
-                      <span style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd', // ✅ BACKGROUND SOLID - albastru sau galben foarte deschis
-                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404' // ✅ CULORI SOLIDE
-                      }}>
-                        TVA: {clientInfo.platitorTva}
-                      </span>
-                    )}
-                  </div>
-                )}
-                
-                {clientInfo.id && (
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <div style={{
-                      background: '#d4edda', // ✅ BACKGROUND SOLID verde foarte deschis - COMPLET OPAC
-                      border: '1px solid #c3e6cb', // ✅ Border solid verde deschis
-                      borderRadius: '12px',
-                      padding: '1rem',
-                      fontSize: '12px'
+                      background: '#d4edda',
+                      border: '1px solid #c3e6cb',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      fontSize: '10px'
                     }}>
                       ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
                     </div>
@@ -1388,22 +1245,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* ✅ Secțiune Servicii/Produse Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Secțiune Servicii/Produse */}
           <div style={{
-            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-            padding: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-            borderRadius: '12px', // ✅ COMPACTAT: redus de la 16px la 12px
-            border: '1px solid #e0e0e0', // ✅ Border solid
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+            background: '#ffffff',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e0e0e0',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '0.75rem' // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
+              marginBottom: '0.75rem'
             }}>
               <h3 style={{
-                fontSize: '16px', // ✅ COMPACTAT: redus de la 18px la 16px
+                fontSize: '16px',
                 fontWeight: '600',
                 color: '#2c3e50',
                 margin: 0,
@@ -1419,21 +1276,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                  padding: '0.5rem 0.75rem', // ✅ COMPACTAT: redus de la 0.75rem 1.25rem la 0.5rem 0.75rem
-                  fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '12px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.3s ease',
                   boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
                 }}
               >
                 + Adaugă linie
@@ -1444,74 +1293,72 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
-                fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+                fontSize: '12px',
+                background: '#ffffff',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
               }}>
                 <thead>
-                  <tr style={{
-                    background: '#f8f9fa' // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC
-                  }}>
+                  <tr style={{ background: '#f8f9fa' }}>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'left',
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>Denumire serviciu/produs *</th>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'center',
-                      width: '60px', // ✅ COMPACTAT: redus de la 80px la 60px
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      width: '60px',
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>Cant.</th>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'center',
-                      width: '100px', // ✅ COMPACTAT: redus de la 130px la 100px
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      width: '100px',
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>Preț unit. (RON)</th>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'center',
-                      width: '60px', // ✅ COMPACTAT: redus de la 80px la 60px
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      width: '60px',
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>TVA %</th>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'center',
-                      width: '100px', // ✅ COMPACTAT: redus de la 130px la 100px
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      width: '100px',
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px'
                     }}>Total (RON)</th>
                     <th style={{
-                      border: '1px solid #e0e0e0', // ✅ Border solid
-                      padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+                      border: '1px solid #e0e0e0',
+                      padding: '0.5rem',
                       textAlign: 'center',
-                      width: '40px', // ✅ COMPACTAT: redus de la 60px la 40px
-                      fontSize: '10px', // ✅ COMPACTAT: redus de la 12px la 10px
+                      width: '40px',
+                      fontSize: '10px',
                       fontWeight: '700',
                       color: '#2c3e50',
                       textTransform: 'uppercase',
@@ -1533,173 +1380,42 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     
                     return (
                       <tr key={index} style={{
-                        background: linie.tip === 'subproiect' ? 
-                          '#f0f8ff' : // ✅ BACKGROUND SOLID albastru foarte deschis pentru subproiecte - COMPLET OPAC
-                          index % 2 === 0 ? '#ffffff' : '#f8f9fa', // ✅ BACKGROUND SOLID alb sau gri foarte deschis - COMPLET OPAC
+                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? '#ffffff' : '#f8f9fa',
                         transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#e6f3ff'; // ✅ BACKGROUND SOLID albastru foarte foarte deschis - COMPLET OPAC
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = linie.tip === 'subproiect' ? 
-                          '#f0f8ff' : 
-                          index % 2 === 0 ? '#ffffff' : '#f8f9fa';
-                      }}
-                      >
+                      }}>
                         <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem' // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem' // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
-                          }}>
-                            {linie.tip === 'subproiect' && (
-                              <span style={{
-                                background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                                color: 'white',
-                                padding: '0.125rem 0.25rem', // ✅ COMPACTAT: redus de la 0.25rem 0.5rem la 0.125rem 0.25rem
-                                borderRadius: '4px', // ✅ COMPACTAT: redus de la 6px la 4px
-                                fontSize: '8px', // ✅ COMPACTAT: redus de la 10px la 8px
-                                fontWeight: '700'
-                              }}>
-                                SUB
-                              </span>
-                            )}
-                            <input
-                              type="text"
-                              value={linie.denumire}
-                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
-                              style={{
-                                flex: 1,
-                                padding: '0.375rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.375rem
-                                border: '1px solid #e0e0e0', // ✅ Border solid
-                                borderRadius: '6px', // ✅ COMPACTAT: redus de la 8px la 6px
-                                fontSize: '11px', // ✅ COMPACTAT: redus de la 14px la 11px
-                                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                                transition: 'all 0.3s ease'
-                              }}
-                              placeholder="Descrierea serviciului sau produsului..."
-                              required
-                            />
-                          </div>
-                        </td>
-                        <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem' // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                        }}>
-                          <input
-                            type="number"
-                            value={linie.cantitate}
-                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
-                            style={{
-                              width: '100%',
-                              padding: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
-                              border: '1px solid #e0e0e0', // ✅ Border solid
-                              borderRadius: '4px', // ✅ COMPACTAT: redus de la 8px la 4px
-                              textAlign: 'center',
-                              fontSize: '11px', // ✅ COMPACTAT: redus de la 14px la 11px
-                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                              transition: 'all 0.3s ease'
-                            }}
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem' // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                        }}>
-                          <input
-                            type="number"
-                            value={linie.pretUnitar}
-                            onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
-                            style={{
-                              width: '100%',
-                              padding: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
-                              border: '1px solid #e0e0e0', // ✅ Border solid
-                              borderRadius: '4px', // ✅ COMPACTAT: redus de la 8px la 4px
-                              textAlign: 'right',
-                              fontSize: '11px', // ✅ COMPACTAT: redus de la 14px la 11px
-                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                              transition: 'all 0.3s ease'
-                            }}
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem' // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
-                        }}>
-                          <select
-                            value={linie.cotaTva}
-                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
-                            style={{
-                              width: '100%',
-                              padding: '0.25rem', // ✅ COMPACTAT: redus de la 0.5rem la 0.25rem
-                              border: '1px solid #e0e0e0', // ✅ Border solid
-                              borderRadius: '4px', // ✅ COMPACTAT: redus de la 8px la 4px
-                              textAlign: 'center',
-                              fontSize: '11px', // ✅ COMPACTAT: redus de la 14px la 11px
-                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-                              transition: 'all 0.3s ease'
-                            }}
-                          >
-                            <option value={0}>0%</option>
-                            <option value={5}>5%</option>
-                            <option value={9}>9%</option>
-                            <option value={19}>19%</option>
-                            <option value={21}>21%</option>
-                          </select>
-                        </td>
-                        <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
+                          border: '1px solid #e0e0e0',
+                          padding: '0.5rem',
                           textAlign: 'right',
-                          fontSize: '11px', // ✅ COMPACTAT: redus de la 14px la 11px
+                          fontSize: '11px',
                           fontWeight: '600',
                           color: '#27ae60'
                         }}>
                           {safeFixed(total)}
                         </td>
                         <td style={{
-                          border: '1px solid #e0e0e0', // ✅ Border solid
-                          padding: '0.5rem', // ✅ COMPACTAT: redus de la 0.75rem la 0.5rem
+                          border: '1px solid #e0e0e0',
+                          padding: '0.5rem',
                           textAlign: 'center'
                         }}>
                           <button
                             onClick={() => removeLine(index)}
                             disabled={liniiFactura.length === 1}
                             style={{
-                              background: liniiFactura.length === 1 ? '#f8f9fa' : '#f8d7da', // ✅ BACKGROUND SOLID gri sau roșu foarte deschis - COMPLET OPAC
-                              color: liniiFactura.length === 1 ? '#6c757d' : '#721c24', // ✅ CULORI SOLIDE
+                              background: liniiFactura.length === 1 ? '#f8f9fa' : '#f8d7da',
+                              color: liniiFactura.length === 1 ? '#6c757d' : '#721c24',
                               border: 'none',
-                              borderRadius: '4px', // ✅ COMPACTAT: redus de la 8px la 4px
-                              width: '24px', // ✅ COMPACTAT: redus de la 32px la 24px
-                              height: '24px', // ✅ COMPACTAT: redus de la 32px la 24px
+                              borderRadius: '4px',
+                              width: '24px',
+                              height: '24px',
                               cursor: liniiFactura.length === 1 ? 'not-allowed' : 'pointer',
-                              fontSize: '10px', // ✅ COMPACTAT: redus de la 14px la 10px
+                              fontSize: '10px',
                               transition: 'all 0.3s ease',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center'
                             }}
                             title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
-                            onMouseOver={(e) => {
-                              if (liniiFactura.length > 1) {
-                                e.currentTarget.style.background = '#f5c6cb'; // ✅ BACKGROUND SOLID roșu deschis - COMPLET OPAC
-                                e.currentTarget.style.transform = 'scale(1.1)';
-                              }
-                            }}
-                            onMouseOut={(e) => {
-                              if (liniiFactura.length > 1) {
-                                e.currentTarget.style.background = '#f8d7da';
-                                e.currentTarget.style.transform = 'scale(1)';
-                              }
-                            }}
                           >
                             🗑️
                           </button>
@@ -1712,21 +1428,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ Secțiune Totaluri Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Secțiune Totaluri */}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div style={{
-              width: '300px', // ✅ COMPACTAT: redus de la 400px la 300px
-              background: '#e8f8e8', // ✅ BACKGROUND SOLID verde foarte deschis - COMPLET OPAC
-              padding: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-              borderRadius: '12px', // ✅ COMPACTAT: redus de la 16px la 12px
-              border: '1px solid #c3e6cb', // ✅ Border solid verde deschis
-              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.15)' // ✅ Shadow subtil verde
+              width: '300px',
+              background: '#e8f8e8',
+              padding: '1rem',
+              borderRadius: '12px',
+              border: '1px solid #c3e6cb',
+              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.15)'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}> {/* ✅ COMPACTAT: redus de la 1rem la 0.5rem */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                  fontSize: '12px',
                   color: '#2c3e50'
                 }}>
                   <span>Subtotal (fără TVA):</span>
@@ -1735,7 +1451,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                  fontSize: '12px',
                   color: '#2c3e50'
                 }}>
                   <span>TVA:</span>
@@ -1744,11 +1460,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '16px', // ✅ COMPACTAT: redus de la 18px la 16px
+                  fontSize: '16px',
                   fontWeight: '700',
-                  paddingTop: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
-                  borderTop: '2px solid #28a745', // ✅ Border solid verde
-                  color: '#155724' // ✅ CULOARE SOLIDĂ verde închis
+                  paddingTop: '0.5rem',
+                  borderTop: '2px solid #28a745',
+                  color: '#155724'
                 }}>
                   <span>TOTAL DE PLATĂ:</span>
                   <span>{totals.totalGeneral} RON</span>
@@ -1757,20 +1473,20 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ Secțiune Observații Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Secțiune Observații */}
           <div style={{
-            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
-            padding: '1rem', // ✅ COMPACTAT: redus de la 2rem la 1rem
-            borderRadius: '12px', // ✅ COMPACTAT: redus de la 16px la 12px
-            border: '1px solid #e0e0e0', // ✅ Border solid
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
+            background: '#ffffff',
+            padding: '1rem',
+            borderRadius: '12px',
+            border: '1px solid #e0e0e0',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
           }}>
             <label style={{
               display: 'block',
-              fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+              fontSize: '12px',
               fontWeight: '600',
               color: '#2c3e50',
-              marginBottom: '0.5rem' // ✅ COMPACTAT: redus de la 1rem la 0.5rem
+              marginBottom: '0.5rem'
             }}>
               <span style={{
                 display: 'flex',
@@ -1785,62 +1501,54 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               onChange={(e) => setObservatii(e.target.value)}
               style={{
                 width: '100%',
-                padding: '0.5rem', // ✅ COMPACTAT: redus de la 1rem la 0.5rem
-                border: '1px solid #e0e0e0', // ✅ Border solid
-                borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
-                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                padding: '0.5rem',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                fontSize: '12px',
+                background: '#ffffff',
                 transition: 'all 0.3s ease',
                 resize: 'vertical',
                 boxSizing: 'border-box'
               }}
-              rows={2} // ✅ COMPACTAT: redus de la 3 la 2
+              rows={2}
               placeholder="Observații suplimentare pentru factură..."
-              onFocus={(e) => {
-                e.currentTarget.style.border = '2px solid #3498db';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid #e0e0e0';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
             />
           </div>
 
-          {/* ✅ Footer Buttons Glassmorphism COMPLET OPAC - COMPACTAT */}
+          {/* Footer Buttons */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingTop: '0.75rem', // ✅ COMPACTAT: redus de la 1.5rem la 0.75rem
-            borderTop: '1px solid #e0e0e0' // ✅ Border solid
+            paddingTop: '0.75rem',
+            borderTop: '1px solid #e0e0e0'
           }}>
             <div style={{
-              fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+              fontSize: '12px',
               color: '#7f8c8d',
               fontWeight: '500'
             }}>
               ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură.
             </div>
             
-            <div style={{ display: 'flex', gap: '0.5rem' }}> {/* ✅ COMPACTAT: redus de la 1rem la 0.5rem */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 onClick={onClose}
                 disabled={isLoading}
                 style={{
-                  background: '#f8f9fa', // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC
-                  color: '#6c757d', // ✅ CULOARE SOLIDĂ gri
-                  border: '1px solid #e0e0e0', // ✅ Border solid
-                  borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                  padding: '0.5rem 1rem', // ✅ COMPACTAT: redus de la 0.75rem 1.5rem la 0.5rem 1rem
-                  fontSize: '12px', // ✅ COMPACTAT: redus de la 14px la 12px
+                  background: '#f8f9fa',
+                  color: '#6c757d',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem',
+                  fontSize: '12px',
                   fontWeight: '600',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s ease'
                 }}
                 onMouseOver={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.background = '#e9ecef'; // ✅ BACKGROUND SOLID gri deschis - COMPLET OPAC
+                    e.currentTarget.style.background = '#e9ecef';
                     e.currentTarget.style.transform = 'translateY(-2px)';
                   }
                 }}
@@ -1858,12 +1566,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
                 style={{
                   background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 
-                    '#f8f9fa' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)', // ✅ BACKGROUND SOLID gri deschis sau gradient
-                  color: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#6c757d' : 'white', // ✅ CULORI SOLIDE
+                    '#f8f9fa' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                  color: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#6c757d' : 'white',
                   border: 'none',
-                  borderRadius: '8px', // ✅ COMPACTAT: redus de la 12px la 8px
-                  padding: '0.5rem 1.5rem', // ✅ COMPACTAT: redus de la 0.75rem 2rem la 0.5rem 1.5rem
-                  fontSize: '14px', // ✅ COMPACTAT: redus de la 16px la 14px
+                  borderRadius: '8px',
+                  padding: '0.5rem 1.5rem',
+                  fontSize: '14px',
                   fontWeight: '700',
                   cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s ease',
