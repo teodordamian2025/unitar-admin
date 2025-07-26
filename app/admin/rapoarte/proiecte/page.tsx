@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/page.tsx
-// MODIFICAT: Glassmorphism Premium Layout + Z-index Management + Enhanced UX + TypeScript Fix
+// MODIFICAT: Z-index Management Universal + Backdrop Intensity Control
 // ==================================================================
 
 'use client';
@@ -85,9 +85,11 @@ export default function ProiectePage() {
       padding: '2rem',
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      position: 'relative' as const
+      position: 'relative' as const,
+      // ✅ Z-index de bază redus pentru a face loc modalelor
+      zIndex: 1
     }}>
-      {/* ✅ Background Pattern Glassmorphism */}
+      {/* ✅ Background Pattern Glassmorphism - Opacity redusă */}
       <div style={{
         position: 'absolute' as const,
         top: 0,
@@ -95,27 +97,36 @@ export default function ProiectePage() {
         right: 0,
         bottom: 0,
         background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%)
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%)
         `,
         pointerEvents: 'none' as const,
-        zIndex: 1
+        // ✅ Z-index foarte jos pentru background
+        zIndex: 0
       }} />
 
-      <div style={{ position: 'relative' as const, zIndex: 2 }}>
-        {/* ✅ Header Glassmorphism Premium */}
+      <div style={{ 
+        position: 'relative' as const, 
+        // ✅ Z-index moderat pentru conținut
+        zIndex: 1
+      }}>
+        {/* ✅ Header Glassmorphism Premium - Backdrop redus */}
         <div style={{ 
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '2rem',
           padding: '2rem',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          // ✅ Backdrop-filter redus pentru a nu concura cu modalele
+          backdropFilter: 'blur(8px)',
           borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          // ✅ Z-index specific pentru header
+          position: 'relative' as const,
+          zIndex: 10
         }}>
           <div>
             <h1 style={{ 
@@ -140,7 +151,7 @@ export default function ProiectePage() {
             </p>
           </div>
           
-          {/* ✅ Butonul Proiect Nou - Glassmorphism Premium */}
+          {/* ✅ Butonul Proiect Nou - Z-index optimizat */}
           <button
             onClick={() => setShowProiectModal(true)}
             style={{
@@ -152,18 +163,20 @@ export default function ProiectePage() {
               cursor: 'pointer',
               fontSize: '16px',
               fontWeight: '700',
-              boxShadow: '0 8px 24px rgba(39, 174, 96, 0.4)',
+              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               position: 'relative' as const,
-              overflow: 'hidden' as const
+              overflow: 'hidden' as const,
+              // ✅ Z-index pentru buton
+              zIndex: 11
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-              e.currentTarget.style.boxShadow = '0 12px 32px rgba(39, 174, 96, 0.5)';
+              e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(39, 174, 96, 0.4)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0) scale(1)';
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(39, 174, 96, 0.4)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
             }}
           >
             <span style={{ position: 'relative' as const, zIndex: 1 }}>+ Proiect Nou</span>
@@ -179,15 +192,19 @@ export default function ProiectePage() {
           </button>
         </div>
 
-        {/* ✅ Filtre Glassmorphism */}
+        {/* ✅ Filtre Glassmorphism - Backdrop redus */}
         <div style={{ 
           marginBottom: '2rem',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          // ✅ Backdrop-filter redus
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: '20px',
           padding: '2rem',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          // ✅ Z-index pentru filtre
+          position: 'relative' as const,
+          zIndex: 10
         }}>
           <Suspense fallback={
             <div style={{ 
@@ -226,15 +243,19 @@ export default function ProiectePage() {
           </Suspense>
         </div>
 
-        {/* ✅ Tabel Glassmorphism */}
+        {/* ✅ Tabel Glassmorphism - Backdrop redus */}
         <div style={{ 
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          // ✅ Backdrop-filter redus
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: '20px',
           overflow: 'hidden' as const,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          marginBottom: '2rem'
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          marginBottom: '2rem',
+          // ✅ Z-index pentru tabel
+          position: 'relative' as const,
+          zIndex: 10
         }}>
           <Suspense fallback={
             <div style={{ 
@@ -263,15 +284,19 @@ export default function ProiectePage() {
           </Suspense>
         </div>
 
-        {/* ✅ Footer Info Glassmorphism */}
+        {/* ✅ Footer Info Glassmorphism - Backdrop redus */}
         <div style={{ 
           padding: '1.5rem',
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(255, 255, 255, 0.75)',
+          // ✅ Backdrop-filter redus
+          backdropFilter: 'blur(6px)',
           borderRadius: '16px',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center' as const
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          textAlign: 'center' as const,
+          // ✅ Z-index pentru footer
+          position: 'relative' as const,
+          zIndex: 10
         }}>
           <p style={{ 
             margin: 0, 
@@ -288,9 +313,13 @@ export default function ProiectePage() {
           </p>
         </div>
 
-        {/* ✅ Modal Proiect Nou cu Z-index Management */}
+        {/* ✅ Modal Proiect Nou cu Z-index Management Universal */}
         {showProiectModal && (
-          <div style={{ zIndex: 11000 }}>
+          <div style={{ 
+            // ✅ Z-index foarte înalt pentru toate modalele
+            zIndex: 50000,
+            position: 'relative' as const
+          }}>
             <ProiectNouModal
               isOpen={showProiectModal}
               onClose={() => setShowProiectModal(false)}
@@ -299,6 +328,80 @@ export default function ProiectePage() {
           </div>
         )}
       </div>
+
+      {/* ✅ CSS Global pentru Z-index Management Universal */}
+      <style jsx global>{`
+        /* Z-index Management Universal pentru toate modalele și dropdown-urile */
+        
+        /* Modalele principale (FacturaHibridModal, ProiectNouModal, etc.) */
+        [data-modal="true"],
+        .modal-overlay,
+        .modal-container,
+        div[style*="position: fixed"]:not([data-background]) {
+          z-index: 50000 !important;
+        }
+        
+        /* Dropdown-uri și meniuri contextuale */
+        [data-dropdown="true"],
+        .dropdown-menu,
+        .actions-dropdown,
+        div[style*="position: absolute"][style*="background"]:not([data-background]) {
+          z-index: 40000 !important;
+        }
+        
+        /* Toast-uri și notificări */
+        .toast,
+        .notification,
+        [data-toast="true"] {
+          z-index: 60000 !important;
+        }
+        
+        /* Loading overlays */
+        .loading-overlay,
+        [data-loading="true"] {
+          z-index: 45000 !important;
+        }
+        
+        /* Tooltips */
+        .tooltip,
+        [data-tooltip="true"] {
+          z-index: 35000 !important;
+        }
+        
+        /* Backdrop overlay pentru modalele active */
+        .modal-backdrop {
+          z-index: 49000 !important;
+          background: rgba(0, 0, 0, 0.5) !important;
+          backdrop-filter: blur(2px) !important;
+        }
+        
+        /* Asigură că elementele din pagina principală rămân în spate */
+        .main-content,
+        .page-container,
+        .glassmorphism-container {
+          z-index: 1 !important;
+          position: relative;
+        }
+        
+        /* Fix pentru select-uri și input-uri în modale */
+        .modal-container select,
+        .modal-container input,
+        .modal-container textarea,
+        .modal-container button {
+          z-index: inherit !important;
+        }
+        
+        /* Fix pentru react-select în modale */
+        .react-select__menu {
+          z-index: 51000 !important;
+        }
+        
+        /* Fix pentru dropdowns în interiorul modalelor */
+        .modal-container .dropdown-menu,
+        .modal-container .actions-dropdown {
+          z-index: 51000 !important;
+        }
+      `}</style>
     </div>
   );
 }

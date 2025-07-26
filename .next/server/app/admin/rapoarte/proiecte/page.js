@@ -433,6 +433,9 @@ __webpack_require__.d(__webpack_exports__, {
 
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental/jsx-runtime"
 var jsx_runtime_ = __webpack_require__(76931);
+// EXTERNAL MODULE: ./node_modules/styled-jsx/style.js
+var style = __webpack_require__(86369);
+var style_default = /*#__PURE__*/__webpack_require__.n(style);
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
 var react_experimental_ = __webpack_require__(17640);
 var react_experimental_default = /*#__PURE__*/__webpack_require__.n(react_experimental_);
@@ -5816,9 +5819,10 @@ function ProiecteTable({ searchParams }) {
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/page.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/page.tsx
-// MODIFICAT: Glassmorphism Premium Layout + Z-index Management + Enhanced UX + TypeScript Fix
+// MODIFICAT: Z-index Management Universal + Backdrop Intensity Control
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 
 
@@ -5874,8 +5878,11 @@ function ProiectePage() {
             padding: "2rem",
             minHeight: "100vh",
             background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            position: "relative"
+            position: "relative",
+            // ✅ Z-index de bază redus pentru a face loc modalelor
+            zIndex: 1
         },
+        className: "jsx-b9d82393daaeb258",
         children: [
             /*#__PURE__*/ jsx_runtime_.jsx("div", {
                 style: {
@@ -5885,19 +5892,23 @@ function ProiectePage() {
                     right: 0,
                     bottom: 0,
                     background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%)
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%)
         `,
                     pointerEvents: "none",
-                    zIndex: 1
-                }
+                    // ✅ Z-index foarte jos pentru background
+                    zIndex: 0
+                },
+                className: "jsx-b9d82393daaeb258"
             }),
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
                     position: "relative",
-                    zIndex: 2
+                    // ✅ Z-index moderat pentru conținut
+                    zIndex: 1
                 },
+                className: "jsx-b9d82393daaeb258",
                 children: [
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
@@ -5906,14 +5917,20 @@ function ProiectePage() {
                             alignItems: "center",
                             marginBottom: "2rem",
                             padding: "2rem",
-                            background: "rgba(255, 255, 255, 0.95)",
-                            backdropFilter: "blur(20px)",
+                            background: "rgba(255, 255, 255, 0.85)",
+                            // ✅ Backdrop-filter redus pentru a nu concura cu modalele
+                            backdropFilter: "blur(8px)",
                             borderRadius: "20px",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
+                            border: "1px solid rgba(255, 255, 255, 0.3)",
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+                            // ✅ Z-index specific pentru header
+                            position: "relative",
+                            zIndex: 10
                         },
+                        className: "jsx-b9d82393daaeb258",
                         children: [
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                className: "jsx-b9d82393daaeb258",
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("h1", {
                                         style: {
@@ -5926,6 +5943,7 @@ function ProiectePage() {
                                             WebkitBackgroundClip: "text",
                                             WebkitTextFillColor: "transparent"
                                         },
+                                        className: "jsx-b9d82393daaeb258",
                                         children: "\uD83D\uDCCB Management Proiecte"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("p", {
@@ -5935,6 +5953,7 @@ function ProiectePage() {
                                             fontSize: "1.1rem",
                                             fontWeight: "500"
                                         },
+                                        className: "jsx-b9d82393daaeb258",
                                         children: "Gestionează și monitorizează toate proiectele din portofoliu"
                                     })
                                 ]
@@ -5950,25 +5969,29 @@ function ProiectePage() {
                                     cursor: "pointer",
                                     fontSize: "16px",
                                     fontWeight: "700",
-                                    boxShadow: "0 8px 24px rgba(39, 174, 96, 0.4)",
+                                    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.3)",
                                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                                     position: "relative",
-                                    overflow: "hidden"
+                                    overflow: "hidden",
+                                    // ✅ Z-index pentru buton
+                                    zIndex: 11
                                 },
                                 onMouseOver: (e)=>{
-                                    e.currentTarget.style.transform = "translateY(-4px) scale(1.02)";
-                                    e.currentTarget.style.boxShadow = "0 12px 32px rgba(39, 174, 96, 0.5)";
+                                    e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(39, 174, 96, 0.4)";
                                 },
                                 onMouseOut: (e)=>{
                                     e.currentTarget.style.transform = "translateY(0) scale(1)";
-                                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(39, 174, 96, 0.4)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(39, 174, 96, 0.3)";
                                 },
+                                className: "jsx-b9d82393daaeb258",
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                         style: {
                                             position: "relative",
                                             zIndex: 1
                                         },
+                                        className: "jsx-b9d82393daaeb258",
                                         children: "+ Proiect Nou"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -5980,7 +6003,8 @@ function ProiectePage() {
                                             height: "100%",
                                             background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)",
                                             transition: "left 0.5s ease"
-                                        }
+                                        },
+                                        className: "jsx-b9d82393daaeb258"
                                     })
                                 ]
                             })
@@ -5989,13 +6013,18 @@ function ProiectePage() {
                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
                             marginBottom: "2rem",
-                            background: "rgba(255, 255, 255, 0.95)",
-                            backdropFilter: "blur(20px)",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            background: "rgba(255, 255, 255, 0.85)",
+                            // ✅ Backdrop-filter redus
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255, 255, 255, 0.3)",
                             borderRadius: "20px",
                             padding: "2rem",
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+                            // ✅ Z-index pentru filtre
+                            position: "relative",
+                            zIndex: 10
                         },
+                        className: "jsx-b9d82393daaeb258",
                         children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
                             fallback: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
@@ -6007,6 +6036,7 @@ function ProiectePage() {
                                     justifyContent: "center",
                                     gap: "1rem"
                                 },
+                                className: "jsx-b9d82393daaeb258",
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
@@ -6016,13 +6046,15 @@ function ProiectePage() {
                                             border: "3px solid #3498db",
                                             borderTop: "3px solid transparent",
                                             animation: "spin 1s linear infinite"
-                                        }
+                                        },
+                                        className: "jsx-b9d82393daaeb258"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                         style: {
                                             fontSize: "16px",
                                             fontWeight: "500"
                                         },
+                                        className: "jsx-b9d82393daaeb258",
                                         children: "⏳ Se \xeencarcă filtrele..."
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("style", {
@@ -6044,14 +6076,19 @@ function ProiectePage() {
                     }),
                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
-                            background: "rgba(255, 255, 255, 0.95)",
-                            backdropFilter: "blur(20px)",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            background: "rgba(255, 255, 255, 0.85)",
+                            // ✅ Backdrop-filter redus
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255, 255, 255, 0.3)",
                             borderRadius: "20px",
                             overflow: "hidden",
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
-                            marginBottom: "2rem"
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+                            marginBottom: "2rem",
+                            // ✅ Z-index pentru tabel
+                            position: "relative",
+                            zIndex: 10
                         },
+                        className: "jsx-b9d82393daaeb258",
                         children: /*#__PURE__*/ jsx_runtime_.jsx(react_experimental_.Suspense, {
                             fallback: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
@@ -6063,6 +6100,7 @@ function ProiectePage() {
                                     justifyContent: "center",
                                     gap: "1rem"
                                 },
+                                className: "jsx-b9d82393daaeb258",
                                 children: [
                                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                         style: {
@@ -6072,13 +6110,15 @@ function ProiectePage() {
                                             border: "4px solid #3498db",
                                             borderTop: "4px solid transparent",
                                             animation: "spin 1s linear infinite"
-                                        }
+                                        },
+                                        className: "jsx-b9d82393daaeb258"
                                     }),
                                     /*#__PURE__*/ jsx_runtime_.jsx("span", {
                                         style: {
                                             fontSize: "18px",
                                             fontWeight: "500"
                                         },
+                                        className: "jsx-b9d82393daaeb258",
                                         children: "⏳ Se \xeencarcă proiectele..."
                                     })
                                 ]
@@ -6091,13 +6131,18 @@ function ProiectePage() {
                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
                             padding: "1.5rem",
-                            background: "rgba(255, 255, 255, 0.8)",
-                            backdropFilter: "blur(20px)",
+                            background: "rgba(255, 255, 255, 0.75)",
+                            // ✅ Backdrop-filter redus
+                            backdropFilter: "blur(6px)",
                             borderRadius: "16px",
-                            border: "1px solid rgba(255, 255, 255, 0.3)",
-                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
-                            textAlign: "center"
+                            border: "1px solid rgba(255, 255, 255, 0.4)",
+                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                            textAlign: "center",
+                            // ✅ Z-index pentru footer
+                            position: "relative",
+                            zIndex: 10
                         },
+                        className: "jsx-b9d82393daaeb258",
                         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                             style: {
                                 margin: 0,
@@ -6109,9 +6154,11 @@ function ProiectePage() {
                                 justifyContent: "center",
                                 gap: "0.5rem"
                             },
+                            className: "jsx-b9d82393daaeb258",
                             children: [
                                 "\uD83D\uDCA1 ",
                                 /*#__PURE__*/ jsx_runtime_.jsx("strong", {
+                                    className: "jsx-b9d82393daaeb258",
                                     children: "Tip:"
                                 }),
                                 ' Folosește filtrele pentru a găsi rapid proiectele dorite. Click pe "Acțiuni" pentru a gestiona fiecare proiect individual.'
@@ -6120,8 +6167,11 @@ function ProiectePage() {
                     }),
                     showProiectModal && /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
-                            zIndex: 11000
+                            // ✅ Z-index foarte înalt pentru toate modalele
+                            zIndex: 50000,
+                            position: "relative"
                         },
+                        className: "jsx-b9d82393daaeb258",
                         children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
                             isOpen: showProiectModal,
                             onClose: ()=>setShowProiectModal(false),
@@ -6129,6 +6179,10 @@ function ProiectePage() {
                         })
                     })
                 ]
+            }),
+            jsx_runtime_.jsx((style_default()), {
+                id: "b9d82393daaeb258",
+                children: '[data-modal="true"],.modal-overlay,.modal-container,div[style*="position: fixed"]:not([data-background]){z-index:50000!important}[data-dropdown="true"],.dropdown-menu,.actions-dropdown,div[style*="position: absolute"][style*="background"]:not([data-background]){z-index:40000!important}.toast,.notification,[data-toast="true"]{z-index:60000!important}.loading-overlay,[data-loading="true"]{z-index:45000!important}.tooltip,[data-tooltip="true"]{z-index:35000!important}.modal-backdrop{z-index:49000!important;background:rgba(0,0,0,.5)!important;-webkit-backdrop-filter:blur(2px)!important;backdrop-filter:blur(2px)!important}.main-content,.page-container,.glassmorphism-container{z-index:1!important;position:relative}.modal-container select,.modal-container input,.modal-container textarea,.modal-container button{z-index:inherit!important}.react-select__menu{z-index:51000!important}.modal-container .dropdown-menu,.modal-container .actions-dropdown{z-index:51000!important}'
             })
         ]
     });
@@ -6170,7 +6224,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,8313,9850,6166,6549,4442], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,6369,8313,9850,6166,6549,4442], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();
