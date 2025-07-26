@@ -107,7 +107,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
       icon: '✏️',
       color: 'secondary'
     },
-    // Adaugă subproiect doar pentru proiectele principale
+    // ✅ FIX: Adaugă subproiect doar pentru proiectele principale
     ...(proiect.tip !== 'subproiect' ? [{
       key: 'add_subproject',
       label: 'Adaugă Subproiect',
@@ -115,20 +115,20 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
       color: 'success' as const,
       disabled: proiect.Status === 'Anulat' || proiect.Status === 'Arhivat'
     }] : []),
-    {
+    // ✅ FIX: Factură doar pentru proiectele principale, NU pentru subproiecte
+    ...(proiect.tip !== 'subproiect' ? [{
       key: 'divider1',
       label: '',
       icon: '',
-      color: 'primary',
+      color: 'primary' as const,
       divider: true
-    },
-    {
+    }, {
       key: 'generate_invoice',
       label: 'Generează Factură PDF',
       icon: '💰',
-      color: 'warning',
+      color: 'warning' as const,
       disabled: proiect.Status === 'Anulat'
-    },
+    }] : []),
     {
       key: 'divider2',
       label: '',
@@ -145,7 +145,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
     },
     {
       key: 'suspend',
-      label: 'Suspendă Proiect',
+      label: proiect.tip === 'subproiect' ? 'Suspendă Subproiect' : 'Suspendă Proiect',
       icon: '⏸️',
       color: 'warning',
       disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
@@ -435,12 +435,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
       padding: '1rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
         backdropFilter: 'blur(20px)',
-        borderRadius: '20px',
-        maxWidth: '800px',
+        borderRadius: '16px', // ✅ Mai mic (era 20px)
+        maxWidth: '600px', // ✅ Limitat (era 800px)
         width: '100%',
-        maxHeight: '90vh',
+        maxHeight: '85vh', // ✅ Mai mic (era 90vh)
         overflowY: 'auto',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
         border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -451,10 +451,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '2rem',
+          padding: '1.5rem', // ✅ Mai mic (era 2rem)
           borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
-          borderRadius: '20px 20px 0 0'
+          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)', // ✅ Mai opac (era 0.1)
+          borderRadius: '16px 16px 0 0' // ✅ Mai mic (era 20px)
         }}>
           <div>
             <h2 style={{
@@ -520,13 +520,13 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
         </div>
 
         {/* ✅ Form Glassmorphism */}
-        <form onSubmit={handleSubmit} style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}> {/* ✅ Mai mic spacing */}
           {/* Denumire cu design Glassmorphism */}
           <div style={{
-            background: 'rgba(52, 152, 219, 0.05)',
-            padding: '1.5rem',
-            borderRadius: '16px',
-            border: '1px solid rgba(52, 152, 219, 0.1)',
+            background: 'rgba(52, 152, 219, 0.08)', // ✅ Mai opac (era 0.05)
+            padding: '1.25rem', // ✅ Mai mic (era 1.5rem)
+            borderRadius: '12px', // ✅ Mai mic (era 16px)
+            border: '1px solid rgba(52, 152, 219, 0.15)', // ✅ Mai opac (era 0.1)
             backdropFilter: 'blur(10px)'
           }}>
             <label style={{
@@ -570,15 +570,15 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
           {/* Grid pentru câmpuri în două coloane */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '1.5rem'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', // ✅ Mai mic (era 300px)
+            gap: '1rem' // ✅ Mai mic (era 1.5rem)
           }}>
             {/* Responsabil */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.6)',
-              padding: '1.25rem',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
+              background: 'rgba(255, 255, 255, 0.8)', // ✅ Mai opac (era 0.6)
+              padding: '1rem', // ✅ Mai mic (era 1.25rem)
+              borderRadius: '12px', // ✅ Mai mic (era 16px)
+              border: '1px solid rgba(255, 255, 255, 0.4)', // ✅ Mai opac (era 0.3)
               backdropFilter: 'blur(10px)'
             }}>
               <label style={{
@@ -968,12 +968,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
     const buttonRect = buttonRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const dropdownHeight = 400; // Estimare înălțime dropdown
+    const dropdownHeight = 350; // Estimare înălțime dropdown
     const spaceBelow = viewportHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top;
-
+    
     // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+    // Altfel, afișează în jos (comportament normal)
+    if (spaceBelow < dropdownHeight) {
       setDropdownPosition('top');
     } else {
       setDropdownPosition('bottom');
