@@ -450,15 +450,15 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
         border: '1px solid rgba(255, 255, 255, 0.2)',
         position: 'relative' as const
       }}>
-        {/* ✅ Header Glassmorphism */}
+        {/* ✅ Header Glassmorphism 90% opacitate */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '1.5rem', // ✅ Mai mic (era 2rem)
-          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)', // ✅ Mai opac (era 0.1)
-          borderRadius: '16px 16px 0 0' // ✅ Mai mic (era 20px)
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          background: 'rgba(52, 152, 219, 0.15)', // ✅ Simplificat (era complex gradient)
+          borderRadius: '16px 16px 0 0'
         }}>
           <div>
             <h2 style={{
@@ -1109,7 +1109,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
       {isOpen && (
         <>
-          {/* ✅ Overlay Glassmorphism cu Z-index mai mare */}
+          {/* ✅ Overlay Glassmorphism cu opacitate mărită */}
           <div
             style={{
               position: 'fixed' as const,
@@ -1117,8 +1117,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0, 0, 0, 0.2)', // ✅ Mai opac pentru blocare interacțiune
-              backdropFilter: 'blur(4px)',
+              background: 'rgba(0, 0, 0, 0.3)', // ✅ Păstrat pentru blocare interacțiune
+              backdropFilter: 'blur(6px)',
               zIndex: 10998
             }}
             onClick={() => {
@@ -1127,20 +1127,20 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown Glassmorphism cu poziționare dinamică corectată */}
+          {/* ✅ Dropdown Glassmorphism 90% opacitate */}
           <div style={{
             position: 'absolute' as const,
             ...(dropdownPosition === 'bottom' 
               ? { top: '100%', marginTop: '8px' }
               : { bottom: '100%', marginBottom: '8px' }
-            ), // ✅ FIX: Poziționare explicită în loc de [dropdownPosition]
+            ),
             right: 0,
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(25px)',
+            background: 'rgba(255, 255, 255, 0.9)', // ✅ 90% opacitate (era 0.98)
+            backdropFilter: 'blur(20px)', // ✅ Redus blur (era 25px)
             borderRadius: '16px',
             minWidth: '260px',
-            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)', // ✅ Shadow moderat (era 0.25)
+            border: '2px solid rgba(255, 255, 255, 0.8)', // ✅ Border solid (era 1px 0.4)
             zIndex: 10999,
             overflow: 'hidden' as const,
             transform: 'scale(0.95)',
@@ -1158,12 +1158,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               `}
             </style>
 
-            {/* Header Glassmorphism cu opacitate mărită */}
+            {/* Header Glassmorphism 90% opacitate */}
             <div style={{
               padding: '1rem',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.12)', // ✅ Border mai vizibil
-              background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.95) 100%)', // ✅ Mai opac
-              backdropFilter: 'blur(15px)' // ✅ Mai mult blur
+              borderBottom: '1px solid rgba(0, 0, 0, 0.15)', // ✅ Border mai vizibil
+              background: 'rgba(248, 249, 250, 0.9)', // ✅ 90% opacitate (era 0.95)
+              backdropFilter: 'blur(10px)' // ✅ Blur redus (era 15px)
             }}>
               <div style={{ 
                 fontSize: '12px', 

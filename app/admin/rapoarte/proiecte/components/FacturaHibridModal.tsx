@@ -649,35 +649,35 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     <div style={{
       position: 'fixed' as const,
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.5)', // ✅ Mai opac pentru blocare completă (era 0.3)
-      backdropFilter: 'blur(12px)', // ✅ Mai mult blur (era 8px)
+      background: 'rgba(0, 0, 0, 0.4)', // ✅ Overlay pentru blocare (era 0.5)
+      backdropFilter: 'blur(8px)', // ✅ Blur redus (era 12px)
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 13000, // ✅ Mai mare decât dropdown (10999) și subproiect modal (12000)
+      zIndex: 13000,
       padding: '1rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.99)', // ✅ Aproape opac complet (era 0.98)
-        backdropFilter: 'blur(25px)', // ✅ Blur puternic (era 20px)
+        background: 'rgba(255, 255, 255, 0.9)', // ✅ 90% opacitate (era 0.99)
+        backdropFilter: 'blur(20px)', // ✅ Blur redus (era 25px)
         borderRadius: '16px',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)', // ✅ Shadow mai puternic (era 0.15)
-        border: '2px solid rgba(255, 255, 255, 0.6)', // ✅ Border mai gros și opac (era 1px 0.2)
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)', // ✅ Shadow moderat (era 0.25)
+        border: '2px solid rgba(255, 255, 255, 0.8)', // ✅ Border solid (era 0.6)
         position: 'relative' as const
       }}>
-        {/* ✅ Header Glassmorphism Premium */}
+        {/* ✅ Header Glassmorphism 90% opacitate */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '1.5rem', // ✅ Mai mic (era 2rem)
-          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)', // ✅ Mai opac (era 0.1)
-          borderRadius: '16px 16px 0 0' // ✅ Mai mic (era 20px)
+          padding: '1.5rem',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          background: 'rgba(52, 152, 219, 0.15)', // ✅ Simplificat gradient (era complex)
+          borderRadius: '16px 16px 0 0'
         }}>
           <div>
             <h2 style={{
