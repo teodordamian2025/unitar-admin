@@ -2,7 +2,7 @@
 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Glassmorphism Premium + Dropdown Inteligent + Workflow îmbunătățit
+// MODIFICAT: OPACITY FIXED - Metoda care funcționează aplicată complet
 // ==================================================================
 
 import React from 'react';
@@ -340,7 +340,7 @@ export default function ProiectActions({ proiect, onRefresh }: ProiectActionsPro
   );
 }
 
-// ✅ Modal Glassmorphism Premium pentru adăugare subproiect
+// ✅ Modal Glassmorphism Premium pentru adăugare subproiect cu OPACITY FIXED
 interface SubproiectModalProps {
   proiectParinte: any;
   onClose: () => void;
@@ -430,33 +430,34 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
     <div style={{
       position: 'fixed' as const,
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.3)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(0, 0, 0, 0.6)',
+      backdropFilter: 'blur(5px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 12000,
       padding: '1rem'
     }}>
+      {/* ✅ MODAL CU OPACITY FIXED */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
-        backdropFilter: 'blur(20px)',
-        borderRadius: '16px', // ✅ Mai mic (era 20px)
-        maxWidth: '600px', // ✅ Limitat (era 800px)
+        background: '#ffffff', // ✅ Background SOLID
+        opacity: 0.92, // ✅ Opacitate DIRECTĂ - metoda care funcționează
+        borderRadius: '16px',
+        maxWidth: '600px',
         width: '100%',
-        maxHeight: '85vh', // ✅ Mai mic (era 90vh)
+        maxHeight: '85vh',
         overflowY: 'auto',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)',
+        border: '1px solid #d0d0d0',
         position: 'relative' as const
       }}>
-        {/* Header SOLID pentru subproiect */}
+        {/* ✅ Header cu background solid */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '1.5rem',
-          borderBottom: '1px solid #e0e0e0', // ✅ Border solid
+          borderBottom: '1px solid #e0e0e0',
           background: '#e8f5e8', // ✅ Background solid verde deschis
           borderRadius: '16px 16px 0 0'
         }}>
@@ -523,15 +524,14 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
           </button>
         </div>
 
-        {/* ✅ Form Glassmorphism */}
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}> {/* ✅ Mai mic spacing */}
-          {/* Denumire cu design Glassmorphism */}
+        {/* ✅ Form */}
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Denumire */}
           <div style={{
-            background: 'rgba(52, 152, 219, 0.08)', // ✅ Mai opac (era 0.05)
-            padding: '1.25rem', // ✅ Mai mic (era 1.5rem)
-            borderRadius: '12px', // ✅ Mai mic (era 16px)
-            border: '1px solid rgba(52, 152, 219, 0.15)', // ✅ Mai opac (era 0.1)
-            backdropFilter: 'blur(10px)'
+            background: '#e3f2fd', // ✅ Background solid albastru
+            padding: '1.25rem',
+            borderRadius: '12px',
+            border: '1px solid #bbdefb'
           }}>
             <label style={{
               display: 'block',
@@ -549,41 +549,31 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               style={{
                 width: '100%',
                 padding: '1rem',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                border: '1px solid #ddd',
                 borderRadius: '12px',
                 fontSize: '16px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
+                background: '#ffffff',
                 transition: 'all 0.3s ease',
                 boxSizing: 'border-box'
               }}
               placeholder="Introduceți denumirea subproiectului..."
               required
               disabled={isSubmitting}
-              onFocus={(e) => {
-                e.currentTarget.style.border = '2px solid #3498db';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
             />
           </div>
 
-          {/* Grid pentru câmpuri în două coloane */}
+          {/* Grid pentru câmpuri */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', // ✅ Mai mic (era 300px)
-            gap: '1rem' // ✅ Mai mic (era 1.5rem)
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '1rem'
           }}>
             {/* Responsabil */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.8)', // ✅ Mai opac (era 0.6)
-              padding: '1rem', // ✅ Mai mic (era 1.25rem)
-              borderRadius: '12px', // ✅ Mai mic (era 16px)
-              border: '1px solid rgba(255, 255, 255, 0.4)', // ✅ Mai opac (era 0.3)
-              backdropFilter: 'blur(10px)'
+              background: '#f5f5f5', // ✅ Background solid gri deschis
+              padding: '1rem',
+              borderRadius: '12px',
+              border: '1px solid #e0e0e0'
             }}>
               <label style={{
                 display: 'block',
@@ -601,10 +591,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #ddd',
                   borderRadius: '12px',
                   fontSize: '14px',
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: '#ffffff',
                   transition: 'all 0.3s ease',
                   boxSizing: 'border-box'
                 }}
@@ -615,11 +605,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
 
             {/* Status */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.6)',
-              padding: '1.25rem',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(10px)'
+              background: '#f5f5f5',
+              padding: '1rem',
+              borderRadius: '12px',
+              border: '1px solid #e0e0e0'
             }}>
               <label style={{
                 display: 'block',
@@ -636,10 +625,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #ddd',
                   borderRadius: '12px',
                   fontSize: '14px',
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: '#ffffff',
                   transition: 'all 0.3s ease',
                   boxSizing: 'border-box'
                 }}
@@ -654,11 +643,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
 
             {/* Data Start */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.6)',
-              padding: '1.25rem',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(10px)'
+              background: '#f5f5f5',
+              padding: '1rem',
+              borderRadius: '12px',
+              border: '1px solid #e0e0e0'
             }}>
               <label style={{
                 display: 'block',
@@ -676,10 +664,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #ddd',
                   borderRadius: '12px',
                   fontSize: '14px',
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: '#ffffff',
                   transition: 'all 0.3s ease',
                   boxSizing: 'border-box'
                 }}
@@ -689,11 +677,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
 
             {/* Data Final */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.6)',
-              padding: '1.25rem',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(10px)'
+              background: '#f5f5f5',
+              padding: '1rem',
+              borderRadius: '12px',
+              border: '1px solid #e0e0e0'
             }}>
               <label style={{
                 display: 'block',
@@ -711,10 +698,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #ddd',
                   borderRadius: '12px',
                   fontSize: '14px',
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: '#ffffff',
                   transition: 'all 0.3s ease',
                   boxSizing: 'border-box'
                 }}
@@ -725,11 +712,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
 
           {/* Valoare Estimată */}
           <div style={{
-            background: 'rgba(46, 204, 113, 0.05)',
+            background: '#e8f5e8', // ✅ Background solid verde deschis
             padding: '1.5rem',
-            borderRadius: '16px',
-            border: '1px solid rgba(46, 204, 113, 0.1)',
-            backdropFilter: 'blur(10px)'
+            borderRadius: '12px',
+            border: '1px solid #c8e6c9'
           }}>
             <label style={{
               display: 'block',
@@ -747,11 +733,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               style={{
                 width: '100%',
                 padding: '1rem',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                border: '1px solid #ddd',
                 borderRadius: '12px',
                 fontSize: '16px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
+                background: '#ffffff',
                 transition: 'all 0.3s ease',
                 boxSizing: 'border-box'
               }}
@@ -762,13 +747,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             />
           </div>
 
-          {/* Info despre proiectul părinte Glassmorphism */}
+          {/* Info despre proiectul părinte */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(149, 165, 166, 0.1) 0%, rgba(52, 152, 219, 0.1) 100%)',
+            background: '#f8f9fa', // ✅ Background solid gri foarte deschis
             padding: '1.5rem',
-            borderRadius: '16px',
-            border: '1px solid rgba(149, 165, 166, 0.2)',
-            backdropFilter: 'blur(10px)'
+            borderRadius: '12px',
+            border: '1px solid #e9ecef'
           }}>
             <h4 style={{
               fontSize: '16px',
@@ -787,28 +771,28 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
               gap: '1rem'
             }}>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff',
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
+                border: '1px solid #dee2e6'
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CLIENT</div>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Client}</div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff',
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
+                border: '1px solid #dee2e6'
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>STATUS</div>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Status}</div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff',
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
+                border: '1px solid #dee2e6'
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>VALOARE</div>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>
@@ -816,10 +800,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 </div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff',
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
+                border: '1px solid #dee2e6'
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ADRESĂ</div>
                 <div style={{ fontSize: '12px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiectParinte.Adresa || 'Nespecificată'}</div>
@@ -827,42 +811,29 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
             </div>
           </div>
 
-          {/* ✅ Butoane Glassmorphism cu workflow îmbunătățit */}
+          {/* ✅ Butoane */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: '1rem',
             paddingTop: '1rem',
-            borderTop: '1px solid rgba(0, 0, 0, 0.08)'
+            borderTop: '1px solid #e0e0e0'
           }}>
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
               style={{
-                background: 'rgba(149, 165, 166, 0.1)',
+                background: '#f5f5f5',
                 color: '#7f8c8d',
-                border: '1px solid rgba(149, 165, 166, 0.2)',
+                border: '1px solid #ddd',
                 borderRadius: '12px',
                 padding: '0.75rem 1.5rem',
                 fontSize: '14px',
                 fontWeight: '600',
                 cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease',
-                backdropFilter: 'blur(10px)'
-              }}
-              onMouseOver={(e) => {
-                if (!isSubmitting) {
-                  e.currentTarget.style.background = 'rgba(149, 165, 166, 0.2)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!isSubmitting) {
-                  e.currentTarget.style.background = 'rgba(149, 165, 166, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }
+                transition: 'all 0.3s ease'
               }}
             >
               ✕ Închide
@@ -874,7 +845,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 disabled={isSubmitting || !formData.denumire.trim()}
                 style={{
                   background: isSubmitting || !formData.denumire.trim() ? 
-                    'rgba(149, 165, 166, 0.3)' : 
+                    '#ddd' : 
                     'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
                   color: 'white',
                   border: 'none',
@@ -886,20 +857,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                   transition: 'all 0.3s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: (isSubmitting || !formData.denumire.trim()) ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
-                }}
-                onMouseOver={(e) => {
-                  if (!isSubmitting && formData.denumire.trim()) {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!isSubmitting && formData.denumire.trim()) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
-                  }
+                  gap: '0.5rem'
                 }}
               >
                 {isSubmitting ? (
@@ -909,7 +867,6 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                 )}
               </button>
               
-              {/* ✅ Butonul "Resetează" înlocuiește "Mai adaugă" pentru UX mai bun */}
               <button
                 type="button"
                 onClick={resetForm}
@@ -926,22 +883,9 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
                   transition: 'all 0.3s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: isSubmitting ? 'none' : '0 4px 12px rgba(39, 174, 96, 0.4)'
+                  gap: '0.5rem'
                 }}
                 title="Resetează formularul pentru a adăuga alt subproiect"
-                onMouseOver={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
-                  }
-                }}
               >
                 🔄 Resetează
               </button>
@@ -953,7 +897,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
   );
 }
 
-// ✅ Dropdown Glassmorphism Premium cu poziționare inteligentă
+// ✅ Dropdown cu OPACITY FIXED - Metoda care funcționează
 interface EnhancedActionDropdownProps {
   actions: ActionItem[];
   onAction: (actionKey: string) => void;
@@ -964,12 +908,13 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const [isOpen, setIsOpen] = React.useState(false);
   const [loading, setLoading] = React.useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
+  const [dropdownStyle, setDropdownStyle] = React.useState<any>({});
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   
-  // ✅ FIX: ID unic pentru acest dropdown
+  // ID unic pentru acest dropdown
   const dropdownId = React.useMemo(() => `dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [proiect.ID_Proiect]);
 
-  // ✅ FIX: Înregistrează funcția de închidere
+  // Înregistrează funcția de închidere
   React.useEffect(() => {
     openDropdowns.set(dropdownId, () => setIsOpen(false));
     
@@ -978,7 +923,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     };
   }, [dropdownId]);
 
-  // ✅ FIX: Închide dropdown-ul când se deschide altul
+  // Închide dropdown-ul când se deschide altul
   React.useEffect(() => {
     if (isOpen) {
       // Închide toate celelalte dropdown-uri
@@ -991,7 +936,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
       currentOpenDropdown = dropdownId;
       calculateDropdownPosition();
       
-      // Adaugă event listener pentru resize
       window.addEventListener('resize', calculateDropdownPosition);
       return () => window.removeEventListener('resize', calculateDropdownPosition);
     } else {
@@ -1001,7 +945,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   }, [isOpen, dropdownId]);
 
-  // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ COMPLET
+  // ✅ METODA CARE FUNCȚIONEAZĂ - Poziționare FIXED cu calcul explicit
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
@@ -1019,15 +963,28 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
       buttonBottom: buttonRect.bottom,
       viewportHeight,
       dropdownId 
-    }); // ✅ Debug cu ID
+    });
     
-    // ✅ FIX: Logică corectată - dacă e la început (sus), coboară jos; dacă e la sfârșit (jos), urcă sus
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
       console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
       setDropdownPosition('top');
+      // ✅ POZIȚIONARE FIXED - ca cea care funcționează
+      setDropdownStyle({
+        position: 'fixed',
+        top: buttonRect.top - dropdownHeight - 8, // Deasupra butonului
+        left: buttonRect.right - 260, // Aliniat la dreapta
+        width: '260px'
+      });
     } else {
       console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
       setDropdownPosition('bottom');
+      // ✅ POZIȚIONARE FIXED - ca cea care funcționează  
+      setDropdownStyle({
+        position: 'fixed',
+        top: buttonRect.bottom + 8, // Sub buton
+        left: buttonRect.right - 260, // Aliniat la dreapta
+        width: '260px'
+      });
     }
   };
 
@@ -1035,7 +992,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     if (loading) return;
     
     setLoading(actionKey);
-    setIsOpen(false); // ✅ Închide dropdown-ul
+    setIsOpen(false);
     
     try {
       await onAction(actionKey);
@@ -1109,7 +1066,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
       {isOpen && (
         <>
-          {/* ✅ Overlay Glassmorphism cu opacitate mărită */}
+          {/* Overlay */}
           <div
             style={{
               position: 'fixed' as const,
@@ -1117,7 +1074,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0, 0, 0, 0.3)', // ✅ Păstrat pentru blocare interacțiune
+              background: 'rgba(0, 0, 0, 0.3)',
               backdropFilter: 'blur(6px)',
               zIndex: 10998
             }}
@@ -1127,42 +1084,25 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown OPAC 90% - CORECTARE ANIMAȚIE */}
+          {/* ✅ DROPDOWN CU METODA CARE FUNCȚIONEAZĂ - OPACITY FIXED */}
           <div style={{
-            position: 'absolute' as const,
-            ...(dropdownPosition === 'bottom' 
-              ? { top: '100%', marginTop: '8px' }
-              : { bottom: '100%', marginBottom: '8px' }
-            ),
-            right: 0,
-            background: '#ffffff', // ✅ ALBU SOLID 
+            ...dropdownStyle, // ✅ Poziționare FIXED calculată explicit
+            background: '#ffffff', // ✅ Background SOLID
+            opacity: 0.92, // ✅ Opacitate DIRECTĂ ca cea care funcționează
             borderRadius: '16px',
             minWidth: '260px',
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
             border: '1px solid #e0e0e0',
             zIndex: 10999,
-            overflow: 'hidden' as const,
-            transform: 'scale(0.95)',
-            opacity: 0, // ✅ Start cu 0 pentru animație
-            animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+            overflow: 'hidden' as const
+            // ✅ FĂRĂ animații care resetează opacity
           }}>
-            <style>
-              {`
-                @keyframes dropdownAppear {
-                  to {
-                    transform: scale(1);
-                    opacity: 0.9; /* ✅ FINAL opacity 90% în loc de 1 */
-                  }
-                }
-              `}
-            </style>
 
-            {/* Header OPAC 90% */}
+            {/* Header cu background solid */}
             <div style={{
               padding: '1rem',
-              borderBottom: '1px solid #e0e0e0', // ✅ Border solid gri
-              background: '#f8f9fa', // ✅ BACKGROUND SOLID în loc de rgba
-              // ✅ Nu mai aplicăm opacity aici ca se aplică la elementul părinte
+              borderBottom: '1px solid #e0e0e0',
+              background: '#f8f9fa' // ✅ Background solid
             }}>
               <div style={{ 
                 fontSize: '12px', 
@@ -1196,7 +1136,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               </div>
             </div>
 
-            {/* Actions cu Glassmorphism */}
+            {/* Actions */}
             <div style={{ padding: '0.5rem 0' }}>
               {actions.map((action) => {
                 if (action.divider) {
@@ -1222,7 +1162,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                       padding: '0.75rem 1rem',
                       background: 'transparent',
                       border: 'none',
-                      textAlign: 'left',
+                      textAlign: 'left' as const,
                       cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
                       color: action.disabled ? '#bdc3c7' : '#2c3e50',
@@ -1238,14 +1178,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                         e.currentTarget.style.background = `linear-gradient(135deg, ${getActionColor(action.color)}15 0%, ${getActionColor(action.color)}08 100%)`;
                         e.currentTarget.style.color = getActionColor(action.color);
                         e.currentTarget.style.transform = 'translateX(4px)';
-                        e.currentTarget.style.backdropFilter = 'blur(10px)';
                       }
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'transparent';
                       e.currentTarget.style.color = action.disabled ? '#bdc3c7' : '#2c3e50';
                       e.currentTarget.style.transform = 'translateX(0)';
-                      e.currentTarget.style.backdropFilter = 'none';
                     }}
                   >
                     <span style={{ 
