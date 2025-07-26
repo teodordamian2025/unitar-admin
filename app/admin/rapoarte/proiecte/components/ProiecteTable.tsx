@@ -92,6 +92,20 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     loadData();
   }, [searchParams, refreshTrigger]);
 
+  // ✅ FIX: Auto-expand subproiecte când datele se schimbă
+  useEffect(() => {
+    if (proiecte.length > 0 && subproiecte.length > 0) {
+      const proiecteCuSubproiecte = proiecte
+        .map(p => p.ID_Proiect)
+        .filter(id => subproiecte.some(sub => sub.ID_Proiect === id));
+      
+      if (proiecteCuSubproiecte.length > 0) {
+        setExpandedProjects(new Set(proiecteCuSubproiecte));
+        console.log('🔍 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
+      }
+    }
+  }, [proiecte, subproiecte]); // ✅ Trigger când se schimbă datele
+
   // Verifică notificări pentru statusul facturii din URL
   useEffect(() => {
     if (searchParams?.invoice_status && searchParams?.project_id) {
@@ -115,20 +129,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     try {
       setLoading(true);
       await Promise.all([loadProiecte(), loadSubproiecte()]);
-      
-      // ✅ FIX: Auto-expand toate proiectele care au subproiecte
-      setTimeout(() => {
-        const proiecteIds = proiecte.map(p => p.ID_Proiect);
-        const proiecteCuSubproiecte = proiecteIds.filter(id => 
-          subproiecte.some(sub => sub.ID_Proiect === id)
-        );
-        
-        if (proiecteCuSubproiecte.length > 0) {
-          setExpandedProjects(new Set(proiecteCuSubproiecte));
-          console.log('🔍 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
-        }
-      }, 100); // Mic delay pentru a fi sigur că datele sunt încărcate
-      
+      // ✅ Eliminat auto-expand de aici - se face în useEffect separat
     } catch (error) {
       console.error('Eroare la încărcarea datelor:', error);
       showToast('Eroare de conectare la baza de date', 'error');
