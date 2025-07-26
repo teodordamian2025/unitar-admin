@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// CORECTAT: Syntaxă JSX Completă + Glassmorphism Premium + Design Compact + Toate Funcționalitățile
+// COMPLET REGENERAT: Fix Transparență + Design Compact + Toate Funcționalitățile
 // ==================================================================
 
 'use client';
@@ -148,6 +148,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (!date) return '';
     return typeof date === 'string' ? date : date.value;
   };
+
+  // ✅ BODY LOCK EFFECT - Blochează scroll-ul și interacțiunile din spate
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalPointerEvents = document.body.style.pointerEvents;
+    
+    // Blochează toate interacțiunile cu pagina din spate
+    document.body.style.overflow = 'hidden';
+    document.body.style.pointerEvents = 'none';
+    
+    // Cleanup la unmount
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.pointerEvents = originalPointerEvents;
+    };
+  }, []);
 
   useEffect(() => {
     loadClientFromDatabase();
@@ -640,30 +656,54 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF;
-
+  // ✅ RENDER JSX - Cu Fix Transparență Complet
   return (
-    <div style={{
-      position: 'fixed',
-      inset: '0',
-      background: 'rgba(0, 0, 0, 0.6)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 13000,
-      padding: '1rem'
-    }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '16px',
-        maxWidth: '1000px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)',
-        border: '1px solid #d0d0d0',
-        position: 'relative'
-      }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        background: '#000000', // ✅ NEGRU COMPLET SOLID - ZERO TRANSPARENȚĂ
+        opacity: 0.85, // ✅ Control exact al opacității
+        zIndex: 13000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backdropFilter: 'blur(15px) saturate(0.2)', // ✅ Blur puternic + desaturare
+        WebkitBackdropFilter: 'blur(15px) saturate(0.2)',
+        padding: '1rem',
+        pointerEvents: 'auto' // ✅ Permite interacțiuni
+      }}
+      onClick={(e) => {
+        // ✅ Click pe overlay închide modalul
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      {/* ✅ CONTAINER MODAL PRINCIPAL */}
+      <div
+        style={{
+          background: '#ffffff', // ✅ BACKGROUND SOLID COMPLET OPAC
+          borderRadius: '16px',
+          maxWidth: '1000px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.8)', // ✅ Shadow foarte puternic
+          border: '2px solid #d0d0d0', // ✅ Border gros pentru separare clară
+          position: 'relative',
+          pointerEvents: 'auto' // ✅ Asigură funcționalitatea modalului
+        }}
+        onClick={(e) => {
+          // ✅ Previne închiderea când click pe modal
+          e.stopPropagation();
+        }}
+      >
         {/* Header Modal */}
         <div style={{
           display: 'flex',
@@ -719,24 +759,33 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         </div>
 
         <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* Loading Overlay */}
+          {/* ✅ LOADING OVERLAY - COMPLET OPAC */}
           {isLoading && (
-            <div style={{
-              position: 'fixed',
-              inset: '0',
-              background: 'rgba(0, 0, 0, 0.6)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 14000
-            }}>
+            <div 
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100vw',
+                height: '100vh',
+                background: '#000000', // ✅ NEGRU SOLID pentru loading
+                opacity: 0.9, // ✅ Opacitate mare pentru loading
+                zIndex: 14000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)'
+              }}
+            >
               <div style={{
                 background: '#ffffff',
                 padding: '2rem',
                 borderRadius: '20px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-                border: '1px solid #e0e0e0',
+                boxShadow: '0 30px 60px rgba(0, 0, 0, 0.6)',
+                border: '2px solid #e0e0e0',
                 textAlign: 'center'
               }}>
                 <div style={{
@@ -1385,6 +1434,105 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       }}>
                         <td style={{
                           border: '1px solid #e0e0e0',
+                          padding: '0.5rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            {linie.tip === 'subproiect' && (
+                              <span style={{
+                                background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                                color: 'white',
+                                padding: '0.125rem 0.25rem',
+                                borderRadius: '4px',
+                                fontSize: '8px',
+                                fontWeight: '700'
+                              }}>
+                                SUB
+                              </span>
+                            )}
+                            <input
+                              type="text"
+                              value={linie.denumire}
+                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: '0.375rem',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                background: '#ffffff',
+                                transition: 'all 0.3s ease'
+                              }}
+                              placeholder="Descrierea serviciului sau produsului..."
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.cantitate}
+                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                            style={{
+                              width: '100%',
+                              padding: '0.25rem',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '11px',
+                              background: '#ffffff',
+                              transition: 'all 0.3s ease'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.pretUnitar}
+                            onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
+                            style={{
+                              width: '100%',
+                              padding: '0.25rem',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '4px',
+                              textAlign: 'right',
+                              fontSize: '11px',
+                              background: '#ffffff',
+                              transition: 'all 0.3s ease'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                          <select
+                            value={linie.cotaTva}
+                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                            style={{
+                              width: '100%',
+                              padding: '0.25rem',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '11px',
+                              background: '#ffffff',
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={9}>9%</option>
+                            <option value={19}>19%</option>
+                            <option value={21}>21%</option>
+                          </select>
+                        </td>
+                        <td style={{
+                          border: '1px solid #e0e0e0',
                           padding: '0.5rem',
                           textAlign: 'right',
                           fontSize: '11px',
@@ -1546,18 +1694,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   cursor: isLoading ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s ease'
                 }}
-                onMouseOver={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.background = '#e9ecef';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.background = '#f8f9fa';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }
-                }}
               >
                 Anulează
               </button>
@@ -1579,18 +1715,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   alignItems: 'center',
                   gap: '0.5rem',
                   boxShadow: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'none' : '0 4px 12px rgba(39, 174, 96, 0.4)'
-                }}
-                onMouseOver={(e) => {
-                  if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!isLoading && clientInfo?.cui && clientInfo?.denumire) {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
-                  }
                 }}
               >
                 {isLoading ? (
