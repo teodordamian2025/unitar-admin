@@ -649,8 +649,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     <div style={{
       position: 'fixed' as const,
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.3)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(0, 0, 0, 0.5)', // ✅ Mai opac pentru blocare completă (era 0.3)
+      backdropFilter: 'blur(12px)', // ✅ Mai mult blur (era 8px)
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -658,15 +658,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
-        backdropFilter: 'blur(20px)',
-        borderRadius: '16px', // ✅ Mai mic (era 20px)
-        maxWidth: '1000px', // ✅ Mai mic (era 1200px)
+        background: 'rgba(255, 255, 255, 0.99)', // ✅ Aproape opac complet (era 0.98)
+        backdropFilter: 'blur(25px)', // ✅ Blur puternic (era 20px)
+        borderRadius: '16px',
+        maxWidth: '1000px',
         width: '100%',
-        maxHeight: '90vh', // ✅ Mai mic (era 95vh)
+        maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)', // ✅ Shadow mai puternic (era 0.15)
+        border: '2px solid rgba(255, 255, 255, 0.6)', // ✅ Border mai gros și opac (era 1px 0.2)
         position: 'relative' as const
       }}>
         {/* ✅ Header Glassmorphism Premium */}

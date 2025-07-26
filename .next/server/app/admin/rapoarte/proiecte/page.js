@@ -1253,8 +1253,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         style: {
             position: "fixed",
             inset: "0",
-            background: "rgba(0, 0, 0, 0.3)",
-            backdropFilter: "blur(8px)",
+            background: "rgba(0, 0, 0, 0.5)",
+            backdropFilter: "blur(12px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1263,15 +1263,15 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "rgba(255, 255, 255, 0.98)",
-                backdropFilter: "blur(20px)",
+                background: "rgba(255, 255, 255, 0.99)",
+                backdropFilter: "blur(25px)",
                 borderRadius: "16px",
                 maxWidth: "1000px",
                 width: "100%",
                 maxHeight: "90vh",
                 overflowY: "auto",
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
+                border: "2px solid rgba(255, 255, 255, 0.6)",
                 position: "relative"
             },
             children: [
@@ -3807,18 +3807,28 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
     const [loading, setLoading] = react_experimental_default().useState(null);
     const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
     const buttonRef = react_experimental_default().useRef(null);
-    // ✅ FIX: Calculează poziționarea inteligentă pentru ultimele 3 rânduri
+    // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ LOGICA
     const calculateDropdownPosition = ()=>{
         if (!buttonRef.current) return;
         const buttonRect = buttonRef.current.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
-        const dropdownHeight = 350; // Estimare înălțime dropdown
+        const dropdownHeight = 350;
         const spaceBelow = viewportHeight - buttonRect.bottom;
-        // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
-        // Altfel, afișează în jos (comportament normal)
-        if (spaceBelow < dropdownHeight) {
+        const spaceAbove = buttonRect.top;
+        console.log("\uD83D\uDCCF Dropdown positioning:", {
+            spaceBelow,
+            spaceAbove,
+            dropdownHeight,
+            buttonTop: buttonRect.top,
+            buttonBottom: buttonRect.bottom,
+            viewportHeight
+        }); // ✅ Debug
+        // ✅ FIX: Logică corectată - dacă e la început (sus), coboară jos; dacă e la sfârșit (jos), urcă sus
+        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+            console.log("\uD83D\uDD3C Dropdown va urca sus");
             setDropdownPosition("top");
         } else {
+            console.log("\uD83D\uDD3D Dropdown va cobor\xee jos");
             setDropdownPosition("bottom");
         }
     };
@@ -3923,8 +3933,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            background: "rgba(0, 0, 0, 0.1)",
-                            backdropFilter: "blur(2px)",
+                            background: "rgba(0, 0, 0, 0.2)",
+                            backdropFilter: "blur(4px)",
                             zIndex: 10998
                         },
                         onClick: ()=>setIsOpen(false)
@@ -3934,12 +3944,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             position: "absolute",
                             [dropdownPosition]: "100%",
                             right: 0,
-                            background: "rgba(255, 255, 255, 0.95)",
-                            backdropFilter: "blur(20px)",
+                            background: "rgba(255, 255, 255, 0.98)",
+                            backdropFilter: "blur(25px)",
                             borderRadius: "16px",
                             minWidth: "260px",
-                            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
+                            border: "1px solid rgba(255, 255, 255, 0.4)",
                             zIndex: 10999,
                             marginTop: dropdownPosition === "bottom" ? "8px" : "0",
                             marginBottom: dropdownPosition === "top" ? "8px" : "0",
@@ -3962,9 +3972,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
                                     padding: "1rem",
-                                    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-                                    background: "linear-gradient(135deg, rgba(248, 249, 250, 0.8) 0%, rgba(233, 236, 239, 0.8) 100%)",
-                                    backdropFilter: "blur(10px)"
+                                    borderBottom: "1px solid rgba(0, 0, 0, 0.12)",
+                                    background: "linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.95) 100%)",
+                                    backdropFilter: "blur(15px)" // ✅ Mai mult blur
                                 },
                                 children: [
                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -5079,7 +5089,7 @@ function ProiecteTable({ searchParams }) {
     const [loading, setLoading] = (0,react_experimental_.useState)(true);
     const [refreshTrigger, setRefreshTrigger] = (0,react_experimental_.useState)(0);
     const [showProiectModal, setShowProiectModal] = (0,react_experimental_.useState)(false);
-    const [expandedProjects, setExpandedProjects] = (0,react_experimental_.useState)(new Set());
+    const [expandedProjects, setExpandedProjects] = (0,react_experimental_.useState)(new Set()); // ✅ Îl vom popula automat
     (0,react_experimental_.useEffect)(()=>{
         loadData();
     }, [
@@ -5112,6 +5122,15 @@ function ProiecteTable({ searchParams }) {
                 loadProiecte(),
                 loadSubproiecte()
             ]);
+            // ✅ FIX: Auto-expand toate proiectele care au subproiecte
+            setTimeout(()=>{
+                const proiecteIds = proiecte.map((p)=>p.ID_Proiect);
+                const proiecteCuSubproiecte = proiecteIds.filter((id)=>subproiecte.some((sub)=>sub.ID_Proiect === id));
+                if (proiecteCuSubproiecte.length > 0) {
+                    setExpandedProjects(new Set(proiecteCuSubproiecte));
+                    console.log("\uD83D\uDD0D Auto-expanded proiecte cu subproiecte:", proiecteCuSubproiecte);
+                }
+            }, 100); // Mic delay pentru a fi sigur că datele sunt încărcate
         } catch (error) {
             console.error("Eroare la \xeencărcarea datelor:", error);
             ProiecteTable_showToast("Eroare de conectare la baza de date", "error");
@@ -5292,11 +5311,23 @@ function ProiecteTable({ searchParams }) {
                 return "⚪";
         }
     };
-    // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele
+    // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele - CORECT
     const calculateTotalValue = ()=>{
-        const totalProiecte = proiecte.reduce((sum, p)=>sum + (p.Valoare_Estimata || 0), 0);
-        const totalSubproiecte = subproiecte.reduce((sum, s)=>sum + (s.Valoare_Estimata || 0), 0);
-        return totalProiecte + totalSubproiecte;
+        const totalProiecte = proiecte.reduce((sum, p)=>{
+            const valoare = Number(p.Valoare_Estimata) || 0;
+            return sum + valoare;
+        }, 0);
+        const totalSubproiecte = subproiecte.reduce((sum, s)=>{
+            const valoare = Number(s.Valoare_Estimata) || 0;
+            return sum + valoare;
+        }, 0);
+        const total = totalProiecte + totalSubproiecte;
+        console.log("\uD83D\uDCB0 Calcul totaluri:", {
+            totalProiecte,
+            totalSubproiecte,
+            total
+        }); // ✅ Debug
+        return total;
     };
     if (loading) {
         return /*#__PURE__*/ jsx_runtime_.jsx("div", {

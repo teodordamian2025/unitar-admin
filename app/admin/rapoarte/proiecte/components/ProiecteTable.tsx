@@ -86,7 +86,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showProiectModal, setShowProiectModal] = useState(false);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set()); // ✅ Îl vom popula automat
 
   useEffect(() => {
     loadData();
@@ -115,6 +115,20 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     try {
       setLoading(true);
       await Promise.all([loadProiecte(), loadSubproiecte()]);
+      
+      // ✅ FIX: Auto-expand toate proiectele care au subproiecte
+      setTimeout(() => {
+        const proiecteIds = proiecte.map(p => p.ID_Proiect);
+        const proiecteCuSubproiecte = proiecteIds.filter(id => 
+          subproiecte.some(sub => sub.ID_Proiect === id)
+        );
+        
+        if (proiecteCuSubproiecte.length > 0) {
+          setExpandedProjects(new Set(proiecteCuSubproiecte));
+          console.log('🔍 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
+        }
+      }, 100); // Mic delay pentru a fi sigur că datele sunt încărcate
+      
     } catch (error) {
       console.error('Eroare la încărcarea datelor:', error);
       showToast('Eroare de conectare la baza de date', 'error');
@@ -314,11 +328,21 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele
+  // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele - CORECT
   const calculateTotalValue = () => {
-    const totalProiecte = proiecte.reduce((sum, p) => sum + (p.Valoare_Estimata || 0), 0);
-    const totalSubproiecte = subproiecte.reduce((sum, s) => sum + (s.Valoare_Estimata || 0), 0);
-    return totalProiecte + totalSubproiecte;
+    const totalProiecte = proiecte.reduce((sum, p) => {
+      const valoare = Number(p.Valoare_Estimata) || 0;
+      return sum + valoare;
+    }, 0);
+    
+    const totalSubproiecte = subproiecte.reduce((sum, s) => {
+      const valoare = Number(s.Valoare_Estimata) || 0;
+      return sum + valoare;
+    }, 0);
+    
+    const total = totalProiecte + totalSubproiecte;
+    console.log('💰 Calcul totaluri:', { totalProiecte, totalSubproiecte, total }); // ✅ Debug
+    return total;
   };
 
   if (loading) {

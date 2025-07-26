@@ -962,20 +962,31 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
-  // ✅ FIX: Calculează poziționarea inteligentă pentru ultimele 3 rânduri
+  // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ LOGICA
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
     const buttonRect = buttonRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const dropdownHeight = 350; // Estimare înălțime dropdown
+    const dropdownHeight = 350;
     const spaceBelow = viewportHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
     
-    // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
-    // Altfel, afișează în jos (comportament normal)
-    if (spaceBelow < dropdownHeight) {
+    console.log('📏 Dropdown positioning:', { 
+      spaceBelow, 
+      spaceAbove, 
+      dropdownHeight,
+      buttonTop: buttonRect.top,
+      buttonBottom: buttonRect.bottom,
+      viewportHeight 
+    }); // ✅ Debug
+    
+    // ✅ FIX: Logică corectată - dacă e la început (sus), coboară jos; dacă e la sfârșit (jos), urcă sus
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      console.log('🔼 Dropdown va urca sus');
       setDropdownPosition('top');
     } else {
+      console.log('🔽 Dropdown va coborî jos');
       setDropdownPosition('bottom');
     }
   };
@@ -1064,7 +1075,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
       {isOpen && (
         <>
-          {/* Overlay Glassmorphism */}
+          {/* ✅ Overlay Glassmorphism cu Z-index mai mare */}
           <div
             style={{
               position: 'fixed' as const,
@@ -1072,24 +1083,24 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(0, 0, 0, 0.1)',
-              backdropFilter: 'blur(2px)',
+              background: 'rgba(0, 0, 0, 0.2)', // ✅ Mai opac pentru blocare interacțiune
+              backdropFilter: 'blur(4px)',
               zIndex: 10998
             }}
             onClick={() => setIsOpen(false)}
           />
 
-          {/* ✅ Dropdown Glassmorphism cu poziționare inteligentă */}
+          {/* ✅ Dropdown Glassmorphism cu opacitate mărită */}
           <div style={{
             position: 'absolute' as const,
             [dropdownPosition]: '100%',
             right: 0,
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
+            backdropFilter: 'blur(25px)', // ✅ Mai mult blur (era 20px)
             borderRadius: '16px',
             minWidth: '260px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)', // ✅ Shadow mai puternic (era 0.15)
+            border: '1px solid rgba(255, 255, 255, 0.4)', // ✅ Border mai opac (era 0.2)
             zIndex: 10999,
             marginTop: dropdownPosition === 'bottom' ? '8px' : '0',
             marginBottom: dropdownPosition === 'top' ? '8px' : '0',
@@ -1109,12 +1120,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               `}
             </style>
 
-            {/* Header Glassmorphism */}
+            {/* Header Glassmorphism cu opacitate mărită */}
             <div style={{
               padding: '1rem',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-              background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.8) 0%, rgba(233, 236, 239, 0.8) 100%)',
-              backdropFilter: 'blur(10px)'
+              borderBottom: '1px solid rgba(0, 0, 0, 0.12)', // ✅ Border mai vizibil
+              background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.95) 100%)', // ✅ Mai opac
+              backdropFilter: 'blur(15px)' // ✅ Mai mult blur
             }}>
               <div style={{ 
                 fontSize: '12px', 
