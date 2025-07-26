@@ -1263,12 +1263,12 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "rgba(255, 255, 255, 0.95)",
+                background: "rgba(255, 255, 255, 0.98)",
                 backdropFilter: "blur(20px)",
-                borderRadius: "20px",
-                maxWidth: "1200px",
+                borderRadius: "16px",
+                maxWidth: "1000px",
                 width: "100%",
-                maxHeight: "95vh",
+                maxHeight: "90vh",
                 overflowY: "auto",
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
@@ -1280,10 +1280,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "2rem",
+                        padding: "1.5rem",
                         borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)",
-                        borderRadius: "20px 20px 0 0"
+                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)",
+                        borderRadius: "16px 16px 0 0" // ✅ Mai mic (era 20px)
                     },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1357,12 +1357,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                 }),
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     style: {
-                        padding: "2rem",
+                        padding: "1.5rem",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "2rem"
+                        gap: "1.5rem"
                     },
                     children: [
+                        " ",
                         isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 position: "fixed",
@@ -2869,7 +2870,7 @@ function ProiectActions({ proiect, onRefresh }) {
             icon: "✏️",
             color: "secondary"
         },
-        // Adaugă subproiect doar pentru proiectele principale
+        // ✅ FIX: Adaugă subproiect doar pentru proiectele principale
         ...proiect.tip !== "subproiect" ? [
             {
                 key: "add_subproject",
@@ -2879,20 +2880,23 @@ function ProiectActions({ proiect, onRefresh }) {
                 disabled: proiect.Status === "Anulat" || proiect.Status === "Arhivat"
             }
         ] : [],
-        {
-            key: "divider1",
-            label: "",
-            icon: "",
-            color: "primary",
-            divider: true
-        },
-        {
-            key: "generate_invoice",
-            label: "Generează Factură PDF",
-            icon: "\uD83D\uDCB0",
-            color: "warning",
-            disabled: proiect.Status === "Anulat"
-        },
+        // ✅ FIX: Factură doar pentru proiectele principale, NU pentru subproiecte
+        ...proiect.tip !== "subproiect" ? [
+            {
+                key: "divider1",
+                label: "",
+                icon: "",
+                color: "primary",
+                divider: true
+            },
+            {
+                key: "generate_invoice",
+                label: "Generează Factură PDF",
+                icon: "\uD83D\uDCB0",
+                color: "warning",
+                disabled: proiect.Status === "Anulat"
+            }
+        ] : [],
         {
             key: "divider2",
             label: "",
@@ -2909,7 +2913,7 @@ function ProiectActions({ proiect, onRefresh }) {
         },
         {
             key: "suspend",
-            label: "Suspendă Proiect",
+            label: proiect.tip === "subproiect" ? "Suspendă Subproiect" : "Suspendă Proiect",
             icon: "⏸️",
             color: "warning",
             disabled: proiect.Status === "Suspendat" || proiect.Status === "Finalizat"
@@ -3150,12 +3154,12 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "rgba(255, 255, 255, 0.95)",
+                background: "rgba(255, 255, 255, 0.98)",
                 backdropFilter: "blur(20px)",
-                borderRadius: "20px",
-                maxWidth: "800px",
+                borderRadius: "16px",
+                maxWidth: "600px",
                 width: "100%",
-                maxHeight: "90vh",
+                maxHeight: "85vh",
                 overflowY: "auto",
                 boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
@@ -3167,10 +3171,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "2rem",
+                        padding: "1.5rem",
                         borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)",
-                        borderRadius: "20px 20px 0 0"
+                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)",
+                        borderRadius: "16px 16px 0 0" // ✅ Mai mic (era 20px)
                     },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -3253,18 +3257,19 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("form", {
                     onSubmit: handleSubmit,
                     style: {
-                        padding: "2rem",
+                        padding: "1.5rem",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "1.5rem"
+                        gap: "1.25rem"
                     },
                     children: [
+                        " ",
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(52, 152, 219, 0.05)",
-                                padding: "1.5rem",
-                                borderRadius: "16px",
-                                border: "1px solid rgba(52, 152, 219, 0.1)",
+                                background: "rgba(52, 152, 219, 0.08)",
+                                padding: "1.25rem",
+                                borderRadius: "12px",
+                                border: "1px solid rgba(52, 152, 219, 0.15)",
                                 backdropFilter: "blur(10px)"
                             },
                             children: [
@@ -3310,16 +3315,16 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
                                 display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                                gap: "1.5rem"
+                                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                                gap: "1rem" // ✅ Mai mic (era 1.5rem)
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
-                                        background: "rgba(255, 255, 255, 0.6)",
-                                        padding: "1.25rem",
-                                        borderRadius: "16px",
-                                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                                        background: "rgba(255, 255, 255, 0.8)",
+                                        padding: "1rem",
+                                        borderRadius: "12px",
+                                        border: "1px solid rgba(255, 255, 255, 0.4)",
                                         backdropFilter: "blur(10px)"
                                     },
                                     children: [
@@ -3807,11 +3812,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
         if (!buttonRef.current) return;
         const buttonRect = buttonRef.current.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
-        const dropdownHeight = 400; // Estimare înălțime dropdown
+        const dropdownHeight = 350; // Estimare înălțime dropdown
         const spaceBelow = viewportHeight - buttonRect.bottom;
-        const spaceAbove = buttonRect.top;
         // Dacă sunt în ultimele 3 rânduri (spațiu insuficient jos), afișează în sus
-        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        // Altfel, afișează în jos (comportament normal)
+        if (spaceBelow < dropdownHeight) {
             setDropdownPosition("top");
         } else {
             setDropdownPosition("bottom");
@@ -5156,20 +5161,31 @@ function ProiecteTable({ searchParams }) {
                     }
                 });
             }
+            console.log("\uD83D\uDD0D Loading subproiecte with params:", queryParams.toString()); // ✅ Debug
             const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
+            console.log("\uD83D\uDCCB Subproiecte API response:", data); // ✅ Debug
             if (data.success) {
                 setSubproiecte(data.data || []);
-                console.log("Subproiecte \xeencărcate:", data.data); // Debug
+                console.log("✅ Subproiecte \xeencărcate:", data.data?.length || 0, "items"); // ✅ Enhanced debug
+                console.log("\uD83D\uDCCA Subproiecte data:", data.data); // ✅ Detailed debug
+                // ✅ Debug pentru fiecare proiect
+                if (data.data && data.data.length > 0) {
+                    const groupedByProject = data.data.reduce((acc, sub)=>{
+                        acc[sub.ID_Proiect] = (acc[sub.ID_Proiect] || 0) + 1;
+                        return acc;
+                    }, {});
+                    console.log("\uD83D\uDCC8 Subproiecte grupate pe proiecte:", groupedByProject);
+                }
             } else {
-                console.warn("Nu s-au găsit subproiecte sau eroare:", data.error);
+                console.warn("⚠️ Nu s-au găsit subproiecte sau eroare:", data.error);
                 setSubproiecte([]);
             }
         } catch (error) {
-            console.error("Eroare la \xeencărcarea subproiectelor:", error);
+            console.error("❌ Eroare la \xeencărcarea subproiectelor:", error);
             setSubproiecte([]);
         }
     };
@@ -5189,7 +5205,9 @@ function ProiecteTable({ searchParams }) {
         });
     };
     const getSubproiecteForProject = (proiectId)=>{
-        return subproiecte.filter((sub)=>sub.ID_Proiect === proiectId);
+        const result = subproiecte.filter((sub)=>sub.ID_Proiect === proiectId);
+        console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result); // ✅ Debug
+        return result;
     };
     const handleExportExcel = async ()=>{
         try {

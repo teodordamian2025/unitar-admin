@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/subproiecte/route.ts  
-// MODIFICAT: Fix BigQuery types pentru null values + optimizări
+// MODIFICAT: Fix activ field + îmbunătățiri afișare subproiecte
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // ✅ FIX: Query cu câmpuri existente în tabelul Subproiecte
+    // ✅ FIX: Query simplificat și verificare câmp activ
     let query = `
       SELECT 
         s.*,
@@ -31,12 +31,12 @@ export async function GET(request: NextRequest) {
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` s
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
         ON s.ID_Proiect = p.ID_Proiect
-      WHERE s.activ = true
+      WHERE (s.activ IS NULL OR s.activ = true)
     `;
     
     const conditions: string[] = [];
     const params: any = {};
-    const types: any = {}; // ✅ FIX: Adăugat types
+    const types: any = {};
 
     // Filtre
     const search = searchParams.get('search');
@@ -48,26 +48,26 @@ export async function GET(request: NextRequest) {
         LOWER(COALESCE(p.Client, '')) LIKE LOWER(@search)
       )`);
       params.search = `%${search}%`;
-      types.search = 'STRING'; // ✅ FIX: Adăugat type
+      types.search = 'STRING';
     }
 
     const status = searchParams.get('status');
     if (status) {
       conditions.push('s.Status = @status');
       params.status = status;
-      types.status = 'STRING'; // ✅ FIX: Adăugat type
+      types.status = 'STRING';
     }
 
     const proiectId = searchParams.get('proiect_id');
     if (proiectId) {
       conditions.push('s.ID_Proiect = @proiectId');
       params.proiectId = proiectId;
-      types.proiectId = 'STRING'; // ✅ FIX: Adăugat type
+      types.proiectId = 'STRING';
     }
 
     // Adaugă condiții la query
     if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+      query += ' AND ' + conditions.join(' AND ');
     }
 
     // Sortare
@@ -75,14 +75,15 @@ export async function GET(request: NextRequest) {
 
     console.log('Executing subproiecte query:', query);
     console.log('With params:', params);
-    console.log('With types:', types);
 
     const [rows] = await bigquery.query({
       query: query,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
+
+    console.log(`Found ${rows.length} subproiecte`); // ✅ Debug logging
 
     return NextResponse.json({
       success: true,
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('POST subproiect request body:', body); // Debug
+    console.log('POST subproiect request body:', body);
     
     const { 
       ID_Subproiect, 
@@ -124,16 +125,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Query simplificat fără câmpuri care poate să nu existe
+    // ✅ FIX: Adăugat câmpul activ = true explicit
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, 
-       Status, Valoare_Estimata)
+       Status, Valoare_Estimata, activ, data_creare)
       VALUES (@ID_Subproiect, @ID_Proiect, @Denumire, @Responsabil, @Data_Start, 
-              @Data_Final, @Status, @Valoare_Estimata)
+              @Data_Final, @Status, @Valoare_Estimata, @activ, @data_creare)
     `;
 
-    // ✅ FIX: Params cu null handling explicit
+    // ✅ FIX: Params cu activ = true și data_creare
     const params = {
       ID_Subproiect: ID_Subproiect,
       ID_Proiect: ID_Proiect,
@@ -142,10 +143,12 @@ export async function POST(request: NextRequest) {
       Data_Start: Data_Start || null,
       Data_Final: Data_Final || null,
       Status: Status,
-      Valoare_Estimata: Valoare_Estimata || null
+      Valoare_Estimata: Valoare_Estimata || null,
+      activ: true, // ✅ FIX: Explicit true
+      data_creare: new Date().toISOString() // ✅ FIX: Timestamp creare
     };
 
-    // ✅ FIX: Types specificate pentru toate parametrii
+    // ✅ FIX: Types pentru toate câmpurile
     const types = {
       ID_Subproiect: 'STRING',
       ID_Proiect: 'STRING',
@@ -154,22 +157,26 @@ export async function POST(request: NextRequest) {
       Data_Start: 'DATE',
       Data_Final: 'DATE',
       Status: 'STRING',
-      Valoare_Estimata: 'NUMERIC'
+      Valoare_Estimata: 'NUMERIC',
+      activ: 'BOOLEAN', // ✅ FIX: Type pentru activ
+      data_creare: 'TIMESTAMP' // ✅ FIX: Type pentru data_creare
     };
 
-    console.log('Insert subproiect params:', params); // Debug
-    console.log('Insert subproiect types:', types); // Debug
+    console.log('Insert subproiect params:', params);
 
     await bigquery.query({
       query: insertQuery,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
 
+    console.log(`✅ Subproiect ${ID_Subproiect} adăugat cu succes pentru proiectul ${ID_Proiect}`); // ✅ Debug
+
     return NextResponse.json({
       success: true,
-      message: 'Subproiect adăugat cu succes'
+      message: 'Subproiect adăugat cu succes',
+      data: { ID_Subproiect, ID_Proiect }
     });
 
   } catch (error) {
@@ -197,9 +204,8 @@ export async function PUT(request: NextRequest) {
     // Construire query UPDATE dinamic
     const updateFields: string[] = [];
     const params: any = { id };
-    const types: any = { id: 'STRING' }; // ✅ FIX: Adăugat types pentru id
+    const types: any = { id: 'STRING' };
 
-    // ✅ FIX: Mapping pentru types
     const fieldTypes: { [key: string]: string } = {
       'Denumire': 'STRING',
       'Responsabil': 'STRING',
@@ -212,8 +218,8 @@ export async function PUT(request: NextRequest) {
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id' && fieldTypes[key]) {
         updateFields.push(`${key} = @${key}`);
-        params[key] = value || null; // ✅ FIX: Explicit null pentru empty values
-        types[key] = fieldTypes[key]; // ✅ FIX: Adăugat type
+        params[key] = value || null;
+        types[key] = fieldTypes[key];
       }
     });
 
@@ -224,20 +230,23 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ✅ FIX: Adăugat data_actualizare la UPDATE
+    updateFields.push('data_actualizare = @data_actualizare');
+    params.data_actualizare = new Date().toISOString();
+    types.data_actualizare = 'TIMESTAMP';
+
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(', ')}
       WHERE ID_Subproiect = @id
     `;
 
-    console.log('Update subproiect query:', updateQuery); // Debug
-    console.log('Update subproiect params:', params); // Debug
-    console.log('Update subproiect types:', types); // Debug
+    console.log('Update subproiect query:', updateQuery);
 
     await bigquery.query({
       query: updateQuery,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
 
@@ -268,7 +277,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Soft delete folosind câmpul activ existent
+    // ✅ FIX: Soft delete cu câmpul activ
     const deleteQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET activ = false, data_actualizare = @data_actualizare
@@ -287,6 +296,8 @@ export async function DELETE(request: NextRequest) {
       },
       location: 'EU',
     });
+
+    console.log(`✅ Subproiect ${id} șters (soft delete)`); // ✅ Debug
 
     return NextResponse.json({
       success: true,

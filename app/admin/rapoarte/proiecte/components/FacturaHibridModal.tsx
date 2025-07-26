@@ -658,12 +658,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
         backdropFilter: 'blur(20px)',
-        borderRadius: '20px',
-        maxWidth: '1200px',
+        borderRadius: '16px', // ✅ Mai mic (era 20px)
+        maxWidth: '1000px', // ✅ Mai mic (era 1200px)
         width: '100%',
-        maxHeight: '95vh',
+        maxHeight: '90vh', // ✅ Mai mic (era 95vh)
         overflowY: 'auto',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
         border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -674,10 +674,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '2rem',
+          padding: '1.5rem', // ✅ Mai mic (era 2rem)
           borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
-          borderRadius: '20px 20px 0 0'
+          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)', // ✅ Mai opac (era 0.1)
+          borderRadius: '16px 16px 0 0' // ✅ Mai mic (era 20px)
         }}>
           <div>
             <h2 style={{
@@ -735,7 +735,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </button>
         </div>
 
-        <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}> {/* ✅ Mai mic padding (era 2rem) */}
           {/* ✅ Loading Overlay Glassmorphism */}
           {isLoading && (
             <div style={{

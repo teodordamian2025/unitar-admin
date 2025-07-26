@@ -170,22 +170,35 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         });
       }
 
+      console.log('🔍 Loading subproiecte with params:', queryParams.toString()); // ✅ Debug
+
       const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('📋 Subproiecte API response:', data); // ✅ Debug
       
       if (data.success) {
         setSubproiecte(data.data || []);
-        console.log('Subproiecte încărcate:', data.data); // Debug
+        console.log('✅ Subproiecte încărcate:', data.data?.length || 0, 'items'); // ✅ Enhanced debug
+        console.log('📊 Subproiecte data:', data.data); // ✅ Detailed debug
+        
+        // ✅ Debug pentru fiecare proiect
+        if (data.data && data.data.length > 0) {
+          const groupedByProject = data.data.reduce((acc: any, sub: any) => {
+            acc[sub.ID_Proiect] = (acc[sub.ID_Proiect] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('📈 Subproiecte grupate pe proiecte:', groupedByProject);
+        }
       } else {
-        console.warn('Nu s-au găsit subproiecte sau eroare:', data.error);
+        console.warn('⚠️ Nu s-au găsit subproiecte sau eroare:', data.error);
         setSubproiecte([]);
       }
     } catch (error) {
-      console.error('Eroare la încărcarea subproiectelor:', error);
+      console.error('❌ Eroare la încărcarea subproiectelor:', error);
       setSubproiecte([]);
     }
   };
@@ -208,7 +221,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
   const getSubproiecteForProject = (proiectId: string): Subproiect[] => {
-    return subproiecte.filter(sub => sub.ID_Proiect === proiectId);
+    const result = subproiecte.filter(sub => sub.ID_Proiect === proiectId);
+    console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result); // ✅ Debug
+    return result;
   };
 
   const handleExportExcel = async () => {
