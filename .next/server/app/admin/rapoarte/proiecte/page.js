@@ -4764,11 +4764,15 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
 }
 
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+// MODIFICAT: Z-index Management + Modal Compatibility + Backdrop Fix
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
 
-// ✅ Toast system optimizat cu Glassmorphism
+// ✅ Toast system optimizat cu Z-index compatibil cu modalele
 const ProiecteTable_showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
     toastEl.style.cssText = `
@@ -4776,11 +4780,11 @@ const ProiecteTable_showToast = (message, type = "info")=>{
     top: 20px;
     right: 20px;
     background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(12px);
     color: ${type === "success" ? "#27ae60" : type === "error" ? "#e74c3c" : "#3498db"};
     padding: 16px 20px;
     border-radius: 16px;
-    z-index: 10000;
+    z-index: 60000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -4815,14 +4819,14 @@ function ProiecteTable({ searchParams }) {
     const [loading, setLoading] = (0,react_experimental_.useState)(true);
     const [refreshTrigger, setRefreshTrigger] = (0,react_experimental_.useState)(0);
     const [showProiectModal, setShowProiectModal] = (0,react_experimental_.useState)(false);
-    const [expandedProjects, setExpandedProjects] = (0,react_experimental_.useState)(new Set()); // ✅ Îl vom popula automat
+    const [expandedProjects, setExpandedProjects] = (0,react_experimental_.useState)(new Set());
     (0,react_experimental_.useEffect)(()=>{
         loadData();
     }, [
         searchParams,
         refreshTrigger
     ]);
-    // ✅ FIX: Auto-expand subproiecte când datele se schimbă
+    // ✅ Auto-expand subproiecte când datele se schimbă
     (0,react_experimental_.useEffect)(()=>{
         if (proiecte.length > 0 && subproiecte.length > 0) {
             const proiecteCuSubproiecte = proiecte.map((p)=>p.ID_Proiect).filter((id)=>subproiecte.some((sub)=>sub.ID_Proiect === id));
@@ -4834,7 +4838,7 @@ function ProiecteTable({ searchParams }) {
     }, [
         proiecte,
         subproiecte
-    ]); // ✅ Trigger când se schimbă datele
+    ]);
     // Verifică notificări pentru statusul facturii din URL
     (0,react_experimental_.useEffect)(()=>{
         if (searchParams?.invoice_status && searchParams?.project_id) {
@@ -4861,7 +4865,6 @@ function ProiecteTable({ searchParams }) {
                 loadProiecte(),
                 loadSubproiecte()
             ]);
-        // ✅ Eliminat auto-expand de aici - se face în useEffect separat
         } catch (error) {
             console.error("Eroare la \xeencărcarea datelor:", error);
             ProiecteTable_showToast("Eroare de conectare la baza de date", "error");
@@ -4911,18 +4914,17 @@ function ProiecteTable({ searchParams }) {
                     }
                 });
             }
-            console.log("\uD83D\uDD0D Loading subproiecte with params:", queryParams.toString()); // ✅ Debug
+            console.log("\uD83D\uDD0D Loading subproiecte with params:", queryParams.toString());
             const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
-            console.log("\uD83D\uDCCB Subproiecte API response:", data); // ✅ Debug
+            console.log("\uD83D\uDCCB Subproiecte API response:", data);
             if (data.success) {
                 setSubproiecte(data.data || []);
-                console.log("✅ Subproiecte \xeencărcate:", data.data?.length || 0, "items"); // ✅ Enhanced debug
-                console.log("\uD83D\uDCCA Subproiecte data:", data.data); // ✅ Detailed debug
-                // ✅ Debug pentru fiecare proiect
+                console.log("✅ Subproiecte \xeencărcate:", data.data?.length || 0, "items");
+                console.log("\uD83D\uDCCA Subproiecte data:", data.data);
                 if (data.data && data.data.length > 0) {
                     const groupedByProject = data.data.reduce((acc, sub)=>{
                         acc[sub.ID_Proiect] = (acc[sub.ID_Proiect] || 0) + 1;
@@ -4956,7 +4958,7 @@ function ProiecteTable({ searchParams }) {
     };
     const getSubproiecteForProject = (proiectId)=>{
         const result = subproiecte.filter((sub)=>sub.ID_Proiect === proiectId);
-        console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result); // ✅ Debug
+        console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result);
         return result;
     };
     const handleExportExcel = async ()=>{
@@ -5042,7 +5044,7 @@ function ProiecteTable({ searchParams }) {
                 return "⚪";
         }
     };
-    // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele - CORECT
+    // ✅ Calculează totalul combinat pentru toate proiectele și subproiectele
     const calculateTotalValue = ()=>{
         const totalProiecte = proiecte.reduce((sum, p)=>{
             const valoare = Number(p.Valoare_Estimata) || 0;
@@ -5057,7 +5059,7 @@ function ProiecteTable({ searchParams }) {
             totalProiecte,
             totalSubproiecte,
             total
-        }); // ✅ Debug
+        });
         return total;
     };
     if (loading) {
@@ -5069,15 +5071,22 @@ function ProiecteTable({ searchParams }) {
                 height: "300px",
                 fontSize: "16px",
                 color: "#7f8c8d",
-                background: "rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(20px)",
+                background: "rgba(255, 255, 255, 0.8)",
+                backdropFilter: "blur(8px)",
                 borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.2)"
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                // ✅ Z-index redus pentru loading
+                zIndex: 1
             },
             children: "⏳ Se \xeencarcă proiectele..."
         });
     }
     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+        style: {
+            // ✅ Z-index redus pentru tot container-ul
+            zIndex: 1,
+            position: "relative"
+        },
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
@@ -5086,11 +5095,14 @@ function ProiecteTable({ searchParams }) {
                     alignItems: "center",
                     marginBottom: "1.5rem",
                     padding: "1.5rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(20px)",
+                    background: "rgba(255, 255, 255, 0.85)",
+                    // ✅ Backdrop-filter redus
+                    backdropFilter: "blur(8px)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+                    // ✅ Z-index moderat
+                    zIndex: 10
                 },
                 children: [
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -5137,7 +5149,9 @@ function ProiecteTable({ searchParams }) {
                                     fontSize: "14px",
                                     fontWeight: "600",
                                     boxShadow: "0 4px 12px rgba(39, 174, 96, 0.4)",
-                                    transition: "all 0.3s ease"
+                                    transition: "all 0.3s ease",
+                                    // ✅ Z-index pentru butoane
+                                    zIndex: 11
                                 },
                                 onMouseOver: (e)=>{
                                     e.currentTarget.style.transform = "translateY(-2px)";
@@ -5161,7 +5175,8 @@ function ProiecteTable({ searchParams }) {
                                     fontSize: "14px",
                                     fontWeight: "600",
                                     boxShadow: "0 4px 12px rgba(52, 152, 219, 0.4)",
-                                    transition: "all 0.3s ease"
+                                    transition: "all 0.3s ease",
+                                    zIndex: 11
                                 },
                                 onMouseOver: (e)=>{
                                     e.currentTarget.style.transform = "translateY(-2px)";
@@ -5185,7 +5200,8 @@ function ProiecteTable({ searchParams }) {
                                     fontSize: "14px",
                                     fontWeight: "600",
                                     boxShadow: "0 4px 12px rgba(243, 156, 18, 0.4)",
-                                    transition: "all 0.3s ease"
+                                    transition: "all 0.3s ease",
+                                    zIndex: 11
                                 },
                                 onMouseOver: (e)=>{
                                     e.currentTarget.style.transform = "translateY(-2px)";
@@ -5205,10 +5221,11 @@ function ProiecteTable({ searchParams }) {
                 style: {
                     textAlign: "center",
                     padding: "3rem",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    backdropFilter: "blur(20px)",
+                    background: "rgba(255, 255, 255, 0.8)",
+                    backdropFilter: "blur(8px)",
                     borderRadius: "16px",
-                    border: "2px dashed rgba(255, 255, 255, 0.3)"
+                    border: "2px dashed rgba(255, 255, 255, 0.4)",
+                    zIndex: 1
                 },
                 children: [
                     /*#__PURE__*/ jsx_runtime_.jsx("p", {
@@ -5230,18 +5247,22 @@ function ProiecteTable({ searchParams }) {
                 ]
             }) : /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(20px)",
+                    background: "rgba(255, 255, 255, 0.85)",
+                    // ✅ Backdrop-filter redus
+                    backdropFilter: "blur(8px)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    // ✅ Overflow normal pentru compatibilitate cu dropdown-uri
                     overflow: "visible",
-                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
-                    position: "relative"
+                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.08)",
+                    // ✅ Z-index moderat
+                    zIndex: 10
                 },
                 children: [
                     /*#__PURE__*/ jsx_runtime_.jsx("div", {
                         style: {
-                            overflow: "auto"
+                            overflowX: "auto",
+                            overflowY: "visible"
                         },
                         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
                             style: {
@@ -5254,7 +5275,7 @@ function ProiecteTable({ searchParams }) {
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                         style: {
                                             background: "rgba(248, 249, 250, 0.8)",
-                                            backdropFilter: "blur(10px)",
+                                            backdropFilter: "blur(6px)",
                                             borderBottom: "1px solid rgba(0, 0, 0, 0.08)"
                                         },
                                         children: [
@@ -5359,7 +5380,6 @@ function ProiecteTable({ searchParams }) {
                                                             style: {
                                                                 padding: "0.75rem",
                                                                 color: "#2c3e50",
-                                                                // ✅ FIX: Removed maxWidth constraint and enabled text wrapping
                                                                 width: "300px",
                                                                 minWidth: "250px"
                                                             },
@@ -5525,7 +5545,8 @@ function ProiecteTable({ searchParams }) {
                                                             style: {
                                                                 padding: "0.75rem",
                                                                 textAlign: "center",
-                                                                position: "relative"
+                                                                // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
+                                                                zIndex: 20
                                                             },
                                                             children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
                                                                 proiect: {
@@ -5665,7 +5686,8 @@ function ProiecteTable({ searchParams }) {
                                                                 style: {
                                                                     padding: "0.5rem 0.75rem",
                                                                     textAlign: "center",
-                                                                    position: "relative"
+                                                                    // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
+                                                                    zIndex: 20
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectActions, {
                                                                     proiect: {
@@ -5696,11 +5718,12 @@ function ProiecteTable({ searchParams }) {
                             padding: "1.5rem",
                             borderTop: "1px solid rgba(0, 0, 0, 0.08)",
                             background: "rgba(248, 249, 250, 0.8)",
-                            backdropFilter: "blur(10px)",
+                            backdropFilter: "blur(6px)",
                             display: "grid",
                             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                             gap: "1rem",
-                            textAlign: "center"
+                            textAlign: "center",
+                            zIndex: 1
                         },
                         children: [
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -5807,10 +5830,15 @@ function ProiecteTable({ searchParams }) {
                     })
                 ]
             }),
-            /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
-                isOpen: showProiectModal,
-                onClose: ()=>setShowProiectModal(false),
-                onProiectAdded: handleRefresh
+            showProiectModal && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    zIndex: 50000
+                },
+                children: /*#__PURE__*/ jsx_runtime_.jsx(ProiectNouModal, {
+                    isOpen: showProiectModal,
+                    onClose: ()=>setShowProiectModal(false),
+                    onProiectAdded: handleRefresh
+                })
             })
         ]
     });

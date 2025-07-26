@@ -1,3 +1,8 @@
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+// MODIFICAT: Z-index Management + Modal Compatibility + Backdrop Fix
+// ==================================================================
+
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
@@ -36,7 +41,7 @@ interface ProiecteTableProps {
   searchParams?: { [key: string]: string | undefined };
 }
 
-// ✅ Toast system optimizat cu Glassmorphism
+// ✅ Toast system optimizat cu Z-index compatibil cu modalele
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -44,11 +49,11 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     top: 20px;
     right: 20px;
     background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(12px);
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
     border-radius: 16px;
-    z-index: 10000;
+    z-index: 60000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -86,13 +91,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showProiectModal, setShowProiectModal] = useState(false);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set()); // ✅ Îl vom popula automat
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
   }, [searchParams, refreshTrigger]);
 
-  // ✅ FIX: Auto-expand subproiecte când datele se schimbă
+  // ✅ Auto-expand subproiecte când datele se schimbă
   useEffect(() => {
     if (proiecte.length > 0 && subproiecte.length > 0) {
       const proiecteCuSubproiecte = proiecte
@@ -104,7 +109,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         console.log('🔍 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
       }
     }
-  }, [proiecte, subproiecte]); // ✅ Trigger când se schimbă datele
+  }, [proiecte, subproiecte]);
 
   // Verifică notificări pentru statusul facturii din URL
   useEffect(() => {
@@ -129,7 +134,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     try {
       setLoading(true);
       await Promise.all([loadProiecte(), loadSubproiecte()]);
-      // ✅ Eliminat auto-expand de aici - se face în useEffect separat
     } catch (error) {
       console.error('Eroare la încărcarea datelor:', error);
       showToast('Eroare de conectare la baza de date', 'error');
@@ -185,7 +189,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         });
       }
 
-      console.log('🔍 Loading subproiecte with params:', queryParams.toString()); // ✅ Debug
+      console.log('🔍 Loading subproiecte with params:', queryParams.toString());
 
       const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
       if (!response.ok) {
@@ -193,14 +197,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
       
       const data = await response.json();
-      console.log('📋 Subproiecte API response:', data); // ✅ Debug
+      console.log('📋 Subproiecte API response:', data);
       
       if (data.success) {
         setSubproiecte(data.data || []);
-        console.log('✅ Subproiecte încărcate:', data.data?.length || 0, 'items'); // ✅ Enhanced debug
-        console.log('📊 Subproiecte data:', data.data); // ✅ Detailed debug
+        console.log('✅ Subproiecte încărcate:', data.data?.length || 0, 'items');
+        console.log('📊 Subproiecte data:', data.data);
         
-        // ✅ Debug pentru fiecare proiect
         if (data.data && data.data.length > 0) {
           const groupedByProject = data.data.reduce((acc: any, sub: any) => {
             acc[sub.ID_Proiect] = (acc[sub.ID_Proiect] || 0) + 1;
@@ -237,7 +240,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const getSubproiecteForProject = (proiectId: string): Subproiect[] => {
     const result = subproiecte.filter(sub => sub.ID_Proiect === proiectId);
-    console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result); // ✅ Debug
+    console.log(`🔍 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result);
     return result;
   };
 
@@ -329,7 +332,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ FIX: Calculează totalul combinat pentru toate proiectele și subproiectele - CORECT
+  // ✅ Calculează totalul combinat pentru toate proiectele și subproiectele
   const calculateTotalValue = () => {
     const totalProiecte = proiecte.reduce((sum, p) => {
       const valoare = Number(p.Valoare_Estimata) || 0;
@@ -342,7 +345,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }, 0);
     
     const total = totalProiecte + totalSubproiecte;
-    console.log('💰 Calcul totaluri:', { totalProiecte, totalSubproiecte, total }); // ✅ Debug
+    console.log('💰 Calcul totaluri:', { totalProiecte, totalSubproiecte, total });
     return total;
   };
 
@@ -355,10 +358,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         height: '300px',
         fontSize: '16px',
         color: '#7f8c8d',
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
+        background: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(8px)',
         borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.2)'
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        // ✅ Z-index redus pentru loading
+        zIndex: 1
       }}>
         ⏳ Se încarcă proiectele...
       </div>
@@ -366,19 +371,26 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   }
 
   return (
-    <div>
-      {/* ✅ Header cu acțiuni - Glassmorphism Premium */}
+    <div style={{
+      // ✅ Z-index redus pentru tot container-ul
+      zIndex: 1,
+      position: 'relative' as const
+    }}>
+      {/* ✅ Header cu acțiuni - Backdrop redus */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
         marginBottom: '1.5rem',
         padding: '1.5rem',
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(20px)',
+        background: 'rgba(255, 255, 255, 0.85)',
+        // ✅ Backdrop-filter redus
+        backdropFilter: 'blur(8px)',
         borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+        // ✅ Z-index moderat
+        zIndex: 10
       }}>
         <div>
           <h3 style={{ 
@@ -416,7 +428,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               fontSize: '14px',
               fontWeight: '600',
               boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              // ✅ Z-index pentru butoane
+              zIndex: 11
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
@@ -442,7 +456,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               fontSize: '14px',
               fontWeight: '600',
               boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              zIndex: 11
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
@@ -468,7 +483,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               fontSize: '14px',
               fontWeight: '600',
               boxShadow: '0 4px 12px rgba(243, 156, 18, 0.4)',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              zIndex: 11
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
@@ -489,10 +505,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         <div style={{ 
           textAlign: 'center', 
           padding: '3rem',
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(8px)',
           borderRadius: '16px',
-          border: '2px dashed rgba(255, 255, 255, 0.3)'
+          border: '2px dashed rgba(255, 255, 255, 0.4)',
+          zIndex: 1
         }}>
           <p style={{ fontSize: '18px', color: '#7f8c8d', margin: 0 }}>
             📋 Nu au fost găsite proiecte
@@ -503,15 +520,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       ) : (
         <div style={{ 
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          // ✅ Backdrop-filter redus
+          backdropFilter: 'blur(8px)',
           borderRadius: '16px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          // ✅ Overflow normal pentru compatibilitate cu dropdown-uri
           overflow: 'visible',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          position: 'relative' as const
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+          // ✅ Z-index moderat
+          zIndex: 10
         }}>
-          <div style={{ overflow: 'auto' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
             <table style={{ 
               width: '100%', 
               borderCollapse: 'collapse',
@@ -520,7 +540,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               <thead>
                 <tr style={{ 
                   background: 'rgba(248, 249, 250, 0.8)',
-                  backdropFilter: 'blur(10px)',
+                  backdropFilter: 'blur(6px)',
                   borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
                 }}>
                   <th style={{ 
@@ -617,7 +637,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         <td style={{ 
                           padding: '0.75rem',
                           color: '#2c3e50',
-                          // ✅ FIX: Removed maxWidth constraint and enabled text wrapping
                           width: '300px',
                           minWidth: '250px'
                         }}>
@@ -661,10 +680,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               }}>
                                 🏗️ {proiect.ID_Proiect}
                               </div>
-                              {/* ✅ FIX: Text wrapping enabled with proper height adjustment */}
                               <div style={{ 
                                 color: '#2c3e50',
-                                whiteSpace: 'normal', // Changed from 'nowrap'
+                                whiteSpace: 'normal',
                                 wordBreak: 'break-word',
                                 lineHeight: '1.4',
                                 fontSize: '14px',
@@ -747,7 +765,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         <td style={{ 
                           padding: '0.75rem',
                           textAlign: 'center' as const,
-                          position: 'relative' as const
+                          // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
+                          zIndex: 20
                         }}>
                           <ProiectActions 
                             proiect={{
@@ -862,7 +881,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center' as const,
-                            position: 'relative' as const
+                            // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
+                            zIndex: 20
                           }}>
                             <ProiectActions 
                               proiect={{
@@ -888,17 +908,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* ✅ Footer cu statistici - Glassmorphism Premium cu total combinat */}
+          {/* ✅ Footer cu statistici - Backdrop redus */}
           {proiecte.length > 0 && (
             <div style={{
               padding: '1.5rem',
               borderTop: '1px solid rgba(0, 0, 0, 0.08)',
               background: 'rgba(248, 249, 250, 0.8)',
-              backdropFilter: 'blur(10px)',
+              backdropFilter: 'blur(6px)',
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '1rem',
-              textAlign: 'center'
+              textAlign: 'center',
+              zIndex: 1
             }}>
               <div style={{
                 background: 'rgba(255, 255, 255, 0.7)',
@@ -924,7 +945,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {subproiecte.length}
                 </div>
               </div>
-              {/* ✅ FIX: Total combinat în loc de valori separate */}
               <div style={{
                 background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
                 padding: '1rem',
@@ -946,12 +966,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* Modal Proiect Nou */}
-      <ProiectNouModal
-        isOpen={showProiectModal}
-        onClose={() => setShowProiectModal(false)}
-        onProiectAdded={handleRefresh}
-      />
+      {/* ✅ Modal Proiect Nou cu Z-index Mare */}
+      {showProiectModal && (
+        <div style={{ zIndex: 50000 }}>
+          <ProiectNouModal
+            isOpen={showProiectModal}
+            onClose={() => setShowProiectModal(false)}
+            onProiectAdded={handleRefresh}
+          />
+        </div>
+      )}
     </div>
   );
 }
