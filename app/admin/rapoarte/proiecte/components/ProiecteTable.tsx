@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// MODIFICAT: Z-index Management + Modal Compatibility + Backdrop Fix
+// MODIFICAT: Management Centralizat al Tuturor Modalelor cu Z-index 50000
 // ==================================================================
 
 'use client';
@@ -8,6 +8,8 @@
 import { useState, useEffect, Fragment } from 'react';
 import ProiectActions from './ProiectActions';
 import ProiectNouModal from './ProiectNouModal';
+import FacturaHibridModal from './FacturaHibridModal';
+import SubproiectModal from './SubproiectModal';
 
 interface Proiect {
   ID_Proiect: string;
@@ -90,7 +92,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // ✅ NOWI: State management centralizat pentru toate modalele
   const [showProiectModal, setShowProiectModal] = useState(false);
+  const [showFacturaModal, setShowFacturaModal] = useState(false);
+  const [showSubproiectModal, setShowSubproiectModal] = useState(false);
+  const [selectedProiect, setSelectedProiect] = useState<any>(null);
+  
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -224,6 +232,43 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     showToast('Date actualizate!', 'success');
+  };
+
+  // ✅ NOWI: Handler-e pentru modalele externe
+  const handleShowFacturaModal = (proiect: any) => {
+    console.log('📄 Deschidere modal factură pentru:', proiect);
+    setSelectedProiect(proiect);
+    setShowFacturaModal(true);
+  };
+
+  const handleShowSubproiectModal = (proiect: any) => {
+    console.log('📂 Deschidere modal subproiect pentru:', proiect);
+    setSelectedProiect(proiect);
+    setShowSubproiectModal(true);
+  };
+
+  const handleFacturaSuccess = (invoiceId: string, downloadUrl?: string) => {
+    setShowFacturaModal(false);
+    setSelectedProiect(null);
+    showToast(`Factura ${invoiceId} a fost generată cu succes!`, 'success');
+    handleRefresh();
+  };
+
+  const handleSubproiectSuccess = () => {
+    setShowSubproiectModal(false);
+    setSelectedProiect(null);
+    showToast('✅ Subproiect adăugat cu succes!', 'success');
+    handleRefresh();
+  };
+
+  const handleCloseFacturaModal = () => {
+    setShowFacturaModal(false);
+    setSelectedProiect(null);
+  };
+
+  const handleCloseSubproiectModal = () => {
+    setShowSubproiectModal(false);
+    setSelectedProiect(null);
   };
 
   const toggleProjectExpansion = (proiectId: string) => {
@@ -362,7 +407,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         backdropFilter: 'blur(8px)',
         borderRadius: '16px',
         border: '1px solid rgba(255, 255, 255, 0.3)',
-        // ✅ Z-index redus pentru loading
         zIndex: 1
       }}>
         ⏳ Se încarcă proiectele...
@@ -372,7 +416,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   return (
     <div style={{
-      // ✅ Z-index redus pentru tot container-ul
       zIndex: 1,
       position: 'relative' as const
     }}>
@@ -384,12 +427,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         marginBottom: '1.5rem',
         padding: '1.5rem',
         background: 'rgba(255, 255, 255, 0.85)',
-        // ✅ Backdrop-filter redus
         backdropFilter: 'blur(8px)',
         borderRadius: '16px',
         border: '1px solid rgba(255, 255, 255, 0.3)',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-        // ✅ Z-index moderat
         zIndex: 10
       }}>
         <div>
@@ -429,7 +470,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               fontWeight: '600',
               boxShadow: '0 4px 12px rgba(39, 174, 96, 0.4)',
               transition: 'all 0.3s ease',
-              // ✅ Z-index pentru butoane
               zIndex: 11
             }}
             onMouseOver={(e) => {
@@ -521,14 +561,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       ) : (
         <div style={{ 
           background: 'rgba(255, 255, 255, 0.85)',
-          // ✅ Backdrop-filter redus
           backdropFilter: 'blur(8px)',
           borderRadius: '16px',
           border: '1px solid rgba(255, 255, 255, 0.3)',
-          // ✅ Overflow normal pentru compatibilitate cu dropdown-uri
           overflow: 'visible',
           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-          // ✅ Z-index moderat
           zIndex: 10
         }}>
           <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
@@ -765,15 +802,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         <td style={{ 
                           padding: '0.75rem',
                           textAlign: 'center' as const,
-                          // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
                           zIndex: 20
                         }}>
+                          {/* ✅ MODIFICAT: Adăugat callback-uri pentru modalele externe */}
                           <ProiectActions 
                             proiect={{
                               ...proiect,
                               tip: 'proiect'
                             }} 
                             onRefresh={handleRefresh}
+                            onShowFacturaModal={handleShowFacturaModal}
+                            onShowSubproiectModal={handleShowSubproiectModal}
                           />
                         </td>
                       </tr>
@@ -881,9 +920,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center' as const,
-                            // ✅ ELIMINAT position: relative pentru compatibilitate dropdown
                             zIndex: 20
                           }}>
+                            {/* ✅ MODIFICAT: Adăugat callback-uri pentru subproiecte */}
                             <ProiectActions 
                               proiect={{
                                 ID_Proiect: subproiect.ID_Subproiect,
@@ -897,6 +936,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                 Responsabil: subproiect.Responsabil
                               }} 
                               onRefresh={handleRefresh}
+                              onShowFacturaModal={handleShowFacturaModal}
+                              onShowSubproiectModal={handleShowSubproiectModal}
                             />
                           </td>
                         </tr>
@@ -966,13 +1007,38 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* ✅ Modal Proiect Nou cu Z-index Mare */}
+      {/* ✅ TOATE MODALELE GESTIONATE CENTRALIZAT CU Z-INDEX 50000 */}
+      
+      {/* Modal Proiect Nou */}
       {showProiectModal && (
         <div style={{ zIndex: 50000 }}>
           <ProiectNouModal
             isOpen={showProiectModal}
             onClose={() => setShowProiectModal(false)}
             onProiectAdded={handleRefresh}
+          />
+        </div>
+      )}
+
+      {/* ✅ NOWI: Modal Factură Hibridă */}
+      {showFacturaModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <FacturaHibridModal
+            proiect={selectedProiect}
+            onClose={handleCloseFacturaModal}
+            onSuccess={handleFacturaSuccess}
+          />
+        </div>
+      )}
+
+      {/* ✅ NOWI: Modal Subproiect */}
+      {showSubproiectModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <SubproiectModal
+            proiectParinte={selectedProiect}
+            isOpen={showSubproiectModal}
+            onClose={handleCloseSubproiectModal}
+            onSuccess={handleSubproiectSuccess}
           />
         </div>
       )}
