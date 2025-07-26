@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced
+// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced + OPACITATE FIXATĂ
 // ==================================================================
 
 'use client';
@@ -649,8 +649,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     <div style={{
       position: 'fixed' as const,
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.6)', // ✅ Overlay mai puternic pentru blocare
-      backdropFilter: 'blur(5px)',
+      background: 'rgba(0, 0, 0, 0.6)', // ✅ Overlay puternic pentru blocare
+      backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -658,19 +658,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: '#ffffff', // ✅ ALBU SOLID
-        opacity: 0.9, // ✅ 90% opacitate DIRECTĂ (nu mai folosesc animații care resetează)
+        background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLEȚI OPAC
         borderRadius: '16px',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic
-        border: '1px solid #d0d0d0', // ✅ Border solid
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic pentru separare
+        border: '1px solid #d0d0d0', // ✅ Border solid pentru delimitare clară
         position: 'relative' as const,
-        // ✅ Eliminat toate animațiile care pot reseta opacity
-        transform: 'scale(1)', // ✅ Static scale
-        transition: 'none' // ✅ Fără tranziții care pot afecta opacity
+        // ✅ ELIMINAT orice animație sau proprietate care poate afecta opacitatea
+        transform: 'scale(1)',
+        opacity: 1 // ✅ OPACITATE 100% - COMPLETĂ
       }}>
         {/* Header SOLID pentru modal factură */}
         <div style={{
@@ -679,7 +678,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           justifyContent: 'space-between',
           padding: '1.5rem',
           borderBottom: '1px solid #e0e0e0', // ✅ Border solid
-          background: '#e3f2fd', // ✅ Background solid albastru deschis
+          background: '#e3f2fd', // ✅ Background solid albastru deschis - COMPLET OPAC
           borderRadius: '16px 16px 0 0'
         }}>
           <div>
@@ -738,13 +737,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </button>
         </div>
 
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}> {/* ✅ Mai mic padding (era 2rem) */}
-          {/* ✅ Loading Overlay Glassmorphism */}
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* ✅ Loading Overlay Glassmorphism COMPLET OPAC */}
           {isLoading && (
             <div style={{
               position: 'fixed' as const,
               inset: '0',
-              background: 'rgba(0, 0, 0, 0.3)',
+              background: 'rgba(0, 0, 0, 0.6)', // ✅ Background semi-transparent puternic
               backdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
@@ -752,12 +751,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               zIndex: 14000 // ✅ Peste modalul principal
             }}>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(20px)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLETĂ OPACITATE
                 padding: '2rem',
                 borderRadius: '20px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)', // ✅ Shadow puternic pentru separare
+                border: '1px solid #e0e0e0', // ✅ Border solid pentru delimitare
                 textAlign: 'center'
               }}>
                 <div style={{
@@ -794,13 +792,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-          {/* ✅ Secțiune informații proiect Glassmorphism */}
+          {/* ✅ Secțiune informații proiect Glassmorphism COMPLET OPAC */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.05) 0%, rgba(52, 152, 219, 0.1) 100%)',
+            background: '#f0f8ff', // ✅ BACKGROUND SOLID albastru foarte deschis - COMPLET OPAC
             padding: '2rem',
             borderRadius: '16px',
-            border: '1px solid rgba(52, 152, 219, 0.1)',
-            backdropFilter: 'blur(10px)'
+            border: '1px solid #cce7ff', // ✅ Border solid albastru deschis
+            boxShadow: '0 4px 12px rgba(52, 152, 219, 0.15)' // ✅ Shadow subtil
           }}>
             <h3 style={{
               fontSize: '18px',
@@ -819,42 +817,42 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               gap: '1rem'
             }}>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
+                border: '1px solid #e0e0e0', // ✅ Border solid
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID Proiect</div>
                 <div style={{ fontSize: '16px', fontWeight: '700', color: '#2c3e50', marginTop: '0.25rem', fontFamily: 'monospace' }}>{proiect.ID_Proiect}</div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
+                border: '1px solid #e0e0e0', // ✅ Border solid
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</div>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#27ae60', marginTop: '0.25rem' }}>{proiect.Status}</div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)',
+                border: '1px solid #e0e0e0', // ✅ Border solid
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)', // ✅ Shadow subtil
                 gridColumn: 'span 2'
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Denumire</div>
                 <div style={{ fontSize: '14px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>{proiect.Denumire}</div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
+                border: '1px solid #e0e0e0', // ✅ Border solid
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Estimată</div>
                 <div style={{ fontSize: '16px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
@@ -862,11 +860,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 </div>
               </div>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 padding: '1rem',
                 borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                backdropFilter: 'blur(10px)'
+                border: '1px solid #e0e0e0', // ✅ Border solid
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
               }}>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Perioada</div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: '#2c3e50', marginTop: '0.25rem' }}>
@@ -875,12 +873,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* ✅ Secțiunea subproiecte Glassmorphism */}
+            {/* ✅ Secțiunea subproiecte Glassmorphism COMPLET OPAC */}
             {subproiecteDisponibile.length > 0 && (
               <div style={{
                 marginTop: '2rem',
                 paddingTop: '1.5rem',
-                borderTop: '1px solid rgba(52, 152, 219, 0.2)'
+                borderTop: '1px solid #cce7ff' // ✅ Border solid albastru deschis
               }}>
                 <div style={{
                   display: 'flex',
@@ -943,28 +941,26 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                         key={subproiect.ID_Subproiect} 
                         style={{
                           background: subproiect.adaugat ? 
-                            'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)' : 
-                            'rgba(255, 255, 255, 0.8)',
+                            '#e8f8e8' : '#ffffff', // ✅ BACKGROUND SOLID - verde foarte deschis sau alb - COMPLET OPAC
                           border: subproiect.adaugat ? 
-                            '2px solid rgba(39, 174, 96, 0.3)' : 
-                            '1px solid rgba(0, 0, 0, 0.1)',
+                            '2px solid #4ade80' : '1px solid #e0e0e0', // ✅ Border solid
                           borderRadius: '12px',
                           padding: '1rem',
                           transition: 'all 0.3s ease',
-                          backdropFilter: 'blur(10px)'
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
                         }}
                         onMouseOver={(e) => {
                           if (!subproiect.adaugat) {
-                            e.currentTarget.style.border = '2px solid rgba(52, 152, 219, 0.3)';
+                            e.currentTarget.style.border = '2px solid #3498db';
                             e.currentTarget.style.transform = 'translateY(-2px)';
                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
                           }
                         }}
                         onMouseOut={(e) => {
                           if (!subproiect.adaugat) {
-                            e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                            e.currentTarget.style.border = '1px solid #e0e0e0';
                             e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
+                            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
                           }
                         }}
                       >
@@ -1006,9 +1002,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               cursor: subproiect.adaugat ? 'not-allowed' : 'pointer',
                               transition: 'all 0.3s ease',
                               background: subproiect.adaugat ? 
-                                'rgba(39, 174, 96, 0.2)' : 
-                                'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                              color: subproiect.adaugat ? '#27ae60' : 'white',
+                                '#d4edda' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)', // ✅ BACKGROUND SOLID verde foarte deschis sau gradient
+                              color: subproiect.adaugat ? '#155724' : 'white', // ✅ CULORI SOLIDE
                               boxShadow: subproiect.adaugat ? 'none' : '0 2px 8px rgba(39, 174, 96, 0.3)'
                             }}
                             onMouseOver={(e) => {
@@ -1035,13 +1030,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* ✅ Secțiune Client Glassmorphism */}
+          {/* ✅ Secțiune Client Glassmorphism COMPLET OPAC */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.6)',
+            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
             padding: '2rem',
             borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            backdropFilter: 'blur(10px)'
+            border: '1px solid #e0e0e0', // ✅ Border solid
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
           }}>
             <div style={{
               display: 'flex',
@@ -1069,12 +1064,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   placeholder="Introduceți CUI (ex: RO12345678)"
                   style={{
                     padding: '0.75rem',
-                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #e0e0e0', // ✅ Border solid
                     borderRadius: '12px',
                     fontSize: '14px',
                     width: '220px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(10px)',
+                    background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                     transition: 'all 0.3s ease'
                   }}
                   onFocus={(e) => {
@@ -1082,7 +1076,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.border = '1px solid #e0e0e0';
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
@@ -1091,9 +1085,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   disabled={isLoadingANAF || !cuiInput.trim()}
                   style={{
                     background: isLoadingANAF || !cuiInput.trim() ? 
-                      'rgba(149, 165, 166, 0.3)' : 
-                      'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                    color: 'white',
+                      '#f8f9fa' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)', // ✅ BACKGROUND SOLID gri deschis sau gradient
+                    color: isLoadingANAF || !cuiInput.trim() ? '#6c757d' : 'white', // ✅ CULORI SOLIDE
                     border: 'none',
                     borderRadius: '12px',
                     padding: '0.75rem 1.25rem',
@@ -1123,13 +1116,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             
             {anafError && (
               <div style={{
-                background: 'rgba(231, 76, 60, 0.1)',
-                border: '1px solid rgba(231, 76, 60, 0.2)',
+                background: '#f8d7da', // ✅ BACKGROUND SOLID roșu foarte deschis - COMPLET OPAC
+                border: '1px solid #f5c6cb', // ✅ Border solid roșu deschis
                 borderRadius: '12px',
                 padding: '1rem',
                 marginBottom: '1.5rem'
               }}>
-                <p style={{ fontSize: '14px', color: '#e74c3c', margin: 0, fontWeight: '500' }}>❌ {anafError}</p>
+                <p style={{ fontSize: '14px', color: '#721c24', margin: 0, fontWeight: '500' }}>❌ {anafError}</p>
               </div>
             )}
             
@@ -1158,10 +1151,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       borderRadius: '12px',
                       fontSize: '14px',
-                      background: 'rgba(255, 255, 255, 0.8)',
+                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1187,10 +1180,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       borderRadius: '12px',
                       fontSize: '14px',
-                      background: 'rgba(255, 255, 255, 0.8)',
+                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1216,10 +1209,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       borderRadius: '12px',
                       fontSize: '14px',
-                      background: 'rgba(255, 255, 255, 0.8)',
+                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1244,10 +1237,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       borderRadius: '12px',
                       fontSize: '14px',
-                      background: 'rgba(255, 255, 255, 0.8)',
+                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1272,10 +1265,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       borderRadius: '12px',
                       fontSize: '14px',
-                      background: 'rgba(255, 255, 255, 0.8)',
+                      background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                       transition: 'all 0.3s ease',
                       boxSizing: 'border-box'
                     }}
@@ -1291,8 +1284,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                         borderRadius: '12px',
                         fontSize: '12px',
                         fontWeight: '600',
-                        background: clientInfo.status === 'Activ' ? 'rgba(39, 174, 96, 0.2)' : 'rgba(231, 76, 60, 0.2)',
-                        color: clientInfo.status === 'Activ' ? '#27ae60' : '#e74c3c'
+                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da', // ✅ BACKGROUND SOLID - verde sau roșu foarte deschis
+                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24' // ✅ CULORI SOLIDE
                       }}>
                         Status ANAF: {clientInfo.status}
                       </span>
@@ -1303,8 +1296,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                         borderRadius: '12px',
                         fontSize: '12px',
                         fontWeight: '600',
-                        background: clientInfo.platitorTva === 'Da' ? 'rgba(52, 152, 219, 0.2)' : 'rgba(243, 156, 18, 0.2)',
-                        color: clientInfo.platitorTva === 'Da' ? '#3498db' : '#f39c12'
+                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd', // ✅ BACKGROUND SOLID - albastru sau galben foarte deschis
+                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404' // ✅ CULORI SOLIDE
                       }}>
                         TVA: {clientInfo.platitorTva}
                       </span>
@@ -1315,8 +1308,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 {clientInfo.id && (
                   <div style={{ gridColumn: 'span 2' }}>
                     <div style={{
-                      background: 'rgba(39, 174, 96, 0.1)',
-                      border: '1px solid rgba(39, 174, 96, 0.2)',
+                      background: '#d4edda', // ✅ BACKGROUND SOLID verde foarte deschis - COMPLET OPAC
+                      border: '1px solid #c3e6cb', // ✅ Border solid verde deschis
                       borderRadius: '12px',
                       padding: '1rem',
                       fontSize: '12px'
@@ -1329,13 +1322,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* ✅ Secțiune Servicii/Produse Glassmorphism */}
+          {/* ✅ Secțiune Servicii/Produse Glassmorphism COMPLET OPAC */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.6)',
+            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
             padding: '2rem',
             borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            backdropFilter: 'blur(10px)'
+            border: '1px solid #e0e0e0', // ✅ Border solid
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
           }}>
             <div style={{
               display: 'flex',
@@ -1386,15 +1379,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: '14px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)'
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
               }}>
                 <thead>
                   <tr style={{
-                    background: 'linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(233, 236, 239, 0.9) 100%)'
+                    background: '#f8f9fa' // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC
                   }}>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'left',
                       fontSize: '12px',
@@ -1404,7 +1397,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       letterSpacing: '0.5px'
                     }}>Denumire serviciu/produs *</th>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'center',
                       width: '80px',
@@ -1415,7 +1408,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       letterSpacing: '0.5px'
                     }}>Cant.</th>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'center',
                       width: '130px',
@@ -1426,7 +1419,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       letterSpacing: '0.5px'
                     }}>Preț unit. (RON)</th>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'center',
                       width: '80px',
@@ -1437,7 +1430,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       letterSpacing: '0.5px'
                     }}>TVA %</th>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'center',
                       width: '130px',
@@ -1448,7 +1441,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       letterSpacing: '0.5px'
                     }}>Total (RON)</th>
                     <th style={{
-                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                      border: '1px solid #e0e0e0', // ✅ Border solid
                       padding: '1rem',
                       textAlign: 'center',
                       width: '60px',
@@ -1475,21 +1468,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     return (
                       <tr key={index} style={{
                         background: linie.tip === 'subproiect' ? 
-                          'rgba(52, 152, 219, 0.05)' : 
-                          index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
+                          '#f0f8ff' : // ✅ BACKGROUND SOLID albastru foarte deschis pentru subproiecte - COMPLET OPAC
+                          index % 2 === 0 ? '#ffffff' : '#f8f9fa', // ✅ BACKGROUND SOLID alb sau gri foarte deschis - COMPLET OPAC
                         transition: 'all 0.3s ease'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(52, 152, 219, 0.08)';
+                        e.currentTarget.style.background = '#e6f3ff'; // ✅ BACKGROUND SOLID albastru foarte foarte deschis - COMPLET OPAC
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.background = linie.tip === 'subproiect' ? 
-                          'rgba(52, 152, 219, 0.05)' : 
-                          index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)';
+                          '#f0f8ff' : 
+                          index % 2 === 0 ? '#ffffff' : '#f8f9fa';
                       }}
                       >
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem'
                         }}>
                           <div style={{
@@ -1516,10 +1509,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               style={{
                                 flex: 1,
                                 padding: '0.5rem',
-                                border: '1px solid rgba(0, 0, 0, 0.1)',
+                                border: '1px solid #e0e0e0', // ✅ Border solid
                                 borderRadius: '8px',
                                 fontSize: '14px',
-                                background: 'rgba(255, 255, 255, 0.8)',
+                                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                                 transition: 'all 0.3s ease'
                               }}
                               placeholder="Descrierea serviciului sau produsului..."
@@ -1528,7 +1521,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </div>
                         </td>
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem'
                         }}>
                           <input
@@ -1538,11 +1531,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             style={{
                               width: '100%',
                               padding: '0.5rem',
-                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e0e0e0', // ✅ Border solid
                               borderRadius: '8px',
                               textAlign: 'center',
                               fontSize: '14px',
-                              background: 'rgba(255, 255, 255, 0.8)',
+                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                               transition: 'all 0.3s ease'
                             }}
                             min="0"
@@ -1550,7 +1543,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem'
                         }}>
                           <input
@@ -1560,11 +1553,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             style={{
                               width: '100%',
                               padding: '0.5rem',
-                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e0e0e0', // ✅ Border solid
                               borderRadius: '8px',
                               textAlign: 'right',
                               fontSize: '14px',
-                              background: 'rgba(255, 255, 255, 0.8)',
+                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                               transition: 'all 0.3s ease'
                             }}
                             min="0"
@@ -1572,7 +1565,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem'
                         }}>
                           <select
@@ -1581,11 +1574,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             style={{
                               width: '100%',
                               padding: '0.5rem',
-                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e0e0e0', // ✅ Border solid
                               borderRadius: '8px',
                               textAlign: 'center',
                               fontSize: '14px',
-                              background: 'rgba(255, 255, 255, 0.8)',
+                              background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                               transition: 'all 0.3s ease'
                             }}
                           >
@@ -1597,7 +1590,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </select>
                         </td>
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem',
                           textAlign: 'right',
                           fontSize: '14px',
@@ -1607,7 +1600,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           {safeFixed(total)}
                         </td>
                         <td style={{
-                          border: '1px solid rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #e0e0e0', // ✅ Border solid
                           padding: '0.75rem',
                           textAlign: 'center'
                         }}>
@@ -1615,8 +1608,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             onClick={() => removeLine(index)}
                             disabled={liniiFactura.length === 1}
                             style={{
-                              background: liniiFactura.length === 1 ? 'rgba(149, 165, 166, 0.3)' : 'rgba(231, 76, 60, 0.1)',
-                              color: liniiFactura.length === 1 ? '#95a5a6' : '#e74c3c',
+                              background: liniiFactura.length === 1 ? '#f8f9fa' : '#f8d7da', // ✅ BACKGROUND SOLID gri sau roșu foarte deschis - COMPLET OPAC
+                              color: liniiFactura.length === 1 ? '#6c757d' : '#721c24', // ✅ CULORI SOLIDE
                               border: 'none',
                               borderRadius: '8px',
                               width: '32px',
@@ -1631,13 +1624,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
                             onMouseOver={(e) => {
                               if (liniiFactura.length > 1) {
-                                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.2)';
+                                e.currentTarget.style.background = '#f5c6cb'; // ✅ BACKGROUND SOLID roșu deschis - COMPLET OPAC
                                 e.currentTarget.style.transform = 'scale(1.1)';
                               }
                             }}
                             onMouseOut={(e) => {
                               if (liniiFactura.length > 1) {
-                                e.currentTarget.style.background = 'rgba(231, 76, 60, 0.1)';
+                                e.currentTarget.style.background = '#f8d7da';
                                 e.currentTarget.style.transform = 'scale(1)';
                               }
                             }}
@@ -1653,15 +1646,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ Secțiune Totaluri Glassmorphism */}
+          {/* ✅ Secțiune Totaluri Glassmorphism COMPLET OPAC */}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div style={{
               width: '400px',
-              background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(39, 174, 96, 0.1) 100%)',
+              background: '#e8f8e8', // ✅ BACKGROUND SOLID verde foarte deschis - COMPLET OPAC
               padding: '2rem',
               borderRadius: '16px',
-              border: '1px solid rgba(39, 174, 96, 0.2)',
-              backdropFilter: 'blur(10px)'
+              border: '1px solid #c3e6cb', // ✅ Border solid verde deschis
+              boxShadow: '0 4px 12px rgba(39, 174, 96, 0.15)' // ✅ Shadow subtil verde
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{
@@ -1688,8 +1681,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   fontSize: '18px',
                   fontWeight: '700',
                   paddingTop: '1rem',
-                  borderTop: '2px solid rgba(39, 174, 96, 0.3)',
-                  color: '#27ae60'
+                  borderTop: '2px solid #28a745', // ✅ Border solid verde
+                  color: '#155724' // ✅ CULOARE SOLIDĂ verde închis
                 }}>
                   <span>TOTAL DE PLATĂ:</span>
                   <span>{totals.totalGeneral} RON</span>
@@ -1698,13 +1691,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ Secțiune Observații Glassmorphism */}
+          {/* ✅ Secțiune Observații Glassmorphism COMPLET OPAC */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.6)',
+            background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
             padding: '2rem',
             borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            backdropFilter: 'blur(10px)'
+            border: '1px solid #e0e0e0', // ✅ Border solid
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' // ✅ Shadow subtil
           }}>
             <label style={{
               display: 'block',
@@ -1727,11 +1720,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               style={{
                 width: '100%',
                 padding: '1rem',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e0e0e0', // ✅ Border solid
                 borderRadius: '12px',
                 fontSize: '14px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
+                background: '#ffffff', // ✅ BACKGROUND SOLID ALBU - COMPLET OPAC
                 transition: 'all 0.3s ease',
                 resize: 'vertical',
                 boxSizing: 'border-box'
@@ -1743,19 +1735,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.border = '1px solid #e0e0e0';
                 e.currentTarget.style.boxShadow = 'none';
               }}
             />
           </div>
 
-          {/* ✅ Footer Buttons Glassmorphism */}
+          {/* ✅ Footer Buttons Glassmorphism COMPLET OPAC */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             paddingTop: '1.5rem',
-            borderTop: '1px solid rgba(0, 0, 0, 0.08)'
+            borderTop: '1px solid #e0e0e0' // ✅ Border solid
           }}>
             <div style={{
               fontSize: '14px',
@@ -1770,26 +1762,25 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 onClick={onClose}
                 disabled={isLoading}
                 style={{
-                  background: 'rgba(149, 165, 166, 0.1)',
-                  color: '#7f8c8d',
-                  border: '1px solid rgba(149, 165, 166, 0.2)',
+                  background: '#f8f9fa', // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC
+                  color: '#6c757d', // ✅ CULOARE SOLIDĂ gri
+                  border: '1px solid #e0e0e0', // ✅ Border solid
                   borderRadius: '12px',
                   padding: '0.75rem 1.5rem',
                   fontSize: '14px',
                   fontWeight: '600',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  backdropFilter: 'blur(10px)'
+                  transition: 'all 0.3s ease'
                 }}
                 onMouseOver={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.background = 'rgba(149, 165, 166, 0.2)';
+                    e.currentTarget.style.background = '#e9ecef'; // ✅ BACKGROUND SOLID gri deschis - COMPLET OPAC
                     e.currentTarget.style.transform = 'translateY(-2px)';
                   }
                 }}
                 onMouseOut={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.background = 'rgba(149, 165, 166, 0.1)';
+                    e.currentTarget.style.background = '#f8f9fa';
                     e.currentTarget.style.transform = 'translateY(0)';
                   }
                 }}
@@ -1801,9 +1792,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
                 style={{
                   background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 
-                    'rgba(149, 165, 166, 0.3)' : 
-                    'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
-                  color: 'white',
+                    '#f8f9fa' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)', // ✅ BACKGROUND SOLID gri deschis sau gradient
+                  color: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#6c757d' : 'white', // ✅ CULORI SOLIDE
                   border: 'none',
                   borderRadius: '12px',
                   padding: '0.75rem 2rem',
