@@ -34,6 +34,10 @@ interface ProiectActionsProps {
   onRefresh?: () => void;
 }
 
+// ✅ FIX: System global pentru management dropdown-uri multiple
+let currentOpenDropdown: string | null = null;
+const openDropdowns = new Map<string, () => void>();
+
 // ✅ Toast system Glassmorphism Premium
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
@@ -961,8 +965,43 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const [loading, setLoading] = React.useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
   const buttonRef = React.useRef<HTMLButtonElement>(null);
+  
+  // ✅ FIX: ID unic pentru acest dropdown
+  const dropdownId = React.useMemo(() => `dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [proiect.ID_Proiect]);
 
-  // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ LOGICA
+  // ✅ FIX: Înregistrează funcția de închidere
+  React.useEffect(() => {
+    openDropdowns.set(dropdownId, () => setIsOpen(false));
+    
+    return () => {
+      openDropdowns.delete(dropdownId);
+    };
+  }, [dropdownId]);
+
+  // ✅ FIX: Închide dropdown-ul când se deschide altul
+  React.useEffect(() => {
+    if (isOpen) {
+      // Închide toate celelalte dropdown-uri
+      if (currentOpenDropdown && currentOpenDropdown !== dropdownId) {
+        const closeFunction = openDropdowns.get(currentOpenDropdown);
+        if (closeFunction) {
+          closeFunction();
+        }
+      }
+      currentOpenDropdown = dropdownId;
+      calculateDropdownPosition();
+      
+      // Adaugă event listener pentru resize
+      window.addEventListener('resize', calculateDropdownPosition);
+      return () => window.removeEventListener('resize', calculateDropdownPosition);
+    } else {
+      if (currentOpenDropdown === dropdownId) {
+        currentOpenDropdown = null;
+      }
+    }
+  }, [isOpen, dropdownId]);
+
+  // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ COMPLET
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
@@ -978,33 +1017,25 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
       dropdownHeight,
       buttonTop: buttonRect.top,
       buttonBottom: buttonRect.bottom,
-      viewportHeight 
-    }); // ✅ Debug
+      viewportHeight,
+      dropdownId 
+    }); // ✅ Debug cu ID
     
     // ✅ FIX: Logică corectată - dacă e la început (sus), coboară jos; dacă e la sfârșit (jos), urcă sus
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      console.log('🔼 Dropdown va urca sus');
+      console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
       setDropdownPosition('top');
     } else {
-      console.log('🔽 Dropdown va coborî jos');
+      console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
       setDropdownPosition('bottom');
     }
   };
-
-  React.useEffect(() => {
-    if (isOpen) {
-      calculateDropdownPosition();
-      // Recalculează la resize
-      window.addEventListener('resize', calculateDropdownPosition);
-      return () => window.removeEventListener('resize', calculateDropdownPosition);
-    }
-  }, [isOpen]);
 
   const handleActionClick = async (actionKey: string) => {
     if (loading) return;
     
     setLoading(actionKey);
-    setIsOpen(false);
+    setIsOpen(false); // ✅ Închide dropdown-ul
     
     try {
       await onAction(actionKey);
@@ -1038,7 +1069,10 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     <div style={{ position: 'relative' as const, display: 'inline-block' }}>
       <button
         ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          console.log(`🔘 Buton ${dropdownId} apăsat, isOpen: ${isOpen}`);
+          setIsOpen(!isOpen);
+        }}
         disabled={loading !== null}
         style={{
           background: loading ? 
@@ -1087,23 +1121,27 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               backdropFilter: 'blur(4px)',
               zIndex: 10998
             }}
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              console.log(`🔘 Overlay ${dropdownId} clicked - closing`);
+              setIsOpen(false);
+            }}
           />
 
-          {/* ✅ Dropdown Glassmorphism cu opacitate mărită */}
+          {/* ✅ Dropdown Glassmorphism cu poziționare dinamică corectată */}
           <div style={{
             position: 'absolute' as const,
-            [dropdownPosition]: '100%',
+            ...(dropdownPosition === 'bottom' 
+              ? { top: '100%', marginTop: '8px' }
+              : { bottom: '100%', marginBottom: '8px' }
+            ), // ✅ FIX: Poziționare explicită în loc de [dropdownPosition]
             right: 0,
-            background: 'rgba(255, 255, 255, 0.98)', // ✅ Mai opac (era 0.95)
-            backdropFilter: 'blur(25px)', // ✅ Mai mult blur (era 20px)
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(25px)',
             borderRadius: '16px',
             minWidth: '260px',
-            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)', // ✅ Shadow mai puternic (era 0.15)
-            border: '1px solid rgba(255, 255, 255, 0.4)', // ✅ Border mai opac (era 0.2)
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
             zIndex: 10999,
-            marginTop: dropdownPosition === 'bottom' ? '8px' : '0',
-            marginBottom: dropdownPosition === 'top' ? '8px' : '0',
             overflow: 'hidden' as const,
             transform: 'scale(0.95)',
             opacity: 0,
