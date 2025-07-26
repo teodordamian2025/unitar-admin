@@ -741,7 +741,7 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced
+// MODIFICAT: Glassmorphism Premium Complete + Z-index Management + UX Enhanced + OPACITATE FIXATĂ
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
@@ -1253,8 +1253,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         style: {
             position: "fixed",
             inset: "0",
-            background: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(12px)",
+            background: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(8px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1263,16 +1263,18 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "rgba(255, 255, 255, 0.99)",
-                backdropFilter: "blur(25px)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 maxWidth: "1000px",
                 width: "100%",
                 maxHeight: "90vh",
                 overflowY: "auto",
-                boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
-                border: "2px solid rgba(255, 255, 255, 0.6)",
-                position: "relative"
+                boxShadow: "0 15px 35px rgba(0, 0, 0, 0.4)",
+                border: "1px solid #d0d0d0",
+                position: "relative",
+                // ✅ ELIMINAT orice animație sau proprietate care poate afecta opacitatea
+                transform: "scale(1)",
+                opacity: 1 // ✅ OPACITATE 100% - COMPLETĂ
             },
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1281,9 +1283,9 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         alignItems: "center",
                         justifyContent: "space-between",
                         padding: "1.5rem",
-                        borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)",
-                        borderRadius: "16px 16px 0 0" // ✅ Mai mic (era 20px)
+                        borderBottom: "1px solid #e0e0e0",
+                        background: "#e3f2fd",
+                        borderRadius: "16px 16px 0 0"
                     },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1363,12 +1365,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         gap: "1.5rem"
                     },
                     children: [
-                        " ",
                         isLoading && /*#__PURE__*/ jsx_runtime_.jsx("div", {
                             style: {
                                 position: "fixed",
                                 inset: "0",
-                                background: "rgba(0, 0, 0, 0.3)",
+                                background: "rgba(0, 0, 0, 0.6)",
                                 backdropFilter: "blur(8px)",
                                 display: "flex",
                                 alignItems: "center",
@@ -1377,12 +1378,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             },
                             children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
-                                    background: "rgba(255, 255, 255, 0.95)",
-                                    backdropFilter: "blur(20px)",
+                                    background: "#ffffff",
                                     padding: "2rem",
                                     borderRadius: "20px",
-                                    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                                    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+                                    border: "1px solid #e0e0e0",
                                     textAlign: "center"
                                 },
                                 children: [
@@ -1427,11 +1427,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "linear-gradient(135deg, rgba(52, 152, 219, 0.05) 0%, rgba(52, 152, 219, 0.1) 100%)",
+                                background: "#f0f8ff",
                                 padding: "2rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(52, 152, 219, 0.1)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #cce7ff",
+                                boxShadow: "0 4px 12px rgba(52, 152, 219, 0.15)" // ✅ Shadow subtil
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h3", {
@@ -1455,11 +1455,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                                backdropFilter: "blur(10px)"
+                                                border: "1px solid #e0e0e0",
+                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -1486,11 +1486,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                                backdropFilter: "blur(10px)"
+                                                border: "1px solid #e0e0e0",
+                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -1516,11 +1516,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                                backdropFilter: "blur(10px)",
+                                                border: "1px solid #e0e0e0",
+                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
                                                 gridColumn: "span 2"
                                             },
                                             children: [
@@ -1547,11 +1547,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                                backdropFilter: "blur(10px)"
+                                                border: "1px solid #e0e0e0",
+                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -1577,11 +1577,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                                backdropFilter: "blur(10px)"
+                                                border: "1px solid #e0e0e0",
+                                                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -1615,7 +1615,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     style: {
                                         marginTop: "2rem",
                                         paddingTop: "1.5rem",
-                                        borderTop: "1px solid rgba(52, 152, 219, 0.2)"
+                                        borderTop: "1px solid #cce7ff" // ✅ Border solid albastru deschis
                                     },
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1685,25 +1685,25 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             },
                                             children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                     style: {
-                                                        background: subproiect.adaugat ? "linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)" : "rgba(255, 255, 255, 0.8)",
-                                                        border: subproiect.adaugat ? "2px solid rgba(39, 174, 96, 0.3)" : "1px solid rgba(0, 0, 0, 0.1)",
+                                                        background: subproiect.adaugat ? "#e8f8e8" : "#ffffff",
+                                                        border: subproiect.adaugat ? "2px solid #4ade80" : "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         padding: "1rem",
                                                         transition: "all 0.3s ease",
-                                                        backdropFilter: "blur(10px)"
+                                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                                     },
                                                     onMouseOver: (e)=>{
                                                         if (!subproiect.adaugat) {
-                                                            e.currentTarget.style.border = "2px solid rgba(52, 152, 219, 0.3)";
+                                                            e.currentTarget.style.border = "2px solid #3498db";
                                                             e.currentTarget.style.transform = "translateY(-2px)";
                                                             e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
                                                         }
                                                     },
                                                     onMouseOut: (e)=>{
                                                         if (!subproiect.adaugat) {
-                                                            e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                                            e.currentTarget.style.border = "1px solid #e0e0e0";
                                                             e.currentTarget.style.transform = "translateY(0)";
-                                                            e.currentTarget.style.boxShadow = "none";
+                                                            e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.1)";
                                                         }
                                                     },
                                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1778,8 +1778,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     fontWeight: "600",
                                                                     cursor: subproiect.adaugat ? "not-allowed" : "pointer",
                                                                     transition: "all 0.3s ease",
-                                                                    background: subproiect.adaugat ? "rgba(39, 174, 96, 0.2)" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
-                                                                    color: subproiect.adaugat ? "#27ae60" : "white",
+                                                                    background: subproiect.adaugat ? "#d4edda" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                                    color: subproiect.adaugat ? "#155724" : "white",
                                                                     boxShadow: subproiect.adaugat ? "none" : "0 2px 8px rgba(39, 174, 96, 0.3)"
                                                                 },
                                                                 onMouseOver: (e)=>{
@@ -1806,11 +1806,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(255, 255, 255, 0.6)",
+                                background: "#ffffff",
                                 padding: "2rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #e0e0e0",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -1857,12 +1857,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     placeholder: "Introduceți CUI (ex: RO12345678)",
                                                     style: {
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
                                                         width: "220px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
-                                                        backdropFilter: "blur(10px)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease"
                                                     },
                                                     onFocus: (e)=>{
@@ -1870,7 +1869,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
                                                     },
                                                     onBlur: (e)=>{
-                                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                                        e.currentTarget.style.border = "1px solid #e0e0e0";
                                                         e.currentTarget.style.boxShadow = "none";
                                                     }
                                                 }),
@@ -1878,8 +1877,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     onClick: handlePreluareDateANAF,
                                                     disabled: isLoadingANAF || !cuiInput.trim(),
                                                     style: {
-                                                        background: isLoadingANAF || !cuiInput.trim() ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
-                                                        color: "white",
+                                                        background: isLoadingANAF || !cuiInput.trim() ? "#f8f9fa" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                        color: isLoadingANAF || !cuiInput.trim() ? "#6c757d" : "white",
                                                         border: "none",
                                                         borderRadius: "12px",
                                                         padding: "0.75rem 1.25rem",
@@ -1909,8 +1908,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 }),
                                 anafError && /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                     style: {
-                                        background: "rgba(231, 76, 60, 0.1)",
-                                        border: "1px solid rgba(231, 76, 60, 0.2)",
+                                        background: "#f8d7da",
+                                        border: "1px solid #f5c6cb",
                                         borderRadius: "12px",
                                         padding: "1rem",
                                         marginBottom: "1.5rem"
@@ -1918,7 +1917,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("p", {
                                         style: {
                                             fontSize: "14px",
-                                            color: "#e74c3c",
+                                            color: "#721c24",
                                             margin: 0,
                                             fontWeight: "500"
                                         },
@@ -1959,10 +1958,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     style: {
                                                         width: "100%",
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease",
                                                         boxSizing: "border-box"
                                                     },
@@ -1994,10 +1993,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     style: {
                                                         width: "100%",
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease",
                                                         boxSizing: "border-box"
                                                     },
@@ -2029,10 +2028,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     style: {
                                                         width: "100%",
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease",
                                                         boxSizing: "border-box"
                                                     }
@@ -2063,10 +2062,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     style: {
                                                         width: "100%",
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease",
                                                         boxSizing: "border-box"
                                                     }
@@ -2100,10 +2099,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     style: {
                                                         width: "100%",
                                                         padding: "0.75rem",
-                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                        border: "1px solid #e0e0e0",
                                                         borderRadius: "12px",
                                                         fontSize: "14px",
-                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                        background: "#ffffff",
                                                         transition: "all 0.3s ease",
                                                         boxSizing: "border-box"
                                                     },
@@ -2125,8 +2124,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         borderRadius: "12px",
                                                         fontSize: "12px",
                                                         fontWeight: "600",
-                                                        background: clientInfo.status === "Activ" ? "rgba(39, 174, 96, 0.2)" : "rgba(231, 76, 60, 0.2)",
-                                                        color: clientInfo.status === "Activ" ? "#27ae60" : "#e74c3c"
+                                                        background: clientInfo.status === "Activ" ? "#d4edda" : "#f8d7da",
+                                                        color: clientInfo.status === "Activ" ? "#155724" : "#721c24" // ✅ CULORI SOLIDE
                                                     },
                                                     children: [
                                                         "Status ANAF: ",
@@ -2139,8 +2138,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         borderRadius: "12px",
                                                         fontSize: "12px",
                                                         fontWeight: "600",
-                                                        background: clientInfo.platitorTva === "Da" ? "rgba(52, 152, 219, 0.2)" : "rgba(243, 156, 18, 0.2)",
-                                                        color: clientInfo.platitorTva === "Da" ? "#3498db" : "#f39c12"
+                                                        background: clientInfo.platitorTva === "Da" ? "#cce7ff" : "#fff3cd",
+                                                        color: clientInfo.platitorTva === "Da" ? "#004085" : "#856404" // ✅ CULORI SOLIDE
                                                     },
                                                     children: [
                                                         "TVA: ",
@@ -2155,8 +2154,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             },
                                             children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                 style: {
-                                                    background: "rgba(39, 174, 96, 0.1)",
-                                                    border: "1px solid rgba(39, 174, 96, 0.2)",
+                                                    background: "#d4edda",
+                                                    border: "1px solid #c3e6cb",
                                                     borderRadius: "12px",
                                                     padding: "1rem",
                                                     fontSize: "12px"
@@ -2177,11 +2176,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(255, 255, 255, 0.6)",
+                                background: "#ffffff",
                                 padding: "2rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #e0e0e0",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -2241,19 +2240,19 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             width: "100%",
                                             borderCollapse: "collapse",
                                             fontSize: "14px",
-                                            background: "rgba(255, 255, 255, 0.8)",
-                                            backdropFilter: "blur(10px)"
+                                            background: "#ffffff",
+                                            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                                         },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("thead", {
                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                                     style: {
-                                                        background: "linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(233, 236, 239, 0.9) 100%)"
+                                                        background: "#f8f9fa" // ✅ BACKGROUND SOLID gri foarte deschis - COMPLET OPAC
                                                     },
                                                     children: [
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "left",
                                                                 fontSize: "12px",
@@ -2266,7 +2265,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "center",
                                                                 width: "80px",
@@ -2280,7 +2279,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "center",
                                                                 width: "130px",
@@ -2294,7 +2293,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "center",
                                                                 width: "80px",
@@ -2308,7 +2307,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "center",
                                                                 width: "130px",
@@ -2322,7 +2321,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                         }),
                                                         /*#__PURE__*/ jsx_runtime_.jsx("th", {
                                                             style: {
-                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                border: "1px solid #e0e0e0",
                                                                 padding: "1rem",
                                                                 textAlign: "center",
                                                                 width: "60px",
@@ -2348,19 +2347,19 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                     const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
                                                     return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
                                                         style: {
-                                                            background: linie.tip === "subproiect" ? "rgba(52, 152, 219, 0.05)" : index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)",
+                                                            background: linie.tip === "subproiect" ? "#f0f8ff" : index % 2 === 0 ? "#ffffff" : "#f8f9fa",
                                                             transition: "all 0.3s ease"
                                                         },
                                                         onMouseOver: (e)=>{
-                                                            e.currentTarget.style.background = "rgba(52, 152, 219, 0.08)";
+                                                            e.currentTarget.style.background = "#e6f3ff"; // ✅ BACKGROUND SOLID albastru foarte foarte deschis - COMPLET OPAC
                                                         },
                                                         onMouseOut: (e)=>{
-                                                            e.currentTarget.style.background = linie.tip === "subproiect" ? "rgba(52, 152, 219, 0.05)" : index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "rgba(248, 249, 250, 0.5)";
+                                                            e.currentTarget.style.background = linie.tip === "subproiect" ? "#f0f8ff" : index % 2 === 0 ? "#ffffff" : "#f8f9fa";
                                                         },
                                                         children: [
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem"
                                                                 },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -2388,10 +2387,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                             style: {
                                                                                 flex: 1,
                                                                                 padding: "0.5rem",
-                                                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                                border: "1px solid #e0e0e0",
                                                                                 borderRadius: "8px",
                                                                                 fontSize: "14px",
-                                                                                background: "rgba(255, 255, 255, 0.8)",
+                                                                                background: "#ffffff",
                                                                                 transition: "all 0.3s ease"
                                                                             },
                                                                             placeholder: "Descrierea serviciului sau produsului...",
@@ -2402,7 +2401,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem"
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -2412,11 +2411,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     style: {
                                                                         width: "100%",
                                                                         padding: "0.5rem",
-                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        border: "1px solid #e0e0e0",
                                                                         borderRadius: "8px",
                                                                         textAlign: "center",
                                                                         fontSize: "14px",
-                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        background: "#ffffff",
                                                                         transition: "all 0.3s ease"
                                                                     },
                                                                     min: "0",
@@ -2425,7 +2424,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem"
                                                                 },
                                                                 children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
@@ -2435,11 +2434,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     style: {
                                                                         width: "100%",
                                                                         padding: "0.5rem",
-                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        border: "1px solid #e0e0e0",
                                                                         borderRadius: "8px",
                                                                         textAlign: "right",
                                                                         fontSize: "14px",
-                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        background: "#ffffff",
                                                                         transition: "all 0.3s ease"
                                                                     },
                                                                     min: "0",
@@ -2448,7 +2447,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem"
                                                                 },
                                                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
@@ -2457,11 +2456,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     style: {
                                                                         width: "100%",
                                                                         padding: "0.5rem",
-                                                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                        border: "1px solid #e0e0e0",
                                                                         borderRadius: "8px",
                                                                         textAlign: "center",
                                                                         fontSize: "14px",
-                                                                        background: "rgba(255, 255, 255, 0.8)",
+                                                                        background: "#ffffff",
                                                                         transition: "all 0.3s ease"
                                                                     },
                                                                     children: [
@@ -2490,7 +2489,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem",
                                                                     textAlign: "right",
                                                                     fontSize: "14px",
@@ -2501,7 +2500,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                             }),
                                                             /*#__PURE__*/ jsx_runtime_.jsx("td", {
                                                                 style: {
-                                                                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                                    border: "1px solid #e0e0e0",
                                                                     padding: "0.75rem",
                                                                     textAlign: "center"
                                                                 },
@@ -2509,8 +2508,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     onClick: ()=>removeLine(index),
                                                                     disabled: liniiFactura.length === 1,
                                                                     style: {
-                                                                        background: liniiFactura.length === 1 ? "rgba(149, 165, 166, 0.3)" : "rgba(231, 76, 60, 0.1)",
-                                                                        color: liniiFactura.length === 1 ? "#95a5a6" : "#e74c3c",
+                                                                        background: liniiFactura.length === 1 ? "#f8f9fa" : "#f8d7da",
+                                                                        color: liniiFactura.length === 1 ? "#6c757d" : "#721c24",
                                                                         border: "none",
                                                                         borderRadius: "8px",
                                                                         width: "32px",
@@ -2525,13 +2524,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                                     title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
                                                                     onMouseOver: (e)=>{
                                                                         if (liniiFactura.length > 1) {
-                                                                            e.currentTarget.style.background = "rgba(231, 76, 60, 0.2)";
+                                                                            e.currentTarget.style.background = "#f5c6cb"; // ✅ BACKGROUND SOLID roșu deschis - COMPLET OPAC
                                                                             e.currentTarget.style.transform = "scale(1.1)";
                                                                         }
                                                                     },
                                                                     onMouseOut: (e)=>{
                                                                         if (liniiFactura.length > 1) {
-                                                                            e.currentTarget.style.background = "rgba(231, 76, 60, 0.1)";
+                                                                            e.currentTarget.style.background = "#f8d7da";
                                                                             e.currentTarget.style.transform = "scale(1)";
                                                                         }
                                                                     },
@@ -2555,11 +2554,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                             children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                 style: {
                                     width: "400px",
-                                    background: "linear-gradient(135deg, rgba(39, 174, 96, 0.05) 0%, rgba(39, 174, 96, 0.1) 100%)",
+                                    background: "#e8f8e8",
                                     padding: "2rem",
                                     borderRadius: "16px",
-                                    border: "1px solid rgba(39, 174, 96, 0.2)",
-                                    backdropFilter: "blur(10px)"
+                                    border: "1px solid #c3e6cb",
+                                    boxShadow: "0 4px 12px rgba(39, 174, 96, 0.15)" // ✅ Shadow subtil verde
                                 },
                                 children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
@@ -2619,8 +2618,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                                 fontSize: "18px",
                                                 fontWeight: "700",
                                                 paddingTop: "1rem",
-                                                borderTop: "2px solid rgba(39, 174, 96, 0.3)",
-                                                color: "#27ae60"
+                                                borderTop: "2px solid #28a745",
+                                                color: "#155724" // ✅ CULOARE SOLIDĂ verde închis
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("span", {
@@ -2640,11 +2639,11 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(255, 255, 255, 0.6)",
+                                background: "#ffffff",
                                 padding: "2rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(255, 255, 255, 0.3)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #e0e0e0",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -2670,11 +2669,10 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                     style: {
                                         width: "100%",
                                         padding: "1rem",
-                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        border: "1px solid #e0e0e0",
                                         borderRadius: "12px",
                                         fontSize: "14px",
-                                        background: "rgba(255, 255, 255, 0.8)",
-                                        backdropFilter: "blur(10px)",
+                                        background: "#ffffff",
                                         transition: "all 0.3s ease",
                                         resize: "vertical",
                                         boxSizing: "border-box"
@@ -2686,7 +2684,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                         e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
                                     },
                                     onBlur: (e)=>{
-                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                        e.currentTarget.style.border = "1px solid #e0e0e0";
                                         e.currentTarget.style.boxShadow = "none";
                                     }
                                 })
@@ -2698,7 +2696,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 paddingTop: "1.5rem",
-                                borderTop: "1px solid rgba(0, 0, 0, 0.08)"
+                                borderTop: "1px solid #e0e0e0" // ✅ Border solid
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -2719,26 +2717,25 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             onClick: onClose,
                                             disabled: isLoading,
                                             style: {
-                                                background: "rgba(149, 165, 166, 0.1)",
-                                                color: "#7f8c8d",
-                                                border: "1px solid rgba(149, 165, 166, 0.2)",
+                                                background: "#f8f9fa",
+                                                color: "#6c757d",
+                                                border: "1px solid #e0e0e0",
                                                 borderRadius: "12px",
                                                 padding: "0.75rem 1.5rem",
                                                 fontSize: "14px",
                                                 fontWeight: "600",
                                                 cursor: isLoading ? "not-allowed" : "pointer",
-                                                transition: "all 0.3s ease",
-                                                backdropFilter: "blur(10px)"
+                                                transition: "all 0.3s ease"
                                             },
                                             onMouseOver: (e)=>{
                                                 if (!isLoading) {
-                                                    e.currentTarget.style.background = "rgba(149, 165, 166, 0.2)";
+                                                    e.currentTarget.style.background = "#e9ecef"; // ✅ BACKGROUND SOLID gri deschis - COMPLET OPAC
                                                     e.currentTarget.style.transform = "translateY(-2px)";
                                                 }
                                             },
                                             onMouseOut: (e)=>{
                                                 if (!isLoading) {
-                                                    e.currentTarget.style.background = "rgba(149, 165, 166, 0.1)";
+                                                    e.currentTarget.style.background = "#f8f9fa";
                                                     e.currentTarget.style.transform = "translateY(0)";
                                                 }
                                             },
@@ -2748,8 +2745,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             onClick: handleGenereazaFactura,
                                             disabled: isLoading || !clientInfo?.cui || !clientInfo?.denumire,
                                             style: {
-                                                background: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
-                                                color: "white",
+                                                background: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "#f8f9fa" : "linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)",
+                                                color: isLoading || !clientInfo?.cui || !clientInfo?.denumire ? "#6c757d" : "white",
                                                 border: "none",
                                                 borderRadius: "12px",
                                                 padding: "0.75rem 2rem",
@@ -2798,10 +2795,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Glassmorphism Premium + Dropdown Inteligent + Workflow îmbunătățit
+// MODIFICAT: Glassmorphism Premium + Dropdown Inteligent + Workflow îmbunătățit + OPACITATE FIXATĂ COMPLET
 // ==================================================================
 
 
+// ✅ FIX: System global pentru management dropdown-uri multiple
+let currentOpenDropdown = null;
+const openDropdowns = new Map();
 // ✅ Toast system Glassmorphism Premium
 const ProiectActions_showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
@@ -3144,7 +3144,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         style: {
             position: "fixed",
             inset: "0",
-            background: "rgba(0, 0, 0, 0.3)",
+            background: "rgba(0, 0, 0, 0.6)",
             backdropFilter: "blur(8px)",
             display: "flex",
             alignItems: "center",
@@ -3154,16 +3154,18 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
         },
         children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
             style: {
-                background: "rgba(255, 255, 255, 0.98)",
-                backdropFilter: "blur(20px)",
+                background: "#ffffff",
                 borderRadius: "16px",
                 maxWidth: "600px",
                 width: "100%",
                 maxHeight: "85vh",
                 overflowY: "auto",
-                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                position: "relative"
+                boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+                border: "1px solid #e0e0e0",
+                position: "relative",
+                // ✅ ELIMINAT orice animație sau proprietate care poate afecta opacitatea
+                transform: "scale(1)",
+                opacity: 1 // ✅ OPACITATE 100% - COMPLETĂ (luat de la dropdown-ul care urcă)
             },
             children: [
                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -3172,9 +3174,9 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         alignItems: "center",
                         justifyContent: "space-between",
                         padding: "1.5rem",
-                        borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-                        background: "linear-gradient(135deg, rgba(52, 152, 219, 0.15) 0%, rgba(46, 204, 113, 0.15) 100%)",
-                        borderRadius: "16px 16px 0 0" // ✅ Mai mic (era 20px)
+                        borderBottom: "1px solid #e0e0e0",
+                        background: "#e8f5e8",
+                        borderRadius: "16px 16px 0 0"
                     },
                     children: [
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -3263,14 +3265,13 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         gap: "1.25rem"
                     },
                     children: [
-                        " ",
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(52, 152, 219, 0.08)",
+                                background: "#f0f8ff",
                                 padding: "1.25rem",
                                 borderRadius: "12px",
-                                border: "1px solid rgba(52, 152, 219, 0.15)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #cce7ff",
+                                boxShadow: "0 4px 12px rgba(52, 152, 219, 0.15)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3290,11 +3291,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     style: {
                                         width: "100%",
                                         padding: "1rem",
-                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        border: "1px solid #e0e0e0",
                                         borderRadius: "12px",
                                         fontSize: "16px",
-                                        background: "rgba(255, 255, 255, 0.8)",
-                                        backdropFilter: "blur(10px)",
+                                        background: "#ffffff",
                                         transition: "all 0.3s ease",
                                         boxSizing: "border-box"
                                     },
@@ -3306,7 +3306,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         e.currentTarget.style.boxShadow = "0 4px 12px rgba(52, 152, 219, 0.2)";
                                     },
                                     onBlur: (e)=>{
-                                        e.currentTarget.style.border = "1px solid rgba(0, 0, 0, 0.1)";
+                                        e.currentTarget.style.border = "1px solid #e0e0e0";
                                         e.currentTarget.style.boxShadow = "none";
                                     }
                                 })
@@ -3316,16 +3316,16 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                             style: {
                                 display: "grid",
                                 gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                                gap: "1rem" // ✅ Mai mic (era 1.5rem)
+                                gap: "1rem"
                             },
                             children: [
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
-                                        background: "rgba(255, 255, 255, 0.8)",
+                                        background: "#ffffff",
                                         padding: "1rem",
                                         borderRadius: "12px",
-                                        border: "1px solid rgba(255, 255, 255, 0.4)",
-                                        backdropFilter: "blur(10px)"
+                                        border: "1px solid #e0e0e0",
+                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3345,10 +3345,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             style: {
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                border: "1px solid #e0e0e0",
                                                 borderRadius: "12px",
                                                 fontSize: "14px",
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 transition: "all 0.3s ease",
                                                 boxSizing: "border-box"
                                             },
@@ -3359,11 +3359,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
-                                        background: "rgba(255, 255, 255, 0.6)",
-                                        padding: "1.25rem",
-                                        borderRadius: "16px",
-                                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                                        backdropFilter: "blur(10px)"
+                                        background: "#ffffff",
+                                        padding: "1rem",
+                                        borderRadius: "12px",
+                                        border: "1px solid #e0e0e0",
+                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3382,10 +3382,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             style: {
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                border: "1px solid #e0e0e0",
                                                 borderRadius: "12px",
                                                 fontSize: "14px",
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 transition: "all 0.3s ease",
                                                 boxSizing: "border-box"
                                             },
@@ -3413,11 +3413,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
-                                        background: "rgba(255, 255, 255, 0.6)",
-                                        padding: "1.25rem",
-                                        borderRadius: "16px",
-                                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                                        backdropFilter: "blur(10px)"
+                                        background: "#ffffff",
+                                        padding: "1rem",
+                                        borderRadius: "12px",
+                                        border: "1px solid #e0e0e0",
+                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3437,10 +3437,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             style: {
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                border: "1px solid #e0e0e0",
                                                 borderRadius: "12px",
                                                 fontSize: "14px",
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 transition: "all 0.3s ease",
                                                 boxSizing: "border-box"
                                             },
@@ -3450,11 +3450,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
-                                        background: "rgba(255, 255, 255, 0.6)",
-                                        padding: "1.25rem",
-                                        borderRadius: "16px",
-                                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                                        backdropFilter: "blur(10px)"
+                                        background: "#ffffff",
+                                        padding: "1rem",
+                                        borderRadius: "12px",
+                                        border: "1px solid #e0e0e0",
+                                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                                     },
                                     children: [
                                         /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3474,10 +3474,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             style: {
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                border: "1px solid rgba(0, 0, 0, 0.1)",
+                                                border: "1px solid #e0e0e0",
                                                 borderRadius: "12px",
                                                 fontSize: "14px",
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 transition: "all 0.3s ease",
                                                 boxSizing: "border-box"
                                             },
@@ -3489,11 +3489,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "rgba(46, 204, 113, 0.05)",
+                                background: "#e8f8e8",
                                 padding: "1.5rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(46, 204, 113, 0.1)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #c3e6cb",
+                                boxShadow: "0 4px 12px rgba(39, 174, 96, 0.15)" // ✅ Shadow subtil verde (luat de la dropdown-ul care urcă)
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("label", {
@@ -3513,11 +3513,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     style: {
                                         width: "100%",
                                         padding: "1rem",
-                                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                                        border: "1px solid #e0e0e0",
                                         borderRadius: "12px",
                                         fontSize: "16px",
-                                        background: "rgba(255, 255, 255, 0.8)",
-                                        backdropFilter: "blur(10px)",
+                                        background: "#ffffff",
                                         transition: "all 0.3s ease",
                                         boxSizing: "border-box"
                                     },
@@ -3530,11 +3529,11 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
-                                background: "linear-gradient(135deg, rgba(149, 165, 166, 0.1) 0%, rgba(52, 152, 219, 0.1) 100%)",
+                                background: "#f8f9fa",
                                 padding: "1.5rem",
                                 borderRadius: "16px",
-                                border: "1px solid rgba(149, 165, 166, 0.2)",
-                                backdropFilter: "blur(10px)"
+                                border: "1px solid #e0e0e0",
+                                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" // ✅ Shadow subtil (luat de la dropdown-ul care urcă)
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("h4", {
@@ -3558,10 +3557,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     children: [
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                                border: "1px solid #e0e0e0" // ✅ Border solid (luat de la dropdown-ul care urcă)
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -3587,10 +3586,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                                border: "1px solid #e0e0e0" // ✅ Border solid (luat de la dropdown-ul care urcă)
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -3616,10 +3615,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                                border: "1px solid #e0e0e0" // ✅ Border solid (luat de la dropdown-ul care urcă)
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -3645,10 +3644,10 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                         }),
                                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                             style: {
-                                                background: "rgba(255, 255, 255, 0.8)",
+                                                background: "#ffffff",
                                                 padding: "1rem",
                                                 borderRadius: "12px",
-                                                border: "1px solid rgba(255, 255, 255, 0.3)"
+                                                border: "1px solid #e0e0e0" // ✅ Border solid (luat de la dropdown-ul care urcă)
                                             },
                                             children: [
                                                 /*#__PURE__*/ jsx_runtime_.jsx("div", {
@@ -3683,7 +3682,7 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                 alignItems: "center",
                                 gap: "1rem",
                                 paddingTop: "1rem",
-                                borderTop: "1px solid rgba(0, 0, 0, 0.08)"
+                                borderTop: "1px solid #e0e0e0" // ✅ Border solid
                             },
                             children: [
                                 /*#__PURE__*/ jsx_runtime_.jsx("button", {
@@ -3691,26 +3690,25 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                     onClick: onClose,
                                     disabled: isSubmitting,
                                     style: {
-                                        background: "rgba(149, 165, 166, 0.1)",
-                                        color: "#7f8c8d",
-                                        border: "1px solid rgba(149, 165, 166, 0.2)",
+                                        background: "#f8f9fa",
+                                        color: "#6c757d",
+                                        border: "1px solid #e0e0e0",
                                         borderRadius: "12px",
                                         padding: "0.75rem 1.5rem",
                                         fontSize: "14px",
                                         fontWeight: "600",
                                         cursor: isSubmitting ? "not-allowed" : "pointer",
-                                        transition: "all 0.3s ease",
-                                        backdropFilter: "blur(10px)"
+                                        transition: "all 0.3s ease"
                                     },
                                     onMouseOver: (e)=>{
                                         if (!isSubmitting) {
-                                            e.currentTarget.style.background = "rgba(149, 165, 166, 0.2)";
+                                            e.currentTarget.style.background = "#e9ecef"; // ✅ BACKGROUND SOLID gri deschis - COMPLET OPAC (luat de la dropdown-ul care urcă)
                                             e.currentTarget.style.transform = "translateY(-2px)";
                                         }
                                     },
                                     onMouseOut: (e)=>{
                                         if (!isSubmitting) {
-                                            e.currentTarget.style.background = "rgba(149, 165, 166, 0.1)";
+                                            e.currentTarget.style.background = "#f8f9fa";
                                             e.currentTarget.style.transform = "translateY(0)";
                                         }
                                     },
@@ -3726,8 +3724,8 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }) {
                                             type: "submit",
                                             disabled: isSubmitting || !formData.denumire.trim(),
                                             style: {
-                                                background: isSubmitting || !formData.denumire.trim() ? "rgba(149, 165, 166, 0.3)" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
-                                                color: "white",
+                                                background: isSubmitting || !formData.denumire.trim() ? "#f8f9fa" : "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
+                                                color: isSubmitting || !formData.denumire.trim() ? "#6c757d" : "white",
                                                 border: "none",
                                                 borderRadius: "12px",
                                                 padding: "0.75rem 1.5rem",
@@ -3807,7 +3805,44 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
     const [loading, setLoading] = react_experimental_default().useState(null);
     const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
     const buttonRef = react_experimental_default().useRef(null);
-    // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ LOGICA
+    // ✅ FIX: ID unic pentru acest dropdown
+    const dropdownId = react_experimental_default().useMemo(()=>`dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [
+        proiect.ID_Proiect
+    ]);
+    // ✅ FIX: Înregistrează funcția de închidere
+    react_experimental_default().useEffect(()=>{
+        openDropdowns.set(dropdownId, ()=>setIsOpen(false));
+        return ()=>{
+            openDropdowns.delete(dropdownId);
+        };
+    }, [
+        dropdownId
+    ]);
+    // ✅ FIX: Închide dropdown-ul când se deschide altul
+    react_experimental_default().useEffect(()=>{
+        if (isOpen) {
+            // Închide toate celelalte dropdown-uri
+            if (currentOpenDropdown && currentOpenDropdown !== dropdownId) {
+                const closeFunction = openDropdowns.get(currentOpenDropdown);
+                if (closeFunction) {
+                    closeFunction();
+                }
+            }
+            currentOpenDropdown = dropdownId;
+            calculateDropdownPosition();
+            // Adaugă event listener pentru resize
+            window.addEventListener("resize", calculateDropdownPosition);
+            return ()=>window.removeEventListener("resize", calculateDropdownPosition);
+        } else {
+            if (currentOpenDropdown === dropdownId) {
+                currentOpenDropdown = null;
+            }
+        }
+    }, [
+        isOpen,
+        dropdownId
+    ]);
+    // ✅ FIX: Calculează poziționarea inteligentă - CORECTATĂ COMPLET
     const calculateDropdownPosition = ()=>{
         if (!buttonRef.current) return;
         const buttonRect = buttonRef.current.getBoundingClientRect();
@@ -3821,31 +3856,22 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
             dropdownHeight,
             buttonTop: buttonRect.top,
             buttonBottom: buttonRect.bottom,
-            viewportHeight
-        }); // ✅ Debug
+            viewportHeight,
+            dropdownId
+        }); // ✅ Debug cu ID
         // ✅ FIX: Logică corectată - dacă e la început (sus), coboară jos; dacă e la sfârșit (jos), urcă sus
         if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-            console.log("\uD83D\uDD3C Dropdown va urca sus");
+            console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
             setDropdownPosition("top");
         } else {
-            console.log("\uD83D\uDD3D Dropdown va cobor\xee jos");
+            console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
             setDropdownPosition("bottom");
         }
     };
-    react_experimental_default().useEffect(()=>{
-        if (isOpen) {
-            calculateDropdownPosition();
-            // Recalculează la resize
-            window.addEventListener("resize", calculateDropdownPosition);
-            return ()=>window.removeEventListener("resize", calculateDropdownPosition);
-        }
-    }, [
-        isOpen
-    ]);
     const handleActionClick = async (actionKey)=>{
         if (loading) return;
         setLoading(actionKey);
-        setIsOpen(false);
+        setIsOpen(false); // ✅ Închide dropdown-ul
         try {
             await onAction(actionKey);
         } finally{
@@ -3890,11 +3916,14 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
                 ref: buttonRef,
-                onClick: ()=>setIsOpen(!isOpen),
+                onClick: ()=>{
+                    console.log(`🔘 Buton ${dropdownId} apăsat, isOpen: ${isOpen}`);
+                    setIsOpen(!isOpen);
+                },
                 disabled: loading !== null,
                 style: {
-                    background: loading ? "rgba(189, 195, 199, 0.3)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
+                    background: loading ? "#f8f9fa" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    color: loading ? "#6c757d" : "white",
                     border: "none",
                     borderRadius: "12px",
                     padding: "0.5rem 1rem",
@@ -3933,26 +3962,32 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            background: "rgba(0, 0, 0, 0.2)",
-                            backdropFilter: "blur(4px)",
+                            background: "rgba(0, 0, 0, 0.3)",
+                            backdropFilter: "blur(6px)",
                             zIndex: 10998
                         },
-                        onClick: ()=>setIsOpen(false)
+                        onClick: ()=>{
+                            console.log(`🔘 Overlay ${dropdownId} clicked - closing`);
+                            setIsOpen(false);
+                        }
                     }),
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
                             position: "absolute",
-                            [dropdownPosition]: "100%",
+                            ...dropdownPosition === "bottom" ? {
+                                top: "100%",
+                                marginTop: "8px"
+                            } : {
+                                bottom: "100%",
+                                marginBottom: "8px"
+                            },
                             right: 0,
-                            background: "rgba(255, 255, 255, 0.98)",
-                            backdropFilter: "blur(25px)",
+                            background: "#ffffff",
                             borderRadius: "16px",
                             minWidth: "260px",
-                            boxShadow: "0 25px 50px rgba(0, 0, 0, 0.25)",
-                            border: "1px solid rgba(255, 255, 255, 0.4)",
+                            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
+                            border: "1px solid #e0e0e0",
                             zIndex: 10999,
-                            marginTop: dropdownPosition === "bottom" ? "8px" : "0",
-                            marginBottom: dropdownPosition === "top" ? "8px" : "0",
                             overflow: "hidden",
                             transform: "scale(0.95)",
                             opacity: 0,
@@ -3964,7 +3999,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                 @keyframes dropdownAppear {
                   to {
                     transform: scale(1);
-                    opacity: 1;
+                    opacity: 1; /* ✅ FINAL opacity 100% COMPLETĂ (LUAT DE LA DROPDOWN-UL CARE URCĂ) */
                   }
                 }
               `
@@ -3972,9 +4007,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
                                     padding: "1rem",
-                                    borderBottom: "1px solid rgba(0, 0, 0, 0.12)",
-                                    background: "linear-gradient(135deg, rgba(248, 249, 250, 0.95) 0%, rgba(233, 236, 239, 0.95) 100%)",
-                                    backdropFilter: "blur(15px)" // ✅ Mai mult blur
+                                    borderBottom: "1px solid #e0e0e0",
+                                    background: "#f8f9fa"
                                 },
                                 children: [
                                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
@@ -4054,17 +4088,15 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                                         },
                                         onMouseOver: (e)=>{
                                             if (!action.disabled && loading !== action.key) {
-                                                e.currentTarget.style.background = `linear-gradient(135deg, ${getActionColor(action.color)}15 0%, ${getActionColor(action.color)}08 100%)`;
+                                                e.currentTarget.style.background = `${getActionColor(action.color)}15`; // ✅ BACKGROUND SOLID cu transparență redusă (LUAT DE LA DROPDOWN-UL CARE URCĂ)
                                                 e.currentTarget.style.color = getActionColor(action.color);
                                                 e.currentTarget.style.transform = "translateX(4px)";
-                                                e.currentTarget.style.backdropFilter = "blur(10px)";
                                             }
                                         },
                                         onMouseOut: (e)=>{
                                             e.currentTarget.style.background = "transparent";
                                             e.currentTarget.style.color = action.disabled ? "#bdc3c7" : "#2c3e50";
                                             e.currentTarget.style.transform = "translateX(0)";
-                                            e.currentTarget.style.backdropFilter = "none";
                                         },
                                         children: [
                                             /*#__PURE__*/ jsx_runtime_.jsx("span", {
@@ -5096,6 +5128,19 @@ function ProiecteTable({ searchParams }) {
         searchParams,
         refreshTrigger
     ]);
+    // ✅ FIX: Auto-expand subproiecte când datele se schimbă
+    (0,react_experimental_.useEffect)(()=>{
+        if (proiecte.length > 0 && subproiecte.length > 0) {
+            const proiecteCuSubproiecte = proiecte.map((p)=>p.ID_Proiect).filter((id)=>subproiecte.some((sub)=>sub.ID_Proiect === id));
+            if (proiecteCuSubproiecte.length > 0) {
+                setExpandedProjects(new Set(proiecteCuSubproiecte));
+                console.log("\uD83D\uDD0D Auto-expanded proiecte cu subproiecte:", proiecteCuSubproiecte);
+            }
+        }
+    }, [
+        proiecte,
+        subproiecte
+    ]); // ✅ Trigger când se schimbă datele
     // Verifică notificări pentru statusul facturii din URL
     (0,react_experimental_.useEffect)(()=>{
         if (searchParams?.invoice_status && searchParams?.project_id) {
@@ -5122,15 +5167,7 @@ function ProiecteTable({ searchParams }) {
                 loadProiecte(),
                 loadSubproiecte()
             ]);
-            // ✅ FIX: Auto-expand toate proiectele care au subproiecte
-            setTimeout(()=>{
-                const proiecteIds = proiecte.map((p)=>p.ID_Proiect);
-                const proiecteCuSubproiecte = proiecteIds.filter((id)=>subproiecte.some((sub)=>sub.ID_Proiect === id));
-                if (proiecteCuSubproiecte.length > 0) {
-                    setExpandedProjects(new Set(proiecteCuSubproiecte));
-                    console.log("\uD83D\uDD0D Auto-expanded proiecte cu subproiecte:", proiecteCuSubproiecte);
-                }
-            }, 100); // Mic delay pentru a fi sigur că datele sunt încărcate
+        // ✅ Eliminat auto-expand de aici - se face în useEffect separat
         } catch (error) {
             console.error("Eroare la \xeencărcarea datelor:", error);
             ProiecteTable_showToast("Eroare de conectare la baza de date", "error");
