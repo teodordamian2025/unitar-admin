@@ -658,16 +658,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: '#ffffff', // ✅ ALBU SOLID în loc de rgba transparent
-        opacity: 0.95, // ✅ 95% opacitate pentru modal mai mare (era rgba transparent)
+        background: '#ffffff', // ✅ ALBU SOLID
+        opacity: 0.9, // ✅ 90% opacitate DIRECTĂ (nu mai folosesc animații care resetează)
         borderRadius: '16px',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic pentru contrast
-        border: '1px solid #d0d0d0', // ✅ Border solid gri
-        position: 'relative' as const
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic
+        border: '1px solid #d0d0d0', // ✅ Border solid
+        position: 'relative' as const,
+        // ✅ Eliminat toate animațiile care pot reseta opacity
+        transform: 'scale(1)', // ✅ Static scale
+        transition: 'none' // ✅ Fără tranziții care pot afecta opacity
       }}>
         {/* Header SOLID pentru modal factură */}
         <div style={{

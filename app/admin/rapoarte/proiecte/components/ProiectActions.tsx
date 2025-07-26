@@ -1127,7 +1127,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown OPAC 90% - REAL */}
+          {/* ✅ Dropdown OPAC 90% - CORECTARE ANIMAȚIE */}
           <div style={{
             position: 'absolute' as const,
             ...(dropdownPosition === 'bottom' 
@@ -1135,16 +1135,15 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               : { bottom: '100%', marginBottom: '8px' }
             ),
             right: 0,
-            background: '#ffffff', // ✅ ALBU SOLID în loc de rgba transparent
-            opacity: 0.9, // ✅ 90% opacitate aplicată la întregul element
-            backdropFilter: 'none', // ✅ Eliminat blur ca să nu interfere
+            background: '#ffffff', // ✅ ALBU SOLID 
             borderRadius: '16px',
             minWidth: '260px',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)', // ✅ Shadow mai puternic pentru contrast
-            border: '1px solid #e0e0e0', // ✅ Border solid gri în loc de transparent
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #e0e0e0',
             zIndex: 10999,
             overflow: 'hidden' as const,
             transform: 'scale(0.95)',
+            opacity: 0, // ✅ Start cu 0 pentru animație
             animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
           }}>
             <style>
@@ -1152,7 +1151,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                 @keyframes dropdownAppear {
                   to {
                     transform: scale(1);
-                    opacity: 1;
+                    opacity: 0.9; /* ✅ FINAL opacity 90% în loc de 1 */
                   }
                 }
               `}
