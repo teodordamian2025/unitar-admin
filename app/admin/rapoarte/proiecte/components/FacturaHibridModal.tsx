@@ -649,8 +649,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     <div style={{
       position: 'fixed' as const,
       inset: '0',
-      background: 'rgba(0, 0, 0, 0.4)', // ✅ Overlay pentru blocare (era 0.5)
-      backdropFilter: 'blur(8px)', // ✅ Blur redus (era 12px)
+      background: 'rgba(0, 0, 0, 0.6)', // ✅ Overlay mai puternic pentru blocare
+      backdropFilter: 'blur(5px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -658,25 +658,25 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       padding: '1rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.9)', // ✅ 90% opacitate (era 0.99)
-        backdropFilter: 'blur(20px)', // ✅ Blur redus (era 25px)
+        background: '#ffffff', // ✅ ALBU SOLID în loc de rgba transparent
+        opacity: 0.95, // ✅ 95% opacitate pentru modal mai mare (era rgba transparent)
         borderRadius: '16px',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)', // ✅ Shadow moderat (era 0.25)
-        border: '2px solid rgba(255, 255, 255, 0.8)', // ✅ Border solid (era 0.6)
+        boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)', // ✅ Shadow puternic pentru contrast
+        border: '1px solid #d0d0d0', // ✅ Border solid gri
         position: 'relative' as const
       }}>
-        {/* ✅ Header Glassmorphism 90% opacitate */}
+        {/* Header SOLID pentru modal factură */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '1.5rem',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-          background: 'rgba(52, 152, 219, 0.15)', // ✅ Simplificat gradient (era complex)
+          borderBottom: '1px solid #e0e0e0', // ✅ Border solid
+          background: '#e3f2fd', // ✅ Background solid albastru deschis
           borderRadius: '16px 16px 0 0'
         }}>
           <div>

@@ -450,14 +450,14 @@ function SubproiectModal({ proiectParinte, onClose, onSuccess }: SubproiectModal
         border: '1px solid rgba(255, 255, 255, 0.2)',
         position: 'relative' as const
       }}>
-        {/* ✅ Header Glassmorphism 90% opacitate */}
+        {/* Header SOLID pentru subproiect */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '1.5rem',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-          background: 'rgba(52, 152, 219, 0.15)', // ✅ Simplificat (era complex gradient)
+          borderBottom: '1px solid #e0e0e0', // ✅ Border solid
+          background: '#e8f5e8', // ✅ Background solid verde deschis
           borderRadius: '16px 16px 0 0'
         }}>
           <div>
@@ -1127,7 +1127,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown Glassmorphism 90% opacitate */}
+          {/* ✅ Dropdown OPAC 90% - REAL */}
           <div style={{
             position: 'absolute' as const,
             ...(dropdownPosition === 'bottom' 
@@ -1135,16 +1135,16 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               : { bottom: '100%', marginBottom: '8px' }
             ),
             right: 0,
-            background: 'rgba(255, 255, 255, 0.9)', // ✅ 90% opacitate (era 0.98)
-            backdropFilter: 'blur(20px)', // ✅ Redus blur (era 25px)
+            background: '#ffffff', // ✅ ALBU SOLID în loc de rgba transparent
+            opacity: 0.9, // ✅ 90% opacitate aplicată la întregul element
+            backdropFilter: 'none', // ✅ Eliminat blur ca să nu interfere
             borderRadius: '16px',
             minWidth: '260px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)', // ✅ Shadow moderat (era 0.25)
-            border: '2px solid rgba(255, 255, 255, 0.8)', // ✅ Border solid (era 1px 0.4)
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)', // ✅ Shadow mai puternic pentru contrast
+            border: '1px solid #e0e0e0', // ✅ Border solid gri în loc de transparent
             zIndex: 10999,
             overflow: 'hidden' as const,
             transform: 'scale(0.95)',
-            opacity: 0,
             animation: 'dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
           }}>
             <style>
@@ -1158,12 +1158,12 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               `}
             </style>
 
-            {/* Header Glassmorphism 90% opacitate */}
+            {/* Header OPAC 90% */}
             <div style={{
               padding: '1rem',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.15)', // ✅ Border mai vizibil
-              background: 'rgba(248, 249, 250, 0.9)', // ✅ 90% opacitate (era 0.95)
-              backdropFilter: 'blur(10px)' // ✅ Blur redus (era 15px)
+              borderBottom: '1px solid #e0e0e0', // ✅ Border solid gri
+              background: '#f8f9fa', // ✅ BACKGROUND SOLID în loc de rgba
+              // ✅ Nu mai aplicăm opacity aici ca se aplică la elementul părinte
             }}>
               <div style={{ 
                 fontSize: '12px', 
