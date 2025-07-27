@@ -48,7 +48,7 @@ var next_response = __webpack_require__(89335);
 ;// CONCATENATED MODULE: ./app/api/anaf/company-info/route.ts
 // ==================================================================
 // CALEA: app/api/anaf/company-info/route.ts
-// DESCRIERE: Preluare informații companie din ANAF
+// DESCRIERE: Preluare informații companie din ANAF - REPARAT cu API v9 public
 // ==================================================================
 
 async function GET(request) {
@@ -72,81 +72,99 @@ async function GET(request) {
             });
         }
         console.log(`Interogare ANAF pentru CUI: ${cleanCui}`);
-        const response = await fetch("https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "User-Agent": "UNITAR-PROIECT/1.0"
-            },
-            body: JSON.stringify([
-                {
-                    cui: cleanCui
-                }
-            ])
-        });
-        if (!response.ok) {
-            throw new Error(`ANAF API error: ${response.status} - ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log("ANAF Response:", data);
-        if (data.found && data.found.length > 0) {
-            const info = data.found[0];
-            return next_response/* default */.Z.json({
-                success: true,
-                data: {
-                    denumire: info.denumire,
-                    cui: `RO${info.cui}`,
-                    nrRegCom: info.nrRegCom || "",
-                    adresa: buildCompleteAddress(info),
-                    telefon: info.telefon || "",
-                    status: info.statusInactivi ? "Inactiv" : "Activ",
-                    dataInregistrare: info.dataInregistrare,
-                    platitorTva: info.scpTVA ? "Da" : "Nu",
-                    dataInceputTva: info.dataInceputTva || null,
-                    dataAnulareTva: info.dataAnulareTva || null,
-                    dataActualizare: info.dataActualizare,
-                    // Date suplimentare pentru completare automată
-                    judet: info.judet || "",
-                    localitate: info.localitate || "",
-                    codPostal: info.codPostal || "",
-                    strada: info.adresa || "",
-                    numar: info.numar || "",
-                    bloc: info.bloc || "",
-                    scara: info.scara || "",
-                    etaj: info.etaj || "",
-                    apartament: info.ap || ""
-                }
+        // ✅ URL PUBLIC ANAF v9 - FĂRĂ AUTENTIFICARE
+        const anafUrl = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
+        // ✅ FIX TYPESCRIPT: lastError poate fi string sau null
+        let lastError = null;
+        try {
+            console.log(`Apelare ANAF API v9: ${anafUrl}`);
+            const response = await fetch(anafUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "User-Agent": "UNITAR-PROIECT/1.0",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify([
+                    {
+                        cui: cleanCui,
+                        data: new Date().toISOString().split("T")[0]
+                    }
+                ])
             });
-        } else {
-            // Verifică dacă există în lista de erori
-            if (data.notfound && data.notfound.length > 0) {
+            console.log(`ANAF Response Status: ${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                lastError = `ANAF API error: ${response.status} - ${response.statusText}`;
+                console.error(lastError);
+                return next_response/* default */.Z.json({
+                    success: false,
+                    error: lastError
+                }, {
+                    status: response.status
+                });
+            }
+            const data = await response.json();
+            console.log("ANAF Response v9:", JSON.stringify(data, null, 2));
+            // ✅ PARSING ACTUALIZAT PENTRU STRUCTURA v9
+            if (data.found && data.found.length > 0) {
+                const info = data.found[0];
+                const dateGenerale = info.date_generale || {};
+                const adresaSediuSocial = info.adresa_sediu_social || {};
+                const adresaDomiciliuFiscal = info.adresa_domiciliu_fiscal || {};
+                const inregistrareScop = info.inregistrare_scop_Tva || {};
+                const stareInactiv = info.stare_inactiv || {};
+                return next_response/* default */.Z.json({
+                    success: true,
+                    data: {
+                        denumire: dateGenerale.denumire || "",
+                        cui: dateGenerale.cui ? `RO${dateGenerale.cui}` : "",
+                        nrRegCom: dateGenerale.nrRegCom || "",
+                        adresa: buildCompleteAddressV9(adresaDomiciliuFiscal, adresaSediuSocial),
+                        telefon: dateGenerale.telefon || "",
+                        status: stareInactiv.statusInactivi ? "Inactiv" : "Activ",
+                        dataInregistrare: dateGenerale.data_inregistrare || null,
+                        platitorTva: inregistrareScop.scpTVA ? "Da" : "Nu",
+                        dataInceputTva: inregistrareScop.perioade_TVA?.data_inceput_ScpTVA || null,
+                        dataAnulareTva: inregistrareScop.perioade_TVA?.data_sfarsit_ScpTVA || null,
+                        dataActualizare: new Date().toISOString(),
+                        // Date suplimentare pentru completare automată
+                        judet: adresaDomiciliuFiscal.ddenumire_Judet || adresaSediuSocial.sdenumire_Judet || "",
+                        localitate: adresaDomiciliuFiscal.ddenumire_Localitate || adresaSediuSocial.sdenumire_Localitate || "",
+                        codPostal: adresaDomiciliuFiscal.dcod_Postal || adresaSediuSocial.scod_Postal || "",
+                        strada: adresaDomiciliuFiscal.ddenumire_Strada || adresaSediuSocial.sdenumire_Strada || "",
+                        numar: adresaDomiciliuFiscal.dnumar_Strada || adresaSediuSocial.snumar_Strada || "",
+                        detaliiAdresa: adresaDomiciliuFiscal.ddetalii_Adresa || adresaSediuSocial.sdetalii_Adresa || ""
+                    }
+                });
+            } else if (data.notFound && data.notFound.length > 0) {
+                // CUI nu a fost găsit
                 return next_response/* default */.Z.json({
                     success: false,
                     error: "CUI-ul nu este \xeenregistrat \xeen sistemul ANAF sau nu este valid"
                 }, {
                     status: 404
                 });
+            } else {
+                // Răspuns neașteptat
+                return next_response/* default */.Z.json({
+                    success: false,
+                    error: "Răspuns neașteptat de la ANAF"
+                }, {
+                    status: 502
+                });
             }
+        } catch (error) {
+            console.error(`Eroare pentru ANAF API:`, error);
+            lastError = error instanceof Error ? error.message : "Eroare necunoscută";
             return next_response/* default */.Z.json({
                 success: false,
-                error: "Nu s-au găsit informații pentru CUI-ul specificat"
+                error: `Nu s-a putut conecta la serviciul ANAF: ${lastError}`
             }, {
-                status: 404
+                status: 503
             });
         }
     } catch (error) {
         console.error("Eroare ANAF API:", error);
-        // Verifică tipul de eroare
-        if (error instanceof Error) {
-            if (error.message.includes("fetch")) {
-                return next_response/* default */.Z.json({
-                    success: false,
-                    error: "Nu s-a putut conecta la serviciul ANAF. Verificați conexiunea la internet."
-                }, {
-                    status: 503
-                });
-            }
-        }
         return next_response/* default */.Z.json({
             success: false,
             error: `Eroare la preluarea datelor de la ANAF: ${error instanceof Error ? error.message : "Eroare necunoscută"}`
@@ -155,41 +173,43 @@ async function GET(request) {
         });
     }
 }
-// Helper function pentru construirea adresei complete
-function buildCompleteAddress(info) {
+// ✅ Helper function pentru construirea adresei complete din structura v9
+function buildCompleteAddressV9(domiciliuFiscal, sediuSocial) {
     const addressParts = [];
+    // Prioritate: domiciliu fiscal, apoi sediu social
+    const adresa = domiciliuFiscal || sediuSocial || {};
     // Strada și numărul
-    if (info.adresa) {
-        addressParts.push(info.adresa);
+    const strada = adresa.ddenumire_Strada || adresa.sdenumire_Strada || "";
+    const numar = adresa.dnumar_Strada || adresa.snumar_Strada || "";
+    if (strada) {
+        addressParts.push(strada);
     }
-    if (info.numar) {
-        addressParts.push(`nr. ${info.numar}`);
+    if (numar) {
+        addressParts.push(`nr. ${numar}`);
     }
-    // Bloc, scară, etaj, apartament
-    const buildingParts = [];
-    if (info.bloc) buildingParts.push(`Bl. ${info.bloc}`);
-    if (info.scara) buildingParts.push(`Sc. ${info.scara}`);
-    if (info.etaj) buildingParts.push(`Et. ${info.etaj}`);
-    if (info.ap) buildingParts.push(`Ap. ${info.ap}`);
-    if (buildingParts.length > 0) {
-        addressParts.push(buildingParts.join(", "));
+    // Detalii adresă (bloc, scară, etc.)
+    const detalii = adresa.ddetalii_Adresa || adresa.sdetalii_Adresa || "";
+    if (detalii) {
+        addressParts.push(detalii);
     }
     // Localitate și județ
+    const localitate = adresa.ddenumire_Localitate || adresa.sdenumire_Localitate || "";
+    const judet = adresa.ddenumire_Judet || adresa.sdenumire_Judet || "";
     const locationParts = [];
-    if (info.localitate) locationParts.push(info.localitate);
-    if (info.judet) locationParts.push(`jud. ${info.judet}`);
+    if (localitate) locationParts.push(localitate);
+    if (judet) locationParts.push(`jud. ${judet}`);
     if (locationParts.length > 0) {
         addressParts.push(locationParts.join(", "));
     }
     // Cod poștal
-    if (info.codPostal) {
-        addressParts.push(`CP ${info.codPostal}`);
+    const codPostal = adresa.dcod_Postal || adresa.scod_Postal || "";
+    if (codPostal) {
+        addressParts.push(`CP ${codPostal}`);
     }
     return addressParts.join(", ");
 }
 // ==================================================================
-// CALEA: app/api/anaf/verify-vat/route.ts
-// DESCRIERE: Verificare rapidă CUI și status TVA
+// POST: Verificare rapidă CUI și status TVA
 // ==================================================================
 async function POST(request) {
     try {
@@ -202,39 +222,65 @@ async function POST(request) {
             });
         }
         const cleanCui = cui.replace(/[^0-9]/g, "");
-        const response = await fetch("https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "User-Agent": "UNITAR-PROIECT/1.0"
-            },
-            body: JSON.stringify([
-                {
-                    cui: cleanCui
-                }
-            ])
-        });
-        const data = await response.json();
-        if (data.found && data.found.length > 0) {
-            const info = data.found[0];
-            return next_response/* default */.Z.json({
-                success: true,
-                isValid: true,
-                isActive: !info.statusInactivi,
-                isVatPayer: !!info.scpTVA,
-                data: {
-                    denumire: info.denumire,
-                    cui: `RO${info.cui}`,
-                    status: info.statusInactivi ? "Inactiv" : "Activ",
-                    platitorTva: info.scpTVA ? "Da" : "Nu",
-                    adresa: buildCompleteAddress(info)
-                }
+        // ✅ Folosește API-ul public v9
+        const anafUrl = "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
+        try {
+            const response = await fetch(anafUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "User-Agent": "UNITAR-PROIECT/1.0"
+                },
+                body: JSON.stringify([
+                    {
+                        cui: cleanCui,
+                        data: new Date().toISOString().split("T")[0]
+                    }
+                ])
             });
-        } else {
+            if (!response.ok) {
+                return next_response/* default */.Z.json({
+                    success: false,
+                    error: "Nu s-a putut verifica CUI-ul la ANAF"
+                }, {
+                    status: 503
+                });
+            }
+            const data = await response.json();
+            if (data.found && data.found.length > 0) {
+                const info = data.found[0];
+                const dateGenerale = info.date_generale || {};
+                const inregistrareScop = info.inregistrare_scop_Tva || {};
+                const stareInactiv = info.stare_inactiv || {};
+                const adresaDomiciliuFiscal = info.adresa_domiciliu_fiscal || {};
+                const adresaSediuSocial = info.adresa_sediu_social || {};
+                return next_response/* default */.Z.json({
+                    success: true,
+                    isValid: true,
+                    isActive: !stareInactiv.statusInactivi,
+                    isVatPayer: !!inregistrareScop.scpTVA,
+                    data: {
+                        denumire: dateGenerale.denumire || "",
+                        cui: dateGenerale.cui ? `RO${dateGenerale.cui}` : "",
+                        status: stareInactiv.statusInactivi ? "Inactiv" : "Activ",
+                        platitorTva: inregistrareScop.scpTVA ? "Da" : "Nu",
+                        adresa: buildCompleteAddressV9(adresaDomiciliuFiscal, adresaSediuSocial)
+                    }
+                });
+            } else {
+                return next_response/* default */.Z.json({
+                    success: true,
+                    isValid: false,
+                    message: "CUI-ul nu este valid sau nu este \xeenregistrat la ANAF"
+                });
+            }
+        } catch (error) {
+            console.error("Eroare verificare TVA:", error);
             return next_response/* default */.Z.json({
-                success: true,
-                isValid: false,
-                message: "CUI-ul nu este valid sau nu este \xeenregistrat la ANAF"
+                success: false,
+                error: "Nu s-a putut verifica CUI-ul la ANAF"
+            }, {
+                status: 503
             });
         }
     } catch (error) {

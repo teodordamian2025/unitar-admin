@@ -283,10 +283,34 @@ find | sed 's|[^/]*/|- |g'
 ## 🔑 Environment Variables
 
 ```env
-GOOGLE_CLOUD_PROJECT_ID=your-project-id
-GOOGLE_CLOUD_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
-GOOGLE_CLOUD_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_CLOUD_CLIENT_ID=your-client-id
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=u
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=1
+NEXT_PUBLIC_RECAPTCHA_SITE_KEY=
+RECAPTCHA_SECRET_KEY=
+OPENAI_API_KEY=
+NEXT_PUBLIC_API_AI_URL=https://unitar-admin.vercel.app
+NEXT_PUBLIC_BASE_URL=https://admin.unitarproiect.eu
+GOOGLE_CLOUD_PROJECT_ID=hale-mode-464009-i6
+GOOGLE_CLOUD_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----....-----END PRIVATE KEY-----"
+GOOGLE_CLOUD_CLIENT_EMAIL=
+GOOGLE_CLOUD_CLIENT_ID=
+UNITAR_CUI=35639210
+UNITAR_ADRESA=Str. Dristorului, nr. 98, bl. 11, sc. B, ap. 85, mun. Bucuresti, sector 3
+UNITAR_TELEFON=0765486044
+UNITAR_EMAIL=office@unitarproiect.eu
+# Factureaza.me API Integration
+FACTUREAZA_API_ENDPOINT=https://api.factureaza.me
+FACTUREAZA_API_KEY=
+# Webhook URL pentru notificări (opțional)
+FACTUREAZA_WEBHOOK_URL=
+# Pentru debugging client nou
+NEXT_PUBLIC_FACTUREAZA_ENABLED=false
+# Pentru debugging
+NEXT_PUBLIC_DEBUG=true
 ```
 
 ## 🏢 Configurare Firmă
@@ -356,25 +380,25 @@ Rezumat Toate Problemele Rezolvate:
 app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
 Câmp nou "Adresa Proiect" în formular
 Validare și trimitere în API
-Reset form include și adresa
+Reset form include și adresa=functional
 
 ✅ 2. API Proiecte - Suport pentru Adresa:
 app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
 POST include câmpul Adresa în INSERT
 PUT permite actualizarea Adresei
-GET include căutare și în câmpul Adresa
+GET include căutare și în câmpul Adresa=functional
 
 ✅ 3. Dropdown Actions - Poziționare Inteligentă:
 app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 Calculează spațiul disponibil automat
 Se afișează deasupra când e aproape de jos
-useRef pentru referința butonului
+useRef pentru referința butonului=functional
 
 ✅ 4. Vezi Detalii și Editează - Implementate:
 app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 "Vezi Detalii" afișează informații complete în toast
 "Editează" pregătit pentru modal/pagină de editare
-Console.log pentru debugging
+Console.log pentru debugging=functional
 
 ✅ 5. TVA 21% - Adăugat în dropdown:
 app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
@@ -435,7 +459,7 @@ Soluția:
 
 Fișier: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 Status: Funcționalitatea există deja în versiunea originală
-Verificare: Odată rezolvate erorile API, selectorul va funcționa
+Verificare: Odată rezolvate erorile API, selectorul va funcționa=functional
 
 📁 Fișiere Actualizate
 🎯 Frontend Components:
@@ -508,55 +532,40 @@ app/api/rapoarte/subproiecte/route.ts
 2. Test Vezi Detalii:
 ✅ Click pe "Acțiuni" pentru orice proiect
 ✅ Click "Vezi Detalii" → apare toast cu informații complete
-✅ Verifică că toate câmpurile sunt afișate corect
+✅ Verifică că toate câmpurile sunt afișate corect=functional
 3. Test Adăugare Subproiect:
 ✅ Click pe "Acțiuni" pentru un proiect principal
 ✅ Click "Adaugă Subproiect" → se deschide modalul fără erori React
 ✅ Completează și submit → subproiectul se creează
-✅ Verifică în listă că subproiectul apare
+✅ Verifică în listă că subproiectul apare=functional
 4. Test Generare Factură:
 ✅ Click pe "Acțiuni" → "Generare Factură"
 ✅ Verifică că se încarcă subproiectele disponibile
 ✅ Verifică că butonul de adăugare subproiecte funcționează
 ✅ Generează PDF cu succes
-⚡ Quick Fix Implementation
-Pentru a implementa fix-urile:
+⚡ Quick Fix Implementation=functional
+De facut:
+1. Integrare Clienti noi cu baza de date ANAF
+Sunt introduse cele 3 pagini, dar toate par sa aiba nevoie de inregistrare si Semnatura electronica
+https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva (original)
+https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/tva (alternativ)
+https://webservicesp.anaf.ro/rest/api/v1/ws/tva (simplificat)
+Fisiere asociate cu integrarea ANAF:
+app/api/anaf/search-clients/route.ts // DESCRIERE: Căutare și import clienți din ANAF în baza de date
+app/api/anaf/company-info/route.ts // DESCRIERE: Preluare informații companie din ANAF - Actualizat cu fallback URLs
+app/api/anaf/search-clients/route.ts // DESCRIERE: Căutare și import clienți din ANAF în baza de date
+app/api/verify-anaf/route.ts
+app/admin/rapoarte/clienti/components/ANAFClientSearch.tsx // DESCRIERE: Componentă pentru căutare și import clienți din ANAF
+app/admin/rapoarte/clienti/components/ClientNouModal.tsx // MODIFICAT: Integrare completă ANAF cu componenta ANAFClientSearch
+2. Realizare Contract
+Motivație:
 
-Copiază fișierele actualizate:
+Ușor de implementat cu infrastructura actuală
+Funcționalitate completă de management proiecte
+Valoare comercială imediată.
+3. E-factura ANAF
+Motivație:
 
-bash# Frontend
-app/admin/rapoarte/proiecte/page.tsx
-app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-
-# Backend  
-app/api/rapoarte/proiecte/route.ts
-app/api/rapoarte/subproiecte/route.ts
-
-Restart aplicația:
-
-bashnpm run build
-vercel --prod  # sau deployment-ul obișnuit
-
-Testează workflow-ul complet:
-
-
-✅ Butonul "Proiect Nou" în header
-✅ Vezi Detalii funcțional cu toast
-✅ Adăugare subproiect fără erori React
-✅ API-uri fără erori HTTP 500
-
-🎉 Rezultat Final
-Status: ✅ TOATE PROBLEMELE REZOLVATE
-
-✅ Butonul "Proiect Nou" readăugat și funcțional
-✅ API-uri BigQuery funcționale cu types specificate
-✅ React Error #31 eliminat complet
-✅ Vezi Detalii & Editează funcționale
-✅ Management subproiecte complet functional
-✅ Selector subproiecte în factură disponibil
-
-Sistemul UnitarProiect este din nou complet funcțional! 🚀
-
-📞 Pentru probleme suplimentare:
-Toate fix-urile au fost implementate conservativ, păstrând funcționalitatea existentă și adăugând doar remedierile necesare. Codul este optimizat pentru stabilitate și performance.
-
+Cel mai complex dar și cel mai valoros
+Necesită date client validate (din etapa 1)
+Impact major pentru conformitatea fiscală

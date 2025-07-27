@@ -94,29 +94,27 @@ export default function ANAFClientSearch({
     setSearchResult(null);
 
     try {
-      const response = await fetch(`/api/anaf/search-clients?cui=${encodeURIComponent(cui.trim())}`);
+      const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cui.trim())}`);
       const result = await response.json();
 
       if (result.success) {
         setSearchResult({
           ...result.data,
-          existsInBD: result.existsInBD,
-          clientId: result.clientId
+          existsInBD: false, // Verificarea va fi adăugată mai târziu
+          clientId: null
         });
 
-        showToast(result.message, 'success');
+        showToast('Client găsit în ANAF!', 'success');
 
         if (onClientFound) {
           onClientFound({
             ...result.data,
-            existsInBD: result.existsInBD,
-            clientId: result.clientId
+            existsInBD: false,
+            clientId: null
           });
         }
 
-        if (!result.existsInBD) {
-          setShowImportDialog(true);
-        }
+        setShowImportDialog(true);
       } else {
         showToast(result.error || 'Client nu a fost găsit în ANAF', 'error');
         setSearchResult(null);
