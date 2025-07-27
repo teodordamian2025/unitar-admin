@@ -741,6 +741,8 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
     });
 }
 
+// EXTERNAL MODULE: external "next/dist/compiled/react-dom-experimental/server-rendering-stub"
+var server_rendering_stub_ = __webpack_require__(55752);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectActions.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
@@ -748,6 +750,7 @@ function ProiectFilters({ values, onChange, onReset, loading = false }) {
 // MODIFICAT: Z-index Management + Callback System pentru modale externe
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 // ✅ FIX: System global pentru management dropdown-uri multiple
 let currentOpenDropdown = null;
@@ -1010,6 +1013,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
     const [isOpen, setIsOpen] = react_experimental_default().useState(false);
     const [loading, setLoading] = react_experimental_default().useState(null);
     const [dropdownPosition, setDropdownPosition] = react_experimental_default().useState("bottom");
+    const [dropdownCoords, setDropdownCoords] = react_experimental_default().useState({
+        top: 0,
+        left: 0,
+        width: 0
+    });
     const buttonRef = react_experimental_default().useRef(null);
     // ✅ FIX: ID unic pentru acest dropdown
     const dropdownId = react_experimental_default().useMemo(()=>`dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [
@@ -1048,35 +1056,51 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
         isOpen,
         dropdownId
     ]);
-    // ✅ FIX: Calculează poziționarea inteligentă cu compensarea pentru rânduri înalte
+    // ✅ FIX: Calculează poziționarea și coordonatele pentru Portal
     const calculateDropdownPosition = ()=>{
         if (!buttonRef.current) return;
         const buttonRect = buttonRef.current.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
         const dropdownHeight = 350;
-        // ✅ NOWI: Găsește rândul părinte pentru a calcula înălțimea acestuia
+        // ✅ Găsește rândul părinte pentru a calcula înălțimea acestuia
         const tableRow = buttonRef.current.closest("tr");
         const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
-        // ✅ NOWI: Ajustează calculul cu înălțimea rândului
+        // ✅ Ajustează calculul cu înălțimea rândului
         const spaceBelow = viewportHeight - buttonRect.bottom;
-        const spaceAbove = buttonRect.top - rowHeight; // Compensează pentru înălțimea rândului
-        console.log("\uD83D\uDCCF Dropdown positioning:", {
+        const spaceAbove = buttonRect.top - rowHeight;
+        let finalTop = 0;
+        let finalLeft = buttonRect.right - 260; // Dropdown width: 260px, align right
+        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+            // ✅ Urcă sus
+            finalTop = buttonRect.top - dropdownHeight - 8;
+            setDropdownPosition("top");
+            console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
+        } else {
+            // ✅ Coboară jos
+            finalTop = buttonRect.bottom + 8;
+            setDropdownPosition("bottom");
+            console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
+        }
+        // ✅ Asigură că dropdown-ul nu iese din viewport
+        if (finalLeft < 10) finalLeft = 10;
+        if (finalLeft + 260 > window.innerWidth - 10) {
+            finalLeft = window.innerWidth - 270;
+        }
+        setDropdownCoords({
+            top: finalTop,
+            left: finalLeft,
+            width: 260
+        });
+        console.log("\uD83D\uDCCF Portal dropdown positioning:", {
             spaceBelow,
             spaceAbove,
             dropdownHeight,
             rowHeight,
-            buttonTop: buttonRect.top,
-            buttonBottom: buttonRect.bottom,
-            viewportHeight,
+            finalTop,
+            finalLeft,
+            buttonRect,
             dropdownId
         });
-        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-            console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
-            setDropdownPosition("top");
-        } else {
-            console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
-            setDropdownPosition("bottom");
-        }
     };
     const handleActionClick = async (actionKey)=>{
         if (loading) return;
@@ -1187,139 +1211,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             setIsOpen(false);
                         }
                     }),
-                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                        style: {
-                            position: "absolute",
-                            ...dropdownPosition === "bottom" ? {
-                                top: "100%",
-                                marginTop: "8px"
-                            } : {
-                                bottom: "100%",
-                                marginBottom: "8px"
-                            },
-                            right: 0,
-                            background: "#ffffff",
-                            opacity: 1,
-                            borderRadius: "16px",
-                            minWidth: "260px",
-                            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
-                            border: "1px solid #e0e0e0",
-                            zIndex: dropdownPosition === "bottom" ? 45000 : 41000,
-                            overflow: "hidden",
-                            transform: "scale(1)"
-                        },
-                        children: [
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                style: {
-                                    padding: "1rem",
-                                    borderBottom: "1px solid #e0e0e0",
-                                    background: "#f8f9fa"
-                                },
-                                children: [
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                        style: {
-                                            fontSize: "12px",
-                                            fontWeight: "700",
-                                            color: "#2c3e50",
-                                            marginBottom: "0.5rem",
-                                            fontFamily: "monospace"
-                                        },
-                                        children: [
-                                            proiect.ID_Proiect,
-                                            proiect.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                style: {
-                                                    marginLeft: "8px",
-                                                    fontSize: "10px",
-                                                    background: "linear-gradient(135deg, #3498db 0%, #5dade2 100%)",
-                                                    color: "white",
-                                                    padding: "2px 6px",
-                                                    borderRadius: "6px",
-                                                    fontWeight: "600"
-                                                },
-                                                children: "SUB"
-                                            })
-                                        ]
-                                    }),
-                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                        style: {
-                                            fontSize: "11px",
-                                            color: "#7f8c8d"
-                                        },
-                                        children: [
-                                            "Status: ",
-                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                style: {
-                                                    color: getStatusColor(proiect.Status),
-                                                    fontWeight: "600"
-                                                },
-                                                children: proiect.Status
-                                            })
-                                        ]
-                                    })
-                                ]
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                style: {
-                                    padding: "0.5rem 0"
-                                },
-                                children: actions.map((action)=>{
-                                    if (action.divider) {
-                                        return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            style: {
-                                                height: "1px",
-                                                background: "linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)",
-                                                margin: "0.5rem 0"
-                                            }
-                                        }, action.key);
-                                    }
-                                    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                        onClick: ()=>handleActionClick(action.key),
-                                        disabled: action.disabled || loading === action.key,
-                                        style: {
-                                            width: "100%",
-                                            padding: "0.75rem 1rem",
-                                            background: "transparent",
-                                            border: "none",
-                                            textAlign: "left",
-                                            cursor: action.disabled || loading === action.key ? "not-allowed" : "pointer",
-                                            fontSize: "14px",
-                                            color: action.disabled ? "#bdc3c7" : "#2c3e50",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.75rem",
-                                            opacity: action.disabled ? 0.5 : 1,
-                                            transition: "all 0.3s ease",
-                                            fontWeight: "500"
-                                        },
-                                        onMouseOver: (e)=>{
-                                            if (!action.disabled && loading !== action.key) {
-                                                e.currentTarget.style.background = `${getActionColor(action.color)}15`;
-                                                e.currentTarget.style.color = getActionColor(action.color);
-                                                e.currentTarget.style.transform = "translateX(4px)";
-                                            }
-                                        },
-                                        onMouseOut: (e)=>{
-                                            e.currentTarget.style.background = "transparent";
-                                            e.currentTarget.style.color = action.disabled ? "#bdc3c7" : "#2c3e50";
-                                            e.currentTarget.style.transform = "translateX(0)";
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                style: {
-                                                    minWidth: "20px",
-                                                    fontSize: "16px"
-                                                },
-                                                children: loading === action.key ? "⏳" : action.icon
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                children: action.label
-                                            })
-                                        ]
-                                    }, action.key);
-                                })
-                            })
-                        ]
-                    })
+                     false && /*#__PURE__*/ 0
                 ]
             })
         ]
@@ -4877,6 +4769,17 @@ function ProiectEditModal({ isOpen, proiect, onClose, onProiectUpdated, onProiec
         Responsabil: "",
         Observatii: ""
     });
+    // ✅ Helper pentru safe parsing a datelor
+    const safeDateParse = (date)=>{
+        if (!date) return "";
+        if (typeof date === "string") {
+            return date.includes("T") ? date.split("T")[0] : date;
+        }
+        if (typeof date === "object" && date.value) {
+            return date.value.includes("T") ? date.value.split("T")[0] : date.value;
+        }
+        return "";
+    };
     (0,react_experimental_.useEffect)(()=>{
         if (isOpen && proiect) {
             loadClienti();
@@ -4888,8 +4791,8 @@ function ProiectEditModal({ isOpen, proiect, onClose, onProiectUpdated, onProiec
                 selectedClientId: "",
                 Adresa: proiect.Adresa || "",
                 Descriere: proiect.Descriere || "",
-                Data_Start: proiect.Data_Start ? proiect.Data_Start.split("T")[0] : "",
-                Data_Final: proiect.Data_Final ? proiect.Data_Final.split("T")[0] : "",
+                Data_Start: safeDateParse(proiect.Data_Start),
+                Data_Final: safeDateParse(proiect.Data_Final),
                 Status: proiect.Status || "Activ",
                 Valoare_Estimata: proiect.Valoare_Estimata ? proiect.Valoare_Estimata.toString() : "",
                 Responsabil: proiect.Responsabil || "",

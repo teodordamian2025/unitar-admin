@@ -104,6 +104,18 @@ export default function ProiectEditModal({
     Observatii: ''
   });
 
+  // ✅ Helper pentru safe parsing a datelor
+  const safeDateParse = (date?: string | { value: string }): string => {
+    if (!date) return '';
+    if (typeof date === 'string') {
+      return date.includes('T') ? date.split('T')[0] : date;
+    }
+    if (typeof date === 'object' && date.value) {
+      return date.value.includes('T') ? date.value.split('T')[0] : date.value;
+    }
+    return '';
+  };
+
   useEffect(() => {
     if (isOpen && proiect) {
       loadClienti();
@@ -115,8 +127,8 @@ export default function ProiectEditModal({
         selectedClientId: '',
         Adresa: proiect.Adresa || '',
         Descriere: proiect.Descriere || '',
-        Data_Start: proiect.Data_Start ? proiect.Data_Start.split('T')[0] : '',
-        Data_Final: proiect.Data_Final ? proiect.Data_Final.split('T')[0] : '',
+        Data_Start: safeDateParse(proiect.Data_Start), // ✅ Safe parsing
+        Data_Final: safeDateParse(proiect.Data_Final), // ✅ Safe parsing
         Status: proiect.Status || 'Activ',
         Valoare_Estimata: proiect.Valoare_Estimata ? proiect.Valoare_Estimata.toString() : '',
         Responsabil: proiect.Responsabil || '',

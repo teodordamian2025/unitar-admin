@@ -7,6 +7,7 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface ActionItem {
   key: string;
@@ -333,6 +334,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const [isOpen, setIsOpen] = React.useState(false);
   const [loading, setLoading] = React.useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
+  const [dropdownCoords, setDropdownCoords] = React.useState({ top: 0, left: 0, width: 0 });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   
   // ✅ FIX: ID unic pentru acest dropdown
@@ -370,7 +372,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   }, [isOpen, dropdownId]);
 
-  // ✅ FIX: Calculează poziționarea inteligentă cu compensarea pentru rânduri înalte
+  // ✅ FIX: Calculează poziționarea și coordonatele pentru Portal
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
@@ -378,32 +380,51 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     const viewportHeight = window.innerHeight;
     const dropdownHeight = 350;
     
-    // ✅ NOWI: Găsește rândul părinte pentru a calcula înălțimea acestuia
+    // ✅ Găsește rândul părinte pentru a calcula înălțimea acestuia
     const tableRow = buttonRef.current.closest('tr');
     const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
     
-    // ✅ NOWI: Ajustează calculul cu înălțimea rândului
+    // ✅ Ajustează calculul cu înălțimea rândului
     const spaceBelow = viewportHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top - rowHeight; // Compensează pentru înălțimea rândului
+    const spaceAbove = buttonRect.top - rowHeight;
     
-    console.log('📏 Dropdown positioning:', { 
+    let finalTop = 0;
+    let finalLeft = buttonRect.right - 260; // Dropdown width: 260px, align right
+    
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      // ✅ Urcă sus
+      finalTop = buttonRect.top - dropdownHeight - 8;
+      setDropdownPosition('top');
+      console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
+    } else {
+      // ✅ Coboară jos
+      finalTop = buttonRect.bottom + 8;
+      setDropdownPosition('bottom');
+      console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
+    }
+    
+    // ✅ Asigură că dropdown-ul nu iese din viewport
+    if (finalLeft < 10) finalLeft = 10;
+    if (finalLeft + 260 > window.innerWidth - 10) {
+      finalLeft = window.innerWidth - 270;
+    }
+    
+    setDropdownCoords({
+      top: finalTop,
+      left: finalLeft,
+      width: 260
+    });
+    
+    console.log('📏 Portal dropdown positioning:', { 
       spaceBelow, 
       spaceAbove, 
       dropdownHeight,
       rowHeight,
-      buttonTop: buttonRect.top,
-      buttonBottom: buttonRect.bottom,
-      viewportHeight,
+      finalTop,
+      finalLeft,
+      buttonRect,
       dropdownId 
     });
-    
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
-      setDropdownPosition('top');
-    } else {
-      console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
-      setDropdownPosition('bottom');
-    }
   };
 
   const handleActionClick = async (actionKey: string) => {
@@ -513,126 +534,126 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown cu z-index diferențiat pe poziție */}
-          <div style={{
-            position: 'absolute' as const,
-            ...(dropdownPosition === 'bottom' 
-              ? { top: '100%', marginTop: '8px' }
-              : { bottom: '100%', marginBottom: '8px' }
-            ),
-            right: 0,
-            background: '#ffffff',
-            opacity: 1,
-            borderRadius: '16px',
-            minWidth: '260px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-            border: '1px solid #e0e0e0',
-            zIndex: dropdownPosition === 'bottom' ? 45000 : 41000,
-            overflow: 'hidden' as const,
-            transform: 'scale(1)'
-          }}>
-            {/* Header */}
+          {/* ✅ Portal Dropdown - Render direct în document.body */}
+          {typeof window !== 'undefined' && createPortal(
             <div style={{
-              padding: '1rem',
-              borderBottom: '1px solid #e0e0e0',
-              background: '#f8f9fa'
+              position: 'fixed' as const,
+              top: dropdownCoords.top,
+              left: dropdownCoords.left,
+              width: dropdownCoords.width,
+              background: '#ffffff',
+              opacity: 1,
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+              border: '1px solid #e0e0e0',
+              zIndex: 45000, // ✅ Z-index mare pentru Portal
+              overflow: 'hidden' as const,
+              transform: 'scale(1)'
             }}>
-              <div style={{ 
-                fontSize: '12px', 
-                fontWeight: '700',
-                color: '#2c3e50',
-                marginBottom: '0.5rem',
-                fontFamily: 'monospace'
+              {/* Header */}
+              <div style={{
+                padding: '1rem',
+                borderBottom: '1px solid #e0e0e0',
+                background: '#f8f9fa'
               }}>
-                {proiect.ID_Proiect}
-                {proiect.tip === 'subproiect' && (
-                  <span style={{ 
-                    marginLeft: '8px',
-                    fontSize: '10px',
-                    background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                    color: 'white',
-                    padding: '2px 6px',
-                    borderRadius: '6px',
+                <div style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '700',
+                  color: '#2c3e50',
+                  marginBottom: '0.5rem',
+                  fontFamily: 'monospace'
+                }}>
+                  {proiect.ID_Proiect}
+                  {proiect.tip === 'subproiect' && (
+                    <span style={{ 
+                      marginLeft: '8px',
+                      fontSize: '10px',
+                      background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '6px',
+                      fontWeight: '600'
+                    }}>
+                      SUB
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                  Status: <span style={{ 
+                    color: getStatusColor(proiect.Status),
                     fontWeight: '600'
                   }}>
-                    SUB
+                    {proiect.Status}
                   </span>
-                )}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
-                Status: <span style={{ 
-                  color: getStatusColor(proiect.Status),
-                  fontWeight: '600'
-                }}>
-                  {proiect.Status}
-                </span>
-              </div>
-            </div>
 
-            {/* Actions */}
-            <div style={{ padding: '0.5rem 0' }}>
-              {actions.map((action) => {
-                if (action.divider) {
+              {/* Actions */}
+              <div style={{ padding: '0.5rem 0' }}>
+                {actions.map((action) => {
+                  if (action.divider) {
+                    return (
+                      <div
+                        key={action.key}
+                        style={{
+                          height: '1px',
+                          background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
+                          margin: '0.5rem 0'
+                        }}
+                      />
+                    );
+                  }
+
                   return (
-                    <div
+                    <button
                       key={action.key}
+                      onClick={() => handleActionClick(action.key)}
+                      disabled={action.disabled || loading === action.key}
                       style={{
-                        height: '1px',
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
-                        margin: '0.5rem 0'
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        background: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        color: action.disabled ? '#bdc3c7' : '#2c3e50',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        opacity: action.disabled ? 0.5 : 1,
+                        transition: 'all 0.3s ease',
+                        fontWeight: '500'
                       }}
-                    />
+                      onMouseOver={(e) => {
+                        if (!action.disabled && loading !== action.key) {
+                          e.currentTarget.style.background = `${getActionColor(action.color)}15`;
+                          e.currentTarget.style.color = getActionColor(action.color);
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = action.disabled ? '#bdc3c7' : '#2c3e50';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      <span style={{ 
+                        minWidth: '20px',
+                        fontSize: '16px'
+                      }}>
+                        {loading === action.key ? '⏳' : action.icon}
+                      </span>
+                      <span>
+                        {action.label}
+                      </span>
+                    </button>
                   );
-                }
-
-                return (
-                  <button
-                    key={action.key}
-                    onClick={() => handleActionClick(action.key)}
-                    disabled={action.disabled || loading === action.key}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem',
-                      background: 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: (action.disabled || loading === action.key) ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      color: action.disabled ? '#bdc3c7' : '#2c3e50',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      opacity: action.disabled ? 0.5 : 1,
-                      transition: 'all 0.3s ease',
-                      fontWeight: '500'
-                    }}
-                    onMouseOver={(e) => {
-                      if (!action.disabled && loading !== action.key) {
-                        e.currentTarget.style.background = `${getActionColor(action.color)}15`;
-                        e.currentTarget.style.color = getActionColor(action.color);
-                        e.currentTarget.style.transform = 'translateX(4px)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = action.disabled ? '#bdc3c7' : '#2c3e50';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                    }}
-                  >
-                    <span style={{ 
-                      minWidth: '20px',
-                      fontSize: '16px'
-                    }}>
-                      {loading === action.key ? '⏳' : action.icon}
-                    </span>
-                    <span>
-                      {action.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                })}
+              </div>
+            </div>,
+            document.body
+          )}
         </>
       )}
     </div>
