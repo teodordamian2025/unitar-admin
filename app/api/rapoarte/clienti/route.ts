@@ -41,22 +41,15 @@ export async function GET(request: NextRequest) {
       params.tipClient = tipClient;
     }
 
-    const sincronizat = searchParams.get('sincronizat');
-    if (sincronizat !== null) {
-      if (sincronizat === 'true') {
-        conditions.push('sincronizat_factureaza = true');
-      } else if (sincronizat === 'false') {
-        conditions.push('(sincronizat_factureaza = false OR sincronizat_factureaza IS NULL)');
-      }
-    }
+    // ✅ ELIMINAT: Filtrul sincronizat_factureaza nu mai este necesar
 
     // Adaugă condiții la query
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
 
-    // Sortare
-    query += ' ORDER BY data_creare DESC';
+    // Sortare - ordinea alfabetică în loc de data_creare (care poate fi problematică)
+    query += ' ORDER BY nume ASC';
 
     console.log('Executing clienti query:', query);
     console.log('With params:', params);
@@ -87,7 +80,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       nume,
-      tip_client = 'persoana_juridica',
+      tip_client = 'Juridic',
       cui,
       nr_reg_com,
       adresa,
@@ -113,13 +106,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (tip_client === 'persoana_juridica' && !cui?.trim()) {
+    if ((tip_client === 'Juridic' || tip_client === 'Juridic_TVA' || tip_client === 'persoana_juridica') && !cui?.trim()) {
       return NextResponse.json({ 
         error: 'CUI-ul este obligatoriu pentru persoanele juridice' 
       }, { status: 400 });
     }
 
-    if (tip_client === 'persoana_fizica' && !cnp?.trim()) {
+    if ((tip_client === 'Fizic' || tip_client === 'persoana_fizica') && !cnp?.trim()) {
       return NextResponse.json({ 
         error: 'CNP-ul este obligatoriu pentru persoanele fizice' 
       }, { status: 400 });
@@ -153,9 +146,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Generează ID unic
-    const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const clientId = body.id || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Folosește aceeași abordare ca chatbot-ul - construiește SQL direct
+    // ✅ ELIMINAT: sincronizat_factureaza din datele de inserare
     const insertData = {
       id: clientId,
       nume: nume.trim(),
@@ -176,17 +169,16 @@ export async function POST(request: NextRequest) {
       ci_numar: ci_numar?.trim() || null,
       ci_eliberata_de: ci_eliberata_de?.trim() || null,
       ci_eliberata_la: ci_eliberata_la || null,
-      data_creare: new Date().toISOString(),
-      data_actualizare: new Date().toISOString(),
-      activ: true,
-      sincronizat_factureaza: false,
+      data_creare: body.data_creare || new Date().toISOString(),
+      data_actualizare: body.data_actualizare || new Date().toISOString(),
+      activ: body.activ !== undefined ? body.activ : true,
       observatii: observatii?.trim() || null
     };
 
-    // Construiește query-ul ca în chatbot
+    // Construiește query-ul
     const insertQuery = generateInsertQuery('PanouControlUnitar', 'Clienti', insertData);
     
-    console.log('Executing insert query:', insertQuery); // Debug
+    console.log('Executing insert query:', insertQuery);
 
     await bigquery.query({
       query: insertQuery,
@@ -208,7 +200,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Funcție helper pentru generarea query-urilor INSERT (copiată din chatbot)
+// Funcție helper pentru generarea query-urilor INSERT
 function generateInsertQuery(dataset: string, table: string, data: any): string {
   const fullTableName = `\`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
   
@@ -270,6 +262,9 @@ export async function PUT(request: NextRequest) {
       WHERE id = @id AND activ = true
     `;
 
+    console.log('Executing update query:', updateQuery);
+    console.log('With params:', params);
+
     await bigquery.query({
       query: updateQuery,
       params: params,
@@ -307,6 +302,8 @@ export async function DELETE(request: NextRequest) {
       SET activ = false, data_actualizare = @data_actualizare
       WHERE id = @id
     `;
+
+    console.log('Executing delete query:', deleteQuery);
 
     await bigquery.query({
       query: deleteQuery,

@@ -546,10 +546,9 @@ app/api/rapoarte/subproiecte/route.ts
 ⚡ Quick Fix Implementation=functional
 De facut:
 1. Integrare Clienti noi cu baza de date ANAF
-Sunt introduse cele 3 pagini, dar toate par sa aiba nevoie de inregistrare si Semnatura electronica
-https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva (original)
-https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/tva (alternativ)
-https://webservicesp.anaf.ro/rest/api/v1/ws/tva (simplificat)
+Este adaugata adresa publica fara autentiticare:
+https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva
+Functioneaza cu aceasta pagina
 Fisiere asociate cu integrarea ANAF:
 app/api/anaf/search-clients/route.ts // DESCRIERE: Căutare și import clienți din ANAF în baza de date
 app/api/anaf/company-info/route.ts // DESCRIERE: Preluare informații companie din ANAF - Actualizat cu fallback URLs

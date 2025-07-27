@@ -96,6 +96,13 @@
       "static/chunks/396-9dfd2a0c926cb9ac.js",
       "static/chunks/app/admin/rapoarte/layout-43a01cd5c1e52cbb.js"
     ],
+    "/admin/rapoarte/facturi/page": [
+      "static/chunks/webpack-b6e09ecdadc03a2a.js",
+      "static/chunks/bf6a786c-fac6a0c26c7747df.js",
+      "static/chunks/114-863cc310e958bcdf.js",
+      "static/chunks/main-app-c55efb12a7fbb29b.js",
+      "static/chunks/app/admin/rapoarte/facturi/page-e9d351d89a189cac.js"
+    ],
     "/admin/rapoarte/clienti/page": [
       "static/chunks/webpack-b6e09ecdadc03a2a.js",
       "static/chunks/bf6a786c-fac6a0c26c7747df.js",
@@ -103,14 +110,7 @@
       "static/chunks/main-app-c55efb12a7fbb29b.js",
       "static/chunks/259-c7ad190c0e837254.js",
       "static/chunks/154-439f0d5296a1f8b1.js",
-      "static/chunks/app/admin/rapoarte/clienti/page-9a9f33b6abcd17dd.js"
-    ],
-    "/admin/rapoarte/facturi/page": [
-      "static/chunks/webpack-b6e09ecdadc03a2a.js",
-      "static/chunks/bf6a786c-fac6a0c26c7747df.js",
-      "static/chunks/114-863cc310e958bcdf.js",
-      "static/chunks/main-app-c55efb12a7fbb29b.js",
-      "static/chunks/app/admin/rapoarte/facturi/page-e9d351d89a189cac.js"
+      "static/chunks/app/admin/rapoarte/clienti/page-f1494029015c8b87.js"
     ],
     "/admin/rapoarte/proiecte/page": [
       "static/chunks/webpack-b6e09ecdadc03a2a.js",

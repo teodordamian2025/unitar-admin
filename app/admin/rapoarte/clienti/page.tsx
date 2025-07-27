@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import ClientNouModal from './components/ClientNouModal';
+import ClientEditModal from './components/ClientEditModal';
 
 interface Client {
   id: string;
@@ -15,15 +16,15 @@ interface Client {
   adresa?: string;
   oras?: string;
   judet?: string;
-  sincronizat_factureaza?: boolean;
-  data_creare?: string;
+  activ?: boolean;
 }
 
 export default function ClientiPage() {
   const [clienti, setClienti] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [syncLoading, setSyncLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   useEffect(() => {
     loadClienti();
@@ -51,48 +52,58 @@ export default function ClientiPage() {
     }
   };
 
-  const handleSyncFactureaza = async () => {
+  const handleEditClient = (client: Client) => {
+    setSelectedClient(client);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteClient = async (clientId: string, numeClient: string) => {
+    const confirmDelete = confirm(
+      `Ești sigur că vrei să ștergi clientul "${numeClient}"?\n\nAceastă acțiune nu poate fi anulată.`
+    );
+    
+    if (!confirmDelete) return;
+
     try {
-      setSyncLoading(true);
-      toast.info('Se sincronizează clienții din factureaza.me...');
-      
-      const response = await fetch('/api/actions/clients/sync-factureaza', {
-        method: 'GET'
+      const response = await fetch(`/api/rapoarte/clienti?id=${encodeURIComponent(clientId)}`, {
+        method: 'DELETE'
       });
       
       const result = await response.json();
       
       if (result.success) {
-        toast.success(`Sincronizare completă: ${result.syncedCount} clienți adăugați`);
-        if (result.errorCount > 0) {
-          toast.warning(`${result.errorCount} erori în timpul sincronizării`);
-        }
+        toast.success(`Clientul "${numeClient}" a fost șters cu succes`);
         loadClienti(); // Reîncarcă lista
       } else {
-        toast.error(`Eroare la sincronizare: ${result.error}`);
+        toast.error(`Eroare la ștergerea clientului: ${result.error}`);
       }
     } catch (error) {
-      toast.error('Eroare la sincronizarea cu factureaza.me');
-    } finally {
-      setSyncLoading(false);
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString('ro-RO');
-    } catch {
-      return '';
+      console.error('Eroare la ștergerea clientului:', error);
+      toast.error('Eroare la ștergerea clientului');
     }
   };
 
   const getTipClientIcon = (tip: string) => {
-    return tip === 'persoana_juridica' ? '🏢' : '👤';
+    if (tip === 'Juridic' || tip === 'Juridic_TVA' || tip === 'persoana_juridica') {
+      return '🏢';
+    }
+    return '👤';
   };
 
-  const getSyncIcon = (sincronizat?: boolean) => {
-    return sincronizat ? '✅' : '⚠️';
+  const getTipClientLabel = (tip: string) => {
+    switch (tip) {
+      case 'Juridic':
+        return 'Juridic';
+      case 'Juridic_TVA':
+        return 'Juridic (TVA)';
+      case 'persoana_juridica':
+        return 'Juridic';
+      case 'persoana_fizica':
+      case 'Fizic':
+        return 'Fizic';
+      default:
+        return tip;
+    }
   };
 
   if (loading) {
@@ -131,7 +142,7 @@ export default function ClientiPage() {
           color: '#7f8c8d',
           fontSize: '1.1rem'
         }}>
-          Gestionează clienții și sincronizează cu factureaza.me
+          Gestionează clienții și sincronizează cu ANAF
         </p>
       </div>
 
@@ -151,7 +162,7 @@ export default function ClientiPage() {
             👥 Clienți găsiți: {clienti.length}
           </h3>
           <p style={{ margin: '0.25rem 0 0 0', fontSize: '14px', color: '#7f8c8d' }}>
-            {clienti.filter(c => c.sincronizat_factureaza).length} sincronizați cu factureaza.me
+            Clienți activi în baza de date
           </p>
         </div>
         
@@ -170,23 +181,6 @@ export default function ClientiPage() {
             }}
           >
             + Client Nou
-          </button>
-          
-          <button
-            onClick={handleSyncFactureaza}
-            disabled={syncLoading}
-            style={{
-              padding: '0.5rem 1rem',
-              background: syncLoading ? '#bdc3c7' : '#3498db',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: syncLoading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
-          >
-            {syncLoading ? '⏳ Sincronizare...' : '🔄 Sync factureaza.me'}
           </button>
           
           <button
@@ -220,7 +214,7 @@ export default function ClientiPage() {
             👥 Nu au fost găsiți clienți
           </p>
           <p style={{ fontSize: '14px', color: '#bdc3c7', margin: '0.5rem 0' }}>
-            Adaugă primul client sau sincronizează din factureaza.me
+            Adaugă primul client sau importă din ANAF
           </p>
           <div style={{ marginTop: '1rem' }}>
             <button
@@ -233,27 +227,10 @@ export default function ClientiPage() {
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '16px',
-                fontWeight: 'bold',
-                marginRight: '1rem'
-              }}
-            >
-              + Adaugă Client
-            </button>
-            <button
-              onClick={handleSyncFactureaza}
-              disabled={syncLoading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: syncLoading ? '#bdc3c7' : '#3498db',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: syncLoading ? 'not-allowed' : 'pointer',
-                fontSize: '16px',
                 fontWeight: 'bold'
               }}
             >
-              {syncLoading ? '⏳ Sincronizare...' : 'Sincronizează din factureaza.me'}
+              + Adaugă Client
             </button>
           </div>
         </div>
@@ -321,15 +298,7 @@ export default function ClientiPage() {
                   fontWeight: 'bold',
                   color: '#2c3e50'
                 }}>
-                  factureaza.me
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Data Creare
+                  Acțiuni
                 </th>
               </tr>
             </thead>
@@ -346,9 +315,14 @@ export default function ClientiPage() {
                     padding: '0.75rem',
                     textAlign: 'center'
                   }}>
-                    <span style={{ fontSize: '18px' }}>
-                      {getTipClientIcon(client.tip_client)}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '18px' }}>
+                        {getTipClientIcon(client.tip_client)}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                        {getTipClientLabel(client.tip_client)}
+                      </span>
+                    </div>
                   </td>
                   <td style={{ 
                     padding: '0.75rem',
@@ -386,30 +360,40 @@ export default function ClientiPage() {
                     padding: '0.75rem',
                     textAlign: 'center'
                   }}>
-                    <span style={{ 
-                      fontSize: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.25rem'
-                    }}>
-                      {getSyncIcon(client.sincronizat_factureaza)}
-                      <span style={{ 
-                        fontSize: '12px',
-                        color: client.sincronizat_factureaza ? '#27ae60' : '#f39c12'
-                      }}>
-                        {client.sincronizat_factureaza ? 'Sync' : 'Local'}
-                      </span>
-                    </span>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    textAlign: 'center',
-                    color: '#7f8c8d',
-                    fontSize: '12px',
-                    fontFamily: 'monospace'
-                  }}>
-                    {formatDate(client.data_creare)}
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => handleEditClient(client)}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: '#3498db',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                        title="Editează client"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client.id, client.nume)}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          background: '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                        title="Șterge client"
+                      >
+                        🗑️ Del
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -423,6 +407,17 @@ export default function ClientiPage() {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onClientAdded={loadClienti}
+      />
+
+      {/* Modal Client Edit */}
+      <ClientEditModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedClient(null);
+        }}
+        onClientUpdated={loadClienti}
+        client={selectedClient}
       />
     </div>
   );
