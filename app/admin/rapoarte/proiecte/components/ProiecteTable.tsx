@@ -10,6 +10,7 @@ import ProiectActions from './ProiectActions';
 import ProiectNouModal from './ProiectNouModal';
 import FacturaHibridModal from './FacturaHibridModal';
 import SubproiectModal from './SubproiectModal';
+import ProiectEditModal from './ProiectEditModal';
 
 interface Proiect {
   ID_Proiect: string;
@@ -97,6 +98,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showSubproiectModal, setShowSubproiectModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProiect, setSelectedProiect] = useState<any>(null);
   
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -247,6 +249,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     setShowSubproiectModal(true);
   };
 
+  const handleShowEditModal = (proiect: any) => {
+    console.log('✏️ Deschidere modal editare pentru:', proiect);
+    setSelectedProiect(proiect);
+    setShowEditModal(true);
+  };
+
   const handleFacturaSuccess = (invoiceId: string, downloadUrl?: string) => {
     setShowFacturaModal(false);
     setSelectedProiect(null);
@@ -261,6 +269,20 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     handleRefresh();
   };
 
+  const handleEditSuccess = () => {
+    setShowEditModal(false);
+    setSelectedProiect(null);
+    showToast('✅ Proiect actualizat cu succes!', 'success');
+    handleRefresh();
+  };
+
+  const handleEditDelete = () => {
+    setShowEditModal(false);
+    setSelectedProiect(null);
+    showToast('✅ Proiect șters cu succes!', 'success');
+    handleRefresh();
+  };
+
   const handleCloseFacturaModal = () => {
     setShowFacturaModal(false);
     setSelectedProiect(null);
@@ -268,6 +290,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const handleCloseSubproiectModal = () => {
     setShowSubproiectModal(false);
+    setSelectedProiect(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
     setSelectedProiect(null);
   };
 
@@ -565,8 +592,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           borderRadius: '16px',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           overflow: 'visible',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-          zIndex: 10
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
         }}>
           <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
             <table style={{ 
@@ -801,8 +827,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
-                          textAlign: 'center' as const,
-                          zIndex: 20
+                          textAlign: 'center' as const
                         }}>
                           {/* ✅ MODIFICAT: Adăugat callback-uri pentru modalele externe */}
                           <ProiectActions 
@@ -813,6 +838,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             onRefresh={handleRefresh}
                             onShowFacturaModal={handleShowFacturaModal}
                             onShowSubproiectModal={handleShowSubproiectModal}
+                            onShowEditModal={handleShowEditModal}
                           />
                         </td>
                       </tr>
@@ -919,8 +945,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
-                            textAlign: 'center' as const,
-                            zIndex: 20
+                            textAlign: 'center' as const
                           }}>
                             {/* ✅ MODIFICAT: Adăugat callback-uri pentru subproiecte */}
                             <ProiectActions 
@@ -938,6 +963,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               onRefresh={handleRefresh}
                               onShowFacturaModal={handleShowFacturaModal}
                               onShowSubproiectModal={handleShowSubproiectModal}
+                              onShowEditModal={handleShowEditModal}
                             />
                           </td>
                         </tr>
@@ -1039,6 +1065,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             isOpen={showSubproiectModal}
             onClose={handleCloseSubproiectModal}
             onSuccess={handleSubproiectSuccess}
+          />
+        </div>
+      )}
+
+      {/* ✅ NOWI: Modal Editare Proiect */}
+      {showEditModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <ProiectEditModal
+            proiect={selectedProiect}
+            isOpen={showEditModal}
+            onClose={handleCloseEditModal}
+            onProiectUpdated={handleEditSuccess}
+            onProiectDeleted={handleEditDelete}
           />
         </div>
       )}

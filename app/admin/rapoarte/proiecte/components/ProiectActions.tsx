@@ -35,6 +35,7 @@ interface ProiectActionsProps {
   // ✅ NOWI: Callback-uri pentru modale externe (gestionate în ProiecteTable)
   onShowFacturaModal?: (proiect: any) => void;
   onShowSubproiectModal?: (proiect: any) => void;
+  onShowEditModal?: (proiect: any) => void;
 }
 
 // ✅ FIX: System global pentru management dropdown-uri multiple
@@ -90,7 +91,8 @@ export default function ProiectActions({
   proiect, 
   onRefresh, 
   onShowFacturaModal, 
-  onShowSubproiectModal 
+  onShowSubproiectModal,
+  onShowEditModal
 }: ProiectActionsProps) {
   
   // Helper pentru formatarea datelor
@@ -245,19 +247,14 @@ export default function ProiectActions({
     console.log('Detalii proiect:', proiect);
   };
 
+  // ✅ MODIFICAT: Folosește callback extern în loc de alert local
   const handleEdit = async () => {
-    const confirmare = confirm(`Vrei să editezi ${proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul'} "${proiect.Denumire}"?\n\nNOTĂ: Funcția de editare va fi implementată în următoarea versiune.`);
-    
-    if (confirmare) {
-      showToast('Funcția de editare va fi disponibilă în curând!', 'info');
+    if (onShowEditModal) {
+      onShowEditModal(proiect);
+    } else {
+      console.warn('onShowEditModal callback not provided');
+      showToast('Funcția de editare nu este disponibilă', 'error');
     }
-    
-    const editUrl = proiect.tip === 'subproiect' 
-      ? `/admin/rapoarte/subproiecte/${proiect.ID_Proiect}/edit`
-      : `/admin/rapoarte/proiecte/${proiect.ID_Proiect}/edit`;
-    
-    console.log('Ar trebui să redirectionez la:', editUrl);
-    console.log('Date pentru editare:', proiect);
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -373,20 +370,27 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   }, [isOpen, dropdownId]);
 
-  // ✅ FIX: Calculează poziționarea inteligentă
+  // ✅ FIX: Calculează poziționarea inteligentă cu compensarea pentru rânduri înalte
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
     const buttonRect = buttonRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const dropdownHeight = 350;
+    
+    // ✅ NOWI: Găsește rândul părinte pentru a calcula înălțimea acestuia
+    const tableRow = buttonRef.current.closest('tr');
+    const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
+    
+    // ✅ NOWI: Ajustează calculul cu înălțimea rândului
     const spaceBelow = viewportHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top;
+    const spaceAbove = buttonRect.top - rowHeight; // Compensează pentru înălțimea rândului
     
     console.log('📏 Dropdown positioning:', { 
       spaceBelow, 
       spaceAbove, 
       dropdownHeight,
+      rowHeight,
       buttonTop: buttonRect.top,
       buttonBottom: buttonRect.bottom,
       viewportHeight,
@@ -447,7 +451,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         disabled={loading !== null}
         style={{
           background: loading ? 
-            '#f8f9fa' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            '#f8f9fa' : 
+            (proiect.tip === 'subproiect' 
+              ? 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)' // ✅ Albastru pentru subproiecte
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' // ✅ Mov pentru proiecte
+            ),
           color: loading ? '#6c757d' : 'white',
           border: 'none',
           borderRadius: '12px',
@@ -455,7 +463,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           cursor: loading ? 'not-allowed' : 'pointer',
           fontSize: '14px',
           fontWeight: '600',
-          boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+          boxShadow: loading ? 'none' : 
+            (proiect.tip === 'subproiect' 
+              ? '0 4px 12px rgba(52, 152, 219, 0.4)' // ✅ Shadow albastru pentru subproiecte
+              : '0 4px 12px rgba(102, 126, 234, 0.4)' // ✅ Shadow mov pentru proiecte
+            ),
           transition: 'all 0.3s ease',
           display: 'flex',
           alignItems: 'center',
@@ -464,13 +476,17 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         onMouseOver={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+            e.currentTarget.style.boxShadow = proiect.tip === 'subproiect' 
+              ? '0 6px 16px rgba(52, 152, 219, 0.5)' // ✅ Hover albastru pentru subproiecte
+              : '0 6px 16px rgba(102, 126, 234, 0.5)'; // ✅ Hover mov pentru proiecte
           }
         }}
         onMouseOut={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            e.currentTarget.style.boxShadow = proiect.tip === 'subproiect' 
+              ? '0 4px 12px rgba(52, 152, 219, 0.4)' // ✅ Normal albastru pentru subproiecte
+              : '0 4px 12px rgba(102, 126, 234, 0.4)'; // ✅ Normal mov pentru proiecte
           }
         }}
       >
