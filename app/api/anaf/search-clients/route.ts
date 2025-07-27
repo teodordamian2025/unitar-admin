@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ Helper: Căutare în ANAF (reutilizează logica existentă)
+// ✅ Helper: Căutare în ANAF cu multiple URL-uri fallback
 async function searchInANAF(cui: string) {
   const cleanCui = cui.replace(/[^0-9]/g, '');
   
@@ -153,55 +153,88 @@ async function searchInANAF(cui: string) {
   
   console.log(`Căutare ANAF pentru CUI: ${cleanCui}`);
   
-  const response = await fetch('https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'UNITAR-PROIECT/1.0'
-    },
-    body: JSON.stringify([{ cui: cleanCui }])
-  });
-
-  if (!response.ok) {
-    throw new Error(`ANAF API error: ${response.status} - ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  // ✅ Încercăm multiple URL-uri ANAF
+  const anafUrls = [
+    'https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/ws/tva',
+    'https://webservicesp.anaf.ro/PlatformDevelopers/rest/api/v1/tva', // URL alternativ
+    'https://webservicesp.anaf.ro/rest/api/v1/ws/tva' // URL mai scurt
+  ];
   
-  if (data.found && data.found.length > 0) {
-    const info = data.found[0];
-    
-    return {
-      success: true,
-      data: {
-        denumire: info.denumire,
-        cui: `RO${info.cui}`,
-        nrRegCom: info.nrRegCom || '',
-        adresa: buildCompleteAddress(info),
-        telefon: info.telefon || '',
-        email: '', // ANAF nu furnizează email
-        status: info.statusInactivi ? 'Inactiv' : 'Activ',
-        platitorTva: info.scpTVA ? 'Da' : 'Nu',
-        // Date detaliate pentru BD
-        judet: info.judet || '',
-        oras: info.localitate || '',
-        codPostal: info.codPostal || '',
-        strada: info.adresa || '',
-        numar: info.numar || '',
-        bloc: info.bloc || '',
-        scara: info.scara || '',
-        etaj: info.etaj || '',
-        apartament: info.ap || '',
-        dataInregistrare: info.dataInregistrare,
-        dataActualizare: info.dataActualizare
+  for (const anafUrl of anafUrls) {
+    try {
+      console.log(`Încercăm URL ANAF: ${anafUrl}`);
+      
+      const response = await fetch(anafUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'UNITAR-PROIECT/1.0',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify([{ cui: cleanCui }])
+      });
+
+      console.log(`ANAF Response Status: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        console.error(`ANAF API HTTP Error pentru ${anafUrl}: ${response.status} - ${response.statusText}`);
+        continue; // Încearcă următorul URL
       }
-    };
-  } else {
-    return {
-      success: false,
-      error: 'CUI-ul nu este înregistrat în sistemul ANAF sau nu este valid'
-    };
+
+      const data = await response.json();
+      console.log('ANAF Response Data:', data);
+      
+      if (data.found && data.found.length > 0) {
+        const info = data.found[0];
+        console.log('ANAF Company Found:', info);
+        
+        return {
+          success: true,
+          data: {
+            denumire: info.denumire,
+            cui: `RO${info.cui}`,
+            nrRegCom: info.nrRegCom || '',
+            adresa: buildCompleteAddress(info),
+            telefon: info.telefon || '',
+            email: '', // ANAF nu furnizează email
+            status: info.statusInactivi ? 'Inactiv' : 'Activ',
+            platitorTva: info.scpTVA ? 'Da' : 'Nu',
+            // Date detaliate pentru BD
+            judet: info.judet || '',
+            oras: info.localitate || '',
+            codPostal: info.codPostal || '',
+            strada: info.adresa || '',
+            numar: info.numar || '',
+            bloc: info.bloc || '',
+            scara: info.scara || '',
+            etaj: info.etaj || '',
+            apartament: info.ap || '',
+            dataInregistrare: info.dataInregistrare,
+            dataActualizare: info.dataActualizare
+          }
+        };
+      } else if (data.notfound && data.notfound.length > 0) {
+        console.log('CUI not found in ANAF:', data.notfound);
+        return {
+          success: false,
+          error: 'CUI-ul nu este înregistrat în sistemul ANAF sau nu este valid'
+        };
+      }
+      
+      // Dacă ajungem aici, încearcă următorul URL
+      console.log(`Nu s-au găsit date pentru URL ${anafUrl}, încercăm următorul...`);
+      
+    } catch (error) {
+      console.error(`Eroare pentru URL ${anafUrl}:`, error);
+      continue; // Încearcă următorul URL
+    }
   }
+  
+  // Dacă nici un URL nu a funcționat
+  return {
+    success: false,
+    error: 'Nu s-a putut conecta la serviciul ANAF. Serviciul poate fi temporar indisponibil.'
+  };
 }
 
 // ✅ Helper: Verifică client existent în BD
