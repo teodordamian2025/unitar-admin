@@ -1220,8 +1220,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
 
 // EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs + 1 modules
 var dist = __webpack_require__(7365);
-// EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx
-var ClientNouModal = __webpack_require__(14442);
+// EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx + 1 modules
+var ClientNouModal = __webpack_require__(19518);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
@@ -7064,7 +7064,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,6369,8313,9850,6166,6549,4442], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,6369,8313,9850,6166,6549,9518], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();
