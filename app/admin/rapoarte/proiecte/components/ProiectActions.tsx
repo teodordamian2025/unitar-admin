@@ -497,7 +497,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             }}
           />
 
-          {/* ✅ Dropdown cu z-index sub modalele externe (50000) */}
+          {/* ✅ Dropdown cu z-index diferențiat pe poziție */}
           <div style={{
             position: 'absolute' as const,
             ...(dropdownPosition === 'bottom' 
@@ -511,7 +511,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             minWidth: '260px',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
             border: '1px solid #e0e0e0',
-            zIndex: 41000,
+            zIndex: dropdownPosition === 'bottom' ? 45000 : 41000,
             overflow: 'hidden' as const,
             transform: 'scale(1)'
           }}>

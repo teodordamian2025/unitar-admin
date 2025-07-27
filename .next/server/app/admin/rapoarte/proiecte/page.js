@@ -1193,7 +1193,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }) {
                             minWidth: "260px",
                             boxShadow: "0 20px 40px rgba(0, 0, 0, 0.3)",
                             border: "1px solid #e0e0e0",
-                            zIndex: 41000,
+                            zIndex: dropdownPosition === "bottom" ? 45000 : 41000,
                             overflow: "hidden",
                             transform: "scale(1)"
                         },
