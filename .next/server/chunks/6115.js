@@ -34,7 +34,6 @@ const precise_date_1 = __webpack_require__(90639);
 const util_1 = __webpack_require__(26225);
 const Big = __webpack_require__(44517);
 const extend = __webpack_require__(55573);
-const is = __webpack_require__(18286);
 const crypto_1 = __webpack_require__(6113);
 const dataset_1 = __webpack_require__(4636);
 const job_1 = __webpack_require__(95372);
@@ -710,13 +709,13 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
             "JSON",
             "RANGE"
         ];
-        if (is.array(providedType)) {
+        if ((0, util_1.isArray)(providedType)) {
             providedType = providedType;
             return {
                 type: "ARRAY",
                 arrayType: BigQuery.getTypeDescriptorFromProvidedType_(providedType[0])
             };
-        } else if (is.object(providedType)) {
+        } else if ((0, util_1.isObject)(providedType)) {
             return {
                 type: "STRUCT",
                 structTypes: Object.keys(providedType).map((prop)=>{
@@ -778,7 +777,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                     type: value.elementType
                 }
             };
-        } else if (Array.isArray(value)) {
+        } else if ((0, util_1.isArray)(value)) {
             if (value.length === 0) {
                 throw new Error("Parameter types must be provided for empty arrays via the 'types' field in query options.");
             }
@@ -786,11 +785,11 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                 type: "ARRAY",
                 arrayType: BigQuery.getTypeDescriptorFromValue_(value[0])
             };
-        } else if (is.boolean(value)) {
+        } else if ((0, util_1.isBoolean)(value)) {
             typeName = "BOOL";
-        } else if (is.number(value)) {
+        } else if ((0, util_1.isNumber)(value)) {
             typeName = value % 1 === 0 ? "INT64" : "FLOAT64";
-        } else if (is.object(value)) {
+        } else if ((0, util_1.isObject)(value)) {
             return {
                 type: "STRUCT",
                 structTypes: Object.keys(value).map((prop)=>{
@@ -801,7 +800,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                     };
                 })
             };
-        } else if (is.string(value)) {
+        } else if ((0, util_1.isString)(value)) {
             typeName = "STRING";
         }
         if (!typeName) {
@@ -827,7 +826,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
      * @returns {object} A properly-formed `queryParameter` object.
      */ static valueToQueryParameter_(// eslint-disable-next-line @typescript-eslint/no-explicit-any
     value, providedType) {
-        if (is.date(value)) {
+        if ((0, util_1.isDate)(value)) {
             value = BigQuery.timestamp(value);
         }
         let parameterType;
@@ -844,8 +843,8 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
         if (typeName === "ARRAY") {
             queryParameter.parameterValue.arrayValues = value.map((itemValue)=>{
                 const value = BigQuery._getValue(itemValue, parameterType.arrayType);
-                if (is.object(value) || is.array(value)) {
-                    if (is.array(providedType)) {
+                if ((0, util_1.isObject)(value) || (0, util_1.isArray)(value)) {
+                    if ((0, util_1.isArray)(providedType)) {
                         providedType = providedType;
                         return BigQuery.valueToQueryParameter_(value, providedType[0]).parameterValue;
                     } else {
@@ -883,7 +882,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                     value: rangeValue.value.end
                 }
             };
-        } else if (typeName === "JSON" && is.object(value)) {
+        } else if (typeName === "JSON" && (0, util_1.isObject)(value)) {
             queryParameter.parameterValue.value = JSON.stringify(value);
         } else {
             queryParameter.parameterValue.value = BigQuery._getValue(value, parameterType);
@@ -998,7 +997,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                 params: undefined
             };
         }
-        const parameterMode = is.array(params) ? "positional" : "named";
+        const parameterMode = (0, util_1.isArray)(params) ? "positional" : "named";
         const queryParameters = [];
         if (parameterMode === "named") {
             const namedParams = params;
@@ -1006,7 +1005,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
                 const value = namedParams[namedParameter];
                 let queryParameter;
                 if (types) {
-                    if (!is.object(types)) {
+                    if (!(0, util_1.isObject)(types)) {
                         throw new Error("Provided types must match the value type passed to `params`");
                     }
                     const namedTypes = types;
@@ -1023,7 +1022,7 @@ exports.PROTOCOL_REGEX = /^(\w*):\/\//;
             }
         } else {
             if (types) {
-                if (!is.array(types)) {
+                if (!(0, util_1.isArray)(types)) {
                     throw new Error("Provided types must match the value type passed to `params`");
                 }
                 const positionalTypes = types;
@@ -1435,7 +1434,7 @@ exports.BigQuery = BigQuery;
 });
 function convertSchemaFieldValue(schemaField, // eslint-disable-next-line @typescript-eslint/no-explicit-any
 value, options) {
-    if (is.null(value)) {
+    if (value === null) {
         return value;
     }
     switch(schemaField.type){
@@ -1725,7 +1724,7 @@ exports.BigQueryDatetime = BigQueryDatetime;
             const h = value.hours;
             const m = value.minutes || 0;
             const s = value.seconds || 0;
-            const f = is.defined(value.fractional) ? "." + value.fractional : "";
+            const f = value.fractional !== undefined ? "." + value.fractional : "";
             value = `${h}:${m}:${s}${f}`;
         }
         this.value = value;
@@ -4036,7 +4035,6 @@ const Big = __webpack_require__(44517);
 const extend = __webpack_require__(55573);
 const events_1 = __webpack_require__(82361);
 const fs = __webpack_require__(57147);
-const is = __webpack_require__(18286);
 const path = __webpack_require__(71017);
 const streamEvents = __webpack_require__(87614);
 const crypto_1 = __webpack_require__(6113);
@@ -4417,10 +4415,10 @@ const rowQueue_1 = __webpack_require__(7064);
         if (isCustomType) {
             return value.value;
         }
-        if (is.date(value)) {
+        if ((0, util_1.isDate)(value)) {
             return value.toJSON();
         }
-        if (is.array(value)) {
+        if ((0, util_1.isArray)(value)) {
             return value.map(Table.encodeValue_);
         }
         if (typeof value === "object") {
@@ -4439,10 +4437,10 @@ const rowQueue_1 = __webpack_require__(7064);
             body.friendlyName = options.name;
             delete body.name;
         }
-        if (is.string(options.schema)) {
+        if ((0, util_1.isString)(options.schema)) {
             body.schema = Table.createSchemaFromString_(options.schema);
         }
-        if (is.array(options.schema)) {
+        if ((0, util_1.isArray)(options.schema)) {
             body.schema = {
                 fields: options.schema
             };
@@ -4455,13 +4453,13 @@ const rowQueue_1 = __webpack_require__(7064);
                 return field;
             });
         }
-        if (is.string(options.partitioning)) {
+        if ((0, util_1.isString)(options.partitioning)) {
             body.timePartitioning = {
                 type: options.partitioning.toUpperCase()
             };
             delete body.partitioning;
         }
-        if (is.string(options.view)) {
+        if ((0, util_1.isString)(options.view)) {
             body.view = {
                 query: options.view,
                 useLegacySql: false
@@ -5262,6 +5260,12 @@ Object.defineProperty(exports, "__esModule", ({
     value: true
 }));
 exports.toArray = toArray;
+exports.isObject = isObject;
+exports.isString = isString;
+exports.isArray = isArray;
+exports.isDate = isDate;
+exports.isBoolean = isBoolean;
+exports.isNumber = isNumber;
 /**
  * Convert a value to an array. Replacement to arrify
  * @internal
@@ -5285,6 +5289,45 @@ exports.toArray = toArray;
     return [
         value
     ];
+}
+/**
+ * Check if value is an object.
+ * @internal
+ */ function isObject(value) {
+    return value && [
+        undefined,
+        Object
+    ].includes(value.constructor);
+}
+/**
+ * Check if value is an object.
+ * @internal
+ */ function isString(value) {
+    return Object.prototype.toString.call(value) === "[object String]";
+}
+/**
+ * Check if value is an array.
+ * @internal
+ */ function isArray(value) {
+    return Array.isArray(value);
+}
+/**
+ * Check if value is an instance of Date.
+ * @internal
+ */ function isDate(value) {
+    return value instanceof Date;
+}
+/**
+ * Check if value is a boolean.
+ * @internal
+ */ function isBoolean(value) {
+    return Object.prototype.toString.call(value) === "[object Boolean]";
+}
+/**
+ * Check if value is a number.
+ * @internal
+ */ function isNumber(value) {
+    return Object.prototype.toString.call(value) === "[object Number]";
 } //# sourceMappingURL=util.js.map
 
 
@@ -13815,7 +13858,7 @@ const DEFAULT_TOKEN_URL = "https://sts.{universeDomain}/v1/token";
         }
         const clientId = opts.get("client_id");
         const clientSecret = opts.get("client_secret");
-        const tokenUrl = opts.get("token_url") ?? DEFAULT_TOKEN_URL.replace("{universeDomain}", this.universeDomain);
+        this.tokenUrl = opts.get("token_url") ?? DEFAULT_TOKEN_URL.replace("{universeDomain}", this.universeDomain);
         const subjectTokenType = opts.get("subject_token_type");
         const workforcePoolUserProject = opts.get("workforce_pool_user_project");
         const serviceAccountImpersonationUrl = opts.get("service_account_impersonation_url");
@@ -13830,7 +13873,7 @@ const DEFAULT_TOKEN_URL = "https://sts.{universeDomain}/v1/token";
             };
         }
         this.stsCredential = new sts.StsCredentials({
-            tokenExchangeEndpoint: tokenUrl,
+            tokenExchangeEndpoint: this.tokenUrl,
             clientAuthentication: this.clientAuth
         });
         this.scopes = opts.get("scopes") || [
@@ -14145,8 +14188,232 @@ const DEFAULT_TOKEN_URL = "https://sts.{universeDomain}/v1/token";
         const credentialSourceType = this.credentialSourceType ? this.credentialSourceType : "unknown";
         return `gl-node/${nodeVersion} auth/${shared_cjs_1.pkg.version} google-byoid-sdk source/${credentialSourceType} sa-impersonation/${saImpersonation} config-lifetime/${this.configLifetimeRequested}`;
     }
+    getTokenUrl() {
+        return this.tokenUrl;
+    }
 }
 exports.BaseExternalAccountClient = BaseExternalAccountClient; //# sourceMappingURL=baseexternalclient.js.map
+
+
+/***/ }),
+
+/***/ 44437:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+Object.defineProperty(exports, "__esModule", ({
+    value: true
+}));
+exports.CertificateSubjectTokenSupplier = exports.InvalidConfigurationError = exports.CertificateSourceUnavailableError = exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = void 0;
+const util_1 = __webpack_require__(35805);
+const fs = __webpack_require__(57147);
+const crypto_1 = __webpack_require__(6113);
+const https = __webpack_require__(95687);
+exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = "GOOGLE_API_CERTIFICATE_CONFIG";
+/**
+ * Thrown when the certificate source cannot be located or accessed.
+ */ class CertificateSourceUnavailableError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "CertificateSourceUnavailableError";
+    }
+}
+exports.CertificateSourceUnavailableError = CertificateSourceUnavailableError;
+/**
+ * Thrown for invalid configuration that is not related to file availability.
+ */ class InvalidConfigurationError extends Error {
+    constructor(message){
+        super(message);
+        this.name = "InvalidConfigurationError";
+    }
+}
+exports.InvalidConfigurationError = InvalidConfigurationError;
+/**
+ * A subject token supplier that uses a client certificate for authentication.
+ * It provides the certificate chain as the subject token for identity federation.
+ */ class CertificateSubjectTokenSupplier {
+    /**
+     * Initializes a new instance of the CertificateSubjectTokenSupplier.
+     * @param opts The configuration options for the supplier.
+     */ constructor(opts){
+        if (!opts.useDefaultCertificateConfig && !opts.certificateConfigLocation) {
+            throw new InvalidConfigurationError("Either `useDefaultCertificateConfig` must be true or a `certificateConfigLocation` must be provided.");
+        }
+        if (opts.useDefaultCertificateConfig && opts.certificateConfigLocation) {
+            throw new InvalidConfigurationError("Both `useDefaultCertificateConfig` and `certificateConfigLocation` cannot be provided.");
+        }
+        this.trustChainPath = opts.trustChainPath;
+        this.certificateConfigPath = opts.certificateConfigLocation ?? "";
+    }
+    /**
+     * Creates an HTTPS agent configured with the client certificate and private key for mTLS.
+     * @returns An mTLS-configured https.Agent.
+     */ async createMtlsHttpsAgent() {
+        if (!this.key || !this.cert) {
+            throw new InvalidConfigurationError("Cannot create mTLS Agent with missing certificate or key");
+        }
+        return new https.Agent({
+            key: this.key,
+            cert: this.cert
+        });
+    }
+    /**
+     * Constructs the subject token, which is the base64-encoded certificate chain.
+     * @returns A promise that resolves with the subject token.
+     */ async getSubjectToken() {
+        // The "subject token" in this context is the processed certificate chain.
+        this.certificateConfigPath = await this.#resolveCertificateConfigFilePath();
+        const { certPath, keyPath } = await this.#getCertAndKeyPaths();
+        ({ cert: this.cert, key: this.key } = await this.#getKeyAndCert(certPath, keyPath));
+        return await this.#processChainFromPaths(this.cert);
+    }
+    /**
+     * Resolves the absolute path to the certificate configuration file
+     * by checking the "certificate_config_location" provided in the ADC file,
+     * or the "GOOGLE_API_CERTIFICATE_CONFIG" environment variable
+     * or in the default gcloud path.
+     * @param overridePath An optional path to check first.
+     * @returns The resolved file path.
+     */ async #resolveCertificateConfigFilePath() {
+        // 1. Check for the override path from constructor options.
+        const overridePath = this.certificateConfigPath;
+        if (overridePath) {
+            if (await (0, util_1.isValidFile)(overridePath)) {
+                return overridePath;
+            }
+            throw new CertificateSourceUnavailableError(`Provided certificate config path is invalid: ${overridePath}`);
+        }
+        // 2. Check the standard environment variable.
+        const envPath = process.env[exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE];
+        if (envPath) {
+            if (await (0, util_1.isValidFile)(envPath)) {
+                return envPath;
+            }
+            throw new CertificateSourceUnavailableError(`Path from environment variable "${exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE}" is invalid: ${envPath}`);
+        }
+        // 3. Check the well-known gcloud config location.
+        const wellKnownPath = (0, util_1.getWellKnownCertificateConfigFileLocation)();
+        if (await (0, util_1.isValidFile)(wellKnownPath)) {
+            return wellKnownPath;
+        }
+        // 4. If none are found, throw an error.
+        throw new CertificateSourceUnavailableError("Could not find certificate configuration file. Searched override path, " + `the "${exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE}" env var, and the gcloud path (${wellKnownPath}).`);
+    }
+    /**
+     * Reads and parses the certificate config JSON file to extract the certificate and key paths.
+     * @returns An object containing the certificate and key paths.
+     */ async #getCertAndKeyPaths() {
+        const configPath = this.certificateConfigPath;
+        let fileContents;
+        try {
+            fileContents = await fs.promises.readFile(configPath, "utf8");
+        } catch (err) {
+            throw new CertificateSourceUnavailableError(`Failed to read certificate config file at: ${configPath}`);
+        }
+        try {
+            const config = JSON.parse(fileContents);
+            const certPath = config?.cert_configs?.workload?.cert_path;
+            const keyPath = config?.cert_configs?.workload?.key_path;
+            if (!certPath || !keyPath) {
+                throw new InvalidConfigurationError(`Certificate config file (${configPath}) is missing required "cert_path" or "key_path" in the workload config.`);
+            }
+            return {
+                certPath,
+                keyPath
+            };
+        } catch (e) {
+            if (e instanceof InvalidConfigurationError) throw e;
+            throw new InvalidConfigurationError(`Failed to parse certificate config from ${configPath}: ${e.message}`);
+        }
+    }
+    /**
+     * Reads and parses the cert and key files get their content and check valid format.
+     * @returns An object containing the cert content and key content in buffer format.
+     */ async #getKeyAndCert(certPath, keyPath) {
+        let cert, key;
+        try {
+            cert = await fs.promises.readFile(certPath);
+            new crypto_1.X509Certificate(cert);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new CertificateSourceUnavailableError(`Failed to read certificate file at ${certPath}: ${message}`);
+        }
+        try {
+            key = await fs.promises.readFile(keyPath);
+            (0, crypto_1.createPrivateKey)(key);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new CertificateSourceUnavailableError(`Failed to read private key file at ${keyPath}: ${message}`);
+        }
+        return {
+            cert,
+            key
+        };
+    }
+    /**
+     * Reads the leaf certificate and trust chain, combines them,
+     * and returns a JSON array of base64-encoded certificates.
+     * @returns A stringified JSON array of the certificate chain.
+     */ async #processChainFromPaths(leafCertBuffer) {
+        const leafCert = new crypto_1.X509Certificate(leafCertBuffer);
+        // If no trust chain is provided, just use the successfully parsed leaf certificate.
+        if (!this.trustChainPath) {
+            return JSON.stringify([
+                leafCert.raw.toString("base64")
+            ]);
+        }
+        // Handle the trust chain logic.
+        try {
+            const chainPems = await fs.promises.readFile(this.trustChainPath, "utf8");
+            const pemBlocks = chainPems.match(/-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/g) ?? [];
+            const chainCerts = pemBlocks.map((pem, index)=>{
+                try {
+                    return new crypto_1.X509Certificate(pem);
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    // Throw a more precise error if a single certificate in the chain is invalid.
+                    throw new InvalidConfigurationError(`Failed to parse certificate at index ${index} in trust chain file ${this.trustChainPath}: ${message}`);
+                }
+            });
+            const leafIndex = chainCerts.findIndex((chainCert)=>leafCert.raw.equals(chainCert.raw));
+            let finalChain;
+            if (leafIndex === -1) {
+                // Leaf not found, so prepend it to the chain.
+                finalChain = [
+                    leafCert,
+                    ...chainCerts
+                ];
+            } else if (leafIndex === 0) {
+                // Leaf is already the first element, so the chain is correctly ordered.
+                finalChain = chainCerts;
+            } else {
+                // Leaf is in the chain but not at the top, which is invalid.
+                throw new InvalidConfigurationError(`Leaf certificate exists in the trust chain but is not the first entry (found at index ${leafIndex}).`);
+            }
+            return JSON.stringify(finalChain.map((cert)=>cert.raw.toString("base64")));
+        } catch (err) {
+            // Re-throw our specific configuration errors.
+            if (err instanceof InvalidConfigurationError) throw err;
+            const message = err instanceof Error ? err.message : String(err);
+            throw new CertificateSourceUnavailableError(`Failed to process certificate chain from ${this.trustChainPath}: ${message}`);
+        }
+    }
+}
+exports.CertificateSubjectTokenSupplier = CertificateSubjectTokenSupplier; //# sourceMappingURL=certificatesubjecttokensupplier.js.map
 
 
 /***/ }),
@@ -16165,6 +16432,9 @@ const baseexternalclient_1 = __webpack_require__(2715);
 const util_1 = __webpack_require__(35805);
 const filesubjecttokensupplier_1 = __webpack_require__(41475);
 const urlsubjecttokensupplier_1 = __webpack_require__(44791);
+const certificatesubjecttokensupplier_1 = __webpack_require__(44437);
+const stscredentials_1 = __webpack_require__(28182);
+const gaxios_1 = __webpack_require__(80772);
 /**
  * Defines the Url-sourced and file-sourced external account clients mainly
  * used for K8s and Azure workloads.
@@ -16207,17 +16477,18 @@ const urlsubjecttokensupplier_1 = __webpack_require__(44791);
             }
             const file = credentialSourceOpts.get("file");
             const url = credentialSourceOpts.get("url");
+            const certificate = credentialSourceOpts.get("certificate");
             const headers = credentialSourceOpts.get("headers");
-            if (file && url) {
-                throw new Error('No valid Identity Pool "credential_source" provided, must be either file or url.');
-            } else if (file && !url) {
+            if (file && url || url && certificate || file && certificate) {
+                throw new Error('No valid Identity Pool "credential_source" provided, must be either file, url, or certificate.');
+            } else if (file) {
                 this.credentialSourceType = "file";
                 this.subjectTokenSupplier = new filesubjecttokensupplier_1.FileSubjectTokenSupplier({
                     filePath: file,
                     formatType: formatType,
                     subjectTokenFieldName: formatSubjectTokenFieldName
                 });
-            } else if (!file && url) {
+            } else if (url) {
                 this.credentialSourceType = "url";
                 this.subjectTokenSupplier = new urlsubjecttokensupplier_1.UrlSubjectTokenSupplier({
                     url: url,
@@ -16226,8 +16497,16 @@ const urlsubjecttokensupplier_1 = __webpack_require__(44791);
                     headers: headers,
                     additionalGaxiosOptions: IdentityPoolClient.RETRY_CONFIG
                 });
+            } else if (certificate) {
+                this.credentialSourceType = "certificate";
+                const certificateSubjecttokensupplier = new certificatesubjecttokensupplier_1.CertificateSubjectTokenSupplier({
+                    useDefaultCertificateConfig: certificate.use_default_certificate_config,
+                    certificateConfigLocation: certificate.certificate_config_location,
+                    trustChainPath: certificate.trust_chain_path
+                });
+                this.subjectTokenSupplier = certificateSubjecttokensupplier;
             } else {
-                throw new Error('No valid Identity Pool "credential_source" provided, must be either file or url.');
+                throw new Error('No valid Identity Pool "credential_source" provided, must be either file, url, or certificate.');
             }
         }
     }
@@ -16237,7 +16516,22 @@ const urlsubjecttokensupplier_1 = __webpack_require__(44791);
      * the configured {@link SubjectTokenSupplier}
      * @return A promise that resolves with the external subject token.
      */ async retrieveSubjectToken() {
-        return this.subjectTokenSupplier.getSubjectToken(this.supplierContext);
+        const subjectToken = await this.subjectTokenSupplier.getSubjectToken(this.supplierContext);
+        if (this.subjectTokenSupplier instanceof certificatesubjecttokensupplier_1.CertificateSubjectTokenSupplier) {
+            const mtlsAgent = await this.subjectTokenSupplier.createMtlsHttpsAgent();
+            this.stsCredential = new stscredentials_1.StsCredentials({
+                tokenExchangeEndpoint: this.getTokenUrl(),
+                clientAuthentication: this.clientAuth,
+                transporter: new gaxios_1.Gaxios({
+                    agent: mtlsAgent
+                })
+            });
+            this.transporter = new gaxios_1.Gaxios({
+                ...this.transporter.defaults || {},
+                agent: mtlsAgent
+            });
+        }
+        return subjectToken;
     }
 }
 exports.IdentityPoolClient = IdentityPoolClient; //# sourceMappingURL=identitypoolclient.js.map
@@ -19289,7 +19583,7 @@ exports.auth = auth; //# sourceMappingURL=index.js.map
 /***/ }),
 
 /***/ 35805:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
@@ -19313,6 +19607,13 @@ exports.LRUCache = void 0;
 exports.snakeToCamel = snakeToCamel;
 exports.originalOrCamelOptions = originalOrCamelOptions;
 exports.removeUndefinedValuesInObject = removeUndefinedValuesInObject;
+exports.isValidFile = isValidFile;
+exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocation;
+const fs = __webpack_require__(57147);
+const os = __webpack_require__(22037);
+const path = __webpack_require__(71017);
+const WELL_KNOWN_CERTIFICATE_CONFIG_FILE = "certificate_config.json";
+const CLOUDSDK_CONFIG_DIRECTORY = "gcloud";
 /**
  * Returns the camel case of a provided string.
  *
@@ -19418,6 +19719,31 @@ function removeUndefinedValuesInObject(object) {
         }
     });
     return object;
+}
+/**
+ * Helper to check if a path points to a valid file.
+ */ async function isValidFile(filePath) {
+    try {
+        const stats = await fs.promises.lstat(filePath);
+        return stats.isFile();
+    } catch (e) {
+        return false;
+    }
+}
+/**
+ * Determines the well-known gcloud location for the certificate config file.
+ * @returns The platform-specific path to the configuration file.
+ * @internal
+ */ function getWellKnownCertificateConfigFileLocation() {
+    const configDir = process.env.CLOUDSDK_CONFIG || (_isWindows() ? path.join(process.env.APPDATA || "", CLOUDSDK_CONFIG_DIRECTORY) : path.join(process.env.HOME || "", ".config", CLOUDSDK_CONFIG_DIRECTORY));
+    return path.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
+}
+/**
+ * Checks if the current operating system is Windows.
+ * @returns True if the OS is Windows, false otherwise.
+ * @internal
+ */ function _isWindows() {
+    return os.platform().startsWith("win");
 } //# sourceMappingURL=util.js.map
 
 
@@ -20401,645 +20727,6 @@ function promisify(fn) {
     };
 }
 exports["default"] = promisify; //# sourceMappingURL=promisify.js.map
-
-
-/***/ }),
-
-/***/ 18286:
-/***/ ((module) => {
-
-"use strict";
-/* globals window, HTMLElement */ 
-/**!
- * is
- * the definitive JavaScript type testing library
- *
- * @copyright 2013-2014 Enrico Marino / Jordan Harband
- * @license MIT
- */ var objProto = Object.prototype;
-var owns = objProto.hasOwnProperty;
-var toStr = objProto.toString;
-var symbolValueOf;
-if (typeof Symbol === "function") {
-    symbolValueOf = Symbol.prototype.valueOf;
-}
-var bigIntValueOf;
-if (typeof BigInt === "function") {
-    bigIntValueOf = BigInt.prototype.valueOf;
-}
-var isActualNaN = function(value) {
-    return value !== value;
-};
-var NON_HOST_TYPES = {
-    "boolean": 1,
-    number: 1,
-    string: 1,
-    undefined: 1
-};
-var base64Regex = /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$/;
-var hexRegex = /^[A-Fa-f0-9]+$/;
-/**
- * Expose `is`
- */ var is = {};
-/**
- * Test general.
- */ /**
- * is.type
- * Test if `value` is a type of `type`.
- *
- * @param {*} value value to test
- * @param {String} type type
- * @return {Boolean} true if `value` is a type of `type`, false otherwise
- * @api public
- */ is.a = is.type = function(value, type) {
-    return typeof value === type;
-};
-/**
- * is.defined
- * Test if `value` is defined.
- *
- * @param {*} value value to test
- * @return {Boolean} true if 'value' is defined, false otherwise
- * @api public
- */ is.defined = function(value) {
-    return typeof value !== "undefined";
-};
-/**
- * is.empty
- * Test if `value` is empty.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is empty, false otherwise
- * @api public
- */ is.empty = function(value) {
-    var type = toStr.call(value);
-    var key;
-    if (type === "[object Array]" || type === "[object Arguments]" || type === "[object String]") {
-        return value.length === 0;
-    }
-    if (type === "[object Object]") {
-        for(key in value){
-            if (owns.call(value, key)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    return !value;
-};
-/**
- * is.equal
- * Test if `value` is equal to `other`.
- *
- * @param {*} value value to test
- * @param {*} other value to compare with
- * @return {Boolean} true if `value` is equal to `other`, false otherwise
- */ is.equal = function equal(value, other) {
-    if (value === other) {
-        return true;
-    }
-    var type = toStr.call(value);
-    var key;
-    if (type !== toStr.call(other)) {
-        return false;
-    }
-    if (type === "[object Object]") {
-        for(key in value){
-            if (!is.equal(value[key], other[key]) || !(key in other)) {
-                return false;
-            }
-        }
-        for(key in other){
-            if (!is.equal(value[key], other[key]) || !(key in value)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (type === "[object Array]") {
-        key = value.length;
-        if (key !== other.length) {
-            return false;
-        }
-        while(key--){
-            if (!is.equal(value[key], other[key])) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (type === "[object Function]") {
-        return value.prototype === other.prototype;
-    }
-    if (type === "[object Date]") {
-        return value.getTime() === other.getTime();
-    }
-    return false;
-};
-/**
- * is.hosted
- * Test if `value` is hosted by `host`.
- *
- * @param {*} value to test
- * @param {*} host host to test with
- * @return {Boolean} true if `value` is hosted by `host`, false otherwise
- * @api public
- */ is.hosted = function(value, host) {
-    var type = typeof host[value];
-    return type === "object" ? !!host[value] : !NON_HOST_TYPES[type];
-};
-/**
- * is.instance
- * Test if `value` is an instance of `constructor`.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an instance of `constructor`
- * @api public
- */ is.instance = is["instanceof"] = function(value, constructor) {
-    return value instanceof constructor;
-};
-/**
- * is.nil / is.null
- * Test if `value` is null.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is null, false otherwise
- * @api public
- */ is.nil = is["null"] = function(value) {
-    return value === null;
-};
-/**
- * is.undef / is.undefined
- * Test if `value` is undefined.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is undefined, false otherwise
- * @api public
- */ is.undef = is.undefined = function(value) {
-    return typeof value === "undefined";
-};
-/**
- * Test arguments.
- */ /**
- * is.args
- * Test if `value` is an arguments object.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an arguments object, false otherwise
- * @api public
- */ is.args = is.arguments = function(value) {
-    var isStandardArguments = toStr.call(value) === "[object Arguments]";
-    var isOldArguments = !is.array(value) && is.arraylike(value) && is.object(value) && is.fn(value.callee);
-    return isStandardArguments || isOldArguments;
-};
-/**
- * Test array.
- */ /**
- * is.array
- * Test if 'value' is an array.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an array, false otherwise
- * @api public
- */ is.array = Array.isArray || function(value) {
-    return toStr.call(value) === "[object Array]";
-};
-/**
- * is.arguments.empty
- * Test if `value` is an empty arguments object.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an empty arguments object, false otherwise
- * @api public
- */ is.args.empty = function(value) {
-    return is.args(value) && value.length === 0;
-};
-/**
- * is.array.empty
- * Test if `value` is an empty array.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an empty array, false otherwise
- * @api public
- */ is.array.empty = function(value) {
-    return is.array(value) && value.length === 0;
-};
-/**
- * is.arraylike
- * Test if `value` is an arraylike object.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an arguments object, false otherwise
- * @api public
- */ is.arraylike = function(value) {
-    return !!value && !is.bool(value) && owns.call(value, "length") && isFinite(value.length) && is.number(value.length) && value.length >= 0;
-};
-/**
- * Test boolean.
- */ /**
- * is.bool
- * Test if `value` is a boolean.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a boolean, false otherwise
- * @api public
- */ is.bool = is["boolean"] = function(value) {
-    return toStr.call(value) === "[object Boolean]";
-};
-/**
- * is.false
- * Test if `value` is false.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is false, false otherwise
- * @api public
- */ is["false"] = function(value) {
-    return is.bool(value) && Boolean(Number(value)) === false;
-};
-/**
- * is.true
- * Test if `value` is true.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is true, false otherwise
- * @api public
- */ is["true"] = function(value) {
-    return is.bool(value) && Boolean(Number(value)) === true;
-};
-/**
- * Test date.
- */ /**
- * is.date
- * Test if `value` is a date.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a date, false otherwise
- * @api public
- */ is.date = function(value) {
-    return toStr.call(value) === "[object Date]";
-};
-/**
- * is.date.valid
- * Test if `value` is a valid date.
- *
- * @param {*} value value to test
- * @returns {Boolean} true if `value` is a valid date, false otherwise
- */ is.date.valid = function(value) {
-    return is.date(value) && !isNaN(Number(value));
-};
-/**
- * Test element.
- */ /**
- * is.element
- * Test if `value` is an html element.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an HTML Element, false otherwise
- * @api public
- */ is.element = function(value) {
-    return value !== undefined && typeof HTMLElement !== "undefined" && value instanceof HTMLElement && value.nodeType === 1;
-};
-/**
- * Test error.
- */ /**
- * is.error
- * Test if `value` is an error object.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an error object, false otherwise
- * @api public
- */ is.error = function(value) {
-    return toStr.call(value) === "[object Error]";
-};
-/**
- * Test function.
- */ /**
- * is.fn / is.function (deprecated)
- * Test if `value` is a function.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a function, false otherwise
- * @api public
- */ is.fn = is["function"] = function(value) {
-    var isAlert =  false && 0;
-    if (isAlert) {
-        return true;
-    }
-    var str = toStr.call(value);
-    return str === "[object Function]" || str === "[object GeneratorFunction]" || str === "[object AsyncFunction]";
-};
-/**
- * Test number.
- */ /**
- * is.number
- * Test if `value` is a number.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a number, false otherwise
- * @api public
- */ is.number = function(value) {
-    return toStr.call(value) === "[object Number]";
-};
-/**
- * is.infinite
- * Test if `value` is positive or negative infinity.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is positive or negative Infinity, false otherwise
- * @api public
- */ is.infinite = function(value) {
-    return value === Infinity || value === -Infinity;
-};
-/**
- * is.decimal
- * Test if `value` is a decimal number.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a decimal number, false otherwise
- * @api public
- */ is.decimal = function(value) {
-    return is.number(value) && !isActualNaN(value) && !is.infinite(value) && value % 1 !== 0;
-};
-/**
- * is.divisibleBy
- * Test if `value` is divisible by `n`.
- *
- * @param {Number} value value to test
- * @param {Number} n dividend
- * @return {Boolean} true if `value` is divisible by `n`, false otherwise
- * @api public
- */ is.divisibleBy = function(value, n) {
-    var isDividendInfinite = is.infinite(value);
-    var isDivisorInfinite = is.infinite(n);
-    var isNonZeroNumber = is.number(value) && !isActualNaN(value) && is.number(n) && !isActualNaN(n) && n !== 0;
-    return isDividendInfinite || isDivisorInfinite || isNonZeroNumber && value % n === 0;
-};
-/**
- * is.integer
- * Test if `value` is an integer.
- *
- * @param value to test
- * @return {Boolean} true if `value` is an integer, false otherwise
- * @api public
- */ is.integer = is["int"] = function(value) {
-    return is.number(value) && !isActualNaN(value) && value % 1 === 0;
-};
-/**
- * is.maximum
- * Test if `value` is greater than 'others' values.
- *
- * @param {Number} value value to test
- * @param {Array} others values to compare with
- * @return {Boolean} true if `value` is greater than `others` values
- * @api public
- */ is.maximum = function(value, others) {
-    if (isActualNaN(value)) {
-        throw new TypeError("NaN is not a valid value");
-    } else if (!is.arraylike(others)) {
-        throw new TypeError("second argument must be array-like");
-    }
-    var len = others.length;
-    while(--len >= 0){
-        if (value < others[len]) {
-            return false;
-        }
-    }
-    return true;
-};
-/**
- * is.minimum
- * Test if `value` is less than `others` values.
- *
- * @param {Number} value value to test
- * @param {Array} others values to compare with
- * @return {Boolean} true if `value` is less than `others` values
- * @api public
- */ is.minimum = function(value, others) {
-    if (isActualNaN(value)) {
-        throw new TypeError("NaN is not a valid value");
-    } else if (!is.arraylike(others)) {
-        throw new TypeError("second argument must be array-like");
-    }
-    var len = others.length;
-    while(--len >= 0){
-        if (value > others[len]) {
-            return false;
-        }
-    }
-    return true;
-};
-/**
- * is.nan
- * Test if `value` is not a number.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is not a number, false otherwise
- * @api public
- */ is.nan = function(value) {
-    return !is.number(value) || value !== value;
-};
-/**
- * is.even
- * Test if `value` is an even number.
- *
- * @param {Number} value value to test
- * @return {Boolean} true if `value` is an even number, false otherwise
- * @api public
- */ is.even = function(value) {
-    return is.infinite(value) || is.number(value) && value === value && value % 2 === 0;
-};
-/**
- * is.odd
- * Test if `value` is an odd number.
- *
- * @param {Number} value value to test
- * @return {Boolean} true if `value` is an odd number, false otherwise
- * @api public
- */ is.odd = function(value) {
-    return is.infinite(value) || is.number(value) && value === value && value % 2 !== 0;
-};
-/**
- * is.ge
- * Test if `value` is greater than or equal to `other`.
- *
- * @param {Number} value value to test
- * @param {Number} other value to compare with
- * @return {Boolean}
- * @api public
- */ is.ge = function(value, other) {
-    if (isActualNaN(value) || isActualNaN(other)) {
-        throw new TypeError("NaN is not a valid value");
-    }
-    return !is.infinite(value) && !is.infinite(other) && value >= other;
-};
-/**
- * is.gt
- * Test if `value` is greater than `other`.
- *
- * @param {Number} value value to test
- * @param {Number} other value to compare with
- * @return {Boolean}
- * @api public
- */ is.gt = function(value, other) {
-    if (isActualNaN(value) || isActualNaN(other)) {
-        throw new TypeError("NaN is not a valid value");
-    }
-    return !is.infinite(value) && !is.infinite(other) && value > other;
-};
-/**
- * is.le
- * Test if `value` is less than or equal to `other`.
- *
- * @param {Number} value value to test
- * @param {Number} other value to compare with
- * @return {Boolean} if 'value' is less than or equal to 'other'
- * @api public
- */ is.le = function(value, other) {
-    if (isActualNaN(value) || isActualNaN(other)) {
-        throw new TypeError("NaN is not a valid value");
-    }
-    return !is.infinite(value) && !is.infinite(other) && value <= other;
-};
-/**
- * is.lt
- * Test if `value` is less than `other`.
- *
- * @param {Number} value value to test
- * @param {Number} other value to compare with
- * @return {Boolean} if `value` is less than `other`
- * @api public
- */ is.lt = function(value, other) {
-    if (isActualNaN(value) || isActualNaN(other)) {
-        throw new TypeError("NaN is not a valid value");
-    }
-    return !is.infinite(value) && !is.infinite(other) && value < other;
-};
-/**
- * is.within
- * Test if `value` is within `start` and `finish`.
- *
- * @param {Number} value value to test
- * @param {Number} start lower bound
- * @param {Number} finish upper bound
- * @return {Boolean} true if 'value' is is within 'start' and 'finish'
- * @api public
- */ is.within = function(value, start, finish) {
-    if (isActualNaN(value) || isActualNaN(start) || isActualNaN(finish)) {
-        throw new TypeError("NaN is not a valid value");
-    } else if (!is.number(value) || !is.number(start) || !is.number(finish)) {
-        throw new TypeError("all arguments must be numbers");
-    }
-    var isAnyInfinite = is.infinite(value) || is.infinite(start) || is.infinite(finish);
-    return isAnyInfinite || value >= start && value <= finish;
-};
-/**
- * Test object.
- */ /**
- * is.object
- * Test if `value` is an object.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is an object, false otherwise
- * @api public
- */ is.object = function(value) {
-    return toStr.call(value) === "[object Object]";
-};
-/**
- * is.primitive
- * Test if `value` is a primitive.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a primitive, false otherwise
- * @api public
- */ is.primitive = function isPrimitive(value) {
-    if (!value) {
-        return true;
-    }
-    if (typeof value === "object" || is.object(value) || is.fn(value) || is.array(value)) {
-        return false;
-    }
-    return true;
-};
-/**
- * is.hash
- * Test if `value` is a hash - a plain object literal.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a hash, false otherwise
- * @api public
- */ is.hash = function(value) {
-    return is.object(value) && value.constructor === Object && !value.nodeType && !value.setInterval;
-};
-/**
- * Test regexp.
- */ /**
- * is.regexp
- * Test if `value` is a regular expression.
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a regexp, false otherwise
- * @api public
- */ is.regexp = function(value) {
-    return toStr.call(value) === "[object RegExp]";
-};
-/**
- * Test string.
- */ /**
- * is.string
- * Test if `value` is a string.
- *
- * @param {*} value value to test
- * @return {Boolean} true if 'value' is a string, false otherwise
- * @api public
- */ is.string = function(value) {
-    return toStr.call(value) === "[object String]";
-};
-/**
- * Test base64 string.
- */ /**
- * is.base64
- * Test if `value` is a valid base64 encoded string.
- *
- * @param {*} value value to test
- * @return {Boolean} true if 'value' is a base64 encoded string, false otherwise
- * @api public
- */ is.base64 = function(value) {
-    return is.string(value) && (!value.length || base64Regex.test(value));
-};
-/**
- * Test base64 string.
- */ /**
- * is.hex
- * Test if `value` is a valid hex encoded string.
- *
- * @param {*} value value to test
- * @return {Boolean} true if 'value' is a hex encoded string, false otherwise
- * @api public
- */ is.hex = function(value) {
-    return is.string(value) && (!value.length || hexRegex.test(value));
-};
-/**
- * is.symbol
- * Test if `value` is an ES6 Symbol
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a Symbol, false otherise
- * @api public
- */ is.symbol = function(value) {
-    return typeof Symbol === "function" && toStr.call(value) === "[object Symbol]" && typeof symbolValueOf.call(value) === "symbol";
-};
-/**
- * is.bigint
- * Test if `value` is an ES-proposed BigInt
- *
- * @param {*} value value to test
- * @return {Boolean} true if `value` is a BigInt, false otherise
- * @api public
- */ is.bigint = function(value) {
-    // eslint-disable-next-line valid-typeof
-    return typeof BigInt === "function" && toStr.call(value) === "[object BigInt]" && typeof bigIntValueOf.call(value) === "bigint";
-};
-module.exports = is;
 
 
 /***/ }),
@@ -25311,7 +24998,7 @@ exports.highSurrogateTo = 0xdbff; //# sourceMappingURL=surrogate-pairs.js.map
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"@google-cloud/bigquery","description":"Google BigQuery Client Library for Node.js","version":"8.1.0","license":"Apache-2.0","author":"Google LLC","engines":{"node":">=18"},"repository":"googleapis/nodejs-bigquery","main":"./build/src/index.js","types":"./build/src/index.d.ts","files":["build/src","!build/src/**/*.map"],"keywords":["google apis client","google api client","google apis","google api","google","google cloud platform","google cloud","cloud","google bigquery","bigquery"],"scripts":{"prebenchmark":"npm run compile","benchmark":"node build/benchmark/bench.js benchmark/queries.json","docs":"jsdoc -c .jsdoc.js","lint":"gts check","samples-test":"cd samples/ && npm link ../ && npm test && cd ../","test":"c8 mocha build/test","system-test":"mocha build/system-test --timeout 600000","presystem-test":"npm run compile","clean":"gts clean","compile":"tsc -p . && cp src/types.d.ts build/src/","fix":"gts fix","predocs":"npm run compile","prepare":"npm run compile","pretest":"npm run compile","docs-test":"linkinator docs","predocs-test":"npm run docs","types":"node scripts/gen-types.js","prelint":"cd samples; npm link ../; npm install","precompile":"gts clean"},"dependencies":{"@google-cloud/common":"^6.0.0","@google-cloud/paginator":"^6.0.0","@google-cloud/precise-date":"^5.0.0","@google-cloud/promisify":"^5.0.0","teeny-request":"^10.0.0","arrify":"^3.0.0","big.js":"^6.2.2","duplexify":"^4.1.3","extend":"^3.0.2","is":"^3.3.0","stream-events":"^1.0.5"},"overrides":{"@google-cloud/common":{"google-auth-library":"10.0.0-rc.2"}},"devDependencies":{"@google-cloud/storage":"^7.16.0","@types/big.js":"^6.2.2","@types/duplexify":"^3.6.4","@types/extend":"^3.0.4","@types/is":"^0.0.25","@types/mocha":"^10.0.10","@types/node":"^22.14.0","@types/proxyquire":"^1.3.31","@types/sinon":"^17.0.4","c8":"^10.1.3","codecov":"^3.8.3","discovery-tsd":"^0.3.0","eslint-plugin-prettier":"^5.2.6","gts":"^6.0.2","jsdoc":"^4.0.4","jsdoc-fresh":"^3.0.0","jsdoc-region-tag":"^3.0.0","linkinator":"^6.1.2","mocha":"^11.1.0","nise":"^6.1.1","pack-n-play":"^3.0.1","path-to-regexp":"^8.2.0","prettier":"^3.5.3","proxyquire":"^2.1.3","sinon":"^20.0.0","typescript":"^5.8.2"}}');
+module.exports = JSON.parse('{"name":"@google-cloud/bigquery","description":"Google BigQuery Client Library for Node.js","version":"8.1.1","license":"Apache-2.0","author":"Google LLC","engines":{"node":">=18"},"repository":"googleapis/nodejs-bigquery","main":"./build/src/index.js","types":"./build/src/index.d.ts","files":["build/src","!build/src/**/*.map"],"keywords":["google apis client","google api client","google apis","google api","google","google cloud platform","google cloud","cloud","google bigquery","bigquery"],"scripts":{"prebenchmark":"npm run compile","benchmark":"node build/benchmark/bench.js benchmark/queries.json","docs":"jsdoc -c .jsdoc.js","lint":"gts check","samples-test":"cd samples/ && npm link ../ && npm test && cd ../","test":"c8 mocha build/test","system-test":"mocha build/system-test --timeout 600000","presystem-test":"npm run compile","clean":"gts clean","compile":"tsc -p . && cp src/types.d.ts build/src/","fix":"gts fix","predocs":"npm run compile","prepare":"npm run compile","pretest":"npm run compile","docs-test":"linkinator docs","predocs-test":"npm run docs","types":"node scripts/gen-types.js","prelint":"cd samples; npm link ../; npm install","precompile":"gts clean"},"dependencies":{"@google-cloud/common":"^6.0.0","@google-cloud/paginator":"^6.0.0","@google-cloud/precise-date":"^5.0.0","@google-cloud/promisify":"^5.0.0","teeny-request":"^10.0.0","arrify":"^3.0.0","big.js":"^6.2.2","duplexify":"^4.1.3","extend":"^3.0.2","stream-events":"^1.0.5"},"overrides":{"@google-cloud/common":{"google-auth-library":"10.1.0"}},"devDependencies":{"@google-cloud/storage":"^7.16.0","@types/big.js":"^6.2.2","@types/duplexify":"^3.6.4","@types/extend":"^3.0.4","@types/is":"^0.0.25","@types/mocha":"^10.0.10","@types/node":"^22.14.0","@types/proxyquire":"^1.3.31","@types/sinon":"^17.0.4","c8":"^10.1.3","codecov":"^3.8.3","discovery-tsd":"^0.3.0","eslint-plugin-prettier":"^5.2.6","gts":"^6.0.2","jsdoc":"^4.0.4","jsdoc-fresh":"^3.0.0","jsdoc-region-tag":"^3.0.0","linkinator":"^6.1.2","mocha":"^11.1.0","nise":"^6.1.1","pack-n-play":"^3.0.1","path-to-regexp":"^8.2.0","prettier":"^3.5.3","proxyquire":"^2.1.3","sinon":"^20.0.0","typescript":"^5.8.2"}}');
 
 /***/ }),
 
@@ -25327,7 +25014,7 @@ module.exports = JSON.parse('{"name":"gaxios","version":"7.1.1","description":"A
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"google-auth-library","version":"10.1.0","author":"Google Inc.","description":"Google APIs Authentication Client Library for Node.js","engines":{"node":">=18"},"main":"./build/src/index.js","types":"./build/src/index.d.ts","repository":"googleapis/google-auth-library-nodejs.git","keywords":["google","api","google apis","client","client library"],"dependencies":{"base64-js":"^1.3.0","ecdsa-sig-formatter":"^1.0.11","gaxios":"^7.0.0","gcp-metadata":"^7.0.0","google-logging-utils":"^1.0.0","gtoken":"^8.0.0","jws":"^4.0.0"},"devDependencies":{"@types/base64-js":"^1.2.5","@types/jws":"^3.1.0","@types/mocha":"^10.0.10","@types/mv":"^2.1.0","@types/ncp":"^2.0.1","@types/node":"^22.0.0","@types/sinon":"^17.0.0","assert-rejects":"^1.0.0","c8":"^10.0.0","codecov":"^3.0.2","gts":"^6.0.0","is-docker":"^3.0.0","jsdoc":"^4.0.0","jsdoc-fresh":"^4.0.0","jsdoc-region-tag":"^3.0.0","karma":"^6.0.0","karma-chrome-launcher":"^3.0.0","karma-coverage":"^2.0.0","karma-firefox-launcher":"^2.0.0","karma-mocha":"^2.0.0","karma-sourcemap-loader":"^0.4.0","karma-webpack":"^5.0.1","keypair":"^1.0.4","linkinator":"^6.1.2","mocha":"^11.1.0","mv":"^2.1.1","ncp":"^2.0.0","nock":"^14.0.1","null-loader":"^4.0.0","puppeteer":"^24.0.0","sinon":"^18.0.1","ts-loader":"^8.0.0","typescript":"^5.1.6","webpack":"^5.21.2","webpack-cli":"^4.0.0"},"files":["build/src","!build/src/**/*.map"],"scripts":{"test":"c8 mocha build/test","clean":"gts clean","prepare":"npm run compile","lint":"gts check --no-inline-config","compile":"tsc -p .","fix":"gts fix","pretest":"npm run compile -- --sourceMap","docs":"jsdoc -c .jsdoc.js","samples-setup":"cd samples/ && npm link ../ && npm run setup && cd ../","samples-test":"cd samples/ && npm link ../ && npm test && cd ../","system-test":"mocha build/system-test --timeout 60000","presystem-test":"npm run compile -- --sourceMap","webpack":"webpack","browser-test":"karma start","docs-test":"linkinator docs","predocs-test":"npm run docs","prelint":"cd samples; npm link ../; npm install"},"license":"Apache-2.0"}');
+module.exports = JSON.parse('{"name":"google-auth-library","version":"10.2.0","author":"Google Inc.","description":"Google APIs Authentication Client Library for Node.js","engines":{"node":">=18"},"main":"./build/src/index.js","types":"./build/src/index.d.ts","repository":"googleapis/google-auth-library-nodejs.git","keywords":["google","api","google apis","client","client library"],"dependencies":{"base64-js":"^1.3.0","ecdsa-sig-formatter":"^1.0.11","gaxios":"^7.0.0","gcp-metadata":"^7.0.0","google-logging-utils":"^1.0.0","gtoken":"^8.0.0","jws":"^4.0.0"},"devDependencies":{"@types/base64-js":"^1.2.5","@types/jws":"^3.1.0","@types/mocha":"^10.0.10","@types/mv":"^2.1.0","@types/ncp":"^2.0.1","@types/node":"^22.0.0","@types/sinon":"^17.0.0","assert-rejects":"^1.0.0","c8":"^10.0.0","codecov":"^3.0.2","gts":"^6.0.0","is-docker":"^3.0.0","jsdoc":"^4.0.0","jsdoc-fresh":"^4.0.0","jsdoc-region-tag":"^3.0.0","karma":"^6.0.0","karma-chrome-launcher":"^3.0.0","karma-coverage":"^2.0.0","karma-firefox-launcher":"^2.0.0","karma-mocha":"^2.0.0","karma-sourcemap-loader":"^0.4.0","karma-webpack":"^5.0.1","keypair":"^1.0.4","linkinator":"^6.1.2","mocha":"^11.1.0","mv":"^2.1.1","ncp":"^2.0.0","nock":"^14.0.1","null-loader":"^4.0.0","puppeteer":"^24.0.0","sinon":"^21.0.0","ts-loader":"^8.0.0","typescript":"^5.1.6","webpack":"^5.21.2","webpack-cli":"^4.0.0"},"files":["build/src","!build/src/**/*.map"],"scripts":{"test":"c8 mocha build/test","clean":"gts clean","prepare":"npm run compile","lint":"gts check --no-inline-config","compile":"tsc -p .","fix":"gts fix","pretest":"npm run compile -- --sourceMap","docs":"jsdoc -c .jsdoc.js","samples-setup":"cd samples/ && npm link ../ && npm run setup && cd ../","samples-test":"cd samples/ && npm link ../ && npm test && cd ../","system-test":"mocha build/system-test --timeout 60000","presystem-test":"npm run compile -- --sourceMap","webpack":"webpack","browser-test":"karma start","docs-test":"linkinator docs","predocs-test":"npm run docs","prelint":"cd samples; npm link ../; npm install"},"license":"Apache-2.0"}');
 
 /***/ })
 

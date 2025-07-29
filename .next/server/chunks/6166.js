@@ -28,7 +28,7 @@ var react_experimental_ = __webpack_require__(17640);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
 var navigation = __webpack_require__(57114);
 // EXTERNAL MODULE: ./node_modules/firebase/auth/dist/index.mjs + 2 modules
-var dist = __webpack_require__(53498);
+var dist = __webpack_require__(92648);
 // EXTERNAL MODULE: ./lib/firebaseConfig.ts
 var firebaseConfig = __webpack_require__(79850);
 ;// CONCATENATED MODULE: ./components/ProtectedRoute.tsx

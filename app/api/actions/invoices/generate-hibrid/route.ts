@@ -1,10 +1,12 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// MODIFICAT: Corecții diacritice + date firmă actualizate + informații bancare
+// MODIFICAT: Extins cu suport pentru sendToAnaf (păstrează funcționalitatea PDF)
+// FIX: Corrigeat eroarea cu facturaId folosit înainte de definire
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
+import crypto from 'crypto';
 
 // Inițializare BigQuery
 const bigquery = new BigQuery({
@@ -19,11 +21,23 @@ const bigquery = new BigQuery({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { proiectId, liniiFactura, observatii, clientInfo } = body;
+    const { 
+      proiectId, 
+      liniiFactura, 
+      observatii, 
+      clientInfo,
+      sendToAnaf = false  // ✅ NOU: Parametru pentru e-factura ANAF
+    } = body;
 
-    console.log('Date primite:', { proiectId, liniiFactura, observatii, clientInfo });
+    console.log('Date primite:', { 
+      proiectId, 
+      liniiFactura, 
+      observatii, 
+      clientInfo, 
+      sendToAnaf 
+    });
 
-    // Validări și defaults
+    // ✅ VALIDĂRI EXISTENTE - păstrate identice
     if (!proiectId) {
       return NextResponse.json({ error: 'Lipsește proiectId' }, { status: 400 });
     }
@@ -32,7 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
     }
 
-    // Calculează totalurile din liniiFactura cu verificări sigure
+    // ✅ CALCULE TOTALE - păstrate identice
     let subtotal = 0;
     let totalTva = 0;
     
@@ -50,11 +64,13 @@ export async function POST(request: NextRequest) {
     
     const total = subtotal + totalTva;
 
-    // Extrage informații despre client din prima linie (temporar - până implementăm clientInfo din modal)
+    // ✅ FIX: Generează facturaId AICI, nu în try block
+    const facturaId = crypto.randomUUID();
+
+    // ✅ CLIENT DATA HANDLING - păstrat identice
     const primeaLinie = liniiFactura[0];
     const descrierePrincipala = primeaLinie.denumire || 'Servicii de consultanță';
     
-    // ✅ FOLOSEȘTE clientInfo din modal dacă există, altfel defaults
     const safeClientData = clientInfo ? {
       nume: clientInfo.denumire || 'Client din Proiect',
       cui: clientInfo.cui || 'RO00000000',
@@ -81,12 +97,11 @@ export async function POST(request: NextRequest) {
       termenPlata: '30 zile'
     };
 
-    // Funcție sigură pentru formatare numerică în template
+    // ✅ TEMPLATE HTML - păstrat identice
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
 
-    // ✅ TEMPLATE HTML CORECTAT - fără diacritice + date firmă actualizate
     const htmlTemplate = `
     <!DOCTYPE html>
     <html>
@@ -116,7 +131,7 @@ export async function POST(request: NextRequest) {
                 margin-bottom: 20px;
             }
             .header h1 {
-                font-size: 16px; /* ✅ MĂRIT pentru mai multă vizibilitate */
+                font-size: 16px;
                 color: #2c3e50;
                 margin-bottom: 10px;
                 font-weight: bold;
@@ -131,7 +146,7 @@ export async function POST(request: NextRequest) {
                 flex: 1;
             }
             .company-left h3, .company-right h3 {
-                font-size: 14px; /* ✅ MĂRIT pentru mai multă vizibilitate */
+                font-size: 14px;
                 color: #34495e;
                 margin-bottom: 8px;
                 border-bottom: 1px solid #bdc3c7;
@@ -149,7 +164,7 @@ export async function POST(request: NextRequest) {
                 margin-bottom: 20px;
             }
             .invoice-number {
-                font-size: 12px; /* ✅ MĂRIT pentru mai multă vizibilitate */
+                font-size: 12px;
                 font-weight: bold;
                 color: #e74c3c;
                 margin-bottom: 8px;
@@ -206,21 +221,21 @@ export async function POST(request: NextRequest) {
                 padding: 6px 0;
             }
             .payment-info {
-                margin-top: 15px; /* ✅ MĂRIT pentru spațiere */
+                margin-top: 15px;
                 background: #f8f9fa;
-                padding: 12px; /* ✅ MĂRIT pentru mai mult spațiu */
+                padding: 12px;
                 border-radius: 3px;
             }
             .payment-info h4 {
                 color: #34495e;
                 margin-bottom: 8px;
-                font-size: 11px; /* ✅ MĂRIT pentru vizibilitate */
+                font-size: 11px;
                 font-weight: bold;
             }
             .bank-details {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 15px; /* ✅ MĂRIT pentru spațiere */
+                gap: 15px;
                 margin-top: 8px;
             }
             .bank-section {
@@ -238,22 +253,22 @@ export async function POST(request: NextRequest) {
                 padding-bottom: 2px;
             }
             .signatures {
-                margin-top: 25px; /* ✅ MĂRIT pentru spațiere */
+                margin-top: 25px;
                 display: flex;
                 justify-content: space-between;
             }
             .signature-box {
                 text-align: center;
-                width: 120px; /* ✅ MĂRIT pentru mai mult spațiu */
-                font-size: 11px; /* ✅ ADĂUGAT: Font mai mare pentru "Furnizor" și "Client" */
-                font-weight: bold; /* ✅ ADĂUGAT: Bold pentru mai multă vizibilitate */
+                width: 120px;
+                font-size: 11px;
+                font-weight: bold;
             }
             .signature-line {
                 border-top: 1px solid #34495e;
                 margin-top: 20px;
                 padding-top: 4px;
-                font-size: 9px; /* ✅ MĂRIT pentru vizibilitate */
-                font-weight: normal; /* ✅ ADĂUGAT: Normal weight pentru text semnătură */
+                font-size: 9px;
+                font-weight: normal;
             }
             .footer {
                 margin-top: 20px;
@@ -391,6 +406,7 @@ export async function POST(request: NextRequest) {
             <div class="generated-info">
                 <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
                 Data generarii: ${new Date().toLocaleString('ro-RO')}
+                ${sendToAnaf ? '<br><strong>📤 Trimisa automat la ANAF ca e-Factura</strong>' : ''}
             </div>
             <div>
                 Aceasta factura a fost generata electronic si nu necesita semnatura fizica.<br>
@@ -400,19 +416,23 @@ export async function POST(request: NextRequest) {
     </body>
     </html>`;
 
-    // ✅ SALVARE ÎMBUNĂTĂȚITĂ în BigQuery
+    // ✅ SALVARE ÎMBUNĂTĂȚITĂ în BigQuery - extinsă cu support e-factura
+    let xmlResult: any = null;
+
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
 
+      // ✅ FIX: facturaId este deja definit mai sus, nu mai declarăm aici
+
       const facturaData = [{
-        id: crypto.randomUUID(),
+        id: facturaId,
         proiect_id: proiectId,
         serie: 'INV',
         numar: safeInvoiceData.numarFactura,
         data_factura: new Date().toISOString().split('T')[0],
-        data_scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 zile
-        client_id: null, // Va fi completat când implementăm legătura cu clienti
+        data_scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        client_id: null,
         client_nume: safeClientData.nume,
         client_cui: safeClientData.cui,
         subtotal: Number(subtotal.toFixed(2)),
@@ -420,6 +440,9 @@ export async function POST(request: NextRequest) {
         total: Number(total.toFixed(2)),
         valoare_platita: 0,
         status: 'generata',
+        efactura_enabled: sendToAnaf, // ✅ NOU: Flag pentru e-factura
+        efactura_status: sendToAnaf ? 'pending' : null, // ✅ NOU: Status initial
+        anaf_upload_id: null, // ✅ NOU: Va fi populat la upload
         date_complete_json: JSON.stringify({
           liniiFactura,
           observatii,
@@ -435,22 +458,64 @@ export async function POST(request: NextRequest) {
 
       await table.insert(facturaData);
       console.log('✅ Metadata factură salvată în BigQuery FacturiGenerate');
+
+      // ✅ NOU: Dacă sendToAnaf = true, generează și XML-ul
+      if (sendToAnaf) {
+        console.log('🔄 Generating XML for ANAF...');
+        
+        try {
+          const xmlResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/actions/invoices/generate-xml`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              facturaId: facturaId,
+              forceRegenerate: false 
+            })
+          });
+
+          xmlResult = await xmlResponse.json();
+          
+          if (xmlResult.success) {
+            console.log('✅ XML generated successfully:', xmlResult.xmlId);
+          } else {
+            console.error('❌ XML generation failed:', xmlResult.error);
+          }
+        } catch (xmlError) {
+          console.error('❌ Error calling XML generation API:', xmlError);
+        }
+      }
+
     } catch (bgError) {
       console.error('❌ Eroare la salvarea în BigQuery:', bgError);
     }
 
-    // Returnează JSON cu HTML pentru generarea PDF pe client
-    return NextResponse.json({
+    // ✅ RESPONSE extins cu informații e-factura
+    const response = {
       success: true,
-      message: 'Factură pregătită pentru generare',
+      message: sendToAnaf ? 
+        'Factură pregătită pentru generare PDF + XML e-factura' : 
+        'Factură pregătită pentru generare PDF',
       fileName: fileName,
       htmlContent: htmlTemplate,
       invoiceData: {
+        facturaId: facturaId, // ✅ FIX: Acum facturaId este definit corect
         numarFactura: safeInvoiceData.numarFactura,
         total: total,
         client: safeClientData.nume
+      },
+      // ✅ NOU: Informații e-factura
+      efactura: sendToAnaf ? {
+        enabled: true,
+        xmlId: xmlResult?.xmlId || null,
+        xmlStatus: xmlResult?.status || 'error',
+        xmlGenerated: xmlResult?.success || false,
+        xmlError: xmlResult?.error || null
+      } : {
+        enabled: false
       }
-    });
+    };
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Eroare la generarea facturii:', error);

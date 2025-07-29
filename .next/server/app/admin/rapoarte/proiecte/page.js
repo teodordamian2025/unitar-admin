@@ -2169,11 +2169,12 @@ function ProiectNouModal({ isOpen, onClose, onProiectAdded }) {
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// FIX FINAL: Modelul ProiectNouModal + Design Compact + Toate Funcționalitățile
+// MODIFICAT: Adăugat checkbox "Trimite la ANAF" + validări OAuth
+// PARTEA 1/2 - Până la end funcții helper
 // ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
-// ✅ Toast system Premium cu design solid
+// ✅ Toast system Premium cu design solid - păstrat identic
 const FacturaHibridModal_showToast = (message, type = "info")=>{
     const toastEl = document.createElement("div");
     toastEl.style.cssText = `
@@ -2233,7 +2234,14 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     const [isProcessingPDF, setIsProcessingPDF] = (0,react_experimental_.useState)(false);
     const [subproiecteDisponibile, setSubproiecteDisponibile] = (0,react_experimental_.useState)([]);
     const [showSubproiecteSelector, setShowSubproiecteSelector] = (0,react_experimental_.useState)(false);
-    // Helper pentru formatarea datelor cu support dual
+    // ✅ NOU: State pentru e-factura ANAF
+    const [sendToAnaf, setSendToAnaf] = (0,react_experimental_.useState)(false);
+    const [anafTokenStatus, setAnafTokenStatus] = (0,react_experimental_.useState)({
+        hasValidToken: false,
+        loading: true
+    });
+    const [isCheckingAnafToken, setIsCheckingAnafToken] = (0,react_experimental_.useState)(false);
+    // Helper pentru formatarea datelor cu support dual - păstrat identic
     const formatDate = (date)=>{
         if (!date) return "";
         const dateValue = typeof date === "string" ? date : date.value;
@@ -2250,9 +2258,50 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     (0,react_experimental_.useEffect)(()=>{
         loadClientFromDatabase();
         loadSubproiecte();
+        // ✅ NOU: Verifică status OAuth ANAF la încărcare
+        checkAnafTokenStatus();
     }, [
         proiect
     ]);
+    // ✅ NOU: Funcție pentru verificarea status-ului OAuth ANAF
+    const checkAnafTokenStatus = async ()=>{
+        setIsCheckingAnafToken(true);
+        try {
+            const response = await fetch("/api/anaf/oauth/token");
+            const data = await response.json();
+            setAnafTokenStatus({
+                hasValidToken: data.hasValidToken,
+                tokenInfo: data.tokenInfo,
+                loading: false
+            });
+            if (!data.hasValidToken) {
+                setSendToAnaf(false); // Dezactivează checkbox-ul dacă nu avem token valid
+            }
+        } catch (error) {
+            console.error("Error checking ANAF token status:", error);
+            setAnafTokenStatus({
+                hasValidToken: false,
+                loading: false
+            });
+            setSendToAnaf(false);
+        } finally{
+            setIsCheckingAnafToken(false);
+        }
+    };
+    // ✅ NOU: Handler pentru checkbox ANAF
+    const handleAnafCheckboxChange = (checked)=>{
+        if (checked && !anafTokenStatus.hasValidToken) {
+            FacturaHibridModal_showToast("❌ Nu există token ANAF valid. Configurează OAuth mai \xeent\xe2i.", "error");
+            return;
+        }
+        if (checked && anafTokenStatus.tokenInfo?.expires_in_minutes && anafTokenStatus.tokenInfo.expires_in_minutes < 10) {
+            FacturaHibridModal_showToast("⚠️ Token ANAF expiră \xeen cur\xe2nd. Recomandăm refresh \xeenainte de trimitere.", "info");
+        }
+        setSendToAnaf(checked);
+        if (checked) {
+            FacturaHibridModal_showToast("✅ Factura va fi trimisă automat la ANAF ca e-Factură", "success");
+        }
+    };
     const loadClientFromDatabase = async ()=>{
         if (!proiect.Client) return;
         setIsLoadingClient(true);
@@ -2460,6 +2509,8 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
             document.head.appendChild(jsPDFScript);
         });
     };
+    // CONTINUĂ ÎN PARTEA 2/2...
+    // CONTINUAREA CODULUI din PARTEA 1/2...
     const processPDF = async (htmlContent, fileName)=>{
         try {
             setIsProcessingPDF(true);
@@ -2627,6 +2678,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
             FacturaHibridModal_showToast(`❌ Eroare la generarea PDF: ${error instanceof Error ? error.message : "Eroare necunoscută"}`, "error");
         }
     };
+    // ✅ MODIFICAT: handleGenereazaFactura cu support pentru sendToAnaf
     const handleGenereazaFactura = async ()=>{
         if (!clientInfo?.cui) {
             FacturaHibridModal_showToast("CUI-ul clientului este obligatoriu", "error");
@@ -2640,9 +2692,32 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
             FacturaHibridModal_showToast("Denumirea clientului este obligatorie", "error");
             return;
         }
+        // ✅ NOU: Validări suplimentare pentru e-factura ANAF
+        if (sendToAnaf) {
+            if (!anafTokenStatus.hasValidToken) {
+                FacturaHibridModal_showToast("❌ Nu există token ANAF valid pentru e-factura", "error");
+                return;
+            }
+            if (anafTokenStatus.tokenInfo?.is_expired) {
+                FacturaHibridModal_showToast("❌ Token ANAF a expirat. Re\xeemprospătează token-ul.", "error");
+                return;
+            }
+            if (!clientInfo.cui || clientInfo.cui === "RO00000000") {
+                FacturaHibridModal_showToast("❌ CUI valid este obligatoriu pentru e-factura ANAF", "error");
+                return;
+            }
+            if (!clientInfo.adresa || clientInfo.adresa === "Adresa client") {
+                FacturaHibridModal_showToast("❌ Adresa completă a clientului este obligatorie pentru e-factura ANAF", "error");
+                return;
+            }
+        }
         setIsGenerating(true);
         try {
-            FacturaHibridModal_showToast("\uD83D\uDD04 Se generează template-ul facturii...", "info");
+            if (sendToAnaf) {
+                FacturaHibridModal_showToast("\uD83D\uDD04 Se generează factură PDF + XML pentru ANAF...", "info");
+            } else {
+                FacturaHibridModal_showToast("\uD83D\uDD04 Se generează template-ul facturii...", "info");
+            }
             const response = await fetch("/api/actions/invoices/generate-hibrid", {
                 method: "POST",
                 headers: {
@@ -2652,12 +2727,22 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                     proiectId: proiect.ID_Proiect,
                     liniiFactura,
                     observatii,
-                    clientInfo
+                    clientInfo,
+                    sendToAnaf
                 })
             });
             const result = await response.json();
             if (result.success && result.htmlContent) {
-                FacturaHibridModal_showToast("✅ Template generat! Se procesează PDF-ul...", "success");
+                // ✅ NOU: Afișează informații despre e-factura dacă este cazul
+                if (sendToAnaf) {
+                    if (result.efactura?.xmlGenerated) {
+                        FacturaHibridModal_showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, "success");
+                    } else {
+                        FacturaHibridModal_showToast(`⚠️ PDF generat, dar XML a eșuat: ${result.efactura?.xmlError}`, "info");
+                    }
+                } else {
+                    FacturaHibridModal_showToast("✅ Template generat! Se procesează PDF-ul...", "success");
+                }
                 await processPDF(result.htmlContent, result.fileName);
             } else {
                 throw new Error(result.error || "Eroare la generarea template-ului");
@@ -2673,7 +2758,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
     };
     const totals = calculateTotals();
     const isLoading = isGenerating || isProcessingPDF;
-    // ✅ RENDER JSX - EXACT ca ProiectNouModal (FĂRĂ interferențe)
+    // ✅ RENDER JSX - cu checkbox ANAF integrat
     return /*#__PURE__*/ jsx_runtime_.jsx("div", {
         style: {
             position: "fixed",
@@ -2804,7 +2889,7 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             }),
                                             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
                                                 children: [
-                                                    isGenerating && !isProcessingPDF && "\uD83D\uDD04 Se generează template-ul...",
+                                                    isGenerating && !isProcessingPDF && (sendToAnaf ? "\uD83D\uDD04 Se generează PDF + XML ANAF..." : "\uD83D\uDD04 Se generează template-ul..."),
                                                     isProcessingPDF && "\uD83D\uDCC4 Se procesează PDF-ul cu date din BD..."
                                                 ]
                                             })
@@ -2821,1034 +2906,159 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 ]
                             })
                         }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            style: {
-                                background: "#f8f9fa",
-                                padding: "1rem",
-                                borderRadius: "6px",
-                                border: "1px solid #dee2e6",
-                                marginBottom: "1rem"
-                            },
-                            children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                    style: {
-                                        fontSize: "16px",
-                                        fontWeight: "bold",
-                                        color: "#2c3e50",
-                                        marginBottom: "1rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.5rem"
-                                    },
-                                    children: "\uD83C\uDFD7️ Informații Proiect"
-                                }),
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        display: "grid",
-                                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                        gap: "1rem"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "ID Proiect"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        background: "white",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontFamily: "monospace",
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: proiect.ID_Proiect
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Status"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        background: "white",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        color: "#27ae60",
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: proiect.Status
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                gridColumn: "span 2"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Denumire"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        background: "white",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px"
-                                                    },
-                                                    children: proiect.Denumire
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Valoare Estimată"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        background: "white",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        color: "#27ae60",
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString("ro-RO")} RON` : "N/A"
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Perioada"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        background: "white",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    },
-                                                    children: [
-                                                        formatDate(proiect.Data_Start),
-                                                        " → ",
-                                                        formatDate(proiect.Data_Final)
-                                                    ]
-                                                })
-                                            ]
-                                        })
-                                    ]
-                                }),
-                                subproiecteDisponibile.length > 0 && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        marginTop: "1rem",
-                                        paddingTop: "1rem",
-                                        borderTop: "1px solid #dee2e6"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                alignItems: "center",
-                                                marginBottom: "1rem"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h4", {
-                                                    style: {
-                                                        margin: 0,
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: [
-                                                        "\uD83D\uDCCB Subproiecte Disponibile (",
-                                                        subproiecteDisponibile.length,
-                                                        ")"
-                                                    ]
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("button", {
-                                                    type: "button",
-                                                    onClick: ()=>setShowSubproiecteSelector(!showSubproiecteSelector),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        padding: "0.5rem 1rem",
-                                                        background: "#3498db",
-                                                        color: "white",
-                                                        border: "none",
-                                                        borderRadius: "6px",
-                                                        cursor: isLoading ? "not-allowed" : "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: [
-                                                        showSubproiecteSelector ? "\uD83D\uDC41️ Ascunde" : "\uD83D\uDC40 Afișează",
-                                                        " Lista"
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        showSubproiecteSelector && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            style: {
-                                                display: "grid",
-                                                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                                                gap: "0.5rem",
-                                                maxHeight: "200px",
-                                                overflowY: "auto"
-                                            },
-                                            children: subproiecteDisponibile.map((subproiect)=>/*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        padding: "1rem",
-                                                        background: subproiect.adaugat ? "#d4edda" : "white"
-                                                    },
-                                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                        style: {
-                                                            display: "flex",
-                                                            justifyContent: "space-between",
-                                                            alignItems: "flex-start"
-                                                        },
-                                                        children: [
-                                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                style: {
-                                                                    flex: 1
-                                                                },
-                                                                children: [
-                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        style: {
-                                                                            fontWeight: "bold",
-                                                                            color: "#2c3e50",
-                                                                            marginBottom: "0.5rem"
-                                                                        },
-                                                                        children: [
-                                                                            "\uD83D\uDCCB ",
-                                                                            subproiect.Denumire
-                                                                        ]
-                                                                    }),
-                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        style: {
-                                                                            fontSize: "12px",
-                                                                            color: "#7f8c8d"
-                                                                        },
-                                                                        children: [
-                                                                            "\uD83D\uDCB0 Valoare: ",
-                                                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                                style: {
-                                                                                    fontWeight: "bold",
-                                                                                    color: "#27ae60"
-                                                                                },
-                                                                                children: subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString("ro-RO")} RON` : "Fără valoare"
-                                                                            })
-                                                                        ]
-                                                                    }),
-                                                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                        style: {
-                                                                            fontSize: "12px",
-                                                                            color: "#7f8c8d"
-                                                                        },
-                                                                        children: [
-                                                                            "\uD83D\uDCCA Status: ",
-                                                                            /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                                style: {
-                                                                                    fontWeight: "bold"
-                                                                                },
-                                                                                children: subproiect.Status
-                                                                            })
-                                                                        ]
-                                                                    })
-                                                                ]
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                                onClick: ()=>addSubproiectToFactura(subproiect),
-                                                                disabled: subproiect.adaugat || isLoading,
-                                                                style: {
-                                                                    marginLeft: "1rem",
-                                                                    padding: "0.5rem 1rem",
-                                                                    background: subproiect.adaugat ? "#27ae60" : "#3498db",
-                                                                    color: "white",
-                                                                    border: "none",
-                                                                    borderRadius: "6px",
-                                                                    cursor: subproiect.adaugat || isLoading ? "not-allowed" : "pointer",
-                                                                    fontSize: "12px",
-                                                                    fontWeight: "bold"
-                                                                },
-                                                                children: subproiect.adaugat ? "✓ Adăugat" : "+ Adaugă"
-                                                            })
-                                                        ]
-                                                    })
-                                                }, subproiect.ID_Subproiect))
-                                        })
-                                    ]
-                                })
-                            ]
-                        }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            style: {
-                                marginBottom: "1rem"
-                            },
-                            children: [
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        marginBottom: "1rem"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
-                                            style: {
-                                                margin: 0,
-                                                color: "#2c3e50"
-                                            },
-                                            children: [
-                                                "\uD83D\uDC64 Informații Client",
-                                                isLoadingClient && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    style: {
-                                                        fontSize: "12px",
-                                                        color: "#3498db",
-                                                        fontWeight: "500"
-                                                    },
-                                                    children: " ⏳ Se \xeencarcă din BD..."
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                display: "flex",
-                                                gap: "0.5rem"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: cuiInput,
-                                                    onChange: (e)=>setCuiInput(e.target.value),
-                                                    disabled: isLoading,
-                                                    placeholder: "Introduceți CUI (ex: RO12345678)",
-                                                    style: {
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px",
-                                                        width: "200px"
-                                                    }
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                    onClick: handlePreluareDateANAF,
-                                                    disabled: isLoadingANAF || !cuiInput.trim() || isLoading,
-                                                    style: {
-                                                        padding: "0.75rem 1rem",
-                                                        background: isLoadingANAF || !cuiInput.trim() || isLoading ? "#bdc3c7" : "#3498db",
-                                                        color: "white",
-                                                        border: "none",
-                                                        borderRadius: "6px",
-                                                        cursor: isLoadingANAF || !cuiInput.trim() || isLoading ? "not-allowed" : "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "bold",
-                                                        whiteSpace: "nowrap"
-                                                    },
-                                                    children: isLoadingANAF ? "⏳ Se preiau..." : "\uD83D\uDCE1 Preluare ANAF"
-                                                })
-                                            ]
-                                        })
-                                    ]
-                                }),
-                                anafError && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        background: "#f8d7da",
-                                        border: "1px solid #f5c6cb",
-                                        borderRadius: "6px",
-                                        padding: "0.75rem",
-                                        marginBottom: "1rem",
-                                        fontSize: "14px",
-                                        color: "#721c24"
-                                    },
-                                    children: [
-                                        "❌ ",
-                                        anafError
-                                    ]
-                                }),
-                                clientInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        display: "grid",
-                                        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                        gap: "1rem"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Denumire *"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.denumire,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            denumire: e.target.value
-                                                        }),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        width: "100%",
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    },
-                                                    required: true
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "CUI *"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.cui,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            cui: e.target.value
-                                                        }),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        width: "100%",
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    },
-                                                    required: true
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Nr. Reg. Com."
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.nrRegCom,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            nrRegCom: e.target.value
-                                                        }),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        width: "100%",
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    }
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Telefon"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.telefon || "",
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            telefon: e.target.value
-                                                        }),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        width: "100%",
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    }
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                gridColumn: "span 2"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                                    style: {
-                                                        display: "block",
-                                                        marginBottom: "0.5rem",
-                                                        fontWeight: "bold",
-                                                        color: "#2c3e50"
-                                                    },
-                                                    children: "Adresa *"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                    type: "text",
-                                                    value: clientInfo.adresa,
-                                                    onChange: (e)=>setClientInfo({
-                                                            ...clientInfo,
-                                                            adresa: e.target.value
-                                                        }),
-                                                    disabled: isLoading,
-                                                    style: {
-                                                        width: "100%",
-                                                        padding: "0.75rem",
-                                                        border: "1px solid #dee2e6",
-                                                        borderRadius: "6px",
-                                                        fontSize: "14px"
-                                                    },
-                                                    required: true
-                                                })
-                                            ]
-                                        }),
-                                        (clientInfo.status || clientInfo.platitorTva) && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                gridColumn: "span 2",
-                                                display: "flex",
-                                                gap: "1rem",
-                                                marginTop: "0.5rem"
-                                            },
-                                            children: [
-                                                clientInfo.status && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    style: {
-                                                        padding: "0.5rem 1rem",
-                                                        borderRadius: "6px",
-                                                        fontSize: "12px",
-                                                        fontWeight: "bold",
-                                                        background: clientInfo.status === "Activ" ? "#d4edda" : "#f8d7da",
-                                                        color: clientInfo.status === "Activ" ? "#155724" : "#721c24"
-                                                    },
-                                                    children: [
-                                                        "Status ANAF: ",
-                                                        clientInfo.status
-                                                    ]
-                                                }),
-                                                clientInfo.platitorTva && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    style: {
-                                                        padding: "0.5rem 1rem",
-                                                        borderRadius: "6px",
-                                                        fontSize: "12px",
-                                                        fontWeight: "bold",
-                                                        background: clientInfo.platitorTva === "Da" ? "#cce7ff" : "#fff3cd",
-                                                        color: clientInfo.platitorTva === "Da" ? "#004085" : "#856404"
-                                                    },
-                                                    children: [
-                                                        "TVA: ",
-                                                        clientInfo.platitorTva
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        clientInfo.id && /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                            style: {
-                                                gridColumn: "span 2"
-                                            },
-                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                style: {
-                                                    background: "#d4edda",
-                                                    border: "1px solid #c3e6cb",
-                                                    borderRadius: "6px",
-                                                    padding: "0.75rem",
-                                                    fontSize: "12px"
-                                                },
-                                                children: [
-                                                    "✅ ",
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("strong", {
-                                                        children: "Date preluate din BD:"
-                                                    }),
-                                                    " Client ID ",
-                                                    clientInfo.id
-                                                ]
-                                            })
-                                        })
-                                    ]
-                                })
-                            ]
-                        }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                            style: {
-                                marginBottom: "1rem"
-                            },
-                            children: [
-                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        marginBottom: "1rem"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("h3", {
-                                            style: {
-                                                margin: 0,
-                                                color: "#2c3e50"
-                                            },
-                                            children: "\uD83D\uDCCB Servicii/Produse"
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                            onClick: addLine,
-                                            disabled: isLoading,
-                                            style: {
-                                                padding: "0.5rem 1rem",
-                                                background: "#27ae60",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "6px",
-                                                cursor: isLoading ? "not-allowed" : "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "bold"
-                                            },
-                                            children: "+ Adaugă linie"
-                                        })
-                                    ]
-                                }),
-                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                    style: {
-                                        overflowX: "auto"
-                                    },
-                                    children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
-                                        style: {
-                                            width: "100%",
-                                            borderCollapse: "collapse",
-                                            fontSize: "14px"
-                                        },
-                                        children: [
-                                            /*#__PURE__*/ jsx_runtime_.jsx("thead", {
-                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                    style: {
-                                                        background: "#f8f9fa"
-                                                    },
-                                                    children: [
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "left",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "Denumire serviciu/produs *"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "center",
-                                                                width: "80px",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "Cant."
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "center",
-                                                                width: "120px",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "Preț unit. (RON)"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "center",
-                                                                width: "80px",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "TVA %"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "center",
-                                                                width: "120px",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "Total (RON)"
-                                                        }),
-                                                        /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                                            style: {
-                                                                border: "1px solid #dee2e6",
-                                                                padding: "0.75rem",
-                                                                textAlign: "center",
-                                                                width: "60px",
-                                                                fontWeight: "bold",
-                                                                color: "#2c3e50"
-                                                            },
-                                                            children: "Acț."
-                                                        })
-                                                    ]
-                                                })
-                                            }),
-                                            /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
-                                                children: liniiFactura.map((linie, index)=>{
-                                                    const cantitate = Number(linie.cantitate) || 0;
-                                                    const pretUnitar = Number(linie.pretUnitar) || 0;
-                                                    const cotaTva = Number(linie.cotaTva) || 0;
-                                                    const valoare = cantitate * pretUnitar;
-                                                    const tva = valoare * (cotaTva / 100);
-                                                    const total = valoare + tva;
-                                                    const safeFixed = (num)=>(Number(num) || 0).toFixed(2);
-                                                    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                                        style: {
-                                                            background: linie.tip === "subproiect" ? "#f0f8ff" : index % 2 === 0 ? "white" : "#f8f9fa"
-                                                        },
-                                                        children: [
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem"
-                                                                },
-                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                                                    style: {
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: "0.5rem"
-                                                                    },
-                                                                    children: [
-                                                                        linie.tip === "subproiect" && /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                                            style: {
-                                                                                background: "#3498db",
-                                                                                color: "white",
-                                                                                padding: "0.25rem 0.5rem",
-                                                                                borderRadius: "4px",
-                                                                                fontSize: "10px",
-                                                                                fontWeight: "bold"
-                                                                            },
-                                                                            children: "SUB"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                            type: "text",
-                                                                            value: linie.denumire,
-                                                                            onChange: (e)=>updateLine(index, "denumire", e.target.value),
-                                                                            disabled: isLoading,
-                                                                            style: {
-                                                                                flex: 1,
-                                                                                padding: "0.5rem",
-                                                                                border: "1px solid #dee2e6",
-                                                                                borderRadius: "4px",
-                                                                                fontSize: "14px"
-                                                                            },
-                                                                            placeholder: "Descrierea serviciului sau produsului...",
-                                                                            required: true
-                                                                        })
-                                                                    ]
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem"
-                                                                },
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                    type: "number",
-                                                                    value: linie.cantitate,
-                                                                    onChange: (e)=>updateLine(index, "cantitate", parseFloat(e.target.value) || 0),
-                                                                    disabled: isLoading,
-                                                                    style: {
-                                                                        width: "100%",
-                                                                        padding: "0.5rem",
-                                                                        border: "1px solid #dee2e6",
-                                                                        borderRadius: "4px",
-                                                                        textAlign: "center",
-                                                                        fontSize: "14px"
-                                                                    },
-                                                                    min: "0",
-                                                                    step: "0.01"
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem"
-                                                                },
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("input", {
-                                                                    type: "number",
-                                                                    value: linie.pretUnitar,
-                                                                    onChange: (e)=>updateLine(index, "pretUnitar", parseFloat(e.target.value) || 0),
-                                                                    disabled: isLoading,
-                                                                    style: {
-                                                                        width: "100%",
-                                                                        padding: "0.5rem",
-                                                                        border: "1px solid #dee2e6",
-                                                                        borderRadius: "4px",
-                                                                        textAlign: "right",
-                                                                        fontSize: "14px"
-                                                                    },
-                                                                    min: "0",
-                                                                    step: "0.01"
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem"
-                                                                },
-                                                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("select", {
-                                                                    value: linie.cotaTva,
-                                                                    onChange: (e)=>updateLine(index, "cotaTva", parseFloat(e.target.value)),
-                                                                    disabled: isLoading,
-                                                                    style: {
-                                                                        width: "100%",
-                                                                        padding: "0.5rem",
-                                                                        border: "1px solid #dee2e6",
-                                                                        borderRadius: "4px",
-                                                                        textAlign: "center",
-                                                                        fontSize: "14px"
-                                                                    },
-                                                                    children: [
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 0,
-                                                                            children: "0%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 5,
-                                                                            children: "5%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 9,
-                                                                            children: "9%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 19,
-                                                                            children: "19%"
-                                                                        }),
-                                                                        /*#__PURE__*/ jsx_runtime_.jsx("option", {
-                                                                            value: 21,
-                                                                            children: "21%"
-                                                                        })
-                                                                    ]
-                                                                })
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem",
-                                                                    textAlign: "right",
-                                                                    fontSize: "14px",
-                                                                    fontWeight: "bold",
-                                                                    color: "#27ae60"
-                                                                },
-                                                                children: safeFixed(total)
-                                                            }),
-                                                            /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                                                style: {
-                                                                    border: "1px solid #dee2e6",
-                                                                    padding: "0.5rem",
-                                                                    textAlign: "center"
-                                                                },
-                                                                children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                                    onClick: ()=>removeLine(index),
-                                                                    disabled: liniiFactura.length === 1 || isLoading,
-                                                                    style: {
-                                                                        background: liniiFactura.length === 1 || isLoading ? "#bdc3c7" : "#e74c3c",
-                                                                        color: "white",
-                                                                        border: "none",
-                                                                        borderRadius: "4px",
-                                                                        padding: "0.5rem",
-                                                                        cursor: liniiFactura.length === 1 || isLoading ? "not-allowed" : "pointer",
-                                                                        fontSize: "12px"
-                                                                    },
-                                                                    title: linie.tip === "subproiect" ? "Șterge subproiectul din factură" : "Șterge linia",
-                                                                    children: "\uD83D\uDDD1️"
-                                                                })
-                                                            })
-                                                        ]
-                                                    }, index);
-                                                })
-                                            })
-                                        ]
-                                    })
-                                })
-                            ]
-                        }),
                         /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                            style: {
-                                display: "flex",
-                                justifyContent: "flex-end",
-                                marginBottom: "1rem"
-                            },
-                            children: /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                style: {
-                                    width: "300px",
-                                    background: "#f8f9fa",
-                                    padding: "1rem",
-                                    borderRadius: "6px",
-                                    border: "1px solid #dee2e6"
-                                },
-                                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                    style: {
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: "0.5rem"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                fontSize: "14px",
-                                                color: "#2c3e50"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "Subtotal (fără TVA):"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    style: {
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: [
-                                                        totals.subtotal,
-                                                        " RON"
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                fontSize: "14px",
-                                                color: "#2c3e50"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "TVA:"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    style: {
-                                                        fontWeight: "bold"
-                                                    },
-                                                    children: [
-                                                        totals.totalTva,
-                                                        " RON"
-                                                    ]
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                                            style: {
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                fontSize: "16px",
-                                                fontWeight: "bold",
-                                                paddingTop: "0.5rem",
-                                                borderTop: "2px solid #27ae60",
-                                                color: "#27ae60"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("span", {
-                                                    children: "TOTAL DE PLATĂ:"
-                                                }),
-                                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
-                                                    children: [
-                                                        totals.totalGeneral,
-                                                        " RON"
-                                                    ]
-                                                })
-                                            ]
-                                        })
-                                    ]
-                                })
-                            })
-                        }),
-                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
                                 marginBottom: "1.5rem"
                             },
-                            children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("label", {
-                                    style: {
-                                        display: "block",
-                                        marginBottom: "0.5rem",
-                                        fontWeight: "bold",
-                                        color: "#2c3e50"
-                                    },
-                                    children: "\uD83D\uDCDD Observații (opțional)"
-                                }),
-                                /*#__PURE__*/ jsx_runtime_.jsx("textarea", {
-                                    value: observatii,
-                                    onChange: (e)=>setObservatii(e.target.value),
-                                    disabled: isLoading,
-                                    style: {
-                                        width: "100%",
-                                        padding: "0.75rem",
-                                        border: "1px solid #dee2e6",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        resize: "vertical"
-                                    },
-                                    rows: 2,
-                                    placeholder: "Observații suplimentare pentru factură..."
-                                })
-                            ]
+                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    background: "#f0f8ff",
+                                    border: "1px solid #cce7ff",
+                                    borderRadius: "6px",
+                                    padding: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            marginBottom: "0.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("h3", {
+                                                style: {
+                                                    margin: 0,
+                                                    color: "#2c3e50",
+                                                    fontSize: "16px"
+                                                },
+                                                children: "\uD83D\uDCE4 e-Factura ANAF"
+                                            }),
+                                            isCheckingAnafToken && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                style: {
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "0.5rem"
+                                                },
+                                                children: [
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                        style: {
+                                                            width: "16px",
+                                                            height: "16px",
+                                                            borderRadius: "50%",
+                                                            border: "2px solid #3498db",
+                                                            borderTop: "2px solid transparent",
+                                                            animation: "spin 1s linear infinite"
+                                                        }
+                                                    }),
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                        style: {
+                                                            fontSize: "12px",
+                                                            color: "#7f8c8d"
+                                                        },
+                                                        children: "Se verifică token..."
+                                                    })
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: "1rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("label", {
+                                                style: {
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "0.5rem",
+                                                    cursor: anafTokenStatus.hasValidToken ? "pointer" : "not-allowed",
+                                                    fontSize: "14px",
+                                                    fontWeight: "500"
+                                                },
+                                                children: [
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("input", {
+                                                        type: "checkbox",
+                                                        checked: sendToAnaf,
+                                                        onChange: (e)=>handleAnafCheckboxChange(e.target.checked),
+                                                        disabled: !anafTokenStatus.hasValidToken || isLoading,
+                                                        style: {
+                                                            transform: "scale(1.2)",
+                                                            marginRight: "0.25rem"
+                                                        }
+                                                    }),
+                                                    "\uD83D\uDCE4 Trimite automat la ANAF ca e-Factură"
+                                                ]
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                style: {
+                                                    flex: 1
+                                                },
+                                                children: [
+                                                    anafTokenStatus.loading ? /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                        style: {
+                                                            fontSize: "12px",
+                                                            color: "#7f8c8d"
+                                                        },
+                                                        children: "Se verifică statusul OAuth..."
+                                                    }) : anafTokenStatus.hasValidToken ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                        style: {
+                                                            fontSize: "12px",
+                                                            color: "#27ae60"
+                                                        },
+                                                        children: [
+                                                            "✅ Token ANAF valid",
+                                                            anafTokenStatus.tokenInfo && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("span", {
+                                                                style: {
+                                                                    color: anafTokenStatus.tokenInfo.expires_in_minutes < 60 ? "#e67e22" : "#27ae60"
+                                                                },
+                                                                children: [
+                                                                    " ",
+                                                                    "(expiră \xeen ",
+                                                                    anafTokenStatus.tokenInfo.expires_in_minutes,
+                                                                    " min)"
+                                                                ]
+                                                            })
+                                                        ]
+                                                    }) : /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                                        style: {
+                                                            fontSize: "12px",
+                                                            color: "#e74c3c"
+                                                        },
+                                                        children: [
+                                                            "❌ Nu există token ANAF valid.",
+                                                            " ",
+                                                            /*#__PURE__*/ jsx_runtime_.jsx("a", {
+                                                                href: "/admin/anaf/setup",
+                                                                target: "_blank",
+                                                                style: {
+                                                                    color: "#3498db",
+                                                                    textDecoration: "underline"
+                                                                },
+                                                                children: "Configurează OAuth"
+                                                            })
+                                                        ]
+                                                    }),
+                                                    sendToAnaf && /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                        style: {
+                                                            marginTop: "0.5rem",
+                                                            padding: "0.5rem",
+                                                            background: "#e8f5e8",
+                                                            border: "1px solid #c3e6c3",
+                                                            borderRadius: "4px",
+                                                            fontSize: "12px",
+                                                            color: "#2d5016"
+                                                        },
+                                                        children: "ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura."
+                                                    })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            })
                         }),
                         /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                             style: {
@@ -3859,13 +3069,16 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                 borderTop: "1px solid #dee2e6"
                             },
                             children: [
-                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
                                         fontSize: "12px",
                                         color: "#7f8c8d",
                                         fontWeight: "500"
                                     },
-                                    children: "ℹ️ Date client auto-completate din BD. Subproiecte disponibile pentru adăugare la factură."
+                                    children: [
+                                        "ℹ️ Date client auto-completate din BD. ",
+                                        sendToAnaf ? "E-factura va fi trimisă la ANAF." : "Doar PDF va fi generat."
+                                    ]
                                 }),
                                 /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                     style: {
@@ -3904,10 +3117,13 @@ function FacturaHibridModal({ proiect, onClose, onSuccess }) {
                                             children: isLoading ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
                                                 children: [
                                                     "⏳ ",
-                                                    isProcessingPDF ? "Se generează PDF cu date BD..." : "Se procesează..."
+                                                    isProcessingPDF ? "Se generează PDF cu date BD..." : sendToAnaf ? "Se procesează PDF + XML ANAF..." : "Se procesează..."
                                                 ]
-                                            }) : /*#__PURE__*/ jsx_runtime_.jsx(jsx_runtime_.Fragment, {
-                                                children: "\uD83D\uDCB0 Generează Factură din BD"
+                                            }) : /*#__PURE__*/ (0,jsx_runtime_.jsxs)(jsx_runtime_.Fragment, {
+                                                children: [
+                                                    "\uD83D\uDCB0 ",
+                                                    sendToAnaf ? "Generează Factură + e-Factura ANAF" : "Generează Factură din BD"
+                                                ]
                                             })
                                         })
                                     ]
@@ -7064,7 +6280,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7843,2322,7365,6369,8313,9850,6166,6549,9518], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,2322,7365,6369,8313,9850,6166,6549,9518], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();
