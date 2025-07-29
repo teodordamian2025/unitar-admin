@@ -2,6 +2,7 @@
 // DESCRIERE: Test simplu pentru a verifica dacă route-urile funcționează
 
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   console.log('🧪 TEST CALLBACK - Route funcționează!');

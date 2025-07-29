@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
+export const dynamic = 'force-dynamic';
 
 // Inițializare BigQuery
 const bigquery = new BigQuery({
