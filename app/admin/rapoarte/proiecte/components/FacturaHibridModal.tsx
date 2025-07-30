@@ -1,7 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Adăugat checkbox "Trimite la ANAF" + validări OAuth
-// PARTEA 1/2 - Până la end funcții helper
+// VERSIUNEA FINALĂ HIBRIDĂ: Toate funcționalitățile originale + e-Factura ANAF
 // ==================================================================
 
 'use client';
@@ -455,9 +454,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     });
   };
 
-// CONTINUĂ ÎN PARTEA 2/2...
-// CONTINUAREA CODULUI din PARTEA 1/2...
-
   const processPDF = async (htmlContent: string, fileName: string) => {
     try {
       setIsProcessingPDF(true);
@@ -748,8 +744,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF;
-  
-  // ✅ RENDER JSX - cu checkbox ANAF integrat
+
+  // ✅ RENDER JSX - COMPLET cu toate secțiunile + checkbox ANAF
   return (
     <div style={{
       position: 'fixed',
@@ -773,7 +769,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         maxHeight: '90vh',
         overflowY: 'auto'
       }}>
-        {/* ✅ Header IDENTIC */}
+        {/* ✅ Header */}
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
@@ -804,7 +800,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         </div>
 
         <div style={{ padding: '1.5rem' }}>
-          {/* ✅ LOADING OVERLAY - identic */}
+          {/* ✅ LOADING OVERLAY */}
           {isLoading && (
             <div style={{
               position: 'fixed',
@@ -859,16 +855,685 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-          {/* Toate secțiunile existente rămân identice... */}
-          {/* Pentru brevitate, nu reiau tot codul, dar include: */}
-          {/* - Secțiunea informații proiect */}
-          {/* - Secțiunea subproiecte */}
-          {/* - Secțiunea Client */}
-          {/* - Secțiunea Servicii/Produse */}
-          {/* - Secțiunea Totaluri */}
-          {/* - Secțiunea Observații */}
+          {/* Secțiune informații proiect */}
+          <div style={{
+            background: '#f8f9fa',
+            padding: '1rem',
+            borderRadius: '6px',
+            border: '1px solid #dee2e6',
+            marginBottom: '1rem'
+          }}>
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#2c3e50',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              🏗️ Informații Proiect
+            </h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>ID Proiect</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold'
+                }}>{proiect.ID_Proiect}</div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Status</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  color: '#27ae60',
+                  fontWeight: 'bold'
+                }}>{proiect.Status}</div>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Denumire</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px'
+                }}>{proiect.Denumire}</div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Valoare Estimată</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  color: '#27ae60',
+                  fontWeight: 'bold'
+                }}>
+                  {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} RON` : 'N/A'}
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>Perioada</label>
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'white', 
+                  border: '1px solid #dee2e6', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {formatDate(proiect.Data_Start)} → {formatDate(proiect.Data_Final)}
+                </div>
+              </div>
+            </div>
+            
+            {/* Secțiunea subproiecte */}
+            {subproiecteDisponibile.length > 0 && (
+              <div style={{
+                marginTop: '1rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #dee2e6'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem'
+                }}>
+                  <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                    📋 Subproiecte Disponibile ({subproiecteDisponibile.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowSubproiecteSelector(!showSubproiecteSelector)}
+                    disabled={isLoading}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
+                  </button>
+                </div>
+                
+                {showSubproiecteSelector && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                    gap: '0.5rem',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {subproiecteDisponibile.map((subproiect) => (
+                      <div 
+                        key={subproiect.ID_Subproiect} 
+                        style={{
+                          border: '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          padding: '1rem',
+                          background: subproiect.adaugat ? '#d4edda' : 'white'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontWeight: 'bold',
+                              color: '#2c3e50',
+                              marginBottom: '0.5rem'
+                            }}>
+                              📋 {subproiect.Denumire}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => addSubproiectToFactura(subproiect)}
+                            disabled={subproiect.adaugat || isLoading}
+                            style={{
+                              marginLeft: '1rem',
+                              padding: '0.5rem 1rem',
+                              background: subproiect.adaugat ? '#27ae60' : '#3498db',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: (subproiect.adaugat || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-          {/* ✅ NOU: Secțiune e-Factura ANAF - ADĂUGATĂ ÎNAINTEA BUTONULUI FINAL */}
+          {/* Secțiune Client */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>
+                👤 Informații Client
+                {isLoadingClient && <span style={{ fontSize: '12px', color: '#3498db', fontWeight: '500' }}> ⏳ Se încarcă din BD...</span>}
+              </h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={cuiInput}
+                  onChange={(e) => setCuiInput(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="Introduceți CUI (ex: RO12345678)"
+                  style={{
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    width: '200px'
+                  }}
+                />
+                <button
+                  onClick={handlePreluareDateANAF}
+                  disabled={isLoadingANAF || !cuiInput.trim() || isLoading}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: (isLoadingANAF || !cuiInput.trim() || isLoading) ? '#bdc3c7' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (isLoadingANAF || !cuiInput.trim() || isLoading) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
+                </button>
+              </div>
+            </div>
+            
+            {anafError && (
+              <div style={{
+                background: '#f8d7da',
+                border: '1px solid #f5c6cb',
+                borderRadius: '6px',
+                padding: '0.75rem',
+                marginBottom: '1rem',
+                fontSize: '14px',
+                color: '#721c24'
+              }}>
+                ❌ {anafError}
+              </div>
+            )}
+            
+            {clientInfo && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem'
+              }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Denumire *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.denumire}
+                    onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    CUI *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.cui}
+                    onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Nr. Reg. Com.
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.nrRegCom}
+                    onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Telefon
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.telefon || ''}
+                    onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Adresa *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.adresa}
+                    onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                
+                {(clientInfo.status || clientInfo.platitorTva) && (
+                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    {clientInfo.status && (
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da',
+                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24'
+                      }}>
+                        Status ANAF: {clientInfo.status}
+                      </span>
+                    )}
+                    {clientInfo.platitorTva && (
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd',
+                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404'
+                      }}>
+                        TVA: {clientInfo.platitorTva}
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {clientInfo.id && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{
+                      background: '#d4edda',
+                      border: '1px solid #c3e6cb',
+                      borderRadius: '6px',
+                      padding: '0.75rem',
+                      fontSize: '12px'
+                    }}>
+                      ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Secțiune Servicii/Produse */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Servicii/Produse</h3>
+              <button
+                onClick={addLine}
+                disabled={isLoading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Adaugă linie
+              </button>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'left',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Denumire serviciu/produs *</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '80px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Cant.</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '120px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Preț unit. (RON)</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '80px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>TVA %</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '120px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Total (RON)</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '60px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Acț.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liniiFactura.map((linie, index) => {
+                    const cantitate = Number(linie.cantitate) || 0;
+                    const pretUnitar = Number(linie.pretUnitar) || 0;
+                    const cotaTva = Number(linie.cotaTva) || 0;
+                    
+                    const valoare = cantitate * pretUnitar;
+                    const tva = valoare * (cotaTva / 100);
+                    const total = valoare + tva;
+                    
+                    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                    
+                    return (
+                      <tr key={index} style={{
+                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {linie.tip === 'subproiect' && (
+                              <span style={{
+                                background: '#3498db',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                SUB
+                              </span>
+                            )}
+                            <input
+                              type="text"
+                              value={linie.denumire}
+                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                              disabled={isLoading}
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '14px'
+                              }}
+                              placeholder="Descrierea serviciului sau produsului..."
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.cantitate}
+                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.pretUnitar}
+                            onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'right',
+                              fontSize: '14px'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <select
+                            value={linie.cotaTva}
+                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={9}>9%</option>
+                            <option value={19}>19%</option>
+                            <option value={21}>21%</option>
+                          </select>
+                        </td>
+                        <td style={{
+                          border: '1px solid #dee2e6',
+                          padding: '0.5rem',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          color: '#27ae60'
+                        }}>
+                          {safeFixed(total)}
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => removeLine(index)}
+                            disabled={liniiFactura.length === 1 || isLoading}
+                            style={{
+                              background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Secțiune Totaluri */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <div style={{
+              width: '300px',
+              background: '#f8f9fa',
+              padding: '1rem',
+              borderRadius: '6px',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
+                  <span>Subtotal (fără TVA):</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
+                  <span>TVA:</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  paddingTop: '0.5rem',
+                  borderTop: '2px solid #27ae60',
+                  color: '#27ae60'
+                }}>
+                  <span>TOTAL DE PLATĂ:</span>
+                  <span>{totals.totalGeneral} RON</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Secțiune Observații */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              📝 Observații (opțional)
+            </label>
+            <textarea
+              value={observatii}
+              onChange={(e) => setObservatii(e.target.value)}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
+              }}
+              rows={2}
+              placeholder="Observații suplimentare pentru factură..."
+            />
+          </div>
+
+          {/* ✅ NOU: Secțiune e-Factura ANAF */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{
               background: '#f0f8ff',

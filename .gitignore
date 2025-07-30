@@ -14,3 +14,6 @@ service-account-key.json
 uploads/*.pdf
 uploads/*.docx
 !uploads/.gitkeep
+.next/
+node_modules/
+*.log

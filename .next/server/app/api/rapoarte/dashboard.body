@@ -1,1 +1,1 @@
-{"success":true,"data":{"proiecte":{"total":4,"active":3,"finalizate":0,"suspendate":0},"clienti":{"total":0,"activi":0,"sincronizati":0},"contracte":{"total":0,"generate":0},"facturi":{"total":9,"valoare_incasata":0,"valoare_de_incasat":94642}}}
+{"success":true,"data":{"proiecte":{"total":5,"active":4,"finalizate":0,"suspendate":0},"clienti":{"total":0,"activi":0,"sincronizati":0},"contracte":{"total":0,"generate":0},"facturi":{"total":10,"valoare_incasata":0,"valoare_de_incasat":103924}}}

@@ -251,7 +251,8 @@ var route_namespaceObject = {};
 __webpack_require__.r(route_namespaceObject);
 __webpack_require__.d(route_namespaceObject, {
   GET: () => (GET),
-  POST: () => (POST)
+  POST: () => (POST),
+  dynamic: () => (dynamic)
 });
 
 // EXTERNAL MODULE: ./node_modules/next/dist/server/node-polyfill-headers.js
@@ -275,6 +276,7 @@ var external_crypto_default = /*#__PURE__*/__webpack_require__.n(external_crypto
 
 
 
+const dynamic = "force-dynamic";
 // Inițializare BigQuery
 const bigquery = new src.BigQuery({
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,

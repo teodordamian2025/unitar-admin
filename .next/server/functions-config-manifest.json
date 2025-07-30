@@ -1,6 +1,10 @@
 {
   "version": 1,
   "functions": {
+    "/api/anaf/oauth/authorize": {},
+    "/api/anaf/oauth/callback-test": {},
+    "/api/anaf/oauth/callback": {},
+    "/api/anaf/oauth/token": {},
     "/api/proceseaza-upload/pdf": {}
   }
 }
