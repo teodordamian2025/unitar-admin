@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ SALVARE în BigQuery FacturiGenerate - păstrată și extinsă
+    // ✅ SALVARE în BigQuery FacturiGenerate - compatibil cu schema existentă
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
@@ -522,6 +522,9 @@ export async function POST(request: NextRequest) {
         numar: safeInvoiceData.numarFactura,
         data_factura: new Date().toISOString().split('T')[0],
         data_scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        id_factura_externa: null,
+        url_publica: null,
+        url_download: null,
         client_id: null,
         client_nume: safeClientData.nume,
         client_cui: safeClientData.cui,
@@ -530,10 +533,8 @@ export async function POST(request: NextRequest) {
         total: Number(total.toFixed(2)),
         valoare_platita: 0,
         status: 'generata',
-        efactura_enabled: sendToAnaf,
-        efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_test' : 'pending') : null,
-        efactura_mock_mode: MOCK_EFACTURA_MODE && sendToAnaf, // ✅ NOU: Flag pentru mock
-        anaf_upload_id: xmlResult?.xmlId || null,
+        data_trimitere: null,
+        data_plata: null,
         date_complete_json: JSON.stringify({
           liniiFactura,
           observatii,
@@ -545,7 +546,11 @@ export async function POST(request: NextRequest) {
           mockMode: MOCK_EFACTURA_MODE && sendToAnaf
         }),
         data_creare: new Date().toISOString(),
-        data_actualizare: new Date().toISOString()
+        data_actualizare: new Date().toISOString(),
+        // ✅ CÂMPURI pentru e-factura
+        efactura_enabled: sendToAnaf,
+        efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
+        anaf_upload_id: null  // Va fi actualizat după generarea XML
       }];
 
       await table.insert(facturaData);
@@ -600,7 +605,9 @@ export async function POST(request: NextRequest) {
 async function saveMockEfacturaRecord(data: any) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('FacturiEFACTURA');
+    
+    // ✅ FOLOSEȘTE tabelul AnafEFactura existent (nu FacturiEFACTURA)
+    const table = dataset.table('AnafEFactura');
 
     const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
@@ -633,41 +640,69 @@ async function saveMockEfacturaRecord(data: any) {
   </AccountingCustomerParty>
 </Invoice>`;
 
+    // ✅ RECORD compatibil cu schema AnafEFactura existentă
     const record = [{
       id: crypto.randomUUID(),
-      factura_id: data.facturaId,
-      xml_id: data.xmlId,
-      proiect_id: data.proiectId,
-      client_cui: data.clientInfo.cui,
-      client_denumire: data.clientInfo.nume,
-      subtotal_factura: parseFloat(data.subtotal),
-      tva_factura: parseFloat(data.totalTva),
-      total_factura: parseFloat(data.total),
-      status_anaf: 'MOCK_TEST',
-      xml_content: mockXmlContent,
-      data_creare: new Date().toISOString(),
-      data_trimitere_anaf: null, // NULL pentru mock
-      data_raspuns_anaf: null,
-      response_anaf: JSON.stringify({ 
+      factura_id: data.facturaId,                    // ✅ Leagă cu FacturiGenerate
+      anaf_upload_id: data.xmlId,                    // ✅ Mock XML ID
+      xml_content: mockXmlContent,                   // ✅ Mock XML
+      anaf_status: 'MOCK_TEST',                      // ✅ Status mock
+      anaf_response: JSON.stringify({ 
         mock: true, 
         test_mode: true, 
         message: 'XML generat în mod test - nu a fost trimis la ANAF',
         xml_id: data.xmlId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        client_cui: data.clientInfo.cui,
+        total_factura: data.total
       }),
-      upload_index_anaf: null,
-      mesaje_anaf: JSON.stringify([{
-        tip: 'INFO',
-        mesaj: '🧪 Factură generată în Mock Mode pentru testare',
-        data: new Date().toISOString()
-      }])
+      error_message: null,                           // ✅ Null pentru mock success
+      error_code: null,                              // ✅ Null pentru mock success
+      data_upload: null,                             // ✅ Null - nu a fost uplodat
+      data_validare: null,                           // ✅ Null - nu a fost validat
+      retry_count: 0,                                // ✅ Default
+      max_retries: 3,                                // ✅ Default
+      data_creare: new Date().toISOString(),         // ✅ Timestamp actual
+      data_actualizare: new Date().toISOString()     // ✅ Timestamp actual
     }];
 
     await table.insert(record);
-    console.log('✅ Mock e-factura record salvat în FacturiEFACTURA:', data.xmlId);
+    console.log('✅ Mock e-factura record salvat în AnafEFactura:', data.xmlId);
+
+    // ✅ BONUS: Actualizează și FacturiGenerate cu informații mock
+    try {
+      const facturaTable = dataset.table('FacturiGenerate');
+      
+      // Update doar dacă facturaId există
+      const updateQuery = `
+        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+        SET 
+          efactura_enabled = true,
+          efactura_status = 'mock_generated',
+          anaf_upload_id = @xmlId,
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE id = @facturaId
+      `;
+
+      await bigquery.query({
+        query: updateQuery,
+        params: { 
+          xmlId: data.xmlId,
+          facturaId: data.facturaId 
+        },
+        location: 'EU'
+      });
+
+      console.log('✅ FacturiGenerate actualizat cu info mock pentru factura:', data.facturaId);
+
+    } catch (updateError) {
+      console.log('⚠️ Nu s-a putut actualiza FacturiGenerate (nu e critico):', updateError);
+    }
 
   } catch (error) {
     console.error('❌ Eroare la salvarea mock e-factura record:', error);
-    throw error;
+    
+    // ✅ NU aruncă eroarea pentru a nu opri generarea PDF-ului
+    console.log('⚠️ Continuă fără salvare mock e-factura - PDF va fi generat normal');
   }
 }
