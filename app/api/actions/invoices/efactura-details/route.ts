@@ -1,4 +1,4 @@
-3. CALEA: app/api/actions/invoices/efactura-details/route.ts
+// CALEA: app/api/actions/invoices/efactura-details/route.ts
 // DESCRIERE: Detalii e-factura cu timeline din BigQuery
 // ==================================================================
 

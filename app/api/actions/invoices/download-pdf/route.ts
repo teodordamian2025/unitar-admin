@@ -1,4 +1,4 @@
-2. CALEA: app/api/actions/invoices/download-pdf/route.ts
+// CALEA: app/api/actions/invoices/download-pdf/route.ts
 // DESCRIERE: Download PDF cu numele real de fișier
 // ==================================================================
 
