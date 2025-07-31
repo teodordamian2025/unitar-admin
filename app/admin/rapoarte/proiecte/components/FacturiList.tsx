@@ -856,3 +856,173 @@ export default function FacturiList({
     </div>
   );
 }
+
+// ✅ DOAR SECȚIUNEA MODIFICATĂ - păstrează restul codului identic
+
+// ✅ NOUĂ: Funcție safe pentru formatarea datelor din BigQuery
+const formatDateSafe = (dateInput: any) => {
+  if (!dateInput) return 'N/A';
+  
+  try {
+    let dateValue: string;
+    
+    // ✅ SUPORT pentru formatul BigQuery: {"value": "2025-07-31"}
+    if (typeof dateInput === 'object' && dateInput.value) {
+      dateValue = dateInput.value;
+    } else if (typeof dateInput === 'string') {
+      dateValue = dateInput;
+    } else {
+      return 'Format invalid';
+    }
+    
+    // Detectează formatul și parsează corect
+    if (dateValue.includes('T')) {
+      // Format: 2025-07-25T19:46:31.778Z
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    } else if (dateValue.includes('-') && dateValue.length === 10) {
+      // Format: 2025-07-25
+      return new Date(dateValue + 'T00:00:00').toLocaleDateString('ro-RO');
+    } else {
+      // Alte formate
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    }
+  } catch (error) {
+    console.warn('Invalid date format:', dateInput);
+    return 'Data invalidă';
+  }
+};
+
+// ✅ FIX: Download PDF care funcționează fără dependența de fișiere fizice
+const handleDownload = async (factura: Factura) => {
+  try {
+    showToast('🔄 Se regenerează PDF-ul din datele facturii...', 'info');
+
+    // În loc să caute fișierul fizic, regenerează PDF-ul din datele din BD
+    const response = await fetch('/api/actions/invoices/regenerate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        facturaId: factura.id,
+        numar: factura.numar
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/pdf')) {
+      // Răspuns direct PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Factura_${factura.numar}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showToast(`✅ PDF descărcat pentru factura ${factura.numar}`, 'success');
+    } else {
+      // Răspuns JSON cu htmlContent pentru regenerare în browser
+      const data = await response.json();
+      
+      if (data.success && data.htmlContent) {
+        // Folosește aceeași metodă ca în FacturaHibridModal pentru generarea PDF
+        await regeneratePDFInBrowser(data.htmlContent, `Factura_${factura.numar}.pdf`);
+        showToast(`✅ PDF regenerat și descărcat pentru factura ${factura.numar}`, 'success');
+      } else {
+        throw new Error(data.error || 'Nu s-a putut regenera PDF-ul');
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error downloading PDF:', error);
+    showToast(`❌ Eroare la descărcarea PDF: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
+  }
+};
+
+// ✅ NOUĂ: Funcție pentru regenerarea PDF în browser (din FacturaHibridModal)
+const regeneratePDFInBrowser = async (htmlContent: string, fileName: string) => {
+  // Încarcă bibliotecile jsPDF și html2canvas dacă nu sunt deja încărcate
+  if (!window.jsPDF || !window.html2canvas) {
+    await loadPDFLibraries();
+  }
+
+  const tempDiv = document.createElement('div');
+  tempDiv.id = 'pdf-regenerate-content';
+  tempDiv.style.cssText = `
+    position: fixed;
+    left: 0px;
+    top: 0px;
+    width: 794px;
+    height: 1000px;
+    backgroundColor: white;
+    fontFamily: Arial, sans-serif;
+    fontSize: 4px;
+    color: #333;
+    lineHeight: 1.0;
+    padding: 15px;
+    zIndex: -1000;
+    opacity: 1;
+    overflow: hidden;
+    boxSizing: border-box;
+  `;
+  
+  const parser = new DOMParser();
+  const htmlDoc = parser.parseFromString(htmlContent, 'text/html');
+  
+  if (htmlDoc.body) {
+    tempDiv.innerHTML = htmlDoc.body.innerHTML;
+  } else {
+    tempDiv.innerHTML = htmlContent;
+  }
+  
+  document.body.appendChild(tempDiv);
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const pdf = new window.jsPDF('p', 'pt', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  
+  await pdf.html(tempDiv, {
+    callback: function (pdf: any) {
+      document.body.removeChild(tempDiv);
+      pdf.save(fileName);
+    },
+    margin: [10, 10, 10, 10],
+    width: pageWidth - 20,
+    windowWidth: pageWidth - 20,
+    autoPaging: 'text'
+  });
+};
+
+// ✅ NOUĂ: Încărcare biblioteci PDF
+const loadPDFLibraries = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.jsPDF && window.html2canvas) {
+      resolve();
+      return;
+    }
+
+    const jsPDFScript = document.createElement('script');
+    jsPDFScript.src = 'https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js';
+    jsPDFScript.onload = () => {
+      window.jsPDF = (window as any).jspdf.jsPDF;
+      
+      const html2canvasScript = document.createElement('script');
+      html2canvasScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      html2canvasScript.onload = () => {
+        window.html2canvas = (window as any).html2canvas;
+        resolve();
+      };
+      html2canvasScript.onerror = reject;
+      document.head.appendChild(html2canvasScript);
+    };
+    jsPDFScript.onerror = reject;
+    document.head.appendChild(jsPDFScript);
+  });
+};

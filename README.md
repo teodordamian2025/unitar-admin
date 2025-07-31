@@ -577,6 +577,10 @@ Rezumat implementare OAuth ANAF
 app/api/actions/invoices/generate-xml/route.ts // DESCRIERE: Generare XML UBL 2.1 pentru e-Factura ANAF
 app/admin/anaf/setup/page.tsx // DESCRIERE: Pagină pentru configurarea și testarea OAuth ANAF
 
+app/api/actions/invoices/get-pdf-filename/route.ts
+app/api/actions/invoices/download-pdf/route.ts
+app/api/actions/invoices/efactura-details/route.ts
+
 ✅ Funcționalități:
 
 Security: State verification pentru CSRF protection
