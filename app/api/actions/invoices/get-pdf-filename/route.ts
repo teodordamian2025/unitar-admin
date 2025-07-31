@@ -1,5 +1,5 @@
 // ==================================================================
-// 1. CALEA: app/api/actions/invoices/get-pdf-filename/route.ts
+// CALEA: app/api/actions/invoices/get-pdf-filename/route.ts
 // DESCRIERE: Găsește numele real al fișierului PDF
 // ==================================================================
 
@@ -18,12 +18,19 @@ export async function GET(request: NextRequest) {
     try {
       const files = await fs.readdir(uploadsDir);
       
-      // Caută fișierul care conține ID-ul sau numărul facturii
-      const foundFile = files.find(file => 
-        file.includes(facturaId) || 
-        file.includes(numar) ||
-        file.endsWith('.pdf')
-      );
+      // ✅ Caută fișierul care conține ID-ul sau numărul facturii (cu verificări null)
+      const foundFile = files.find(file => {
+        // Verifică dacă fișierul este PDF
+        if (!file.endsWith('.pdf')) return false;
+        
+        // Verifică dacă conține facturaId (doar dacă nu e null)
+        if (facturaId && file.includes(facturaId)) return true;
+        
+        // Verifică dacă conține numărul (doar dacă nu e null)
+        if (numar && file.includes(numar)) return true;
+        
+        return false;
+      });
       
       if (foundFile) {
         return NextResponse.json({
