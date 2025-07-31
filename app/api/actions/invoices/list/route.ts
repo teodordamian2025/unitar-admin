@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/list/route.ts
-// DESCRIERE: Lista facturilor generate (hibride) - VERSIUNE CORECTATĂ
+// DESCRIERE: Lista facturilor generate (hibride) - VERSIUNE CORECTATĂ + E-FACTURA
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -43,6 +43,17 @@ export async function GET(request: NextRequest) {
         fg.data_actualizare,
         p.Denumire as proiect_denumire,
         p.Status as proiect_status,
+        
+        -- ✅ NOU: Câmpuri e-factura
+        fg.efactura_enabled,
+        fg.efactura_status,
+        fg.anaf_upload_id,
+        
+        -- ✅ Mock mode indicator
+        CASE
+          WHEN fg.efactura_status = 'mock_pending' THEN true
+          ELSE false
+        END as efactura_mock_mode,
         
         -- Calcule utile
         (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
@@ -151,7 +162,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ==================================================================
-// API pentru statistici facturi (folosit în dashboard)
+// API pentru statistici facturi (folosit în dashboard) - ACTUALIZAT CU E-FACTURA
 // ==================================================================
 
 export async function POST(request: NextRequest) {
@@ -165,6 +176,14 @@ export async function POST(request: NextRequest) {
           COUNTIF(status = 'pdf_generated') as facturi_pdf,
           COUNTIF(status = 'anaf_success') as facturi_anaf,
           COUNTIF(status = 'anaf_error') as facturi_eroare,
+          
+          -- ✅ NOU: Statistici e-factura
+          COUNTIF(efactura_enabled = true) as facturi_efactura_enabled,
+          COUNTIF(efactura_status = 'uploaded') as facturi_efactura_uploaded,
+          COUNTIF(efactura_status = 'accepted') as facturi_efactura_accepted,
+          COUNTIF(efactura_status = 'rejected') as facturi_efactura_rejected,
+          COUNTIF(efactura_status = 'mock_pending') as facturi_efactura_mock,
+          
           SUM(total) as valoare_totala,
           SUM(COALESCE(valoare_platita, 0)) as valoare_platita,
           SUM(total - COALESCE(valoare_platita, 0)) as rest_de_plata,
