@@ -14,6 +14,14 @@ const bigquery = new BigQuery({
   },
 });
 
+// ✅ Interface pentru evenimentele din timeline
+interface TimelineEvent {
+  data: string;
+  eveniment: string;
+  status: 'success' | 'error' | 'pending';
+  detalii: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -57,8 +65,8 @@ export async function GET(request: NextRequest) {
     
     const efacturaData = rows[0];
     
-    // Construiește timeline-ul
-    const timeline = [];
+    // ✅ Construiește timeline-ul cu tip explicit
+    const timeline: TimelineEvent[] = [];
     
     // Eveniment creare XML
     timeline.push({
