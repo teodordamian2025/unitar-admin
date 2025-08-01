@@ -55,7 +55,7 @@ function getEmailTransporter() {
       }
     };
 
-    transporter = nodemailer.createTransporter(smtpConfig);
+    transporter = nodemailer.createTransport(smtpConfig);
   }
 
   return transporter;
