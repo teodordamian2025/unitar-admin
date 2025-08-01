@@ -571,8 +571,18 @@ async function sendNotification(context: NotificationContext) {
     const transporter = getEmailTransporter();
     
     const recipients = context.recipients || 
-      process.env.NOTIFICATION_RECIPIENTS?.split(',') || 
-      [process.env.SMTP_USER];
+      process.env.NOTIFICATION_RECIPIENTS?.split(',').map(email => email.trim()).filter(Boolean) || 
+      [process.env.SMTP_USER].filter(Boolean);
+
+    // ✅ Ensure recipients array contains only valid strings
+    const validRecipients = recipients.filter((email): email is string => typeof email === 'string' && email.length > 0);
+
+    if (validRecipients.length === 0) {
+      return {
+        success: false,
+        error: 'No valid recipients found'
+      };
+    }
 
     const priorityMap = {
       'info': 'Low',
@@ -583,7 +593,7 @@ async function sendNotification(context: NotificationContext) {
 
     const result = await transporter.sendMail({
       from: process.env.SMTP_FROM,
-      to: recipients,
+      to: validRecipients,
       subject: `[ANAF ${context.severity.toUpperCase()}] ${context.title}`,
       html: generateEmailHTML(context),
       text: context.message,
@@ -597,7 +607,7 @@ async function sendNotification(context: NotificationContext) {
     return {
       success: true,
       messageId: result.messageId,
-      recipients: recipients.length
+      recipients: validRecipients.length
     };
 
   } catch (error) {
