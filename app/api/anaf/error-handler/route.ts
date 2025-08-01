@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
+import crypto from 'crypto';
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -257,7 +258,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const severity = searchParams.get('severity');
 
-    const stats = await getErrorStatistics(timeRange, category, severity);
+    const stats = await getErrorStatistics(timeRange, category || undefined, severity || undefined);
 
     return NextResponse.json({
       success: true,
