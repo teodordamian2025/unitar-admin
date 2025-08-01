@@ -101,6 +101,27 @@ export default function ANAFMonitoringDashboard() {
   const [flowData, setFlowData] = useState<any[]>([]);
   const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
 
+  // ✅ Helper functions moved to top of component
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'healthy': return '✅';
+      case 'warning': return '⚠️';
+      case 'critical': return '🔴';
+      default: return '❓';
+    }
+  };
+
+  const getTrendIcon = (trend: number) => {
+    if (trend > 0) return '📈';
+    if (trend < 0) return '📉';
+    return '➡️';
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('ro-RO');
+  };
+
   useEffect(() => {
     loadDashboardData();
     
@@ -212,26 +233,6 @@ export default function ANAFMonitoringDashboard() {
         document.body.removeChild(toastEl);
       }
     }, 4000);
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('ro-RO');
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'healthy': return '✅';
-      case 'warning': return '⚠️';
-      case 'critical': return '🔴';
-      default: return '❓';
-    }
-  };
-
-  const getTrendIcon = (trend: number) => {
-    if (trend > 0) return '📈';
-    if (trend < 0) return '📉';
-    return '➡️';
   };
 
   return (
