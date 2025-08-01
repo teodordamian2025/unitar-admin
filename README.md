@@ -581,6 +581,13 @@ app/api/actions/invoices/get-pdf-filename/route.ts
 app/api/actions/invoices/download-pdf/route.ts
 app/api/actions/invoices/efactura-details/route.ts
 
+Pentru monitorizare si erori Oauth si e-factura:
+app/api/anaf/error-handler/route.ts // DESCRIERE: Centralized Error Handling & Categorization pentru ANAF
+app/api/anaf/notifications/route.ts // DESCRIERE: Email Notifications System pentru ANAF Error Monitoring
+app/api/anaf/monitoring/route.ts // DESCRIERE: API Backend pentru ANAF Monitoring Dashboard
+app/admin/anaf/monitoring/page.tsx // DESCRIERE: Dashboard complet pentru ANAF Monitoring cu real-time updates
+Dashbord erori: https://admin.unitarproiect.eu/admin/anaf/monitoring
+
 ✅ Funcționalități:
 
 Security: State verification pentru CSRF protection
