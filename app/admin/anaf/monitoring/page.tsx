@@ -86,6 +86,27 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
+// ✅ Helper functions moved outside component for global access
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'healthy': return '✅';
+    case 'warning': return '⚠️';
+    case 'critical': return '🔴';
+    default: return '❓';
+  }
+};
+
+const getTrendIcon = (trend: number) => {
+  if (trend > 0) return '📈';
+  if (trend < 0) return '📉';
+  return '➡️';
+};
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleString('ro-RO');
+};
+
 export default function ANAFMonitoringDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('24h');
@@ -100,27 +121,6 @@ export default function ANAFMonitoringDashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [flowData, setFlowData] = useState<any[]>([]);
   const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
-
-  // ✅ Helper functions moved to top of component
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'healthy': return '✅';
-      case 'warning': return '⚠️';
-      case 'critical': return '🔴';
-      default: return '❓';
-    }
-  };
-
-  const getTrendIcon = (trend: number) => {
-    if (trend > 0) return '📈';
-    if (trend < 0) return '📉';
-    return '➡️';
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('ro-RO');
-  };
 
   useEffect(() => {
     loadDashboardData();
