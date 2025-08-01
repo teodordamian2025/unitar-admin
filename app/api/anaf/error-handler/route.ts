@@ -16,40 +16,44 @@ const bigquery = new BigQuery({
 });
 
 // ✅ Error Categories - Complete din planul inițial
-export enum ErrorCategory {
+const ErrorCategory = {
   // OAuth Errors
-  OAUTH_EXPIRED = 'oauth_expired',
-  OAUTH_INVALID = 'oauth_invalid', 
-  OAUTH_REVOKED = 'oauth_revoked',
+  OAUTH_EXPIRED: 'oauth_expired',
+  OAUTH_INVALID: 'oauth_invalid', 
+  OAUTH_REVOKED: 'oauth_revoked',
   
   // XML Errors
-  XML_GENERATION = 'xml_generation',
-  XML_VALIDATION = 'xml_validation',
-  XML_BUSINESS_RULES = 'xml_business_rules',
+  XML_GENERATION: 'xml_generation',
+  XML_VALIDATION: 'xml_validation',
+  XML_BUSINESS_RULES: 'xml_business_rules',
   
   // Upload Errors
-  ANAF_CONNECTION = 'anaf_connection',
-  ANAF_TIMEOUT = 'anaf_timeout',
-  ANAF_SERVER_ERROR = 'anaf_server_error',
-  ANAF_BUSINESS_ERROR = 'anaf_business_error',
+  ANAF_CONNECTION: 'anaf_connection',
+  ANAF_TIMEOUT: 'anaf_timeout',
+  ANAF_SERVER_ERROR: 'anaf_server_error',
+  ANAF_BUSINESS_ERROR: 'anaf_business_error',
   
   // System Errors
-  DATABASE_ERROR = 'database_error',
-  NETWORK_ERROR = 'network_error',
-  VALIDATION_ERROR = 'validation_error',
-  UNKNOWN_ERROR = 'unknown_error'
-}
+  DATABASE_ERROR: 'database_error',
+  NETWORK_ERROR: 'network_error',
+  VALIDATION_ERROR: 'validation_error',
+  UNKNOWN_ERROR: 'unknown_error'
+} as const;
+
+type ErrorCategoryType = typeof ErrorCategory[keyof typeof ErrorCategory];
 
 // ✅ Error Severity Levels
-export enum ErrorSeverity {
-  LOW = 'low',           // Info/Warning
-  MEDIUM = 'medium',     // Recoverable errors
-  HIGH = 'high',         // Business impact
-  CRITICAL = 'critical'  // System down
-}
+const ErrorSeverity = {
+  LOW: 'low',           // Info/Warning
+  MEDIUM: 'medium',     // Recoverable errors
+  HIGH: 'high',         // Business impact
+  CRITICAL: 'critical'  // System down
+} as const;
+
+type ErrorSeverityType = typeof ErrorSeverity[keyof typeof ErrorSeverity];
 
 // ✅ Retry Strategy Configuration
-export interface RetryConfig {
+interface RetryConfig {
   shouldRetry: boolean;
   maxRetries: number;
   backoffIntervals: number[]; // în minute
@@ -57,9 +61,9 @@ export interface RetryConfig {
 }
 
 // ✅ Error Context Interface
-export interface ErrorContext {
-  category: ErrorCategory;
-  severity: ErrorSeverity;
+interface ErrorContext {
+  category: ErrorCategoryType;
+  severity: ErrorSeverityType;
   message: string;
   details?: any;
   facturaId?: string;
@@ -71,7 +75,7 @@ export interface ErrorContext {
 }
 
 // ✅ Retry Strategy Mapping
-const RETRY_STRATEGIES: Record<ErrorCategory, RetryConfig> = {
+const RETRY_STRATEGIES: Record<ErrorCategoryType, RetryConfig> = {
   // OAuth errors: Refresh token automat
   [ErrorCategory.OAUTH_EXPIRED]: {
     shouldRetry: true,
@@ -170,7 +174,7 @@ const RETRY_STRATEGIES: Record<ErrorCategory, RetryConfig> = {
 };
 
 // ✅ Severity Mapping
-const SEVERITY_MAPPING: Record<ErrorCategory, ErrorSeverity> = {
+const SEVERITY_MAPPING: Record<ErrorCategoryType, ErrorSeverityType> = {
   [ErrorCategory.OAUTH_EXPIRED]: ErrorSeverity.MEDIUM,
   [ErrorCategory.OAUTH_INVALID]: ErrorSeverity.HIGH,
   [ErrorCategory.OAUTH_REVOKED]: ErrorSeverity.CRITICAL,
@@ -279,7 +283,7 @@ function categorizeError(error: any, context: any): ErrorContext {
   const timestamp = new Date().toISOString();
   
   // Determine category based on error characteristics
-  let category = ErrorCategory.UNKNOWN_ERROR;
+  let category: ErrorCategoryType = ErrorCategory.UNKNOWN_ERROR;
   
   // OAuth-related errors
   if (error.message?.includes('token') || error.message?.includes('oauth')) {
