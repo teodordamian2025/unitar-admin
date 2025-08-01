@@ -17,19 +17,21 @@ const bigquery = new BigQuery({
 });
 
 // ✅ Notification Types din planul inițial
-export enum NotificationType {
-  TOKEN_EXPIRY_WARNING = 'token_expiry_warning',    // Token expiră în 7 zile
-  BULK_ERRORS = 'bulk_errors',                      // Facturi cu erori ANAF > 5
-  HIGH_FAILURE_RATE = 'high_failure_rate',          // Upload failure rate > 10%
-  CONNECTION_DOWN = 'connection_down',              // Conexiune ANAF down
-  CRITICAL_ERROR = 'critical_error',                // Eroare critică imediată
-  MANUAL_INTERVENTION = 'manual_intervention',      // Necesită intervenție manuală
-  DAILY_SUMMARY = 'daily_summary',                  // Rezumatul zilnic
-  SYSTEM_HEALTH = 'system_health'                   // Status general sistem
-}
+const NotificationType = {
+  TOKEN_EXPIRY_WARNING: 'token_expiry_warning',    // Token expiră în 7 zile
+  BULK_ERRORS: 'bulk_errors',                      // Facturi cu erori ANAF > 5
+  HIGH_FAILURE_RATE: 'high_failure_rate',          // Upload failure rate > 10%
+  CONNECTION_DOWN: 'connection_down',              // Conexiune ANAF down
+  CRITICAL_ERROR: 'critical_error',                // Eroare critică imediată
+  MANUAL_INTERVENTION: 'manual_intervention',      // Necesită intervenție manuală
+  DAILY_SUMMARY: 'daily_summary',                  // Rezumatul zilnic
+  SYSTEM_HEALTH: 'system_health'                   // Status general sistem
+} as const;
 
-export interface NotificationContext {
-  type: NotificationType;
+type NotificationTypeType = typeof NotificationType[keyof typeof NotificationType];
+
+interface NotificationContext {
+  type: NotificationTypeType;
   severity: 'info' | 'warning' | 'error' | 'critical';
   title: string;
   message: string;
