@@ -1,3 +1,8 @@
+// ==================================================================
+// CALEA: app/admin/page.tsx
+// DESCRIERE: Dashboard admin cu buton ANAF Monitoring adăugat în secțiunea Management Facturi
+// ==================================================================
+
 'use client';
 
 import { signOut } from 'firebase/auth';
@@ -331,6 +336,31 @@ export default function AdminPage() {
             >
               💰 Management Facturi
             </Link>
+
+            {/* ✅ ADĂUGAT: Buton pentru ANAF Monitoring */}
+            <Link 
+              href="/admin/anaf/monitoring" 
+              style={{ 
+                display: 'block',
+                padding: '0.75rem 1rem',
+                background: '#ecf0f1',
+                color: '#2c3e50',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                border: '1px solid #bdc3c7',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#9b59b6';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ecf0f1';
+                e.currentTarget.style.color = '#2c3e50';
+              }}
+            >
+              📊 ANAF Monitoring
+            </Link>
           </div>
         </div>
 
@@ -392,6 +422,23 @@ export default function AdminPage() {
               onClick={() => router.push('/admin/rapoarte/facturi')}
             >
               💰 Generează Factură PDF
+            </button>
+
+            {/* ✅ ADĂUGAT: Buton rapid pentru ANAF Monitoring */}
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#9b59b6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => router.push('/admin/anaf/monitoring')}
+            >
+              📊 ANAF Status Monitor
             </button>
           </div>
         </div>
@@ -485,6 +532,7 @@ export default function AdminPage() {
               <li>Integrare ANAF</li>
               <li>Dashboard statistici</li>
               <li>Export și tracking</li>
+              <li>📊 ANAF Monitoring</li>
             </ul>
           </div>
           <div>
