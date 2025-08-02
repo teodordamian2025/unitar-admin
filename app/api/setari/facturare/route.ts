@@ -110,8 +110,42 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('POST request body:', body);
 
+    // ✅ HELPER pentru procesarea datelor BigQuery
+    const processValue = (value: any) => {
+      if (value && typeof value === 'object' && value.value) {
+        return value.value; // Extrage din formatul BigQuery {value: "..."}
+      }
+      return value;
+    };
+
+    // ✅ Procesează toate valorile care ar putea veni în format BigQuery
+    const cleanBody = {
+      serie_facturi: processValue(body.serie_facturi),
+      serie_proforme: processValue(body.serie_proforme),
+      serie_chitante: processValue(body.serie_chitante),
+      serie_contracte: processValue(body.serie_contracte),
+      numar_curent_facturi: processValue(body.numar_curent_facturi),
+      numar_curent_proforme: processValue(body.numar_curent_proforme),
+      numar_curent_chitante: processValue(body.numar_curent_chitante),
+      numar_curent_contracte: processValue(body.numar_curent_contracte),
+      format_numerotare: processValue(body.format_numerotare),
+      separator_numerotare: processValue(body.separator_numerotare),
+      include_an_numerotare: processValue(body.include_an_numerotare),
+      include_luna_numerotare: processValue(body.include_luna_numerotare),
+      efactura_enabled: processValue(body.efactura_enabled),
+      efactura_timp_intarziere: processValue(body.efactura_timp_intarziere),
+      efactura_mock_mode: processValue(body.efactura_mock_mode),
+      efactura_auto_send: processValue(body.efactura_auto_send),
+      cota_tva_standard: processValue(body.cota_tva_standard),
+      cota_tva_redusa: processValue(body.cota_tva_redusa),
+      valabilitate_proforme: processValue(body.valabilitate_proforme),
+      termen_plata_standard: processValue(body.termen_plata_standard)
+    };
+
+    console.log('Processed clean body:', cleanBody);
+
     // Validări de bază
-    if (!body.serie_facturi || !body.serie_proforme) {
+    if (!cleanBody.serie_facturi || !cleanBody.serie_proforme) {
       return NextResponse.json({ 
         success: false,
         error: 'Seriile de facturi și proforme sunt obligatorii' 
@@ -163,26 +197,26 @@ export async function POST(request: NextRequest) {
 
       const params = {
         id: setariId,
-        serie_facturi: body.serie_facturi,
-        serie_proforme: body.serie_proforme,
-        serie_chitante: body.serie_chitante,
-        serie_contracte: body.serie_contracte,
-        numar_curent_facturi: body.numar_curent_facturi,
-        numar_curent_proforme: body.numar_curent_proforme,
-        numar_curent_chitante: body.numar_curent_chitante,
-        numar_curent_contracte: body.numar_curent_contracte,
-        format_numerotare: body.format_numerotare,
-        separator_numerotare: body.separator_numerotare,
-        include_an_numerotare: body.include_an_numerotare,
-        include_luna_numerotare: body.include_luna_numerotare,
-        efactura_enabled: body.efactura_enabled,
-        efactura_timp_intarziere: body.efactura_timp_intarziere,
-        efactura_mock_mode: body.efactura_mock_mode,
-        efactura_auto_send: body.efactura_auto_send,
-        cota_tva_standard: body.cota_tva_standard,
-        cota_tva_redusa: body.cota_tva_redusa,
-        valabilitate_proforme: body.valabilitate_proforme,
-        termen_plata_standard: body.termen_plata_standard,
+        serie_facturi: cleanBody.serie_facturi,
+        serie_proforme: cleanBody.serie_proforme,
+        serie_chitante: cleanBody.serie_chitante,
+        serie_contracte: cleanBody.serie_contracte,
+        numar_curent_facturi: cleanBody.numar_curent_facturi,
+        numar_curent_proforme: cleanBody.numar_curent_proforme,
+        numar_curent_chitante: cleanBody.numar_curent_chitante,
+        numar_curent_contracte: cleanBody.numar_curent_contracte,
+        format_numerotare: cleanBody.format_numerotare,
+        separator_numerotare: cleanBody.separator_numerotare,
+        include_an_numerotare: cleanBody.include_an_numerotare,
+        include_luna_numerotare: cleanBody.include_luna_numerotare,
+        efactura_enabled: cleanBody.efactura_enabled,
+        efactura_timp_intarziere: cleanBody.efactura_timp_intarziere,
+        efactura_mock_mode: cleanBody.efactura_mock_mode,
+        efactura_auto_send: cleanBody.efactura_auto_send,
+        cota_tva_standard: cleanBody.cota_tva_standard,
+        cota_tva_redusa: cleanBody.cota_tva_redusa,
+        valabilitate_proforme: cleanBody.valabilitate_proforme,
+        termen_plata_standard: cleanBody.termen_plata_standard,
         data_actualizare: currentTime
       };
 
@@ -241,26 +275,26 @@ export async function POST(request: NextRequest) {
 
       const params = {
         id: setariId,
-        serie_facturi: body.serie_facturi,
-        serie_proforme: body.serie_proforme,
-        serie_chitante: body.serie_chitante,
-        serie_contracte: body.serie_contracte,
-        numar_curent_facturi: body.numar_curent_facturi,
-        numar_curent_proforme: body.numar_curent_proforme,
-        numar_curent_chitante: body.numar_curent_chitante,
-        numar_curent_contracte: body.numar_curent_contracte,
-        format_numerotare: body.format_numerotare,
-        separator_numerotare: body.separator_numerotare,
-        include_an_numerotare: body.include_an_numerotare,
-        include_luna_numerotare: body.include_luna_numerotare,
-        efactura_enabled: body.efactura_enabled,
-        efactura_timp_intarziere: body.efactura_timp_intarziere,
-        efactura_mock_mode: body.efactura_mock_mode,
-        efactura_auto_send: body.efactura_auto_send,
-        cota_tva_standard: body.cota_tva_standard,
-        cota_tva_redusa: body.cota_tva_redusa,
-        valabilitate_proforme: body.valabilitate_proforme,
-        termen_plata_standard: body.termen_plata_standard,
+        serie_facturi: cleanBody.serie_facturi,
+        serie_proforme: cleanBody.serie_proforme,
+        serie_chitante: cleanBody.serie_chitante,
+        serie_contracte: cleanBody.serie_contracte,
+        numar_curent_facturi: cleanBody.numar_curent_facturi,
+        numar_curent_proforme: cleanBody.numar_curent_proforme,
+        numar_curent_chitante: cleanBody.numar_curent_chitante,
+        numar_curent_contracte: cleanBody.numar_curent_contracte,
+        format_numerotare: cleanBody.format_numerotare,
+        separator_numerotare: cleanBody.separator_numerotare,
+        include_an_numerotare: cleanBody.include_an_numerotare,
+        include_luna_numerotare: cleanBody.include_luna_numerotare,
+        efactura_enabled: cleanBody.efactura_enabled,
+        efactura_timp_intarziere: cleanBody.efactura_timp_intarziere,
+        efactura_mock_mode: cleanBody.efactura_mock_mode,
+        efactura_auto_send: cleanBody.efactura_auto_send,
+        cota_tva_standard: cleanBody.cota_tva_standard,
+        cota_tva_redusa: cleanBody.cota_tva_redusa,
+        valabilitate_proforme: cleanBody.valabilitate_proforme,
+        termen_plata_standard: cleanBody.termen_plata_standard,
         data_creare: currentTime,
         data_actualizare: currentTime
       };
