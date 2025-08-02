@@ -166,6 +166,10 @@ export async function POST(request: NextRequest) {
     const currentTime = new Date().toISOString();
     const setariId = existingRows.length > 0 ? existingRows[0].id : 'setari_facturare_main';
 
+    console.log('Current time for BigQuery:', currentTime);
+    console.log('Existing rows found:', existingRows.length);
+    console.log('Using setari ID:', setariId);
+
     if (existingRows.length > 0) {
       // UPDATE - actualizează setările existente
       const updateQuery = `
@@ -191,7 +195,7 @@ export async function POST(request: NextRequest) {
           cota_tva_redusa = @cota_tva_redusa,
           valabilitate_proforme = @valabilitate_proforme,
           termen_plata_standard = @termen_plata_standard,
-          data_actualizare = @data_actualizare
+          data_actualizare = CURRENT_TIMESTAMP()
         WHERE id = @id
       `;
 
@@ -216,8 +220,8 @@ export async function POST(request: NextRequest) {
         cota_tva_standard: cleanBody.cota_tva_standard,
         cota_tva_redusa: cleanBody.cota_tva_redusa,
         valabilitate_proforme: cleanBody.valabilitate_proforme,
-        termen_plata_standard: cleanBody.termen_plata_standard,
-        data_actualizare: currentTime
+        termen_plata_standard: cleanBody.termen_plata_standard
+        // ✅ Eliminat data_actualizare din params - folosim CURRENT_TIMESTAMP() în query
       };
 
       const types = {
@@ -241,8 +245,8 @@ export async function POST(request: NextRequest) {
         cota_tva_standard: 'INT64',
         cota_tva_redusa: 'INT64',
         valabilitate_proforme: 'INT64',
-        termen_plata_standard: 'INT64',
-        data_actualizare: 'TIMESTAMP'
+        termen_plata_standard: 'INT64'
+        // ✅ Eliminat data_actualizare din types
       };
 
       await bigquery.query({
@@ -251,6 +255,8 @@ export async function POST(request: NextRequest) {
         types: types,
         location: 'EU',
       });
+
+      console.log('✅ BigQuery UPDATE executed successfully');
 
       console.log('✅ Setări actualizate cu succes');
 
