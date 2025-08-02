@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/page.tsx
-// DESCRIERE: Dashboard admin cu buton ANAF Monitoring adăugat în secțiunea Management Facturi
+// MODIFICAT: Adăugat butonul pentru Zona de Setări în dashboard
 // ==================================================================
 
 'use client';
@@ -337,7 +337,6 @@ export default function AdminPage() {
               💰 Management Facturi
             </Link>
 
-            {/* ✅ ADĂUGAT: Buton pentru ANAF Monitoring */}
             <Link 
               href="/admin/anaf/monitoring" 
               style={{ 
@@ -424,7 +423,6 @@ export default function AdminPage() {
               💰 Generează Factură PDF
             </button>
 
-            {/* ✅ ADĂUGAT: Buton rapid pentru ANAF Monitoring */}
             <button 
               style={{ 
                 padding: '0.75rem 1rem',
@@ -443,7 +441,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* AI & Analytics Card */}
+        {/* ✅ ADĂUGAT: Card pentru Setări și Configurare */}
         <div style={{ 
           background: 'white', 
           border: '1px solid #dee2e6', 
@@ -452,13 +450,13 @@ export default function AdminPage() {
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
         }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-            🤖 AI & ANALIZĂ
+            ⚙️ SETĂRI ȘI CONFIGURARE
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <button 
               style={{ 
                 padding: '0.75rem 1rem',
-                background: '#9b59b6',
+                background: '#e67e22',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
@@ -466,20 +464,15 @@ export default function AdminPage() {
                 fontSize: '14px',
                 fontWeight: 'bold'
               }}
-              onClick={() => {
-                const chatSection = document.querySelector('#chatbot-section');
-                if (chatSection) {
-                  chatSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
+              onClick={() => router.push('/admin/setari')}
             >
-              💬 Deschide AI Chat
+              ⚙️ Zona de Setări
             </button>
             
             <button 
               style={{ 
                 padding: '0.75rem 1rem',
-                background: '#34495e',
+                background: '#8e44ad',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
@@ -487,9 +480,41 @@ export default function AdminPage() {
                 fontSize: '14px',
                 fontWeight: 'bold'
               }}
-              onClick={() => toast.info('Analytics în dezvoltare!')}
+              onClick={() => router.push('/admin/setari/facturare')}
             >
-              📈 Dashboard Analytics
+              📄 Setări Facturare
+            </button>
+            
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#16a085',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => router.push('/admin/setari/firma')}
+            >
+              🏢 Date Firmă
+            </button>
+
+            <button 
+              style={{ 
+                padding: '0.75rem 1rem',
+                background: '#c0392b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+              onClick={() => toast.info('Funcție în dezvoltare!')}
+            >
+              🔧 Configurări Avansate
             </button>
           </div>
         </div>
@@ -536,11 +561,12 @@ export default function AdminPage() {
             </ul>
           </div>
           <div>
-            <strong>🤖 AI Integration:</strong>
+            <strong>⚙️ Configurare Sistem:</strong>
             <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-              <li>Chatbot pentru întrebări</li>
-              <li>Procesare documente</li>
-              <li>Generare conținut</li>
+              <li>📄 Setări Facturare</li>
+              <li>🏢 Date Firmă</li>
+              <li>🔢 Numerotare Documente</li>
+              <li>🤖 AI Integration</li>
             </ul>
           </div>
         </div>
