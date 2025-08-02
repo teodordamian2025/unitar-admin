@@ -208,48 +208,6 @@ export async function POST(request: NextRequest) {
         cota_tva_redusa: 'INT64',
         valabilitate_proforme: 'INT64',
         termen_plata_standard: 'INT64',
-        data_creare: 'TIMESTAMP',
-        data_actualizare: 'TIMESTAMP'
-      };
-
-      await bigquery.query({
-        query: insertQuery,
-        params: params,
-        types: types,
-        location: 'EU',
-      });
-
-      console.log('✅ Setări create cu succes (prima configurare)');
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: existingRows.length > 0 ? 'Setări actualizate cu succes' : 'Setări create cu succes'
-    });
-
-  } catch (error) {
-    console.error('Eroare la salvarea setărilor de facturare:', error);
-    return NextResponse.json({ 
-      success: false,
-      error: 'Eroare la salvarea setărilor de facturare',
-      details: error instanceof Error ? error.message : 'Eroare necunoscută'
-    }, { status: 500 });
-  }
-}curent_proforme: 'INT64',
-        numar_curent_chitante: 'INT64',
-        numar_curent_contracte: 'INT64',
-        format_numerotare: 'STRING',
-        separator_numerotare: 'STRING',
-        include_an_numerotare: 'BOOL',
-        include_luna_numerotare: 'BOOL',
-        efactura_enabled: 'BOOL',
-        efactura_timp_intarziere: 'INT64',
-        efactura_mock_mode: 'BOOL',
-        efactura_auto_send: 'BOOL',
-        cota_tva_standard: 'INT64',
-        cota_tva_redusa: 'INT64',
-        valabilitate_proforme: 'INT64',
-        termen_plata_standard: 'INT64',
         data_actualizare: 'TIMESTAMP'
       };
 
@@ -314,4 +272,46 @@ export async function POST(request: NextRequest) {
         serie_chitante: 'STRING',
         serie_contracte: 'STRING',
         numar_curent_facturi: 'INT64',
-        numar_
+        numar_curent_proforme: 'INT64',
+        numar_curent_chitante: 'INT64',
+        numar_curent_contracte: 'INT64',
+        format_numerotare: 'STRING',
+        separator_numerotare: 'STRING',
+        include_an_numerotare: 'BOOL',
+        include_luna_numerotare: 'BOOL',
+        efactura_enabled: 'BOOL',
+        efactura_timp_intarziere: 'INT64',
+        efactura_mock_mode: 'BOOL',
+        efactura_auto_send: 'BOOL',
+        cota_tva_standard: 'INT64',
+        cota_tva_redusa: 'INT64',
+        valabilitate_proforme: 'INT64',
+        termen_plata_standard: 'INT64',
+        data_creare: 'TIMESTAMP',
+        data_actualizare: 'TIMESTAMP'
+      };
+
+      await bigquery.query({
+        query: insertQuery,
+        params: params,
+        types: types,
+        location: 'EU',
+      });
+
+      console.log('✅ Setări create cu succes (prima configurare)');
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: existingRows.length > 0 ? 'Setări actualizate cu succes' : 'Setări create cu succes'
+    });
+
+  } catch (error) {
+    console.error('Eroare la salvarea setărilor de facturare:', error);
+    return NextResponse.json({ 
+      success: false,
+      error: 'Eroare la salvarea setărilor de facturare',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+    }, { status: 500 });
+  }
+}
