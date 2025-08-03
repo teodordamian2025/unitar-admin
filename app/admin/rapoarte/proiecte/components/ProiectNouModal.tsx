@@ -1442,3 +1442,4 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       )}
     </div>
   );
+}
