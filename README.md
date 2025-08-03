@@ -587,6 +587,9 @@ app/api/anaf/notifications/route.ts // DESCRIERE: Email Notifications System pen
 app/api/anaf/monitoring/route.ts // DESCRIERE: API Backend pentru ANAF Monitoring Dashboard
 app/admin/anaf/monitoring/page.tsx // DESCRIERE: Dashboard complet pentru ANAF Monitoring cu real-time updates
 Dashbord erori: https://admin.unitarproiect.eu/admin/anaf/monitoring
+app/admin/page.tsx // DESCRIERE: Dashboard admin cu buton ANAF Monitoring adăugat în secțiunea Management Facturi
+app/admin/rapoarte/facturi/page.tsx // DESCRIERE: Pagină dedicată pentru gestionarea facturilor cu buton ANAF Monitoring
+// ==================================================================
 
 ✅ Funcționalități:
 
@@ -595,4 +598,55 @@ Encryption: Token-urile sunt criptate în BigQuery cu AES-256
 Management: Dezactivare automată tokens vechi
 Error handling: Logging complet și redirecturi corecte
 
+Implementare setari cu datele pentru facturare, setari firma, setari conturi banca, adaugare cheltuieli la Proiecte, adaugare curs valutar la facturare si curs BNR, adaugare statusuri pentru proiecte-predat/nepredat, pentru contracte Semnat/Nesemnat/Nu e cazul, pentru facturi Facturat/Nefacturat, pentru Achitari
+📋 PLAN DE IMPLEMENTARE
+ETAPA 1: ZONA DE SETĂRI 🔧
+Prioritate: ÎNALTĂ - fundația pentru toate celelalte funcții
+Pagini noi necesare:
 
+app/admin/setari/page.tsx - Dashboard setări= implementat
+app/admin/setari/facturare/page.tsx - Setări facturare=implementat
+app/admin/setari/firma/page.tsx - Date firmă
+app/admin/setari/banca/page.tsx - Conturi bancare= in lucru (cod neterminat)
+
+API-uri noi necesare:
+
+app/api/setari/facturare/route.ts - CRUD setări numerotare = implementat
+app/api/setari/firma/route.ts - CRUD date firmă =implementat
+app/api/setari/banca/route.ts - CRUD conturi bancare= in lucru (cod neterminat)
+
+Tabele BigQuery noi:
+sql- SetariFacturare (serii, numerotare, timp_intarziere_efactura) = implementat
+- SetariFirma (nume, adresa, cui, nr_reg_com, email, telefon) = implementat
+- SetariBanca (nume_banca, iban, cont_principal, observatii) = implementat
+ETAPA 2: ÎMBUNĂTĂȚIRI PROIECTE 💼
+Prioritate: ÎNALTĂ - extinde funcționalitatea de bază
+Modificări la tabele existente:
+sql- Proiecte: +moneda, +status_predare, +status_contract, +status_facturare, +status_achitare
+- Subproiecte: +moneda, +status_predare, +status_contract, +status_facturare, +status_achitare
+Tabel nou:
+sql- ProiecteCheltuieli (id, proiect_id, tip_cheltuiala, furnizor, descriere, valoare, moneda, status_*)
+app/api/rapoarte/cheltuieli/route.ts // DESCRIERE: API pentru managementul cheltuielilor proiectelor (subcontractanți, materiale, etc.)
+Componente de modificat:
+
+ProiectNouModal.tsx - adaugă câmpuri noi = implementat
+ProiecteTable.tsx - afișare status-uri multiple = nu este implementat
+ProiectActions.tsx - acțiuni pentru cheltuieli = nu este implementat
+
+ETAPA 3: SISTEM MULTI-VALUTĂ 💱
+Prioritate: MEDIE - necesită API BNR
+API-uri noi:
+
+app/api/bnr/curs-valutar/route.ts - Integrare BNR = implementat
+Modificare generate-hibrid/route.ts - calcule multi-valută
+
+ETAPA 4: EDITARE/STORNARE FACTURI ✏️
+Prioritate: ÎNALTĂ - funcționalitate critică
+Componente noi:
+
+EditareFacturaModal.tsx - modal editare identic cu generarea = nu este implementat
+Modificare FacturiList.tsx - buton editare = nu este implementat
+
+API-uri modificate:
+
+app/api/actions/invoices/ - endpoints pentru editare/stornare = nu este implementat

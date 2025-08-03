@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// MODIFICAT: Adăugat câmp Adresa pentru proiecte
+// MODIFICAT: Adăugat suport pentru monede, status-uri multiple și chestuieli
 // ==================================================================
 
 'use client';
@@ -22,6 +22,20 @@ interface Client {
   email?: string;
 }
 
+interface CheltuialaProiect {
+  id: string;
+  tip_cheltuiala: string;
+  furnizor_nume: string;
+  furnizor_cui: string;
+  descriere: string;
+  valoare: string;
+  moneda: string;
+  status_predare: string;
+  status_contract: string;
+  status_facturare: string;
+  status_achitare: string;
+}
+
 export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: ProiectNouModalProps) {
   const [loading, setLoading] = useState(false);
   const [clienti, setClienti] = useState<Client[]>([]);
@@ -29,27 +43,49 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   const [clientSearch, setClientSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   
+  // ✅ State pentru conversii valutare
+  const [cursValutar, setCursValutar] = useState<number | null>(null);
+  const [loadingCurs, setLoadingCurs] = useState(false);
+  
   const [formData, setFormData] = useState({
     ID_Proiect: '',
     Denumire: '',
     Client: '',
     selectedClientId: '',
-    Adresa: '', // ✅ NOUĂ: Câmp Adresa
+    Adresa: '',
     Descriere: '',
     Data_Start: '',
     Data_Final: '',
     Status: 'Activ',
+    
+    // ✅ NOUĂ: Valoare și monedă
     Valoare_Estimata: '',
+    moneda: 'RON',
+    curs_valutar: '',
+    data_curs_valutar: '',
+    valoare_ron: '',
+    
+    // ✅ NOUĂ: Status-uri multiple
+    status_predare: 'Nepredat',
+    status_contract: 'Nu e cazul',
+    status_facturare: 'Nefacturat', 
+    status_achitare: 'Neachitat',
+    
     Responsabil: '',
     Observatii: '',
-    // Pentru subproiecte
+    
+    // Pentru subproiecte (păstrat din versiunea originală)
     subproiecte: [] as Array<{
       id: string;
       denumire: string;
       responsabil: string;
       valoare: string;
+      moneda: string;
       status: string;
-    }>
+    }>,
+    
+    // ✅ NOUĂ: Pentru cheltuieli proiect
+    cheltuieli: [] as CheltuialaProiect[]
   });
 
   useEffect(() => {
@@ -58,10 +94,25 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       // Generează ID proiect automat
       setFormData(prev => ({
         ...prev,
-        ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`
+        ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
+        data_curs_valutar: new Date().toISOString().split('T')[0]
       }));
     }
   }, [isOpen]);
+
+  // ✅ NOUĂ: Effect pentru calcularea cursului valutar
+  useEffect(() => {
+    if (formData.moneda !== 'RON' && formData.Valoare_Estimata) {
+      loadCursValutar();
+    } else if (formData.moneda === 'RON') {
+      setFormData(prev => ({
+        ...prev,
+        valoare_ron: prev.Valoare_Estimata,
+        curs_valutar: '1',
+      }));
+      setCursValutar(1);
+    }
+  }, [formData.moneda, formData.Valoare_Estimata, formData.data_curs_valutar]);
 
   const loadClienti = async () => {
     try {
@@ -72,6 +123,40 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       }
     } catch (error) {
       console.error('Eroare la încărcarea clienților:', error);
+    }
+  };
+
+  // ✅ NOUĂ: Funcție pentru încărcarea cursului valutar
+  const loadCursValutar = async () => {
+    if (formData.moneda === 'RON') return;
+    
+    setLoadingCurs(true);
+    try {
+      const response = await fetch(`/api/curs-valutar?moneda=${formData.moneda}&data=${formData.data_curs_valutar}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCursValutar(data.curs);
+        
+        const valoareRON = parseFloat(formData.Valoare_Estimata) * data.curs;
+        
+        setFormData(prev => ({
+          ...prev,
+          curs_valutar: data.curs.toString(),
+          valoare_ron: valoareRON.toFixed(2)
+        }));
+        
+        if (data.source === 'fallback') {
+          toast.warning(data.warning || 'Folosind curs aproximativ');
+        }
+      } else {
+        toast.error('Nu s-a putut obține cursul valutar');
+      }
+    } catch (error) {
+      console.error('Eroare la obținerea cursului:', error);
+      toast.error('Eroare la obținerea cursului valutar');
+    } finally {
+      setLoadingCurs(false);
     }
   };
 
@@ -99,20 +184,33 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         return;
       }
 
-      console.log('Trimitere date proiect:', formData); // Debug
+      console.log('Trimitere date proiect extins:', formData); // Debug
       toast.info('Se adaugă proiectul...');
 
-      // ✅ ACTUALIZAT: Adaugă proiectul principal cu câmpul Adresa
+      // ✅ ACTUALIZAT: Adaugă proiectul principal cu toate câmpurile noi
       const proiectData = {
         ID_Proiect: formData.ID_Proiect.trim(),
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
-        Adresa: formData.Adresa.trim(), // ✅ NOUĂ: Include Adresa
+        Adresa: formData.Adresa.trim(),
         Descriere: formData.Descriere.trim(),
         Data_Start: formData.Data_Start || null,
         Data_Final: formData.Data_Final || null,
         Status: formData.Status,
         Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
+        
+        // ✅ NOUĂ: Monedă și conversii
+        moneda: formData.moneda,
+        curs_valutar: formData.curs_valutar ? parseFloat(formData.curs_valutar) : null,
+        data_curs_valutar: formData.data_curs_valutar || null,
+        valoare_ron: formData.valoare_ron ? parseFloat(formData.valoare_ron) : null,
+        
+        // ✅ NOUĂ: Status-uri multiple
+        status_predare: formData.status_predare,
+        status_contract: formData.status_contract,
+        status_facturare: formData.status_facturare,
+        status_achitare: formData.status_achitare,
+        
         Responsabil: formData.Responsabil.trim(),
         Observatii: formData.Observatii.trim()
       };
@@ -131,6 +229,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         // Adaugă subproiectele dacă există
         if (formData.subproiecte.length > 0) {
           await addSubproiecte(formData.ID_Proiect);
+        }
+        
+        // ✅ NOUĂ: Adaugă cheltuielile dacă există
+        if (formData.cheltuieli.length > 0) {
+          await addCheltuieli(formData.ID_Proiect);
         }
 
         toast.success('Proiect adăugat cu succes!');
@@ -158,7 +261,14 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           Denumire: subproiect.denumire,
           Responsabil: subproiect.responsabil,
           Status: subproiect.status,
-          Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null
+          Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+          
+          // ✅ NOUĂ: Aceleași câmpuri ca la proiectul principal
+          moneda: subproiect.moneda || 'RON',
+          status_predare: 'Nepredat',
+          status_contract: 'Nu e cazul',
+          status_facturare: 'Nefacturat',
+          status_achitare: 'Neachitat'
         };
 
         await fetch('/api/rapoarte/subproiecte', {
@@ -172,23 +282,63 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
+  // ✅ NOUĂ: Funcție pentru adăugarea cheltuielilor
+  const addCheltuieli = async (proiectId: string) => {
+    for (const cheltuiala of formData.cheltuieli) {
+      try {
+        const cheltuialaData = {
+          id: `${proiectId}_CHE_${cheltuiala.id}`,
+          proiect_id: proiectId,
+          tip_cheltuiala: cheltuiala.tip_cheltuiala,
+          furnizor_nume: cheltuiala.furnizor_nume,
+          furnizor_cui: cheltuiala.furnizor_cui,
+          descriere: cheltuiala.descriere,
+          valoare: parseFloat(cheltuiala.valoare),
+          moneda: cheltuiala.moneda,
+          status_predare: cheltuiala.status_predare,
+          status_contract: cheltuiala.status_contract,
+          status_facturare: cheltuiala.status_facturare,
+          status_achitare: cheltuiala.status_achitare
+        };
+
+        await fetch('/api/rapoarte/cheltuieli', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cheltuialaData)
+        });
+      } catch (error) {
+        console.error(`Eroare la adăugarea cheltuielii ${cheltuiala.descriere}:`, error);
+      }
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       ID_Proiect: '',
       Denumire: '',
       Client: '',
       selectedClientId: '',
-      Adresa: '', // ✅ NOUĂ: Reset Adresa
+      Adresa: '',
       Descriere: '',
       Data_Start: '',
       Data_Final: '',
       Status: 'Activ',
       Valoare_Estimata: '',
+      moneda: 'RON',
+      curs_valutar: '',
+      data_curs_valutar: '',
+      valoare_ron: '',
+      status_predare: 'Nepredat',
+      status_contract: 'Nu e cazul',
+      status_facturare: 'Nefacturat',
+      status_achitare: 'Neachitat',
       Responsabil: '',
       Observatii: '',
-      subproiecte: []
+      subproiecte: [],
+      cheltuieli: []
     });
     setClientSearch('');
+    setCursValutar(null);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -224,11 +374,49 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       denumire: '',
       responsabil: '',
       valoare: '',
+      moneda: 'RON',
       status: 'Planificat'
     };
     setFormData(prev => ({
       ...prev,
       subproiecte: [...prev.subproiecte, newSubproiect]
+    }));
+  };
+
+  // ✅ NOUĂ: Funcții pentru management cheltuieli
+  const addCheltuiala = () => {
+    const newCheltuiala: CheltuialaProiect = {
+      id: Date.now().toString(),
+      tip_cheltuiala: 'subcontractant',
+      furnizor_nume: '',
+      furnizor_cui: '',
+      descriere: '',
+      valoare: '',
+      moneda: 'RON',
+      status_predare: 'Nepredat',
+      status_contract: 'Nu e cazul',
+      status_facturare: 'Nefacturat',
+      status_achitare: 'Neachitat'
+    };
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: [...prev.cheltuieli, newCheltuiala]
+    }));
+  };
+
+  const removeCheltuiala = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: prev.cheltuieli.filter(ch => ch.id !== id)
+    }));
+  };
+
+  const updateCheltuiala = (id: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: prev.cheltuieli.map(ch =>
+        ch.id === id ? { ...ch, [field]: value } : ch
+      )
     }));
   };
 
@@ -268,7 +456,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         background: 'white',
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        maxWidth: '900px',
+        maxWidth: '1100px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -282,7 +470,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              📋 Adaugă Proiect Nou
+              📋 Adaugă Proiect Nou (Extins)
             </h2>
             <button
               onClick={onClose}
@@ -299,12 +487,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             </button>
           </div>
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            Completează informațiile pentru noul proiect și subproiectele asociate
+            Completează informațiile pentru noul proiect cu suport multi-valută și status-uri avansate
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {/* Grid pentru informații de bază */}
+          {/* Informații de bază */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
@@ -334,10 +522,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               />
             </div>
 
-            {/* Status */}
+            {/* Status General */}
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Status
+                Status General
               </label>
               <select
                 value={formData.Status}
@@ -354,6 +542,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 <option value="Activ">🟢 Activ</option>
                 <option value="Planificat">📅 Planificat</option>
                 <option value="Suspendat">⏸️ Suspendat</option>
+                <option value="Finalizat">✅ Finalizat</option>
               </select>
             </div>
           </div>
@@ -467,7 +656,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             </div>
           </div>
 
-          {/* ✅ NOUĂ: Câmp Adresa */}
+          {/* Adresa */}
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
               Adresa Proiect
@@ -477,7 +666,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               value={formData.Adresa}
               onChange={(e) => handleInputChange('Adresa', e.target.value)}
               disabled={loading}
-              placeholder="Adresa unde se desfășoară proiectul (ex: Str. Exemplu Nr. 1, Bucuresti)"
+              placeholder="Adresa unde se desfășoară proiectul"
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -488,7 +677,213 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             />
           </div>
 
-          {/* Grid pentru date și valori */}
+          {/* ✅ NOUĂ SECȚIUNE: Valoare și Monedă */}
+          <div style={{ 
+            background: '#f8f9fa',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #dee2e6'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>💰 Valoare Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Valoare Estimată *
+                </label>
+                <input
+                  type="number"
+                  value={formData.Valoare_Estimata}
+                  onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
+                  disabled={loading}
+                  placeholder="15000"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Monedă
+                </label>
+                <select
+                  value={formData.moneda}
+                  onChange={(e) => handleInputChange('moneda', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="RON">🇷🇴 RON (Lei români)</option>
+                  <option value="EUR">🇪🇺 EUR (Euro)</option>
+                  <option value="USD">🇺🇸 USD (Dolari SUA)</option>
+                  <option value="GBP">🇬🇧 GBP (Lire sterline)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Curs
+                </label>
+                <input
+                  type="date"
+                  value={formData.data_curs_valutar}
+                  onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
+                  disabled={loading || formData.moneda === 'RON'}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Echivalent RON
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  background: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: loadingCurs ? '#6c757d' : '#27ae60'
+                }}>
+                  {loadingCurs ? '⏳ Se calculează...' : 
+                   formData.valoare_ron ? `${parseFloat(formData.valoare_ron).toLocaleString('ro-RO')} RON` : 
+                   '0.00 RON'}
+                </div>
+                {cursValutar && formData.moneda !== 'RON' && (
+                  <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                    Curs: 1 {formData.moneda} = {cursValutar.toFixed(4)} RON
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ NOUĂ SECȚIUNE: Status-uri Multiple */}
+          <div style={{ 
+            background: '#e8f5e8',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #c3e6cb'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>📊 Status-uri Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Predare
+                </label>
+                <select
+                  value={formData.status_predare}
+                  onChange={(e) => handleInputChange('status_predare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nepredat">❌ Nepredat</option>
+                  <option value="Predat">✅ Predat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Contract
+                </label>
+                <select
+                  value={formData.status_contract}
+                  onChange={(e) => handleInputChange('status_contract', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nu e cazul">➖ Nu e cazul</option>
+                  <option value="Nesemnat">📝 Nesemnat</option>
+                  <option value="Semnat">✅ Semnat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Facturare
+                </label>
+                <select
+                  value={formData.status_facturare}
+                  onChange={(e) => handleInputChange('status_facturare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nefacturat">❌ Nefacturat</option>
+                  <option value="Facturat">✅ Facturat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Achitare
+                </label>
+                <select
+                  value={formData.status_achitare}
+                  onChange={(e) => handleInputChange('status_achitare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Neachitat">❌ Neachitat</option>
+                  <option value="Achitat 1/3">🟡 Achitat 1/3</option>
+                  <option value="Achitat 1/1">✅ Achitat 1/1</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Date și responsabil */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -535,14 +930,14 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
 
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Valoare Estimată (RON)
+                Responsabil
               </label>
               <input
-                type="number"
-                value={formData.Valoare_Estimata}
-                onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
+                type="text"
+                value={formData.Responsabil}
+                onChange={(e) => handleInputChange('Responsabil', e.target.value)}
                 disabled={loading}
-                placeholder="15000"
+                placeholder="Numele responsabilului"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -552,27 +947,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 }}
               />
             </div>
-          </div>
-
-          {/* Responsabil */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Responsabil
-            </label>
-            <input
-              type="text"
-              value={formData.Responsabil}
-              onChange={(e) => handleInputChange('Responsabil', e.target.value)}
-              disabled={loading}
-              placeholder="Numele responsabilului de proiect"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
           </div>
 
           {/* Descriere */}
@@ -597,7 +971,245 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             />
           </div>
 
-          {/* Subproiecte */}
+          {/* ✅ NOUĂ SECȚIUNE: Cheltuieli Proiect */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#2c3e50' }}>💰 Cheltuieli Proiect</h4>
+              <button
+                type="button"
+                onClick={addCheltuiala}
+                disabled={loading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#e67e22',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Adaugă Cheltuială
+              </button>
+            </div>
+
+            {formData.cheltuieli.map((cheltuiala, index) => (
+              <div
+                key={cheltuiala.id}
+                style={{
+                  border: '1px solid #f39c12',
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  background: '#fef9e7'
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '0.5rem'
+                }}>
+                  <h5 style={{ margin: 0, color: '#2c3e50' }}>
+                    Cheltuială #{index + 1}
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => removeCheltuiala(cheltuiala.id)}
+                    disabled={loading}
+                    style={{
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <select
+                    value={cheltuiala.tip_cheltuiala}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="subcontractant">👷 Subcontractant</option>
+                    <option value="materiale">🧱 Materiale</option>
+                    <option value="transport">🚚 Transport</option>
+                    <option value="alte">📦 Alte cheltuieli</option>
+                  </select>
+                  
+                  <input
+                    type="text"
+                    value={cheltuiala.furnizor_nume}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'furnizor_nume', e.target.value)}
+                    disabled={loading}
+                    placeholder="Nume furnizor"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  
+                  <input
+                    type="text"
+                    value={cheltuiala.furnizor_cui}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'furnizor_cui', e.target.value)}
+                    disabled={loading}
+                    placeholder="CUI furnizor"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <input
+                    type="text"
+                    value={cheltuiala.descriere}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
+                    disabled={loading}
+                    placeholder="Descriere cheltuială"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      gridColumn: 'span 2'
+                    }}
+                  />
+                  
+                  <input
+                    type="number"
+                    value={cheltuiala.valoare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
+                    disabled={loading}
+                    placeholder="Valoare"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  
+                  <select
+                    value={cheltuiala.moneda}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="RON">RON</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+
+                {/* Status-uri pentru cheltuială */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                  gap: '0.5rem'
+                }}>
+                  <select
+                    value={cheltuiala.status_predare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nepredat">❌ Nepredat</option>
+                    <option value="Predat">✅ Predat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_contract}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nu e cazul">➖ Nu e cazul</option>
+                    <option value="Nesemnat">📝 Nesemnat</option>
+                    <option value="Semnat">✅ Semnat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_facturare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nefacturat">❌ Nefacturat</option>
+                    <option value="Facturat">✅ Facturat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_achitare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Neachitat">❌ Neachitat</option>
+                    <option value="Achitat 1/3">🟡 Achitat 1/3</option>
+                    <option value="Achitat 1/1">✅ Achitat 1/1</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Subproiecte (păstrat din versiunea originală) */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ margin: 0, color: '#2c3e50' }}>📋 Subproiecte</h4>
@@ -696,7 +1308,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     value={subproiect.valoare}
                     onChange={(e) => updateSubproiect(subproiect.id, 'valoare', e.target.value)}
                     disabled={loading}
-                    placeholder="Valoare (RON)"
+                    placeholder="Valoare"
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #dee2e6',
@@ -704,6 +1316,23 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '14px'
                     }}
                   />
+                  
+                  <select
+                    value={subproiect.moneda}
+                    onChange={(e) => updateSubproiect(subproiect.id, 'moneda', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="RON">RON</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                  </select>
                   
                   <select
                     value={subproiect.status}

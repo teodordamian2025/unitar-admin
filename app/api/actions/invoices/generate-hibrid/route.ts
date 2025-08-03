@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// MODIFICAT: Adăugat Mock Mode pentru testare e-factura + păstrează toate funcționalitățile
+// MODIFICAT: Integrare conturi bancare dinamice din BigQuery + păstrează toate funcționalitățile
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,6 +19,81 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+// ✅ NOUĂ FUNCȚIE pentru încărcarea conturilor bancare din BigQuery
+async function loadContariBancare() {
+  try {
+    const query = `
+      SELECT nume_banca, iban, cont_principal, observatii 
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SetariBanca\`
+      ORDER BY cont_principal DESC, nume_banca ASC
+    `;
+
+    const [rows] = await bigquery.query({
+      query: query,
+      location: 'EU',
+    });
+
+    if (rows && rows.length > 0) {
+      console.log(`✅ Încărcat ${rows.length} conturi bancare din BigQuery`);
+      return rows.map((row: any) => ({
+        nume_banca: row.nume_banca,
+        iban: row.iban,
+        cont_principal: row.cont_principal,
+        observatii: row.observatii
+      }));
+    } else {
+      console.log('⚠️ Nu s-au găsit conturi bancare în BigQuery - folosesc fallback');
+      return null;
+    }
+  } catch (error) {
+    console.log('⚠️ Eroare la încărcarea conturilor bancare din BigQuery:', error);
+    console.log('📋 Folosesc conturile hard-codate ca fallback');
+    return null;
+  }
+}
+
+// ✅ FALLBACK conturi bancare hard-codate (ca backup)
+const FALLBACK_CONTURI = [
+  {
+    nume_banca: 'ING Bank',
+    iban: 'RO82INGB0000999905667533',
+    cont_principal: true,
+    observatii: 'Cont principal pentru încasări'
+  },
+  {
+    nume_banca: 'Trezorerie',
+    iban: 'RO29TREZ7035069XXX018857',
+    cont_principal: false,
+    observatii: 'Trezoreria sectorului 3 Bucuresti'
+  }
+];
+
+// ✅ FUNCȚIE pentru generarea HTML-ului conturilor bancare
+function generateBankDetailsHTML(conturi: any[]) {
+  if (!conturi || conturi.length === 0) {
+    conturi = FALLBACK_CONTURI;
+  }
+
+  return conturi.map((cont, index) => {
+    const formatIBAN = (iban: string) => {
+      // Formatează IBAN cu spații la fiecare 4 caractere pentru lizibilitate
+      return iban.replace(/(.{4})/g, '$1 ').trim();
+    };
+
+    const bankTitle = cont.cont_principal ? 
+      `CONT PRINCIPAL - ${cont.nume_banca}` : 
+      cont.nume_banca.toUpperCase();
+
+    return `
+                <div class="bank-section">
+                    <h5>${bankTitle}</h5>
+                    ${cont.nume_banca !== 'Trezorerie' ? `<div class="info-line">Banca: ${cont.nume_banca}</div>` : ''}
+                    <div class="info-line">IBAN: ${formatIBAN(cont.iban)}</div>
+                    ${cont.observatii ? `<div class="info-line">${cont.observatii}</div>` : ''}
+                </div>`;
+  }).join('');
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +123,14 @@ export async function POST(request: NextRequest) {
     if (!liniiFactura || !Array.isArray(liniiFactura) || liniiFactura.length === 0) {
       return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
     }
+
+    // ✅ ÎNCĂRCARE CONTURI BANCARE din BigQuery
+    const contariBancare = await loadContariBancare();
+    const contariFinale = contariBancare || FALLBACK_CONTURI;
+    
+    console.log(`🏦 Folosesc ${contariFinale.length} conturi bancare:`, 
+      contariFinale.map(c => `${c.nume_banca} (${c.cont_principal ? 'Principal' : 'Secundar'})`).join(', ')
+    );
 
     // ✅ CALCULE TOTALE - păstrate identice
     let subtotal = 0;
@@ -100,7 +183,7 @@ export async function POST(request: NextRequest) {
       termenPlata: '30 zile'
     };
 
-    // ✅ TEMPLATE HTML - păstrat identic
+    // ✅ TEMPLATE HTML - cu conturi bancare dinamice
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${proiectId}-${timestamp}.pdf`;
@@ -237,7 +320,7 @@ export async function POST(request: NextRequest) {
             }
             .bank-details {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                 gap: 15px;
                 margin-top: 8px;
             }
@@ -401,16 +484,7 @@ export async function POST(request: NextRequest) {
             <div class="info-line">Metoda de plata: Transfer bancar</div>
             
             <div class="bank-details">
-                <div class="bank-section">
-                    <h5>CONT PRINCIPAL</h5>
-                    <div class="info-line">Banca: ING</div>
-                    <div class="info-line">IBAN: RO82INGB0000999905667533</div>
-                </div>
-                <div class="bank-section">
-                    <h5>CONT TREZORERIE</h5>
-                    <div class="info-line">IBAN: RO29TREZ7035069XXX018857</div>
-                    <div class="info-line">Trezoreria sectorului 3 Bucuresti</div>
-                </div>
+                ${generateBankDetailsHTML(contariFinale)}
             </div>
         </div>
 
@@ -441,7 +515,7 @@ export async function POST(request: NextRequest) {
     </body>
     </html>`;
 
-    // ✅ MANAGEMENT e-FACTURA - Mock Mode sau Producție
+    // ✅ MANAGEMENT e-FACTURA - Mock Mode sau Producție (PĂSTRAT IDENTIC)
     let xmlResult: any = null;
 
     if (sendToAnaf) {
@@ -510,7 +584,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ SALVARE în BigQuery FacturiGenerate - compatibil cu schema existentă
+    // ✅ SALVARE în BigQuery FacturiGenerate - compatibil cu schema existentă (PĂSTRAT IDENTIC)
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
@@ -543,6 +617,7 @@ export async function POST(request: NextRequest) {
             id: proiectId,
             denumire: safeInvoiceData.denumireProiect
           },
+          contariBancare: contariFinale, // ✅ SALVEAZĂ și conturile bancare folosite
           mockMode: MOCK_EFACTURA_MODE && sendToAnaf
         }),
         data_creare: new Date().toISOString(),
@@ -560,7 +635,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Eroare la salvarea în BigQuery FacturiGenerate:', bgError);
     }
 
-    // ✅ RESPONSE complet cu informații Mock/Producție
+    // ✅ RESPONSE complet cu informații Mock/Producție (PĂSTRAT IDENTIC)
     const response = {
       success: true,
       message: sendToAnaf ? 
@@ -574,7 +649,8 @@ export async function POST(request: NextRequest) {
         facturaId: facturaId,
         numarFactura: safeInvoiceData.numarFactura,
         total: total,
-        client: safeClientData.nume
+        client: safeClientData.nume,
+        contariBancare: contariFinale.length // ✅ INFO despre câte conturi au fost folosite
       },
       efactura: sendToAnaf ? {
         enabled: true,
@@ -601,7 +677,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ FUNCȚIE MOCK pentru salvare test e-factura
+// ✅ FUNCȚIE MOCK pentru salvare test e-factura (PĂSTRATĂ IDENTICĂ)
 async function saveMockEfacturaRecord(data: any) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
