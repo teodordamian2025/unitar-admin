@@ -1,27 +1,17 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectEditModal.tsx
-// MODIFICAT: Modal de editare identic cu ProiectNouModal + Buton Șterge
+// DESCRIERE: Modal editare identic cu ProiectNou + opțiunea șterge proiect
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import ClientNouModal from '../../clienti/components/ClientNouModal';
 
 interface ProiectEditModalProps {
+  proiect: any;
   isOpen: boolean;
-  proiect: {
-    ID_Proiect: string;
-    Denumire: string;
-    Client: string;
-    Status: string;
-    Data_Start?: string;
-    Data_Final?: string;
-    Valoare_Estimata?: number;
-    Responsabil?: string;
-    Adresa?: string;
-    Observatii?: string;
-    Descriere?: string;
-  };
   onClose: () => void;
   onProiectUpdated: () => void;
   onProiectDeleted: () => void;
@@ -34,60 +24,22 @@ interface Client {
   email?: string;
 }
 
-// ✅ Toast system cu Z-index compatibil cu modalele
-const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-  const toastEl = document.createElement('div');
-  toastEl.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    padding: 16px 20px;
-    border-radius: 16px;
-    z-index: 60000;
-    font-family: 'Inter', Arial, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    max-width: 400px;
-    word-wrap: break-word;
-    transform: translateY(-10px);
-    opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  `;
-  toastEl.textContent = message;
-  document.body.appendChild(toastEl);
-  
-  setTimeout(() => {
-    toastEl.style.transform = 'translateY(0)';
-    toastEl.style.opacity = '1';
-  }, 10);
-  
-  setTimeout(() => {
-    toastEl.style.transform = 'translateY(-10px)';
-    toastEl.style.opacity = '0';
-    setTimeout(() => {
-      if (document.body.contains(toastEl)) {
-        document.body.removeChild(toastEl);
-      }
-    }, 300);
-  }, type === 'success' || type === 'error' ? 4000 : 6000);
-};
-
 export default function ProiectEditModal({ 
-  isOpen, 
   proiect, 
+  isOpen, 
   onClose, 
   onProiectUpdated, 
   onProiectDeleted 
 }: ProiectEditModalProps) {
   const [loading, setLoading] = useState(false);
   const [clienti, setClienti] = useState<Client[]>([]);
+  const [showClientModal, setShowClientModal] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  
+  // ✅ State pentru conversii valutare
+  const [cursValutar, setCursValutar] = useState<number | null>(null);
+  const [loadingCurs, setLoadingCurs] = useState(false);
   
   const [formData, setFormData] = useState({
     ID_Proiect: '',
@@ -99,44 +51,91 @@ export default function ProiectEditModal({
     Data_Start: '',
     Data_Final: '',
     Status: 'Activ',
+    
+    // ✅ Valoare și monedă
     Valoare_Estimata: '',
+    moneda: 'RON',
+    curs_valutar: '',
+    data_curs_valutar: '',
+    valoare_ron: '',
+    
+    // ✅ Status-uri multiple
+    status_predare: 'Nepredat',
+    status_contract: 'Nu e cazul',
+    status_facturare: 'Nefacturat', 
+    status_achitare: 'Neachitat', // ✅ FIX: Opțiuni corecte
+    
     Responsabil: '',
     Observatii: ''
   });
 
-  // ✅ Helper pentru safe parsing a datelor
-  const safeDateParse = (date?: string | { value: string }): string => {
-    if (!date) return '';
-    if (typeof date === 'string') {
-      return date.includes('T') ? date.split('T')[0] : date;
-    }
-    if (typeof date === 'object' && date.value) {
-      return date.value.includes('T') ? date.value.split('T')[0] : date.value;
-    }
-    return '';
-  };
-
   useEffect(() => {
     if (isOpen && proiect) {
       loadClienti();
-      // Pre-populează formularul cu datele existente
-      setFormData({
-        ID_Proiect: proiect.ID_Proiect || '',
-        Denumire: proiect.Denumire || '',
-        Client: proiect.Client || '',
-        selectedClientId: '',
-        Adresa: proiect.Adresa || '',
-        Descriere: proiect.Descriere || '',
-        Data_Start: safeDateParse(proiect.Data_Start), // ✅ Safe parsing
-        Data_Final: safeDateParse(proiect.Data_Final), // ✅ Safe parsing
-        Status: proiect.Status || 'Activ',
-        Valoare_Estimata: proiect.Valoare_Estimata ? proiect.Valoare_Estimata.toString() : '',
-        Responsabil: proiect.Responsabil || '',
-        Observatii: proiect.Observatii || ''
-      });
-      setClientSearch(proiect.Client || '');
+      loadProiectData();
     }
   }, [isOpen, proiect]);
+
+  // ✅ Effect pentru calcularea cursului valutar
+  useEffect(() => {
+    if (formData.moneda !== 'RON' && formData.Valoare_Estimata) {
+      loadCursValutar();
+    } else if (formData.moneda === 'RON') {
+      setFormData(prev => ({
+        ...prev,
+        valoare_ron: prev.Valoare_Estimata,
+        curs_valutar: '1',
+      }));
+      setCursValutar(1);
+    }
+  }, [formData.moneda, formData.Valoare_Estimata, formData.data_curs_valutar]);
+
+  const loadProiectData = () => {
+    // ✅ Încarcă datele existente ale proiectului în formular
+    setFormData({
+      ID_Proiect: proiect.ID_Proiect || '',
+      Denumire: proiect.Denumire || '',
+      Client: proiect.Client || '',
+      selectedClientId: '',
+      Adresa: proiect.Adresa || '',
+      Descriere: proiect.Descriere || '',
+      Data_Start: proiect.Data_Start ? formatDateForInput(proiect.Data_Start) : '',
+      Data_Final: proiect.Data_Final ? formatDateForInput(proiect.Data_Final) : '',
+      Status: proiect.Status || 'Activ',
+      
+      // ✅ Încarcă valorile existente sau setează default-uri
+      Valoare_Estimata: proiect.Valoare_Estimata?.toString() || '',
+      moneda: proiect.moneda || 'RON',
+      curs_valutar: proiect.curs_valutar?.toString() || '',
+      data_curs_valutar: proiect.data_curs_valutar || new Date().toISOString().split('T')[0],
+      valoare_ron: proiect.valoare_ron?.toString() || '',
+      
+      // ✅ Încarcă status-urile existente
+      status_predare: proiect.status_predare || 'Nepredat',
+      status_contract: proiect.status_contract || 'Nu e cazul',
+      status_facturare: proiect.status_facturare || 'Nefacturat',
+      status_achitare: proiect.status_achitare || 'Neachitat',
+      
+      Responsabil: proiect.Responsabil || '',
+      Observatii: proiect.Observatii || ''
+    });
+    
+    setClientSearch(proiect.Client || '');
+  };
+
+  // ✅ Helper pentru formatarea datei pentru input
+  const formatDateForInput = (dateString: string | { value: string }): string => {
+    try {
+      const dateValue = typeof dateString === 'string' ? dateString : dateString.value;
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return '';
+      
+      // ✅ Format ISO pentru input type="date"
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
 
   const loadClienti = async () => {
     try {
@@ -150,6 +149,40 @@ export default function ProiectEditModal({
     }
   };
 
+  // ✅ Funcție pentru încărcarea cursului valutar
+  const loadCursValutar = async () => {
+    if (formData.moneda === 'RON') return;
+    
+    setLoadingCurs(true);
+    try {
+      const response = await fetch(`/api/curs-valutar?moneda=${formData.moneda}&data=${formData.data_curs_valutar}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCursValutar(data.curs);
+        
+        const valoareRON = parseFloat(formData.Valoare_Estimata) * data.curs;
+        
+        setFormData(prev => ({
+          ...prev,
+          curs_valutar: data.curs.toString(),
+          valoare_ron: valoareRON.toFixed(2)
+        }));
+        
+        if (data.source === 'fallback') {
+          toast.warning(data.warning || 'Folosind curs aproximativ');
+        }
+      } else {
+        toast.error('Nu s-a putut obține cursul valutar');
+      }
+    } catch (error) {
+      console.error('Eroare la obținerea cursului:', error);
+      toast.error('Eroare la obținerea cursului valutar');
+    } finally {
+      setLoadingCurs(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -157,21 +190,23 @@ export default function ProiectEditModal({
     try {
       // Validări
       if (!formData.Denumire.trim()) {
-        showToast('Denumirea proiectului este obligatorie', 'error');
+        toast.error('Denumirea proiectului este obligatorie');
         setLoading(false);
         return;
       }
 
       if (!formData.Client.trim()) {
-        showToast('Clientul este obligatoriu', 'error');
+        toast.error('Clientul este obligatoriu');
         setLoading(false);
         return;
       }
 
-      showToast('Se actualizează proiectul...', 'info');
+      console.log('Actualizare proiect:', formData);
+      toast.info('Se actualizează proiectul...');
 
-      const proiectData = {
-        id: proiect.ID_Proiect,
+      // ✅ Pregătește datele pentru actualizare
+      const updateData = {
+        id: formData.ID_Proiect,
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
         Adresa: formData.Adresa.trim(),
@@ -180,6 +215,19 @@ export default function ProiectEditModal({
         Data_Final: formData.Data_Final || null,
         Status: formData.Status,
         Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
+        
+        // ✅ Monedă și conversii
+        moneda: formData.moneda,
+        curs_valutar: formData.curs_valutar ? parseFloat(formData.curs_valutar) : null,
+        data_curs_valutar: formData.data_curs_valutar || null,
+        valoare_ron: formData.valoare_ron ? parseFloat(formData.valoare_ron) : null,
+        
+        // ✅ Status-uri multiple
+        status_predare: formData.status_predare,
+        status_contract: formData.status_contract,
+        status_facturare: formData.status_facturare,
+        status_achitare: formData.status_achitare,
+        
         Responsabil: formData.Responsabil.trim(),
         Observatii: formData.Observatii.trim()
       };
@@ -187,51 +235,61 @@ export default function ProiectEditModal({
       const response = await fetch('/api/rapoarte/proiecte', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(proiectData)
+        body: JSON.stringify(updateData)
       });
 
       const result = await response.json();
 
       if (result.success || response.ok) {
-        showToast('Proiect actualizat cu succes!', 'success');
+        toast.success('Proiect actualizat cu succes!');
         onProiectUpdated();
         onClose();
       } else {
-        showToast(`Eroare: ${result.error || 'Eroare necunoscută'}`, 'error');
+        console.error('Eroare API:', result);
+        toast.error(`Eroare: ${result.error || 'Eroare necunoscută'}`);
       }
     } catch (error) {
       console.error('Eroare la actualizarea proiectului:', error);
-      showToast('Eroare la actualizarea proiectului', 'error');
+      toast.error('Eroare la actualizarea proiectului');
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ NOUĂ: Funcție pentru ștergerea proiectului
   const handleDelete = async () => {
-    const confirmed = confirm(`Sigur vrei să ștergi proiectul "${proiect.Denumire}"?\n\nAceastă acțiune nu poate fi anulată!`);
+    const itemType = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
+    const confirmed = confirm(
+      `ATENȚIE: Ești sigur că vrei să ștergi ${itemType} "${formData.Denumire}"?\n\n` +
+      `ID: ${formData.ID_Proiect}\n` +
+      `Client: ${formData.Client}\n\n` +
+      `Această acțiune nu poate fi anulată și va șterge permanent toate datele asociate!`
+    );
+    
     if (!confirmed) return;
 
     setLoading(true);
-
     try {
-      showToast('Se șterge proiectul...', 'info');
-
-      const response = await fetch(`/api/rapoarte/proiecte?id=${encodeURIComponent(proiect.ID_Proiect)}`, {
+      const apiEndpoint = proiect.tip === 'subproiect' 
+        ? `/api/rapoarte/subproiecte?id=${encodeURIComponent(formData.ID_Proiect)}`
+        : `/api/rapoarte/proiecte?id=${encodeURIComponent(formData.ID_Proiect)}`;
+      
+      const response = await fetch(apiEndpoint, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        showToast('Proiect șters cu succes!', 'success');
+        toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
         onProiectDeleted();
         onClose();
       } else {
-        showToast(`Eroare: ${result.error || 'Eroare la ștergerea proiectului'}`, 'error');
+        toast.error(result.error || `Eroare la ștergerea ${itemType}`);
       }
     } catch (error) {
-      console.error('Eroare la ștergerea proiectului:', error);
-      showToast('Eroare la ștergerea proiectului', 'error');
+      console.error('Eroare la ștergere:', error);
+      toast.error(`Eroare la ștergerea ${itemType}`);
     } finally {
       setLoading(false);
     }
@@ -274,7 +332,7 @@ export default function ProiectEditModal({
       right: 0,
       bottom: 0,
       background: 'rgba(0,0,0,0.7)',
-      zIndex: 50000,
+      zIndex: 99999,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -284,7 +342,7 @@ export default function ProiectEditModal({
         background: 'white',
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        maxWidth: '900px',
+        maxWidth: '1100px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -293,12 +351,12 @@ export default function ProiectEditModal({
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
-          background: '#f0f8ff',
+          background: '#f8f9fa',
           borderRadius: '8px 8px 0 0'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              ✏️ Editează Proiect
+              ✏️ Editează {proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}
             </h2>
             <button
               onClick={onClose}
@@ -315,22 +373,22 @@ export default function ProiectEditModal({
             </button>
           </div>
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            Proiect: <span style={{ fontFamily: 'monospace', fontWeight: 'bold', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+            ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile proiectului
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {/* Grid pentru informații de bază */}
+          {/* Informații de bază */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
             gap: '1rem',
             marginBottom: '1rem'
           }}>
-            {/* ID Proiect (readonly) */}
+            {/* ID Proiect - Read Only */}
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                ID Proiect
+                ID Proiect (Nu se poate modifica)
               </label>
               <input
                 type="text"
@@ -350,10 +408,10 @@ export default function ProiectEditModal({
               />
             </div>
 
-            {/* Status */}
+            {/* Status General */}
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Status
+                Status General
               </label>
               <select
                 value={formData.Status}
@@ -371,7 +429,6 @@ export default function ProiectEditModal({
                 <option value="Planificat">📅 Planificat</option>
                 <option value="Suspendat">⏸️ Suspendat</option>
                 <option value="Finalizat">✅ Finalizat</option>
-                <option value="Arhivat">📦 Arhivat</option>
               </select>
             </div>
           </div>
@@ -402,65 +459,86 @@ export default function ProiectEditModal({
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
               Client *
             </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => handleClientSearch(e.target.value)}
-                disabled={loading}
-                placeholder="Caută client sau scrie numele..."
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="text"
+                  value={clientSearch}
+                  onChange={(e) => handleClientSearch(e.target.value)}
+                  disabled={loading}
+                  placeholder="Caută client sau scrie numele..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                
+                {/* Suggestions dropdown */}
+                {showClientSuggestions && filteredClients.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid #dee2e6',
+                    borderTop: 'none',
+                    borderRadius: '0 0 6px 6px',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                    zIndex: 1000,
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {filteredClients.map(client => (
+                      <div
+                        key={client.id}
+                        onClick={() => selectClient(client)}
+                        style={{
+                          padding: '0.75rem',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f1f2f6',
+                          fontSize: '14px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'white';
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
+                        {client.cui && (
+                          <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                            CUI: {client.cui}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               
-              {/* Suggestions dropdown */}
-              {showClientSuggestions && filteredClients.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  background: 'white',
-                  border: '1px solid #dee2e6',
-                  borderTop: 'none',
-                  borderRadius: '0 0 6px 6px',
-                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                  zIndex: 1000,
-                  maxHeight: '200px',
-                  overflowY: 'auto'
-                }}>
-                  {filteredClients.map(client => (
-                    <div
-                      key={client.id}
-                      onClick={() => selectClient(client)}
-                      style={{
-                        padding: '0.75rem',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #f1f2f6',
-                        fontSize: '14px'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#f8f9fa';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'white';
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
-                      {client.cui && (
-                        <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                          CUI: {client.cui}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowClientModal(true)}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                + Client Nou
+              </button>
             </div>
           </div>
 
@@ -485,7 +563,214 @@ export default function ProiectEditModal({
             />
           </div>
 
-          {/* Grid pentru date și valori */}
+          {/* ✅ SECȚIUNE: Valoare și Monedă */}
+          <div style={{ 
+            background: '#f8f9fa',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #dee2e6'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>💰 Valoare Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Valoare Estimată *
+                </label>
+                <input
+                  type="number"
+                  value={formData.Valoare_Estimata}
+                  onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
+                  disabled={loading}
+                  placeholder="15000"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Monedă
+                </label>
+                <select
+                  value={formData.moneda}
+                  onChange={(e) => handleInputChange('moneda', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="RON">🇷🇴 RON (Lei români)</option>
+                  <option value="EUR">🇪🇺 EUR (Euro)</option>
+                  <option value="USD">🇺🇸 USD (Dolari SUA)</option>
+                  <option value="GBP">🇬🇧 GBP (Lire sterline)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Curs
+                </label>
+                <input
+                  type="date"
+                  value={formData.data_curs_valutar}
+                  onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
+                  disabled={loading || formData.moneda === 'RON'}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Echivalent RON
+                </label>
+                <div style={{
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  background: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: loadingCurs ? '#6c757d' : '#27ae60'
+                }}>
+                  {loadingCurs ? '⏳ Se calculează...' : 
+                   formData.valoare_ron ? `${parseFloat(formData.valoare_ron).toLocaleString('ro-RO')} RON` : 
+                   '0.00 RON'}
+                </div>
+                {cursValutar && formData.moneda !== 'RON' && (
+                  <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                    Curs: 1 {formData.moneda} = {cursValutar.toFixed(4)} RON
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ SECȚIUNE: Status-uri Multiple cu FIX pentru Status Achitare */}
+          <div style={{ 
+            background: '#e8f5e8',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #c3e6cb'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>📊 Status-uri Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Predare
+                </label>
+                <select
+                  value={formData.status_predare}
+                  onChange={(e) => handleInputChange('status_predare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nepredat">❌ Nepredat</option>
+                  <option value="Predat">✅ Predat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Contract
+                </label>
+                <select
+                  value={formData.status_contract}
+                  onChange={(e) => handleInputChange('status_contract', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nu e cazul">➖ Nu e cazul</option>
+                  <option value="Nesemnat">📝 Nesemnat</option>
+                  <option value="Semnat">✅ Semnat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Facturare
+                </label>
+                <select
+                  value={formData.status_facturare}
+                  onChange={(e) => handleInputChange('status_facturare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nefacturat">❌ Nefacturat</option>
+                  <option value="Facturat">✅ Facturat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Achitare
+                </label>
+                <select
+                  value={formData.status_achitare}
+                  onChange={(e) => handleInputChange('status_achitare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  {/* ✅ FIX: Opțiuni corecte pentru Status Achitare */}
+                  <option value="Neachitat">❌ Neachitat</option>
+                  <option value="Achitat">✅ Achitat</option>
+                  <option value="Nu e cazul">➖ Nu e cazul</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Date și responsabil */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -532,14 +817,14 @@ export default function ProiectEditModal({
 
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Valoare Estimată (RON)
+                Responsabil
               </label>
               <input
-                type="number"
-                value={formData.Valoare_Estimata}
-                onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
+                type="text"
+                value={formData.Responsabil}
+                onChange={(e) => handleInputChange('Responsabil', e.target.value)}
                 disabled={loading}
-                placeholder="15000"
+                placeholder="Numele responsabilului"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -549,27 +834,6 @@ export default function ProiectEditModal({
                 }}
               />
             </div>
-          </div>
-
-          {/* Responsabil */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Responsabil
-            </label>
-            <input
-              type="text"
-              value={formData.Responsabil}
-              onChange={(e) => handleInputChange('Responsabil', e.target.value)}
-              disabled={loading}
-              placeholder="Numele responsabilului de proiect"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
           </div>
 
           {/* Descriere */}
@@ -624,7 +888,7 @@ export default function ProiectEditModal({
             paddingTop: '1rem',
             borderTop: '1px solid #dee2e6'
           }}>
-            {/* Buton Șterge (stânga) */}
+            {/* ✅ Buton ȘTERGE în stânga */}
             <button
               type="button"
               onClick={handleDelete}
@@ -640,10 +904,10 @@ export default function ProiectEditModal({
                 fontWeight: 'bold'
               }}
             >
-              🗑️ Șterge Proiect
+              {loading ? '⏳ Se șterge...' : '🗑️ Șterge Proiect'}
             </button>
-
-            {/* Butoane dreapta */}
+            
+            {/* Butoane Anulează și Salvează în dreapta */}
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 type="button"
@@ -668,7 +932,7 @@ export default function ProiectEditModal({
                 disabled={loading}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: loading ? '#bdc3c7' : '#3498db',
+                  background: loading ? '#bdc3c7' : '#27ae60',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -683,6 +947,18 @@ export default function ProiectEditModal({
           </div>
         </form>
       </div>
+
+      {/* Modal Client Nou */}
+      {showClientModal && (
+        <ClientNouModal
+          isOpen={showClientModal}
+          onClose={() => setShowClientModal(false)}
+          onClientAdded={() => {
+            loadClienti();
+            setShowClientModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }

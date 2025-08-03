@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// MODIFICAT: Adăugat suport pentru monede, status-uri multiple și chestuieli
+// MODIFICAT: Fix Status Achitare opțiuni + Format dată românesc
 // ==================================================================
 
 'use client';
@@ -65,11 +65,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     data_curs_valutar: '',
     valoare_ron: '',
     
-    // ✅ NOUĂ: Status-uri multiple
+    // ✅ NOUĂ: Status-uri multiple cu FIX pentru Status Achitare
     status_predare: 'Nepredat',
     status_contract: 'Nu e cazul',
     status_facturare: 'Nefacturat', 
-    status_achitare: 'Neachitat',
+    status_achitare: 'Neachitat', // ✅ FIX: Opțiuni corecte
     
     Responsabil: '',
     Observatii: '',
@@ -91,11 +91,14 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   useEffect(() => {
     if (isOpen) {
       loadClienti();
-      // Generează ID proiect automat
+      // ✅ FIX: Setează data actuală în format ISO pentru input date
+      const today = new Date();
+      const todayISO = today.toISOString().split('T')[0];
+      
       setFormData(prev => ({
         ...prev,
         ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
-        data_curs_valutar: new Date().toISOString().split('T')[0]
+        data_curs_valutar: todayISO
       }));
     }
   }, [isOpen]);
@@ -268,7 +271,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           status_predare: 'Nepredat',
           status_contract: 'Nu e cazul',
           status_facturare: 'Nefacturat',
-          status_achitare: 'Neachitat'
+          status_achitare: 'Neachitat' // ✅ FIX: Opțiune corectă
         };
 
         await fetch('/api/rapoarte/subproiecte', {
@@ -313,6 +316,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   };
 
   const resetForm = () => {
+    const today = new Date().toISOString().split('T')[0];
+    
     setFormData({
       ID_Proiect: '',
       Denumire: '',
@@ -326,12 +331,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       Valoare_Estimata: '',
       moneda: 'RON',
       curs_valutar: '',
-      data_curs_valutar: '',
+      data_curs_valutar: today,
       valoare_ron: '',
       status_predare: 'Nepredat',
       status_contract: 'Nu e cazul',
       status_facturare: 'Nefacturat',
-      status_achitare: 'Neachitat',
+      status_achitare: 'Neachitat', // ✅ FIX: Opțiune corectă
       Responsabil: '',
       Observatii: '',
       subproiecte: [],
@@ -396,7 +401,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       status_predare: 'Nepredat',
       status_contract: 'Nu e cazul',
       status_facturare: 'Nefacturat',
-      status_achitare: 'Neachitat'
+      status_achitare: 'Neachitat' // ✅ FIX: Opțiune corectă
     };
     setFormData(prev => ({
       ...prev,
@@ -780,7 +785,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             </div>
           </div>
 
-          {/* ✅ NOUĂ SECȚIUNE: Status-uri Multiple */}
+          {/* ✅ SECȚIUNE: Status-uri Multiple cu FIX pentru Status Achitare */}
           <div style={{ 
             background: '#e8f5e8',
             padding: '1rem',
@@ -875,9 +880,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
+                  {/* ✅ FIX: Opțiuni corecte pentru Status Achitare */}
                   <option value="Neachitat">❌ Neachitat</option>
-                  <option value="Achitat 1/3">🟡 Achitat 1/3</option>
-                  <option value="Achitat 1/1">✅ Achitat 1/1</option>
+                  <option value="Achitat">✅ Achitat</option>
+                  <option value="Nu e cazul">➖ Nu e cazul</option>
                 </select>
               </div>
             </div>
@@ -971,7 +977,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             />
           </div>
 
-          {/* ✅ NOUĂ SECȚIUNE: Cheltuieli Proiect */}
+          {/* ✅ SECȚIUNE: Cheltuieli Proiect */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ margin: 0, color: '#2c3e50' }}>💰 Cheltuieli Proiect</h4>
@@ -1137,7 +1143,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   </select>
                 </div>
 
-                {/* Status-uri pentru cheltuială */}
+                {/* Status-uri pentru cheltuială cu FIX */}
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
@@ -1200,9 +1206,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
+                    {/* ✅ FIX: Opțiuni corecte pentru Status Achitare la cheltuieli */}
                     <option value="Neachitat">❌ Neachitat</option>
-                    <option value="Achitat 1/3">🟡 Achitat 1/3</option>
-                    <option value="Achitat 1/1">✅ Achitat 1/1</option>
+                    <option value="Achitat">✅ Achitat</option>
+                    <option value="Nu e cazul">➖ Nu e cazul</option>
                   </select>
                 </div>
               </div>
@@ -1428,11 +1435,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           isOpen={showClientModal}
           onClose={() => setShowClientModal(false)}
           onClientAdded={() => {
-            loadClienti(); // Reîncarcă lista de clienți
+            loadClienti();
             setShowClientModal(false);
           }}
         />
       )}
     </div>
   );
-}

@@ -606,14 +606,14 @@ Pagini noi necesare:
 
 app/admin/setari/page.tsx - Dashboard setări= implementat
 app/admin/setari/facturare/page.tsx - Setări facturare=implementat
-app/admin/setari/firma/page.tsx - Date firmă
-app/admin/setari/banca/page.tsx - Conturi bancare= in lucru (cod neterminat)
+app/admin/setari/firma/page.tsx - Date firmă = implementat
+app/admin/setari/banca/page.tsx - Conturi bancare= implementat
 
 API-uri noi necesare:
 
 app/api/setari/facturare/route.ts - CRUD setări numerotare = implementat
 app/api/setari/firma/route.ts - CRUD date firmă =implementat
-app/api/setari/banca/route.ts - CRUD conturi bancare= in lucru (cod neterminat)
+app/api/setari/banca/route.ts - CRUD conturi bancare= implementat
 
 Tabele BigQuery noi:
 sql- SetariFacturare (serii, numerotare, timp_intarziere_efactura) = implementat
@@ -630,8 +630,11 @@ app/api/rapoarte/cheltuieli/route.ts // DESCRIERE: API pentru managementul chelt
 Componente de modificat:
 
 ProiectNouModal.tsx - adaugă câmpuri noi = implementat
-ProiecteTable.tsx - afișare status-uri multiple = nu este implementat
-ProiectActions.tsx - acțiuni pentru cheltuieli = nu este implementat
+ProiecteTable.tsx - afișare status-uri multiple = este implementat
+ProiectActions.tsx - acțiuni pentru cheltuieli = este implementat
+La pagina Proiecte Actuni/Editeaza pagina ar trebui sa fie identica cu cea pentru Proiect nou, in plus cu optiunea sterge proiect = nu este implementat
+La pagina Proiecte Totalul estimat este aratat in RON, nu este coroborat cu moneda si valoarea din Proiect Nou= nu este implementat
+La Pagina Proiect Nou data este in format mm/dd/year, ar trebui dd/mm/year.
 
 ETAPA 3: SISTEM MULTI-VALUTĂ 💱
 Prioritate: MEDIE - necesită API BNR

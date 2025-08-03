@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// MODIFICAT: Management Centralizat al Tuturor Modalelor cu Z-index 50000
+// MODIFICAT: Afișare monedă originală + RON în lista de proiecte
 // ==================================================================
 
 'use client';
@@ -20,6 +20,10 @@ interface Proiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
+  // ✅ NOUĂ: Câmpuri pentru multi-valută
+  moneda?: string;
+  valoare_ron?: number;
+  curs_valutar?: number;
   tip?: 'proiect' | 'subproiect';
   ID_Proiect_Parinte?: string;
   Responsabil?: string;
@@ -36,6 +40,10 @@ interface Subproiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
+  // ✅ NOUĂ: Câmpuri pentru multi-valută la subproiecte
+  moneda?: string;
+  valoare_ron?: number;
+  curs_valutar?: number;
   Client?: string;
   Proiect_Denumire?: string;
 }
@@ -94,7 +102,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // ✅ NOWI: State management centralizat pentru toate modalele
+  // ✅ State management centralizat pentru toate modalele
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showSubproiectModal, setShowSubproiectModal] = useState(false);
@@ -236,7 +244,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     showToast('Date actualizate!', 'success');
   };
 
-  // ✅ NOWI: Handler-e pentru modalele externe
+  // ✅ Handler-e pentru modalele externe
   const handleShowFacturaModal = (proiect: any) => {
     console.log('📄 Deschidere modal factură pentru:', proiect);
     setSelectedProiect(proiect);
@@ -359,6 +367,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
+  // ✅ FIX: Formatare dată în format românesc (dd/mm/yyyy)
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     
@@ -366,6 +375,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';
       
+      // ✅ Format românesc dd/mm/yyyy
       return date.toLocaleDateString('ro-RO', {
         year: 'numeric',
         month: '2-digit',
@@ -376,6 +386,45 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
+  // ✅ FIX: Funcție pentru formatarea valorii cu moneda originală + RON
+  const formatCurrencyWithOriginal = (amount?: number, currency?: string, ronValue?: number, isSubproiect = false) => {
+    if (!amount && amount !== 0) return '';
+    
+    const originalCurrency = currency || 'RON';
+    const colorClass = isSubproiect ? '#3498db' : '#27ae60';
+    
+    // Dacă moneda este RON sau nu avem valoare RON
+    if (originalCurrency === 'RON' || !ronValue) {
+      return (
+        <div style={{ textAlign: 'right', fontWeight: '700', color: colorClass, fontSize: '14px' }}>
+          {new Intl.NumberFormat('ro-RO', {
+            style: 'currency',
+            currency: originalCurrency
+          }).format(amount)}
+        </div>
+      );
+    }
+    
+    // Pentru alte monede, afișează original + RON
+    return (
+      <div style={{ textAlign: 'right', fontWeight: '700', color: colorClass, fontSize: '13px' }}>
+        <div style={{ fontSize: '14px', marginBottom: '2px' }}>
+          {new Intl.NumberFormat('ro-RO', {
+            style: 'currency',
+            currency: originalCurrency
+          }).format(amount)}
+        </div>
+        <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '500' }}>
+          ≈ {new Intl.NumberFormat('ro-RO', {
+            style: 'currency',
+            currency: 'RON'
+          }).format(ronValue)}
+        </div>
+      </div>
+    );
+  };
+
+  // ✅ Funcție păstrată pentru legacy (totaluri)
   const formatCurrency = (amount?: number) => {
     if (!amount && amount !== 0) return '';
     return new Intl.NumberFormat('ro-RO', {
@@ -404,20 +453,22 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ Calculează totalul combinat pentru toate proiectele și subproiectele
+  // ✅ FIX: Calculează totalul combinat folosind valorile RON pentru acuratețe
   const calculateTotalValue = () => {
     const totalProiecte = proiecte.reduce((sum, p) => {
-      const valoare = Number(p.Valoare_Estimata) || 0;
+      // ✅ Folosește valoare_ron dacă există, altfel valoarea originală
+      const valoare = Number(p.valoare_ron) || Number(p.Valoare_Estimata) || 0;
       return sum + valoare;
     }, 0);
     
     const totalSubproiecte = subproiecte.reduce((sum, s) => {
-      const valoare = Number(s.Valoare_Estimata) || 0;
+      // ✅ Folosește valoare_ron dacă există, altfel valoarea originală
+      const valoare = Number(s.valoare_ron) || Number(s.Valoare_Estimata) || 0;
       return sum + valoare;
     }, 0);
     
     const total = totalProiecte + totalSubproiecte;
-    console.log('💰 Calcul totaluri:', { totalProiecte, totalSubproiecte, total });
+    console.log('💰 Calcul totaluri cu RON:', { totalProiecte, totalSubproiecte, total });
     return total;
   };
 
@@ -818,12 +869,15 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
-                          textAlign: 'right',
-                          fontWeight: '700',
-                          color: proiect.Valoare_Estimata ? '#27ae60' : '#bdc3c7',
-                          fontSize: '14px'
+                          textAlign: 'right'
                         }}>
-                          {formatCurrency(proiect.Valoare_Estimata)}
+                          {/* ✅ FIX: Afișare moneda originală + RON */}
+                          {formatCurrencyWithOriginal(
+                            proiect.Valoare_Estimata,
+                            proiect.moneda,
+                            proiect.valoare_ron,
+                            false
+                          )}
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
@@ -936,12 +990,15 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
-                            textAlign: 'right',
-                            fontWeight: '600',
-                            color: subproiect.Valoare_Estimata ? '#3498db' : '#bdc3c7',
-                            fontSize: '13px'
+                            textAlign: 'right'
                           }}>
-                            {formatCurrency(subproiect.Valoare_Estimata)}
+                            {/* ✅ FIX: Afișare moneda originală + RON pentru subproiecte */}
+                            {formatCurrencyWithOriginal(
+                              subproiect.Valoare_Estimata,
+                              subproiect.moneda,
+                              subproiect.valoare_ron,
+                              true
+                            )}
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
@@ -958,7 +1015,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                 Data_Start: subproiect.Data_Start,
                                 Data_Final: subproiect.Data_Final,
                                 tip: 'subproiect',
-                                Responsabil: subproiect.Responsabil
+                                Responsabil: subproiect.Responsabil,
+                                moneda: subproiect.moneda,
+                                valoare_ron: subproiect.valoare_ron
                               }} 
                               onRefresh={handleRefresh}
                               onShowFacturaModal={handleShowFacturaModal}
@@ -1025,7 +1084,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  Proiecte + Subproiecte combinate
+                  Proiecte + Subproiecte combinate (în RON)
                 </div>
               </div>
             </div>
@@ -1046,7 +1105,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* ✅ NOWI: Modal Factură Hibridă */}
+      {/* ✅ Modal Factură Hibridă */}
       {showFacturaModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <FacturaHibridModal
@@ -1057,7 +1116,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* ✅ NOWI: Modal Subproiect */}
+      {/* ✅ Modal Subproiect */}
       {showSubproiectModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <SubproiectModal
@@ -1069,7 +1128,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* ✅ NOWI: Modal Editare Proiect */}
+      {/* ✅ Modal Editare Proiect */}
       {showEditModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <ProiectEditModal

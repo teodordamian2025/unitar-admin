@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/proiecte/route.ts
-// MODIFICAT: Fix BigQuery types pentru null values + Adresa support
+// MODIFICAT: Suport complet pentru multi-valută și status-uri multiple
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,8 +22,29 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Construire query cu filtre
-    let query = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
+    // ✅ ACTUALIZAT: Query cu câmpuri noi pentru multi-valută
+    let query = `SELECT 
+      ID_Proiect, 
+      Denumire, 
+      Client, 
+      Adresa,
+      Descriere,
+      Data_Start, 
+      Data_Final, 
+      Status, 
+      Valoare_Estimata,
+      moneda,
+      curs_valutar,
+      data_curs_valutar,
+      valoare_ron,
+      status_predare,
+      status_contract,
+      status_facturare,
+      status_achitare,
+      Responsabil,
+      Observatii
+    FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
+    
     const conditions: string[] = [];
     const params: any = {};
     const types: any = {};
@@ -68,18 +89,56 @@ export async function GET(request: NextRequest) {
       types.dataStartTo = 'DATE';
     }
 
+    // ✅ ACTUALIZAT: Filtrare pe baza valorii RON pentru acuratețe
     const valoareMin = searchParams.get('valoare_min');
     if (valoareMin && !isNaN(Number(valoareMin))) {
-      conditions.push('CAST(COALESCE(Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin');
+      conditions.push('CAST(COALESCE(valoare_ron, Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin');
       params.valoareMin = Number(valoareMin);
-              types.valoareMin = 'NUMERIC';
+      types.valoareMin = 'NUMERIC';
     }
 
     const valoareMax = searchParams.get('valoare_max');
     if (valoareMax && !isNaN(Number(valoareMax))) {
-      conditions.push('CAST(COALESCE(Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax');
+      conditions.push('CAST(COALESCE(valoare_ron, Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax');
       params.valoareMax = Number(valoareMax);
-              types.valoareMax = 'NUMERIC';
+      types.valoareMax = 'NUMERIC';
+    }
+
+    // ✅ NOUĂ: Filtrare pe baza monedei
+    const moneda = searchParams.get('moneda');
+    if (moneda) {
+      conditions.push('COALESCE(moneda, "RON") = @moneda');
+      params.moneda = moneda;
+      types.moneda = 'STRING';
+    }
+
+    // ✅ NOUĂ: Filtrare pe baza status-urilor multiple
+    const statusPredare = searchParams.get('status_predare');
+    if (statusPredare) {
+      conditions.push('COALESCE(status_predare, "Nepredat") = @statusPredare');
+      params.statusPredare = statusPredare;
+      types.statusPredare = 'STRING';
+    }
+
+    const statusContract = searchParams.get('status_contract');
+    if (statusContract) {
+      conditions.push('COALESCE(status_contract, "Nu e cazul") = @statusContract');
+      params.statusContract = statusContract;
+      types.statusContract = 'STRING';
+    }
+
+    const statusFacturare = searchParams.get('status_facturare');
+    if (statusFacturare) {
+      conditions.push('COALESCE(status_facturare, "Nefacturat") = @statusFacturare');
+      params.statusFacturare = statusFacturare;
+      types.statusFacturare = 'STRING';
+    }
+
+    const statusAchitare = searchParams.get('status_achitare');
+    if (statusAchitare) {
+      conditions.push('COALESCE(status_achitare, "Neachitat") = @statusAchitare');
+      params.statusAchitare = statusAchitare;
+      types.statusAchitare = 'STRING';
     }
 
     // Adaugă condiții la query
@@ -97,7 +156,7 @@ export async function GET(request: NextRequest) {
     const [rows] = await bigquery.query({
       query: query,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
 
@@ -120,7 +179,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('POST request body:', body); // Debug
+    console.log('POST request body:', body);
     
     const { 
       ID_Proiect, 
@@ -132,6 +191,16 @@ export async function POST(request: NextRequest) {
       Data_Final, 
       Status = 'Activ', 
       Valoare_Estimata,
+      // ✅ NOUĂ: Câmpuri multi-valută
+      moneda = 'RON',
+      curs_valutar,
+      data_curs_valutar,
+      valoare_ron,
+      // ✅ NOUĂ: Status-uri multiple
+      status_predare = 'Nepredat',
+      status_contract = 'Nu e cazul',
+      status_facturare = 'Nefacturat',
+      status_achitare = 'Neachitat',
       Responsabil,
       Observatii
     } = body;
@@ -144,16 +213,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Query cu types specificate pentru toate câmpurile
+    // ✅ ACTUALIZAT: Query cu toate câmpurile noi
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       (ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final, 
-       Status, Valoare_Estimata, Responsabil, Observatii)
+       Status, Valoare_Estimata, moneda, curs_valutar, data_curs_valutar, valoare_ron,
+       status_predare, status_contract, status_facturare, status_achitare,
+       Responsabil, Observatii)
       VALUES (@ID_Proiect, @Denumire, @Client, @Adresa, @Descriere, @Data_Start, 
-              @Data_Final, @Status, @Valoare_Estimata, @Responsabil, @Observatii)
+              @Data_Final, @Status, @Valoare_Estimata, @moneda, @curs_valutar, 
+              @data_curs_valutar, @valoare_ron, @status_predare, @status_contract,
+              @status_facturare, @status_achitare, @Responsabil, @Observatii)
     `;
 
-    // ✅ FIX: Pregătire params cu null handling explicit
+    // ✅ ACTUALIZAT: Params cu toate câmpurile noi
     const params = {
       ID_Proiect: ID_Proiect,
       Denumire: Denumire,
@@ -164,11 +237,19 @@ export async function POST(request: NextRequest) {
       Data_Final: Data_Final || null,
       Status: Status,
       Valoare_Estimata: Valoare_Estimata || null,
+      moneda: moneda,
+      curs_valutar: curs_valutar || null,
+      data_curs_valutar: data_curs_valutar || null,
+      valoare_ron: valoare_ron || null,
+      status_predare: status_predare,
+      status_contract: status_contract,
+      status_facturare: status_facturare,
+      status_achitare: status_achitare,
       Responsabil: Responsabil || null,
       Observatii: Observatii || null
     };
 
-    // ✅ FIX: Types specificate pentru toate parametrii
+    // ✅ ACTUALIZAT: Types pentru toate câmpurile noi
     const types = {
       ID_Proiect: 'STRING',
       Denumire: 'STRING',
@@ -179,17 +260,25 @@ export async function POST(request: NextRequest) {
       Data_Final: 'DATE',
       Status: 'STRING',
       Valoare_Estimata: 'NUMERIC',
+      moneda: 'STRING',
+      curs_valutar: 'NUMERIC',
+      data_curs_valutar: 'DATE',
+      valoare_ron: 'NUMERIC',
+      status_predare: 'STRING',
+      status_contract: 'STRING',
+      status_facturare: 'STRING',
+      status_achitare: 'STRING',
       Responsabil: 'STRING',
       Observatii: 'STRING'
     };
 
-    console.log('Insert params:', params); // Debug
-    console.log('Insert types:', types); // Debug
+    console.log('Insert params:', params);
+    console.log('Insert types:', types);
 
     await bigquery.query({
       query: insertQuery,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
 
@@ -223,18 +312,23 @@ export async function PUT(request: NextRequest) {
     // Construire query UPDATE dinamic
     const updateFields: string[] = [];
     const params: any = { id };
-    const types: any = { id: 'STRING' }; // ✅ FIX: Adăugat types pentru id
+    const types: any = { id: 'STRING' };
 
     if (status) {
       updateFields.push('Status = @status');
       params.status = status;
-      types.status = 'STRING'; // ✅ FIX: Adăugat type
+      types.status = 'STRING';
     }
 
-    // Include Adresa în câmpurile actualizabile
-    const allowedFields = ['Denumire', 'Client', 'Adresa', 'Descriere', 'Data_Start', 'Data_Final', 'Valoare_Estimata', 'Responsabil', 'Observatii'];
+    // ✅ ACTUALIZAT: Include toate câmpurile noi în actualizare
+    const allowedFields = [
+      'Denumire', 'Client', 'Adresa', 'Descriere', 'Data_Start', 'Data_Final', 
+      'Valoare_Estimata', 'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
+      'status_predare', 'status_contract', 'status_facturare', 'status_achitare',
+      'Responsabil', 'Observatii'
+    ];
     
-    // ✅ FIX: Mapping pentru types
+    // ✅ ACTUALIZAT: Mapping pentru types cu câmpuri noi
     const fieldTypes: { [key: string]: string } = {
       'Denumire': 'STRING',
       'Client': 'STRING',
@@ -243,6 +337,14 @@ export async function PUT(request: NextRequest) {
       'Data_Start': 'DATE',
       'Data_Final': 'DATE',
       'Valoare_Estimata': 'NUMERIC',
+      'moneda': 'STRING',
+      'curs_valutar': 'NUMERIC',
+      'data_curs_valutar': 'DATE',
+      'valoare_ron': 'NUMERIC',
+      'status_predare': 'STRING',
+      'status_contract': 'STRING',
+      'status_facturare': 'STRING',
+      'status_achitare': 'STRING',
       'Responsabil': 'STRING',
       'Observatii': 'STRING'
     };
@@ -251,8 +353,8 @@ export async function PUT(request: NextRequest) {
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
         updateFields.push(`${key} = @${key}`);
-        params[key] = value || null; // ✅ FIX: Explicit null pentru empty values
-        types[key] = fieldTypes[key]; // ✅ FIX: Adăugat type
+        params[key] = value || null;
+        types[key] = fieldTypes[key];
       }
     });
 
@@ -269,14 +371,14 @@ export async function PUT(request: NextRequest) {
       WHERE ID_Proiect = @id
     `;
 
-    console.log('Update query:', updateQuery); // Debug
-    console.log('Update params:', params); // Debug
-    console.log('Update types:', types); // Debug
+    console.log('Update query:', updateQuery);
+    console.log('Update params:', params);
+    console.log('Update types:', types);
 
     await bigquery.query({
       query: updateQuery,
       params: params,
-      types: types, // ✅ FIX: Adăugat types
+      types: types,
       location: 'EU',
     });
 
@@ -315,7 +417,7 @@ export async function DELETE(request: NextRequest) {
     await bigquery.query({
       query: deleteQuery,
       params: { id },
-      types: { id: 'STRING' }, // ✅ FIX: Adăugat types
+      types: { id: 'STRING' },
       location: 'EU',
     });
 
