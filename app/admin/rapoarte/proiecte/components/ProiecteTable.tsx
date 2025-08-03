@@ -24,10 +24,16 @@ interface Proiect {
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
+  data_curs_valutar?: string;
+  status_predare?: string;
+  status_contract?: string;
+  status_facturare?: string;
+  status_achitare?: string;
   tip?: 'proiect' | 'subproiect';
   ID_Proiect_Parinte?: string;
   Responsabil?: string;
   Adresa?: string;
+  Descriere?: string;
   Observatii?: string;
 }
 
@@ -44,6 +50,11 @@ interface Subproiect {
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
+  data_curs_valutar?: string;
+  status_predare?: string;
+  status_contract?: string;
+  status_facturare?: string;
+  status_achitare?: string;
   Client?: string;
   Proiect_Denumire?: string;
 }
