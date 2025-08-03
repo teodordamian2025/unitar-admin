@@ -1,7 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// PARTEA 1: Component Principal + Dropdown (FĂRĂ modale locale)
-// MODIFICAT: Z-index Management + Callback System pentru modale externe
+// MODIFICAT: Interface actualizată cu suport multi-valută
 // ==================================================================
 
 'use client';
@@ -27,13 +26,24 @@ interface ProiectActionsProps {
     Valoare_Estimata?: number;
     Data_Start?: string | { value: string };
     Data_Final?: string | { value: string };
+    // ✅ FIX: Adăugat toate câmpurile pentru multi-valută
+    moneda?: string;
+    valoare_ron?: number;
+    curs_valutar?: number;
+    data_curs_valutar?: string;
+    status_predare?: string;
+    status_contract?: string;
+    status_facturare?: string;
+    status_achitare?: string;
     tip?: 'proiect' | 'subproiect';
+    ID_Proiect_Parinte?: string;
     Responsabil?: string;
     Adresa?: string;
+    Descriere?: string;
     Observatii?: string;
   };
   onRefresh?: () => void;
-  // ✅ NOWI: Callback-uri pentru modale externe (gestionate în ProiecteTable)
+  // ✅ Callback-uri pentru modale externe (gestionate în ProiecteTable)
   onShowFacturaModal?: (proiect: any) => void;
   onShowSubproiectModal?: (proiect: any) => void;
   onShowEditModal?: (proiect: any) => void;
@@ -232,16 +242,25 @@ export default function ProiectActions({
   };
 
   const handleViewDetails = async () => {
+    // ✅ FIX: Include informații despre monedă și valoare RON
+    const monedaInfo = proiect.moneda && proiect.moneda !== 'RON' 
+      ? `\n💱 Monedă: ${proiect.moneda}\n💰 Valoare RON: ${proiect.valoare_ron ? `${proiect.valoare_ron.toLocaleString('ro-RO')} RON` : 'N/A'}`
+      : '';
+    
+    const statusuriInfo = proiect.status_predare || proiect.status_contract || proiect.status_facturare || proiect.status_achitare
+      ? `\n📊 Status Predare: ${proiect.status_predare || 'N/A'}\n📝 Status Contract: ${proiect.status_contract || 'N/A'}\n🧾 Status Facturare: ${proiect.status_facturare || 'N/A'}\n💳 Status Achitare: ${proiect.status_achitare || 'N/A'}`
+      : '';
+
     const detalii = `📋 ${proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT'}: ${proiect.ID_Proiect}
 
 📝 Denumire: ${proiect.Denumire}
 👤 Client: ${proiect.Client}
 📊 Status: ${proiect.Status}
-💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'N/A'}
+💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}${monedaInfo}
 📅 Începe: ${formatDate(proiect.Data_Start)}
 📅 Finalizare: ${formatDate(proiect.Data_Final)}
 👤 Responsabil: ${proiect.Responsabil || 'Neatribuit'}
-📍 Adresă: ${proiect.Adresa || 'Nespecificată'}
+📍 Adresă: ${proiect.Adresa || 'Nespecificată'}${statusuriInfo}
 📝 Observații: ${proiect.Observatii || 'Fără observații'}`;
     
     showToast(detalii, 'info');
