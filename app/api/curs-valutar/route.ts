@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/curs-valutar/route.ts
-// DESCRIERE: API pentru integrarea cu BNR pentru cursul valutar
+// DESCRIERE: API pentru integrarea cu BNR pentru cursul valutar - FIXED
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,11 +22,12 @@ let cursCache: { [key: string]: { curs: number; data: string; timestamp: number 
 const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 ore în milisecunde
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const moneda = searchParams.get('moneda') || 'EUR';
-    const data = searchParams.get('data') || new Date().toISOString().split('T')[0];
+  // ✅ MUTĂM EXTRAGEREA PARAMETRILOR ÎNAINTEA try-catch pentru a fi accesibilă în catch
+  const { searchParams } = new URL(request.url);
+  const moneda = searchParams.get('moneda') || 'EUR';
+  const data = searchParams.get('data') || new Date().toISOString().split('T')[0];
 
+  try {
     // Verifică cache-ul mai întâi
     const cacheKey = `${moneda}_${data}`;
     const cachedData = cursCache[cacheKey];
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Eroare la obținerea cursului valutar:', error);
     
+    // ✅ ACUM variabila moneda este accesibilă în catch block
     // Fallback la cursuri aproximative dacă BNR nu răspunde
     const fallbackRates: { [key: string]: number } = {
       'EUR': 4.97,
