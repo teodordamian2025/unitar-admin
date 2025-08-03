@@ -898,7 +898,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <ProiectActions 
                             proiect={{
                               ...proiect,
-                              tip: 'proiect'
+                              tip: 'proiect' as const
                             }} 
                             onRefresh={handleRefresh}
                             onShowFacturaModal={handleShowFacturaModal}
@@ -1025,10 +1025,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                 Valoare_Estimata: subproiect.Valoare_Estimata,
                                 Data_Start: subproiect.Data_Start,
                                 Data_Final: subproiect.Data_Final,
-                                tip: 'subproiect',
+                                tip: 'subproiect' as const,
                                 Responsabil: subproiect.Responsabil,
                                 moneda: subproiect.moneda,
-                                valoare_ron: subproiect.valoare_ron
+                                valoare_ron: subproiect.valoare_ron,
+                                curs_valutar: subproiect.curs_valutar,
+                                data_curs_valutar: subproiect.data_curs_valutar,
+                                status_predare: subproiect.status_predare,
+                                status_contract: subproiect.status_contract,
+                                status_facturare: subproiect.status_facturare,
+                                status_achitare: subproiect.status_achitare,
+                                Adresa: undefined,
+                                Descriere: undefined,
+                                Observatii: undefined
                               }} 
                               onRefresh={handleRefresh}
                               onShowFacturaModal={handleShowFacturaModal}
