@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Dacă se marchează ca principal, dezactivează celelalte
-    let updateOthersPromise = Promise.resolve();
+    let updateOthersPromise: Promise<any> = Promise.resolve();
     if (body.cont_principal === true) {
       const updateOthersQuery = `
         UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
