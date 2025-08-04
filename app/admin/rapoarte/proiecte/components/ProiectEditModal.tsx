@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectEditModal.tsx
-// DESCRIERE: Modal editare identic cu ProiectNou + opțiunea șterge proiect
+// MODIFICAT: Fix format dată românesc dd/mm/year + păstrează toate funcționalitățile
 // ==================================================================
 
 'use client';
@@ -68,6 +68,16 @@ export default function ProiectEditModal({
     Responsabil: '',
     Observatii: ''
   });
+
+  // ✅ NOU: Funcție pentru formatarea datei în format românesc pentru afișare
+  const formatDateForDisplay = (dateValue: string): string => {
+    if (!dateValue) return '';
+    try {
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    } catch {
+      return dateValue;
+    }
+  };
 
   useEffect(() => {
     if (isOpen && proiect) {
@@ -624,6 +634,12 @@ export default function ProiectEditModal({
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Curs
+                  {/* ✅ NOU: Afișare data în format românesc */}
+                  {formData.data_curs_valutar && (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                      ({formatDateForDisplay(formData.data_curs_valutar)})
+                    </span>
+                  )}
                 </label>
                 <input
                   type="date"
@@ -780,6 +796,12 @@ export default function ProiectEditModal({
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Început
+                {/* ✅ NOU: Afișare data în format românesc */}
+                {formData.Data_Start && (
+                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                    ({formatDateForDisplay(formData.Data_Start)})
+                  </span>
+                )}
               </label>
               <input
                 type="date"
@@ -799,6 +821,12 @@ export default function ProiectEditModal({
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Finalizare
+                {/* ✅ NOU: Afișare data în format românesc */}
+                {formData.Data_Final && (
+                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                    ({formatDateForDisplay(formData.Data_Final)})
+                  </span>
+                )}
               </label>
               <input
                 type="date"

@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/page.tsx
-// MODIFICAT: Z-index Management Universal + Backdrop Intensity Control
+// MODIFICAT: Adăugat navigație către Facturi în header + păstrează toate funcționalitățile
 // ==================================================================
 
 'use client';
@@ -111,6 +111,163 @@ export default function ProiectePage() {
         // ✅ Z-index moderat pentru conținut
         zIndex: 1
       }}>
+        {/* ✅ NOU: Navigație rapidă */}
+        <div style={{ 
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: '1.5rem',
+          padding: '1rem',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+          position: 'relative' as const,
+          zIndex: 15
+        }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: '#2c3e50',
+              marginRight: '0.5rem'
+            }}>
+              🚀 Navigație rapidă:
+            </span>
+            
+            <button
+              onClick={() => router.push('/admin')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 2px 8px rgba(52, 152, 219, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(52, 152, 219, 0.3)';
+              }}
+            >
+              🏠 Dashboard
+            </button>
+
+            <button
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'default',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 2px 8px rgba(39, 174, 96, 0.4)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              📋 Proiecte
+              <span style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                background: 'rgba(255, 255, 255, 0.8)'
+              }}></span>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/rapoarte/clienti')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 2px 8px rgba(155, 89, 182, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(155, 89, 182, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(155, 89, 182, 0.3)';
+              }}
+            >
+              👥 Clienți
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/rapoarte/facturi')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 2px 8px rgba(231, 76, 60, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(231, 76, 60, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(231, 76, 60, 0.3)';
+              }}
+            >
+              💰 Facturi
+            </button>
+
+            <button
+              onClick={() => window.open('/admin/actions/contracts/generate', '_blank')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600',
+                boxShadow: '0 2px 8px rgba(243, 156, 18, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(243, 156, 18, 0.3)';
+              }}
+            >
+              📄 Contracte
+            </button>
+          </div>
+        </div>
+
         {/* ✅ Header Glassmorphism Premium - Backdrop redus */}
         <div style={{ 
           display: 'flex',

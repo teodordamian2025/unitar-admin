@@ -82,30 +82,6 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 
 ## 📁 Structura Fișiere Key
 
-```
-app/
-├── admin/rapoarte/
-│   ├── proiecte/
-│   │   ├── components/
-│   │   │   ├── FacturaHibridModal.tsx ✅ (COMPLET + Auto-completare + Subproiecte)
-│   │   │   ├── ProiectActions.tsx ✅ (COMPLET + Buton Adauga Subproiect + Modal)
-│   │   │   ├── ProiecteTable.tsx ✅ (COMPLET + Afișare ierarhică subproiecte)
-│   │   │   ├── ProiectFilters.tsx ✅ (Filtrare avansată)
-│   │   │   └── ProiectNouModal.tsx ✅ (Creare proiecte noi)
-│   │   └── page.tsx ✅ (Layout principal cu filtre și tabel)
-│   └── facturi/page.tsx ✅ (Management facturi generate)
-├── api/
-│   ├── actions/invoices/
-│   │   └── generate-hibrid/route.ts ✅ (HTML+jsPDF + Client lookup + Metadata)
-│   ├── anaf/
-│   │   └── company-info/route.ts ✅ (ANAF API integration completă)
-│   └── rapoarte/
-│       ├── proiecte/route.ts ✅ (CRUD complet proiecte)
-│       ├── subproiecte/route.ts ✅ (CRUD complet subproiecte cu JOIN)
-│       └── clienti/route.ts ✅ (CRUD complet clienti)
-└── components/ (globale)
-```
-
 find | sed 's|[^/]*/|- |g'
 .
 - .env.local
@@ -128,11 +104,26 @@ find | sed 's|[^/]*/|- |g'
 - - - page.tsx
 - - admin
 - - - layout.tsx
+- - - anaf
+- - - - monitoring
+- - - - - page.tsx
+- - - - setup
+- - - - - page.tsx
+- - - setari
+- - - - firma
+- - - - - page.tsx
+- - - - banca
+- - - - - page.tsx
+- - - - page.tsx
+- - - - facturare
+- - - - - page.tsx
 - - - rapoarte
 - - - - layout.tsx
 - - - - clienti
 - - - - - page.tsx
 - - - - - components
+- - - - - - ANAFClientSearch.tsx
+- - - - - - ClientEditModal.tsx
 - - - - - - ClientNouModal.tsx
 - - - - page.tsx
 - - - - facturi
@@ -142,7 +133,9 @@ find | sed 's|[^/]*/|- |g'
 - - - - - - page.tsx
 - - - - - page.tsx
 - - - - - components
+- - - - - - ProiectEditModal.tsx
 - - - - - - ProiectActions.tsx
+- - - - - - SubproiectModal.tsx
 - - - - - - ProiectNouModal.tsx
 - - - - - - ProiecteTable.tsx
 - - - - - - FacturaHibridModal.tsx
@@ -157,14 +150,24 @@ find | sed 's|[^/]*/|- |g'
 - - api
 - - - actions
 - - - - invoices
+- - - - - download-pdf
+- - - - - - route.ts
 - - - - - webhook
 - - - - - - route.ts
 - - - - - generate-hibrid
 - - - - - - route.ts
+- - - - - regenerate-pdf
+- - - - - - route.ts
+- - - - - efactura-details
+- - - - - - route.ts
 - - - - - download
 - - - - - - [id]
 - - - - - - - route.ts
+- - - - - generate-xml
+- - - - - - route.ts
 - - - - - list
+- - - - - - route.ts
+- - - - - get-pdf-filename
 - - - - - - route.ts
 - - - - contracts
 - - - - - generate
@@ -189,10 +192,36 @@ find | sed 's|[^/]*/|- |g'
 - - - user-database
 - - - - route.ts
 - - - anaf
+- - - - error-handler
+- - - - - route.ts
+- - - - oauth
+- - - - - callback
+- - - - - - route.ts
+- - - - - callback-test
+- - - - - - route.ts
+- - - - - token
+- - - - - - route.ts
+- - - - - authorize
+- - - - - - route.ts
+- - - - monitoring
+- - - - - route.ts
+- - - - notifications
+- - - - - route.ts
+- - - - search-clients
+- - - - - route.ts
 - - - - company-info
+- - - - - route.ts
+- - - setari
+- - - - firma
+- - - - - route.ts
+- - - - banca
+- - - - - route.ts
+- - - - facturare
 - - - - - route.ts
 - - - rapoarte
 - - - - subproiecte
+- - - - - route.ts
+- - - - cheltuieli
 - - - - - route.ts
 - - - - clienti
 - - - - - route.ts
@@ -207,6 +236,8 @@ find | sed 's|[^/]*/|- |g'
 - - - queryOpenAI
 - - - - route.ts
 - - - verify-recaptcha
+- - - - route.ts
+- - - curs-valutar
 - - - - route.ts
 - - - genereaza
 - - - - docx
@@ -240,12 +271,12 @@ find | sed 's|[^/]*/|- |g'
 - next-env.d.ts
 - hooks
 - - useANAFCompanyInfo.ts
-- node_modules
 - uploads
 - - temp
 - - contracte
 - - facturi
 - git-filter-repo.py
+
 
 
 ### 📋 Descriere Componente Cheie
@@ -445,22 +476,6 @@ Modal subproiect implementat complet în aceeași componentă
 
 
 
-✅ 4. Vezi Detalii & Editează - FUNCȚIONALE
-Problema: Butoanele nu făceau nimic și dădeau erori în consolă
-Soluția:
-
-Vezi Detalii: Afișează toast detaliat cu toate informațiile proiectului
-Editează: Modal de confirmare (pregătit pentru implementare completă)
-Format: Informații organizate și formatate frumos în toast
-
-✅ 5. Selector Subproiecte în Factură - IMPLEMENTAT
-Problema: Nu apărea butonul de adăugare subproiecte în modalul facturii
-Soluția:
-
-Fișier: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-Status: Funcționalitatea există deja în versiunea originală
-Verificare: Odată rezolvate erorile API, selectorul va funcționa=functional
-
 📁 Fișiere Actualizate
 🎯 Frontend Components:
 
@@ -634,7 +649,7 @@ ProiecteTable.tsx - afișare status-uri multiple = este implementat
 ProiectActions.tsx - acțiuni pentru cheltuieli = este implementat
 La pagina Proiecte Actuni/Editeaza pagina ar trebui sa fie identica cu cea pentru Proiect nou, in plus cu optiunea sterge proiect = nu este implementat
 La pagina Proiecte Totalul estimat este aratat in RON, nu este coroborat cu moneda si valoarea din Proiect Nou= nu este implementat
-La Pagina Proiect Nou data este in format mm/dd/year, ar trebui dd/mm/year.
+La Pagina Proiect Nou data este in format mm/dd/year, ar trebui dd/mm/year, de corectat.
 
 ETAPA 3: SISTEM MULTI-VALUTĂ 💱
 Prioritate: MEDIE - necesită API BNR

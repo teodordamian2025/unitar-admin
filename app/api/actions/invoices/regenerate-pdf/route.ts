@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/regenerate-pdf/route.ts
-// DESCRIERE: Regenerează PDF din datele facturii salvate în BigQuery
+// DESCRIERE: Regenerează PDF din BD folosind template-ul identic cu generate-hibrid
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,498 +15,491 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-
-export async function POST(request: NextRequest) {
+// ✅ ÎNCĂRCARE CONTURI BANCARE - Identic cu generate-hibrid
+async function loadContariBancare() {
   try {
-    const { facturaId, numar } = await request.json();
-    
-    if (!facturaId) {
-      return NextResponse.json({ error: 'facturaId este obligatoriu' }, { status: 400 });
-    }
-    
-    // Preluare date completă factură din BigQuery
     const query = `
-      SELECT 
-        id,
-        numar,
-        data_factura,
-        data_scadenta,
-        client_nume,
-        client_cui,
-        subtotal,
-        total_tva,
-        total,
-        date_complete_json,
-        data_creare
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\`
-      WHERE id = @facturaId
-      LIMIT 1
+      SELECT nume_banca, iban, cont_principal, observatii 
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SetariBanca\`
+      ORDER BY cont_principal DESC, nume_banca ASC
     `;
-    
+
     const [rows] = await bigquery.query({
-      query,
-      params: { facturaId },
-      location: 'EU'
+      query: query,
+      location: 'EU',
     });
-    
-    if (rows.length === 0) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Factura nu a fost găsită în baza de date' 
-      }, { status: 404 });
+
+    if (rows && rows.length > 0) {
+      console.log(`✅ Încărcat ${rows.length} conturi bancare din BigQuery`);
+      return rows.map((row: any) => ({
+        nume_banca: row.nume_banca,
+        iban: row.iban,
+        cont_principal: row.cont_principal,
+        observatii: row.observatii
+      }));
+    } else {
+      console.log('⚠️ Nu s-au găsit conturi bancare în BigQuery - folosesc fallback');
+      return null;
     }
-    
-    const factura = rows[0];
-    
-    // Parse datele complete JSON
-    let dateComplete;
-    try {
-      dateComplete = typeof factura.date_complete_json === 'string' 
-        ? JSON.parse(factura.date_complete_json)
-        : factura.date_complete_json;
-    } catch (error) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Datele complete ale facturii sunt corupte' 
-      }, { status: 500 });
-    }
-    
-    // Regenerează HTML template-ul facturii
-    const htmlContent = generateInvoiceHTML(factura, dateComplete);
-    
-    return NextResponse.json({
-      success: true,
-      htmlContent,
-      fileName: `Factura_${factura.numar}.pdf`,
-      facturaData: {
-        id: factura.id,
-        numar: factura.numar,
-        total: factura.total
-      }
-    });
-    
   } catch (error) {
-    console.error('Eroare regenerare PDF:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Eroare la regenerarea PDF-ului'
-    }, { status: 500 });
+    console.log('⚠️ Eroare la încărcarea conturilor bancare din BigQuery:', error);
+    return null;
   }
 }
 
-// ✅ Funcție pentru generarea HTML template (identică cu cea din generate-hibrid)
-function generateInvoiceHTML(factura: any, dateComplete: any) {
-  const formatDate = (date: any) => {
-    if (!date) return 'N/A';
-    
-    let dateValue: string;
-    if (typeof date === 'object' && date.value) {
-      dateValue = date.value;
-    } else if (typeof date === 'string') {
-      dateValue = date;
-    } else {
-      return 'N/A';
-    }
-    
-    try {
-      return new Date(dateValue).toLocaleDateString('ro-RO');
-    } catch {
-      return 'Data invalidă';
-    }
-  };
+// ✅ FALLBACK CONTURI - Identic cu generate-hibrid
+const FALLBACK_CONTURI = [
+  {
+    nume_banca: 'ING Bank',
+    iban: 'RO82INGB0000999905667533',
+    cont_principal: true,
+    observatii: 'Cont principal pentru încasări'
+  },
+  {
+    nume_banca: 'Trezorerie',
+    iban: 'RO29TREZ7035069XXX018857',
+    cont_principal: false,
+    observatii: 'Trezoreria sectorului 3 Bucuresti'
+  }
+];
 
-  const formatCurrency = (amount: any) => {
-    const num = parseFloat(amount) || 0;
-    return num.toLocaleString('ro-RO', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+// ✅ TEMPLATE HTML - Identic cu generate-hibrid
+function generateBankDetailsHTML(conturi: any[]) {
+  if (!conturi || conturi.length === 0) {
+    conturi = FALLBACK_CONTURI;
+  }
+
+  return conturi.map((cont, index) => {
+    const formatIBAN = (iban: string) => {
+      return iban.replace(/(.{4})/g, '$1 ').trim();
+    };
+
+    const bankTitle = cont.cont_principal ? 
+      `CONT PRINCIPAL - ${cont.nume_banca}` : 
+      cont.nume_banca.toUpperCase();
+
+    return `
+                <div class="bank-section">
+                    <h5>${bankTitle}</h5>
+                    ${cont.nume_banca !== 'Trezorerie' ? `<div class="info-line">Banca: ${cont.nume_banca}</div>` : ''}
+                    <div class="info-line">IBAN: ${formatIBAN(cont.iban)}</div>
+                    ${cont.observatii ? `<div class="info-line">${cont.observatii}</div>` : ''}
+                </div>`;
+  }).join('');
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { facturaId, numar } = body;
+
+    console.log('📋 Regenerez PDF pentru factură:', { facturaId, numar });
+
+    if (!facturaId) {
+      return NextResponse.json({ error: 'facturaId este obligatoriu' }, { status: 400 });
+    }
+
+    // ✅ ÎNCARCĂ DATELE FACTURII DIN BigQuery
+    const facturaQuery = `
+      SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      WHERE id = @facturaId
+    `;
+
+    const [facturaRows] = await bigquery.query({
+      query: facturaQuery,
+      params: { facturaId },
+      types: { facturaId: 'STRING' },
+      location: 'EU',
     });
-  };
 
-  // Extrage informațiile din dateComplete
-  const liniiFactura = dateComplete.liniiFactura || [];
-  const clientInfo = dateComplete.clientInfo || {};
-  const observatii = dateComplete.observatii || '';
+    if (facturaRows.length === 0) {
+      return NextResponse.json({ error: 'Factura nu a fost găsită' }, { status: 404 });
+    }
 
-  const currentDate = new Date().toLocaleDateString('ro-RO');
+    const facturaData = facturaRows[0];
+    
+    // ✅ PARSEAZĂ DATELE COMPLETE DIN JSON
+    let dateComplete: any = {};
+    try {
+      if (facturaData.date_complete_json) {
+        dateComplete = JSON.parse(facturaData.date_complete_json);
+      }
+    } catch (error) {
+      console.log('⚠️ Nu s-au putut parsa datele complete JSON:', error);
+    }
 
-  return `
-<!DOCTYPE html>
-<html lang="ro">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Factura ${factura.numar}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    // ✅ ÎNCARCĂ CONTURI BANCARE
+    const contariBancare = await loadContariBancare();
+    const contariFinale = contariBancare || dateComplete.contariBancare || FALLBACK_CONTURI;
+
+    // ✅ RECONSTITUIE DATELE PENTRU TEMPLATE
+    const clientInfo = dateComplete.clientInfo || {
+      nume: facturaData.client_nume || 'Client necunoscut',
+      cui: facturaData.client_cui || 'CUI necunoscut',
+      nr_reg_com: 'N/A',
+      adresa: 'Adresa necunoscută',
+      telefon: 'N/A',
+      email: 'N/A'
+    };
+
+    const liniiFactura = dateComplete.liniiFactura || [{
+      denumire: 'Servicii facturate',
+      cantitate: 1,
+      pretUnitar: facturaData.subtotal || 0,
+      cotaTva: facturaData.total_tva > 0 ? 19 : 0,
+      tip: 'proiect'
+    }];
+
+    const proiectInfo = dateComplete.proiectInfo || {
+      id: facturaData.proiect_id || 'NECUNOSCUT',
+      denumire: `Proiect #${facturaData.proiect_id || 'NECUNOSCUT'}`
+    };
+
+    // ✅ CALCULE TOTALE
+    const subtotal = facturaData.subtotal || 0;
+    const totalTva = facturaData.total_tva || 0;
+    const total = facturaData.total || 0;
+
+    const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
+
+    // ✅ TEMPLATE HTML IDENTIC CU generate-hibrid
+    const htmlTemplate = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Factura ${facturaData.numar || numar}</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 10px;
+                line-height: 1.2;
+                color: #333;
+                padding: 15px;
+                background: white;
+                min-height: 1000px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .header h1 {
+                font-size: 16px;
+                color: #2c3e50;
+                margin-bottom: 10px;
+                font-weight: bold;
+            }
+            .company-info {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 20px;
+                gap: 20px;
+            }
+            .company-left, .company-right {
+                flex: 1;
+            }
+            .company-left h3, .company-right h3 {
+                font-size: 14px;
+                color: #34495e;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #bdc3c7;
+                padding-bottom: 4px;
+                font-weight: bold;
+            }
+            .info-line {
+                margin-bottom: 4px;
+                font-size: 10px;
+            }
+            .invoice-details {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 3px;
+                margin-bottom: 20px;
+            }
+            .invoice-number {
+                font-size: 12px;
+                font-weight: bold;
+                color: #e74c3c;
+                margin-bottom: 8px;
+            }
+            .invoice-meta {
+                display: flex;
+                gap: 30px;
+                font-size: 10px;
+            }
+            .table-container {
+                margin-bottom: 20px;
+                flex-grow: 1;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-size: 10px;
+            }
+            th {
+                background: #34495e;
+                color: white;
+                padding: 8px 4px;
+                text-align: left;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            td {
+                padding: 6px 4px;
+                border-bottom: 1px solid #ecf0f1;
+                font-size: 10px;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .totals-section {
+                margin-top: 2px;
+                margin-left: auto;
+                width: 150px;
+            }
+            .totals-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 4px 0;
+                border-bottom: 1px solid #ecf0f1;
+                font-size: 10px;
+            }
+            .totals-row.final {
+                border-top: 2px solid #34495e;
+                border-bottom: 2px solid #34495e;
+                font-weight: bold;
+                font-size: 12px;
+                background: #f8f9fa;
+                padding: 6px 0;
+            }
+            .payment-info {
+                margin-top: 15px;
+                background: #f8f9fa;
+                padding: 12px;
+                border-radius: 3px;
+            }
+            .payment-info h4 {
+                color: #34495e;
+                margin-bottom: 8px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            .bank-details {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+                margin-top: 8px;
+            }
+            .bank-section {
+                border: 1px solid #dee2e6;
+                padding: 8px;
+                border-radius: 3px;
+                background: white;
+            }
+            .bank-section h5 {
+                font-size: 10px;
+                font-weight: bold;
+                color: #34495e;
+                margin-bottom: 5px;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 2px;
+            }
+            .signatures {
+                margin-top: 25px;
+                display: flex;
+                justify-content: space-between;
+            }
+            .signature-box {
+                text-align: center;
+                width: 120px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            .signature-line {
+                border-top: 1px solid #34495e;
+                margin-top: 20px;
+                padding-top: 4px;
+                font-size: 9px;
+                font-weight: normal;
+            }
+            .footer {
+                margin-top: 20px;
+                text-align: center;
+                font-size: 8px;
+                color: #7f8c8d;
+                border-top: 1px solid #ecf0f1;
+                padding-top: 10px;
+            }
+            .footer .generated-info {
+                margin-bottom: 8px;
+                font-size: 9px;
+                color: #34495e;
+            }
+            .regenerated-badge {
+                background: #e8f4f8;
+                border: 1px solid #bee5eb;
+                color: #0c5460;
+                padding: 8px;
+                margin: 10px 0;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="regenerated-badge">
+            📄 PDF REGENERAT din baza de date - ${new Date().toLocaleDateString('ro-RO')} ${new Date().toLocaleTimeString('ro-RO')}
+        </div>
         
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
-            background: white;
-            padding: 20px;
-        }
-        
-        .invoice-container {
-            max-width: 210mm;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #2c3e50;
-        }
-        
-        .company-info {
-            flex: 1;
-        }
-        
-        .company-info h1 {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .company-details {
-            font-size: 11px;
-            line-height: 1.5;
-            color: #666;
-        }
-        
-        .invoice-number {
-            text-align: right;
-            flex: 1;
-        }
-        
-        .invoice-number h2 {
-            font-size: 24px;
-            color: #27ae60;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .invoice-meta {
-            font-size: 11px;
-            color: #666;
-            text-align: right;
-        }
-        
-        .client-section {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-        }
-        
-        .client-info {
-            flex: 1;
-            margin-right: 20px;
-        }
-        
-        .client-info h3 {
-            font-size: 14px;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .client-details {
-            font-size: 11px;
-            line-height: 1.6;
-        }
-        
-        .invoice-details {
-            flex: 1;
-        }
-        
-        .invoice-details h3 {
-            font-size: 14px;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 11px;
-        }
-        
-        .detail-label {
-            color: #666;
-        }
-        
-        .detail-value {
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-            font-size: 11px;
-        }
-        
-        .items-table th {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .items-table td {
-            border: 1px solid #dee2e6;
-            padding: 10px 8px;
-            vertical-align: top;
-        }
-        
-        .items-table .text-right {
-            text-align: right;
-        }
-        
-        .items-table .text-center {
-            text-align: center;
-        }
-        
-        .totals-section {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 30px;
-        }
-        
-        .totals-table {
-            width: 300px;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        
-        .totals-table td {
-            padding: 8px 12px;
-            border: 1px solid #dee2e6;
-        }
-        
-        .totals-table .label {
-            background: #f8f9fa;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .totals-table .value {
-            text-align: right;
-            font-weight: bold;
-        }
-        
-        .totals-table .total-row {
-            background: #27ae60;
-            color: white;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        
-        .notes-section {
-            margin-bottom: 30px;
-        }
-        
-        .notes-section h3 {
-            font-size: 14px;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .notes-content {
-            font-size: 11px;
-            line-height: 1.6;
-            color: #666;
-            background: #f8f9fa;
-            padding: 15px;
-            border-left: 4px solid #3498db;
-        }
-        
-        .footer {
-            border-top: 1px solid #dee2e6;
-            padding-top: 20px;
-            text-align: center;
-            font-size: 10px;
-            color: #999;
-        }
-        
-        .bank-info {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-        }
-        
-        .bank-info h3 {
-            font-size: 12px;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        
-        .bank-details {
-            font-size: 10px;
-            line-height: 1.5;
-        }
-    </style>
-</head>
-<body>
-    <div class="invoice-container">
-        <!-- Header -->
         <div class="header">
-            <div class="company-info">
-                <h1>UNITAR PROIECT TDA SRL</h1>
-                <div class="company-details">
-                    CUI: RO35639210<br>
-                    Nr. Reg. Com.: J2016002024405<br>
-                    Adresa: Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01,<br>
-                    mun. Bucuresti, sector 4<br>
-                    Telefon: 0765486044<br>
-                    Email: contact@unitarproiect.eu
-                </div>
+            <h1>FACTURA</h1>
+        </div>
+
+        <div class="company-info">
+            <div class="company-left">
+                <h3>FURNIZOR</h3>
+                <div class="info-line"><strong>UNITAR PROIECT TDA SRL</strong></div>
+                <div class="info-line">CUI: RO35639210</div>
+                <div class="info-line">Nr. Reg. Com.: J2016002024405</div>
+                <div class="info-line">Adresa: Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01, mun. Bucuresti, sector 4</div>
+                <div class="info-line">Telefon: 0765486044</div>
+                <div class="info-line">Email: contact@unitarproiect.eu</div>
             </div>
-            <div class="invoice-number">
-                <h2>FACTURA</h2>
-                <div class="invoice-meta">
-                    Nr: <strong>${factura.numar}</strong><br>
-                    Data: ${formatDate(factura.data_factura)}<br>
-                    Generata: ${currentDate}
-                </div>
+            <div class="company-right">
+                <h3>CLIENT</h3>
+                <div class="info-line"><strong>${clientInfo.nume}</strong></div>
+                <div class="info-line">CUI: ${clientInfo.cui}</div>
+                <div class="info-line">Nr. Reg. Com.: ${clientInfo.nr_reg_com}</div>
+                <div class="info-line">Adresa: ${clientInfo.adresa}</div>
+                <div class="info-line">Telefon: ${clientInfo.telefon}</div>
+                <div class="info-line">Email: ${clientInfo.email}</div>
             </div>
         </div>
 
-        <!-- Client & Invoice Details -->
-        <div class="client-section">
-            <div class="client-info">
-                <h3>Facturat catre:</h3>
-                <div class="client-details">
-                    <strong>${clientInfo.nume || clientInfo.denumire || factura.client_nume}</strong><br>
-                    CUI: ${clientInfo.cui || factura.client_cui}<br>
-                    ${clientInfo.nr_reg_com ? `Nr. Reg. Com.: ${clientInfo.nr_reg_com}<br>` : ''}
-                    ${clientInfo.adresa ? `Adresa: ${clientInfo.adresa}<br>` : ''}
-                    ${clientInfo.telefon && clientInfo.telefon !== 'N/A' ? `Telefon: ${clientInfo.telefon}<br>` : ''}
-                    ${clientInfo.email && clientInfo.email !== 'N/A' ? `Email: ${clientInfo.email}` : ''}
-                </div>
-            </div>
-            <div class="invoice-details">
-                <h3>Detalii Factura:</h3>
-                <div class="detail-row">
-                    <span class="detail-label">Data emiterii:</span>
-                    <span class="detail-value">${formatDate(factura.data_factura)}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Data scadentei:</span>
-                    <span class="detail-value">${formatDate(factura.data_scadenta)}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Moneda:</span>
-                    <span class="detail-value">RON</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Total de plata:</span>
-                    <span class="detail-value" style="color: #27ae60; font-size: 14px;">${formatCurrency(factura.total)} RON</span>
-                </div>
+        <div class="invoice-details">
+            <div class="invoice-number">Factura nr: ${facturaData.numar || numar}</div>
+            <div class="invoice-meta">
+                <div><strong>Data:</strong> ${facturaData.data_factura ? new Date(facturaData.data_factura).toLocaleDateString('ro-RO') : new Date().toLocaleDateString('ro-RO')}</div>
+                <div><strong>Proiect:</strong> ${proiectInfo.denumire}</div>
+                <div><strong>Regenerat:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
             </div>
         </div>
 
-        <!-- Items Table -->
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width: 50%">Descriere servicii/produse</th>
-                    <th style="width: 10%" class="text-center">Cant.</th>
-                    <th style="width: 15%" class="text-right">Pret unitar (RON)</th>
-                    <th style="width: 10%" class="text-center">TVA %</th>
-                    <th style="width: 15%" class="text-right">Valoare (RON)</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${liniiFactura.map((linie: any) => {
-                  const cantitate = parseFloat(linie.cantitate) || 0;
-                  const pretUnitar = parseFloat(linie.pretUnitar) || 0;
-                  const cotaTva = parseFloat(linie.cotaTva) || 0;
-                  const valoare = cantitate * pretUnitar;
-                  const tva = valoare * (cotaTva / 100);
-                  const total = valoare + tva;
-                  
-                  return `
+        <div class="table-container">
+            <table>
+                <thead>
                     <tr>
-                        <td>
-                            ${linie.denumire}
-                            ${linie.tip === 'subproiect' ? '<br><small style="color: #3498db; font-weight: bold;">(Subproiect)</small>' : ''}
-                        </td>
-                        <td class="text-center">${formatCurrency(cantitate)}</td>
-                        <td class="text-right">${formatCurrency(pretUnitar)}</td>
-                        <td class="text-center">${cotaTva}%</td>
-                        <td class="text-right">${formatCurrency(total)}</td>
+                        <th style="width: 40px;">Nr.</th>
+                        <th style="width: 300px;">Descriere</th>
+                        <th style="width: 60px;" class="text-center">Cant.</th>
+                        <th style="width: 80px;" class="text-right">Pret Unitar</th>
+                        <th style="width: 80px;" class="text-right">Total</th>
                     </tr>
-                  `;
-                }).join('')}
-            </tbody>
-        </table>
-
-        <!-- Totals -->
-        <div class="totals-section">
-            <table class="totals-table">
-                <tr>
-                    <td class="label">Subtotal (fara TVA):</td>
-                    <td class="value">${formatCurrency(factura.subtotal)} RON</td>
-                </tr>
-                <tr>
-                    <td class="label">TVA:</td>
-                    <td class="value">${formatCurrency(factura.total_tva)} RON</td>
-                </tr>
-                <tr class="total-row">
-                    <td>TOTAL DE PLATA:</td>
-                    <td class="value">${formatCurrency(factura.total)} RON</td>
-                </tr>
+                </thead>
+                <tbody>
+                    ${liniiFactura.map((linie: any, index: number) => {
+                      const cantitate = Number(linie.cantitate) || 0;
+                      const pretUnitar = Number(linie.pretUnitar) || 0;
+                      const cotaTva = Number(linie.cotaTva) || 0;
+                      
+                      const valoare = cantitate * pretUnitar;
+                      
+                      return `
+                    <tr>
+                        <td class="text-center">${index + 1}</td>
+                        <td>${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUBPROIECT]</small>' : ''}</td>
+                        <td class="text-center">${safeFormat(cantitate)}</td>
+                        <td class="text-right">${safeFormat(pretUnitar)} RON</td>
+                        <td class="text-right">${safeFormat(valoare)} RON</td>
+                    </tr>`;
+                    }).join('')}
+                </tbody>
             </table>
-        </div>
 
-        <!-- Notes -->
-        ${observatii ? `
-        <div class="notes-section">
-            <h3>Observatii:</h3>
-            <div class="notes-content">
-                ${observatii}
+            <div class="totals-section">
+                <div class="totals-row">
+                    <span>Subtotal:</span>
+                    <span>${safeFormat(subtotal)} RON</span>
+                </div>
+                ${totalTva > 0 ? `
+                <div class="totals-row">
+                    <span>TVA:</span>
+                    <span>${safeFormat(totalTva)} RON</span>
+                </div>
+                ` : ''}
+                <div class="totals-row final">
+                    <span>TOTAL DE PLATA:</span>
+                    <span>${safeFormat(total)} RON</span>
+                </div>
             </div>
         </div>
-        ` : ''}
 
-        <!-- Bank Info -->
-        <div class="bank-info">
-            <h3>Informatii bancare:</h3>
+        <div class="payment-info">
+            <h4>Conditii de plata</h4>
+            <div class="info-line">Termen de plata: 30 zile</div>
+            <div class="info-line">Metoda de plata: Transfer bancar</div>
+            
             <div class="bank-details">
-                <strong>ING Bank:</strong> RO82INGB0000999905667533<br>
-                <strong>Trezoreria:</strong> RO29TREZ7035069XXX018857 (Trezoreria sectorului 3 Bucuresti)
+                ${generateBankDetailsHTML(contariFinale)}
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            Aceasta factura a fost generata electronic de sistemul UNITAR PROIECT.<br>
-            Pentru intrebari, contactati-ne la contact@unitarproiect.eu sau 0765486044.
+        <div class="signatures">
+            <div class="signature-box">
+                <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px;">Furnizor</div>
+                <div class="signature-line">Semnatura si stampila</div>
+            </div>
+            <div class="signature-box">
+                <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px;">Client</div>
+                <div class="signature-line">Semnatura si stampila</div>
+            </div>
         </div>
-    </div>
-</body>
-</html>
-  `;
+
+        <div class="footer">
+            <div class="generated-info">
+                <strong>Factura regenerata din sistemul UNITAR PROIECT TDA</strong><br>
+                Original: ${facturaData.data_creare ? new Date(facturaData.data_creare).toLocaleString('ro-RO') : 'N/A'}<br>
+                Regenerat: ${new Date().toLocaleString('ro-RO')}
+            </div>
+            <div>
+                Aceasta factura a fost regenerata din baza de date si este identica cu originalul.<br>
+                Pentru intrebari contactati: contact@unitarproiect.eu | 0765486044
+            </div>
+        </div>
+    </body>
+    </html>`;
+
+    // ✅ RETURN HTML pentru regenerare în browser (ca în FacturiList.tsx)
+    return NextResponse.json({
+      success: true,
+      htmlContent: htmlTemplate,
+      fileName: `Factura_${facturaData.numar || numar}.pdf`,
+      message: 'Template HTML generat pentru regenerare PDF',
+      facturaData: {
+        id: facturaData.id,
+        numar: facturaData.numar || numar,
+        client: clientInfo.nume,
+        total: total,
+        contariCount: contariFinale.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Eroare la regenerarea PDF:', error);
+    return NextResponse.json({
+      error: 'Eroare la regenerarea PDF',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+    }, { status: 500 });
+  }
 }

@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// MODIFICAT: Fix Status Achitare opțiuni + Format dată românesc
+// MODIFICAT: Fix format dată românesc dd/mm/year + păstrează toate funcționalitățile
 // ==================================================================
 
 'use client';
@@ -87,6 +87,32 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     // ✅ NOUĂ: Pentru cheltuieli proiect
     cheltuieli: [] as CheltuialaProiect[]
   });
+
+  // ✅ NOU: Funcție pentru formatarea datei în format românesc pentru afișare
+  const formatDateForDisplay = (dateValue: string): string => {
+    if (!dateValue) return '';
+    try {
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    } catch {
+      return dateValue;
+    }
+  };
+
+  // ✅ NOU: Funcție pentru convertirea din format românesc înapoi la ISO pentru salvare
+  const convertRomanianDateToISO = (romanianDate: string): string => {
+    if (!romanianDate) return '';
+    try {
+      // Presupunem format dd/mm/yyyy
+      const parts = romanianDate.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      return romanianDate;
+    } catch {
+      return romanianDate;
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -743,6 +769,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Curs
+                  {/* ✅ NOU: Afișare data în format românesc */}
+                  {formData.data_curs_valutar && (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                      ({formatDateForDisplay(formData.data_curs_valutar)})
+                    </span>
+                  )}
                 </label>
                 <input
                   type="date"
@@ -899,6 +931,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Început
+                {/* ✅ NOU: Afișare data în format românesc */}
+                {formData.Data_Start && (
+                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                    ({formatDateForDisplay(formData.Data_Start)})
+                  </span>
+                )}
               </label>
               <input
                 type="date"
@@ -918,6 +956,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Finalizare
+                {/* ✅ NOU: Afișare data în format românesc */}
+                {formData.Data_Final && (
+                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
+                    ({formatDateForDisplay(formData.Data_Final)})
+                  </span>
+                )}
               </label>
               <input
                 type="date"

@@ -1,11 +1,12 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturiList.tsx
-// VERSIUNEA FINALĂ: Toate problemele rezolvate + îmbunătățiri complete
+// MODIFICAT: Adăugare butoane Edit/Delete/Stornare + toate funcționalitățile existente
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EditFacturaModal from './EditFacturaModal';
 
 // ✅ Adăugat declare global pentru jsPDF
 declare global {
@@ -40,6 +41,8 @@ interface Factura {
   anaf_upload_id?: string;
   // ✅ Pentru download PDF corect
   fileName?: string;
+  // ✅ JSON cu date complete
+  date_complete_json?: string;
 }
 
 interface FacturiListProps {
@@ -91,6 +94,10 @@ export default function FacturiList({
   const [processingActions, setProcessingActions] = useState<{[key: string]: boolean}>({});
   const [eFacturaDetails, setEFacturaDetails] = useState<{[key: string]: EFacturaDetails}>({});
   const [showEFacturaModal, setShowEFacturaModal] = useState<string | null>(null);
+
+  // ✅ NOU: State pentru editare factură
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
 
   useEffect(() => {
     loadFacturi();
@@ -471,6 +478,25 @@ export default function FacturiList({
     }
   };
 
+  // ✅ NOU: Deschide modal editare
+  const handleEditFactura = (factura: Factura) => {
+    setSelectedFactura(factura);
+    setShowEditModal(true);
+  };
+
+  // ✅ NOU: Callback pentru succes editare
+  const handleEditSuccess = (action: 'updated' | 'cancelled', facturaId: string) => {
+    setShowEditModal(false);
+    setSelectedFactura(null);
+    loadFacturi(); // Reîncarcă lista
+    
+    if (action === 'updated') {
+      showToast('✅ Factură actualizată cu succes', 'success');
+    } else if (action === 'cancelled') {
+      showToast('✅ Factură anulată cu succes', 'success');
+    }
+  };
+
   // ✅ NOU: Modal detalii e-factura cu timeline
   const showEFacturaDetailsModal = (factura: Factura) => {
     setShowEFacturaModal(factura.id);
@@ -487,7 +513,7 @@ export default function FacturiList({
       color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
       padding: 12px 16px;
       border-radius: 8px;
-      z-index: 10000;
+      z-index: 60000;
       font-size: 14px;
       font-weight: 500;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -779,133 +805,175 @@ export default function FacturiList({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {facturi.map((factura) => (
-                  <tr key={factura.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 flex items-center gap-2">
-                        {factura.numar}
-                        {/* ✅ Indicator e-factura */}
-                        {factura.efactura_enabled && (
-                          <span 
-                            className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded"
-                            title="Factură cu e-factura ANAF"
-                          >
-                            📤
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatDateSafe(factura.data_factura)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{factura.client_nume}</div>
-                      <div className="text-xs text-gray-500">{factura.client_cui}</div>
-                    </td>
-                    {/* ✅ MODIFICAT: Text wrap pentru proiect */}
-                    <td className="px-4 py-3 max-w-32">
-                      <div className="font-medium text-gray-900 break-words leading-tight">
-                        {factura.proiect_denumire}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Status: {factura.proiect_status}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="font-semibold text-gray-900">
-                        {formatCurrency(factura.total)}
-                      </div>
-                      {factura.valoare_platita > 0 && (
-                        <div className="text-xs text-green-600">
-                          Plătit: {formatCurrency(factura.valoare_platita)}
-                        </div>
-                      )}
-                      {factura.rest_de_plata > 0 && (
-                        <div className="text-xs text-orange-600">
-                          Rest: {formatCurrency(factura.rest_de_plata)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {getStatusBadge(factura)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div>{getScadentaBadge(factura.status_scadenta, factura.zile_pana_scadenta)}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {formatDateSafe(factura.data_scadenta)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        {/* ✅ Buton PDF */}
-                        <button
-                          onClick={() => handleDownload(factura)}
-                          className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600"
-                          title="Descarcă PDF"
-                        >
-                          📄 PDF
-                        </button>
-
-                        {/* ✅ Butoane e-factura */}
-                        {factura.efactura_enabled && (
-                          <>
-                            {/* Download XML */}
-                            {(factura.efactura_status === 'draft' || 
-                              factura.efactura_status === 'sent' || 
-                              factura.efactura_status === 'validated' ||
-                              factura.efactura_status === 'mock_pending') && (
-                              <button
-                                onClick={() => handleDownloadXML(factura)}
-                                className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                                title="Descarcă XML e-factura"
-                              >
-                                📄 XML
-                              </button>
-                            )}
-
-                            {/* Trimite la ANAF */}
-                            {(!factura.efactura_status || 
-                              factura.efactura_status === 'draft') && (
-                              <button
-                                onClick={() => handleSendToANAF(factura)}
-                                disabled={processingActions[factura.id]}
-                                className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 disabled:bg-gray-400"
-                                title="Trimite la ANAF"
-                              >
-                                {processingActions[factura.id] ? '⏳' : '📤'} ANAF
-                              </button>
-                            )}
-
-                            {/* Retry ANAF */}
-                            {factura.efactura_status === 'error' && (
-                              <button
-                                onClick={() => handleRetryANAF(factura)}
-                                disabled={processingActions[factura.id]}
-                                className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 disabled:bg-gray-400"
-                                title="Reîncearcă ANAF"
-                              >
-                                {processingActions[factura.id] ? '⏳' : '🔄'} Retry
-                              </button>
-                            )}
-
-                            {/* ✅ NOU: Buton Detalii e-factura */}
-                            <button
-                              onClick={() => showEFacturaDetailsModal(factura)}
-                              className="bg-purple-500 text-white px-2 py-1 rounded text-xs hover:bg-purple-600"
-                              title="Vezi detalii e-factura"
+                {facturi.map((factura) => {
+                  // ✅ NOU: Logică pentru butoane în funcție de status
+                  const canEdit = !factura.efactura_enabled || factura.efactura_status === 'draft';
+                  const canDelete = !factura.efactura_enabled;
+                  const canStorno = factura.efactura_enabled && factura.efactura_status !== 'draft';
+                  
+                  return (
+                    <tr key={factura.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900 flex items-center gap-2">
+                          {factura.numar}
+                          {/* ✅ Indicator e-factura */}
+                          {factura.efactura_enabled && (
+                            <span 
+                              className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded"
+                              title="Factură cu e-factura ANAF"
                             >
-                              🔍 Detalii
-                            </button>
-                          </>
+                              📤
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {formatDateSafe(factura.data_factura)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{factura.client_nume}</div>
+                        <div className="text-xs text-gray-500">{factura.client_cui}</div>
+                      </td>
+                      {/* ✅ MODIFICAT: Text wrap pentru proiect */}
+                      <td className="px-4 py-3 max-w-32">
+                        <div className="font-medium text-gray-900 break-words leading-tight">
+                          {factura.proiect_denumire}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Status: {factura.proiect_status}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="font-semibold text-gray-900">
+                          {formatCurrency(factura.total)}
+                        </div>
+                        {factura.valoare_platita > 0 && (
+                          <div className="text-xs text-green-600">
+                            Plătit: {formatCurrency(factura.valoare_platita)}
+                          </div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {factura.rest_de_plata > 0 && (
+                          <div className="text-xs text-orange-600">
+                            Rest: {formatCurrency(factura.rest_de_plata)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {getStatusBadge(factura)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div>{getScadentaBadge(factura.status_scadenta, factura.zile_pana_scadenta)}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {formatDateSafe(factura.data_scadenta)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          {/* ✅ Buton PDF */}
+                          <button
+                            onClick={() => handleDownload(factura)}
+                            className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600"
+                            title="Descarcă PDF"
+                          >
+                            📄 PDF
+                          </button>
+
+                          {/* ✅ NOU: Buton EDITARE */}
+                          {canEdit && (
+                            <button
+                              onClick={() => handleEditFactura(factura)}
+                              className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                              title="Editează factură"
+                            >
+                              ✏️ Edit
+                            </button>
+                          )}
+
+                          {/* ✅ NOU: Buton STORNARE (dacă e în ANAF) */}
+                          {canStorno && (
+                            <button
+                              onClick={() => handleEditFactura(factura)}
+                              className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
+                              title="Creează factură de stornare"
+                            >
+                              ↩️ Storno
+                            </button>
+                          )}
+
+                          {/* ✅ Butoane e-factura */}
+                          {factura.efactura_enabled && (
+                            <>
+                              {/* Download XML */}
+                              {(factura.efactura_status === 'draft' || 
+                                factura.efactura_status === 'sent' || 
+                                factura.efactura_status === 'validated' ||
+                                factura.efactura_status === 'mock_pending') && (
+                                <button
+                                  onClick={() => handleDownloadXML(factura)}
+                                  className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                                  title="Descarcă XML e-factura"
+                                >
+                                  📄 XML
+                                </button>
+                              )}
+
+                              {/* Trimite la ANAF */}
+                              {(!factura.efactura_status || 
+                                factura.efactura_status === 'draft') && (
+                                <button
+                                  onClick={() => handleSendToANAF(factura)}
+                                  disabled={processingActions[factura.id]}
+                                  className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 disabled:bg-gray-400"
+                                  title="Trimite la ANAF"
+                                >
+                                  {processingActions[factura.id] ? '⏳' : '📤'} ANAF
+                                </button>
+                              )}
+
+                              {/* Retry ANAF */}
+                              {factura.efactura_status === 'error' && (
+                                <button
+                                  onClick={() => handleRetryANAF(factura)}
+                                  disabled={processingActions[factura.id]}
+                                  className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 disabled:bg-gray-400"
+                                  title="Reîncearcă ANAF"
+                                >
+                                  {processingActions[factura.id] ? '⏳' : '🔄'} Retry
+                                </button>
+                              )}
+
+                              {/* ✅ NOU: Buton Detalii e-factura */}
+                              <button
+                                onClick={() => showEFacturaDetailsModal(factura)}
+                                className="bg-purple-500 text-white px-2 py-1 rounded text-xs hover:bg-purple-600"
+                                title="Vezi detalii e-factura"
+                              >
+                                🔍 Detalii
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {/* ✅ NOU: Modal pentru editare factură */}
+      {showEditModal && selectedFactura && (
+        <EditFacturaModal
+          factura={selectedFactura}
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedFactura(null);
+          }}
+          onSuccess={handleEditSuccess}
+        />
       )}
 
       {/* ✅ NOU: Modal pentru detalii e-factura */}
