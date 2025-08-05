@@ -265,61 +265,91 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ MODIFICAT: Funcție pentru verificarea status-ului OAuth ANAF cu calcul în zile
+// ✅ MODIFICAT: Funcție pentru verificarea status-ului OAuth ANAF cu calcul corect din expires_at
   const checkAnafTokenStatus = async () => {
-    setIsCheckingAnafToken(true);
-    try {
-      const response = await fetch('/api/anaf/oauth/token');
-      const data = await response.json();
-      
-      // ✅ MODIFICAT: Calculăm în zile, nu minute
-      let expiresInDays = 0;
-      if (data.tokenInfo?.expires_in_minutes) {
-        expiresInDays = Math.floor(data.tokenInfo.expires_in_minutes / (60 * 24));
-      }
-      
-      setAnafTokenStatus({
-        hasValidToken: data.hasValidToken,
-        tokenInfo: data.tokenInfo ? {
-          ...data.tokenInfo,
-          expires_in_days: expiresInDays  // ✅ Adăugăm câmp pentru zile
-        } : undefined,
-        loading: false
-      });
-
-      if (!data.hasValidToken) {
-        setSendToAnaf(false); // Dezactivează checkbox-ul dacă nu avem token valid
-      }
-    } catch (error) {
-      console.error('Error checking ANAF token status:', error);
-      setAnafTokenStatus({
-        hasValidToken: false,
-        loading: false
-      });
-      setSendToAnaf(false);
-    } finally {
-      setIsCheckingAnafToken(false);
-    }
-  };
-
-  // ✅ Handler pentru checkbox ANAF
-  const handleAnafCheckboxChange = (checked: boolean) => {
-    if (checked && !anafTokenStatus.hasValidToken) {
-      showToast('❌ Nu există token ANAF valid. Configurează OAuth mai întâi.', 'error');
-      return;
-    }
-
-    if (checked && anafTokenStatus.tokenInfo?.expires_in_days !== undefined && 
-        anafTokenStatus.tokenInfo.expires_in_days < 1) {
-      showToast('⚠️ Token ANAF expiră în mai puțin de o zi. Recomandăm refresh înainte de trimitere.', 'info');
-    }
-
-    setSendToAnaf(checked);
+  setIsCheckingAnafToken(true);
+  try {
+    const response = await fetch('/api/anaf/oauth/token');
+    const data = await response.json();
     
-    if (checked) {
-      showToast('✅ Factura va fi trimisă automat la ANAF ca e-Factură', 'success');
+    // ✅ MODIFICAT: Calculăm corect zilele rămase din expires_at
+    let expiresInDays = 0;
+    let expiresInMinutes = 0;
+    
+    if (data.success && data.hasValidToken && data.tokenInfo) {
+      // API-ul returnează deja expires_in_minutes calculat corect
+      if (data.tokenInfo.expires_in_minutes !== undefined) {
+        expiresInMinutes = data.tokenInfo.expires_in_minutes;
+        // Calculăm zilele din minute
+        expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+        
+        // Dacă sunt mai puțin de 24 de ore, afișăm 0 zile
+        if (expiresInMinutes > 0 && expiresInDays === 0 && expiresInMinutes < 1440) {
+          // Afișăm ore dacă e mai puțin de o zi
+          const expiresInHours = Math.floor(expiresInMinutes / 60);
+          console.log(`Token expiră în ${expiresInHours} ore (${expiresInMinutes} minute)`);
+        }
+      }
+      
+      // Alternativ, calculăm direct din expires_at dacă există
+      if (data.tokenInfo.expires_at && expiresInMinutes === 0) {
+        const expiresAt = new Date(data.tokenInfo.expires_at);
+        const now = new Date();
+        const diffMs = expiresAt.getTime() - now.getTime();
+        
+        if (diffMs > 0) {
+          expiresInMinutes = Math.floor(diffMs / (1000 * 60));
+          expiresInDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        }
+      }
     }
-  };
+    
+    setAnafTokenStatus({
+      hasValidToken: data.hasValidToken && expiresInMinutes > 0,
+      tokenInfo: data.tokenInfo ? {
+        ...data.tokenInfo,
+        expires_in_minutes: expiresInMinutes,
+        expires_in_days: expiresInDays,
+        is_expired: data.tokenInfo.is_expired || expiresInMinutes <= 0
+      } : undefined,
+      loading: false
+    });
+
+    // Dezactivează checkbox-ul dacă nu avem token valid sau a expirat
+    if (!data.hasValidToken || expiresInMinutes <= 0) {
+      setSendToAnaf(false);
+      
+      if (expiresInMinutes <= 0 && data.hasValidToken) {
+        showToast('⚠️ Token ANAF a expirat. Reîmprospătează token-ul din pagina de setări.', 'error');
+      }
+    }
+    
+    // Avertizare dacă expiră curând
+    if (expiresInDays > 0 && expiresInDays <= 7) {
+      showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}. Consideră reîmprospătarea.`, 'info');
+    }
+    
+    // Log pentru debugging
+    console.log('Token ANAF Status:', {
+      hasValidToken: data.hasValidToken,
+      expiresInDays,
+      expiresInMinutes,
+      expiresAt: data.tokenInfo?.expires_at,
+      isExpired: data.tokenInfo?.is_expired
+    });
+    
+  } catch (error) {
+    console.error('Error checking ANAF token status:', error);
+    setAnafTokenStatus({
+      hasValidToken: false,
+      loading: false
+    });
+    setSendToAnaf(false);
+    showToast('❌ Nu s-a putut verifica statusul token ANAF', 'error');
+  } finally {
+    setIsCheckingAnafToken(false);
+  }
+};
 
   const loadClientFromDatabase = async () => {
     if (!proiect.Client) return;
@@ -1768,32 +1798,41 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   📤 Trimite automat la ANAF ca e-Factură
                 </label>
 
-                <div style={{ flex: 1 }}>
-                  {anafTokenStatus.loading ? (
-                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-                  ) : anafTokenStatus.hasValidToken ? (
-                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
-                      ✅ Token ANAF valid
-                      {anafTokenStatus.tokenInfo?.expires_in_days !== undefined && (
-                        <span style={{ 
-                          color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
-                        }}>
-                          {' '}(expiră în {anafTokenStatus.tokenInfo.expires_in_days} {anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-                      ❌ Nu există token ANAF valid.{' '}
-                      <a 
-                        href="/admin/anaf/setup"
-                        target="_blank"
-                        style={{ color: '#3498db', textDecoration: 'underline' }}
-                      >
-                        Configurează OAuth
-                      </a>
-                    </div>
-                  )}
+		{/* ✅ MODIFICAT: Afișare corectă a expirării token ANAF */}
+		<div style={{ flex: 1 }}>
+		  {anafTokenStatus.loading ? (
+		    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+		  ) : anafTokenStatus.hasValidToken ? (
+		    <div style={{ fontSize: '12px', color: '#27ae60' }}>
+		      ✅ Token ANAF valid
+		      {anafTokenStatus.tokenInfo?.expires_in_days !== undefined && (
+			<span style={{ 
+			  color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
+			}}>
+			  {' '}
+			  {anafTokenStatus.tokenInfo.expires_in_days > 0 ? (
+			    `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+			  ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+			    `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+			  ) : (
+			    '(expiră în curând)'
+			  )}
+			</span>
+		      )}
+		    </div>
+		  ) : (
+		    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+		      ❌ Nu există token ANAF valid.{' '}
+		      <a 
+			href="/admin/anaf/setup"
+			target="_blank"
+			style={{ color: '#3498db', textDecoration: 'underline' }}
+		      >
+			Configurează OAuth
+		      </a>
+		    </div>
+		  )}
+		</div>                
 
                   {sendToAnaf && (
                     <div style={{
