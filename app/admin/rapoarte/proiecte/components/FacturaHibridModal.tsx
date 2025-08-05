@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// MODIFICAT: Număr factură din setări + afișare expirare token în zile
+// MODIFICAT: Număr factură din setări + afișare corectă expirare token în zile
 // ==================================================================
 
 'use client';
@@ -59,7 +59,6 @@ interface SubproiectInfo {
   adaugat?: boolean;
 }
 
-// ✅ MODIFICAT: Interface pentru setări facturare
 interface SetariFacturare {
   serie_facturi: string;
   numar_curent_facturi: number;
@@ -70,12 +69,11 @@ interface SetariFacturare {
   termen_plata_standard: number;
 }
 
-// ✅ MODIFICAT: Interface pentru status OAuth ANAF cu zile
 interface ANAFTokenStatus {
   hasValidToken: boolean;
   tokenInfo?: {
     expires_in_minutes: number;
-    expires_in_days?: number;  // ✅ NOU: Câmp pentru zile
+    expires_in_days?: number;
     is_expired: boolean;
   };
   loading: boolean;
@@ -89,7 +87,6 @@ declare global {
   }
 }
 
-// ✅ Toast system Premium cu design solid - păstrat identic
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -151,17 +148,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [cuiInput, setCuiInput] = useState('');
   const [anafError, setAnafError] = useState<string | null>(null);
   const [isProcessingPDF, setIsProcessingPDF] = useState(false);
-  
   const [subproiecteDisponibile, setSubproiecteDisponibile] = useState<SubproiectInfo[]>([]);
   const [showSubproiecteSelector, setShowSubproiecteSelector] = useState(false);
-
-  // ✅ MODIFICAT: State pentru setări facturare și număr factură
   const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
   const [numarFactura, setNumarFactura] = useState('');
   const [dataFactura] = useState(new Date());
   const [isLoadingSetari, setIsLoadingSetari] = useState(false);
-
-  // ✅ State pentru e-factura ANAF
   const [sendToAnaf, setSendToAnaf] = useState(false);
   const [anafTokenStatus, setAnafTokenStatus] = useState<ANAFTokenStatus>({
     hasValidToken: false,
@@ -169,7 +161,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
 
-  // Helper pentru formatarea datelor cu support dual - păstrat identic
   const formatDate = (date?: string | { value: string }): string => {
     if (!date) return '';
     const dateValue = typeof date === 'string' ? date : date.value;
@@ -188,11 +179,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   useEffect(() => {
     loadClientFromDatabase();
     loadSubproiecte();
-    loadSetariFacturare(); // ✅ Încarcă setările de facturare
+    loadSetariFacturare();
     checkAnafTokenStatus();
   }, [proiect]);
 
-  // ✅ MODIFICAT: Funcție pentru încărcarea setărilor de facturare
   const loadSetariFacturare = async () => {
     setIsLoadingSetari(true);
     try {
@@ -200,7 +190,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const data = await response.json();
       
       if (data.success && data.setari) {
-        // ✅ Procesare valori pentru compatibilitate BigQuery
         const processValue = (value: any) => {
           if (value && typeof value === 'object' && value.value !== undefined) {
             return value.value;
@@ -220,7 +209,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         setSetariFacturare(setariProcesate);
         
-        // Generează numărul facturii bazat pe setări
         const urmatorulNumar = (setariProcesate.numar_curent_facturi || 0) + 1;
         let numarNou = `${setariProcesate.serie_facturi}${setariProcesate.separator_numerotare}${urmatorulNumar}`;
         
@@ -236,7 +224,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         setNumarFactura(numarNou);
         showToast(`✅ Număr factură generat: ${numarNou}`, 'success');
       } else {
-        // Setări default dacă nu există în BD
         const defaultSetari: SetariFacturare = {
           serie_facturi: 'UP',
           numar_curent_facturi: 1000,
@@ -249,14 +236,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         setSetariFacturare(defaultSetari);
         
-        // Generează număr cu setările default
         const numarDefault = `UP-1001-${new Date().getFullYear()}`;
         setNumarFactura(numarDefault);
         showToast(`ℹ️ Folosesc setări default. Număr: ${numarDefault}`, 'info');
       }
     } catch (error) {
       console.error('Eroare la încărcarea setărilor:', error);
-      // Fallback la număr simplu
       const fallbackNumar = `INV-${proiect.ID_Proiect}-${Date.now()}`;
       setNumarFactura(fallbackNumar);
       showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
@@ -265,91 +250,100 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-// ✅ MODIFICAT: Funcție pentru verificarea status-ului OAuth ANAF cu calcul corect din expires_at
+  // ✅ MODIFICAT: Funcție corectată pentru verificarea status-ului OAuth ANAF
   const checkAnafTokenStatus = async () => {
-  setIsCheckingAnafToken(true);
-  try {
-    const response = await fetch('/api/anaf/oauth/token');
-    const data = await response.json();
-    
-    // ✅ MODIFICAT: Calculăm corect zilele rămase din expires_at
-    let expiresInDays = 0;
-    let expiresInMinutes = 0;
-    
-    if (data.success && data.hasValidToken && data.tokenInfo) {
-      // API-ul returnează deja expires_in_minutes calculat corect
-      if (data.tokenInfo.expires_in_minutes !== undefined) {
-        expiresInMinutes = data.tokenInfo.expires_in_minutes;
-        // Calculăm zilele din minute
-        expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+    setIsCheckingAnafToken(true);
+    try {
+      const response = await fetch('/api/anaf/oauth/token');
+      const data = await response.json();
+      
+      let expiresInDays = 0;
+      let expiresInMinutes = 0;
+      
+      if (data.success && data.hasValidToken && data.tokenInfo) {
+        if (data.tokenInfo.expires_in_minutes !== undefined) {
+          expiresInMinutes = data.tokenInfo.expires_in_minutes;
+          expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+          
+          if (expiresInMinutes > 0 && expiresInDays === 0 && expiresInMinutes < 1440) {
+            const expiresInHours = Math.floor(expiresInMinutes / 60);
+            console.log(`Token expiră în ${expiresInHours} ore (${expiresInMinutes} minute)`);
+          }
+        }
         
-        // Dacă sunt mai puțin de 24 de ore, afișăm 0 zile
-        if (expiresInMinutes > 0 && expiresInDays === 0 && expiresInMinutes < 1440) {
-          // Afișăm ore dacă e mai puțin de o zi
-          const expiresInHours = Math.floor(expiresInMinutes / 60);
-          console.log(`Token expiră în ${expiresInHours} ore (${expiresInMinutes} minute)`);
+        if (data.tokenInfo.expires_at && expiresInMinutes === 0) {
+          const expiresAt = new Date(data.tokenInfo.expires_at);
+          const now = new Date();
+          const diffMs = expiresAt.getTime() - now.getTime();
+          
+          if (diffMs > 0) {
+            expiresInMinutes = Math.floor(diffMs / (1000 * 60));
+            expiresInDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          }
         }
       }
       
-      // Alternativ, calculăm direct din expires_at dacă există
-      if (data.tokenInfo.expires_at && expiresInMinutes === 0) {
-        const expiresAt = new Date(data.tokenInfo.expires_at);
-        const now = new Date();
-        const diffMs = expiresAt.getTime() - now.getTime();
-        
-        if (diffMs > 0) {
-          expiresInMinutes = Math.floor(diffMs / (1000 * 60));
-          expiresInDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        }
-      }
-    }
-    
-    setAnafTokenStatus({
-      hasValidToken: data.hasValidToken && expiresInMinutes > 0,
-      tokenInfo: data.tokenInfo ? {
-        ...data.tokenInfo,
-        expires_in_minutes: expiresInMinutes,
-        expires_in_days: expiresInDays,
-        is_expired: data.tokenInfo.is_expired || expiresInMinutes <= 0
-      } : undefined,
-      loading: false
-    });
+      setAnafTokenStatus({
+        hasValidToken: data.hasValidToken && expiresInMinutes > 0,
+        tokenInfo: data.tokenInfo ? {
+          ...data.tokenInfo,
+          expires_in_minutes: expiresInMinutes,
+          expires_in_days: expiresInDays,
+          is_expired: data.tokenInfo.is_expired || expiresInMinutes <= 0
+        } : undefined,
+        loading: false
+      });
 
-    // Dezactivează checkbox-ul dacă nu avem token valid sau a expirat
-    if (!data.hasValidToken || expiresInMinutes <= 0) {
-      setSendToAnaf(false);
-      
-      if (expiresInMinutes <= 0 && data.hasValidToken) {
-        showToast('⚠️ Token ANAF a expirat. Reîmprospătează token-ul din pagina de setări.', 'error');
+      if (!data.hasValidToken || expiresInMinutes <= 0) {
+        setSendToAnaf(false);
+        
+        if (expiresInMinutes <= 0 && data.hasValidToken) {
+          showToast('⚠️ Token ANAF a expirat. Reîmprospătează token-ul din pagina de setări.', 'error');
+        }
       }
+      
+      if (expiresInDays > 0 && expiresInDays <= 7) {
+        showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}. Consideră reîmprospătarea.`, 'info');
+      }
+      
+      console.log('Token ANAF Status:', {
+        hasValidToken: data.hasValidToken,
+        expiresInDays,
+        expiresInMinutes,
+        expiresAt: data.tokenInfo?.expires_at,
+        isExpired: data.tokenInfo?.is_expired
+      });
+      
+    } catch (error) {
+      console.error('Error checking ANAF token status:', error);
+      setAnafTokenStatus({
+        hasValidToken: false,
+        loading: false
+      });
+      setSendToAnaf(false);
+      showToast('❌ Nu s-a putut verifica statusul token ANAF', 'error');
+    } finally {
+      setIsCheckingAnafToken(false);
     }
-    
-    // Avertizare dacă expiră curând
-    if (expiresInDays > 0 && expiresInDays <= 7) {
-      showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}. Consideră reîmprospătarea.`, 'info');
+  };
+
+  const handleAnafCheckboxChange = (checked: boolean) => {
+    if (checked && !anafTokenStatus.hasValidToken) {
+      showToast('❌ Nu există token ANAF valid. Configurează OAuth mai întâi.', 'error');
+      return;
     }
+
+    if (checked && anafTokenStatus.tokenInfo?.expires_in_days !== undefined && 
+        anafTokenStatus.tokenInfo.expires_in_days < 1) {
+      showToast('⚠️ Token ANAF expiră în mai puțin de o zi. Recomandăm refresh înainte de trimitere.', 'info');
+    }
+
+    setSendToAnaf(checked);
     
-    // Log pentru debugging
-    console.log('Token ANAF Status:', {
-      hasValidToken: data.hasValidToken,
-      expiresInDays,
-      expiresInMinutes,
-      expiresAt: data.tokenInfo?.expires_at,
-      isExpired: data.tokenInfo?.is_expired
-    });
-    
-  } catch (error) {
-    console.error('Error checking ANAF token status:', error);
-    setAnafTokenStatus({
-      hasValidToken: false,
-      loading: false
-    });
-    setSendToAnaf(false);
-    showToast('❌ Nu s-a putut verifica statusul token ANAF', 'error');
-  } finally {
-    setIsCheckingAnafToken(false);
-  }
-};
+    if (checked) {
+      showToast('✅ Factura va fi trimisă automat la ANAF ca e-Factură', 'success');
+    }
+  };
 
   const loadClientFromDatabase = async () => {
     if (!proiect.Client) return;
@@ -783,7 +777,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ MODIFICAT: handleGenereazaFactura trimite numărul și setările către API
   const handleGenereazaFactura = async () => {
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
@@ -800,7 +793,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       return;
     }
 
-    // ✅ Validări suplimentare pentru e-factura ANAF
     if (sendToAnaf) {
       if (!anafTokenStatus.hasValidToken) {
         showToast('❌ Nu există token ANAF valid pentru e-factura', 'error');
@@ -840,8 +832,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           liniiFactura,
           observatii,
           clientInfo,
-          numarFactura,      // ✅ MODIFICAT: Trimite numărul generat
-          setariFacturare,   // ✅ MODIFICAT: Trimite setările pentru actualizarea numărului curent
+          numarFactura,
+          setariFacturare,
           sendToAnaf
         })
       });
@@ -849,7 +841,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const result = await response.json();
       
       if (result.success && result.htmlContent) {
-        // ✅ Afișează informații despre e-factura dacă este cazul
         if (sendToAnaf) {
           if (result.efactura?.xmlGenerated) {
             showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, 'success');
@@ -878,8 +869,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
-  // ✅ RENDER JSX - continuare în următorul mesaj din cauza limitării de lungime
-  // Continuare render JSX în partea 3...
+  // Continuare în partea 2...
   // ✅ RENDER JSX - COMPLET cu toate secțiunile + număr factură în header
   return (
     <div style={{
@@ -904,7 +894,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         maxHeight: '90vh',
         overflowY: 'auto'
       }}>
-        {/* ✅ MODIFICAT: Header cu număr factură și dată */}
+        {/* Header cu număr factură și dată */}
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
@@ -930,7 +920,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </button>
           </div>
           
-          {/* ✅ MODIFICAT: Afișare număr factură și dată */}
+          {/* Afișare număr factură și dată */}
           <div style={{
             marginTop: '1rem',
             padding: '1rem',
@@ -987,7 +977,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* ✅ Indicator setări */}
+            {/* Indicator setări */}
             <div style={{
               padding: '0.5rem 1rem',
               background: setariFacturare ? '#d4edda' : '#fff3cd',
@@ -1005,7 +995,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         </div>
 
         <div style={{ padding: '1.5rem' }}>
-          {/* ✅ LOADING OVERLAY */}
+          {/* LOADING OVERLAY */}
           {isLoading && (
             <div style={{
               position: 'fixed',
@@ -1449,7 +1439,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* Secțiune Servicii/Produse - Continuare în următorul mesaj */}
+          {/* Continuare în partea 3... */}
           {/* Secțiune Servicii/Produse */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{
@@ -1740,7 +1730,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             />
           </div>
 
-          {/* ✅ MODIFICAT: Secțiune e-Factura ANAF cu afișare în ZILE */}
+          {/* ✅ MODIFICAT: Secțiune e-Factura ANAF cu afișare corectă în ZILE */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{
               background: '#f0f8ff',
@@ -1798,41 +1788,39 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   📤 Trimite automat la ANAF ca e-Factură
                 </label>
 
-		{/* ✅ MODIFICAT: Afișare corectă a expirării token ANAF */}
-		<div style={{ flex: 1 }}>
-		  {anafTokenStatus.loading ? (
-		    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-		  ) : anafTokenStatus.hasValidToken ? (
-		    <div style={{ fontSize: '12px', color: '#27ae60' }}>
-		      ✅ Token ANAF valid
-		      {anafTokenStatus.tokenInfo?.expires_in_days !== undefined && (
-			<span style={{ 
-			  color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
-			}}>
-			  {' '}
-			  {anafTokenStatus.tokenInfo.expires_in_days > 0 ? (
-			    `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-			  ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-			    `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-			  ) : (
-			    '(expiră în curând)'
-			  )}
-			</span>
-		      )}
-		    </div>
-		  ) : (
-		    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-		      ❌ Nu există token ANAF valid.{' '}
-		      <a 
-			href="/admin/anaf/setup"
-			target="_blank"
-			style={{ color: '#3498db', textDecoration: 'underline' }}
-		      >
-			Configurează OAuth
-		      </a>
-		    </div>
-		  )}
-		</div>                
+                <div style={{ flex: 1 }}>
+                  {anafTokenStatus.loading ? (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+                  ) : anafTokenStatus.hasValidToken ? (
+                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
+                      ✅ Token ANAF valid
+                      {anafTokenStatus.tokenInfo?.expires_in_days !== undefined && (
+                        <span style={{ 
+                          color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
+                        }}>
+                          {' '}
+                          {anafTokenStatus.tokenInfo.expires_in_days > 0 ? (
+                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+                          ) : (
+                            '(expiră în curând)'
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+                      ❌ Nu există token ANAF valid.{' '}
+                      <a 
+                        href="/admin/anaf/setup"
+                        target="_blank"
+                        style={{ color: '#3498db', textDecoration: 'underline' }}
+                      >
+                        Configurează OAuth
+                      </a>
+                    </div>
+                  )}
 
                   {sendToAnaf && (
                     <div style={{
@@ -1852,7 +1840,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ Informații importante */}
+          {/* Informații importante */}
           <div style={{
             background: '#fff3cd',
             border: '1px solid #ffeaa7',
@@ -1871,7 +1859,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </ul>
           </div>
 
-          {/* ✅ Butoane finale */}
+          {/* Butoane finale */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between',
