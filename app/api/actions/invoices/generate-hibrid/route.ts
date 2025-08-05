@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// MODIFICAT: Integrare conturi bancare dinamice din BigQuery + păstrează toate funcționalitățile
+// MODIFICAT: Folosește numărul din setări + coloane optimizate pentru PDF
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -103,14 +103,17 @@ export async function POST(request: NextRequest) {
       liniiFactura, 
       observatii, 
       clientInfo,
-      sendToAnaf = false  // ✅ Parametru pentru e-factura ANAF
+      numarFactura,        // ✅ MODIFICAT: Preia numărul din frontend
+      setariFacturare,     // ✅ MODIFICAT: Preia setările pentru actualizare
+      sendToAnaf = false
     } = body;
 
     console.log('📋 Date primite pentru factură:', { 
       proiectId, 
       liniiFactura: liniiFactura?.length, 
       observatii: observatii?.length, 
-      clientInfo: clientInfo?.nume, 
+      clientInfo: clientInfo?.nume,
+      numarFactura,       // ✅ Log număr factură
       sendToAnaf,
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf
     });
@@ -173,20 +176,21 @@ export async function POST(request: NextRequest) {
       email: 'N/A'
     };
 
+    // ✅ MODIFICAT: Folosește numărul primit din frontend
     const safeInvoiceData = {
-      numarFactura: `INV-${proiectId}-${Date.now()}`,
+      numarFactura: numarFactura || `INV-${proiectId}-${Date.now()}`, // ✅ Folosește numărul din setări
       denumireProiect: `Proiect #${proiectId}`,
       descriere: descrierePrincipala,
       subtotal: Number(subtotal.toFixed(2)),
       tva: Number(totalTva.toFixed(2)),
       total: Number(total.toFixed(2)),
-      termenPlata: '30 zile'
+      termenPlata: setariFacturare?.termen_plata_standard ? `${setariFacturare.termen_plata_standard} zile` : '30 zile'
     };
 
-    // ✅ TEMPLATE HTML - cu conturi bancare dinamice
+    // ✅ TEMPLATE HTML - cu coloane optimizate și TVA dinamic
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `factura-${proiectId}-${timestamp}.pdf`;
+    const fileName = `factura-${numarFactura || proiectId}-${timestamp}.pdf`;
 
     const htmlTemplate = `
     <!DOCTYPE html>
@@ -263,26 +267,31 @@ export async function POST(request: NextRequest) {
             .table-container {
                 margin-bottom: 20px;
                 flex-grow: 1;
+                width: 100%;
+                overflow: visible;
             }
             table {
                 width: 100%;
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                font-size: 10px;
+                font-size: 9px;
+                table-layout: fixed;
             }
             th {
                 background: #34495e;
                 color: white;
-                padding: 8px 4px;
+                padding: 6px 3px;
                 text-align: left;
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: bold;
+                white-space: nowrap;
             }
             td {
-                padding: 6px 4px;
+                padding: 5px 3px;
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 10px;
+                font-size: 9px;
+                word-break: break-word;
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
@@ -429,11 +438,12 @@ export async function POST(request: NextRequest) {
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 40px;">Nr.</th>
-                        <th style="width: 300px;">Descriere</th>
-                        <th style="width: 60px;" class="text-center">Cant.</th>
-                        <th style="width: 80px;" class="text-right">Pret Unitar</th>
-                        <th style="width: 80px;" class="text-right">Total</th>
+                        <th style="width: 30px;">Nr.</th>
+                        <th style="width: 240px;">Descriere</th>
+                        <th style="width: 50px;" class="text-center">Cant.</th>
+                        <th style="width: 70px;" class="text-right">Preț Unitar</th>
+                        <th style="width: 80px;" class="text-center">TVA ${liniiFactura[0]?.cotaTva || 19}%</th>
+                        <th style="width: 70px;" class="text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -451,10 +461,11 @@ export async function POST(request: NextRequest) {
                       return `
                     <tr>
                         <td class="text-center">${index + 1}</td>
-                        <td>${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUBPROIECT]</small>' : ''}</td>
+                        <td>${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUB]</small>' : ''}</td>
                         <td class="text-center">${safeFixed(cantitate)}</td>
-                        <td class="text-right">${safeFixed(pretUnitar)} RON</td>
-                        <td class="text-right">${safeFixed(valoare)} RON</td>
+                        <td class="text-right">${safeFixed(pretUnitar)}</td>
+                        <td class="text-center">${safeFixed(tva)}</td>
+                        <td class="text-right" style="font-weight: bold;">${safeFixed(totalLinie)}</td>
                     </tr>`;
                     }).join('')}
                 </tbody>
@@ -584,7 +595,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ SALVARE în BigQuery FacturiGenerate - compatibil cu schema existentă (PĂSTRAT IDENTIC)
+    // ✅ MODIFICAT: Salvare în BigQuery cu numărul corect din setări
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
@@ -592,14 +603,14 @@ export async function POST(request: NextRequest) {
       const facturaData = [{
         id: facturaId,
         proiect_id: proiectId,
-        serie: 'INV',
-        numar: safeInvoiceData.numarFactura,
+        serie: setariFacturare?.serie_facturi || 'INV',  // ✅ Folosește seria din setări
+        numar: numarFactura || safeInvoiceData.numarFactura, // ✅ Folosește numărul din setări
         data_factura: new Date().toISOString().split('T')[0],
-        data_scadenta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         id_factura_externa: null,
         url_publica: null,
         url_download: null,
-        client_id: null,
+        client_id: clientInfo?.id || null,
         client_nume: safeClientData.nume,
         client_cui: safeClientData.cui,
         subtotal: Number(subtotal.toFixed(2)),
@@ -617,7 +628,8 @@ export async function POST(request: NextRequest) {
             id: proiectId,
             denumire: safeInvoiceData.denumireProiect
           },
-          contariBancare: contariFinale, // ✅ SALVEAZĂ și conturile bancare folosite
+          contariBancare: contariFinale,
+          setariFacturare,  // ✅ Salvăm și setările folosite
           mockMode: MOCK_EFACTURA_MODE && sendToAnaf
         }),
         data_creare: new Date().toISOString(),
@@ -625,11 +637,33 @@ export async function POST(request: NextRequest) {
         // ✅ CÂMPURI pentru e-factura
         efactura_enabled: sendToAnaf,
         efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
-        anaf_upload_id: null  // Va fi actualizat după generarea XML
+        anaf_upload_id: xmlResult?.xmlId || null
       }];
 
       await table.insert(facturaData);
-      console.log('✅ Metadata factură salvată în BigQuery FacturiGenerate');
+      console.log('✅ Metadata factură salvată în BigQuery FacturiGenerate cu număr:', numarFactura);
+
+      // ✅ NOU: Actualizează numărul curent în setări după salvare
+      if (setariFacturare && numarFactura) {
+        try {
+          const updateSetariResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/setari/facturare`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...setariFacturare,
+              numar_curent_facturi: (setariFacturare.numar_curent_facturi || 0) + 1
+            })
+          });
+          
+          if (updateSetariResponse.ok) {
+            console.log('✅ Număr curent actualizat în setări');
+          } else {
+            console.log('⚠️ Nu s-a putut actualiza numărul curent - response not ok');
+          }
+        } catch (error) {
+          console.error('⚠️ Nu s-a putut actualiza numărul curent:', error);
+        }
+      }
 
     } catch (bgError) {
       console.error('❌ Eroare la salvarea în BigQuery FacturiGenerate:', bgError);
@@ -647,10 +681,10 @@ export async function POST(request: NextRequest) {
       htmlContent: htmlTemplate,
       invoiceData: {
         facturaId: facturaId,
-        numarFactura: safeInvoiceData.numarFactura,
+        numarFactura: numarFactura || safeInvoiceData.numarFactura,
         total: total,
         client: safeClientData.nume,
-        contariBancare: contariFinale.length // ✅ INFO despre câte conturi au fost folosite
+        contariBancare: contariFinale.length
       },
       efactura: sendToAnaf ? {
         enabled: true,
@@ -682,7 +716,7 @@ async function saveMockEfacturaRecord(data: any) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
     
-    // ✅ FOLOSEȘTE tabelul AnafEFactura existent (nu FacturiEFACTURA)
+    // ✅ FOLOSEȘTE tabelul AnafEFactura existent
     const table = dataset.table('AnafEFactura');
 
     const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
@@ -719,10 +753,10 @@ async function saveMockEfacturaRecord(data: any) {
     // ✅ RECORD compatibil cu schema AnafEFactura existentă
     const record = [{
       id: crypto.randomUUID(),
-      factura_id: data.facturaId,                    // ✅ Leagă cu FacturiGenerate
-      anaf_upload_id: data.xmlId,                    // ✅ Mock XML ID
-      xml_content: mockXmlContent,                   // ✅ Mock XML
-      anaf_status: 'MOCK_TEST',                      // ✅ Status mock
+      factura_id: data.facturaId,
+      anaf_upload_id: data.xmlId,
+      xml_content: mockXmlContent,
+      anaf_status: 'MOCK_TEST',
       anaf_response: JSON.stringify({ 
         mock: true, 
         test_mode: true, 
@@ -732,14 +766,14 @@ async function saveMockEfacturaRecord(data: any) {
         client_cui: data.clientInfo.cui,
         total_factura: data.total
       }),
-      error_message: null,                           // ✅ Null pentru mock success
-      error_code: null,                              // ✅ Null pentru mock success
-      data_upload: null,                             // ✅ Null - nu a fost uplodat
-      data_validare: null,                           // ✅ Null - nu a fost validat
-      retry_count: 0,                                // ✅ Default
-      max_retries: 3,                                // ✅ Default
-      data_creare: new Date().toISOString(),         // ✅ Timestamp actual
-      data_actualizare: new Date().toISOString()     // ✅ Timestamp actual
+      error_message: null,
+      error_code: null,
+      data_upload: null,
+      data_validare: null,
+      retry_count: 0,
+      max_retries: 3,
+      data_creare: new Date().toISOString(),
+      data_actualizare: new Date().toISOString()
     }];
 
     await table.insert(record);
@@ -747,9 +781,6 @@ async function saveMockEfacturaRecord(data: any) {
 
     // ✅ BONUS: Actualizează și FacturiGenerate cu informații mock
     try {
-      const facturaTable = dataset.table('FacturiGenerate');
-      
-      // Update doar dacă facturaId există
       const updateQuery = `
         UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
         SET 
@@ -777,8 +808,6 @@ async function saveMockEfacturaRecord(data: any) {
 
   } catch (error) {
     console.error('❌ Eroare la salvarea mock e-factura record:', error);
-    
-    // ✅ NU aruncă eroarea pentru a nu opri generarea PDF-ului
     console.log('⚠️ Continuă fără salvare mock e-factura - PDF va fi generat normal');
   }
 }
