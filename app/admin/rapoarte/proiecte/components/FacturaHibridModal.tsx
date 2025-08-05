@@ -1478,168 +1478,171 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <th style={{
                       border: '1px solid #dee2e6',
                       padding: '0.75rem',
-                      textAlign:
+// Continuare de la linia 1820 aproximativ (după tabelul cu TVA %)
+                      textAlign: 'center',
                       width: '80px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>TVA %</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '120px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Total (RON)</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '60px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Acț.</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 {liniiFactura.map((linie, index) => {
-                   const cantitate = Number(linie.cantitate) || 0;
-                   const pretUnitar = Number(linie.pretUnitar) || 0;
-                   const cotaTva = Number(linie.cotaTva) || 0;
-                   
-                   const valoare = cantitate * pretUnitar;
-                   const tva = valoare * (cotaTva / 100);
-                   const total = valoare + tva;
-                   
-                   const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
-                   
-                   return (
-                     <tr key={index} style={{
-                       background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
-                     }}>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                           {linie.tip === 'subproiect' && (
-                             <span style={{
-                               background: '#3498db',
-                               color: 'white',
-                               padding: '0.25rem 0.5rem',
-                               borderRadius: '4px',
-                               fontSize: '10px',
-                               fontWeight: 'bold'
-                             }}>
-                               SUB
-                             </span>
-                           )}
-                           <input
-                             type="text"
-                             value={linie.denumire}
-                             onChange={(e) => updateLine(index, 'denumire', e.target.value)}
-                             disabled={isLoading}
-                             style={{
-                               flex: 1,
-                               padding: '0.5rem',
-                               border: '1px solid #dee2e6',
-                               borderRadius: '4px',
-                               fontSize: '14px'
-                             }}
-                             placeholder="Descrierea serviciului sau produsului..."
-                             required
-                           />
-                         </div>
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <input
-                           type="number"
-                           value={linie.cantitate}
-                           onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'center',
-                             fontSize: '14px'
-                           }}
-                           min="0"
-                           step="0.01"
-                         />
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <input
-                           type="number"
-                           value={linie.pretUnitar}
-                           onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'right',
-                             fontSize: '14px'
-                           }}
-                           min="0"
-                           step="0.01"
-                         />
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <select
-                           value={linie.cotaTva}
-                           onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'center',
-                             fontSize: '14px'
-                           }}
-                         >
-                           <option value={0}>0%</option>
-                           <option value={5}>5%</option>
-                           <option value={9}>9%</option>
-                           <option value={19}>19%</option>
-                           <option value={21}>21%</option>
-                         </select>
-                       </td>
-                       <td style={{
-                         border: '1px solid #dee2e6',
-                         padding: '0.5rem',
-                         textAlign: 'right',
-                         fontSize: '14px',
-                         fontWeight: 'bold',
-                         color: '#27ae60'
-                       }}>
-                         {safeFixed(total)}
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
-                         <button
-                           onClick={() => removeLine(index)}
-                           disabled={liniiFactura.length === 1 || isLoading}
-                           style={{
-                             background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
-                             color: 'white',
-                             border: 'none',
-                             borderRadius: '4px',
-                             padding: '0.5rem',
-                             cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
-                             fontSize: '12px'
-                           }}
-                           title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
-                         >
-                           🗑️
-                         </button>
-                       </td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
-         </div>
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>TVA %</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '120px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Total (RON)</th>
+                    <th style={{
+                      border: '1px solid #dee2e6',
+                      padding: '0.75rem',
+                      textAlign: 'center',
+                      width: '60px',
+                      fontWeight: 'bold',
+                      color: '#2c3e50'
+                    }}>Acț.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liniiFactura.map((linie, index) => {
+                    const cantitate = Number(linie.cantitate) || 0;
+                    const pretUnitar = Number(linie.pretUnitar) || 0;
+                    const cotaTva = Number(linie.cotaTva) || 0;
+                    
+                    const valoare = cantitate * pretUnitar;
+                    const tva = valoare * (cotaTva / 100);
+                    const total = valoare + tva;
+                    
+                    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                    
+                    return (
+                      <tr key={index} style={{
+                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {linie.tip === 'subproiect' && (
+                              <span style={{
+                                background: '#3498db',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                SUB
+                              </span>
+                            )}
+                            <input
+                              type="text"
+                              value={linie.denumire}
+                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                              disabled={isLoading}
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '14px'
+                              }}
+                              placeholder="Descrierea serviciului sau produsului..."
+                              required
+                            />
+                          </div>
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.cantitate}
+                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.pretUnitar}
+                            onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'right',
+                              fontSize: '14px'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <select
+                            value={linie.cotaTva}
+                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={9}>9%</option>
+                            <option value={19}>19%</option>
+                            <option value={21}>21%</option>
+                          </select>
+                        </td>
+                        <td style={{
+                          border: '1px solid #dee2e6',
+                          padding: '0.5rem',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          color: '#27ae60'
+                        }}>
+                          {safeFixed(total)}
+                        </td>
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => removeLine(index)}
+                            disabled={liniiFactura.length === 1 || isLoading}
+                            style={{
+                              background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+
 
          {/* Secțiune Totaluri */}
          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
