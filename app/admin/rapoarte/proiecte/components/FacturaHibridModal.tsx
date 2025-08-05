@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// VERSIUNEA FINALĂ HIBRIDĂ: Toate funcționalitățile originale + e-Factura ANAF
+// MODIFICAT: Adăugat număr factură și dată în header + preluare setări din BigQuery
 // ==================================================================
 
 'use client';
@@ -57,6 +57,17 @@ interface SubproiectInfo {
   Valoare_Estimata?: number;
   Status: string;
   adaugat?: boolean;
+}
+
+// ✅ NOU: Interface pentru setări facturare
+interface SetariFacturare {
+  serie_facturi: string;
+  numar_curent_facturi: number;
+  format_numerotare: string;
+  separator_numerotare: string;
+  include_an_numerotare: boolean;
+  include_luna_numerotare: boolean;
+  termen_plata_standard: number;
 }
 
 // ✅ NOU: Interface pentru status OAuth ANAF
@@ -143,6 +154,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [subproiecteDisponibile, setSubproiecteDisponibile] = useState<SubproiectInfo[]>([]);
   const [showSubproiecteSelector, setShowSubproiecteSelector] = useState(false);
 
+  // ✅ NOU: State pentru setări facturare și număr factură
+  const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
+  const [numarFactura, setNumarFactura] = useState('');
+  const [dataFactura] = useState(new Date());
+  const [isLoadingSetari, setIsLoadingSetari] = useState(false);
+
   // ✅ NOU: State pentru e-factura ANAF
   const [sendToAnaf, setSendToAnaf] = useState(false);
   const [anafTokenStatus, setAnafTokenStatus] = useState<ANAFTokenStatus>({
@@ -170,9 +187,64 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   useEffect(() => {
     loadClientFromDatabase();
     loadSubproiecte();
-    // ✅ NOU: Verifică status OAuth ANAF la încărcare
+    loadSetariFacturare(); // ✅ NOU: Încarcă setările de facturare
     checkAnafTokenStatus();
   }, [proiect]);
+
+  // ✅ NOU: Funcție pentru încărcarea setărilor de facturare
+  const loadSetariFacturare = async () => {
+    setIsLoadingSetari(true);
+    try {
+      const response = await fetch('/api/setari/facturare');
+      const data = await response.json();
+      
+      if (data.success && data.setari) {
+        setSetariFacturare(data.setari);
+        
+        // Generează numărul facturii bazat pe setări
+        const urmatorulNumar = (data.setari.numar_curent_facturi || 0) + 1;
+        let numarNou = `${data.setari.serie_facturi}${data.setari.separator_numerotare}${urmatorulNumar}`;
+        
+        if (data.setari.include_an_numerotare) {
+          numarNou += `${data.setari.separator_numerotare}${new Date().getFullYear()}`;
+        }
+        
+        if (data.setari.include_luna_numerotare) {
+          const luna = String(new Date().getMonth() + 1).padStart(2, '0');
+          numarNou += `${data.setari.separator_numerotare}${luna}`;
+        }
+        
+        setNumarFactura(numarNou);
+        showToast(`✅ Număr factură generat: ${numarNou}`, 'success');
+      } else {
+        // Setări default dacă nu există în BD
+        const defaultSetari: SetariFacturare = {
+          serie_facturi: 'UP',
+          numar_curent_facturi: 1000,
+          format_numerotare: 'serie-numar-an',
+          separator_numerotare: '-',
+          include_an_numerotare: true,
+          include_luna_numerotare: false,
+          termen_plata_standard: 30
+        };
+        
+        setSetariFacturare(defaultSetari);
+        
+        // Generează număr cu setările default
+        const numarDefault = `UP-1001-${new Date().getFullYear()}`;
+        setNumarFactura(numarDefault);
+        showToast(`ℹ️ Folosesc setări default. Număr: ${numarDefault}`, 'info');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea setărilor:', error);
+      // Fallback la număr simplu
+      const fallbackNumar = `INV-${proiect.ID_Proiect}-${Date.now()}`;
+      setNumarFactura(fallbackNumar);
+      showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
+    } finally {
+      setIsLoadingSetari(false);
+    }
+  };
 
   // ✅ NOU: Funcție pentru verificarea status-ului OAuth ANAF
   const checkAnafTokenStatus = async () => {
@@ -652,7 +724,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ MODIFICAT: handleGenereazaFactura cu support pentru sendToAnaf
+  // ✅ MODIFICAT: handleGenereazaFactura cu support pentru sendToAnaf și număr factură din setări
   const handleGenereazaFactura = async () => {
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
@@ -709,6 +781,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           liniiFactura,
           observatii,
           clientInfo,
+          numarFactura, // ✅ NOU: Trimite numărul generat
+          setariFacturare, // ✅ NOU: Trimite setările pentru actualizarea numărului curent
           sendToAnaf // ✅ NOU: Trimite flag-ul către API
         })
       });
@@ -729,6 +803,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         await processPDF(result.htmlContent, result.fileName);
         
+        // ✅ NOU: Actualizează numărul curent în setări
+        if (setariFacturare) {
+          await updateNumarCurent();
+        }
+        
       } else {
         throw new Error(result.error || 'Eroare la generarea template-ului');
       }
@@ -742,10 +821,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  const totals = calculateTotals();
-  const isLoading = isGenerating || isProcessingPDF;
+  // ✅ NOU: Funcție pentru actualizarea numărului curent în setări
+  const updateNumarCurent = async () => {
+    if (!setariFacturare) return;
+    
+    try {
+      const response = await fetch('/api/setari/facturare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...setariFacturare,
+          numar_curent_facturi: (setariFacturare.numar_curent_facturi || 0) + 1
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Număr curent actualizat în setări');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea numărului curent:', error);
+    }
+  };
 
-  // ✅ RENDER JSX - COMPLET cu toate secțiunile + checkbox ANAF
+  const totals = calculateTotals();
+  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
+
+  // ✅ RENDER JSX - COMPLET cu toate secțiunile + număr factură în header
   return (
     <div style={{
       position: 'fixed',
@@ -769,7 +872,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         maxHeight: '90vh',
         overflowY: 'auto'
       }}>
-        {/* ✅ Header */}
+        {/* ✅ MODIFICAT: Header cu număr factură și dată */}
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
@@ -794,6 +897,76 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               ×
             </button>
           </div>
+          
+          {/* ✅ NOU: Afișare număr factură și dată */}
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: 'white',
+            border: '2px solid #3498db',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                  Număr factură:
+                </div>
+                <div style={{ 
+                  fontSize: '20px', 
+                  fontWeight: 'bold', 
+                  color: '#e74c3c',
+                  fontFamily: 'monospace'
+                }}>
+                  {isLoadingSetari ? '⏳ Se generează...' : numarFactura || 'Negenecat'}
+                </div>
+              </div>
+              
+              <div>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                  Data emiterii:
+                </div>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#2c3e50'
+                }}>
+                  {dataFactura.toLocaleDateString('ro-RO', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                  Termen plată:
+                </div>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#27ae60'
+                }}>
+                  {setariFacturare?.termen_plata_standard || 30} zile
+                </div>
+              </div>
+            </div>
+            
+            {/* ✅ NOU: Indicator setări */}
+            <div style={{
+              padding: '0.5rem 1rem',
+              background: setariFacturare ? '#d4edda' : '#fff3cd',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: setariFacturare ? '#155724' : '#856404'
+            }}>
+              {setariFacturare ? '✅ Setări încărcate din BD' : '⚠️ Setări default'}
+            </div>
+          </div>
+          
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
             📊 Auto-completare client din BD + selector subproiecte • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
           </p>
@@ -839,6 +1012,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   }}>
                   </div>
                   <span>
+                    {isLoadingSetari && '🔄 Se încarcă setările de facturare...'}
                     {isGenerating && !isProcessingPDF && (sendToAnaf ? '🔄 Se generează PDF + XML ANAF...' : '🔄 Se generează template-ul...')}
                     {isProcessingPDF && '📄 Se procesează PDF-ul cu date din BD...'}
                   </span>
@@ -1304,394 +1478,413 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <th style={{
                       border: '1px solid #dee2e6',
                       padding: '0.75rem',
-                      textAlign: 'center',
+                      textAlign:
                       width: '80px',
-                      fontWeight: 'bold',
-                      color: '#2c3e50'
-                    }}>TVA %</th>
-                    <th style={{
-                      border: '1px solid #dee2e6',
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      width: '120px',
-                      fontWeight: 'bold',
-                      color: '#2c3e50'
-                    }}>Total (RON)</th>
-                    <th style={{
-                      border: '1px solid #dee2e6',
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      width: '60px',
-                      fontWeight: 'bold',
-                      color: '#2c3e50'
-                    }}>Acț.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {liniiFactura.map((linie, index) => {
-                    const cantitate = Number(linie.cantitate) || 0;
-                    const pretUnitar = Number(linie.pretUnitar) || 0;
-                    const cotaTva = Number(linie.cotaTva) || 0;
-                    
-                    const valoare = cantitate * pretUnitar;
-                    const tva = valoare * (cotaTva / 100);
-                    const total = valoare + tva;
-                    
-                    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
-                    
-                    return (
-                      <tr key={index} style={{
-                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
-                      }}>
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {linie.tip === 'subproiect' && (
-                              <span style={{
-                                background: '#3498db',
-                                color: 'white',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: 'bold'
-                              }}>
-                                SUB
-                              </span>
-                            )}
-                            <input
-                              type="text"
-                              value={linie.denumire}
-                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
-                              disabled={isLoading}
-                              style={{
-                                flex: 1,
-                                padding: '0.5rem',
-                                border: '1px solid #dee2e6',
-                                borderRadius: '4px',
-                                fontSize: '14px'
-                              }}
-                              placeholder="Descrierea serviciului sau produsului..."
-                              required
-                            />
-                          </div>
-                        </td>
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                          <input
-                            type="number"
-                            value={linie.cantitate}
-                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '4px',
-                              textAlign: 'center',
-                              fontSize: '14px'
-                            }}
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                          <input
-                            type="number"
-                            value={linie.pretUnitar}
-                            onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '4px',
-                              textAlign: 'right',
-                              fontSize: '14px'
-                            }}
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                          <select
-                            value={linie.cotaTva}
-                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
-                            disabled={isLoading}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '4px',
-                              textAlign: 'center',
-                              fontSize: '14px'
-                            }}
-                          >
-                            <option value={0}>0%</option>
-                            <option value={5}>5%</option>
-                            <option value={9}>9%</option>
-                            <option value={19}>19%</option>
-                            <option value={21}>21%</option>
-                          </select>
-                        </td>
-                        <td style={{
-                          border: '1px solid #dee2e6',
-                          padding: '0.5rem',
-                          textAlign: 'right',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          color: '#27ae60'
-                        }}>
-                          {safeFixed(total)}
-                        </td>
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
-                          <button
-                            onClick={() => removeLine(index)}
-                            disabled={liniiFactura.length === 1 || isLoading}
-                            style={{
-                              background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.5rem',
-                              cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
-                              fontSize: '12px'
-                            }}
-                            title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                     fontWeight: 'bold',
+                     color: '#2c3e50'
+                   }}>TVA %</th>
+                   <th style={{
+                     border: '1px solid #dee2e6',
+                     padding: '0.75rem',
+                     textAlign: 'center',
+                     width: '120px',
+                     fontWeight: 'bold',
+                     color: '#2c3e50'
+                   }}>Total (RON)</th>
+                   <th style={{
+                     border: '1px solid #dee2e6',
+                     padding: '0.75rem',
+                     textAlign: 'center',
+                     width: '60px',
+                     fontWeight: 'bold',
+                     color: '#2c3e50'
+                   }}>Acț.</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {liniiFactura.map((linie, index) => {
+                   const cantitate = Number(linie.cantitate) || 0;
+                   const pretUnitar = Number(linie.pretUnitar) || 0;
+                   const cotaTva = Number(linie.cotaTva) || 0;
+                   
+                   const valoare = cantitate * pretUnitar;
+                   const tva = valoare * (cotaTva / 100);
+                   const total = valoare + tva;
+                   
+                   const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                   
+                   return (
+                     <tr key={index} style={{
+                       background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
+                     }}>
+                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                           {linie.tip === 'subproiect' && (
+                             <span style={{
+                               background: '#3498db',
+                               color: 'white',
+                               padding: '0.25rem 0.5rem',
+                               borderRadius: '4px',
+                               fontSize: '10px',
+                               fontWeight: 'bold'
+                             }}>
+                               SUB
+                             </span>
+                           )}
+                           <input
+                             type="text"
+                             value={linie.denumire}
+                             onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                             disabled={isLoading}
+                             style={{
+                               flex: 1,
+                               padding: '0.5rem',
+                               border: '1px solid #dee2e6',
+                               borderRadius: '4px',
+                               fontSize: '14px'
+                             }}
+                             placeholder="Descrierea serviciului sau produsului..."
+                             required
+                           />
+                         </div>
+                       </td>
+                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                         <input
+                           type="number"
+                           value={linie.cantitate}
+                           onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                           disabled={isLoading}
+                           style={{
+                             width: '100%',
+                             padding: '0.5rem',
+                             border: '1px solid #dee2e6',
+                             borderRadius: '4px',
+                             textAlign: 'center',
+                             fontSize: '14px'
+                           }}
+                           min="0"
+                           step="0.01"
+                         />
+                       </td>
+                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                         <input
+                           type="number"
+                           value={linie.pretUnitar}
+                           onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
+                           disabled={isLoading}
+                           style={{
+                             width: '100%',
+                             padding: '0.5rem',
+                             border: '1px solid #dee2e6',
+                             borderRadius: '4px',
+                             textAlign: 'right',
+                             fontSize: '14px'
+                           }}
+                           min="0"
+                           step="0.01"
+                         />
+                       </td>
+                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                         <select
+                           value={linie.cotaTva}
+                           onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                           disabled={isLoading}
+                           style={{
+                             width: '100%',
+                             padding: '0.5rem',
+                             border: '1px solid #dee2e6',
+                             borderRadius: '4px',
+                             textAlign: 'center',
+                             fontSize: '14px'
+                           }}
+                         >
+                           <option value={0}>0%</option>
+                           <option value={5}>5%</option>
+                           <option value={9}>9%</option>
+                           <option value={19}>19%</option>
+                           <option value={21}>21%</option>
+                         </select>
+                       </td>
+                       <td style={{
+                         border: '1px solid #dee2e6',
+                         padding: '0.5rem',
+                         textAlign: 'right',
+                         fontSize: '14px',
+                         fontWeight: 'bold',
+                         color: '#27ae60'
+                       }}>
+                         {safeFixed(total)}
+                       </td>
+                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
+                         <button
+                           onClick={() => removeLine(index)}
+                           disabled={liniiFactura.length === 1 || isLoading}
+                           style={{
+                             background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
+                             color: 'white',
+                             border: 'none',
+                             borderRadius: '4px',
+                             padding: '0.5rem',
+                             cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
+                             fontSize: '12px'
+                           }}
+                           title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
+                         >
+                           🗑️
+                         </button>
+                       </td>
+                     </tr>
+                   );
+                 })}
+               </tbody>
+             </table>
+           </div>
+         </div>
 
-          {/* Secțiune Totaluri */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-            <div style={{
-              width: '300px',
-              background: '#f8f9fa',
-              padding: '1rem',
-              borderRadius: '6px',
-              border: '1px solid #dee2e6'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '14px',
-                  color: '#2c3e50'
-                }}>
-                  <span>Subtotal (fără TVA):</span>
-                  <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '14px',
-                  color: '#2c3e50'
-                }}>
-                  <span>TVA:</span>
-                  <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  paddingTop: '0.5rem',
-                  borderTop: '2px solid #27ae60',
-                  color: '#27ae60'
-                }}>
-                  <span>TOTAL DE PLATĂ:</span>
-                  <span>{totals.totalGeneral} RON</span>
-                </div>
-              </div>
-            </div>
-          </div>
+         {/* Secțiune Totaluri */}
+         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+           <div style={{
+             width: '300px',
+             background: '#f8f9fa',
+             padding: '1rem',
+             borderRadius: '6px',
+             border: '1px solid #dee2e6'
+           }}>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+               <div style={{
+                 display: 'flex',
+                 justifyContent: 'space-between',
+                 fontSize: '14px',
+                 color: '#2c3e50'
+               }}>
+                 <span>Subtotal (fără TVA):</span>
+                 <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
+               </div>
+               <div style={{
+                 display: 'flex',
+                 justifyContent: 'space-between',
+                 fontSize: '14px',
+                 color: '#2c3e50'
+               }}>
+                 <span>TVA:</span>
+                 <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
+               </div>
+               <div style={{
+                 display: 'flex',
+                 justifyContent: 'space-between',
+                 fontSize: '16px',
+                 fontWeight: 'bold',
+                 paddingTop: '0.5rem',
+                 borderTop: '2px solid #27ae60',
+                 color: '#27ae60'
+               }}>
+                 <span>TOTAL DE PLATĂ:</span>
+                 <span>{totals.totalGeneral} RON</span>
+               </div>
+             </div>
+           </div>
+         </div>
 
-          {/* Secțiune Observații */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              📝 Observații (opțional)
-            </label>
-            <textarea
-              value={observatii}
-              onChange={(e) => setObservatii(e.target.value)}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                resize: 'vertical'
-              }}
-              rows={2}
-              placeholder="Observații suplimentare pentru factură..."
-            />
-          </div>
+         {/* Secțiune Observații */}
+         <div style={{ marginBottom: '1.5rem' }}>
+           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+             📝 Observații (opțional)
+           </label>
+           <textarea
+             value={observatii}
+             onChange={(e) => setObservatii(e.target.value)}
+             disabled={isLoading}
+             style={{
+               width: '100%',
+               padding: '0.75rem',
+               border: '1px solid #dee2e6',
+               borderRadius: '6px',
+               fontSize: '14px',
+               resize: 'vertical'
+             }}
+             rows={2}
+             placeholder="Observații suplimentare pentru factură..."
+           />
+         </div>
 
-          {/* ✅ NOU: Secțiune e-Factura ANAF */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{
-              background: '#f0f8ff',
-              border: '1px solid #cce7ff',
-              borderRadius: '6px',
-              padding: '1rem'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '0.5rem'
-              }}>
-                <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '16px' }}>
-                  📤 e-Factura ANAF
-                </h3>
-                {isCheckingAnafToken && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      border: '2px solid #3498db',
-                      borderTop: '2px solid transparent',
-                      animation: 'spin 1s linear infinite'
-                    }}></div>
-                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică token...</span>
-                  </div>
-                )}
-              </div>
+         {/* ✅ NOU: Secțiune e-Factura ANAF */}
+         <div style={{ marginBottom: '1.5rem' }}>
+           <div style={{
+             background: '#f0f8ff',
+             border: '1px solid #cce7ff',
+             borderRadius: '6px',
+             padding: '1rem'
+           }}>
+             <div style={{
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'space-between',
+               marginBottom: '0.5rem'
+             }}>
+               <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '16px' }}>
+                 📤 e-Factura ANAF
+               </h3>
+               {isCheckingAnafToken && (
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                   <div style={{
+                     width: '16px',
+                     height: '16px',
+                     borderRadius: '50%',
+                     border: '2px solid #3498db',
+                     borderTop: '2px solid transparent',
+                     animation: 'spin 1s linear infinite'
+                   }}></div>
+                   <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică token...</span>
+                 </div>
+               )}
+             </div>
 
-              <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '1rem'
-              }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  cursor: anafTokenStatus.hasValidToken ? 'pointer' : 'not-allowed',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={sendToAnaf}
-                    onChange={(e) => handleAnafCheckboxChange(e.target.checked)}
-                    disabled={!anafTokenStatus.hasValidToken || isLoading}
-                    style={{
-                      transform: 'scale(1.2)',
-                      marginRight: '0.25rem'
-                    }}
-                  />
-                  📤 Trimite automat la ANAF ca e-Factură
-                </label>
+             <div style={{
+               display: 'flex',
+               alignItems: 'flex-start',
+               gap: '1rem'
+             }}>
+               <label style={{
+                 display: 'flex',
+                 alignItems: 'center',
+                 gap: '0.5rem',
+                 cursor: anafTokenStatus.hasValidToken ? 'pointer' : 'not-allowed',
+                 fontSize: '14px',
+                 fontWeight: '500'
+               }}>
+                 <input
+                   type="checkbox"
+                   checked={sendToAnaf}
+                   onChange={(e) => handleAnafCheckboxChange(e.target.checked)}
+                   disabled={!anafTokenStatus.hasValidToken || isLoading}
+                   style={{
+                     transform: 'scale(1.2)',
+                     marginRight: '0.25rem'
+                   }}
+                 />
+                 📤 Trimite automat la ANAF ca e-Factură
+               </label>
 
-                <div style={{ flex: 1 }}>
-                  {anafTokenStatus.loading ? (
-                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-                  ) : anafTokenStatus.hasValidToken ? (
-                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
-                      ✅ Token ANAF valid
-                      {anafTokenStatus.tokenInfo && (
-                        <span style={{ color: anafTokenStatus.tokenInfo.expires_in_minutes < 60 ? '#e67e22' : '#27ae60' }}>
-                          {' '}(expiră în {anafTokenStatus.tokenInfo.expires_in_minutes} min)
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-                      ❌ Nu există token ANAF valid.{' '}
-                      <a 
-                        href="/admin/anaf/setup"
-                        target="_blank"
-                        style={{ color: '#3498db', textDecoration: 'underline' }}
-                      >
-                        Configurează OAuth
-                      </a>
-                    </div>
-                  )}
+               <div style={{ flex: 1 }}>
+                 {anafTokenStatus.loading ? (
+                   <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+                 ) : anafTokenStatus.hasValidToken ? (
+                   <div style={{ fontSize: '12px', color: '#27ae60' }}>
+                     ✅ Token ANAF valid
+                     {anafTokenStatus.tokenInfo && (
+                       <span style={{ color: anafTokenStatus.tokenInfo.expires_in_minutes < 60 ? '#e67e22' : '#27ae60' }}>
+                         {' '}(expiră în {anafTokenStatus.tokenInfo.expires_in_minutes} min)
+                       </span>
+                     )}
+                   </div>
+                 ) : (
+                   <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+                     ❌ Nu există token ANAF valid.{' '}
+                     <a 
+                       href="/admin/anaf/setup"
+                       target="_blank"
+                       style={{ color: '#3498db', textDecoration: 'underline' }}
+                     >
+                       Configurează OAuth
+                     </a>
+                   </div>
+                 )}
 
-                  {sendToAnaf && (
-                    <div style={{
-                      marginTop: '0.5rem',
-                      padding: '0.5rem',
-                      background: '#e8f5e8',
-                      border: '1px solid #c3e6c3',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      color: '#2d5016'
-                    }}>
-                      ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+                 {sendToAnaf && (
+                   <div style={{
+                     marginTop: '0.5rem',
+                     padding: '0.5rem',
+                     background: '#e8f5e8',
+                     border: '1px solid #c3e6c3',
+                     borderRadius: '4px',
+                     fontSize: '12px',
+                     color: '#2d5016'
+                   }}>
+                     ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.
+                   </div>
+                 )}
+               </div>
+             </div>
+           </div>
+         </div>
 
-          {/* ✅ Butoane finale - MODIFICATE cu text dinamic */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingTop: '1rem',
-            borderTop: '1px solid #dee2e6'
-          }}>
-            <div style={{
-              fontSize: '12px',
-              color: '#7f8c8d',
-              fontWeight: '500'
-            }}>
-              ℹ️ Date client auto-completate din BD. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
-            </div>
-            
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button
-                onClick={onClose}
-                disabled={isLoading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                Anulează
-              </button>
-              
-              <button
-                onClick={handleGenereazaFactura}
-                disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? '#bdc3c7' : '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire) ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                {isLoading ? (
-                  <>⏳ {isProcessingPDF ? 'Se generează PDF cu date BD...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
-                ) : (
-                  <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură din BD'}</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+         {/* ✅ NOU: Informații importante */}
+         <div style={{
+           background: '#fff3cd',
+           border: '1px solid #ffeaa7',
+           borderRadius: '6px',
+           padding: '1rem',
+           marginBottom: '1.5rem'
+         }}>
+           <div style={{ marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404' }}>
+             ℹ️ Informații importante:
+           </div>
+           <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '13px', color: '#856404' }}>
+             <li>Factura va primi numărul: <strong>{numarFactura}</strong></li>
+             <li>După generare, numărul curent va fi actualizat automat în setări</li>
+             {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
+             <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
+           </ul>
+         </div>
+
+         {/* ✅ Butoane finale - MODIFICATE cu text dinamic */}
+         <div style={{ 
+           display: 'flex', 
+           justifyContent: 'space-between',
+           alignItems: 'center',
+           paddingTop: '1rem',
+           borderTop: '1px solid #dee2e6'
+         }}>
+           <div style={{
+             fontSize: '12px',
+             color: '#7f8c8d',
+             fontWeight: '500'
+           }}>
+             ℹ️ Date client auto-completate din BD. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
+           </div>
+           
+           <div style={{ display: 'flex', gap: '1rem' }}>
+             <button
+               onClick={onClose}
+               disabled={isLoading}
+               style={{
+                 padding: '0.75rem 1.5rem',
+                 background: '#6c757d',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '6px',
+                 cursor: isLoading ? 'not-allowed' : 'pointer',
+                 fontSize: '14px',
+                 fontWeight: 'bold'
+               }}
+             >
+               Anulează
+             </button>
+             
+             <button
+               onClick={handleGenereazaFactura}
+               disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura}
+               style={{
+                 padding: '0.75rem 1.5rem',
+                 background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? '#bdc3c7' : '#27ae60',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '6px',
+                 cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? 'not-allowed' : 'pointer',
+                 fontSize: '14px',
+                 fontWeight: 'bold'
+               }}
+             >
+               {isLoading ? (
+                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu date BD...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
+               ) : (
+                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură din BD'}</>
+               )}
+             </button>
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>
+ );
 }
