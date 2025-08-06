@@ -897,7 +897,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
-
+  // ✅ RENDER JSX - COMPLET cu toate secțiunile + număr factură în header
   return (
     <div style={{
       position: 'fixed',
