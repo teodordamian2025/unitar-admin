@@ -269,9 +269,11 @@ export async function POST(request: NextRequest) {
                 flex-grow: 1;
                 width: 100%;
                 overflow: visible;
+                padding-right: 10px; /* Adaugă padding pentru siguranță */
             }
             table {
-                width: 100%;
+                width: 98%; /* Redus de la 100% */
+                margin: 0 auto; /* Centrează tabelul */
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -438,12 +440,12 @@ export async function POST(request: NextRequest) {
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 30px;">Nr.</th>
-                        <th style="width: 240px;">Descriere</th>
-                        <th style="width: 50px;" class="text-center">Cant.</th>
-                        <th style="width: 70px;" class="text-right">Preț Unitar</th>
-                        <th style="width: 80px;" class="text-center">TVA ${liniiFactura[0]?.cotaTva || 19}%</th>
-                        <th style="width: 70px;" class="text-right">Total</th>
+                        <th style="width: 25px;">Nr.</th>
+                        <th style="width: 200px;">Descriere</th>
+                        <th style="width: 45px;" class="text-center">Cant.</th>
+                        <th style="width: 65px;" class="text-right">Pret Unitar</th>
+                        <th style="width: 70px;" class="text-center">TVA ${liniiFactura[0]?.cotaTva || 19}%</th>
+                        <th style="width: 75px;" class="text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -460,12 +462,12 @@ export async function POST(request: NextRequest) {
                       
                       return `
                     <tr>
-                        <td class="text-center">${index + 1}</td>
-                        <td>${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUB]</small>' : ''}</td>
-                        <td class="text-center">${safeFixed(cantitate)}</td>
-                        <td class="text-right">${safeFixed(pretUnitar)}</td>
-                        <td class="text-center">${safeFixed(tva)}</td>
-                        <td class="text-right" style="font-weight: bold;">${safeFixed(totalLinie)}</td>
+                        <td class="text-center" style="font-size: 8px;">${index + 1}</td>
+                        <td style="font-size: 8px; padding: 2px;">${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUB]</small>' : ''}</td>
+                        <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
+                        <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
+                        <td class="text-center" style="font-size: 8px;">${safeFixed(tva)}</td>
+                        <td class="text-right" style="font-weight: bold; font-size: 8px;">${safeFixed(totalLinie)}</td>
                     </tr>`;
                     }).join('')}
                 </tbody>
