@@ -1755,21 +1755,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <div style={{ fontSize: '12px', color: '#27ae60' }}>
                       ✅ Token ANAF valid
                       {anafTokenStatus.tokenInfo && (
-                        <span style={{ 
-                          color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
-                        }}>
-                          {' '}
-                          {anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
-                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-                          ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
-                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
-                          ) : (
-                            '(verifică statusul)'
-                          )}
-                        </span>
-                      )}
+			  <span style={{ 
+			    color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
+			  }}>
+			    {' '}
+			    {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
+			      `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+			    ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
+			      `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+			    ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+			      `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
+			    ) : (
+			      '(verifică statusul)'
+			    )}
+			  </span>
+			)}
                     </div>
                   ) : (
                     <div style={{ fontSize: '12px', color: '#e74c3c' }}>
