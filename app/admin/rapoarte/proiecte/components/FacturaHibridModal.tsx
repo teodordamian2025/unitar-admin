@@ -852,6 +852,35 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         await processPDF(result.htmlContent, result.fileName);
         
+        // După await processPDF(result.htmlContent, result.fileName);
+	// Adaugă:
+
+	// ✅ Actualizează numărul curent în setări după generare cu succes
+	if (setariFacturare && result.success) {
+	  try {
+	    const updateResponse = await fetch('/api/setari/facturare', {
+	      method: 'POST',
+	      headers: { 'Content-Type': 'application/json' },
+	      body: JSON.stringify({
+		...setariFacturare,
+		numar_curent_facturi: (setariFacturare.numar_curent_facturi || 0) + 1
+	      })
+	    });
+	    
+	    if (updateResponse.ok) {
+	      // Actualizează și local pentru următoarea factură
+	      setSetariFacturare({
+		...setariFacturare,
+		numar_curent_facturi: (setariFacturare.numar_curent_facturi || 0) + 1
+	      });
+	      console.log('✅ Număr curent actualizat în setări');
+	    }
+	  } catch (error) {
+	    console.error('⚠️ Nu s-a putut actualiza numărul curent:', error);
+	  }
+	}
+        
+        
       } else {
         throw new Error(result.error || 'Eroare la generarea template-ului');
       }
@@ -1787,39 +1816,43 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   📤 Trimite automat la ANAF ca e-Factură
                 </label>
 
-                <div style={{ flex: 1 }}>
-                  {anafTokenStatus.loading ? (
-                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-                  ) : anafTokenStatus.hasValidToken ? (
-                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
-                      ✅ Token ANAF valid
-                      {anafTokenStatus.tokenInfo?.expires_in_days !== undefined && (
-                        <span style={{ 
-                          color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
-                        }}>
-                          {' '}
-                          {anafTokenStatus.tokenInfo.expires_in_days > 0 ? (
-                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-                          ) : (
-                            '(expiră în curând)'
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-                      ❌ Nu există token ANAF valid.{' '}
-                      <a 
-                        href="/admin/anaf/setup"
-                        target="_blank"
-                        style={{ color: '#3498db', textDecoration: 'underline' }}
-                      >
-                        Configurează OAuth
-                      </a>
-                    </div>
-                  )}
+                {/* ✅ MODIFICAT: Afișare corectă a expirării token ANAF */}
+		<div style={{ flex: 1 }}>
+		  {anafTokenStatus.loading ? (
+		    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+		  ) : anafTokenStatus.hasValidToken ? (
+		    <div style={{ fontSize: '12px', color: '#27ae60' }}>
+		      ✅ Token ANAF valid
+		      {anafTokenStatus.tokenInfo && (
+			<span style={{ 
+			  color: anafTokenStatus.tokenInfo.expires_in_days < 7 ? '#e67e22' : '#27ae60' 
+			}}>
+			  {' '}
+			  {anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
+			    `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+			  ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
+			    `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+			  ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+			    `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
+			  ) : (
+			    '(verifică statusul)'
+			  )}
+			</span>
+		      )}
+		    </div>
+		  ) : (
+		    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+		      ❌ Nu există token ANAF valid.{' '}
+		      <a 
+			href="/admin/anaf/setup"
+			target="_blank"
+			style={{ color: '#3498db', textDecoration: 'underline' }}
+		      >
+			Configurează OAuth
+		      </a>
+		    </div>
+		  )}
+		</div>
 
                   {sendToAnaf && (
                     <div style={{

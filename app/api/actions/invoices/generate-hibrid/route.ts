@@ -300,14 +300,16 @@ export async function POST(request: NextRequest) {
             .totals-section {
                 margin-top: 2px;
                 margin-left: auto;
-                width: 150px;
+                width: 180px; /* Mărit de la 150px */
+                padding-right: 5px; /* Adaugă padding */
             }
             .totals-row {
                 display: flex;
                 justify-content: space-between;
-                padding: 4px 0;
+                padding: 4px 2px; /* Adaugă padding lateral */
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 10px;
+                font-size: 9px;
+                gap: 5px; /* Spațiu între text și valoare */
             }
             .totals-row.final {
                 border-top: 2px solid #34495e;
@@ -474,22 +476,21 @@ export async function POST(request: NextRequest) {
             </table>
 
             <div class="totals-section">
-                <div class="totals-row">
-                    <span>Subtotal:</span>
-                    <span>${safeFormat(subtotal)} RON</span>
-                </div>
-                ${totalTva > 0 ? `
-                <div class="totals-row">
-                    <span>TVA:</span>
-                    <span>${safeFormat(totalTva)} RON</span>
-                </div>
-                ` : ''}
-                <div class="totals-row final">
-                    <span>TOTAL DE PLATA:</span>
-                    <span>${safeFormat(total)} RON</span>
-                </div>
-            </div>
-        </div>
+	    <div class="totals-row">
+		<span style="font-size: 9px;">Subtotal:</span>
+		<span style="font-size: 9px; white-space: nowrap;">${safeFormat(subtotal)} RON</span>
+	    </div>
+	    ${totalTva > 0 ? `
+	    <div class="totals-row">
+		<span style="font-size: 9px;">TVA:</span>
+		<span style="font-size: 9px; white-space: nowrap;">${safeFormat(totalTva)} RON</span>
+	    </div>
+	    ` : ''}
+	    <div class="totals-row final">
+		<span style="font-size: 10px;">TOTAL:</span>
+		<span style="font-size: 10px; white-space: nowrap;">${safeFormat(total)} RON</span>
+	    </div>
+	</div>
 
         <div class="payment-info">
             <h4>Conditii de plata</h4>
