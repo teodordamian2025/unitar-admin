@@ -845,26 +845,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    console.log('📥 Răspuns actualizare:', updateResult);
 	    
 	    if (updateResult.success) {
-	      console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
-	      
-	      // Actualizează și local
-	      setSetariFacturare(prev => ({
-		...prev,
-		numar_curent_facturi: nextNumber
-	      }));
-	      
-	      // Calculează următorul număr pentru afișare
-	      let numarUrmator = `${setariFacturare.serie_facturi}${setariFacturare.separator_numerotare}${nextNumber + 1}`;
-	      if (setariFacturare.include_an_numerotare) {
-		numarUrmator += `${setariFacturare.separator_numerotare}${new Date().getFullYear()}`;
-	      }
-	      
-	      showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
-	      
-	      // Reîncarcă setările după 2 secunde
-	      setTimeout(() => {
-		loadSetariFacturare();
-	      }, 2000);
+		  console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
+		  
+		  // Actualizează local doar dacă avem setări valide
+		  if (setariFacturare) {
+		    setSetariFacturare({
+		      serie_facturi: setariFacturare.serie_facturi,
+		      numar_curent_facturi: nextNumber,
+		      format_numerotare: setariFacturare.format_numerotare,
+		      separator_numerotare: setariFacturare.separator_numerotare,
+		      include_an_numerotare: setariFacturare.include_an_numerotare,
+		      include_luna_numerotare: setariFacturare.include_luna_numerotare,
+		      termen_plata_standard: setariFacturare.termen_plata_standard
+		    });
+		  }
+		  
+		  // Calculează următorul număr pentru afișare
+		  let numarUrmator = `${setariFacturare.serie_facturi}${setariFacturare.separator_numerotare}${nextNumber + 1}`;
+		  if (setariFacturare.include_an_numerotare) {
+		    numarUrmator += `${setariFacturare.separator_numerotare}${new Date().getFullYear()}`;
+		  }
+		  
+		  showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
+		  
+		  // Reîncarcă setările după 2 secunde
+		  setTimeout(() => {
+		    loadSetariFacturare();
+		  }, 2000);
+		}
 	      
 	    } else {
 	      throw new Error(updateResult.error || 'Actualizare eșuată');
