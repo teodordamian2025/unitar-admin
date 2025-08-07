@@ -789,7 +789,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         await processPDF(result.htmlContent, result.fileName);
         
         // ✅ FIX: Actualizează numărul curent după generare cu succes
-	// În handleGenereazaFactura, după await processPDF(...)
 	if (setariFacturare && result.success) {
 	  try {
 	    const currentNumber = setariFacturare.numar_curent_facturi || 0;
@@ -797,45 +796,43 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    
 	    console.log(`📊 Actualizare număr: ${currentNumber} → ${nextNumber}`);
 	    
-	    // Pregătește payload complet pentru API
+	    // Pregătește payload SIMPLIFICAT - doar ce e necesar pentru facturi
 	    const updatePayload = {
-	      // Câmpuri obligatorii - păstrează valorile existente
+	      // Câmpuri esențiale pentru facturi
 	      serie_facturi: setariFacturare.serie_facturi,
-	      serie_proforme: setariFacturare.serie_proforme || 'PRF',
-	      serie_chitante: setariFacturare.serie_chitante || 'CHT', 
-	      serie_contracte: setariFacturare.serie_contracte || 'CTR',
-	      
-	      // ACTUALIZEAZĂ numărul facturilor
 	      numar_curent_facturi: nextNumber,
 	      
-	      // Păstrează celelalte numere
-	      numar_curent_proforme: setariFacturare.numar_curent_proforme || 0,
-	      numar_curent_chitante: setariFacturare.numar_curent_chitante || 0,
-	      numar_curent_contracte: setariFacturare.numar_curent_contracte || 0,
-	      
-	      // Setări formatare
+	      // Setări formatare existente
 	      format_numerotare: setariFacturare.format_numerotare,
 	      separator_numerotare: setariFacturare.separator_numerotare,
 	      include_an_numerotare: Boolean(setariFacturare.include_an_numerotare),
 	      include_luna_numerotare: Boolean(setariFacturare.include_luna_numerotare),
+	      termen_plata_standard: setariFacturare.termen_plata_standard || 30,
 	      
-	      // E-factura settings (obligatorii în API)
-	      efactura_enabled: setariFacturare.efactura_enabled ?? true,
-	      efactura_timp_intarziere: setariFacturare.efactura_timp_intarziere ?? 300,
-	      efactura_mock_mode: setariFacturare.efactura_mock_mode ?? false,
-	      efactura_auto_send: setariFacturare.efactura_auto_send ?? false,
+	      // Câmpuri obligatorii pentru API (valori default)
+	      serie_proforme: 'PRF',
+	      serie_chitante: 'CHT',
+	      serie_contracte: 'CTR',
+	      numar_curent_proforme: 0,
+	      numar_curent_chitante: 0,
+	      numar_curent_contracte: 0,
 	      
-	      // TVA și termene - păstrează existente
-	      cota_tva_standard: setariFacturare.cota_tva_standard ?? 19,
-	      cota_tva_redusa: setariFacturare.cota_tva_redusa ?? 5,
-	      valabilitate_proforme: setariFacturare.valabilitate_proforme ?? 30,
-	      termen_plata_standard: setariFacturare.termen_plata_standard || 30
+	      // E-factura settings (valori default)
+	      efactura_enabled: true,
+	      efactura_timp_intarziere: 300,
+	      efactura_mock_mode: false,
+	      efactura_auto_send: false,
+	      
+	      // TVA și termene (valori default)
+	      cota_tva_standard: 19,
+	      cota_tva_redusa: 5,
+	      valabilitate_proforme: 30
 	    };
 	    
-	    console.log('📤 Trimit actualizare:', updatePayload);
+	    console.log('📤 Trimit actualizare număr factură');
 	    
 	    const updateResponse = await fetch('/api/setari/facturare', {
-	      method: 'POST', // API-ul acceptă doar POST
+	      method: 'POST',
 	      headers: { 'Content-Type': 'application/json' },
 	      body: JSON.stringify(updatePayload)
 	    });
@@ -850,7 +847,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    if (updateResult.success) {
 	      console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
 	      
-	      // Actualizează și local pentru consistență
+	      // Actualizează și local
 	      setSetariFacturare(prev => ({
 		...prev,
 		numar_curent_facturi: nextNumber
@@ -864,7 +861,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	      
 	      showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
 	      
-	      // Optional: Reîncarcă setările după 2 secunde
+	      // Reîncarcă setările după 2 secunde
 	      setTimeout(() => {
 		loadSetariFacturare();
 	      }, 2000);
