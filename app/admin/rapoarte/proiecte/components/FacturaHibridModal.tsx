@@ -171,190 +171,189 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   useEffect(() => {
-	  // Apelează funcțiile în ordine, dar independent
-	  loadClientFromDatabase();
-	  loadSubproiecte();
-	  loadSetariFacturare();
-	  
-	  // Apelează checkAnafTokenStatus separat, cu delay pentru a evita suprapunerea
-	  setTimeout(() => {
-	    checkAnafTokenStatus();
-	  }, 100);
-	}, [proiect]);
-	
-	  // ✅ ADAUGĂ AICI FUNCȚIA NOUĂ
-	  // Funcție pentru a obține următorul număr de factură din BD
-	  const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
-	    try {
-	      // Construim pattern-ul pentru căutare
-	      let searchPattern = `${serie}${separator}`;
-	      
-	      // Query pentru ultimul număr folosit
-	      const response = await fetch('/api/rapoarte/facturi/last-number', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ 
-		  serie,
-		  separator,
-		  pattern: searchPattern 
-		})
-	      });
-	      
-	      const data = await response.json();
-	      
-	      if (data.success && data.lastNumber !== undefined) {
-		const nextNumber = (data.lastNumber || 0) + 1;
-		
-		// Construim numărul complet
-		let numarComplet = `${serie}${separator}${nextNumber}`;
-		
-		if (includeYear) {
-		  numarComplet += `${separator}${new Date().getFullYear()}`;
-		}
-		
-		if (includeMonth) {
-		  const luna = String(new Date().getMonth() + 1).padStart(2, '0');
-		  numarComplet += `${separator}${luna}`;
-		}
-		
-		return {
-		  numarComplet,
-		  numarUrmator: nextNumber
-		};
-	      }
-	      
-	      // Fallback dacă nu găsim nimic
-	      return {
-		numarComplet: `${serie}${separator}1001${separator}${new Date().getFullYear()}`,
-		numarUrmator: 1001
-	      };
-	      
-	    } catch (error) {
-	      console.error('Eroare la obținerea numărului următor:', error);
-	      return {
-		numarComplet: `${serie}${separator}1001${separator}${new Date().getFullYear()}`,
-		numarUrmator: 1001
-	      };
-	    }
-	  };
+    // Apelează funcțiile în ordine, dar independent
+    loadClientFromDatabase();
+    loadSubproiecte();
+    loadSetariFacturare();
+    
+    // Apelează checkAnafTokenStatus separat, cu delay pentru a evita suprapunerea
+    setTimeout(() => {
+      checkAnafTokenStatus();
+    }, 100);
+  }, [proiect]);
+  
+  // Funcție pentru a obține următorul număr de factură din BD
+  const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
+    try {
+      // Construim pattern-ul pentru căutare
+      let searchPattern = `${serie}${separator}`;
+      
+      // Query pentru ultimul număr folosit
+      const response = await fetch('/api/rapoarte/facturi/last-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          serie,
+          separator,
+          pattern: searchPattern 
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.lastNumber !== undefined) {
+        const nextNumber = (data.lastNumber || 0) + 1;
+        
+        // Construim numărul complet
+        let numarComplet = `${serie}${separator}${nextNumber}`;
+        
+        if (includeYear) {
+          numarComplet += `${separator}${new Date().getFullYear()}`;
+        }
+        
+        if (includeMonth) {
+          const luna = String(new Date().getMonth() + 1).padStart(2, '0');
+          numarComplet += `${separator}${luna}`;
+        }
+        
+        return {
+          numarComplet,
+          numarUrmator: nextNumber
+        };
+      }
+      
+      // Fallback dacă nu găsim nimic
+      return {
+        numarComplet: `${serie}${separator}1001${separator}${new Date().getFullYear()}`,
+        numarUrmator: 1001
+      };
+      
+    } catch (error) {
+      console.error('Eroare la obținerea numărului următor:', error);
+      return {
+        numarComplet: `${serie}${separator}1001${separator}${new Date().getFullYear()}`,
+        numarUrmator: 1001
+      };
+    }
+  };
 
-	const loadSetariFacturare = async () => {
-	  setIsLoadingSetari(true);
-	  try {
-	    const response = await fetch('/api/setari/facturare');
-	    const data = await response.json();
-	    
-	    if (data.success && data.setari) {
-	      const processValue = (value: any) => {
-		if (value && typeof value === 'object' && value.value !== undefined) {
-		  return value.value;
-		}
-		return value;
-	      };
+  const loadSetariFacturare = async () => {
+    setIsLoadingSetari(true);
+    try {
+      const response = await fetch('/api/setari/facturare');
+      const data = await response.json();
+      
+      if (data.success && data.setari) {
+        const processValue = (value: any) => {
+          if (value && typeof value === 'object' && value.value !== undefined) {
+            return value.value;
+          }
+          return value;
+        };
 
-	      const setariProcesate: SetariFacturare = {
-		serie_facturi: processValue(data.setari.serie_facturi),
-		numar_curent_facturi: 0, // Nu mai folosim acest câmp
-		format_numerotare: processValue(data.setari.format_numerotare),
-		separator_numerotare: processValue(data.setari.separator_numerotare),
-		include_an_numerotare: processValue(data.setari.include_an_numerotare),
-		include_luna_numerotare: processValue(data.setari.include_luna_numerotare),
-		termen_plata_standard: processValue(data.setari.termen_plata_standard)
-	      };
+        const setariProcesate: SetariFacturare = {
+          serie_facturi: processValue(data.setari.serie_facturi),
+          numar_curent_facturi: 0, // Nu mai folosim acest câmp
+          format_numerotare: processValue(data.setari.format_numerotare),
+          separator_numerotare: processValue(data.setari.separator_numerotare),
+          include_an_numerotare: processValue(data.setari.include_an_numerotare),
+          include_luna_numerotare: processValue(data.setari.include_luna_numerotare),
+          termen_plata_standard: processValue(data.setari.termen_plata_standard)
+        };
 
-	      setSetariFacturare(setariProcesate);
-	      
-	      // Obținem următorul număr din BD
-	      const { numarComplet, numarUrmator } = await getNextInvoiceNumber(
-		setariProcesate.serie_facturi,
-		setariProcesate.separator_numerotare,
-		setariProcesate.include_an_numerotare,
-		setariProcesate.include_luna_numerotare
-	      );
-	      
-	      setNumarFactura(numarComplet);
-	      showToast(`✅ Număr factură generat: ${numarComplet}`, 'success');
-	      
-	    } else {
-	      // Setări default
-	      const defaultSetari: SetariFacturare = {
-		serie_facturi: 'UP',
-		numar_curent_facturi: 0,
-		format_numerotare: 'serie-numar-an',
-		separator_numerotare: '-',
-		include_an_numerotare: true,
-		include_luna_numerotare: false,
-		termen_plata_standard: 30
-	      };
-	      
-	      setSetariFacturare(defaultSetari);
-	      
-	      const { numarComplet } = await getNextInvoiceNumber('UP', '-', true, false);
-	      setNumarFactura(numarComplet);
-	      showToast(`ℹ️ Folosesc setări default. Număr: ${numarComplet}`, 'info');
-	    }
-	  } catch (error) {
-	    console.error('Eroare la încărcarea setărilor:', error);
-	    const fallbackNumar = `INV-${proiect.ID_Proiect}-${Date.now()}`;
-	    setNumarFactura(fallbackNumar);
-	    showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
-	  } finally {
-	    setIsLoadingSetari(false);
-	  }
-	};
+        setSetariFacturare(setariProcesate);
+        
+        // Obținem următorul număr din BD
+        const { numarComplet, numarUrmator } = await getNextInvoiceNumber(
+          setariProcesate.serie_facturi,
+          setariProcesate.separator_numerotare,
+          setariProcesate.include_an_numerotare,
+          setariProcesate.include_luna_numerotare
+        );
+        
+        setNumarFactura(numarComplet);
+        showToast(`✅ Număr factură generat: ${numarComplet}`, 'success');
+        
+      } else {
+        // Setări default
+        const defaultSetari: SetariFacturare = {
+          serie_facturi: 'UP',
+          numar_curent_facturi: 0,
+          format_numerotare: 'serie-numar-an',
+          separator_numerotare: '-',
+          include_an_numerotare: true,
+          include_luna_numerotare: false,
+          termen_plata_standard: 30
+        };
+        
+        setSetariFacturare(defaultSetari);
+        
+        const { numarComplet } = await getNextInvoiceNumber('UP', '-', true, false);
+        setNumarFactura(numarComplet);
+        showToast(`ℹ️ Folosesc setări default. Număr: ${numarComplet}`, 'info');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea setărilor:', error);
+      const fallbackNumar = `INV-${proiect.ID_Proiect}-${Date.now()}`;
+      setNumarFactura(fallbackNumar);
+      showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
+    } finally {
+      setIsLoadingSetari(false);
+    }
+  };
 
-	const checkAnafTokenStatus = async () => {
-	  setIsCheckingAnafToken(true);
-	  try {
-	    // Folosim exact același endpoint ca monitoring
-	    const response = await fetch('/api/anaf/oauth/token');
-	    const data = await response.json();
-	    
-	    console.log('ANAF Token Response:', data); // Debug
-	    
-	    if (data.success && data.hasValidToken && data.tokenInfo) {
-	      // API-ul returnează deja expires_in_minutes calculat corect din BigQuery
-	      const expiresInMinutes = data.tokenInfo.expires_in_minutes || 0;
-	      // Calculăm zilele simplu din minute
-	      const expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
-	      
-	      setAnafTokenStatus({
-		hasValidToken: !data.tokenInfo.is_expired && expiresInMinutes > 0,
-		tokenInfo: {
-		  expires_in_minutes: expiresInMinutes,
-		  expires_in_days: expiresInDays,
-		  is_expired: data.tokenInfo.is_expired || false
-		},
-		loading: false
-	      });
+  const checkAnafTokenStatus = async () => {
+    setIsCheckingAnafToken(true);
+    try {
+      // Folosim exact același endpoint ca monitoring
+      const response = await fetch('/api/anaf/oauth/token');
+      const data = await response.json();
+      
+      console.log('ANAF Token Response:', data); // Debug
+      
+      if (data.success && data.hasValidToken && data.tokenInfo) {
+        // API-ul returnează deja expires_in_minutes calculat corect din BigQuery
+        const expiresInMinutes = data.tokenInfo.expires_in_minutes || 0;
+        // Calculăm zilele simplu din minute
+        const expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+        
+        setAnafTokenStatus({
+          hasValidToken: !data.tokenInfo.is_expired && expiresInMinutes > 0,
+          tokenInfo: {
+            expires_in_minutes: expiresInMinutes,
+            expires_in_days: expiresInDays,
+            is_expired: data.tokenInfo.is_expired || false
+          },
+          loading: false
+        });
 
-	      console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
-	      
-	      // Avertizare pentru expirare apropiată
-	      if (expiresInDays > 0 && expiresInDays <= 7) {
-		showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
-	      }
-	    } else {
-	      setAnafTokenStatus({
-		hasValidToken: false,
-		tokenInfo: undefined,
-		loading: false
-	      });
-	      setSendToAnaf(false);
-	      console.log('❌ Token ANAF invalid sau lipsă');
-	    }
-	    
-	  } catch (error) {
-	    console.error('Error checking ANAF token:', error);
-	    setAnafTokenStatus({
-	      hasValidToken: false,
-	      loading: false
-	    });
-	    setSendToAnaf(false);
-	  } finally {
-	    setIsCheckingAnafToken(false);
-	  }
-	};
+        console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
+        
+        // Avertizare pentru expirare apropiată
+        if (expiresInDays > 0 && expiresInDays <= 7) {
+          showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
+        }
+      } else {
+        setAnafTokenStatus({
+          hasValidToken: false,
+          tokenInfo: undefined,
+          loading: false
+        });
+        setSendToAnaf(false);
+        console.log('❌ Token ANAF invalid sau lipsă');
+      }
+      
+    } catch (error) {
+      console.error('Error checking ANAF token:', error);
+      setAnafTokenStatus({
+        hasValidToken: false,
+        loading: false
+      });
+      setSendToAnaf(false);
+    } finally {
+      setIsCheckingAnafToken(false);
+    }
+  };
 
   const handleAnafCheckboxChange = (checked: boolean) => {
     if (checked && !anafTokenStatus.hasValidToken) {
@@ -836,24 +835,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         await processPDF(result.htmlContent, result.fileName);
         
+        // După generare cu succes, doar afișăm succesul
+        showToast('✅ Factură generată cu succes!', 'success');
 
-	// După await processPDF(result.htmlContent, result.fileName);
-	// Doar afișăm succesul, nu mai actualizăm numărul
-	showToast('✅ Factură generată cu succes!', 'success');
-
-	// Optional: Reîncarcă setările pentru următoarea factură
-	setTimeout(() => {
-	  loadSetariFacturare();
-	}, 1000);
-	      
-	    } else {
-	      throw new Error(updateResult.error || 'Actualizare eșuată');
-	    }
-	  } catch (error) {
-	    console.error('❌ Eroare actualizare număr:', error);
-	    showToast('⚠️ Factura generată dar numărul nu s-a actualizat', 'error');
-	  }
-	}
+        // Optional: Reîncarcă setările pentru următoarea factură
+        setTimeout(() => {
+          loadSetariFacturare();
+        }, 1000);
         
       } else {
         throw new Error(result.error || 'Eroare la generarea template-ului');
@@ -871,7 +859,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
-  // Continuare în partea 2 pentru render JSX...
+  // Render JSX - continuare în partea 2...
   // Render JSX
   return (
     <div style={{
@@ -1797,21 +1785,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <div style={{ fontSize: '12px', color: '#27ae60' }}>
                       ✅ Token ANAF valid
                       {anafTokenStatus.tokenInfo && (
-			  <span style={{ 
-			    color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
-			  }}>
-			    {' '}
-			    {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
-			      `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-			    ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
-			      `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-			    ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-			      `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
-			    ) : (
-			      '(verifică statusul)'
-			    )}
-			  </span>
-			)}
+                        <span style={{ 
+                          color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
+                        }}>
+                          {' '}
+                          {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
+                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+                          ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
+                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
+                          ) : (
+                            '(verifică statusul)'
+                          )}
+                        </span>
+                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: '12px', color: '#e74c3c' }}>
@@ -1857,7 +1845,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
             <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '13px', color: '#856404' }}>
               <li>Factura va primi numărul: <strong>{numarFactura}</strong></li>
-              <li>După generare, numărul curent va fi actualizat automat în setări</li>
+              <li>După generare, numărul se actualizează automat pentru următoarea factură</li>
               {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
               <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
             </ul>
