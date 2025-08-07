@@ -171,11 +171,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   useEffect(() => {
-    loadClientFromDatabase();
-    loadSubproiecte();
-    loadSetariFacturare();
-    checkAnafTokenStatus();
-  }, [proiect]);
+	  // Apelează funcțiile în ordine, dar independent
+	  loadClientFromDatabase();
+	  loadSubproiecte();
+	  loadSetariFacturare();
+	  
+	  // Apelează checkAnafTokenStatus separat, cu delay pentru a evita suprapunerea
+	  setTimeout(() => {
+	    checkAnafTokenStatus();
+	  }, 100);
+	}, [proiect]);
 
   const loadSetariFacturare = async () => {
     setIsLoadingSetari(true);
@@ -253,83 +258,55 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  const checkAnafTokenStatus = async () => {
-    setIsCheckingAnafToken(true);
-    try {
-      const response = await fetch('/api/anaf/oauth/token');
-      const data = await response.json();
-      
-      let expiresInDays = 0;
-      let expiresInMinutes = 0;
-      let isValid = false;
-      
-      if (data.success && data.tokenInfo) {
-        // ✅ FIX: Calculare corectă pentru 82 de zile
-        if (data.tokenInfo.expires_at) {
-          const expiresAt = new Date(data.tokenInfo.expires_at);
-          const now = new Date();
-          const diffMs = expiresAt.getTime() - now.getTime();
-          
-          if (diffMs > 0) {
-            isValid = true;
-            expiresInMinutes = Math.floor(diffMs / (1000 * 60));
-            expiresInDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            
-            console.log('Token calcul din expires_at:', {
-              expires_at: data.tokenInfo.expires_at,
-              diffMs,
-              expiresInDays,
-              expiresInMinutes
-            });
-          }
-        } 
-        // Fallback la expires_in_minutes dacă nu avem expires_at
-        else if (data.tokenInfo.expires_in_minutes !== undefined && data.tokenInfo.expires_in_minutes > 0) {
-          expiresInMinutes = data.tokenInfo.expires_in_minutes;
-          expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
-          isValid = expiresInMinutes > 0;
-        }
-        
-        // Folosește hasValidToken din API dacă există
-        if (data.hasValidToken !== undefined) {
-          isValid = data.hasValidToken && !data.tokenInfo.is_expired;
-        }
-      }
-      
-      setAnafTokenStatus({
-        hasValidToken: isValid,
-        tokenInfo: isValid && data.tokenInfo ? {
-          ...data.tokenInfo,
-          expires_in_minutes: Math.max(0, expiresInMinutes),
-          expires_in_days: Math.max(0, expiresInDays),
-          is_expired: !isValid
-        } : undefined,
-        loading: false
-      });
+	const checkAnafTokenStatus = async () => {
+	  setIsCheckingAnafToken(true);
+	  try {
+	    const response = await fetch('/api/anaf/oauth/token');
+	    const data = await response.json();
+	    
+	    console.log('ANAF Token API Response:', data); // Debug
+	    
+	    if (data.success && data.hasValidToken && data.tokenInfo) {
+	      // Folosește direct valorile din API
+	      const expiresInMinutes = data.tokenInfo.expires_in_minutes || 0;
+	      const expiresInDays = Math.floor(Math.abs(expiresInMinutes) / (60 * 24));
+	      
+	      setAnafTokenStatus({
+		hasValidToken: !data.tokenInfo.is_expired && expiresInMinutes > 0,
+		tokenInfo: {
+		  expires_in_minutes: Math.max(0, expiresInMinutes),
+		  expires_in_days: expiresInDays,
+		  is_expired: data.tokenInfo.is_expired
+		},
+		loading: false
+	      });
 
-      if (!isValid) {
-        setSendToAnaf(false);
-        console.log('⚠️ Token ANAF invalid sau expirat');
-      } else {
-        console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
-      }
-      
-      // Avertizare doar dacă e valid dar expiră curând
-      if (isValid && expiresInDays > 0 && expiresInDays <= 7) {
-        showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}. Consideră reîmprospătarea.`, 'info');
-      }
-      
-    } catch (error) {
-      console.error('Error checking ANAF token status:', error);
-      setAnafTokenStatus({
-        hasValidToken: false,
-        loading: false
-      });
-      setSendToAnaf(false);
-    } finally {
-      setIsCheckingAnafToken(false);
-    }
-  };
+	      console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile`);
+	      
+	      if (expiresInDays > 0 && expiresInDays <= 7) {
+		showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
+	      }
+	    } else {
+	      setAnafTokenStatus({
+		hasValidToken: false,
+		tokenInfo: undefined,
+		loading: false
+	      });
+	      setSendToAnaf(false);
+	      console.log('❌ Token ANAF invalid sau lipsă');
+	    }
+	    
+	  } catch (error) {
+	    console.error('Error checking ANAF token:', error);
+	    setAnafTokenStatus({
+	      hasValidToken: false,
+	      loading: false
+	    });
+	    setSendToAnaf(false);
+	  } finally {
+	    setIsCheckingAnafToken(false);
+	  }
+	};
 
   const handleAnafCheckboxChange = (checked: boolean) => {
     if (checked && !anafTokenStatus.hasValidToken) {
@@ -812,46 +789,94 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         await processPDF(result.htmlContent, result.fileName);
         
         // ✅ FIX: Actualizează numărul curent după generare cu succes
-        if (setariFacturare && result.success) {
-          try {
-            const nextNumber = (setariFacturare.numar_curent_facturi || 0) + 1;
-            
-            // Trimite actualizarea la API
-            const updateResponse = await fetch('/api/setari/facturare', {
-              method: 'PUT',  // Schimbat din POST în PUT
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                serie_facturi: setariFacturare.serie_facturi,
-                numar_curent_facturi: nextNumber,
-                format_numerotare: setariFacturare.format_numerotare,
-                separator_numerotare: setariFacturare.separator_numerotare,
-                include_an_numerotare: setariFacturare.include_an_numerotare,
-                include_luna_numerotare: setariFacturare.include_luna_numerotare,
-                termen_plata_standard: setariFacturare.termen_plata_standard
-              })
-            });
-            
-            const updateResult = await updateResponse.json();
-            
-            if (updateResult.success) {
-              console.log('✅ Număr factură actualizat în BD la:', nextNumber);
-              
-              // Actualizează local pentru următoarea factură
-              setSetariFacturare({
-                ...setariFacturare,
-                numar_curent_facturi: nextNumber
-              });
-              
-              // Nu mai reîncărcăm tot, doar actualizăm local
-              showToast(`✅ Număr factură actualizat la ${nextNumber + 1} pentru următoarea factură`, 'success');
-            } else {
-              console.error('❌ Eroare la actualizarea numărului:', updateResult.error);
-            }
-          } catch (error) {
-            console.error('⚠️ Eroare la actualizarea numărului curent:', error);
-            showToast('⚠️ Numărul facturii nu a putut fi actualizat automat', 'error');
-          }
-        }
+	// În handleGenereazaFactura, după await processPDF(...)
+	if (setariFacturare && result.success) {
+	  try {
+	    const currentNumber = parseInt(setariFacturare.numar_curent_facturi) || 0;
+	    const nextNumber = currentNumber + 1;
+	    
+	    console.log(`📊 Actualizare număr: ${currentNumber} → ${nextNumber}`);
+	    
+	    // Pregătește payload complet pentru API
+	    const updatePayload = {
+	      // Câmpuri obligatorii - păstrează valorile existente
+	      serie_facturi: setariFacturare.serie_facturi,
+	      serie_proforme: setariFacturare.serie_proforme || 'PRF',
+	      serie_chitante: setariFacturare.serie_chitante || 'CHT', 
+	      serie_contracte: setariFacturare.serie_contracte || 'CTR',
+	      
+	      // ACTUALIZEAZĂ numărul facturilor
+	      numar_curent_facturi: nextNumber,
+	      
+	      // Păstrează celelalte numere
+	      numar_curent_proforme: setariFacturare.numar_curent_proforme || 0,
+	      numar_curent_chitante: setariFacturare.numar_curent_chitante || 0,
+	      numar_curent_contracte: setariFacturare.numar_curent_contracte || 0,
+	      
+	      // Setări formatare
+	      format_numerotare: setariFacturare.format_numerotare,
+	      separator_numerotare: setariFacturare.separator_numerotare,
+	      include_an_numerotare: Boolean(setariFacturare.include_an_numerotare),
+	      include_luna_numerotare: Boolean(setariFacturare.include_luna_numerotare),
+	      
+	      // E-factura settings (obligatorii în API)
+	      efactura_enabled: setariFacturare.efactura_enabled ?? true,
+	      efactura_timp_intarziere: setariFacturare.efactura_timp_intarziere ?? 300,
+	      efactura_mock_mode: setariFacturare.efactura_mock_mode ?? false,
+	      efactura_auto_send: setariFacturare.efactura_auto_send ?? false,
+	      
+	      // TVA și termene - păstrează existente
+	      cota_tva_standard: setariFacturare.cota_tva_standard ?? 19,
+	      cota_tva_redusa: setariFacturare.cota_tva_redusa ?? 5,
+	      valabilitate_proforme: setariFacturare.valabilitate_proforme ?? 30,
+	      termen_plata_standard: setariFacturare.termen_plata_standard || 30
+	    };
+	    
+	    console.log('📤 Trimit actualizare:', updatePayload);
+	    
+	    const updateResponse = await fetch('/api/setari/facturare', {
+	      method: 'POST', // API-ul acceptă doar POST
+	      headers: { 'Content-Type': 'application/json' },
+	      body: JSON.stringify(updatePayload)
+	    });
+	    
+	    if (!updateResponse.ok) {
+	      throw new Error(`HTTP error! status: ${updateResponse.status}`);
+	    }
+	    
+	    const updateResult = await updateResponse.json();
+	    console.log('📥 Răspuns actualizare:', updateResult);
+	    
+	    if (updateResult.success) {
+	      console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
+	      
+	      // Actualizează și local pentru consistență
+	      setSetariFacturare(prev => ({
+		...prev,
+		numar_curent_facturi: nextNumber
+	      }));
+	      
+	      // Calculează următorul număr pentru afișare
+	      let numarUrmator = `${setariFacturare.serie_facturi}${setariFacturare.separator_numerotare}${nextNumber + 1}`;
+	      if (setariFacturare.include_an_numerotare) {
+		numarUrmator += `${setariFacturare.separator_numerotare}${new Date().getFullYear()}`;
+	      }
+	      
+	      showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
+	      
+	      // Optional: Reîncarcă setările după 2 secunde
+	      setTimeout(() => {
+		loadSetariFacturare();
+	      }, 2000);
+	      
+	    } else {
+	      throw new Error(updateResult.error || 'Actualizare eșuată');
+	    }
+	  } catch (error) {
+	    console.error('❌ Eroare actualizare număr:', error);
+	    showToast('⚠️ Factura generată dar numărul nu s-a actualizat', 'error');
+	  }
+	}
         
       } else {
         throw new Error(result.error || 'Eroare la generarea template-ului');
