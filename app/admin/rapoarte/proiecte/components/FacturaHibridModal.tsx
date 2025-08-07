@@ -789,6 +789,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         await processPDF(result.htmlContent, result.fileName);
         
         // ✅ FIX: Actualizează numărul curent după generare cu succes
+	// În handleGenereazaFactura, după await processPDF(...)
 	if (setariFacturare && result.success) {
 	  try {
 	    const currentNumber = setariFacturare.numar_curent_facturi || 0;
@@ -796,13 +797,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    
 	    console.log(`📊 Actualizare număr: ${currentNumber} → ${nextNumber}`);
 	    
-	    // Pregătește payload SIMPLIFICAT - doar ce e necesar pentru facturi
+	    // Pregătește payload SIMPLIFICAT
 	    const updatePayload = {
-	      // Câmpuri esențiale pentru facturi
 	      serie_facturi: setariFacturare.serie_facturi,
 	      numar_curent_facturi: nextNumber,
-	      
-	      // Setări formatare existente
 	      format_numerotare: setariFacturare.format_numerotare,
 	      separator_numerotare: setariFacturare.separator_numerotare,
 	      include_an_numerotare: Boolean(setariFacturare.include_an_numerotare),
@@ -816,14 +814,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	      numar_curent_proforme: 0,
 	      numar_curent_chitante: 0,
 	      numar_curent_contracte: 0,
-	      
-	      // E-factura settings (valori default)
 	      efactura_enabled: true,
 	      efactura_timp_intarziere: 300,
 	      efactura_mock_mode: false,
 	      efactura_auto_send: false,
-	      
-	      // TVA și termene (valori default)
 	      cota_tva_standard: 19,
 	      cota_tva_redusa: 5,
 	      valabilitate_proforme: 30
@@ -845,34 +839,33 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    console.log('📥 Răspuns actualizare:', updateResult);
 	    
 	    if (updateResult.success) {
-		  console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
-		  
-		  // Actualizează local doar dacă avem setări valide
-		  if (setariFacturare) {
-		    setSetariFacturare({
-		      serie_facturi: setariFacturare.serie_facturi,
-		      numar_curent_facturi: nextNumber,
-		      format_numerotare: setariFacturare.format_numerotare,
-		      separator_numerotare: setariFacturare.separator_numerotare,
-		      include_an_numerotare: setariFacturare.include_an_numerotare,
-		      include_luna_numerotare: setariFacturare.include_luna_numerotare,
-		      termen_plata_standard: setariFacturare.termen_plata_standard
-		    });
-		  }
-		  
-		  // Calculează următorul număr pentru afișare
-		  let numarUrmator = `${setariFacturare.serie_facturi}${setariFacturare.separator_numerotare}${nextNumber + 1}`;
-		  if (setariFacturare.include_an_numerotare) {
-		    numarUrmator += `${setariFacturare.separator_numerotare}${new Date().getFullYear()}`;
-		  }
-		  
-		  showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
-		  
-		  // Reîncarcă setările după 2 secunde
-		  setTimeout(() => {
-		    loadSetariFacturare();
-		  }, 2000);
-		}
+	      console.log(`✅ Număr actualizat în BD: ${nextNumber}`);
+	      
+	      // Actualizează local doar dacă avem setări valide
+	      if (setariFacturare) {
+		setSetariFacturare({
+		  serie_facturi: setariFacturare.serie_facturi,
+		  numar_curent_facturi: nextNumber,
+		  format_numerotare: setariFacturare.format_numerotare,
+		  separator_numerotare: setariFacturare.separator_numerotare,
+		  include_an_numerotare: setariFacturare.include_an_numerotare,
+		  include_luna_numerotare: setariFacturare.include_luna_numerotare,
+		  termen_plata_standard: setariFacturare.termen_plata_standard
+		});
+	      }
+	      
+	      // Calculează următorul număr pentru afișare
+	      let numarUrmator = `${setariFacturare.serie_facturi}${setariFacturare.separator_numerotare}${nextNumber + 1}`;
+	      if (setariFacturare.include_an_numerotare) {
+		numarUrmator += `${setariFacturare.separator_numerotare}${new Date().getFullYear()}`;
+	      }
+	      
+	      showToast(`✅ Factură salvată! Următorul număr: ${numarUrmator}`, 'success');
+	      
+	      // Reîncarcă setările după 2 secunde
+	      setTimeout(() => {
+		loadSetariFacturare();
+	      }, 2000);
 	      
 	    } else {
 	      throw new Error(updateResult.error || 'Actualizare eșuată');
