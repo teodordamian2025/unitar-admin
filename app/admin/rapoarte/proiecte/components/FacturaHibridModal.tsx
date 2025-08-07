@@ -302,58 +302,116 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  const checkAnafTokenStatus = async () => {
-    setIsCheckingAnafToken(true);
-    try {
-      // Folosim exact același endpoint ca monitoring
-      const response = await fetch('/api/anaf/oauth/token');
-      const data = await response.json();
-      
-      console.log('ANAF Token Response:', data); // Debug
-      
-      if (data.success && data.hasValidToken && data.tokenInfo) {
-        // API-ul returnează deja expires_in_minutes calculat corect din BigQuery
-        const expiresInMinutes = data.tokenInfo.expires_in_minutes || 0;
-        // Calculăm zilele simplu din minute
-        const expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
-        
-        setAnafTokenStatus({
-          hasValidToken: !data.tokenInfo.is_expired && expiresInMinutes > 0,
-          tokenInfo: {
-            expires_in_minutes: expiresInMinutes,
-            expires_in_days: expiresInDays,
-            is_expired: data.tokenInfo.is_expired || false
-          },
-          loading: false
-        });
+	const checkAnafTokenStatus = async () => {
+	  setIsCheckingAnafToken(true);
+	  try {
+	    // Folosim exact același endpoint ca monitoring
+	    const response = await fetch('/api/anaf/oauth/token');
+	    const data = await response.json();
+	    
+	    console.log('ANAF Token Response:', data); // Debug
+	    
+	    if (data.success && data.hasValidToken && data.tokenInfo) {
+	      let expiresInMinutes = 0;
+	      let expiresInDays = 0;
+	      
+	      // Verificăm dacă avem expires_in_minutes direct
+	      if (data.tokenInfo.expires_in_minutes !== null && data.tokenInfo.expires_in_minutes !== undefined) {
+		expiresInMinutes = data.tokenInfo.expires_in_minutes;
+	      } 
+	      // Altfel, calculăm din expires_at
+	      else if (data.tokenInfo.expires_at) {
+		let expiresAtDate: Date;
+		
+		// Gestionăm diferite formate posibile
+		if (typeof data.tokenInfo.expires_at === 'string') {
+		  // Format string direct din BigQuery: "2025-10-28 05:29:36.508000 UTC"
+		  // Înlocuim " UTC" cu "Z" pentru parsing corect
+		  const cleanDateStr = data.tokenInfo.expires_at.replace(' UTC', 'Z').replace(' ', 'T');
+		  expiresAtDate = new Date(cleanDateStr);
+		} else if (data.tokenInfo.expires_at.value) {
+		  // Format obiect BigQuery: { value: '2025-10-28 05:29:36.508000 UTC' }
+		  const cleanDateStr = data.tokenInfo.expires_at.value.replace(' UTC', 'Z').replace(' ', 'T');
+		  expiresAtDate = new Date(cleanDateStr);
+		} else {
+		  console.error('Format expires_at necunoscut:', data.tokenInfo.expires_at);
+		  expiresAtDate = new Date();
+		}
+		
+		// Verificăm dacă data este validă
+		if (isNaN(expiresAtDate.getTime())) {
+		  console.error('Data expires_at invalidă:', data.tokenInfo.expires_at);
+		  expiresAtDate = new Date();
+		}
+		
+		const now = new Date();
+		const diffMs = expiresAtDate.getTime() - now.getTime();
+		expiresInMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Minim 0, nu negative
+		
+		console.log('Calculat din expires_at:', {
+		  expires_at_raw: data.tokenInfo.expires_at,
+		  expires_at_parsed: expiresAtDate.toISOString(),
+		  now: now.toISOString(),
+		  diffMs,
+		  expiresInMinutes
+		});
+	      }
+	      
+	      // Calculăm zilele din minute
+	      expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+	      
+	      // Verificăm dacă token-ul nu a expirat deja
+	      const isExpired = data.tokenInfo.is_expired || expiresInMinutes <= 0;
+	      
+	      setAnafTokenStatus({
+		hasValidToken: !isExpired,
+		tokenInfo: {
+		  expires_in_minutes: expiresInMinutes,
+		  expires_in_days: expiresInDays,
+		  is_expired: isExpired
+		},
+		loading: false
+	      });
 
-        console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
-        
-        // Avertizare pentru expirare apropiată
-        if (expiresInDays > 0 && expiresInDays <= 7) {
-          showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
-        }
-      } else {
-        setAnafTokenStatus({
-          hasValidToken: false,
-          tokenInfo: undefined,
-          loading: false
-        });
-        setSendToAnaf(false);
-        console.log('❌ Token ANAF invalid sau lipsă');
-      }
-      
-    } catch (error) {
-      console.error('Error checking ANAF token:', error);
-      setAnafTokenStatus({
-        hasValidToken: false,
-        loading: false
-      });
-      setSendToAnaf(false);
-    } finally {
-      setIsCheckingAnafToken(false);
-    }
-  };
+	      if (!isExpired) {
+		console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
+		
+		// Avertizări bazate pe timp rămas
+		if (expiresInDays >= 7) {
+		  // Token valid pentru mai mult de 7 zile - nu afișăm nimic
+		} else if (expiresInDays > 0 && expiresInDays < 7) {
+		  showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
+		} else if (expiresInDays === 0 && expiresInMinutes > 60) {
+		  const ore = Math.floor(expiresInMinutes / 60);
+		  showToast(`⚠️ Token ANAF expiră în ${ore} ${ore === 1 ? 'oră' : 'ore'}`, 'warning');
+		} else if (expiresInMinutes > 0 && expiresInMinutes <= 60) {
+		  showToast(`🔴 URGENT: Token ANAF expiră în ${expiresInMinutes} minute!`, 'error');
+		}
+	      } else {
+		console.log('❌ Token ANAF expirat');
+		showToast('❌ Token ANAF a expirat! Reautentifică-te la ANAF.', 'error');
+	      }
+	    } else {
+	      setAnafTokenStatus({
+		hasValidToken: false,
+		tokenInfo: undefined,
+		loading: false
+	      });
+	      setSendToAnaf(false);
+	      console.log('❌ Token ANAF invalid sau lipsă');
+	    }
+	    
+	  } catch (error) {
+	    console.error('Error checking ANAF token:', error);
+	    setAnafTokenStatus({
+	      hasValidToken: false,
+	      loading: false
+	    });
+	    setSendToAnaf(false);
+	  } finally {
+	    setIsCheckingAnafToken(false);
+	  }
+	};
 
   const handleAnafCheckboxChange = (checked: boolean) => {
     if (checked && !anafTokenStatus.hasValidToken) {
