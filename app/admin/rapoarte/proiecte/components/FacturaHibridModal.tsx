@@ -383,7 +383,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 		  showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
 		} else if (expiresInDays === 0 && expiresInMinutes > 60) {
 		  const ore = Math.floor(expiresInMinutes / 60);
-		  showToast(`⚠️ Token ANAF expiră în ${ore} ${ore === 1 ? 'oră' : 'ore'}`, 'warning');
+		  showToast(`⚠️ Token ANAF expiră în ${ore} ${ore === 1 ? 'oră' : 'ore'}`, 'info');
 		} else if (expiresInMinutes > 0 && expiresInMinutes <= 60) {
 		  showToast(`🔴 URGENT: Token ANAF expiră în ${expiresInMinutes} minute!`, 'error');
 		}
