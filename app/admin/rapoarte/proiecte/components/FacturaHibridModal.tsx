@@ -183,6 +183,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const response = await fetch('/api/setari/facturare');
       const data = await response.json();
       
+      // DEBUG - Vezi ce returnează API-ul
+	console.log('DEBUG Token API Response:', {
+	  fullData: data,
+	  hasValidToken: data.hasValidToken,
+	  tokenInfo: data.tokenInfo,
+	  expires_at: data.tokenInfo?.expires_at,
+	  expires_in_minutes: data.tokenInfo?.expires_in_minutes
+	});
+      
       if (data.success && data.setari) {
         const processValue = (value: any) => {
           if (value && typeof value === 'object' && value.value !== undefined) {
