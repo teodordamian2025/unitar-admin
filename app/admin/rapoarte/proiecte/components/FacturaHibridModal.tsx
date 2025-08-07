@@ -792,7 +792,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	// În handleGenereazaFactura, după await processPDF(...)
 	if (setariFacturare && result.success) {
 	  try {
-	    const currentNumber = parseInt(setariFacturare.numar_curent_facturi) || 0;
+	    const currentNumber = setariFacturare.numar_curent_facturi || 0;
 	    const nextNumber = currentNumber + 1;
 	    
 	    console.log(`📊 Actualizare număr: ${currentNumber} → ${nextNumber}`);
