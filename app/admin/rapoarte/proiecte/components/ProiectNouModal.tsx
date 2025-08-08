@@ -270,76 +270,89 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-  // ✅ FUNCȚIE CORECTATĂ pentru adăugarea subproiectelor cu TOATE câmpurile
-  const addSubproiecte = async (proiectId: string) => {
-    console.log(`📋 Începe adăugarea subproiectelor pentru ${proiectId}`);
-    
-    for (const subproiect of formData.subproiecte) {
-      try {
-        // Calculăm valoarea în RON pentru subproiect dacă e în altă monedă
-        let valoareRonSubproiect = null;
-        let cursSubproiect = null;
-        
-        if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
-          // Folosim același curs ca la proiectul principal sau calculăm unul nou
-          if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
-            cursSubproiect = parseFloat(formData.curs_valutar);
-            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
-          } else {
-            // În producție, aici ar trebui să apelăm API-ul pentru curs
-            cursSubproiect = 4.97; // Valoare default pentru EUR
-            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
-          }
-        } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
-          valoareRonSubproiect = parseFloat(subproiect.valoare);
-          cursSubproiect = 1;
-        }
-        
-        const subproiectData = {
-          ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
-          ID_Proiect: proiectId,
-          Denumire: subproiect.denumire,
-          Responsabil: subproiect.responsabil || null,
-          Status: subproiect.status || 'Planificat',
-          Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
-          
-          // ✅ NOUĂ: Câmpuri multi-valută pentru subproiect
-          moneda: subproiect.moneda || 'RON',
-          curs_valutar: cursSubproiect,
-          data_curs_valutar: formData.data_curs_valutar || null,
-          valoare_ron: valoareRonSubproiect,
-          
-          // ✅ NOUĂ: Status-uri multiple pentru subproiect (moștenite de la proiect)
-          status_predare: 'Nepredat',
-          status_contract: 'Nu e cazul',
-          status_facturare: 'Nefacturat',
-          status_achitare: 'Neachitat'
-        };
+	// ✅ FUNCȚIE CORECTATĂ pentru adăugarea subproiectelor cu TOATE câmpurile
+	const addSubproiecte = async (proiectId: string) => {
+	  console.log(`📋 Începe adăugarea subproiectelor pentru ${proiectId}`);
+	  
+	  for (const subproiect of formData.subproiecte) {
+	    try {
+	      // Calculăm valoarea în RON pentru subproiect dacă e în altă monedă
+	      let valoareRonSubproiect: number | null = null;
+	      let cursSubproiect: number | null = null;
+	      
+	      if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
+		// Folosim același curs ca la proiectul principal sau calculăm unul nou
+		if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
+		  cursSubproiect = parseFloat(formData.curs_valutar);
+		  valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+		} else {
+		  // În producție, aici ar trebui să apelăm API-ul pentru curs
+		  // Pentru moment folosim valori default
+		  switch(subproiect.moneda) {
+		    case 'EUR':
+		      cursSubproiect = 4.97;
+		      break;
+		    case 'USD':
+		      cursSubproiect = 4.50;
+		      break;
+		    case 'GBP':
+		      cursSubproiect = 5.80;
+		      break;
+		    default:
+		      cursSubproiect = 1;
+		  }
+		  valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+		}
+	      } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
+		valoareRonSubproiect = parseFloat(subproiect.valoare);
+		cursSubproiect = 1;
+	      }
+	      
+	      const subproiectData = {
+		ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
+		ID_Proiect: proiectId,
+		Denumire: subproiect.denumire,
+		Responsabil: subproiect.responsabil || null,
+		Status: subproiect.status || 'Planificat',
+		Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+		
+		// ✅ NOUĂ: Câmpuri multi-valută pentru subproiect
+		moneda: subproiect.moneda || 'RON',
+		curs_valutar: cursSubproiect,
+		data_curs_valutar: formData.data_curs_valutar || null,
+		valoare_ron: valoareRonSubproiect,
+		
+		// ✅ NOUĂ: Status-uri multiple pentru subproiect (moștenite de la proiect)
+		status_predare: 'Nepredat',
+		status_contract: 'Nu e cazul',
+		status_facturare: 'Nefacturat',
+		status_achitare: 'Neachitat'
+	      };
 
-        console.log(`📤 Trimitere subproiect ${subproiect.denumire}:`, subproiectData);
+	      console.log(`📤 Trimitere subproiect ${subproiect.denumire}:`, subproiectData);
 
-        const response = await fetch('/api/rapoarte/subproiecte', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subproiectData)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log(`✅ Subproiect "${subproiect.denumire}" adăugat cu succes`);
-        } else {
-          console.error(`❌ Eroare la subproiect ${subproiect.denumire}:`, result);
-          toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
-        }
-      } catch (error) {
-        console.error(`❌ Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
-        toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
-      }
-    }
-    
-    console.log(`✅ Procesare subproiecte finalizată pentru ${proiectId}`);
-  };
+	      const response = await fetch('/api/rapoarte/subproiecte', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(subproiectData)
+	      });
+	      
+	      const result = await response.json();
+	      
+	      if (result.success) {
+		console.log(`✅ Subproiect "${subproiect.denumire}" adăugat cu succes`);
+	      } else {
+		console.error(`❌ Eroare la subproiect ${subproiect.denumire}:`, result);
+		toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
+	      }
+	    } catch (error) {
+	      console.error(`❌ Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
+	      toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
+	    }
+	  }
+	  
+	  console.log(`✅ Procesare subproiecte finalizată pentru ${proiectId}`);
+	};
 
   // Funcție pentru adăugarea cheltuielilor (păstrată neschimbată)
   const addCheltuieli = async (proiectId: string) => {
