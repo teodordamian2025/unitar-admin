@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/subproiecte/route.ts  
-// MODIFICAT: Fix activ field + îmbunătățiri afișare subproiecte
+// MODIFICAT: Suport complet pentru multi-valută și status-uri multiple
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // ✅ FIX: Query simplificat și verificare câmp activ
+    // ✅ Query extins cu câmpurile noi
     let query = `
       SELECT 
         s.*,
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     });
 
-    console.log(`Found ${rows.length} subproiecte`); // ✅ Debug logging
+    console.log(`Found ${rows.length} subproiecte`);
 
     return NextResponse.json({
       success: true,
@@ -114,7 +114,16 @@ export async function POST(request: NextRequest) {
       Data_Start, 
       Data_Final, 
       Status = 'Activ', 
-      Valoare_Estimata 
+      Valoare_Estimata,
+      // ✅ NOUĂ: Câmpuri multi-valută și status-uri
+      moneda = 'RON',
+      curs_valutar,
+      data_curs_valutar,
+      valoare_ron,
+      status_predare = 'Nepredat',
+      status_contract = 'Nu e cazul',
+      status_facturare = 'Nefacturat',
+      status_achitare = 'Neachitat'
     } = body;
 
     // Validări
@@ -125,16 +134,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Adăugat câmpul activ = true explicit
+    // ✅ Query complet cu toate câmpurile noi
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, 
-       Status, Valoare_Estimata, activ, data_creare)
+       Status, Valoare_Estimata, activ, data_creare,
+       moneda, curs_valutar, data_curs_valutar, valoare_ron,
+       status_predare, status_contract, status_facturare, status_achitare)
       VALUES (@ID_Subproiect, @ID_Proiect, @Denumire, @Responsabil, @Data_Start, 
-              @Data_Final, @Status, @Valoare_Estimata, @activ, @data_creare)
+              @Data_Final, @Status, @Valoare_Estimata, @activ, @data_creare,
+              @moneda, @curs_valutar, @data_curs_valutar, @valoare_ron,
+              @status_predare, @status_contract, @status_facturare, @status_achitare)
     `;
 
-    // ✅ FIX: Params cu activ = true și data_creare
+    // ✅ Params cu toate câmpurile
     const params = {
       ID_Subproiect: ID_Subproiect,
       ID_Proiect: ID_Proiect,
@@ -144,11 +157,21 @@ export async function POST(request: NextRequest) {
       Data_Final: Data_Final || null,
       Status: Status,
       Valoare_Estimata: Valoare_Estimata || null,
-      activ: true, // ✅ FIX: Explicit true
-      data_creare: new Date().toISOString() // ✅ FIX: Timestamp creare
+      activ: true,
+      data_creare: new Date().toISOString(),
+      // Câmpuri multi-valută
+      moneda: moneda,
+      curs_valutar: curs_valutar || null,
+      data_curs_valutar: data_curs_valutar || null,
+      valoare_ron: valoare_ron || null,
+      // Status-uri multiple
+      status_predare: status_predare,
+      status_contract: status_contract,
+      status_facturare: status_facturare,
+      status_achitare: status_achitare
     };
 
-    // ✅ FIX: Types pentru toate câmpurile
+    // ✅ Types pentru toate câmpurile
     const types = {
       ID_Subproiect: 'STRING',
       ID_Proiect: 'STRING',
@@ -158,8 +181,16 @@ export async function POST(request: NextRequest) {
       Data_Final: 'DATE',
       Status: 'STRING',
       Valoare_Estimata: 'NUMERIC',
-      activ: 'BOOLEAN', // ✅ FIX: Type pentru activ
-      data_creare: 'TIMESTAMP' // ✅ FIX: Type pentru data_creare
+      activ: 'BOOLEAN',
+      data_creare: 'TIMESTAMP',
+      moneda: 'STRING',
+      curs_valutar: 'NUMERIC',
+      data_curs_valutar: 'DATE',
+      valoare_ron: 'NUMERIC',
+      status_predare: 'STRING',
+      status_contract: 'STRING',
+      status_facturare: 'STRING',
+      status_achitare: 'STRING'
     };
 
     console.log('Insert subproiect params:', params);
@@ -171,7 +202,7 @@ export async function POST(request: NextRequest) {
       location: 'EU',
     });
 
-    console.log(`✅ Subproiect ${ID_Subproiect} adăugat cu succes pentru proiectul ${ID_Proiect}`); // ✅ Debug
+    console.log(`✅ Subproiect ${ID_Subproiect} adăugat cu succes pentru proiectul ${ID_Proiect}`);
 
     return NextResponse.json({
       success: true,
@@ -206,13 +237,22 @@ export async function PUT(request: NextRequest) {
     const params: any = { id };
     const types: any = { id: 'STRING' };
 
+    // ✅ ACTUALIZAT: Mapping extins pentru toate câmpurile
     const fieldTypes: { [key: string]: string } = {
       'Denumire': 'STRING',
       'Responsabil': 'STRING',
       'Data_Start': 'DATE',
       'Data_Final': 'DATE',
       'Status': 'STRING',
-      'Valoare_Estimata': 'NUMERIC'
+      'Valoare_Estimata': 'NUMERIC',
+      'moneda': 'STRING',
+      'curs_valutar': 'NUMERIC',
+      'data_curs_valutar': 'DATE',
+      'valoare_ron': 'NUMERIC',
+      'status_predare': 'STRING',
+      'status_contract': 'STRING',
+      'status_facturare': 'STRING',
+      'status_achitare': 'STRING'
     };
 
     Object.entries(updateData).forEach(([key, value]) => {
@@ -230,7 +270,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Adăugat data_actualizare la UPDATE
+    // Adăugat data_actualizare la UPDATE
     updateFields.push('data_actualizare = @data_actualizare');
     params.data_actualizare = new Date().toISOString();
     types.data_actualizare = 'TIMESTAMP';
@@ -277,7 +317,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ FIX: Soft delete cu câmpul activ
+    // Soft delete cu câmpul activ
     const deleteQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET activ = false, data_actualizare = @data_actualizare
@@ -297,7 +337,7 @@ export async function DELETE(request: NextRequest) {
       location: 'EU',
     });
 
-    console.log(`✅ Subproiect ${id} șters (soft delete)`); // ✅ Debug
+    console.log(`✅ Subproiect ${id} șters (soft delete)`);
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubproiectModal.tsx
-// PARTEA 2: Modal Separat pentru management în ProiecteTable.tsx
-// MODIFICAT: Z-index 50000 + Toast System compatibil + Design optimizat
+// MODIFICAT: 08.08.2025 adaugare moneda, curs valutar, multivaluta, status
 // ==================================================================
 
 'use client';
@@ -102,55 +101,69 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     showToast('📋 Formular resetat pentru noul subproiect!', 'info');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.denumire.trim()) {
-      showToast('Denumirea subproiectului este obligatorie', 'error');
-      return;
-    }
+	const handleSubmit = async (e: React.FormEvent) => {
+	  e.preventDefault();
+	  
+	  if (!formData.denumire.trim()) {
+	    showToast('Denumirea subproiectului este obligatorie', 'error');
+	    return;
+	  }
 
-    setIsSubmitting(true);
-    
-    try {
-      const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
-      
-      const requestData = {
-        ID_Subproiect: subproiectId,
-        ID_Proiect: proiectParinte.ID_Proiect,
-        Denumire: formData.denumire.trim(),
-        Responsabil: formData.responsabil.trim() || null,
-        Data_Start: formData.dataStart || null,
-        Data_Final: formData.dataFinal || null,
-        Valoare_Estimata: formData.valoareEstimata ? parseFloat(formData.valoareEstimata) : null,
-        Status: formData.status
-      };
+	  setIsSubmitting(true);
+	  
+	  try {
+	    const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
+	    
+	    // ✅ ACTUALIZAT: Adaugă toate câmpurile necesare
+	    const requestData = {
+	      ID_Subproiect: subproiectId,
+	      ID_Proiect: proiectParinte.ID_Proiect,
+	      Denumire: formData.denumire.trim(),
+	      Responsabil: formData.responsabil.trim() || null,
+	      Data_Start: formData.dataStart || null,
+	      Data_Final: formData.dataFinal || null,
+	      Valoare_Estimata: formData.valoareEstimata ? parseFloat(formData.valoareEstimata) : null,
+	      Status: formData.status,
+	      
+	      // ✅ NOUĂ: Câmpuri multi-valută (RON default pentru subproiecte adăugate individual)
+	      moneda: 'RON',
+	      curs_valutar: 1,
+	      data_curs_valutar: new Date().toISOString().split('T')[0],
+	      valoare_ron: formData.valoareEstimata ? parseFloat(formData.valoareEstimata) : null,
+	      
+	      // ✅ NOUĂ: Status-uri multiple (valori default)
+	      status_predare: 'Nepredat',
+	      status_contract: 'Nu e cazul',
+	      status_facturare: 'Nefacturat',
+	      status_achitare: 'Neachitat'
+	    };
 
-      console.log('Trimitere subproiect:', requestData);
+	    console.log('📤 Trimitere subproiect complet:', requestData);
 
-      const response = await fetch('/api/rapoarte/subproiecte', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData)
-      });
+	    const response = await fetch('/api/rapoarte/subproiecte', {
+	      method: 'POST',
+	      headers: { 'Content-Type': 'application/json' },
+	      body: JSON.stringify(requestData)
+	    });
 
-      const result = await response.json();
-      console.log('Răspuns subproiect:', result);
+	    const result = await response.json();
+	    console.log('📥 Răspuns subproiect:', result);
 
-      if (result.success) {
-        onSuccess();
-        resetForm();
-        showToast('✅ Subproiect adăugat cu succes!', 'success');
-      } else {
-        showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
-      }
-    } catch (error) {
-      console.error('Eroare la adăugarea subproiectului:', error);
-      showToast('Eroare la adăugarea subproiectului', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+	    if (result.success) {
+	      onSuccess();
+	      resetForm();
+	      showToast('✅ Subproiect adăugat cu succes!', 'success');
+	    } else {
+	      console.error('❌ Eroare API:', result);
+	      showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
+	    }
+	  } catch (error) {
+	    console.error('❌ Eroare la adăugarea subproiectului:', error);
+	    showToast('Eroare la adăugarea subproiectului', 'error');
+	  } finally {
+	    setIsSubmitting(false);
+	  }
+	};
 
   // ✅ Nu renderează nimic dacă modalul nu este deschis
   if (!isOpen) return null;
