@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       Data_Final: 'DATE',
       Status: 'STRING',
       Valoare_Estimata: 'NUMERIC',
-      activ: 'BOOLEAN',
+      activ: 'BOOL',
       data_creare: 'TIMESTAMP',
       moneda: 'STRING',
       curs_valutar: 'NUMERIC',
