@@ -549,12 +549,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const loadSubproiecte = async () => {
-    // ✅ MODIFICAT: Pentru Edit, încarcă și subproiectele
-    const proiectId = isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect;
+    // ✅ MODIFICAT: Pentru Edit, încarcă și subproiectele cu ID corect
+    let proiectIdPentruSubproiecte = proiect.ID_Proiect;
+    
+    // Pentru Edit/Storno, folosește proiect_id din initialData dacă există
+    if ((isEdit || isStorno) && initialData?.proiectId) {
+      proiectIdPentruSubproiecte = initialData.proiectId;
+    }
+    
+    if (!proiectIdPentruSubproiecte || proiectIdPentruSubproiecte === 'UNKNOWN') {
+      console.log('⚠️ Nu pot încărca subproiecte - lipsește ID proiect valid');
+      return;
+    }
     
     setIsLoadingSubproiecte(true);
     try {
-      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectId)}`);
+      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdPentruSubproiecte)}`);
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -622,16 +632,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
       valoareSubproiect = subproiect.valoare_ron;
       
-      // Track cursul folosit
-	if (!cursuriUtilizate[monedaSubproiect]) {
-	  setCursuriUtilizate(prev => ({
-	    ...prev,
-	    [monedaSubproiect]: {
-	      curs: typeof cursSubproiect === 'number' ? cursSubproiect : parseFloat(cursSubproiect) || 1, // ✅ FIX
-	      data: new Date().toISOString().split('T')[0]
-	    }
-	  }));
-	}
+      // Track cursul folosit - FIX: conversie la număr
+      if (!cursuriUtilizate[monedaSubproiect]) {
+        setCursuriUtilizate(prev => ({
+          ...prev,
+          [monedaSubproiect]: {
+            curs: typeof cursSubproiect === 'number' ? cursSubproiect : parseFloat(cursSubproiect) || 1,
+            data: new Date().toISOString().split('T')[0]
+          }
+        }));
+      }
+    }
     
     const nouaLinie: LineFactura = {
       denumire: `${subproiect.Denumire} (Subproiect)`,
@@ -1020,17 +1031,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
   // ✅ NOU: Generează nota despre cursuri utilizate
-	const generateCurrencyNote = () => {
-	  const monede = Object.keys(cursuriUtilizate);
-	  if (monede.length === 0) return '';
-	  
-	  return `Curs valutar folosit: ${monede.map(m => {
-	    const curs = cursuriUtilizate[m].curs;
-	    // ✅ FIX: Asigură că cursul este număr
-	    const cursNumeric = typeof curs === 'number' ? curs : parseFloat(curs) || 1;
-	    return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursuriUtilizate[m].data})`;
-	  }).join(', ')}`;
-	};
+  const generateCurrencyNote = () => {
+    const monede = Object.keys(cursuriUtilizate);
+    if (monede.length === 0) return '';
+    
+    return `Curs valutar folosit: ${monede.map(m => {
+      const curs = cursuriUtilizate[m].curs;
+      // ✅ FIX: Asigură că cursul este număr
+      const cursNumeric = typeof curs === 'number' ? curs : parseFloat(curs) || 1;
+      return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursuriUtilizate[m].data})`;
+    }).join(', ')}`;
+  };
 
   // Continuare render JSX...
   return (
