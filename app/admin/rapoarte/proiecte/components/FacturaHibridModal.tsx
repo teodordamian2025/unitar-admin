@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// COMPLET cu toate fix-urile pentru token, număr factură și afișare
+// MODIFICAT: Conversie valută corectă + note curs + suport Edit/Storno
 // ==================================================================
 
 'use client';
@@ -19,6 +19,14 @@ interface ProiectData {
   Responsabil?: string;
   Adresa?: string;
   Observatii?: string;
+  // ✅ NOU: Câmpuri valută
+  moneda?: string;
+  curs_valutar?: number;
+  valoare_ron?: number;
+  // ✅ NOU: Flags pentru Edit/Storno
+  _isEdit?: boolean;
+  _isStorno?: boolean;
+  _initialData?: any;
 }
 
 interface FacturaHibridModalProps {
@@ -34,6 +42,10 @@ interface LineFactura {
   cotaTva: number;
   tip?: 'proiect' | 'subproiect';
   subproiect_id?: string;
+  // ✅ NOU: Date valută originale
+  monedaOriginala?: string;
+  valoareOriginala?: number;
+  cursValutar?: number;
 }
 
 interface ClientInfo {
@@ -56,6 +68,10 @@ interface SubproiectInfo {
   Valoare_Estimata?: number;
   Status: string;
   adaugat?: boolean;
+  // ✅ NOU: Câmpuri valută
+  moneda?: string;
+  curs_valutar?: number;
+  valoare_ron?: number;
 }
 
 interface SetariFacturare {
@@ -76,6 +92,14 @@ interface ANAFTokenStatus {
     is_expired: boolean;
   };
   loading: boolean;
+}
+
+// ✅ NOU: Interfață pentru tracking cursuri folosite
+interface CursuriUtilizate {
+  [moneda: string]: {
+    curs: number;
+    data: string;
+  };
 }
 
 declare global {
@@ -128,18 +152,43 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function FacturaHibridModal({ proiect, onClose, onSuccess }: FacturaHibridModalProps) {
-  const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>([
-    { 
-      denumire: proiect.Denumire,
-      cantitate: 1, 
-      pretUnitar: proiect.Valoare_Estimata || 0, 
-      cotaTva: 19,
-      tip: 'proiect'
+  // ✅ NOU: Verifică dacă e Edit sau Storno
+  const isEdit = proiect._isEdit || false;
+  const isStorno = proiect._isStorno || false;
+  const initialData = proiect._initialData || null;
+
+  // ✅ NOU: Track cursuri folosite
+  const [cursuriUtilizate, setCursuriUtilizate] = useState<CursuriUtilizate>({});
+
+  // ✅ MODIFICAT: Inițializare cu date pentru Edit/Storno
+  const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
+    if (initialData?.liniiFactura) {
+      return initialData.liniiFactura;
     }
-  ]);
+    
+    // ✅ MODIFICAT: Conversie valută pentru proiect principal
+    let valoareProiect = proiect.Valoare_Estimata || 0;
+    let monedaProiect = proiect.moneda || 'RON';
+    let cursProiect = proiect.curs_valutar || 1;
+    
+    if (proiect.valoare_ron && monedaProiect !== 'RON') {
+      valoareProiect = proiect.valoare_ron;
+    }
+    
+    return [{
+      denumire: proiect.Denumire,
+      cantitate: 1,
+      pretUnitar: valoareProiect,
+      cotaTva: 19,
+      tip: 'proiect',
+      monedaOriginala: monedaProiect,
+      valoareOriginala: proiect.Valoare_Estimata,
+      cursValutar: cursProiect
+    }];
+  });
   
-  const [observatii, setObservatii] = useState('');
-  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
+  const [observatii, setObservatii] = useState(initialData?.observatii || '');
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingANAF, setIsLoadingANAF] = useState(false);
   const [isLoadingClient, setIsLoadingClient] = useState(false);
@@ -150,7 +199,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [subproiecteDisponibile, setSubproiecteDisponibile] = useState<SubproiectInfo[]>([]);
   const [showSubproiecteSelector, setShowSubproiecteSelector] = useState(false);
   const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
-  const [numarFactura, setNumarFactura] = useState('');
+  const [numarFactura, setNumarFactura] = useState(initialData?.numarFactura || '');
   const [dataFactura] = useState(new Date());
   const [isLoadingSetari, setIsLoadingSetari] = useState(false);
   const [sendToAnaf, setSendToAnaf] = useState(false);
@@ -171,24 +220,49 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   useEffect(() => {
-    // Apelează funcțiile în ordine, dar independent
-    loadClientFromDatabase();
-    loadSubproiecte();
-    loadSetariFacturare();
+    // ✅ MODIFICAT: Pentru Edit, nu reîncarcă datele
+    if (isEdit && initialData) {
+      // Setează datele din initialData
+      if (initialData.clientInfo) {
+        setClientInfo(initialData.clientInfo);
+        setCuiInput(initialData.clientInfo.cui || '');
+      }
+      if (initialData.numarFactura) {
+        setNumarFactura(initialData.numarFactura);
+      }
+      // Nu reîncarcă setările pentru a păstra numărul
+      setSetariFacturare({
+        serie_facturi: 'UP',
+        numar_curent_facturi: 0,
+        format_numerotare: 'serie-numar-an',
+        separator_numerotare: '-',
+        include_an_numerotare: true,
+        include_luna_numerotare: false,
+        termen_plata_standard: 30
+      });
+    } else {
+      loadClientFromDatabase();
+      loadSubproiecte();
+      loadSetariFacturare();
+    }
     
-    // Apelează checkAnafTokenStatus separat, cu delay pentru a evita suprapunerea
     setTimeout(() => {
       checkAnafTokenStatus();
     }, 100);
-  }, [proiect]);
+  }, [proiect, isEdit, initialData]);
   
-  // Funcție pentru a obține următorul număr de factură din BD
   const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
+    // ✅ MODIFICAT: Pentru Edit, păstrează numărul existent
+    if (isEdit && initialData?.numarFactura) {
+      return {
+        numarComplet: initialData.numarFactura,
+        numarUrmator: 0
+      };
+    }
+
     try {
-      // Construim pattern-ul pentru căutare
-      let searchPattern = `${serie}${separator}`;
+      const searchPattern = `${serie}${separator}`;
       
-      // Query pentru ultimul număr folosit
       const response = await fetch('/api/rapoarte/facturi/last-number', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +278,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       if (data.success && data.lastNumber !== undefined) {
         const nextNumber = (data.lastNumber || 0) + 1;
         
-        // Construim numărul complet
         let numarComplet = `${serie}${separator}${nextNumber}`;
         
         if (includeYear) {
@@ -222,7 +295,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         };
       }
       
-      // Fallback dacă nu găsim nimic
       return {
         numarComplet: `${serie}${separator}1001${separator}${new Date().getFullYear()}`,
         numarUrmator: 1001
@@ -238,6 +310,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const loadSetariFacturare = async () => {
+    // ✅ MODIFICAT: Pentru Edit, nu schimba numărul
+    if (isEdit && initialData?.numarFactura) {
+      setNumarFactura(initialData.numarFactura);
+      return;
+    }
+
     setIsLoadingSetari(true);
     try {
       const response = await fetch('/api/setari/facturare');
@@ -253,7 +331,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         const setariProcesate: SetariFacturare = {
           serie_facturi: processValue(data.setari.serie_facturi),
-          numar_curent_facturi: 0, // Nu mai folosim acest câmp
+          numar_curent_facturi: 0,
           format_numerotare: processValue(data.setari.format_numerotare),
           separator_numerotare: processValue(data.setari.separator_numerotare),
           include_an_numerotare: processValue(data.setari.include_an_numerotare),
@@ -263,7 +341,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         setSetariFacturare(setariProcesate);
         
-        // Obținem următorul număr din BD
         const { numarComplet, numarUrmator } = await getNextInvoiceNumber(
           setariProcesate.serie_facturi,
           setariProcesate.separator_numerotare,
@@ -275,7 +352,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         showToast(`✅ Număr factură generat: ${numarComplet}`, 'success');
         
       } else {
-        // Setări default
         const defaultSetari: SetariFacturare = {
           serie_facturi: 'UP',
           numar_curent_facturi: 0,
@@ -294,7 +370,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     } catch (error) {
       console.error('Eroare la încărcarea setărilor:', error);
-      const fallbackNumar = `INV-${proiect.ID_Proiect}-${Date.now()}`;
+      const fallbackNumar = isStorno ? 
+        `STORNO-${proiect.ID_Proiect}-${Date.now()}` :
+        `INV-${proiect.ID_Proiect}-${Date.now()}`;
       setNumarFactura(fallbackNumar);
       showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
     } finally {
@@ -302,116 +380,104 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-	const checkAnafTokenStatus = async () => {
-	  setIsCheckingAnafToken(true);
-	  try {
-	    // Folosim exact același endpoint ca monitoring
-	    const response = await fetch('/api/anaf/oauth/token');
-	    const data = await response.json();
-	    
-	    console.log('ANAF Token Response:', data); // Debug
-	    
-	    if (data.success && data.hasValidToken && data.tokenInfo) {
-	      let expiresInMinutes = 0;
-	      let expiresInDays = 0;
-	      
-	      // Verificăm dacă avem expires_in_minutes direct
-	      if (data.tokenInfo.expires_in_minutes !== null && data.tokenInfo.expires_in_minutes !== undefined) {
-		expiresInMinutes = data.tokenInfo.expires_in_minutes;
-	      } 
-	      // Altfel, calculăm din expires_at
-	      else if (data.tokenInfo.expires_at) {
-		let expiresAtDate: Date;
-		
-		// Gestionăm diferite formate posibile
-		if (typeof data.tokenInfo.expires_at === 'string') {
-		  // Format string direct din BigQuery: "2025-10-28 05:29:36.508000 UTC"
-		  // Înlocuim " UTC" cu "Z" pentru parsing corect
-		  const cleanDateStr = data.tokenInfo.expires_at.replace(' UTC', 'Z').replace(' ', 'T');
-		  expiresAtDate = new Date(cleanDateStr);
-		} else if (data.tokenInfo.expires_at.value) {
-		  // Format obiect BigQuery: { value: '2025-10-28 05:29:36.508000 UTC' }
-		  const cleanDateStr = data.tokenInfo.expires_at.value.replace(' UTC', 'Z').replace(' ', 'T');
-		  expiresAtDate = new Date(cleanDateStr);
-		} else {
-		  console.error('Format expires_at necunoscut:', data.tokenInfo.expires_at);
-		  expiresAtDate = new Date();
-		}
-		
-		// Verificăm dacă data este validă
-		if (isNaN(expiresAtDate.getTime())) {
-		  console.error('Data expires_at invalidă:', data.tokenInfo.expires_at);
-		  expiresAtDate = new Date();
-		}
-		
-		const now = new Date();
-		const diffMs = expiresAtDate.getTime() - now.getTime();
-		expiresInMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60))); // Minim 0, nu negative
-		
-		console.log('Calculat din expires_at:', {
-		  expires_at_raw: data.tokenInfo.expires_at,
-		  expires_at_parsed: expiresAtDate.toISOString(),
-		  now: now.toISOString(),
-		  diffMs,
-		  expiresInMinutes
-		});
-	      }
-	      
-	      // Calculăm zilele din minute
-	      expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
-	      
-	      // Verificăm dacă token-ul nu a expirat deja
-	      const isExpired = data.tokenInfo.is_expired || expiresInMinutes <= 0;
-	      
-	      setAnafTokenStatus({
-		hasValidToken: !isExpired,
-		tokenInfo: {
-		  expires_in_minutes: expiresInMinutes,
-		  expires_in_days: expiresInDays,
-		  is_expired: isExpired
-		},
-		loading: false
-	      });
+  const checkAnafTokenStatus = async () => {
+    setIsCheckingAnafToken(true);
+    try {
+      const response = await fetch('/api/anaf/oauth/token');
+      const data = await response.json();
+      
+      console.log('ANAF Token Response:', data);
+      
+      if (data.success && data.hasValidToken && data.tokenInfo) {
+        let expiresInMinutes = 0;
+        let expiresInDays = 0;
+        
+        if (data.tokenInfo.expires_in_minutes !== null && data.tokenInfo.expires_in_minutes !== undefined) {
+          expiresInMinutes = data.tokenInfo.expires_in_minutes;
+        } else if (data.tokenInfo.expires_at) {
+          let expiresAtDate: Date;
+          
+          if (typeof data.tokenInfo.expires_at === 'string') {
+            const cleanDateStr = data.tokenInfo.expires_at.replace(' UTC', 'Z').replace(' ', 'T');
+            expiresAtDate = new Date(cleanDateStr);
+          } else if (data.tokenInfo.expires_at.value) {
+            const cleanDateStr = data.tokenInfo.expires_at.value.replace(' UTC', 'Z').replace(' ', 'T');
+            expiresAtDate = new Date(cleanDateStr);
+          } else {
+            console.error('Format expires_at necunoscut:', data.tokenInfo.expires_at);
+            expiresAtDate = new Date();
+          }
+          
+          if (isNaN(expiresAtDate.getTime())) {
+            console.error('Data expires_at invalidă:', data.tokenInfo.expires_at);
+            expiresAtDate = new Date();
+          }
+          
+          const now = new Date();
+          const diffMs = expiresAtDate.getTime() - now.getTime();
+          expiresInMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
+          
+          console.log('Calculat din expires_at:', {
+            expires_at_raw: data.tokenInfo.expires_at,
+            expires_at_parsed: expiresAtDate.toISOString(),
+            now: now.toISOString(),
+            diffMs,
+            expiresInMinutes
+          });
+        }
+        
+        expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
+        
+        const isExpired = data.tokenInfo.is_expired || expiresInMinutes <= 0;
+        
+        setAnafTokenStatus({
+          hasValidToken: !isExpired,
+          tokenInfo: {
+            expires_in_minutes: expiresInMinutes,
+            expires_in_days: expiresInDays,
+            is_expired: isExpired
+          },
+          loading: false
+        });
 
-	      if (!isExpired) {
-		console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
-		
-		// Avertizări bazate pe timp rămas
-		if (expiresInDays >= 7) {
-		  // Token valid pentru mai mult de 7 zile - nu afișăm nimic
-		} else if (expiresInDays > 0 && expiresInDays < 7) {
-		  showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
-		} else if (expiresInDays === 0 && expiresInMinutes > 60) {
-		  const ore = Math.floor(expiresInMinutes / 60);
-		  showToast(`⚠️ Token ANAF expiră în ${ore} ${ore === 1 ? 'oră' : 'ore'}`, 'info');
-		} else if (expiresInMinutes > 0 && expiresInMinutes <= 60) {
-		  showToast(`🔴 URGENT: Token ANAF expiră în ${expiresInMinutes} minute!`, 'error');
-		}
-	      } else {
-		console.log('❌ Token ANAF expirat');
-		showToast('❌ Token ANAF a expirat! Reautentifică-te la ANAF.', 'error');
-	      }
-	    } else {
-	      setAnafTokenStatus({
-		hasValidToken: false,
-		tokenInfo: undefined,
-		loading: false
-	      });
-	      setSendToAnaf(false);
-	      console.log('❌ Token ANAF invalid sau lipsă');
-	    }
-	    
-	  } catch (error) {
-	    console.error('Error checking ANAF token:', error);
-	    setAnafTokenStatus({
-	      hasValidToken: false,
-	      loading: false
-	    });
-	    setSendToAnaf(false);
-	  } finally {
-	    setIsCheckingAnafToken(false);
-	  }
-	};
+        if (!isExpired) {
+          console.log(`✅ Token ANAF valid - expiră în ${expiresInDays} zile (${expiresInMinutes} minute)`);
+          
+          if (expiresInDays >= 7) {
+            // Token valid pentru mai mult de 7 zile
+          } else if (expiresInDays > 0 && expiresInDays < 7) {
+            showToast(`⚠️ Token ANAF expiră în ${expiresInDays} ${expiresInDays === 1 ? 'zi' : 'zile'}`, 'info');
+          } else if (expiresInDays === 0 && expiresInMinutes > 60) {
+            const ore = Math.floor(expiresInMinutes / 60);
+            showToast(`⚠️ Token ANAF expiră în ${ore} ${ore === 1 ? 'oră' : 'ore'}`, 'info');
+          } else if (expiresInMinutes > 0 && expiresInMinutes <= 60) {
+            showToast(`🔴 URGENT: Token ANAF expiră în ${expiresInMinutes} minute!`, 'error');
+          }
+        } else {
+          console.log('❌ Token ANAF expirat');
+          showToast('❌ Token ANAF a expirat! Reautentifică-te la ANAF.', 'error');
+        }
+      } else {
+        setAnafTokenStatus({
+          hasValidToken: false,
+          tokenInfo: undefined,
+          loading: false
+        });
+        setSendToAnaf(false);
+        console.log('❌ Token ANAF invalid sau lipsă');
+      }
+      
+    } catch (error) {
+      console.error('Error checking ANAF token:', error);
+      setAnafTokenStatus({
+        hasValidToken: false,
+        loading: false
+      });
+      setSendToAnaf(false);
+    } finally {
+      setIsCheckingAnafToken(false);
+    }
+  };
 
   const handleAnafCheckboxChange = (checked: boolean) => {
     if (checked && !anafTokenStatus.hasValidToken) {
@@ -483,9 +549,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const loadSubproiecte = async () => {
+    // ✅ MODIFICAT: Pentru Edit, încarcă și subproiectele
+    const proiectId = isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect;
+    
     setIsLoadingSubproiecte(true);
     try {
-      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
+      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectId)}`);
       const result = await response.json();
       
       if (result.success && result.data) {
@@ -494,7 +563,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           Denumire: sub.Denumire,
           Valoare_Estimata: sub.Valoare_Estimata,
           Status: sub.Status,
-          adaugat: false
+          adaugat: false,
+          // ✅ NOU: Date valută
+          moneda: sub.moneda || 'RON',
+          curs_valutar: sub.curs_valutar,
+          valoare_ron: sub.valoare_ron
         }));
         
         setSubproiecteDisponibile(subproiecteFormatate);
@@ -540,13 +613,37 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
+    // ✅ MODIFICAT: Conversie corectă valută pentru subproiecte
+    let valoareSubproiect = subproiect.Valoare_Estimata || 0;
+    let monedaSubproiect = subproiect.moneda || 'RON';
+    let cursSubproiect = subproiect.curs_valutar || 1;
+    
+    // Folosește valoarea în RON dacă există
+    if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
+      valoareSubproiect = subproiect.valoare_ron;
+      
+      // Track cursul folosit
+      if (!cursuriUtilizate[monedaSubproiect]) {
+        setCursuriUtilizate(prev => ({
+          ...prev,
+          [monedaSubproiect]: {
+            curs: cursSubproiect,
+            data: new Date().toISOString().split('T')[0]
+          }
+        }));
+      }
+    }
+    
     const nouaLinie: LineFactura = {
       denumire: `${subproiect.Denumire} (Subproiect)`,
       cantitate: 1,
-      pretUnitar: subproiect.Valoare_Estimata || 0,
+      pretUnitar: valoareSubproiect,
       cotaTva: 19,
       tip: 'subproiect',
-      subproiect_id: subproiect.ID_Subproiect
+      subproiect_id: subproiect.ID_Subproiect,
+      monedaOriginala: monedaSubproiect,
+      valoareOriginala: subproiect.Valoare_Estimata,
+      cursValutar: cursSubproiect
     };
     
     setLiniiFactura(prev => [...prev, nouaLinie]);
@@ -559,7 +656,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       )
     );
     
-    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură`, 'success');
+    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură${monedaSubproiect !== 'RON' ? ` (convertit din ${monedaSubproiect})` : ''}`, 'success');
   };
 
   const handlePreluareDateANAF = async () => {
@@ -864,17 +961,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         showToast('🔄 Se generează template-ul facturii...', 'info');
       }
       
+      // ✅ NOU: Adaugă cursurile utilizate la request
       const response = await fetch('/api/actions/invoices/generate-hibrid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          proiectId: proiect.ID_Proiect,
+          proiectId: isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect,
           liniiFactura,
           observatii,
           clientInfo,
           numarFactura,
           setariFacturare,
-          sendToAnaf
+          sendToAnaf,
+          cursuriUtilizate, // ✅ NOU: Trimite cursurile utilizate
+          isEdit,
+          isStorno,
+          facturaId: isEdit ? initialData?.facturaId : null
         })
       });
       
@@ -893,13 +995,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         await processPDF(result.htmlContent, result.fileName);
         
-        // După generare cu succes, doar afișăm succesul
         showToast('✅ Factură generată cu succes!', 'success');
 
-        // Optional: Reîncarcă setările pentru următoarea factură
-        setTimeout(() => {
-          loadSetariFacturare();
-        }, 1000);
+        // Pentru Edit, nu reîncarcă setările
+        if (!isEdit) {
+          setTimeout(() => {
+            loadSetariFacturare();
+          }, 1000);
+        }
         
       } else {
         throw new Error(result.error || 'Eroare la generarea template-ului');
@@ -917,8 +1020,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
-  // Render JSX - continuare în partea 2...
-  // Render JSX
+  // ✅ NOU: Generează nota despre cursuri utilizate
+  const generateCurrencyNote = () => {
+    const monede = Object.keys(cursuriUtilizate);
+    if (monede.length === 0) return '';
+    
+    return `Curs valutar folosit: ${monede.map(m => 
+      `1 ${m} = ${cursuriUtilizate[m].curs.toFixed(4)} RON (${cursuriUtilizate[m].data})`
+    ).join(', ')}`;
+  };
+
+  // Continuare render JSX...
   return (
     <div style={{
       position: 'fixed',
@@ -951,7 +1063,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              💰 Generare Factură Hibridă
+              {isStorno ? '↩️ Generare Factură Stornare' : 
+               isEdit ? '✏️ Editare Factură' : 
+               '💰 Generare Factură Hibridă'}
             </h2>
             <button
               onClick={onClose}
@@ -987,7 +1101,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div style={{ 
                   fontSize: '20px', 
                   fontWeight: 'bold', 
-                  color: '#e74c3c',
+                  color: isStorno ? '#e67e22' : '#e74c3c',
                   fontFamily: 'monospace'
                 }}>
                   {isLoadingSetari ? '⏳ Se generează...' : numarFactura || 'Negenecat'}
@@ -1028,12 +1142,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             {/* Indicator setări */}
             <div style={{
               padding: '0.5rem 1rem',
-              background: setariFacturare ? '#d4edda' : '#fff3cd',
+              background: isEdit ? '#d4edda' : (setariFacturare ? '#d4edda' : '#fff3cd'),
               borderRadius: '6px',
               fontSize: '12px',
-              color: setariFacturare ? '#155724' : '#856404'
+              color: isEdit ? '#155724' : (setariFacturare ? '#155724' : '#856404')
             }}>
-              {setariFacturare ? '✅ Setări încărcate din BD' : '⚠️ Setări default'}
+              {isEdit ? '✏️ Editare factură existentă' : 
+               isStorno ? '↩️ Stornare factură' :
+               (setariFacturare ? '✅ Setări încărcate din BD' : '⚠️ Setări default')}
             </div>
           </div>
           
@@ -1164,7 +1280,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   color: '#27ae60',
                   fontWeight: 'bold'
                 }}>
-                  {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} RON` : 'N/A'}
+                  {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}
+                  {proiect.moneda && proiect.moneda !== 'RON' && proiect.valoare_ron && (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d', display: 'block' }}>
+                      ≈ {Number(proiect.valoare_ron).toLocaleString('ro-RO')} RON
+                    </span>
+                  )}
                 </div>
               </div>
               <div>
@@ -1248,7 +1369,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               📋 {subproiect.Denumire}
                             </div>
                             <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                              💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>{subproiect.Valoare_Estimata ? `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} RON` : 'Fără valoare'}</span>
+                              💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>
+                                {subproiect.Valoare_Estimata ? 
+                                  `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} ${subproiect.moneda || 'RON'}` : 
+                                  'Fără valoare'}
+                              </span>
+                              {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
+                                <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
                               📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
@@ -1889,6 +2019,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
           </div>
+
+ 		{/* Adaugă nota despre cursuri dacă există */}
+          {Object.keys(cursuriUtilizate).length > 0 && (
+            <div style={{
+              background: '#d1ecf1',
+              border: '1px solid #bee5eb',
+              borderRadius: '6px',
+              padding: '1rem',
+              marginBottom: '1rem',
+              fontSize: '13px',
+              color: '#0c5460'
+            }}>
+              <strong>💱 Note curs valutar:</strong><br/>
+              {generateCurrencyNote()}
+            </div>
+          )}
 
           {/* Informații importante */}
           <div style={{

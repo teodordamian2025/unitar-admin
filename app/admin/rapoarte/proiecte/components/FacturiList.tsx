@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturiList.tsx
-// MODIFICAT: Adăugare butoane Edit/Delete/Stornare + toate funcționalitățile existente
+// MODIFICAT: Fix ștergere + butoane Edit/Storno complete
 // ==================================================================
 
 'use client';
@@ -24,6 +24,7 @@ interface Factura {
   data_scadenta: string | { value: string };
   client_nume: string;
   client_cui: string;
+  proiect_id?: string;
   proiect_denumire: string;
   proiect_status: string;
   subtotal: number;
@@ -98,6 +99,7 @@ export default function FacturiList({
   // ✅ NOU: State pentru editare factură
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
+  const [editMode, setEditMode] = useState<'edit' | 'storno'>('edit');
 
   useEffect(() => {
     loadFacturi();
@@ -152,7 +154,7 @@ export default function FacturiList({
         setFacturi(result);
 
         // ✅ Încarcă detalii e-factura pentru facturile cu ANAF
-        await loadEFacturaDetails(result.filter(f => f.efactura_enabled));
+        await loadEFacturaDetails(result.filter((f: Factura) => f.efactura_enabled));
         
       } else {
         throw new Error(data.error);
@@ -275,6 +277,12 @@ export default function FacturiList({
           textClass = 'text-red-800';
           emoji = '🔴';
           break;
+        case 'stornata':
+          displayStatus = 'Stornată';
+          bgClass = 'bg-gray-100';
+          textClass = 'text-gray-800';
+          emoji = '↩️';
+          break;
         default:
           displayStatus = 'Gata pentru ANAF';
           bgClass = 'bg-orange-100';
@@ -288,7 +296,8 @@ export default function FacturiList({
         'generata': { bg: 'bg-green-100', text: 'text-green-800', label: 'Generată', emoji: '📄' },
         'anaf_processing': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ANAF în curs', emoji: '🟡' },
         'anaf_success': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'ANAF Succes', emoji: '✅' },
-        'anaf_error': { bg: 'bg-red-100', text: 'text-red-800', label: 'Eroare ANAF', emoji: '🔴' }
+        'anaf_error': { bg: 'bg-red-100', text: 'text-red-800', label: 'Eroare ANAF', emoji: '🔴' },
+        'stornata': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Stornată', emoji: '↩️' }
       };
       
       const config = statusConfig[factura.status as keyof typeof statusConfig] || 
@@ -478,14 +487,15 @@ export default function FacturiList({
     }
   };
 
-  // ✅ NOU: Deschide modal editare
-  const handleEditFactura = (factura: Factura) => {
+  // ✅ MODIFICAT: Deschide modal editare cu mod corect
+  const handleEditFactura = (factura: Factura, mode: 'edit' | 'storno' = 'edit') => {
     setSelectedFactura(factura);
+    setEditMode(mode);
     setShowEditModal(true);
   };
 
   // ✅ NOU: Callback pentru succes editare
-  const handleEditSuccess = (action: 'updated' | 'cancelled', facturaId: string) => {
+  const handleEditSuccess = (action: 'updated' | 'cancelled' | 'reversed', facturaId: string) => {
     setShowEditModal(false);
     setSelectedFactura(null);
     loadFacturi(); // Reîncarcă lista
@@ -494,44 +504,43 @@ export default function FacturiList({
       showToast('✅ Factură actualizată cu succes', 'success');
     } else if (action === 'cancelled') {
       showToast('✅ Factură anulată cu succes', 'success');
+    } else if (action === 'reversed') {
+      showToast('✅ Factură de stornare creată cu succes', 'success');
     }
   };
 
-	// Adaugă funcția handleDeleteFactura:
+  // ✅ CORECT: Funcția de ștergere cu numele complet al tabelului
+  const handleDeleteFactura = async (factura: Factura) => {
+    // Verifică dacă poate fi ștearsă
+    if (factura.efactura_enabled && 
+        factura.efactura_status && 
+        !['draft', 'error', 'mock_pending', 'mock_generated'].includes(factura.efactura_status)) {
+      showToast('❌ Factura a fost trimisă la ANAF și nu poate fi ștearsă', 'error');
+      return;
+    }
 
-	const handleDeleteFactura = async (factura: Factura) => {
-	  // Verifică dacă poate fi ștearsă
-	  if (factura.efactura_enabled && 
-	      factura.efactura_status && 
-	      !['draft', 'error', 'mock_pending', 'mock_generated'].includes(factura.efactura_status)) {
-	    showToast('❌ Factura a fost trimisă la ANAF și nu poate fi ștearsă', 'error');
-	    return;
-	  }
+    if (!confirm(`Sigur vrei să ștergi factura ${factura.numar}?\n\nAceastă acțiune nu poate fi anulată!`)) {
+      return;
+    }
 
-	  if (!confirm(`Sigur vrei să ștergi factura ${factura.numar}?\n\nAceastă acțiune nu poate fi anulată!`)) {
-	    return;
-	  }
+    try {
+      const response = await fetch(`/api/actions/invoices/delete?id=${factura.id}`, {
+        method: 'DELETE'
+      });
 
-	  try {
-	    const response = await fetch(`/api/actions/invoices/delete?id=${factura.id}`, {
-	      method: 'DELETE'
-	    });
+      const result = await response.json();
 
-	    const result = await response.json();
-
-	    if (result.success) {
-	      showToast(`✅ Factura ${factura.numar} a fost ștearsă`, 'success');
-	      loadFacturi(); // Reîncarcă lista
-	    } else {
-	      showToast(`❌ ${result.error}`, 'error');
-	    }
-	  } catch (error) {
-	    console.error('Eroare la ștergerea facturii:', error);
-	    showToast('❌ Eroare la ștergerea facturii', 'error');
-	  }
-	};
-
-
+      if (result.success) {
+        showToast(`✅ Factura ${factura.numar} a fost ștearsă`, 'success');
+        loadFacturi(); // Reîncarcă lista
+      } else {
+        showToast(`❌ ${result.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Eroare la ștergerea facturii:', error);
+      showToast('❌ Eroare la ștergerea facturii', 'error');
+    }
+  };
 
   // ✅ NOU: Modal detalii e-factura cu timeline
   const showEFacturaDetailsModal = (factura: Factura) => {
@@ -725,6 +734,7 @@ export default function FacturiList({
                 <option value="sent">Trimis la ANAF</option>
                 <option value="validated">ANAF Validat</option>
                 <option value="error">Eroare ANAF</option>
+                <option value="stornata">Stornată</option>
                 <option value="mock_pending">🧪 Mock Test</option>
               </select>
               <select
@@ -843,9 +853,12 @@ export default function FacturiList({
               <tbody className="bg-white divide-y divide-gray-200">
                 {facturi.map((factura) => {
                   // ✅ NOU: Logică pentru butoane în funcție de status
-                  const canEdit = !factura.efactura_enabled || factura.efactura_status === 'draft';
-                  const canDelete = !factura.efactura_enabled;
-                  const canStorno = factura.efactura_enabled && factura.efactura_status !== 'draft';
+                  const canEdit = (!factura.efactura_enabled || factura.efactura_status === 'draft') && 
+                                  factura.status !== 'stornata';
+                  const canDelete = (!factura.efactura_enabled || 
+                                    ['draft', 'error', 'mock_pending', 'mock_generated'].includes(factura.efactura_status || '')) &&
+                                    factura.status !== 'stornata';
+                  const canStorno = factura.status !== 'stornata';
                   
                   return (
                     <tr key={factura.id} className="hover:bg-gray-50">
@@ -917,7 +930,7 @@ export default function FacturiList({
                           {/* ✅ NOU: Buton EDITARE */}
                           {canEdit && (
                             <button
-                              onClick={() => handleEditFactura(factura)}
+                              onClick={() => handleEditFactura(factura, 'edit')}
                               className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
                               title="Editează factură"
                             >
@@ -925,27 +938,27 @@ export default function FacturiList({
                             </button>
                           )}
 
-                          {/* ✅ NOU: Buton STORNARE (dacă e în ANAF) */}
+                          {/* ✅ NOU: Buton STORNARE */}
                           {canStorno && (
                             <button
-                              onClick={() => handleEditFactura(factura)}
+                              onClick={() => handleEditFactura(factura, 'storno')}
                               className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
                               title="Creează factură de stornare"
                             >
                               ↩️ Storno
                             </button>
                           )}
-                          
-                          {/* ✅ NOU: Buton ȘTERGERE (doar pentru facturi netrimise la ANAF) */}
-				{canDelete && (
-				  <button
-				    onClick={() => handleDeleteFactura(factura)}
-				    className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
-				    title="Șterge factură"
-				  >
-				    🗑️ Șterge
-				  </button>
-				)}
+
+                          {/* ✅ NOU: Buton ȘTERGERE */}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteFactura(factura)}
+                              className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+                              title="Șterge factură"
+                            >
+                              🗑️ Șterge
+                            </button>
+                          )}
 
                           {/* ✅ Butoane e-factura */}
                           {factura.efactura_enabled && (
@@ -1020,6 +1033,7 @@ export default function FacturiList({
             setSelectedFactura(null);
           }}
           onSuccess={handleEditSuccess}
+          mode={editMode}
         />
       )}
 

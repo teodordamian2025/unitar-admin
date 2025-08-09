@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/delete/route.ts
-// DESCRIERE: API pentru ștergerea facturilor care nu au fost trimise la ANAF
+// MODIFICAT: Nume complet tabel FacturiGenerate
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -27,14 +27,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Verifică dacă factura poate fi ștearsă (nu a fost trimisă la ANAF)
+    // ✅ CORECTAT: Nume complet tabel
     const checkQuery = `
       SELECT 
         id,
         numar,
         efactura_enabled,
         efactura_status,
-        anaf_upload_id
+        anaf_upload_id,
+        status
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
       WHERE id = @facturaId
     `;
@@ -54,6 +55,14 @@ export async function DELETE(request: NextRequest) {
 
     const factura = checkRows[0];
 
+    // Verifică dacă factura a fost stornată
+    if (factura.status === 'stornata') {
+      return NextResponse.json(
+        { error: 'Factura a fost stornată și nu poate fi ștearsă' },
+        { status: 403 }
+      );
+    }
+
     // Verifică dacă a fost trimisă la ANAF
     if (factura.efactura_enabled && 
         factura.efactura_status && 
@@ -64,7 +73,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Șterge factura
+    // ✅ CORECTAT: Șterge factura cu nume complet tabel
     const deleteQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
       WHERE id = @facturaId
@@ -75,6 +84,8 @@ export async function DELETE(request: NextRequest) {
       params: { facturaId },
       location: 'EU'
     });
+
+    console.log(`✅ Factură ${factura.numar} ștearsă cu succes din FacturiGenerate`);
 
     // Șterge și înregistrarea e-factura dacă există (doar draft/error)
     if (factura.anaf_upload_id) {
@@ -95,8 +106,6 @@ export async function DELETE(request: NextRequest) {
         console.log('⚠️ Nu s-a putut șterge e-factura (posibil nu există):', error);
       }
     }
-
-    console.log(`✅ Factură ${factura.numar} ștearsă cu succes`);
 
     return NextResponse.json({
       success: true,

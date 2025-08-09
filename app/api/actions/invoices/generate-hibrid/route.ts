@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// MODIFICAT: Folosește numărul din setări + coloane optimizate pentru PDF
+// COMPLET: Suport Edit/Storno + note curs valutar în PDF
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -103,9 +103,14 @@ export async function POST(request: NextRequest) {
       liniiFactura, 
       observatii, 
       clientInfo,
-      numarFactura,        // ✅ MODIFICAT: Preia numărul din frontend
-      setariFacturare,     // ✅ MODIFICAT: Preia setările pentru actualizare
-      sendToAnaf = false
+      numarFactura,
+      setariFacturare,
+      sendToAnaf = false,
+      cursuriUtilizate = {}, // ✅ NOU: Primește cursurile utilizate
+      isEdit = false,        // ✅ NOU: Flag pentru edit
+      isStorno = false,      // ✅ NOU: Flag pentru storno
+      facturaId = null,      // ✅ NOU: ID factură pentru edit
+      facturaOriginala = null // ✅ NOU: Număr factură originală pentru storno
     } = body;
 
     console.log('📋 Date primite pentru factură:', { 
@@ -113,8 +118,12 @@ export async function POST(request: NextRequest) {
       liniiFactura: liniiFactura?.length, 
       observatii: observatii?.length, 
       clientInfo: clientInfo?.nume,
-      numarFactura,       // ✅ Log număr factură
+      numarFactura,
       sendToAnaf,
+      isEdit,
+      isStorno,
+      facturaId,
+      cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? cursuriUtilizate : 'Niciun curs',
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf
     });
 
@@ -153,8 +162,20 @@ export async function POST(request: NextRequest) {
     
     const total = subtotal + totalTva;
 
-    // ✅ Generează facturaId la început
-    const facturaId = crypto.randomUUID();
+    // ✅ NOU: Pentru Edit, folosește facturaId existent
+    const currentFacturaId = isEdit && facturaId ? facturaId : crypto.randomUUID();
+
+    // ✅ NOU: Generează nota despre cursurile valutare
+    let notaCursValutar = '';
+    if (Object.keys(cursuriUtilizate).length > 0) {
+      const monede = Object.keys(cursuriUtilizate);
+      notaCursValutar = `Curs valutar folosit: ${monede.map(m => 
+        `1 ${m} = ${cursuriUtilizate[m].curs.toFixed(4)} RON (${cursuriUtilizate[m].data})`
+      ).join(', ')}`;
+    }
+
+    // ✅ MODIFICAT: Adaugă nota cursului la observații pentru PDF
+    const observatiiFinale = observatii + (notaCursValutar ? `\n\n${notaCursValutar}` : '');
 
     // ✅ CLIENT DATA HANDLING - păstrat identic
     const primeaLinie = liniiFactura[0];
@@ -178,7 +199,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ MODIFICAT: Folosește numărul primit din frontend
     const safeInvoiceData = {
-      numarFactura: numarFactura || `INV-${proiectId}-${Date.now()}`, // ✅ Folosește numărul din setări
+      numarFactura: numarFactura || `INV-${proiectId}-${Date.now()}`,
       denumireProiect: `Proiect #${proiectId}`,
       descriere: descrierePrincipala,
       subtotal: Number(subtotal.toFixed(2)),
@@ -187,7 +208,7 @@ export async function POST(request: NextRequest) {
       termenPlata: setariFacturare?.termen_plata_standard ? `${setariFacturare.termen_plata_standard} zile` : '30 zile'
     };
 
-    // ✅ TEMPLATE HTML - cu coloane optimizate și TVA dinamic
+    // ✅ TEMPLATE HTML - cu coloane optimizate și TVA dinamic + note curs valutar
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${numarFactura || proiectId}-${timestamp}.pdf`;
@@ -269,11 +290,11 @@ export async function POST(request: NextRequest) {
                 flex-grow: 1;
                 width: 100%;
                 overflow: visible;
-                padding-right: 10px; /* Adaugă padding pentru siguranță */
+                padding-right: 10px;
             }
             table {
-                width: 98%; /* Redus de la 100% */
-                margin: 0 auto; /* Centrează tabelul */
+                width: 98%;
+                margin: 0 auto;
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -300,16 +321,16 @@ export async function POST(request: NextRequest) {
             .totals-section {
                 margin-top: 2px;
                 margin-left: auto;
-                width: 180px; /* Mărit de la 150px */
-                padding-right: 5px; /* Adaugă padding */
+                width: 180px;
+                padding-right: 5px;
             }
             .totals-row {
                 display: flex;
                 justify-content: space-between;
-                padding: 4px 2px; /* Adaugă padding lateral */
+                padding: 4px 2px;
                 border-bottom: 1px solid #ecf0f1;
                 font-size: 9px;
-                gap: 5px; /* Spațiu între text și valoare */
+                gap: 5px;
             }
             .totals-row.final {
                 border-top: 2px solid #34495e;
@@ -351,6 +372,17 @@ export async function POST(request: NextRequest) {
                 border-bottom: 1px solid #eee;
                 padding-bottom: 2px;
             }
+            .currency-note {
+                margin-top: 10px;
+                padding: 8px;
+                background: #e8f5e8;
+                border: 1px solid #c3e6c3;
+                border-radius: 3px;
+            }
+            .currency-note-content {
+                font-size: 9px;
+                color: #2d5016;
+            }
             .signatures {
                 margin-top: 25px;
                 display: flex;
@@ -382,6 +414,17 @@ export async function POST(request: NextRequest) {
                 font-size: 9px;
                 color: #34495e;
             }
+            .storno-warning {
+                background: #fff3cd;
+                border: 2px solid #ffc107;
+                color: #856404;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+            }
             ${MOCK_EFACTURA_MODE && sendToAnaf ? `
             .mock-warning {
                 background: #fff3cd;
@@ -404,8 +447,14 @@ export async function POST(request: NextRequest) {
         </div>
         ` : ''}
         
+        ${isStorno ? `
+        <div class="storno-warning">
+            ↩️ FACTURĂ DE STORNARE - Anulează factura ${facturaOriginala || 'originală'}
+        </div>
+        ` : ''}
+        
         <div class="header">
-            <h1>FACTURA</h1>
+            <h1>FACTURA${isStorno ? ' DE STORNARE' : ''}</h1>
         </div>
 
         <div class="company-info">
@@ -434,6 +483,7 @@ export async function POST(request: NextRequest) {
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
                 <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
+                ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>🧪 MODE:</strong> TEST e-Factura</div>' : ''}
             </div>
         </div>
@@ -451,7 +501,7 @@ export async function POST(request: NextRequest) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${liniiFactura.map((linie, index) => {
+                    ${liniiFactura.map((linie: any, index: number) => {
                       const cantitate = Number(linie.cantitate) || 0;
                       const pretUnitar = Number(linie.pretUnitar) || 0;
                       const cotaTva = Number(linie.cotaTva) || 0;
@@ -460,12 +510,21 @@ export async function POST(request: NextRequest) {
                       const tva = valoare * (cotaTva / 100);
                       const totalLinie = valoare + tva;
                       
-                      const safeFixed = (num) => (Number(num) || 0).toFixed(2);
+                      const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                      
+                      // ✅ NOU: Adaugă informații despre valoarea originală în valută
+                      let descriereCompleta = linie.denumire || 'N/A';
+                      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+                        descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala})</small>`;
+                      }
                       
                       return `
                     <tr>
                         <td class="text-center" style="font-size: 8px;">${index + 1}</td>
-                        <td style="font-size: 8px; padding: 2px;">${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUB]</small>' : ''}</td>
+                        <td style="font-size: 8px; padding: 2px;">
+                            ${descriereCompleta}
+                            ${linie.tip === 'subproiect' ? ' <small style="color: #3498db;">[SUB]</small>' : ''}
+                        </td>
                         <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
                         <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
                         <td class="text-center" style="font-size: 8px;">${safeFixed(tva)}</td>
@@ -476,21 +535,40 @@ export async function POST(request: NextRequest) {
             </table>
 
             <div class="totals-section">
-	    <div class="totals-row">
-		<span style="font-size: 9px;">Subtotal:</span>
-		<span style="font-size: 9px; white-space: nowrap;">${safeFormat(subtotal)} RON</span>
-	    </div>
-	    ${totalTva > 0 ? `
-	    <div class="totals-row">
-		<span style="font-size: 9px;">TVA:</span>
-		<span style="font-size: 9px; white-space: nowrap;">${safeFormat(totalTva)} RON</span>
-	    </div>
-	    ` : ''}
-	    <div class="totals-row final">
-		<span style="font-size: 10px;">TOTAL:</span>
-		<span style="font-size: 10px; white-space: nowrap;">${safeFormat(total)} RON</span>
-	    </div>
-	</div>
+                <div class="totals-row">
+                    <span style="font-size: 9px;">Subtotal:</span>
+                    <span style="font-size: 9px; white-space: nowrap;">${safeFormat(subtotal)} RON</span>
+                </div>
+                ${totalTva > 0 ? `
+                <div class="totals-row">
+                    <span style="font-size: 9px;">TVA:</span>
+                    <span style="font-size: 9px; white-space: nowrap;">${safeFormat(totalTva)} RON</span>
+                </div>
+                ` : ''}
+                <div class="totals-row final">
+                    <span style="font-size: 10px;">TOTAL:</span>
+                    <span style="font-size: 10px; white-space: nowrap;">${safeFormat(total)} RON</span>
+                </div>
+            </div>
+        </div>
+
+        ${notaCursValutar ? `
+        <div class="currency-note">
+            <div class="currency-note-content">
+                <strong>💱 Note curs valutar:</strong><br/>
+                ${notaCursValutar}
+            </div>
+        </div>
+        ` : ''}
+
+        ${observatii ? `
+        <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #cce7ff; border-radius: 3px;">
+            <div style="font-size: 9px; color: #0c5460;">
+                <strong>Observații:</strong><br/>
+                ${observatii.replace(/\n/g, '<br/>')}
+            </div>
+        </div>
+        ` : ''}
 
         <div class="payment-info">
             <h4>Conditii de plata</h4>
@@ -517,6 +595,8 @@ export async function POST(request: NextRequest) {
             <div class="generated-info">
                 <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
                 Data generarii: ${new Date().toLocaleString('ro-RO')}
+                ${isEdit ? '<br><strong>✏️ EDITATĂ - Versiune actualizată</strong>' : ''}
+                ${isStorno ? '<br><strong>↩️ STORNARE - Anulează factura originală</strong>' : ''}
                 ${sendToAnaf ? (MOCK_EFACTURA_MODE ? 
                   '<br><strong>🧪 TEST MODE: Simulare e-Factura (NU trimis la ANAF)</strong>' : 
                   '<br><strong>📤 Trimisa automat la ANAF ca e-Factura</strong>') : ''}
@@ -536,7 +616,7 @@ export async function POST(request: NextRequest) {
       if (MOCK_EFACTURA_MODE) {
         // 🧪 MOCK MODE - Simulează e-factura fără trimitere la ANAF
         console.log('🧪 MOCK MODE: Simulez e-factura pentru:', {
-          facturaId,
+          facturaId: currentFacturaId,
           clientCUI: safeClientData.cui,
           totalFactura: safeFormat(total),
           liniiFactura: liniiFactura.length
@@ -547,7 +627,7 @@ export async function POST(request: NextRequest) {
         // Simulează salvare în BigQuery FacturiEFACTURA
         await saveMockEfacturaRecord({
           xmlId: mockXmlId,
-          facturaId,
+          facturaId: currentFacturaId,
           proiectId,
           clientInfo: safeClientData,
           liniiFactura,
@@ -575,7 +655,7 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              facturaId: facturaId,
+              facturaId: currentFacturaId,
               forceRegenerate: false 
             })
           });
@@ -598,56 +678,107 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ MODIFICAT: Salvare în BigQuery cu numărul corect din setări
+    // ✅ MODIFICAT: Salvare în BigQuery cu suport pentru Edit
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
 
-      const facturaData = [{
-        id: facturaId,
-        proiect_id: proiectId,
-        serie: setariFacturare?.serie_facturi || 'INV',  // ✅ Folosește seria din setări
-        numar: numarFactura || safeInvoiceData.numarFactura, // ✅ Folosește numărul din setări
-        data_factura: new Date().toISOString().split('T')[0],
-        data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        id_factura_externa: null,
-        url_publica: null,
-        url_download: null,
-        client_id: clientInfo?.id || null,
-        client_nume: safeClientData.nume,
-        client_cui: safeClientData.cui,
-        subtotal: Number(subtotal.toFixed(2)),
-        total_tva: Number(totalTva.toFixed(2)),
-        total: Number(total.toFixed(2)),
-        valoare_platita: 0,
-        status: 'generata',
-        data_trimitere: null,
-        data_plata: null,
-        date_complete_json: JSON.stringify({
-          liniiFactura,
-          observatii,
-          clientInfo: safeClientData,
-          proiectInfo: {
-            id: proiectId,
-            denumire: safeInvoiceData.denumireProiect
+      if (isEdit && facturaId) {
+        // ✅ Actualizează factura existentă
+        const updateQuery = `
+          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+          SET 
+            subtotal = @subtotal,
+            total_tva = @totalTva,
+            total = @total,
+            date_complete_json = @dateCompleteJson,
+            data_actualizare = CURRENT_TIMESTAMP(),
+            efactura_enabled = @efacturaEnabled,
+            efactura_status = @efacturaStatus,
+            anaf_upload_id = @anafUploadId
+          WHERE id = @facturaId
+        `;
+
+        await bigquery.query({
+          query: updateQuery,
+          params: {
+            facturaId: facturaId,
+            subtotal: Number(subtotal.toFixed(2)),
+            totalTva: Number(totalTva.toFixed(2)),
+            total: Number(total.toFixed(2)),
+            dateCompleteJson: JSON.stringify({
+              liniiFactura,
+              observatii: observatiiFinale,
+              clientInfo: safeClientData,
+              proiectInfo: {
+                id: proiectId,
+                denumire: safeInvoiceData.denumireProiect
+              },
+              contariBancare: contariFinale,
+              setariFacturare,
+              cursuriUtilizate, // ✅ Salvează cursurile utilizate
+              isEdit: true,
+              dataActualizare: new Date().toISOString()
+            }),
+            efacturaEnabled: sendToAnaf,
+            efacturaStatus: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
+            anafUploadId: xmlResult?.xmlId || null
           },
-          contariBancare: contariFinale,
-          setariFacturare,  // ✅ Salvăm și setările folosite
-          mockMode: MOCK_EFACTURA_MODE && sendToAnaf
-        }),
-        data_creare: new Date().toISOString(),
-        data_actualizare: new Date().toISOString(),
-        // ✅ CÂMPURI pentru e-factura
-        efactura_enabled: sendToAnaf,
-        efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
-        anaf_upload_id: xmlResult?.xmlId || null
-      }];
+          location: 'EU'
+        });
 
-      await table.insert(facturaData);
-      console.log('✅ Metadata factură salvată în BigQuery FacturiGenerate cu număr:', numarFactura);
+        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery`);
+        
+      } else {
+        // ✅ Creează factură nouă (inclusiv storno)
+        const facturaData = [{
+          id: currentFacturaId,
+          proiect_id: proiectId,
+          serie: setariFacturare?.serie_facturi || 'INV',
+          numar: numarFactura || safeInvoiceData.numarFactura,
+          data_factura: new Date().toISOString().split('T')[0],
+          data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          id_factura_externa: null,
+          url_publica: null,
+          url_download: null,
+          client_id: clientInfo?.id || null,
+          client_nume: safeClientData.nume,
+          client_cui: safeClientData.cui,
+          subtotal: Number(subtotal.toFixed(2)),
+          total_tva: Number(totalTva.toFixed(2)),
+          total: Number(total.toFixed(2)),
+          valoare_platita: 0,
+          status: isStorno ? 'storno' : 'generata',
+          data_trimitere: null,
+          data_plata: null,
+          date_complete_json: JSON.stringify({
+            liniiFactura,
+            observatii: observatiiFinale,
+            clientInfo: safeClientData,
+            proiectInfo: {
+              id: proiectId,
+              denumire: safeInvoiceData.denumireProiect
+            },
+            contariBancare: contariFinale,
+            setariFacturare,
+            cursuriUtilizate, // ✅ Salvează cursurile utilizate
+            isStorno,
+            facturaOriginala: facturaOriginala || null,
+            mockMode: MOCK_EFACTURA_MODE && sendToAnaf
+          }),
+          data_creare: new Date().toISOString(),
+          data_actualizare: new Date().toISOString(),
+          efactura_enabled: sendToAnaf,
+          efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
+          anaf_upload_id: xmlResult?.xmlId || null
+        }];
 
-      // ✅ NOU: Actualizează numărul curent în setări după salvare
-      if (setariFacturare && numarFactura) {
+        await table.insert(facturaData);
+        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery`);
+      }
+
+      // ✅ NOU: Actualizează numărul curent în setări doar pentru facturi noi (nu edit)
+      if (!isEdit && setariFacturare && numarFactura) {
         try {
           const updateSetariResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/setari/facturare`, {
             method: 'POST',
@@ -672,22 +803,29 @@ export async function POST(request: NextRequest) {
       console.error('❌ Eroare la salvarea în BigQuery FacturiGenerate:', bgError);
     }
 
-    // ✅ RESPONSE complet cu informații Mock/Producție (PĂSTRAT IDENTIC)
+    // ✅ RESPONSE complet cu informații Mock/Producție/Edit/Storno
     const response = {
       success: true,
-      message: sendToAnaf ? 
-        (MOCK_EFACTURA_MODE ? 
-          '🧪 Factură pregătită pentru PDF + e-factura TEST (Mock Mode)' : 
-          '🚀 Factură pregătită pentru PDF + e-factura ANAF') : 
-        '📄 Factură pregătită pentru generare PDF',
+      message: isEdit ? 
+        '✏️ Factură actualizată cu succes' :
+        (isStorno ? 
+          '↩️ Factură de stornare generată cu succes' :
+          (sendToAnaf ? 
+            (MOCK_EFACTURA_MODE ? 
+              '🧪 Factură pregătită pentru PDF + e-factura TEST (Mock Mode)' : 
+              '🚀 Factură pregătită pentru PDF + e-factura ANAF') : 
+            '📄 Factură pregătită pentru generare PDF')),
       fileName: fileName,
       htmlContent: htmlTemplate,
       invoiceData: {
-        facturaId: facturaId,
+        facturaId: currentFacturaId,
         numarFactura: numarFactura || safeInvoiceData.numarFactura,
         total: total,
         client: safeClientData.nume,
-        contariBancare: contariFinale.length
+        contariBancare: contariFinale.length,
+        isEdit,
+        isStorno,
+        cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? cursuriUtilizate : null
       },
       efactura: sendToAnaf ? {
         enabled: true,
