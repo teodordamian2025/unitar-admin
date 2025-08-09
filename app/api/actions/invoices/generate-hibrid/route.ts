@@ -552,14 +552,14 @@ export async function POST(request: NextRequest) {
             </div>
         </div>
 
-        ${notaCursValutar ? `
-        <div class="currency-note">
-            <div class="currency-note-content">
-                <strong>💱 Note curs valutar:</strong><br/>
-                ${notaCursValutar}
-            </div>
-        </div>
-        ` : ''}
+	${notaCursValutar ? `
+	<div class="currency-note">
+	    <div class="currency-note-content">
+		<strong>Note curs valutar:</strong><br/>
+		${notaCursValutar.replace(/[^\x00-\x7F]/g, '')} <!-- FIX: Elimină caractere non-ASCII -->
+	    </div>
+	</div>
+	` : ''}
 
         ${observatii ? `
         <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #cce7ff; border-radius: 3px;">

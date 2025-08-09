@@ -161,31 +161,44 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [cursuriUtilizate, setCursuriUtilizate] = useState<CursuriUtilizate>({});
 
   // ✅ MODIFICAT: Inițializare cu date pentru Edit/Storno
-  const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
-    if (initialData?.liniiFactura) {
-      return initialData.liniiFactura;
-    }
-    
-    // ✅ MODIFICAT: Conversie valută pentru proiect principal
-    let valoareProiect = proiect.Valoare_Estimata || 0;
-    let monedaProiect = proiect.moneda || 'RON';
-    let cursProiect = proiect.curs_valutar || 1;
-    
-    if (proiect.valoare_ron && monedaProiect !== 'RON') {
-      valoareProiect = proiect.valoare_ron;
-    }
-    
-    return [{
-      denumire: proiect.Denumire,
-      cantitate: 1,
-      pretUnitar: valoareProiect,
-      cotaTva: 19,
-      tip: 'proiect',
-      monedaOriginala: monedaProiect,
-      valoareOriginala: proiect.Valoare_Estimata,
-      cursValutar: cursProiect
-    }];
-  });
+	const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
+	  if (initialData?.liniiFactura) {
+	    return initialData.liniiFactura;
+	  }
+	  
+	  // ✅ MODIFICAT: Conversie valută pentru proiect principal
+	  let valoareProiect = proiect.Valoare_Estimata || 0;
+	  let monedaProiect = proiect.moneda || 'RON';
+	  let cursProiect = proiect.curs_valutar || 1;
+	  
+	  if (proiect.valoare_ron && monedaProiect !== 'RON') {
+	    valoareProiect = proiect.valoare_ron;
+	  }
+	  
+	  return [{
+	    denumire: proiect.Denumire,
+	    cantitate: 1,
+	    pretUnitar: valoareProiect,
+	    cotaTva: 19,
+	    tip: 'proiect',
+	    monedaOriginala: monedaProiect,
+	    valoareOriginala: proiect.Valoare_Estimata,
+	    cursValutar: cursProiect
+	  }];
+	});
+
+	// ✅ MODIFICAT: Inițializare cursuri cu proiect principal dacă are valută
+	useEffect(() => {
+	  if (proiect.moneda && proiect.moneda !== 'RON' && proiect.curs_valutar) {
+	    setCursuriUtilizate(prev => ({
+	      ...prev,
+	      [proiect.moneda]: {
+		curs: proiect.curs_valutar,
+		data: new Date().toISOString().split('T')[0]
+	      }
+	    }));
+	  }
+	}, [proiect]);
   
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
@@ -1031,17 +1044,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
   // ✅ NOU: Generează nota despre cursuri utilizate
-  const generateCurrencyNote = () => {
-    const monede = Object.keys(cursuriUtilizate);
-    if (monede.length === 0) return '';
-    
-    return `Curs valutar folosit: ${monede.map(m => {
-      const curs = cursuriUtilizate[m].curs;
-      // ✅ FIX: Asigură că cursul este număr
-      const cursNumeric = typeof curs === 'number' ? curs : parseFloat(curs) || 1;
-      return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursuriUtilizate[m].data})`;
-    }).join(', ')}`;
-  };
+	const generateCurrencyNote = () => {
+	  const monede = Object.keys(cursuriUtilizate);
+	  if (monede.length === 0) return '';
+	  
+	  return `Curs valutar folosit: ${monede.map(m => {
+	    const curs = cursuriUtilizate[m].curs;
+	    // ✅ FIX: Asigură că cursul este număr și afișează 4 zecimale
+	    const cursNumeric = typeof curs === 'number' ? curs : (typeof curs === 'string' ? parseFloat(curs) : 1);
+	    return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursuriUtilizate[m].data})`;
+	  }).join(', ')}`;
+	};
 
   // Continuare render JSX...
   return (
