@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/update/route.ts
-// DESCRIERE: API pentru actualizarea facturilor
+// DESCRIERE: API pentru actualizarea facturilor (Edit/Storno)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,11 +21,7 @@ export async function PUT(request: NextRequest) {
     const { 
       facturaId,
       status,
-      stornoFacturaId,
-      valoare_platita,
-      data_plata,
-      observatii,
-      date_complete_json
+      observatii
     } = body;
 
     if (!facturaId) {
@@ -35,77 +31,30 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Construiește câmpurile de actualizat
-    const updateFields: string[] = [];
-    const params: any = { facturaId };
-
-    if (status !== undefined) {
-      updateFields.push('status = @status');
-      params.status = status;
-    }
-
-    if (stornoFacturaId !== undefined) {
-      // ✅ NOU: Salvează ID-ul facturii de stornare în JSON
-      updateFields.push(`
-        date_complete_json = JSON_SET(
-          IFNULL(date_complete_json, '{}'),
-          '$.stornoFacturaId',
-          @stornoFacturaId
-        )
-      `);
-      params.stornoFacturaId = stornoFacturaId;
-    }
-
-    if (valoare_platita !== undefined) {
-      updateFields.push('valoare_platita = @valoare_platita');
-      params.valoare_platita = valoare_platita;
-    }
-
-    if (data_plata !== undefined) {
-      updateFields.push('data_plata = @data_plata');
-      params.data_plata = data_plata;
-    }
-
-    if (observatii !== undefined) {
-      // ✅ CORECTAT: Actualizează observațiile în JSON
-      updateFields.push(`
-        date_complete_json = JSON_SET(
-          IFNULL(date_complete_json, '{}'),
-          '$.observatiiStornare',
-          @observatii
-        )
-      `);
-      params.observatii = observatii;
-    }
-
-    if (date_complete_json !== undefined) {
-      updateFields.push('date_complete_json = @date_complete_json');
-      params.date_complete_json = date_complete_json;
-    }
-
-    // Adaugă data actualizării
-    updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
-
-    if (updateFields.length === 1) { // Doar data_actualizare
-      return NextResponse.json(
-        { error: 'Nu există câmpuri de actualizat' },
-        { status: 400 }
-      );
-    }
+    console.log(`📝 Actualizare factură ${facturaId}: status=${status}`);
 
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
-      SET ${updateFields.join(', ')}
+      SET 
+        status = @status,
+        data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = @facturaId
     `;
 
     await bigquery.query({
       query: updateQuery,
-      params,
+      params: { 
+        facturaId,
+        status
+      },
+      types: {
+        facturaId: 'STRING',
+        status: 'STRING'
+      },
       location: 'EU'
     });
 
-    console.log(`✅ Factură ${facturaId} actualizată cu succes`);
+    console.log(`✅ Factură ${facturaId} actualizată: status=${status}`);
 
     return NextResponse.json({
       success: true,

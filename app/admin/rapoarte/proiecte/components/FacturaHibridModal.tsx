@@ -644,52 +644,61 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setLiniiFactura(newLines);
   };
 
-  const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
-    // ✅ MODIFICAT: Conversie corectă valută pentru subproiecte
-    let valoareSubproiect = subproiect.Valoare_Estimata || 0;
-    let monedaSubproiect = subproiect.moneda || 'RON';
-    let cursSubproiect = subproiect.curs_valutar || 1;
+	const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
+	  // ✅ MODIFICAT: Conversie corectă valută pentru subproiecte
+	  let valoareSubproiect = subproiect.Valoare_Estimata || 0;
+	  let monedaSubproiect = subproiect.moneda || 'RON';
+	  let cursSubproiect = subproiect.curs_valutar || 1;
+	  
+	  // Folosește valoarea în RON dacă există
+	  if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
+	    valoareSubproiect = subproiect.valoare_ron;
+	    
+	    // ✅ FIX: Track cursul folosit cu conversie corectă la număr cu 4 zecimale
+	    if (!cursuriUtilizate[monedaSubproiect]) {
+	      // Asigură că cursul este număr și păstrează 4 zecimale
+	      const cursNumeric = typeof cursSubproiect === 'number' ? 
+		cursSubproiect : 
+		(typeof cursSubproiect === 'string' ? parseFloat(cursSubproiect) : 1);
+	      
+	      setCursuriUtilizate(prev => {
+		const newCursuri = { ...prev };
+		newCursuri[monedaSubproiect] = {
+		  curs: cursNumeric, // Păstrează valoarea numerică completă
+		  data: new Date().toISOString().split('T')[0]
+		};
+		return newCursuri;
+	      });
+	      
+	      console.log(`📊 Curs salvat pentru ${monedaSubproiect}: ${cursNumeric} (${typeof cursNumeric})`);
+	    }
+	  }
+	  
+	  const nouaLinie: LineFactura = {
+	    denumire: `${subproiect.Denumire} (Subproiect)`,
+	    cantitate: 1,
+	    pretUnitar: valoareSubproiect,
+	    cotaTva: 19,
+	    tip: 'subproiect',
+	    subproiect_id: subproiect.ID_Subproiect,
+	    monedaOriginala: monedaSubproiect,
+	    valoareOriginala: subproiect.Valoare_Estimata,
+	    cursValutar: cursSubproiect
+	  };
+	  
+	  setLiniiFactura(prev => [...prev, nouaLinie]);
+	  
+	  setSubproiecteDisponibile(prev => 
+	    prev.map(sub => 
+	      sub.ID_Subproiect === subproiect.ID_Subproiect 
+		? { ...sub, adaugat: true }
+		: sub
+	    )
+	  );
+	  
+	  showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură${monedaSubproiect !== 'RON' ? ` (convertit din ${monedaSubproiect})` : ''}`, 'success');
+	};
     
-    // Folosește valoarea în RON dacă există
-    if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
-      valoareSubproiect = subproiect.valoare_ron;
-      
-      // Track cursul folosit - FIX: conversie la număr
-      if (!cursuriUtilizate[monedaSubproiect]) {
-        setCursuriUtilizate(prev => ({
-          ...prev,
-          [monedaSubproiect]: {
-            curs: typeof cursSubproiect === 'number' ? cursSubproiect : parseFloat(cursSubproiect) || 1,
-            data: new Date().toISOString().split('T')[0]
-          }
-        }));
-      }
-    }
-    
-    const nouaLinie: LineFactura = {
-      denumire: `${subproiect.Denumire} (Subproiect)`,
-      cantitate: 1,
-      pretUnitar: valoareSubproiect,
-      cotaTva: 19,
-      tip: 'subproiect',
-      subproiect_id: subproiect.ID_Subproiect,
-      monedaOriginala: monedaSubproiect,
-      valoareOriginala: subproiect.Valoare_Estimata,
-      cursValutar: cursSubproiect
-    };
-    
-    setLiniiFactura(prev => [...prev, nouaLinie]);
-    
-    setSubproiecteDisponibile(prev => 
-      prev.map(sub => 
-        sub.ID_Subproiect === subproiect.ID_Subproiect 
-          ? { ...sub, adaugat: true }
-          : sub
-      )
-    );
-    
-    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat la factură${monedaSubproiect !== 'RON' ? ` (convertit din ${monedaSubproiect})` : ''}`, 'success');
-  };
 
   const handlePreluareDateANAF = async () => {
     if (!cuiInput.trim()) {
@@ -946,7 +955,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  const handleGenereazaFactura = async () => {
+	const handleGenereazaFactura = async () => {
+	  // ✅ DEBUGGING pentru Storno
+	  if (isStorno) {
+	    console.log('🔍 STORNO MODE - verificare date:', {
+	      isStorno,
+	      initialData,
+	      clientInfo,
+	      liniiFactura,
+	      numarFactura
+	    });
+	  }
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
       return;
@@ -985,6 +1004,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
 
     setIsGenerating(true);
+      try {
+    // ✅ DEBUGGING
+    console.log('📤 Trimit date pentru generare:', {
+      proiectId: isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect,
+      isEdit,
+      isStorno,
+      facturaOriginala: initialData?.facturaOriginala,
+      liniiFactura: liniiFactura.length,
+      clientInfo: clientInfo?.denumire
+    });
     
     try {
       if (sendToAnaf) {
@@ -994,23 +1023,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
       
       // ✅ NOU: Adaugă cursurile utilizate la request
-      const response = await fetch('/api/actions/invoices/generate-hibrid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proiectId: isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect,
-          liniiFactura,
-          observatii,
-          clientInfo,
-          numarFactura,
-          setariFacturare,
-          sendToAnaf,
-          cursuriUtilizate, // ✅ NOU: Trimite cursurile utilizate
-          isEdit,
-          isStorno,
-          facturaId: isEdit ? initialData?.facturaId : null
-        })
-      });
+    const response = await fetch('/api/actions/invoices/generate-hibrid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        proiectId: isEdit && initialData?.proiectId ? initialData.proiectId : proiect.ID_Proiect,
+        liniiFactura,
+        observatii,
+        clientInfo,
+        numarFactura,
+        setariFacturare,
+        sendToAnaf,
+        cursuriUtilizate,
+        isEdit,
+        isStorno,
+        facturaId: isEdit ? initialData?.facturaId : null,
+        facturaOriginala: isStorno ? initialData?.facturaOriginala : null // ✅ IMPORTANT pentru storno
+      })
+    });
       
       const result = await response.json();
       
