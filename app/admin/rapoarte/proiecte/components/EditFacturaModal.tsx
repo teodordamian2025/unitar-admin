@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// MODIFICAT: Suport complet pentru Edit/Storno cu date din BD
+// CORECTAT: Încărcare completă date proiect + subproiecte
 // ==================================================================
 
 'use client';
@@ -85,93 +85,112 @@ export default function EditFacturaModal({
       if (factura.date_complete_json) {
         try {
           dateComplete = JSON.parse(factura.date_complete_json);
+          console.log('✅ Date complete parsate:', dateComplete);
         } catch (e) {
           console.error('Eroare parsare date_complete_json:', e);
         }
       }
 
-      // ✅ MODIFICAT: Încarcă date proiect din BD dacă avem proiect_id
+      // ✅ CORECTAT: Extrage proiect_id corect
+      const proiectIdActual = factura.proiect_id || 
+                              dateComplete.proiectInfo?.id || 
+                              dateComplete.proiectId ||
+                              null;
+
+      console.log('🔍 Proiect ID găsit:', proiectIdActual);
+
+      // ✅ CORECTAT: Încarcă date proiect din BD
       let proiectInfo = dateComplete.proiectInfo || {};
-      if (factura.proiect_id) {
+      if (proiectIdActual) {
         try {
-          const proiectResponse = await fetch(`/api/rapoarte/proiecte?search=${factura.proiect_id}`);
+          // Caută exact după ID, nu după search
+          const proiectResponse = await fetch(`/api/rapoarte/proiecte`);
           const proiectData = await proiectResponse.json();
           
-          if (proiectData.success && proiectData.data && proiectData.data.length > 0) {
-            const proiect = proiectData.data[0];
-            proiectInfo = {
-              id: proiect.ID_Proiect,
-              denumire: proiect.Denumire,
-              client: proiect.Client,
-              valoare: proiect.Valoare_Estimata,
-              moneda: proiect.moneda,
-              curs_valutar: proiect.curs_valutar,
-              valoare_ron: proiect.valoare_ron,
-              status: proiect.Status
-            };
-            console.log('✅ Date proiect încărcate din BD:', proiectInfo);
+          if (proiectData.success && proiectData.data) {
+            // Găsește proiectul exact după ID
+            const proiect = proiectData.data.find((p: any) => p.ID_Proiect === proiectIdActual);
+            
+            if (proiect) {
+              proiectInfo = {
+                id: proiect.ID_Proiect,
+                denumire: proiect.Denumire,
+                client: proiect.Client,
+                valoare: proiect.Valoare_Estimata,
+                moneda: proiect.moneda || 'RON',
+                curs_valutar: proiect.curs_valutar,
+                valoare_ron: proiect.valoare_ron,
+                status: proiect.Status,
+                adresa: proiect.Adresa
+              };
+              console.log('✅ Date proiect încărcate din BD:', proiectInfo);
+            } else {
+              console.warn('⚠️ Proiect nu găsit în BD pentru ID:', proiectIdActual);
+            }
           }
         } catch (error) {
           console.error('Eroare la încărcarea datelor proiectului:', error);
         }
       }
 
-      // Pentru STORNO, inversăm valorile
-      if (mode === 'storno') {
-        // Inversează liniile facturii
-        if (dateComplete.liniiFactura) {
-          dateComplete.liniiFactura = dateComplete.liniiFactura.map((linie: any) => ({
-            ...linie,
-            pretUnitar: -Math.abs(linie.pretUnitar || 0),
-            denumire: `STORNO: ${linie.denumire}`
-          }));
-        }
+      // ✅ CORECTAT: Pentru STORNO, inversăm valorile
+      let liniiFacturaPregatite = dateComplete.liniiFactura || [{
+        denumire: proiectInfo.denumire || factura.proiect_denumire || 'Servicii',
+        cantitate: 1,
+        pretUnitar: factura.subtotal,
+        cotaTva: factura.total_tva > 0 ? 19 : 0,
+        monedaOriginala: proiectInfo.moneda,
+        valoareOriginala: proiectInfo.valoare,
+        cursValutar: proiectInfo.curs_valutar
+      }];
 
-        // Marchează ca factură de stornare
-        dateComplete.tipFactura = 'storno';
-        dateComplete.facturaOriginala = factura.numar;
+      if (mode === 'storno') {
+        // Inversează valorile pentru storno
+        liniiFacturaPregatite = liniiFacturaPregatite.map((linie: any) => ({
+          ...linie,
+          pretUnitar: -Math.abs(linie.pretUnitar || 0),
+          denumire: linie.denumire.startsWith('STORNO:') ? linie.denumire : `STORNO: ${linie.denumire}`
+        }));
       }
 
-      // ✅ MODIFICAT: Pregătește datele pentru FacturaHibridModal cu mai multe detalii
+      // ✅ CORECTAT: Pregătește datele complete pentru FacturaHibridModal
       const proiect = {
-        ID_Proiect: factura.proiect_id || proiectInfo.id || 'UNKNOWN',
-        Denumire: factura.proiect_denumire || proiectInfo.denumire || 'Proiect necunoscut',
+        ID_Proiect: proiectIdActual || 'UNKNOWN',
+        Denumire: proiectInfo.denumire || factura.proiect_denumire || 'Proiect necunoscut',
         Client: factura.client_nume || proiectInfo.client,
         Status: proiectInfo.status || 'Activ',
         Valoare_Estimata: proiectInfo.valoare || factura.subtotal,
         moneda: proiectInfo.moneda || 'RON',
         curs_valutar: proiectInfo.curs_valutar,
         valoare_ron: proiectInfo.valoare_ron,
+        Adresa: proiectInfo.adresa,
         // Flag-uri pentru edit/storno
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
         _initialData: {
-          liniiFactura: dateComplete.liniiFactura || [{
-            denumire: proiectInfo.denumire || 'Servicii',
-            cantitate: 1,
-            pretUnitar: mode === 'storno' ? -factura.subtotal : factura.subtotal,
-            cotaTva: factura.total_tva > 0 ? 19 : 0,
-            monedaOriginala: proiectInfo.moneda,
-            valoareOriginala: proiectInfo.valoare,
-            cursValutar: proiectInfo.curs_valutar
-          }],
+          liniiFactura: liniiFacturaPregatite,
           clientInfo: dateComplete.clientInfo || {
+            id: '',
             denumire: factura.client_nume,
             cui: factura.client_cui,
             nrRegCom: '',
-            adresa: ''
+            adresa: '',
+            telefon: '',
+            email: ''
           },
           observatii: dateComplete.observatii || '',
-          numarFactura: mode === 'edit' ? factura.numar : null,
+          numarFactura: mode === 'edit' ? factura.numar : null, // Păstrează numărul doar la EDIT
           facturaId: mode === 'edit' ? factura.id : null,
-          proiectId: factura.proiect_id,
+          proiectId: proiectIdActual, // ✅ IMPORTANT: Trimite proiect ID corect
           isEdit: mode === 'edit',
           isStorno: mode === 'storno',
           facturaOriginala: mode === 'storno' ? factura.numar : null,
-          cursuriUtilizate: dateComplete.cursuriUtilizate || {}
+          cursuriUtilizate: dateComplete.cursuriUtilizate || {},
+          setariFacturare: dateComplete.setariFacturare || null
         }
       };
 
+      console.log('📋 Date finale pentru modal:', proiect);
       setProiectData(proiect);
       setLoading(false);
       
@@ -189,14 +208,14 @@ export default function EditFacturaModal({
         showToast('✅ Factură actualizată cu succes', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {
-        // Marchează factura originală ca stornată
+        // ✅ CORECTAT: Marchează factura originală ca stornată
         const response = await fetch('/api/actions/invoices/update', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             facturaId: factura.id,
             status: 'stornata',
-            stornoFacturaId: invoiceId
+            observatii: `Stornată prin factura ${invoiceId}`
           })
         });
 
@@ -204,12 +223,13 @@ export default function EditFacturaModal({
           showToast('✅ Factură de stornare creată cu succes', 'success');
           onSuccess('reversed', invoiceId);
         } else {
-          throw new Error('Eroare la actualizarea statusului facturii originale');
+          const error = await response.json();
+          throw new Error(error.error || 'Eroare la actualizarea statusului facturii originale');
         }
       }
     } catch (error) {
       console.error('Eroare la procesarea facturii:', error);
-      showToast('Eroare la procesarea facturii', 'error');
+      showToast(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
     }
 
     onClose();
@@ -243,7 +263,7 @@ export default function EditFacturaModal({
 
   if (!isOpen || !proiectData) return null;
 
-  // Folosește FacturaHibridModal cu datele încărcate
+  // ✅ Folosește FacturaHibridModal cu datele încărcate
   return (
     <FacturaHibridModal
       proiect={proiectData}

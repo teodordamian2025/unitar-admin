@@ -45,7 +45,14 @@ export async function PUT(request: NextRequest) {
     }
 
     if (stornoFacturaId !== undefined) {
-      updateFields.push('storno_factura_id = @stornoFacturaId');
+      // ✅ NOU: Salvează ID-ul facturii de stornare în JSON
+      updateFields.push(`
+        date_complete_json = JSON_SET(
+          IFNULL(date_complete_json, '{}'),
+          '$.stornoFacturaId',
+          @stornoFacturaId
+        )
+      `);
       params.stornoFacturaId = stornoFacturaId;
     }
 
@@ -60,11 +67,11 @@ export async function PUT(request: NextRequest) {
     }
 
     if (observatii !== undefined) {
-      // Actualizează observațiile în JSON
+      // ✅ CORECTAT: Actualizează observațiile în JSON
       updateFields.push(`
         date_complete_json = JSON_SET(
           IFNULL(date_complete_json, '{}'),
-          '$.observatii',
+          '$.observatiiStornare',
           @observatii
         )
       `);
