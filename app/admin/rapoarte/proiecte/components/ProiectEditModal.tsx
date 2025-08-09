@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectEditModal.tsx
-// MODIFICAT: Fix format dată românesc dd/mm/year + păstrează toate funcționalitățile
+// MODIFICAT: Identic cu ProiectNouModal + încărcare date existente + funcții update/delete
 // ==================================================================
 
 'use client';
@@ -24,6 +24,20 @@ interface Client {
   email?: string;
 }
 
+interface CheltuialaProiect {
+  id: string;
+  tip_cheltuiala: string;
+  furnizor_nume: string;
+  furnizor_cui: string;
+  descriere: string;
+  valoare: string;
+  moneda: string;
+  status_predare: string;
+  status_contract: string;
+  status_facturare: string;
+  status_achitare: string;
+}
+
 export default function ProiectEditModal({ 
   proiect, 
   isOpen, 
@@ -32,12 +46,14 @@ export default function ProiectEditModal({
   onProiectDeleted 
 }: ProiectEditModalProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingSubproiecte, setLoadingSubproiecte] = useState(false);
+  const [loadingCheltuieli, setLoadingCheltuieli] = useState(false);
   const [clienti, setClienti] = useState<Client[]>([]);
   const [showClientModal, setShowClientModal] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   
-  // ✅ State pentru conversii valutare
+  // State pentru conversii valutare
   const [cursValutar, setCursValutar] = useState<number | null>(null);
   const [loadingCurs, setLoadingCurs] = useState(false);
   
@@ -52,24 +68,43 @@ export default function ProiectEditModal({
     Data_Final: '',
     Status: 'Activ',
     
-    // ✅ Valoare și monedă
+    // Valoare și monedă
     Valoare_Estimata: '',
     moneda: 'RON',
     curs_valutar: '',
     data_curs_valutar: '',
     valoare_ron: '',
     
-    // ✅ Status-uri multiple
+    // Status-uri multiple
     status_predare: 'Nepredat',
     status_contract: 'Nu e cazul',
     status_facturare: 'Nefacturat', 
-    status_achitare: 'Neachitat', // ✅ FIX: Opțiuni corecte
+    status_achitare: 'Neachitat',
     
     Responsabil: '',
-    Observatii: ''
+    Observatii: '',
+    
+    // Pentru subproiecte cu câmpuri extinse
+    subproiecte: [] as Array<{
+      id: string;
+      ID_Subproiect?: string; // Pentru subproiecte existente
+      denumire: string;
+      responsabil: string;
+      valoare: string;
+      moneda: string;
+      status: string;
+      curs_valutar?: string;
+      data_curs_valutar?: string;
+      valoare_ron?: string;
+      isExisting?: boolean; // Flag pentru subproiecte existente
+      isDeleted?: boolean; // Flag pentru subproiecte șterse
+    }>,
+    
+    // Pentru cheltuieli proiect
+    cheltuieli: [] as CheltuialaProiect[]
   });
 
-  // ✅ NOU: Funcție pentru formatarea datei în format românesc pentru afișare
+  // Funcție pentru formatarea datei în format românesc pentru afișare
   const formatDateForDisplay = (dateValue: string): string => {
     if (!dateValue) return '';
     try {
@@ -79,14 +114,29 @@ export default function ProiectEditModal({
     }
   };
 
+  // Helper pentru formatarea datei pentru input
+  const formatDateForInput = (dateString: string | { value: string } | null | undefined): string => {
+    if (!dateString) return '';
+    try {
+      const dateValue = typeof dateString === 'string' ? dateString : dateString.value;
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   useEffect(() => {
     if (isOpen && proiect) {
       loadClienti();
       loadProiectData();
+      loadSubproiecte();
+      loadCheltuieli();
     }
   }, [isOpen, proiect]);
 
-  // ✅ Effect pentru calcularea cursului valutar
+  // Effect pentru calcularea cursului valutar pentru proiectul principal
   useEffect(() => {
     if (formData.moneda !== 'RON' && formData.Valoare_Estimata) {
       loadCursValutar();
@@ -101,26 +151,27 @@ export default function ProiectEditModal({
   }, [formData.moneda, formData.Valoare_Estimata, formData.data_curs_valutar]);
 
   const loadProiectData = () => {
-    // ✅ Încarcă datele existente ale proiectului în formular
-    setFormData({
+    // Încarcă datele existente ale proiectului în formular
+    setFormData(prev => ({
+      ...prev,
       ID_Proiect: proiect.ID_Proiect || '',
       Denumire: proiect.Denumire || '',
       Client: proiect.Client || '',
       selectedClientId: '',
       Adresa: proiect.Adresa || '',
       Descriere: proiect.Descriere || '',
-      Data_Start: proiect.Data_Start ? formatDateForInput(proiect.Data_Start) : '',
-      Data_Final: proiect.Data_Final ? formatDateForInput(proiect.Data_Final) : '',
+      Data_Start: formatDateForInput(proiect.Data_Start),
+      Data_Final: formatDateForInput(proiect.Data_Final),
       Status: proiect.Status || 'Activ',
       
-      // ✅ Încarcă valorile existente sau setează default-uri
+      // Încarcă valorile existente sau setează default-uri
       Valoare_Estimata: proiect.Valoare_Estimata?.toString() || '',
       moneda: proiect.moneda || 'RON',
       curs_valutar: proiect.curs_valutar?.toString() || '',
-      data_curs_valutar: proiect.data_curs_valutar || new Date().toISOString().split('T')[0],
+      data_curs_valutar: formatDateForInput(proiect.data_curs_valutar) || new Date().toISOString().split('T')[0],
       valoare_ron: proiect.valoare_ron?.toString() || '',
       
-      // ✅ Încarcă status-urile existente
+      // Încarcă status-urile existente
       status_predare: proiect.status_predare || 'Nepredat',
       status_contract: proiect.status_contract || 'Nu e cazul',
       status_facturare: proiect.status_facturare || 'Nefacturat',
@@ -128,22 +179,89 @@ export default function ProiectEditModal({
       
       Responsabil: proiect.Responsabil || '',
       Observatii: proiect.Observatii || ''
-    });
+    }));
     
     setClientSearch(proiect.Client || '');
   };
 
-  // ✅ Helper pentru formatarea datei pentru input
-  const formatDateForInput = (dateString: string | { value: string }): string => {
+  // ✅ NOUĂ: Încarcă subproiectele existente
+  const loadSubproiecte = async () => {
+    if (!proiect.ID_Proiect) return;
+    
+    setLoadingSubproiecte(true);
     try {
-      const dateValue = typeof dateString === 'string' ? dateString : dateString.value;
-      const date = new Date(dateValue);
-      if (isNaN(date.getTime())) return '';
+      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${proiect.ID_Proiect}`);
+      const data = await response.json();
       
-      // ✅ Format ISO pentru input type="date"
-      return date.toISOString().split('T')[0];
-    } catch {
-      return '';
+      if (data.success && data.data) {
+        const subproiecteFormatate = data.data.map((sub: any) => ({
+          id: sub.ID_Subproiect,
+          ID_Subproiect: sub.ID_Subproiect,
+          denumire: sub.Denumire || '',
+          responsabil: sub.Responsabil || '',
+          valoare: sub.Valoare_Estimata?.toString() || '',
+          moneda: sub.moneda || 'RON',
+          status: sub.Status || 'Planificat',
+          curs_valutar: sub.curs_valutar?.toString() || '',
+          data_curs_valutar: formatDateForInput(sub.data_curs_valutar),
+          valoare_ron: sub.valoare_ron?.toString() || '',
+          isExisting: true,
+          isDeleted: false
+        }));
+        
+        setFormData(prev => ({
+          ...prev,
+          subproiecte: subproiecteFormatate
+        }));
+        
+        console.log(`Încărcate ${subproiecteFormatate.length} subproiecte existente`);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea subproiectelor:', error);
+      toast.error('Eroare la încărcarea subproiectelor');
+    } finally {
+      setLoadingSubproiecte(false);
+    }
+  };
+
+  // ✅ NOUĂ: Încarcă cheltuielile existente
+  const loadCheltuieli = async () => {
+    if (!proiect.ID_Proiect) return;
+    
+    setLoadingCheltuieli(true);
+    try {
+      const response = await fetch(`/api/rapoarte/cheltuieli?proiectId=${proiect.ID_Proiect}`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const cheltuieliFormatate = data.data.map((ch: any) => ({
+          id: ch.id,
+          tip_cheltuiala: ch.tip_cheltuiala || 'subcontractant',
+          furnizor_nume: ch.furnizor_nume || '',
+          furnizor_cui: ch.furnizor_cui || '',
+          descriere: ch.descriere || '',
+          valoare: ch.valoare?.toString() || '',
+          moneda: ch.moneda || 'RON',
+          status_predare: ch.status_predare || 'Nepredat',
+          status_contract: ch.status_contract || 'Nu e cazul',
+          status_facturare: ch.status_facturare || 'Nefacturat',
+          status_achitare: ch.status_achitare || 'Neachitat',
+          isExisting: true,
+          isDeleted: false
+        }));
+        
+        setFormData(prev => ({
+          ...prev,
+          cheltuieli: cheltuieliFormatate
+        }));
+        
+        console.log(`Încărcate ${cheltuieliFormatate.length} cheltuieli existente`);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea cheltuielilor:', error);
+      toast.error('Eroare la încărcarea cheltuielilor');
+    } finally {
+      setLoadingCheltuieli(false);
     }
   };
 
@@ -159,7 +277,7 @@ export default function ProiectEditModal({
     }
   };
 
-  // ✅ Funcție pentru încărcarea cursului valutar
+  // Funcție pentru încărcarea cursului valutar
   const loadCursValutar = async () => {
     if (formData.moneda === 'RON') return;
     
@@ -211,10 +329,10 @@ export default function ProiectEditModal({
         return;
       }
 
-      console.log('Actualizare proiect:', formData);
+      console.log('Actualizare proiect complet:', formData);
       toast.info('Se actualizează proiectul...');
 
-      // ✅ Pregătește datele pentru actualizare
+      // Pregătește datele pentru actualizare
       const updateData = {
         id: formData.ID_Proiect,
         Denumire: formData.Denumire.trim(),
@@ -226,13 +344,13 @@ export default function ProiectEditModal({
         Status: formData.Status,
         Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
         
-        // ✅ Monedă și conversii
+        // Monedă și conversii
         moneda: formData.moneda,
         curs_valutar: formData.curs_valutar ? parseFloat(formData.curs_valutar) : null,
         data_curs_valutar: formData.data_curs_valutar || null,
         valoare_ron: formData.valoare_ron ? parseFloat(formData.valoare_ron) : null,
         
-        // ✅ Status-uri multiple
+        // Status-uri multiple
         status_predare: formData.status_predare,
         status_contract: formData.status_contract,
         status_facturare: formData.status_facturare,
@@ -251,7 +369,13 @@ export default function ProiectEditModal({
       const result = await response.json();
 
       if (result.success || response.ok) {
-        toast.success('Proiect actualizat cu succes!');
+        // ✅ Actualizează subproiectele
+        await updateSubproiecte();
+        
+        // ✅ Actualizează cheltuielile
+        await updateCheltuieli();
+        
+        toast.success('✅ Proiect actualizat cu succes cu toate componentele!');
         onProiectUpdated();
         onClose();
       } else {
@@ -266,40 +390,184 @@ export default function ProiectEditModal({
     }
   };
 
-  // ✅ NOUĂ: Funcție pentru ștergerea proiectului
+  // ✅ NOUĂ: Funcție pentru actualizarea subproiectelor
+  const updateSubproiecte = async () => {
+    const proiectId = formData.ID_Proiect;
+    
+    for (const subproiect of formData.subproiecte) {
+      try {
+        if (subproiect.isDeleted && subproiect.isExisting) {
+          // Șterge subproiectul existent
+          await fetch(`/api/rapoarte/subproiecte?id=${subproiect.ID_Subproiect}`, {
+            method: 'DELETE'
+          });
+          console.log(`✅ Subproiect ${subproiect.ID_Subproiect} șters`);
+        } else if (subproiect.isExisting && !subproiect.isDeleted) {
+          // Actualizează subproiectul existent
+          const updateData = {
+            id: subproiect.ID_Subproiect,
+            Denumire: subproiect.denumire,
+            Responsabil: subproiect.responsabil || null,
+            Status: subproiect.status,
+            Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+            moneda: subproiect.moneda || 'RON'
+          };
+          
+          await fetch('/api/rapoarte/subproiecte', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+          });
+          console.log(`✅ Subproiect ${subproiect.ID_Subproiect} actualizat`);
+        } else if (!subproiect.isExisting && !subproiect.isDeleted) {
+          // Adaugă subproiect nou
+          let valoareRonSubproiect: number | null = null;
+          let cursSubproiect: number | null = null;
+          
+          if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
+            if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
+              cursSubproiect = parseFloat(formData.curs_valutar);
+              valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+            } else {
+              switch(subproiect.moneda) {
+                case 'EUR': cursSubproiect = 4.97; break;
+                case 'USD': cursSubproiect = 4.50; break;
+                case 'GBP': cursSubproiect = 5.80; break;
+                default: cursSubproiect = 1;
+              }
+              valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+            }
+          } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
+            valoareRonSubproiect = parseFloat(subproiect.valoare);
+            cursSubproiect = 1;
+          }
+          
+          const subproiectData = {
+            ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
+            ID_Proiect: proiectId,
+            Denumire: subproiect.denumire,
+            Responsabil: subproiect.responsabil || null,
+            Status: subproiect.status || 'Planificat',
+            Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+            moneda: subproiect.moneda || 'RON',
+            curs_valutar: cursSubproiect,
+            data_curs_valutar: formData.data_curs_valutar || null,
+            valoare_ron: valoareRonSubproiect,
+            status_predare: 'Nepredat',
+            status_contract: 'Nu e cazul',
+            status_facturare: 'Nefacturat',
+            status_achitare: 'Neachitat'
+          };
+
+          await fetch('/api/rapoarte/subproiecte', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subproiectData)
+          });
+          console.log(`✅ Subproiect nou ${subproiect.denumire} adăugat`);
+        }
+      } catch (error) {
+        console.error(`Eroare la procesarea subproiectului ${subproiect.denumire}:`, error);
+      }
+    }
+  };
+
+  // ✅ NOUĂ: Funcție pentru actualizarea cheltuielilor
+  const updateCheltuieli = async () => {
+    const proiectId = formData.ID_Proiect;
+    
+    for (const cheltuiala of formData.cheltuieli) {
+      try {
+        if ((cheltuiala as any).isDeleted && (cheltuiala as any).isExisting) {
+          // Șterge cheltuiala existentă
+          await fetch(`/api/rapoarte/cheltuieli?id=${cheltuiala.id}`, {
+            method: 'DELETE'
+          });
+          console.log(`✅ Cheltuială ${cheltuiala.id} ștearsă`);
+        } else if ((cheltuiala as any).isExisting && !(cheltuiala as any).isDeleted) {
+          // Actualizează cheltuiala existentă
+          const updateData = {
+            id: cheltuiala.id,
+            tip_cheltuiala: cheltuiala.tip_cheltuiala,
+            furnizor_nume: cheltuiala.furnizor_nume,
+            furnizor_cui: cheltuiala.furnizor_cui || null,
+            descriere: cheltuiala.descriere,
+            valoare: parseFloat(cheltuiala.valoare),
+            moneda: cheltuiala.moneda,
+            status_predare: cheltuiala.status_predare,
+            status_contract: cheltuiala.status_contract,
+            status_facturare: cheltuiala.status_facturare,
+            status_achitare: cheltuiala.status_achitare
+          };
+          
+          await fetch('/api/rapoarte/cheltuieli', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+          });
+          console.log(`✅ Cheltuială ${cheltuiala.id} actualizată`);
+        } else if (!(cheltuiala as any).isExisting && !(cheltuiala as any).isDeleted) {
+          // Adaugă cheltuială nouă
+          const cheltuialaData = {
+            id: `${proiectId}_CHE_${Date.now()}`,
+            proiect_id: proiectId,
+            tip_cheltuiala: cheltuiala.tip_cheltuiala,
+            furnizor_nume: cheltuiala.furnizor_nume,
+            furnizor_cui: cheltuiala.furnizor_cui || null,
+            descriere: cheltuiala.descriere,
+            valoare: parseFloat(cheltuiala.valoare),
+            moneda: cheltuiala.moneda,
+            status_predare: cheltuiala.status_predare,
+            status_contract: cheltuiala.status_contract,
+            status_facturare: cheltuiala.status_facturare,
+            status_achitare: cheltuiala.status_achitare
+          };
+
+          await fetch('/api/rapoarte/cheltuieli', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cheltuialaData)
+          });
+          console.log(`✅ Cheltuială nouă ${cheltuiala.descriere} adăugată`);
+        }
+      } catch (error) {
+        console.error(`Eroare la procesarea cheltuielii ${cheltuiala.descriere}:`, error);
+      }
+    }
+  };
+
+  // ✅ Funcție pentru ștergerea proiectului
   const handleDelete = async () => {
-    const itemType = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
     const confirmed = confirm(
-      `ATENȚIE: Ești sigur că vrei să ștergi ${itemType} "${formData.Denumire}"?\n\n` +
+      `ATENȚIE: Ești sigur că vrei să ștergi proiectul "${formData.Denumire}"?\n\n` +
       `ID: ${formData.ID_Proiect}\n` +
       `Client: ${formData.Client}\n\n` +
-      `Această acțiune nu poate fi anulată și va șterge permanent toate datele asociate!`
+      `Această acțiune va șterge și:\n` +
+      `- ${formData.subproiecte.filter(s => !s.isDeleted).length} subproiecte\n` +
+      `- ${formData.cheltuieli.filter(c => !(c as any).isDeleted).length} cheltuieli\n\n` +
+      `Această acțiune nu poate fi anulată!`
     );
     
     if (!confirmed) return;
 
     setLoading(true);
     try {
-      const apiEndpoint = proiect.tip === 'subproiect' 
-        ? `/api/rapoarte/subproiecte?id=${encodeURIComponent(formData.ID_Proiect)}`
-        : `/api/rapoarte/proiecte?id=${encodeURIComponent(formData.ID_Proiect)}`;
-      
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch(`/api/rapoarte/proiecte?id=${encodeURIComponent(formData.ID_Proiect)}`, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`);
+        toast.success('Proiect șters cu succes!');
         onProiectDeleted();
         onClose();
       } else {
-        toast.error(result.error || `Eroare la ștergerea ${itemType}`);
+        toast.error(result.error || 'Eroare la ștergerea proiectului');
       }
     } catch (error) {
       console.error('Eroare la ștergere:', error);
-      toast.error(`Eroare la ștergerea ${itemType}`);
+      toast.error('Eroare la ștergerea proiectului');
     } finally {
       setLoading(false);
     }
@@ -331,6 +599,85 @@ export default function ProiectEditModal({
   const filteredClients = clienti.filter(client =>
     client.nume.toLowerCase().includes(clientSearch.toLowerCase())
   ).slice(0, 5);
+
+  const addSubproiect = () => {
+    const newSubproiect = {
+      id: Date.now().toString(),
+      denumire: '',
+      responsabil: '',
+      valoare: '',
+      moneda: 'RON',
+      status: 'Planificat',
+      isExisting: false,
+      isDeleted: false
+    };
+    setFormData(prev => ({
+      ...prev,
+      subproiecte: [...prev.subproiecte, newSubproiect]
+    }));
+  };
+
+  const addCheltuiala = () => {
+    const newCheltuiala: any = {
+      id: Date.now().toString(),
+      tip_cheltuiala: 'subcontractant',
+      furnizor_nume: '',
+      furnizor_cui: '',
+      descriere: '',
+      valoare: '',
+      moneda: 'RON',
+      status_predare: 'Nepredat',
+      status_contract: 'Nu e cazul',
+      status_facturare: 'Nefacturat',
+      status_achitare: 'Neachitat',
+      isExisting: false,
+      isDeleted: false
+    };
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: [...prev.cheltuieli, newCheltuiala]
+    }));
+  };
+
+  const removeCheltuiala = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: prev.cheltuieli.map(ch => 
+        ch.id === id 
+          ? { ...ch, isDeleted: true } as any
+          : ch
+      ).filter(ch => !(ch as any).isDeleted || (ch as any).isExisting)
+    }));
+  };
+
+  const updateCheltuiala = (id: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cheltuieli: prev.cheltuieli.map(ch =>
+        ch.id === id ? { ...ch, [field]: value } : ch
+      )
+    }));
+  };
+
+  const removeSubproiect = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      subproiecte: prev.subproiecte.map(sub => 
+        (sub.id === id || sub.ID_Subproiect === id)
+          ? { ...sub, isDeleted: true }
+          : sub
+      ).filter(sub => !sub.isDeleted || sub.isExisting)
+    }));
+  };
+
+  const updateSubproiect = (id: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      subproiecte: prev.subproiecte.map(sub =>
+        (sub.id === id || sub.ID_Subproiect === id) ? { ...sub, [field]: value } : sub
+      )
+    }));
+  };
 
   if (!isOpen) return null;
 
@@ -366,7 +713,7 @@ export default function ProiectEditModal({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              ✏️ Editează {proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}
+              ✏️ Editează Proiect
             </h2>
             <button
               onClick={onClose}
@@ -384,6 +731,11 @@ export default function ProiectEditModal({
           </div>
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
             ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile proiectului
+            {(loadingSubproiecte || loadingCheltuieli) && (
+              <span style={{ marginLeft: '1rem', color: '#3498db' }}>
+                ⏳ Se încarcă {loadingSubproiecte ? 'subproiectele' : ''} {loadingCheltuieli ? 'cheltuielile' : ''}...
+              </span>
+            )}
           </p>
         </div>
 
@@ -573,7 +925,7 @@ export default function ProiectEditModal({
             />
           </div>
 
-          {/* ✅ SECȚIUNE: Valoare și Monedă */}
+          {/* SECȚIUNE: Valoare și Monedă */}
           <div style={{ 
             background: '#f8f9fa',
             padding: '1rem',
@@ -634,7 +986,6 @@ export default function ProiectEditModal({
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Curs
-                  {/* ✅ NOU: Afișare data în format românesc */}
                   {formData.data_curs_valutar && (
                     <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
                       ({formatDateForDisplay(formData.data_curs_valutar)})
@@ -682,7 +1033,7 @@ export default function ProiectEditModal({
             </div>
           </div>
 
-          {/* ✅ SECȚIUNE: Status-uri Multiple cu FIX pentru Status Achitare */}
+          {/* SECȚIUNE: Status-uri Multiple */}
           <div style={{ 
             background: '#e8f5e8',
             padding: '1rem',
@@ -777,7 +1128,6 @@ export default function ProiectEditModal({
                     fontSize: '14px'
                   }}
                 >
-                  {/* ✅ FIX: Opțiuni corecte pentru Status Achitare */}
                   <option value="Neachitat">❌ Neachitat</option>
                   <option value="Achitat">✅ Achitat</option>
                   <option value="Nu e cazul">➖ Nu e cazul</option>
@@ -796,7 +1146,6 @@ export default function ProiectEditModal({
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Început
-                {/* ✅ NOU: Afișare data în format românesc */}
                 {formData.Data_Start && (
                   <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
                     ({formatDateForDisplay(formData.Data_Start)})
@@ -821,7 +1170,6 @@ export default function ProiectEditModal({
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Data Finalizare
-                {/* ✅ NOU: Afișare data în format românesc */}
                 {formData.Data_Final && (
                   <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
                     ({formatDateForDisplay(formData.Data_Final)})
@@ -886,107 +1234,543 @@ export default function ProiectEditModal({
             />
           </div>
 
-          {/* Observații */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Observații
-            </label>
-            <textarea
-              value={formData.Observatii}
-              onChange={(e) => handleInputChange('Observatii', e.target.value)}
-              disabled={loading}
-              placeholder="Observații despre proiect..."
-              rows={2}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                resize: 'vertical'
-              }}
-            />
-          </div>
-
-          {/* Butoane */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            gap: '1rem',
-            paddingTop: '1rem',
-            borderTop: '1px solid #dee2e6'
-          }}>
-            {/* ✅ Buton ȘTERGE în stânga */}
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: loading ? '#bdc3c7' : '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              {loading ? '⏳ Se șterge...' : '🗑️ Șterge Proiect'}
-            </button>
-            
-            {/* Butoane Anulează și Salvează în dreapta */}
-            <div style={{ display: 'flex', gap: '1rem' }}>
+          {/* SECȚIUNE: Cheltuieli Proiect */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                💰 Cheltuieli Proiect 
+                {formData.cheltuieli.filter(c => !(c as any).isDeleted).length > 0 && 
+                  <span style={{ fontSize: '14px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                    ({formData.cheltuieli.filter(c => !(c as any).isDeleted).length})
+                  </span>
+                }
+              </h4>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={addCheltuiala}
                 disabled={loading}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#6c757d',
+                  padding: '0.5rem 1rem',
+                  background: '#e67e22',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
+                  fontSize: '12px',
                   fontWeight: 'bold'
                 }}
               >
-                Anulează
-              </button>
-              
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: loading ? '#bdc3c7' : '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                {loading ? '⏳ Se salvează...' : '💾 Salvează Modificările'}
+                + Adaugă Cheltuială
               </button>
             </div>
-          </div>
-        </form>
-      </div>
 
-      {/* Modal Client Nou */}
-      {showClientModal && (
-        <ClientNouModal
-          isOpen={showClientModal}
-          onClose={() => setShowClientModal(false)}
-          onClientAdded={() => {
-            loadClienti();
-            setShowClientModal(false);
-          }}
-        />
-      )}
-    </div>
-  );
+            {formData.cheltuieli.filter(c => !(c as any).isDeleted).map((cheltuiala, index) => (
+              <div
+                key={cheltuiala.id}
+                style={{
+                  border: '1px solid #f39c12',
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  background: '#fef9e7',
+                  position: 'relative'
+                }}
+              >
+                {(cheltuiala as any).isExisting && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '3rem',
+                    background: '#f39c12',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 'bold'
+                  }}>
+                    EXISTENT
+                  </div>
+                )}
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '0.5rem'
+                }}>
+                  <h5 style={{ margin: 0, color: '#2c3e50' }}>
+                    Cheltuială #{index + 1}
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => removeCheltuiala(cheltuiala.id)}
+                    disabled={loading}
+                    style={{
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <select
+                    value={cheltuiala.tip_cheltuiala}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="subcontractant">👷 Subcontractant</option>
+                    <option value="materiale">🧱 Materiale</option>
+                    <option value="transport">🚚 Transport</option>
+                    <option value="alte">📦 Alte cheltuieli</option>
+                  </select>
+                  
+                  <input
+                    type="text"
+                    value={cheltuiala.furnizor_nume}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'furnizor_nume', e.target.value)}
+                    disabled={loading}
+                    placeholder="Nume furnizor"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  
+                  <input
+                    type="text"
+                    value={cheltuiala.furnizor_cui}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'furnizor_cui', e.target.value)}
+                    disabled={loading}
+                    placeholder="CUI furnizor"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <input
+                    type="text"
+                    value={cheltuiala.descriere}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
+                    disabled={loading}
+                    placeholder="Descriere cheltuială"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      gridColumn: 'span 2'
+                    }}
+                  />
+                  
+                  <input
+                    type="number"
+                    value={cheltuiala.valoare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
+                    disabled={loading}
+                    placeholder="Valoare"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  
+                  <select
+                    value={cheltuiala.moneda}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="RON">RON</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+
+                {/* Status-uri pentru cheltuială */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                  gap: '0.5rem'
+                }}>
+                  <select
+                    value={cheltuiala.status_predare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nepredat">❌ Nepredat</option>
+                    <option value="Predat">✅ Predat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_contract}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nu e cazul">➖ Nu e cazul</option>
+                    <option value="Nesemnat">📝 Nesemnat</option>
+                    <option value="Semnat">✅ Semnat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_facturare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Nefacturat">❌ Nefacturat</option>
+                    <option value="Facturat">✅ Facturat</option>
+                  </select>
+                  
+                  <select
+                    value={cheltuiala.status_achitare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <option value="Neachitat">❌ Neachitat</option>
+                    <option value="Achitat">✅ Achitat</option>
+                    <option value="Nu e cazul">➖ Nu e cazul</option>
+                 </select>
+               </div>
+             </div>
+           ))}
+         </div>
+
+         {/* SECȚIUNE: Subproiecte cu câmpuri complete */}
+         <div style={{ marginBottom: '1rem' }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+             <h4 style={{ margin: 0, color: '#2c3e50' }}>
+               📋 Subproiecte
+               {formData.subproiecte.filter(s => !s.isDeleted).length > 0 && 
+                 <span style={{ fontSize: '14px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                   ({formData.subproiecte.filter(s => !s.isDeleted).length})
+                 </span>
+               }
+             </h4>
+             <button
+               type="button"
+               onClick={addSubproiect}
+               disabled={loading}
+               style={{
+                 padding: '0.5rem 1rem',
+                 background: '#3498db',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '6px',
+                 cursor: loading ? 'not-allowed' : 'pointer',
+                 fontSize: '12px',
+                 fontWeight: 'bold'
+               }}
+             >
+               + Adaugă Subproiect
+             </button>
+           </div>
+
+           {formData.subproiecte.filter(s => !s.isDeleted).map((subproiect, index) => (
+             <div
+               key={subproiect.id || subproiect.ID_Subproiect}
+               style={{
+                 border: '1px solid #3498db',
+                 borderRadius: '6px',
+                 padding: '1rem',
+                 marginBottom: '1rem',
+                 background: '#ecf8ff',
+                 position: 'relative'
+               }}
+             >
+               {subproiect.isExisting && (
+                 <div style={{
+                   position: 'absolute',
+                   top: '0.5rem',
+                   right: '3rem',
+                   background: '#3498db',
+                   color: 'white',
+                   padding: '2px 8px',
+                   borderRadius: '4px',
+                   fontSize: '10px',
+                   fontWeight: 'bold'
+                 }}>
+                   EXISTENT
+                 </div>
+               )}
+               
+               <div style={{ 
+                 display: 'flex', 
+                 justifyContent: 'space-between', 
+                 alignItems: 'center',
+                 marginBottom: '0.5rem'
+               }}>
+                 <h5 style={{ margin: 0, color: '#2c3e50' }}>
+                   Subproiect #{index + 1}
+                   {subproiect.ID_Subproiect && (
+                     <span style={{ fontSize: '11px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                       ({subproiect.ID_Subproiect})
+                     </span>
+                   )}
+                 </h5>
+                 <button
+                   type="button"
+                   onClick={() => removeSubproiect(subproiect.id || subproiect.ID_Subproiect!)}
+                   disabled={loading}
+                   style={{
+                     background: '#e74c3c',
+                     color: 'white',
+                     border: 'none',
+                     borderRadius: '4px',
+                     padding: '0.25rem 0.5rem',
+                     cursor: 'pointer',
+                     fontSize: '12px'
+                   }}
+                 >
+                   🗑️
+                 </button>
+               </div>
+
+               <div style={{ 
+                 display: 'grid', 
+                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                 gap: '0.5rem'
+               }}>
+                 <input
+                   type="text"
+                   value={subproiect.denumire}
+                   onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'denumire', e.target.value)}
+                   disabled={loading}
+                   placeholder="Denumire subproiect *"
+                   style={{
+                     padding: '0.5rem',
+                     border: '1px solid #dee2e6',
+                     borderRadius: '4px',
+                     fontSize: '14px'
+                   }}
+                 />
+                 
+                 <input
+                   type="text"
+                   value={subproiect.responsabil}
+                   onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'responsabil', e.target.value)}
+                   disabled={loading}
+                   placeholder="Responsabil"
+                   style={{
+                     padding: '0.5rem',
+                     border: '1px solid #dee2e6',
+                     borderRadius: '4px',
+                     fontSize: '14px'
+                   }}
+                 />
+                 
+                 <input
+                   type="number"
+                   value={subproiect.valoare}
+                   onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'valoare', e.target.value)}
+                   disabled={loading}
+                   placeholder="Valoare"
+                   style={{
+                     padding: '0.5rem',
+                     border: '1px solid #dee2e6',
+                     borderRadius: '4px',
+                     fontSize: '14px'
+                   }}
+                 />
+                 
+                 <select
+                   value={subproiect.moneda}
+                   onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'moneda', e.target.value)}
+                   disabled={loading}
+                   style={{
+                     padding: '0.5rem',
+                     border: '1px solid #dee2e6',
+                     borderRadius: '4px',
+                     fontSize: '14px'
+                   }}
+                 >
+                   <option value="RON">RON</option>
+                   <option value="EUR">EUR</option>
+                   <option value="USD">USD</option>
+                   <option value="GBP">GBP</option>
+                 </select>
+                 
+                 <select
+                   value={subproiect.status}
+                   onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'status', e.target.value)}
+                   disabled={loading}
+                   style={{
+                     padding: '0.5rem',
+                     border: '1px solid #dee2e6',
+                     borderRadius: '4px',
+                     fontSize: '14px'
+                   }}
+                 >
+                   <option value="Planificat">📅 Planificat</option>
+                   <option value="Activ">🟢 Activ</option>
+                   <option value="Finalizat">✅ Finalizat</option>
+                 </select>
+               </div>
+             </div>
+           ))}
+         </div>
+
+         {/* Observații */}
+         <div style={{ marginBottom: '1.5rem' }}>
+           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+             Observații
+           </label>
+           <textarea
+             value={formData.Observatii}
+             onChange={(e) => handleInputChange('Observatii', e.target.value)}
+             disabled={loading}
+             placeholder="Observații despre proiect..."
+             rows={2}
+             style={{
+               width: '100%',
+               padding: '0.75rem',
+               border: '1px solid #dee2e6',
+               borderRadius: '6px',
+               fontSize: '14px',
+               resize: 'vertical'
+             }}
+           />
+         </div>
+
+         {/* Butoane */}
+         <div style={{ 
+           display: 'flex', 
+           justifyContent: 'space-between', 
+           gap: '1rem',
+           paddingTop: '1rem',
+           borderTop: '1px solid #dee2e6'
+         }}>
+           {/* Buton ȘTERGE în stânga */}
+           <button
+             type="button"
+             onClick={handleDelete}
+             disabled={loading}
+             style={{
+               padding: '0.75rem 1.5rem',
+               background: loading ? '#bdc3c7' : '#e74c3c',
+               color: 'white',
+               border: 'none',
+               borderRadius: '6px',
+               cursor: loading ? 'not-allowed' : 'pointer',
+               fontSize: '14px',
+               fontWeight: 'bold'
+             }}
+           >
+             {loading ? '⏳ Se șterge...' : '🗑️ Șterge Proiect'}
+           </button>
+           
+           {/* Butoane Anulează și Salvează în dreapta */}
+           <div style={{ display: 'flex', gap: '1rem' }}>
+             <button
+               type="button"
+               onClick={onClose}
+               disabled={loading}
+               style={{
+                 padding: '0.75rem 1.5rem',
+                 background: '#6c757d',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '6px',
+                 cursor: loading ? 'not-allowed' : 'pointer',
+                 fontSize: '14px',
+                 fontWeight: 'bold'
+               }}
+             >
+               Anulează
+             </button>
+             
+             <button
+               type="submit"
+               disabled={loading}
+               style={{
+                 padding: '0.75rem 1.5rem',
+                 background: loading ? '#bdc3c7' : '#27ae60',
+                 color: 'white',
+                 border: 'none',
+                 borderRadius: '6px',
+                 cursor: loading ? 'not-allowed' : 'pointer',
+                 fontSize: '14px',
+                 fontWeight: 'bold'
+               }}
+             >
+               {loading ? '⏳ Se salvează...' : '💾 Salvează Modificările'}
+             </button>
+           </div>
+         </div>
+       </form>
+     </div>
+
+     {/* Modal Client Nou */}
+     {showClientModal && (
+       <ClientNouModal
+         isOpen={showClientModal}
+         onClose={() => setShowClientModal(false)}
+         onClientAdded={() => {
+           loadClienti();
+           setShowClientModal(false);
+         }}
+       />
+     )}
+   </div>
+ );
 }

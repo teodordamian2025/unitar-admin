@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Interface actualizată cu suport multi-valută
+// MODIFICAT: Fără buton pentru subproiecte și fără "Adaugă Subproiect"
 // ==================================================================
 
 'use client';
@@ -26,7 +26,6 @@ interface ProiectActionsProps {
     Valoare_Estimata?: number;
     Data_Start?: string | { value: string };
     Data_Final?: string | { value: string };
-    // ✅ FIX: Adăugat toate câmpurile pentru multi-valută
     moneda?: string;
     valoare_ron?: number;
     curs_valutar?: number;
@@ -43,17 +42,17 @@ interface ProiectActionsProps {
     Observatii?: string;
   };
   onRefresh?: () => void;
-  // ✅ Callback-uri pentru modale externe (gestionate în ProiecteTable)
+  // Callback-uri pentru modale externe (gestionate în ProiecteTable)
   onShowFacturaModal?: (proiect: any) => void;
   onShowSubproiectModal?: (proiect: any) => void;
   onShowEditModal?: (proiect: any) => void;
 }
 
-// ✅ FIX: System global pentru management dropdown-uri multiple
+// System global pentru management dropdown-uri multiple
 let currentOpenDropdown: string | null = null;
 const openDropdowns = new Map<string, () => void>();
 
-// ✅ Toast system cu Z-index compatibil cu modalele externe
+// Toast system cu Z-index compatibil cu modalele externe
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -81,7 +80,6 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
-  // Smooth entrance animation
   setTimeout(() => {
     toastEl.style.transform = 'translateY(0)';
     toastEl.style.opacity = '1';
@@ -106,6 +104,11 @@ export default function ProiectActions({
   onShowEditModal
 }: ProiectActionsProps) {
   
+  // ✅ FIX: Nu afișa butonul de acțiuni pentru subproiecte
+  if (proiect.tip === 'subproiect') {
+    return null;
+  }
+
   // Helper pentru formatarea datelor
   const formatDate = (date?: string | { value: string }): string => {
     if (!date) return 'N/A';
@@ -130,28 +133,21 @@ export default function ProiectActions({
       icon: '✏️',
       color: 'secondary'
     },
-    // ✅ FIX: Adaugă subproiect doar pentru proiectele principale
-    ...(proiect.tip !== 'subproiect' ? [{
-      key: 'add_subproject',
-      label: 'Adaugă Subproiect',
-      icon: '📂',
-      color: 'success' as const,
-      disabled: proiect.Status === 'Anulat' || proiect.Status === 'Arhivat'
-    }] : []),
-    // ✅ FIX: Factură doar pentru proiectele principale, NU pentru subproiecte
-    ...(proiect.tip !== 'subproiect' ? [{
+    // ✅ FIX: ELIMINAT "Adaugă Subproiect"
+    {
       key: 'divider1',
       label: '',
       icon: '',
-      color: 'primary' as const,
+      color: 'primary',
       divider: true
-    }, {
+    },
+    {
       key: 'generate_invoice',
       label: 'Generează Factură PDF',
       icon: '💰',
-      color: 'warning' as const,
+      color: 'warning',
       disabled: proiect.Status === 'Anulat'
-    }] : []),
+    },
     {
       key: 'divider2',
       label: '',
@@ -168,7 +164,7 @@ export default function ProiectActions({
     },
     {
       key: 'suspend',
-      label: proiect.tip === 'subproiect' ? 'Suspendă Subproiect' : 'Suspendă Proiect',
+      label: 'Suspendă Proiect',
       icon: '⏸️',
       color: 'warning',
       disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
@@ -182,7 +178,7 @@ export default function ProiectActions({
     },
     {
       key: 'delete',
-      label: proiect.tip === 'subproiect' ? 'Șterge Subproiect' : 'Șterge Proiect',
+      label: 'Șterge Proiect',
       icon: '🗑️',
       color: 'danger'
     }
@@ -196,9 +192,6 @@ export default function ProiectActions({
           break;
         case 'edit':
           await handleEdit();
-          break;
-        case 'add_subproject':
-          handleAddSubproject();
           break;
         case 'generate_invoice':
           handleCreateInvoiceHibrid();
@@ -221,17 +214,6 @@ export default function ProiectActions({
     }
   };
 
-  // ✅ MODIFICAT: Folosește callback extern în loc de modal local
-  const handleAddSubproject = () => {
-    if (onShowSubproiectModal) {
-      onShowSubproiectModal(proiect);
-    } else {
-      console.warn('onShowSubproiectModal callback not provided');
-      showToast('Funcția de adăugare subproiect nu este disponibilă', 'error');
-    }
-  };
-
-  // ✅ MODIFICAT: Folosește callback extern în loc de modal local
   const handleCreateInvoiceHibrid = () => {
     if (onShowFacturaModal) {
       onShowFacturaModal(proiect);
@@ -242,7 +224,6 @@ export default function ProiectActions({
   };
 
   const handleViewDetails = async () => {
-    // ✅ FIX: Include informații despre monedă și valoare RON
     const monedaInfo = proiect.moneda && proiect.moneda !== 'RON' 
       ? `\n💱 Monedă: ${proiect.moneda}\n💰 Valoare RON: ${proiect.valoare_ron ? `${proiect.valoare_ron.toLocaleString('ro-RO')} RON` : 'N/A'}`
       : '';
@@ -251,7 +232,7 @@ export default function ProiectActions({
       ? `\n📊 Status Predare: ${proiect.status_predare || 'N/A'}\n📝 Status Contract: ${proiect.status_contract || 'N/A'}\n🧾 Status Facturare: ${proiect.status_facturare || 'N/A'}\n💳 Status Achitare: ${proiect.status_achitare || 'N/A'}`
       : '';
 
-    const detalii = `📋 ${proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT'}: ${proiect.ID_Proiect}
+    const detalii = `📋 PROIECT: ${proiect.ID_Proiect}
 
 📝 Denumire: ${proiect.Denumire}
 👤 Client: ${proiect.Client}
@@ -267,7 +248,6 @@ export default function ProiectActions({
     console.log('Detalii proiect:', proiect);
   };
 
-  // ✅ MODIFICAT: Folosește callback extern în loc de alert local
   const handleEdit = async () => {
     if (onShowEditModal) {
       onShowEditModal(proiect);
@@ -282,9 +262,7 @@ export default function ProiectActions({
     if (!confirmare) return;
 
     try {
-      const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
-      
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch('/api/rapoarte/proiecte', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -307,29 +285,24 @@ export default function ProiectActions({
   };
 
   const handleDelete = async () => {
-    const itemType = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
-    const confirmed = confirm(`Sigur vrei să ștergi ${itemType} ${proiect.ID_Proiect}?\n\nAceastă acțiune nu poate fi anulată!`);
+    const confirmed = confirm(`Sigur vrei să ștergi proiectul ${proiect.ID_Proiect}?\n\nAceastă acțiune nu poate fi anulată!`);
     if (!confirmed) return;
 
     try {
-      const apiEndpoint = proiect.tip === 'subproiect' 
-        ? `/api/rapoarte/subproiecte?id=${encodeURIComponent(proiect.ID_Proiect)}`
-        : `/api/rapoarte/proiecte?id=${encodeURIComponent(proiect.ID_Proiect)}`;
-      
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch(`/api/rapoarte/proiecte?id=${encodeURIComponent(proiect.ID_Proiect)}`, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        showToast(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} șters cu succes!`, 'success');
+        showToast('Proiect șters cu succes!', 'success');
         onRefresh?.();
       } else {
-        showToast(result.error || `Eroare la ștergerea ${itemType}`, 'error');
+        showToast(result.error || 'Eroare la ștergerea proiectului', 'error');
       }
     } catch (error) {
-      showToast(`Eroare la ștergerea ${itemType}`, 'error');
+      showToast('Eroare la ștergerea proiectului', 'error');
     }
   };
 
@@ -342,7 +315,7 @@ export default function ProiectActions({
   );
 }
 
-// ✅ Dropdown cu Z-index Management optimizat pentru modalele externe
+// Dropdown cu Z-index Management optimizat pentru modalele externe
 interface EnhancedActionDropdownProps {
   actions: ActionItem[];
   onAction: (actionKey: string) => void;
@@ -356,10 +329,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const [dropdownCoords, setDropdownCoords] = React.useState({ top: 0, left: 0, width: 0 });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   
-  // ✅ FIX: ID unic pentru acest dropdown
   const dropdownId = React.useMemo(() => `dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [proiect.ID_Proiect]);
 
-  // ✅ FIX: Înregistrează funcția de închidere
   React.useEffect(() => {
     openDropdowns.set(dropdownId, () => setIsOpen(false));
     
@@ -368,10 +339,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     };
   }, [dropdownId]);
 
-  // ✅ FIX: Închide dropdown-ul când se deschide altul
   React.useEffect(() => {
     if (isOpen) {
-      // Închide toate celelalte dropdown-uri
       if (currentOpenDropdown && currentOpenDropdown !== dropdownId) {
         const closeFunction = openDropdowns.get(currentOpenDropdown);
         if (closeFunction) {
@@ -381,7 +350,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
       currentOpenDropdown = dropdownId;
       calculateDropdownPosition();
       
-      // Adaugă event listener pentru resize
       window.addEventListener('resize', calculateDropdownPosition);
       return () => window.removeEventListener('resize', calculateDropdownPosition);
     } else {
@@ -391,7 +359,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   }, [isOpen, dropdownId]);
 
-  // ✅ FIX: Calculează poziționarea și coordonatele pentru Portal
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
@@ -399,30 +366,23 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     const viewportHeight = window.innerHeight;
     const dropdownHeight = 350;
     
-    // ✅ Găsește rândul părinte pentru a calcula înălțimea acestuia
     const tableRow = buttonRef.current.closest('tr');
     const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
     
-    // ✅ Ajustează calculul cu înălțimea rândului
     const spaceBelow = viewportHeight - buttonRect.bottom;
     const spaceAbove = buttonRect.top - rowHeight;
     
     let finalTop = 0;
-    let finalLeft = buttonRect.right - 260; // Dropdown width: 260px, align right
+    let finalLeft = buttonRect.right - 260;
     
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      // ✅ Urcă sus
       finalTop = buttonRect.top - dropdownHeight - 8;
       setDropdownPosition('top');
-      console.log(`🔼 Dropdown ${dropdownId} va urca sus`);
     } else {
-      // ✅ Coboară jos
       finalTop = buttonRect.bottom + 8;
       setDropdownPosition('bottom');
-      console.log(`🔽 Dropdown ${dropdownId} va coborî jos`);
     }
     
-    // ✅ Asigură că dropdown-ul nu iese din viewport
     if (finalLeft < 10) finalLeft = 10;
     if (finalLeft + 260 > window.innerWidth - 10) {
       finalLeft = window.innerWidth - 270;
@@ -432,17 +392,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
       top: finalTop,
       left: finalLeft,
       width: 260
-    });
-    
-    console.log('📏 Portal dropdown positioning:', { 
-      spaceBelow, 
-      spaceAbove, 
-      dropdownHeight,
-      rowHeight,
-      finalTop,
-      finalLeft,
-      buttonRect,
-      dropdownId 
     });
   };
 
@@ -484,18 +433,10 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     <div style={{ position: 'relative' as const, display: 'inline-block' }}>
       <button
         ref={buttonRef}
-        onClick={() => {
-          console.log(`🔘 Buton ${dropdownId} apăsat, isOpen: ${isOpen}`);
-          setIsOpen(!isOpen);
-        }}
+        onClick={() => setIsOpen(!isOpen)}
         disabled={loading !== null}
         style={{
-          background: loading ? 
-            '#f8f9fa' : 
-            (proiect.tip === 'subproiect' 
-              ? 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)' // ✅ Albastru pentru subproiecte
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' // ✅ Mov pentru proiecte
-            ),
+          background: loading ? '#f8f9fa' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: loading ? '#6c757d' : 'white',
           border: 'none',
           borderRadius: '12px',
@@ -503,11 +444,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           cursor: loading ? 'not-allowed' : 'pointer',
           fontSize: '14px',
           fontWeight: '600',
-          boxShadow: loading ? 'none' : 
-            (proiect.tip === 'subproiect' 
-              ? '0 4px 12px rgba(52, 152, 219, 0.4)' // ✅ Shadow albastru pentru subproiecte
-              : '0 4px 12px rgba(102, 126, 234, 0.4)' // ✅ Shadow mov pentru proiecte
-            ),
+          boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
           transition: 'all 0.3s ease',
           display: 'flex',
           alignItems: 'center',
@@ -516,17 +453,13 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         onMouseOver={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = proiect.tip === 'subproiect' 
-              ? '0 6px 16px rgba(52, 152, 219, 0.5)' // ✅ Hover albastru pentru subproiecte
-              : '0 6px 16px rgba(102, 126, 234, 0.5)'; // ✅ Hover mov pentru proiecte
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
           }
         }}
         onMouseOut={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = proiect.tip === 'subproiect' 
-              ? '0 4px 12px rgba(52, 152, 219, 0.4)' // ✅ Normal albastru pentru subproiecte
-              : '0 4px 12px rgba(102, 126, 234, 0.4)'; // ✅ Normal mov pentru proiecte
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
           }
         }}
       >
@@ -535,7 +468,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
 
       {isOpen && (
         <>
-          {/* ✅ Overlay cu z-index optimizat pentru modalele externe */}
           <div
             style={{
               position: 'fixed' as const,
@@ -547,13 +479,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               backdropFilter: 'blur(6px)',
               zIndex: 40000
             }}
-            onClick={() => {
-              console.log(`🔘 Overlay ${dropdownId} clicked - closing`);
-              setIsOpen(false);
-            }}
+            onClick={() => setIsOpen(false)}
           />
 
-          {/* ✅ Portal Dropdown - Render direct în document.body */}
           {typeof window !== 'undefined' && createPortal(
             <div style={{
               position: 'fixed' as const,
@@ -565,7 +493,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
               borderRadius: '16px',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
               border: '1px solid #e0e0e0',
-              zIndex: 45000, // ✅ Z-index mare pentru Portal
+              zIndex: 45000,
               overflow: 'hidden' as const,
               transform: 'scale(1)'
             }}>
@@ -583,19 +511,6 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                   fontFamily: 'monospace'
                 }}>
                   {proiect.ID_Proiect}
-                  {proiect.tip === 'subproiect' && (
-                    <span style={{ 
-                      marginLeft: '8px',
-                      fontSize: '10px',
-                      background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                      color: 'white',
-                      padding: '2px 6px',
-                      borderRadius: '6px',
-                      fontWeight: '600'
-                    }}>
-                      SUB
-                    </span>
-                  )}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                   Status: <span style={{ 
