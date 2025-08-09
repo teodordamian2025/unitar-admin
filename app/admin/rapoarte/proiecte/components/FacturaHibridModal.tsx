@@ -189,17 +189,25 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
 	// ✅ MODIFICAT: Inițializare cursuri cu proiect principal dacă are valută
 	useEffect(() => {
-	  if (proiect.moneda && proiect.moneda !== 'RON' && proiect.curs_valutar) {
-	    const monedaProiect = proiect.moneda as string; // Type assertion pentru TypeScript
-	    setCursuriUtilizate(prev => ({
-	      ...prev,
-	      [monedaProiect]: {
-		curs: proiect.curs_valutar,
+	  // Verificări complete pentru TypeScript
+	  const monedaProiect = proiect.moneda;
+	  const cursValutar = proiect.curs_valutar;
+	  
+	  if (monedaProiect && typeof monedaProiect === 'string' && monedaProiect !== 'RON' && cursValutar) {
+	    setCursuriUtilizate(prev => {
+	      const newCursuri: CursuriUtilizate = { ...prev };
+	      // Asigură că cursul este număr
+	      const cursNumeric = typeof cursValutar === 'number' ? cursValutar : parseFloat(cursValutar) || 1;
+	      
+	      newCursuri[monedaProiect] = {
+		curs: cursNumeric,
 		data: new Date().toISOString().split('T')[0]
-	      }
-	    }));
+	      };
+	      
+	      return newCursuri;
+	    });
 	  }
-	}, [proiect]);
+	}, [proiect.moneda, proiect.curs_valutar]);
   
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
