@@ -693,8 +693,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	      cursSubproiect = Number(subproiect.curs_valutar);
 	    } else if (typeof subproiect.curs_valutar === 'number') {
 	      cursSubproiect = subproiect.curs_valutar;
-	    } else if (typeof subproiect.curs_valutar === 'object' && subproiect.curs_valutar.value) {
-	      cursSubproiect = Number(subproiect.curs_valutar.value);
+	    } else {
+	      // Pentru orice alt tip, încearcă conversie directă
+	      cursSubproiect = Number(subproiect.curs_valutar);
 	    }
 	    
 	    // Verifică că e valid
