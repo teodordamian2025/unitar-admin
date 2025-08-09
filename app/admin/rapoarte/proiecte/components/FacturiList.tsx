@@ -497,6 +497,42 @@ export default function FacturiList({
     }
   };
 
+	// Adaugă funcția handleDeleteFactura:
+
+	const handleDeleteFactura = async (factura: Factura) => {
+	  // Verifică dacă poate fi ștearsă
+	  if (factura.efactura_enabled && 
+	      factura.efactura_status && 
+	      !['draft', 'error', 'mock_pending', 'mock_generated'].includes(factura.efactura_status)) {
+	    showToast('❌ Factura a fost trimisă la ANAF și nu poate fi ștearsă', 'error');
+	    return;
+	  }
+
+	  if (!confirm(`Sigur vrei să ștergi factura ${factura.numar}?\n\nAceastă acțiune nu poate fi anulată!`)) {
+	    return;
+	  }
+
+	  try {
+	    const response = await fetch(`/api/actions/invoices/delete?id=${factura.id}`, {
+	      method: 'DELETE'
+	    });
+
+	    const result = await response.json();
+
+	    if (result.success) {
+	      showToast(`✅ Factura ${factura.numar} a fost ștearsă`, 'success');
+	      loadFacturi(); // Reîncarcă lista
+	    } else {
+	      showToast(`❌ ${result.error}`, 'error');
+	    }
+	  } catch (error) {
+	    console.error('Eroare la ștergerea facturii:', error);
+	    showToast('❌ Eroare la ștergerea facturii', 'error');
+	  }
+	};
+
+
+
   // ✅ NOU: Modal detalii e-factura cu timeline
   const showEFacturaDetailsModal = (factura: Factura) => {
     setShowEFacturaModal(factura.id);
@@ -899,6 +935,17 @@ export default function FacturiList({
                               ↩️ Storno
                             </button>
                           )}
+                          
+                          {/* ✅ NOU: Buton ȘTERGERE (doar pentru facturi netrimise la ANAF) */}
+				{canDelete && (
+				  <button
+				    onClick={() => handleDeleteFactura(factura)}
+				    className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+				    title="Șterge factură"
+				  >
+				    🗑️ Șterge
+				  </button>
+				)}
 
                           {/* ✅ Butoane e-factura */}
                           {factura.efactura_enabled && (
