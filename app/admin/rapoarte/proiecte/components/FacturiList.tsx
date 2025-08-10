@@ -488,11 +488,50 @@ export default function FacturiList({
   };
 
   // ✅ MODIFICAT: Deschide modal editare cu mod corect
-  const handleEditFactura = (factura: Factura, mode: 'edit' | 'storno' = 'edit') => {
-    setSelectedFactura(factura);
-    setEditMode(mode);
-    setShowEditModal(true);
-  };
+	const handleEditFactura = (factura: Factura, mode: 'edit' | 'storno' = 'edit') => {
+	  try {
+	    // Parsează JSON-ul din BigQuery
+	    const dateComplete = typeof factura.date_complete_json === 'string' 
+	      ? JSON.parse(factura.date_complete_json) 
+	      : factura.date_complete_json;
+	    
+	    // ✅ IMPORTANT: Extrage ID-ul din toate locurile posibile
+	    const proiectId = dateComplete?.proiectId || 
+		             dateComplete?.proiectInfo?.ID_Proiect || 
+		             dateComplete?.proiectInfo?.id || 
+		             factura.proiect_id || // din coloana directă
+		             'UNKNOWN';
+	    
+	    console.log('🔍 DEBUG handleEditFactura:', {
+	      mode,
+	      facturaNumar: factura.numar,
+	      proiectId_gasit: proiectId,
+	      din_dateComplete: dateComplete?.proiectId,
+	      din_proiectInfo: dateComplete?.proiectInfo,
+	      din_factura: factura.proiect_id,
+	      cursuriUtilizate: dateComplete?.cursuriUtilizate
+	    });
+	    
+	    // ✅ Pregătește datele pentru EditFacturaModal
+	    const facturaCompleta = {
+	      ...factura,
+	      dateComplete: dateComplete,
+	      proiectId: proiectId // ✅ IMPORTANT: Adaugă ID-ul găsit
+	    };
+	    
+	    setSelectedFactura(facturaCompleta);
+	    setEditMode(mode);
+	    setShowEditModal(true);
+	    
+	  } catch (error) {
+	    console.error('❌ Eroare la pregătirea datelor pentru editare:', error);
+	    showToast('Eroare la încărcarea datelor facturii', 'error');
+	    // Continuă cu datele de bază
+	    setSelectedFactura(factura);
+	    setEditMode(mode);
+	    setShowEditModal(true);
+	  }
+	};
 
   // ✅ NOU: Callback pentru succes editare
   const handleEditSuccess = (action: 'updated' | 'cancelled' | 'reversed', facturaId: string) => {
