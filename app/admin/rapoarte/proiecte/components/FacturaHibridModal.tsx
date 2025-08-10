@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DATA: 10.08.2025 16:15
-// CORECTAT: Fix precizie curs BNR pentru subproiecte (păstrează 4 zecimale)
+// DATA: 11.08.2025 16:45
+// CORECTAT: Centralizare cursuri BNR cu precizie maximă pentru proiect + subproiecte
 // ==================================================================
 
 'use client';
@@ -159,8 +159,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isStorno = proiect._isStorno || false;
   const initialData = proiect._initialData || null;
 
-  // ✅ NOU: Track cursuri folosite cu precizie îmbunătățită
+  // ✅ NOU: Track cursuri folosite cu precizie îmbunătățită - CENTRALIZAT
   const [cursuriUtilizate, setCursuriUtilizate] = useState<CursuriUtilizate>({});
+  const [isLoadingCursuri, setIsLoadingCursuri] = useState(false);
 
   // ✅ CORECTAT: Inițializare cu TVA 21% implicit în loc de 19%
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
@@ -189,54 +190,94 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }];
   });
 
-  // ✅ CORECTAT: Inițializare cursuri cu proiect principal dacă are valută - cu precizie îmbunătățită
-  useEffect(() => {
-    // Verificări complete pentru TypeScript
-    const monedaProiect = proiect.moneda;
-    const cursValutar = proiect.curs_valutar;
+  // ✅ NOU: Funcție centralizată pentru preluarea cursurilor BNR cu precizie maximă
+  const preluaCursuriCentralizat = async (monede: string[]) => {
+    if (monede.length === 0) return {};
     
-    if (monedaProiect && typeof monedaProiect === 'string' && monedaProiect !== 'RON' && cursValutar) {
-      setCursuriUtilizate(prev => {
-        const newCursuri: CursuriUtilizate = { ...prev };
+    setIsLoadingCursuri(true);
+    const cursuri: CursuriUtilizate = {};
+    
+    console.log(`🔄 Încep preluarea centralizată a cursurilor pentru: ${monede.join(', ')}`);
+    
+    try {
+      // Preiau cursurile pentru toate valutele în paralel
+      const promisesCursuri = monede.map(async (moneda) => {
+        if (moneda === 'RON') return null; // Skip RON
         
-        // ✅ FIX PRECIZIE: Păstrează cursul cu precizia maximă
-        let cursNumeric: number;
-        let cursOriginal: string;
-        
-        if (typeof cursValutar === 'number') {
-          cursNumeric = cursValutar;
-          cursOriginal = cursValutar.toString();
-        } else if (typeof cursValutar === 'string') {
-          cursNumeric = parseFloat(cursValutar);
-          cursOriginal = cursValutar;
-        } else {
-          cursNumeric = 1;
-          cursOriginal = '1.0000';
+        try {
+          const response = await fetch(`/api/curs-valutar?moneda=${encodeURIComponent(moneda)}`);
+          const data = await response.json();
+          
+          if (data.success && data.curs) {
+            // ✅ CRUCIAL: Păstrează precizia maximă
+            const cursNumeric = typeof data.curs === 'number' ? data.curs : parseFloat(data.curs.toString());
+            const cursOriginal = data.curs.toString();
+            
+            console.log(`✅ Curs BNR pentru ${moneda}: ${cursNumeric.toFixed(4)} (precizie originală: ${cursOriginal})`);
+            
+            return {
+              moneda,
+              curs: cursNumeric,
+              data: data.data || new Date().toISOString().split('T')[0],
+              precizie_originala: cursOriginal
+            };
+          } else {
+            console.warn(`⚠️ Nu s-a putut prelua cursul pentru ${moneda}:`, data.error || 'Eroare necunoscută');
+            return null;
+          }
+        } catch (error) {
+          console.error(`❌ Eroare la preluarea cursului pentru ${moneda}:`, error);
+          return null;
         }
-        
-        // Verifică validitatea și păstrează precizia
-        if (isNaN(cursNumeric) || cursNumeric <= 0) {
-          cursNumeric = 1;
-          cursOriginal = '1.0000';
-        }
-        
-        newCursuri[monedaProiect] = {
-          curs: cursNumeric,
-          data: new Date().toISOString().split('T')[0],
-          precizie_originala: cursOriginal // ✅ IMPORTANT: păstrează precisica originală
-        };
-        
-        console.log(`✅ Curs proiect principal ${monedaProiect}:`, {
-          curs_numeric: cursNumeric,
-          precizie_originala: cursOriginal,
-          format_4_zecimale: cursNumeric.toFixed(4)
-        });
-        
-        return newCursuri;
       });
+      
+      const rezultateCursuri = await Promise.all(promisesCursuri);
+      
+      // Procesează rezultatele
+      rezultateCursuri.forEach((rezultat) => {
+        if (rezultat) {
+          cursuri[rezultat.moneda] = {
+            curs: rezultat.curs,
+            data: rezultat.data,
+            precizie_originala: rezultat.precizie_originala
+          };
+        }
+      });
+      
+      console.log(`🎯 Cursuri centralizate preluate cu succes:`, Object.keys(cursuri).map(m => 
+        `${m}: ${cursuri[m].curs.toFixed(4)}`
+      ).join(', '));
+      
+      return cursuri;
+      
+    } catch (error) {
+      console.error('❌ Eroare generală la preluarea cursurilor centralizat:', error);
+      showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri existente.', 'error');
+      return {};
+    } finally {
+      setIsLoadingCursuri(false);
     }
-  }, [proiect.moneda, proiect.curs_valutar]);
-  
+  };
+
+  // ✅ NOU: Identifică toate valutele necesare din proiect și subproiecte
+  const identificaValuteNecesare = (subproiecte: SubproiectInfo[] = []) => {
+    const valute = new Set<string>();
+    
+    // Adaugă valuta proiectului principal
+    if (proiect.moneda && proiect.moneda !== 'RON') {
+      valute.add(proiect.moneda);
+    }
+    
+    // Adaugă valutele subproiectelor
+    subproiecte.forEach(sub => {
+      if (sub.moneda && sub.moneda !== 'RON') {
+        valute.add(sub.moneda);
+      }
+    });
+    
+    return Array.from(valute);
+  };
+
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -560,7 +601,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         setClientInfo({
           id: clientData.id,
-          denumire: clientData.nume,
+          denumire: clientData.nume || clientData.denumire, // ✅ SUPORT DUAL
           cui: clientData.cui || '',
           nrRegCom: clientData.nr_reg_com || '',
           adresa: clientData.adresa || '',
@@ -574,23 +615,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           setCuiInput(clientData.cui);
         }
         
-        showToast(`✅ Date client preluate din BD: ${clientData.nume}`, 'success');
+        showToast(`✅ Date client preluate din BD: ${clientData.nume || clientData.denumire}`, 'success');
       } else {
         setClientInfo({
-          denumire: proiect.Client,
+          denumire: proiect.Client || 'Client din proiect',
           cui: '',
           nrRegCom: '',
-          adresa: ''
+          adresa: 'Adresa client'
         });
         showToast(`ℹ️ Client "${proiect.Client}" nu găsit în BD. Completează manual datele.`, 'info');
       }
     } catch (error) {
       console.error('Eroare la încărcarea clientului din BD:', error);
       setClientInfo({
-        denumire: proiect.Client,
+        denumire: proiect.Client || 'Client din proiect',
         cui: '',
         nrRegCom: '',
-        adresa: ''
+        adresa: 'Adresa client'
       });
       showToast('⚠️ Nu s-au putut prelua datele clientului din BD', 'error');
     } finally {
@@ -598,113 +639,120 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-	const loadSubproiecte = async () => {
-	  // ✅ FIX: Extrage ID-ul corect pentru Edit/Storno
-	  let proiectIdPentruSubproiecte = proiect.ID_Proiect;
-	  
-	  // Pentru Edit/Storno, încearcă mai multe surse pentru ID
-	  if ((isEdit || isStorno) && initialData) {
-	    // Încearcă mai întâi din proiectInfo
-	    if (initialData.proiectInfo?.ID_Proiect) {
-	      proiectIdPentruSubproiecte = initialData.proiectInfo.ID_Proiect;
-	      console.log('📋 ID Proiect din proiectInfo:', proiectIdPentruSubproiecte);
-	    } 
-	    // Apoi din proiectInfo.id
-	    else if (initialData.proiectInfo?.id) {
-	      proiectIdPentruSubproiecte = initialData.proiectInfo.id;
-	      console.log('📋 ID Proiect din proiectInfo.id:', proiectIdPentruSubproiecte);
-	    }
-	    // Apoi din proiectId direct
-	    else if (initialData.proiectId) {
-	      proiectIdPentruSubproiecte = initialData.proiectId;
-	      console.log('📋 ID Proiect din proiectId:', proiectIdPentruSubproiecte);
-	    }
-	    // În final, încearcă să extragă din numărul facturii
-	    else if (initialData.numarFactura) {
-	      // Format: UP-1007-2025 -> extrage partea din mijloc dacă e posibil
-	      const parts = initialData.numarFactura.split('-');
-	      if (parts.length >= 2 && !isNaN(Number(parts[1]))) {
-		// Nu putem deduce ID-ul din număr, păstrăm UNKNOWN
-		console.log('⚠️ Nu pot deduce ID proiect din număr factură');
-	      }
-	    }
-	  }
-	  
-	  console.log('🔍 DEBUG loadSubproiecte:', {
-	    isEdit,
-	    isStorno,
-	    proiectIdOriginal: proiect.ID_Proiect,
-	    proiectIdFinal: proiectIdPentruSubproiecte,
-	    initialData: initialData ? Object.keys(initialData) : null
-	  });
-	  
-	  if (!proiectIdPentruSubproiecte || proiectIdPentruSubproiecte === 'UNKNOWN') {
-	    console.log('⚠️ Nu pot încărca subproiecte - lipsește ID proiect valid');
-	    showToast('⚠️ ID proiect necunoscut - subproiectele nu pot fi încărcate', 'info');
-	    return;
-	  }
-	  
-	  setIsLoadingSubproiecte(true);
-	  try {
-	    const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdPentruSubproiecte)}`);
-	    const result = await response.json();
-	    
-	    if (result.success && result.data) {
-	      const subproiecteFormatate = result.data.map((sub: any) => {
-		// ✅ FIX PRECIZIE CURS: Tratează cursul cu precizie maximă
-		let cursSubproiect = 1;
-		
-		if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
-		  // ✅ CRUCIAL: Păstrează precizia maximă cu parseFloat
-		  if (typeof sub.curs_valutar === 'string') {
-		    cursSubproiect = parseFloat(sub.curs_valutar);
-		  } else if (typeof sub.curs_valutar === 'number') {
-		    cursSubproiect = sub.curs_valutar;
-		  } else if (sub.curs_valutar.value) {
-		    // BigQuery object format
-		    cursSubproiect = parseFloat(sub.curs_valutar.value.toString());
-		  }
-		  
-		  // Verifică validitatea
-		  if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
-		    cursSubproiect = 1;
-		  }
-		}
-		
-		console.log(`📊 DEBUG Curs Subproiect ${sub.Denumire}:`, {
-		  curs_original: sub.curs_valutar,
-		  curs_tip: typeof sub.curs_valutar,
-		  curs_procesat: cursSubproiect,
-		  curs_formatat: cursSubproiect.toFixed(4),
-		  moneda: sub.moneda || 'RON'
-		});
-		
-		return {
-		  ID_Subproiect: sub.ID_Subproiect,
-		  Denumire: sub.Denumire,
-		  Valoare_Estimata: sub.Valoare_Estimata,
-		  Status: sub.Status,
-		  adaugat: false,
-		  // ✅ FIX: Date valută cu precizie corectă
-		  moneda: sub.moneda || 'RON',
-		  curs_valutar: cursSubproiect, // ✅ Păstrează precizia cu parseFloat
-		  valoare_ron: sub.valoare_ron
-		};
-	      });
-	      
-	      setSubproiecteDisponibile(subproiecteFormatate);
-	      
-	      if (subproiecteFormatate.length > 0) {
-		showToast(`📋 Găsite ${subproiecteFormatate.length} subproiecte disponibile pentru factură`, 'info');
-	      }
-	    }
-	  } catch (error) {
-	    console.error('Eroare la încărcarea subproiectelor:', error);
-	    showToast('⚠️ Nu s-au putut încărca subproiectele', 'error');
-	  } finally {
-	    setIsLoadingSubproiecte(false);
-	  }
-	};
+  // ✅ MODIFICAT: loadSubproiecte cu preluare centralizată cursuri
+  const loadSubproiecte = async () => {
+    // ✅ FIX: Extrage ID-ul corect pentru Edit/Storno
+    let proiectIdPentruSubproiecte = proiect.ID_Proiect;
+    
+    // Pentru Edit/Storno, încearcă mai multe surse pentru ID
+    if ((isEdit || isStorno) && initialData) {
+      // Încearcă mai întâi din proiectInfo
+      if (initialData.proiectInfo?.ID_Proiect) {
+        proiectIdPentruSubproiecte = initialData.proiectInfo.ID_Proiect;
+        console.log('📋 ID Proiect din proiectInfo:', proiectIdPentruSubproiecte);
+      } 
+      // Apoi din proiectInfo.id
+      else if (initialData.proiectInfo?.id) {
+        proiectIdPentruSubproiecte = initialData.proiectInfo.id;
+        console.log('📋 ID Proiect din proiectInfo.id:', proiectIdPentruSubproiecte);
+      }
+      // Apoi din proiectId direct
+      else if (initialData.proiectId) {
+        proiectIdPentruSubproiecte = initialData.proiectId;
+        console.log('📋 ID Proiect din proiectId:', proiectIdPentruSubproiecte);
+      }
+    }
+    
+    console.log('🔍 DEBUG loadSubproiecte:', {
+      isEdit,
+      isStorno,
+      proiectIdOriginal: proiect.ID_Proiect,
+      proiectIdFinal: proiectIdPentruSubproiecte,
+      initialData: initialData ? Object.keys(initialData) : null
+    });
+    
+    if (!proiectIdPentruSubproiecte || proiectIdPentruSubproiecte === 'UNKNOWN') {
+      console.log('⚠️ Nu pot încărca subproiecte - lipsește ID proiect valid');
+      showToast('⚠️ ID proiect necunoscut - subproiectele nu pot fi încărcate', 'info');
+      return;
+    }
+    
+    setIsLoadingSubproiecte(true);
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdPentruSubproiecte)}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // ✅ NOU: Identifică toate valutele necesare
+        const valuteNecesare = identificaValuteNecesare(result.data);
+        console.log(`💱 Valute necesare identificate: ${valuteNecesare.join(', ') || 'Doar RON'}`);
+        
+        // ✅ NOU: Preiau cursurile centralizat dacă sunt necesare
+        let cursuriCentralizate: CursuriUtilizate = {};
+        if (valuteNecesare.length > 0) {
+          showToast(`💱 Se preiau cursurile BNR pentru: ${valuteNecesare.join(', ')}`, 'info');
+          cursuriCentralizate = await preluaCursuriCentralizat(valuteNecesare);
+          
+          // Setează cursurile centralizate
+          setCursuriUtilizate(prev => ({
+            ...prev,
+            ...cursuriCentralizate
+          }));
+        }
+
+        const subproiecteFormatate = result.data.map((sub: any) => {
+          let cursSubproiect = 1;
+          let monedaSubproiect = sub.moneda || 'RON';
+          
+          // ✅ NOU: Folosește cursul centralizat în loc de cel individual
+          if (monedaSubproiect !== 'RON' && cursuriCentralizate[monedaSubproiect]) {
+            cursSubproiect = cursuriCentralizate[monedaSubproiect].curs;
+            console.log(`🎯 Folosesc curs centralizat pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
+          } else if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
+            // Fallback la cursul din BD dacă nu avem centralizat
+            if (typeof sub.curs_valutar === 'string') {
+              cursSubproiect = parseFloat(sub.curs_valutar);
+            } else if (typeof sub.curs_valutar === 'number') {
+              cursSubproiect = sub.curs_valutar;
+            } else if (sub.curs_valutar && typeof sub.curs_valutar === 'object' && 'value' in sub.curs_valutar) {
+              cursSubproiect = parseFloat((sub.curs_valutar as any).value.toString());
+            }
+            
+            if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
+              cursSubproiect = 1;
+            }
+            
+            console.log(`📊 Folosesc curs din BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
+          }
+          
+          return {
+            ID_Subproiect: sub.ID_Subproiect,
+            Denumire: sub.Denumire,
+            Valoare_Estimata: sub.Valoare_Estimata,
+            Status: sub.Status,
+            adaugat: false,
+            moneda: monedaSubproiect,
+            curs_valutar: cursSubproiect, // ✅ Cursul cu precizie maximă
+            valoare_ron: sub.valoare_ron
+          };
+        });
+        
+        setSubproiecteDisponibile(subproiecteFormatate);
+        
+        if (subproiecteFormatate.length > 0) {
+          const messageSubproiecte = `📋 Găsite ${subproiecteFormatate.length} subproiecte`;
+          const messageCursuri = valuteNecesare.length > 0 ? 
+            ` cu cursuri BNR actualizate (${Object.keys(cursuriCentralizate).length}/${valuteNecesare.length})` : '';
+          showToast(messageSubproiecte + messageCursuri, 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea subproiectelor:', error);
+      showToast('⚠️ Nu s-au putut încărca subproiectele', 'error');
+    } finally {
+      setIsLoadingSubproiecte(false);
+    }
+  };
 
   const addLine = () => {
     // ✅ CORECTAT: TVA 21% implicit pentru linii noi
@@ -735,96 +783,54 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setLiniiFactura(newLines);
   };
 
-	const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
-	  // ✅ FIX: Conversie corectă valută pentru subproiecte cu precizie maximă
-	  let valoareSubproiect = subproiect.Valoare_Estimata || 0;
-	  let monedaSubproiect = subproiect.moneda || 'RON';
-	  
-	  // ✅ CRUCIAL FIX PRECIZIE: Tratează cursul cu parseFloat pentru precizie maximă
-	  let cursSubproiect: number = 1;
-	  
-	  if (subproiect.curs_valutar !== undefined && subproiect.curs_valutar !== null) {
-	    // ✅ IMPORTANT: Folosește parseFloat în loc de Number() pentru precizie maximă
-	    if (typeof subproiect.curs_valutar === 'string') {
-	      cursSubproiect = parseFloat(subproiect.curs_valutar);
-	    } else if (typeof subproiect.curs_valutar === 'number') {
-	      cursSubproiect = subproiect.curs_valutar;
-	    } else if (subproiect.curs_valutar && typeof subproiect.curs_valutar === 'object' && 'value' in subproiect.curs_valutar) {
-	      // Pentru format BigQuery object
-	      cursSubproiect = parseFloat((subproiect.curs_valutar as any).value.toString());
-	    }
-	    
-	    // Verifică validitatea
-	    if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
-	      cursSubproiect = 1;
-	    }
-	  }
-	  
-	  console.log(`📊 DEBUG Curs Subproiect ${subproiect.Denumire} - PRECIZIE:`, {
-	    curs_original: subproiect.curs_valutar,
-	    curs_tip: typeof subproiect.curs_valutar,
-	    curs_procesat: cursSubproiect,
-	    curs_formatat_4_zecimale: cursSubproiect.toFixed(4),
-	    moneda: monedaSubproiect,
-	    precizie_test: cursSubproiect === 4.3561 ? 'CORECT' : 'ROTUNJIT'
-	  });
-	  
-	  // Folosește valoarea în RON dacă există
-	  if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
-	    valoareSubproiect = subproiect.valoare_ron;
-	    
-	    // ✅ FIX: Salvează cursul cu precizie completă în tracking
-	    if (!cursuriUtilizate[monedaSubproiect]) {
-	      setCursuriUtilizate(prev => {
-		const newCursuri = { ...prev };
-		// ✅ IMPORTANT: Salvează cursul cu precizie maximă
-		newCursuri[monedaSubproiect] = {
-		  curs: cursSubproiect, // păstrează precizia completă
-		  data: new Date().toISOString().split('T')[0],
-		  precizie_originala: cursSubproiect.toString() // ✅ salvează și ca string
-		};
-		
-		console.log(`✅ Curs salvat pentru ${monedaSubproiect} cu precizie maximă:`, {
-		  curs_salvat: cursSubproiect,
-		  curs_verificare_4_zecimale: cursSubproiect.toFixed(4),
-		  precizie_originala: cursSubproiect.toString()
-		});
-		
-		return newCursuri;
-	      });
-	    }
-	  }
-	  
-	  const nouaLinie: LineFactura = {
-	    denumire: `${subproiect.Denumire} (Subproiect)`,
-	    cantitate: 1,
-	    pretUnitar: valoareSubproiect,
-	    cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
-	    tip: 'subproiect',
-	    subproiect_id: subproiect.ID_Subproiect,
-	    monedaOriginala: monedaSubproiect,
-	    valoareOriginala: subproiect.Valoare_Estimata,
-	    cursValutar: cursSubproiect // ✅ Salvează cu precizie completă
-	  };
-	  
-	  setLiniiFactura(prev => [...prev, nouaLinie]);
-	  
-	  setSubproiecteDisponibile(prev => 
-	    prev.map(sub => 
-	      sub.ID_Subproiect === subproiect.ID_Subproiect 
-		? { ...sub, adaugat: true }
-		: sub
-	    )
-	  );
-	  
-	  // ✅ DEBUGGING: Afișează cursul final în toast
-	  showToast(
-	    `✅ Subproiect "${subproiect.Denumire}" adăugat la factură${
-	      monedaSubproiect !== 'RON' ? ` (convertit din ${monedaSubproiect} cu curs ${cursSubproiect.toFixed(4)})` : ''
-	    }`, 
-	    'success'
-	  );
-	};
+  // ✅ MODIFICAT: addSubproiectToFactura folosește cursurile centralizate
+  const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
+    let valoareSubproiect = subproiect.Valoare_Estimata || 0;
+    let monedaSubproiect = subproiect.moneda || 'RON';
+    let cursSubproiect = subproiect.curs_valutar || 1; // Vine deja cu cursul centralizat
+
+    console.log(`📊 Adaugă subproiect cu curs centralizat ${subproiect.Denumire}:`, {
+      moneda: monedaSubproiect,
+      curs_folosit: cursSubproiect.toFixed(4),
+      valoare_originala: subproiect.Valoare_Estimata,
+      valoare_ron: subproiect.valoare_ron
+    });
+
+    // Folosește valoarea în RON dacă există
+    if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
+      valoareSubproiect = subproiect.valoare_ron;
+    }
+
+    const nouaLinie: LineFactura = {
+      denumire: `${subproiect.Denumire} (Subproiect)`,
+      cantitate: 1,
+      pretUnitar: valoareSubproiect,
+      cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
+      tip: 'subproiect',
+      subproiect_id: subproiect.ID_Subproiect,
+      monedaOriginala: monedaSubproiect,
+      valoareOriginala: subproiect.Valoare_Estimata,
+      cursValutar: cursSubproiect // ✅ Cursul centralizat cu precizie maximă
+    };
+
+    setLiniiFactura(prev => [...prev, nouaLinie]);
+
+    setSubproiecteDisponibile(prev => 
+      prev.map(sub => 
+        sub.ID_Subproiect === subproiect.ID_Subproiect 
+          ? { ...sub, adaugat: true }
+          : sub
+      )
+    );
+
+    // ✅ DEBUGGING: Afișează cursul centralizat în toast
+    showToast(
+      `✅ Subproiect "${subproiect.Denumire}" adăugat${
+        monedaSubproiect !== 'RON' ? ` (curs BNR centralizat: ${cursSubproiect.toFixed(4)})` : ''
+      }`, 
+      'success'
+    );
+  };
 
   const handlePreluareDateANAF = async () => {
     if (!cuiInput.trim()) {
@@ -1081,209 +1087,207 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-	const handleGenereazaFactura = async () => {
-	  // ✅ DEBUGGING pentru Storno și Edit
-	  if (isStorno || isEdit) {
-	    console.log('🔍 MODE DEBUG - verificare date complete:', {
-	      isStorno,
-	      isEdit,
-	      initialData,
-	      proiect,
-	      clientInfo,
-	      liniiFactura,
-	      numarFactura,
-	      cursuriUtilizate
-	    });
-	  }
+  const handleGenereazaFactura = async () => {
+    // ✅ DEBUGGING pentru Storno și Edit
+    if (isStorno || isEdit) {
+      console.log('🔍 MODE DEBUG - verificare date complete:', {
+        isStorno,
+        isEdit,
+        initialData,
+        proiect,
+        clientInfo,
+        liniiFactura,
+        numarFactura,
+        cursuriUtilizate
+      });
+    }
 
-	  if (!clientInfo?.cui) {
-	    showToast('CUI-ul clientului este obligatoriu', 'error');
-	    return;
-	  }
+    if (!clientInfo?.cui) {
+      showToast('CUI-ul clientului este obligatoriu', 'error');
+      return;
+    }
 
-	  if (liniiFactura.some(linie => !linie.denumire.trim() || (linie.pretUnitar === 0 && !isStorno))) {
-	    if (!isStorno) {
-	      showToast('Toate liniile trebuie să aibă denumire și preț valid', 'error');
-	      return;
-	    }
-	  }
+    if (liniiFactura.some(linie => !linie.denumire.trim() || (linie.pretUnitar === 0 && !isStorno))) {
+      if (!isStorno) {
+        showToast('Toate liniile trebuie să aibă denumire și preț valid', 'error');
+        return;
+      }
+    }
 
-	  if (!clientInfo.denumire.trim()) {
-	    showToast('Denumirea clientului este obligatorie', 'error');
-	    return;
-	  }
+    if (!clientInfo.denumire.trim()) {
+      showToast('Denumirea clientului este obligatorie', 'error');
+      return;
+    }
 
-	  if (sendToAnaf) {
-	    if (!anafTokenStatus.hasValidToken) {
-	      showToast('❌ Nu există token ANAF valid pentru e-factura', 'error');
-	      return;
-	    }
-	    
-	    if (anafTokenStatus.tokenInfo?.is_expired) {
-	      showToast('❌ Token ANAF a expirat. Reîmprospătează token-ul.', 'error');
-	      return;
-	    }
+    if (sendToAnaf) {
+      if (!anafTokenStatus.hasValidToken) {
+        showToast('❌ Nu există token ANAF valid pentru e-factura', 'error');
+        return;
+      }
+      
+      if (anafTokenStatus.tokenInfo?.is_expired) {
+        showToast('❌ Token ANAF a expirat. Reîmprospătează token-ul.', 'error');
+        return;
+      }
 
-	    if (!clientInfo.cui || clientInfo.cui === 'RO00000000') {
-	      showToast('❌ CUI valid este obligatoriu pentru e-factura ANAF', 'error');
-	      return;
-	    }
+      if (!clientInfo.cui || clientInfo.cui === 'RO00000000') {
+        showToast('❌ CUI valid este obligatoriu pentru e-factura ANAF', 'error');
+        return;
+      }
 
-	    if (!clientInfo.adresa || clientInfo.adresa === 'Adresa client') {
-	      showToast('❌ Adresa completă a clientului este obligatorie pentru e-factura ANAF', 'error');
-	      return;
-	    }
-	  }
+      if (!clientInfo.adresa || clientInfo.adresa === 'Adresa client') {
+        showToast('❌ Adresa completă a clientului este obligatorie pentru e-factura ANAF', 'error');
+        return;
+      }
+    }
 
-	  setIsGenerating(true);
-	  
-	  // ✅ FIX: Determinare ID proiect corect
-	  let proiectIdFinal = proiect.ID_Proiect;
-	  
-	  if ((isEdit || isStorno) && initialData) {
-	    // Încearcă toate sursele posibile
-	    if (initialData.proiectInfo?.ID_Proiect && initialData.proiectInfo.ID_Proiect !== 'UNKNOWN') {
-	      proiectIdFinal = initialData.proiectInfo.ID_Proiect;
-	    } else if (initialData.proiectInfo?.id && initialData.proiectInfo.id !== 'UNKNOWN') {
-	      proiectIdFinal = initialData.proiectInfo.id;
-	    } else if (initialData.proiectId && initialData.proiectId !== 'UNKNOWN') {
-	      proiectIdFinal = initialData.proiectId;
-	    } else if (proiect.ID_Proiect && proiect.ID_Proiect !== 'UNKNOWN') {
-	      proiectIdFinal = proiect.ID_Proiect;
-	    }
-	  }
-	  
-	  // ✅ DEBUGGING extins cu focus pe cursuri
-	  console.log('📤 Trimit date pentru generare - FOCUS PRECIZIE CURSURI:', {
-	    proiectId: proiectIdFinal,
-	    proiectOriginal: proiect.ID_Proiect,
-	    isEdit,
-	    isStorno,
-	    facturaOriginala: initialData?.facturaOriginala,
-	    liniiFactura: liniiFactura.length,
-	    clientInfo: clientInfo?.denumire,
-	    cursuriUtilizate_count: Object.keys(cursuriUtilizate).length,
-	    cursuriUtilizate_details: Object.keys(cursuriUtilizate).map(m => ({
-	      moneda: m,
-	      curs_numeric: cursuriUtilizate[m].curs,
-	      curs_formatat_4_zecimale: cursuriUtilizate[m].curs.toFixed(4),
-	      precizie_originala: cursuriUtilizate[m].precizie_originala,
-	      test_precizie: cursuriUtilizate[m].curs === 4.3561 ? 'CORECT - NU E ROTUNJIT' : 'POSIBIL ROTUNJIT'
-	    }))
-	  });
-	  
-	  try {
-	    if (sendToAnaf) {
-	      showToast('🔄 Se generează factură PDF + XML pentru ANAF...', 'info');
-	    } else {
-	      showToast('🔄 Se generează template-ul facturii...', 'info');
-	    }
-	    
-	    // ✅ FIX CRUCIAL: Pregătește cursurile cu precizie maximă pentru trimitere
-	    const cursuriProcesate: CursuriUtilizate = {};
-	    Object.keys(cursuriUtilizate).forEach(moneda => {
-	      const cursData = cursuriUtilizate[moneda];
-	      // ✅ IMPORTANT: Păstrează precizia maximă
-	      cursuriProcesate[moneda] = {
-		curs: cursData.curs, // păstrează numărul cu precizie completă
-		data: cursData.data,
-		precizie_originala: cursData.precizie_originala // transmite și stringul original
-	      };
-	      
-	      console.log(`🔍 TRIMIS curs ${moneda}:`, {
-		curs_numeric: cursData.curs,
-		curs_4_zecimale: cursData.curs.toFixed(4),
-		precizie_originala: cursData.precizie_originala
-	      });
-	    });
-	    
-	    const response = await fetch('/api/actions/invoices/generate-hibrid', {
-	      method: 'POST',
-	      headers: { 'Content-Type': 'application/json' },
-	      body: JSON.stringify({
-		proiectId: proiectIdFinal, // ✅ Folosește ID-ul corect
-		liniiFactura,
-		observatii,
-		clientInfo,
-		numarFactura,
-		setariFacturare,
-		sendToAnaf,
-		cursuriUtilizate: cursuriProcesate, // ✅ Trimite cursurile cu precizie maximă
-		isEdit,
-		isStorno,
-		facturaId: isEdit ? initialData?.facturaId : null,
-		facturaOriginala: isStorno ? initialData?.facturaOriginala : null
-	      })
-	    });
-	    
-	    const result = await response.json();
-	    
-	    if (result.success && result.htmlContent) {
-	      if (sendToAnaf) {
-		if (result.efactura?.xmlGenerated) {
-		  showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, 'success');
-		} else {
-		  showToast(`⚠️ PDF generat, dar XML a eșuat: ${result.efactura?.xmlError}`, 'info');
-		}
-	      } else {
-		showToast('✅ Template generat! Se procesează PDF-ul...', 'success');
-	      }
-	      
-	      await processPDF(result.htmlContent, result.fileName);
-	      
-	      showToast('✅ Factură generată cu succes!', 'success');
+    setIsGenerating(true);
+    
+    // ✅ FIX: Determinare ID proiect corect
+    let proiectIdFinal = proiect.ID_Proiect;
+    
+    if ((isEdit || isStorno) && initialData) {
+      // Încearcă toate sursele posibile
+      if (initialData.proiectInfo?.ID_Proiect && initialData.proiectInfo.ID_Proiect !== 'UNKNOWN') {
+        proiectIdFinal = initialData.proiectInfo.ID_Proiect;
+      } else if (initialData.proiectInfo?.id && initialData.proiectInfo.id !== 'UNKNOWN') {
+        proiectIdFinal = initialData.proiectInfo.id;
+      } else if (initialData.proiectId && initialData.proiectId !== 'UNKNOWN') {
+        proiectIdFinal = initialData.proiectId;
+      } else if (proiect.ID_Proiect && proiect.ID_Proiect !== 'UNKNOWN') {
+        proiectIdFinal = proiect.ID_Proiect;
+      }
+    }
+    
+    // ✅ DEBUGGING extins cu focus pe cursuri centralizate
+    console.log('📤 Trimit date pentru generare - CURSURI CENTRALIZATE:', {
+      proiectId: proiectIdFinal,
+      proiectOriginal: proiect.ID_Proiect,
+      isEdit,
+      isStorno,
+      facturaOriginala: initialData?.facturaOriginala,
+      liniiFactura: liniiFactura.length,
+      clientInfo: clientInfo?.denumire,
+      cursuriUtilizate_count: Object.keys(cursuriUtilizate).length,
+      cursuriUtilizate_details: Object.keys(cursuriUtilizate).map(m => ({
+        moneda: m,
+        curs_numeric: cursuriUtilizate[m].curs,
+        curs_formatat_4_zecimale: cursuriUtilizate[m].curs.toFixed(4),
+        precizie_originala: cursuriUtilizate[m].precizie_originala,
+        sursa: 'BNR_CENTRALIZAT'
+      }))
+    });
+    
+    try {
+      if (sendToAnaf) {
+        showToast('🔄 Se generează factură PDF + XML pentru ANAF...', 'info');
+      } else {
+        showToast('🔄 Se generează template-ul facturii...', 'info');
+      }
+      
+      // ✅ IMPORTANT: Transmite cursurile centralizate cu precizie maximă
+      const cursuriProcesate: CursuriUtilizate = {};
+      Object.keys(cursuriUtilizate).forEach(moneda => {
+        const cursData = cursuriUtilizate[moneda];
+        cursuriProcesate[moneda] = {
+          curs: cursData.curs, // păstrează numărul cu precizie completă
+          data: cursData.data,
+          precizie_originala: cursData.precizie_originala // transmite și stringul original
+        };
+        
+        console.log(`🔍 TRIMIS curs centralizat ${moneda}:`, {
+          curs_numeric: cursData.curs,
+          curs_4_zecimale: cursData.curs.toFixed(4),
+          precizie_originala: cursData.precizie_originala,
+          sursa: 'CENTRALIZAT_BNR'
+        });
+      });
+      
+      const response = await fetch('/api/actions/invoices/generate-hibrid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proiectId: proiectIdFinal, // ✅ Folosește ID-ul corect
+          liniiFactura,
+          observatii,
+          clientInfo,
+          numarFactura,
+          setariFacturare,
+          sendToAnaf,
+          cursuriUtilizate: cursuriProcesate, // ✅ Cursuri centralizate cu precizie maximă
+          isEdit,
+          isStorno,
+          facturaId: isEdit ? initialData?.facturaId : null,
+          facturaOriginala: isStorno ? initialData?.facturaOriginala : null
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.htmlContent) {
+        if (sendToAnaf) {
+          if (result.efactura?.xmlGenerated) {
+            showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, 'success');
+          } else {
+            showToast(`⚠️ PDF generat, dar XML a eșuat: ${result.efactura?.xmlError}`, 'info');
+          }
+        } else {
+          showToast('✅ Template generat! Se procesează PDF-ul...', 'success');
+        }
+        
+        await processPDF(result.htmlContent, result.fileName);
+        
+        showToast('✅ Factură generată cu succes cu cursuri BNR centralizate!', 'success');
 
-	      // Pentru Edit, nu reîncarcă setările
-	      if (!isEdit) {
-		setTimeout(() => {
-		  loadSetariFacturare();
-		}, 1000);
-	      }
-	      
-	    } else {
-	      throw new Error(result.error || 'Eroare la generarea template-ului');
-	    }
-	  } catch (error) {
-	    showToast(`❌ Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
-	    setIsGenerating(false);
-	  } finally {
-	    if (!isProcessingPDF) {
-	      setIsGenerating(false);
-	    }
-	  }
-	};
+        // Pentru Edit, nu reîncarcă setările
+        if (!isEdit) {
+          setTimeout(() => {
+            loadSetariFacturare();
+          }, 1000);
+        }
+        
+      } else {
+        throw new Error(result.error || 'Eroare la generarea template-ului');
+      }
+    } catch (error) {
+      showToast(`❌ Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
+      setIsGenerating(false);
+    } finally {
+      if (!isProcessingPDF) {
+        setIsGenerating(false);
+      }
+    }
+  };
 
   const totals = calculateTotals();
-  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
+  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || isLoadingCursuri;
 
-  // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită
-	const generateCurrencyNote = () => {
-	  const monede = Object.keys(cursuriUtilizate);
-	  if (monede.length === 0) return '';
-	  
-	  return `Curs valutar folosit: ${monede.map(m => {
-	    const cursData = cursuriUtilizate[m];
-	    // ✅ FIX: Afișează cursul cu 4 zecimale din precizia păstrată
-	    let cursNumeric: number;
-	    
-	    if (typeof cursData.curs === 'number') {
-	      cursNumeric = cursData.curs;
-	    } else if (typeof cursData.curs === 'string') {
-	      cursNumeric = parseFloat(cursData.curs);
-	    } else {
-	      cursNumeric = 1;
-	    }
-	    
-	    // Verifică validitatea
-	    if (isNaN(cursNumeric) || cursNumeric <= 0) {
-	      cursNumeric = 1;
-	    }
-	    
-	    return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursData.data})`;
-	  }).join(', ')}`;
-	};
+  // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită + sursă centralizată
+  const generateCurrencyNote = () => {
+    const monede = Object.keys(cursuriUtilizate);
+    if (monede.length === 0) return '';
+    
+    return `Curs valutar BNR (centralizat): ${monede.map(m => {
+      const cursData = cursuriUtilizate[m];
+      let cursNumeric: number;
+      
+      if (typeof cursData.curs === 'number') {
+        cursNumeric = cursData.curs;
+      } else if (typeof cursData.curs === 'string') {
+        cursNumeric = parseFloat(cursData.curs);
+      } else {
+        cursNumeric = 1;
+      }
+      
+      if (isNaN(cursNumeric) || cursNumeric <= 0) {
+        cursNumeric = 1;
+      }
+      
+      return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursData.data})`;
+    }).join(', ')}`;
+  };
 
-  // Continuare render JSX...
+  // Continuare render JSX... (același JSX ca înainte, doar se înlocuiește loading indicator)
   return (
     <div style={{
       position: 'fixed',
@@ -1407,7 +1411,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
           
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            📊 Auto-completare client din BD + selector subproiecte • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+            📊 Auto-completare client din BD + cursuri BNR centralizate • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
           </p>
         </div>
 
@@ -1452,8 +1456,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </div>
                   <span>
                     {isLoadingSetari && '🔄 Se încarcă setările de facturare...'}
+                    {isLoadingCursuri && '💱 Se preiau cursurile BNR centralizat...'}
                     {isGenerating && !isProcessingPDF && (sendToAnaf ? '🔄 Se generează PDF + XML ANAF...' : '🔄 Se generează template-ul...')}
-                    {isProcessingPDF && '📄 Se procesează PDF-ul cu date din BD...'}
+                    {isProcessingPDF && '📄 Se procesează PDF-ul cu cursuri BNR...'}
                   </span>
                 </div>
                 <style>
@@ -1569,7 +1574,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   marginBottom: '1rem'
                 }}>
                   <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                    📋 Subproiecte Disponibile ({subproiecteDisponibile.length})
+                    📋 Subproiecte Disponibile ({subproiecteDisponibile.length}) 
+                    {Object.keys(cursuriUtilizate).length > 0 && (
+                      <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
+                        • Cursuri BNR centralizate ✓
+                      </span>
+                    )}
                   </h4>
                   <button
                     type="button"
@@ -1630,8 +1640,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
                                <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
-                                 {/* ✅ DEBUGGING: Afișează cursul cu precizia completă */}
-                                 <br/>🔍 Curs: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
+                                 {/* ✅ DEBUGGING: Afișează cursul centralizat cu precizia completă */}
+                                 <br/>💱 Curs BNR: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
+                                 {cursuriUtilizate[subproiect.moneda] && (
+                                   <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat)</span>
+                                 )}
                                </span>
                              )}
                            </div>
@@ -1665,7 +1678,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
            )}
          </div>
 
-         {/* Secțiune Client - același cod ca înainte */}
+         {/* Secțiune Client */}
          <div style={{ marginBottom: '1rem' }}>
            <div style={{
              display: 'flex',
@@ -2284,7 +2297,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              fontSize: '13px',
              color: '#0c5460'
            }}>
-             <strong>💱 Note curs valutar (precizie maximă):</strong><br/>
+             <strong>💱 Note curs valutar (centralizat BNR):</strong><br/>
              {generateCurrencyNote()}
            </div>
          )}
@@ -2306,6 +2319,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
              <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
              <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
+             {Object.keys(cursuriUtilizate).length > 0 && (
+               <li>💱 <strong>Cursuri BNR centralizate</strong> pentru precizie maximă</li>
+             )}
            </ul>
          </div>
 
@@ -2322,7 +2338,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              color: '#7f8c8d',
              fontWeight: '500'
            }}>
-             ℹ️ Date client auto-completate din BD. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
+             ℹ️ Date client auto-completate din BD. Cursuri BNR centralizate. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
            </div>
            
            <div style={{ display: 'flex', gap: '1rem' }}>
@@ -2358,9 +2374,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                }}
              >
                {isLoading ? (
-                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri corecte...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
+                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri BNR...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
                ) : (
-                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură din BD'}</>
+                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR'}</>
                )}
              </button>
            </div>

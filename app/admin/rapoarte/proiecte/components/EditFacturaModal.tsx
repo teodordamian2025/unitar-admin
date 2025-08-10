@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 10.08.2025 17:00
-// CORECTAT: Fix ID Proiect din BigQuery și afișare subproiecte în Edit/Storno
+// DATA: 11.08.2025 16:30
+// CORECTAT: Fix denumire client goală și buton inactiv în Edit
 // ==================================================================
 
 'use client';
@@ -234,11 +234,40 @@ export default function EditFacturaModal({
         }
       }
 
+      // ✅ FIX PRINCIPAL: Standardizare clientInfo cu suport dual denumire/nume
+      const clientInfoPregatit = (() => {
+        // Dacă avem dateComplete.clientInfo, folosește-l cu suport dual
+        if (dateComplete.clientInfo) {
+          return {
+            id: dateComplete.clientInfo.id || '',
+            denumire: dateComplete.clientInfo.denumire || dateComplete.clientInfo.nume || factura.client_nume,
+            cui: dateComplete.clientInfo.cui || factura.client_cui,
+            nrRegCom: dateComplete.clientInfo.nrRegCom || dateComplete.clientInfo.nr_reg_com || '',
+            adresa: dateComplete.clientInfo.adresa || 'Adresa client',
+            telefon: dateComplete.clientInfo.telefon || '',
+            email: dateComplete.clientInfo.email || ''
+          };
+        }
+        
+        // Altfel, construiește din datele facturii
+        return {
+          id: '',
+          denumire: factura.client_nume || 'Client din factura',
+          cui: factura.client_cui || '',
+          nrRegCom: '',
+          adresa: 'Adresa client',
+          telefon: '',
+          email: ''
+        };
+      })();
+
+      addDebugLog(`Client info pregătit: ${clientInfoPregatit.denumire} (CUI: ${clientInfoPregatit.cui})`);
+
       // ✅ Date finale cu ID proiect corect și subproiecte
       const dateFinale = {
         ID_Proiect: proiectIdActual,
         Denumire: proiectInfo.denumire || factura.proiect_denumire || 'Proiect necunoscut',
-        Client: dateComplete.clientInfo?.nume || dateComplete.clientInfo?.denumire || factura.client_nume,
+        Client: clientInfoPregatit.denumire, // ✅ FOLOSEȘTE clientInfoPregatit
         Status: proiectInfo.status || 'Activ',
         Valoare_Estimata: proiectInfo.valoare || factura.subtotal,
         moneda: proiectInfo.moneda || 'RON',
@@ -250,19 +279,11 @@ export default function EditFacturaModal({
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
         
-        // ✅ IMPORTANT: Date inițiale complete cu ID corect și subproiecte
+        // ✅ IMPORTANT: Date inițiale complete cu ID corect și clientInfo standardizat
         _initialData: {
           ...dateComplete,
           liniiFactura: liniiFacturaPregatite,
-          clientInfo: dateComplete.clientInfo || {
-            id: '',
-            denumire: factura.client_nume,
-            cui: factura.client_cui,
-            nrRegCom: '',
-            adresa: '',
-            telefon: '',
-            email: ''
-          },
+          clientInfo: clientInfoPregatit, // ✅ FIX: Folosește clientInfo standardizat
           observatii: dateComplete.observatii || '',
           numarFactura: mode === 'edit' ? factura.numar : null,
           facturaId: mode === 'edit' ? factura.id : null,
@@ -286,12 +307,17 @@ export default function EditFacturaModal({
         }
       };
 
-      addDebugLog(`Date finale pregătite. ID Proiect final: ${dateFinale.ID_Proiect}, Subproiecte: ${subproiecteDisponibile.length}`);
+      addDebugLog(`Date finale pregătite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Subproiecte: ${subproiecteDisponibile.length}`);
       
-      console.log('📤 Date finale pentru FacturaHibridModal cu subproiecte:', {
+      console.log('📤 Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
         ...dateFinale,
         _initialData: {
           ...dateFinale._initialData,
+          clientInfo_verify: {
+            denumire: clientInfoPregatit.denumire,
+            cui: clientInfoPregatit.cui,
+            has_id: !!clientInfoPregatit.id
+          },
           subproiecte_count: subproiecteDisponibile.length,
           linii_factura_count: liniiFacturaPregatite.length
         }
