@@ -520,7 +520,7 @@ export async function POST(request: NextRequest) {
                         <th style="width: 200px;">Descriere</th>
                         <th style="width: 45px;" class="text-center">Cant.</th>
                         <th style="width: 65px;" class="text-right">Pret Unitar</th>
-                        <th style="width: 70px;" class="text-center">TVA ${liniiFactura[0]?.cotaTva || 19}%</th>
+                        <th style="width: 70px;" class="text-center">TVA ${liniiFactura[0]?.cotaTva || 21}%</th>
                         <th style="width: 75px;" class="text-right">Total</th>
                     </tr>
                 </thead>

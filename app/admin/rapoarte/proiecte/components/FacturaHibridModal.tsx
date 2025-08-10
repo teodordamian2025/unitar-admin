@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// CORECTAT: Sintaxă completă cu toate acoladele
+// DATA: 10.08.2025 16:15
+// CORECTAT: Fix precizie curs BNR pentru subproiecte (păstrează 4 zecimale)
 // ==================================================================
 
 'use client';
@@ -94,11 +95,12 @@ interface ANAFTokenStatus {
   loading: boolean;
 }
 
-// ✅ NOU: Interfață pentru tracking cursuri folosite
+// ✅ NOU: Interfață pentru tracking cursuri folosite cu precizie îmbunătățită
 interface CursuriUtilizate {
   [moneda: string]: {
     curs: number;
     data: string;
+    precizie_originala?: string; // ✅ ADĂUGAT: păstrează cursul ca string pentru precizie maximă
   };
 }
 
@@ -157,10 +159,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isStorno = proiect._isStorno || false;
   const initialData = proiect._initialData || null;
 
-  // ✅ NOU: Track cursuri folosite
+  // ✅ NOU: Track cursuri folosite cu precizie îmbunătățită
   const [cursuriUtilizate, setCursuriUtilizate] = useState<CursuriUtilizate>({});
 
-  // ✅ MODIFICAT: Inițializare cu date pentru Edit/Storno
+  // ✅ CORECTAT: Inițializare cu TVA 21% implicit în loc de 19%
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
     if (initialData?.liniiFactura) {
       return initialData.liniiFactura;
@@ -179,7 +181,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       denumire: proiect.Denumire,
       cantitate: 1,
       pretUnitar: valoareProiect,
-      cotaTva: 19,
+      cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
       tip: 'proiect',
       monedaOriginala: monedaProiect,
       valoareOriginala: proiect.Valoare_Estimata,
@@ -187,7 +189,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }];
   });
 
-  // ✅ MODIFICAT: Inițializare cursuri cu proiect principal dacă are valută
+  // ✅ CORECTAT: Inițializare cursuri cu proiect principal dacă are valută - cu precizie îmbunătățită
   useEffect(() => {
     // Verificări complete pentru TypeScript
     const monedaProiect = proiect.moneda;
@@ -196,13 +198,39 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (monedaProiect && typeof monedaProiect === 'string' && monedaProiect !== 'RON' && cursValutar) {
       setCursuriUtilizate(prev => {
         const newCursuri: CursuriUtilizate = { ...prev };
-        // Asigură că cursul este număr
-        const cursNumeric = typeof cursValutar === 'number' ? cursValutar : parseFloat(cursValutar) || 1;
+        
+        // ✅ FIX PRECIZIE: Păstrează cursul cu precizia maximă
+        let cursNumeric: number;
+        let cursOriginal: string;
+        
+        if (typeof cursValutar === 'number') {
+          cursNumeric = cursValutar;
+          cursOriginal = cursValutar.toString();
+        } else if (typeof cursValutar === 'string') {
+          cursNumeric = parseFloat(cursValutar);
+          cursOriginal = cursValutar;
+        } else {
+          cursNumeric = 1;
+          cursOriginal = '1.0000';
+        }
+        
+        // Verifică validitatea și păstrează precizia
+        if (isNaN(cursNumeric) || cursNumeric <= 0) {
+          cursNumeric = 1;
+          cursOriginal = '1.0000';
+        }
         
         newCursuri[monedaProiect] = {
           curs: cursNumeric,
-          data: new Date().toISOString().split('T')[0]
+          data: new Date().toISOString().split('T')[0],
+          precizie_originala: cursOriginal // ✅ IMPORTANT: păstrează precisica originală
         };
+        
+        console.log(`✅ Curs proiect principal ${monedaProiect}:`, {
+          curs_numeric: cursNumeric,
+          precizie_originala: cursOriginal,
+          format_4_zecimale: cursNumeric.toFixed(4)
+        });
         
         return newCursuri;
       });
@@ -622,19 +650,47 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    const result = await response.json();
 	    
 	    if (result.success && result.data) {
-	      const subproiecteFormatate = result.data.map((sub: any) => ({
-		ID_Subproiect: sub.ID_Subproiect,
-		Denumire: sub.Denumire,
-		Valoare_Estimata: sub.Valoare_Estimata,
-		Status: sub.Status,
-		adaugat: false,
-		// ✅ NOU: Date valută cu conversie corectă
-		moneda: sub.moneda || 'RON',
-		curs_valutar: typeof sub.curs_valutar === 'number' ? 
-		  sub.curs_valutar : 
-		  (sub.curs_valutar ? Number(sub.curs_valutar) : 1),
-		valoare_ron: sub.valoare_ron
-	      }));
+	      const subproiecteFormatate = result.data.map((sub: any) => {
+		// ✅ FIX PRECIZIE CURS: Tratează cursul cu precizie maximă
+		let cursSubproiect = 1;
+		
+		if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
+		  // ✅ CRUCIAL: Păstrează precizia maximă cu parseFloat
+		  if (typeof sub.curs_valutar === 'string') {
+		    cursSubproiect = parseFloat(sub.curs_valutar);
+		  } else if (typeof sub.curs_valutar === 'number') {
+		    cursSubproiect = sub.curs_valutar;
+		  } else if (sub.curs_valutar.value) {
+		    // BigQuery object format
+		    cursSubproiect = parseFloat(sub.curs_valutar.value.toString());
+		  }
+		  
+		  // Verifică validitatea
+		  if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
+		    cursSubproiect = 1;
+		  }
+		}
+		
+		console.log(`📊 DEBUG Curs Subproiect ${sub.Denumire}:`, {
+		  curs_original: sub.curs_valutar,
+		  curs_tip: typeof sub.curs_valutar,
+		  curs_procesat: cursSubproiect,
+		  curs_formatat: cursSubproiect.toFixed(4),
+		  moneda: sub.moneda || 'RON'
+		});
+		
+		return {
+		  ID_Subproiect: sub.ID_Subproiect,
+		  Denumire: sub.Denumire,
+		  Valoare_Estimata: sub.Valoare_Estimata,
+		  Status: sub.Status,
+		  adaugat: false,
+		  // ✅ FIX: Date valută cu precizie corectă
+		  moneda: sub.moneda || 'RON',
+		  curs_valutar: cursSubproiect, // ✅ Păstrează precizia cu parseFloat
+		  valoare_ron: sub.valoare_ron
+		};
+	      });
 	      
 	      setSubproiecteDisponibile(subproiecteFormatate);
 	      
@@ -651,7 +707,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	};
 
   const addLine = () => {
-    setLiniiFactura([...liniiFactura, { denumire: '', cantitate: 1, pretUnitar: 0, cotaTva: 19 }]);
+    // ✅ CORECTAT: TVA 21% implicit pentru linii noi
+    setLiniiFactura([...liniiFactura, { denumire: '', cantitate: 1, pretUnitar: 0, cotaTva: 21 }]);
   };
 
   const removeLine = (index: number) => {
@@ -679,56 +736,58 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
 	const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
-	  // ✅ FIX: Conversie corectă valută pentru subproiecte
+	  // ✅ FIX: Conversie corectă valută pentru subproiecte cu precizie maximă
 	  let valoareSubproiect = subproiect.Valoare_Estimata || 0;
 	  let monedaSubproiect = subproiect.moneda || 'RON';
 	  
-	  // ✅ IMPORTANT: Asigură-te că cursul este tratat ca număr cu precizie completă
+	  // ✅ CRUCIAL FIX PRECIZIE: Tratează cursul cu parseFloat pentru precizie maximă
 	  let cursSubproiect: number = 1;
 	  
 	  if (subproiect.curs_valutar !== undefined && subproiect.curs_valutar !== null) {
-	    // Convertește la număr păstrând toate zecimalele
+	    // ✅ IMPORTANT: Folosește parseFloat în loc de Number() pentru precizie maximă
 	    if (typeof subproiect.curs_valutar === 'string') {
-	      // Folosește Number() în loc de parseFloat() pentru precizie mai bună
-	      cursSubproiect = Number(subproiect.curs_valutar);
+	      cursSubproiect = parseFloat(subproiect.curs_valutar);
 	    } else if (typeof subproiect.curs_valutar === 'number') {
 	      cursSubproiect = subproiect.curs_valutar;
-	    } else {
-	      // Pentru orice alt tip, încearcă conversie directă
-	      cursSubproiect = Number(subproiect.curs_valutar);
+	    } else if (subproiect.curs_valutar.value) {
+	      // Pentru format BigQuery object
+	      cursSubproiect = parseFloat(subproiect.curs_valutar.value.toString());
 	    }
 	    
-	    // Verifică că e valid
+	    // Verifică validitatea
 	    if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
 	      cursSubproiect = 1;
 	    }
 	  }
 	  
-	  console.log(`📊 DEBUG Curs Subproiect ${subproiect.Denumire}:`, {
+	  console.log(`📊 DEBUG Curs Subproiect ${subproiect.Denumire} - PRECIZIE:`, {
 	    curs_original: subproiect.curs_valutar,
 	    curs_tip: typeof subproiect.curs_valutar,
 	    curs_procesat: cursSubproiect,
-	    curs_formatat: cursSubproiect.toFixed(4),
-	    moneda: monedaSubproiect
+	    curs_formatat_4_zecimale: cursSubproiect.toFixed(4),
+	    moneda: monedaSubproiect,
+	    precizie_test: cursSubproiect === 4.3561 ? 'CORECT' : 'ROTUNJIT'
 	  });
 	  
 	  // Folosește valoarea în RON dacă există
 	  if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
 	    valoareSubproiect = subproiect.valoare_ron;
 	    
-	    // ✅ FIX: Salvează cursul cu precizie completă
+	    // ✅ FIX: Salvează cursul cu precizie completă în tracking
 	    if (!cursuriUtilizate[monedaSubproiect]) {
 	      setCursuriUtilizate(prev => {
 		const newCursuri = { ...prev };
-		// IMPORTANT: Salvează ca număr, nu ca string
+		// ✅ IMPORTANT: Salvează cursul cu precizie maximă
 		newCursuri[monedaSubproiect] = {
-		  curs: cursSubproiect, // Salvează direct numărul
-		  data: new Date().toISOString().split('T')[0]
+		  curs: cursSubproiect, // păstrează precizia completă
+		  data: new Date().toISOString().split('T')[0],
+		  precizie_originala: cursSubproiect.toString() // ✅ salvează și ca string
 		};
 		
-		console.log(`✅ Curs salvat pentru ${monedaSubproiect}:`, {
+		console.log(`✅ Curs salvat pentru ${monedaSubproiect} cu precizie maximă:`, {
 		  curs_salvat: cursSubproiect,
-		  curs_verificare: cursSubproiect.toFixed(4)
+		  curs_verificare_4_zecimale: cursSubproiect.toFixed(4),
+		  precizie_originala: cursSubproiect.toString()
 		});
 		
 		return newCursuri;
@@ -740,12 +799,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    denumire: `${subproiect.Denumire} (Subproiect)`,
 	    cantitate: 1,
 	    pretUnitar: valoareSubproiect,
-	    cotaTva: 19,
+	    cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
 	    tip: 'subproiect',
 	    subproiect_id: subproiect.ID_Subproiect,
 	    monedaOriginala: monedaSubproiect,
 	    valoareOriginala: subproiect.Valoare_Estimata,
-	    cursValutar: cursSubproiect // Salvează ca număr
+	    cursValutar: cursSubproiect // ✅ Salvează cu precizie completă
 	  };
 	  
 	  setLiniiFactura(prev => [...prev, nouaLinie]);
@@ -758,6 +817,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    )
 	  );
 	  
+	  // ✅ DEBUGGING: Afișează cursul final în toast
 	  showToast(
 	    `✅ Subproiect "${subproiect.Denumire}" adăugat la factură${
 	      monedaSubproiect !== 'RON' ? ` (convertit din ${monedaSubproiect} cu curs ${cursSubproiect.toFixed(4)})` : ''
@@ -1093,8 +1153,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    }
 	  }
 	  
-	  // ✅ DEBUGGING extins
-	  console.log('📤 Trimit date pentru generare - DETALIAT:', {
+	  // ✅ DEBUGGING extins cu focus pe cursuri
+	  console.log('📤 Trimit date pentru generare - FOCUS PRECIZIE CURSURI:', {
 	    proiectId: proiectIdFinal,
 	    proiectOriginal: proiect.ID_Proiect,
 	    isEdit,
@@ -1102,12 +1162,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	    facturaOriginala: initialData?.facturaOriginala,
 	    liniiFactura: liniiFactura.length,
 	    clientInfo: clientInfo?.denumire,
-	    cursuriUtilizate: Object.keys(cursuriUtilizate).map(m => ({
+	    cursuriUtilizate_count: Object.keys(cursuriUtilizate).length,
+	    cursuriUtilizate_details: Object.keys(cursuriUtilizate).map(m => ({
 	      moneda: m,
-	      curs: cursuriUtilizate[m].curs,
-	      curs_formatat: typeof cursuriUtilizate[m].curs === 'number' ? 
-		cursuriUtilizate[m].curs.toFixed(4) : 
-		cursuriUtilizate[m].curs
+	      curs_numeric: cursuriUtilizate[m].curs,
+	      curs_formatat_4_zecimale: cursuriUtilizate[m].curs.toFixed(4),
+	      precizie_originala: cursuriUtilizate[m].precizie_originala,
+	      test_precizie: cursuriUtilizate[m].curs === 4.3561 ? 'CORECT - NU E ROTUNJIT' : 'POSIBIL ROTUNJIT'
 	    }))
 	  });
 	  
@@ -1118,14 +1179,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	      showToast('🔄 Se generează template-ul facturii...', 'info');
 	    }
 	    
-	    // ✅ FIX: Asigură-te că cursurile sunt trimise ca numere
+	    // ✅ FIX CRUCIAL: Pregătește cursurile cu precizie maximă pentru trimitere
 	    const cursuriProcesate: CursuriUtilizate = {};
 	    Object.keys(cursuriUtilizate).forEach(moneda => {
 	      const cursData = cursuriUtilizate[moneda];
+	      // ✅ IMPORTANT: Păstrează precizia maximă
 	      cursuriProcesate[moneda] = {
-		curs: typeof cursData.curs === 'number' ? cursData.curs : Number(cursData.curs),
-		data: cursData.data
+		curs: cursData.curs, // păstrează numărul cu precizie completă
+		data: cursData.data,
+		precizie_originala: cursData.precizie_originala // transmite și stringul original
 	      };
+	      
+	      console.log(`🔍 TRIMIS curs ${moneda}:`, {
+		curs_numeric: cursData.curs,
+		curs_4_zecimale: cursData.curs.toFixed(4),
+		precizie_originala: cursData.precizie_originala
+	      });
 	    });
 	    
 	    const response = await fetch('/api/actions/invoices/generate-hibrid', {
@@ -1139,7 +1208,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 		numarFactura,
 		setariFacturare,
 		sendToAnaf,
-		cursuriUtilizate: cursuriProcesate, // ✅ Trimite cursurile procesate
+		cursuriUtilizate: cursuriProcesate, // ✅ Trimite cursurile cu precizie maximă
 		isEdit,
 		isStorno,
 		facturaId: isEdit ? initialData?.facturaId : null,
@@ -1187,20 +1256,20 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari;
 
-  // ✅ NOU: Generează nota despre cursuri utilizate
+  // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită
 	const generateCurrencyNote = () => {
 	  const monede = Object.keys(cursuriUtilizate);
 	  if (monede.length === 0) return '';
 	  
 	  return `Curs valutar folosit: ${monede.map(m => {
 	    const cursData = cursuriUtilizate[m];
-	    // ✅ FIX: Tratează cursul ca număr și formatează cu 4 zecimale
+	    // ✅ FIX: Afișează cursul cu 4 zecimale din precizia păstrată
 	    let cursNumeric: number;
 	    
 	    if (typeof cursData.curs === 'number') {
 	      cursNumeric = cursData.curs;
 	    } else if (typeof cursData.curs === 'string') {
-	      cursNumeric = Number(cursData.curs);
+	      cursNumeric = parseFloat(cursData.curs);
 	    } else {
 	      cursNumeric = 1;
 	    }
@@ -1561,6 +1630,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
                                <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
+                                 {/* ✅ DEBUGGING: Afișează cursul cu precizia completă */}
+                                 <br/>🔍 Curs: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
                                </span>
                              )}
                            </div>
@@ -1594,7 +1665,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
            )}
          </div>
 
-         {/* Secțiune Client */}
+         {/* Secțiune Client - același cod ca înainte */}
          <div style={{ marginBottom: '1rem' }}>
            <div style={{
              display: 'flex',
@@ -2202,7 +2273,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
            </div>
          </div>
 
-         {/* Adaugă nota despre cursuri dacă există */}
+         {/* Adaugă nota despre cursuri dacă există - cu precizie îmbunătățită */}
          {Object.keys(cursuriUtilizate).length > 0 && (
            <div style={{
              background: '#d1ecf1',
@@ -2213,7 +2284,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              fontSize: '13px',
              color: '#0c5460'
            }}>
-             <strong>💱 Note curs valutar:</strong><br/>
+             <strong>💱 Note curs valutar (precizie maximă):</strong><br/>
              {generateCurrencyNote()}
            </div>
          )}
@@ -2234,6 +2305,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              <li>După generare, numărul se actualizează automat pentru următoarea factură</li>
              {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
              <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
+             <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
            </ul>
          </div>
 
@@ -2286,7 +2358,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                }}
              >
                {isLoading ? (
-                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu date BD...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
+                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri corecte...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
                ) : (
                  <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură din BD'}</>
                )}

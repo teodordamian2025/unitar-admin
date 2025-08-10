@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// CORECTAT: ID Proiect și cursuri valutare
+// DATA: 10.08.2025 17:00
+// CORECTAT: Fix ID Proiect din BigQuery și afișare subproiecte în Edit/Storno
 // ==================================================================
 
 'use client';
@@ -14,7 +15,7 @@ interface Factura {
   data_factura: string | { value: string };
   client_nume: string;
   client_cui: string;
-  proiect_id?: string;
+  proiect_id?: string; // ✅ IMPORTANT: Câmpul din BigQuery
   proiect_denumire?: string;
   subtotal: number;
   total_tva: number;
@@ -23,9 +24,10 @@ interface Factura {
   date_complete_json?: string;
   efactura_enabled?: boolean;
   efactura_status?: string;
-  // ✅ NOU: Adăugat pentru a primi din FacturiList
+  // ✅ ADĂUGAT: Câmpuri transmise din FacturiList
   dateComplete?: any;
   proiectId?: string;
+  proiect_id_bigquery?: string;
 }
 
 interface EditFacturaModalProps {
@@ -95,6 +97,14 @@ export default function EditFacturaModal({
     try {
       addDebugLog(`Încep încărcarea datelor pentru factura ID: ${factura.id}`);
       
+      // ✅ CRUCIAL: Prioritizează proiect_id din BigQuery
+      const proiectIdPrioritar = factura.proiect_id || // din BigQuery (PRIORITATEA 1)
+                                factura.proiect_id_bigquery || // backup din FacturiList
+                                factura.proiectId; // din transmitere
+      
+      addDebugLog(`ID-uri proiect disponibile: BigQuery=${factura.proiect_id}, Backup=${factura.proiect_id_bigquery}, Transmis=${factura.proiectId}`);
+      addDebugLog(`ID Proiect FINAL selectat: ${proiectIdPrioritar || 'NULL'}`);
+      
       // ✅ CORECTAT: Folosește dateComplete dacă vine din FacturiList
       let dateComplete: any = factura.dateComplete || {};
       
@@ -111,27 +121,23 @@ export default function EditFacturaModal({
         }
       }
 
-      // ✅ CORECTAT: Prioritizează proiectId transmis din FacturiList
-      const proiectIdActual = factura.proiectId || // din FacturiList
-                              dateComplete.proiectId ||
-                              dateComplete.proiectInfo?.ID_Proiect ||
-                              dateComplete.proiectInfo?.id ||
-                              factura.proiect_id ||
-                              null;
+      // ✅ IMPORTANT: Folosește ID-ul prioritar în loc de căutări complexe
+      const proiectIdActual = proiectIdPrioritar || 'UNKNOWN';
 
-      addDebugLog(`Proiect ID selectat: ${proiectIdActual || 'NULL'}`);
+      addDebugLog(`Proiect ID pentru încărcarea datelor: ${proiectIdActual}`);
       
-      console.log('📋 Verificare completă ID proiect:', {
-        din_factura_proiectId: factura.proiectId,
+      console.log('📋 Verificare completă ID proiect - NOUA ABORDARE:', {
+        proiect_id_din_BigQuery: factura.proiect_id, // ✅ ACEASTA E SURSA PRINCIPALĂ
+        proiect_id_backup: factura.proiect_id_bigquery,
+        proiectId_transmis: factura.proiectId,
         din_dateComplete_proiectId: dateComplete.proiectId,
         din_proiectInfo: dateComplete.proiectInfo,
-        din_factura_proiect_id: factura.proiect_id,
-        final: proiectIdActual
+        ID_FINAL_UTILIZAT: proiectIdActual
       });
 
       if (!proiectIdActual || proiectIdActual === 'UNKNOWN') {
         addDebugLog('⚠️ ATENȚIE: Nu s-a găsit un ID de proiect valid!');
-        console.error('❌ ID proiect invalid sau lipsă');
+        console.error('❌ ID proiect invalid sau lipsă chiar și din BigQuery');
       }
 
       // ✅ Încarcă date proiect din BD dacă avem ID valid
@@ -165,6 +171,8 @@ export default function EditFacturaModal({
               };
               addDebugLog(`✅ Proiect găsit: ${proiect.Denumire}`);
             }
+          } else {
+            addDebugLog(`⚠️ Proiectul ${proiectIdActual} nu a fost găsit în BD`);
           }
         } catch (error) {
           addDebugLog(`EROARE încărcare proiect: ${error}`);
@@ -172,12 +180,12 @@ export default function EditFacturaModal({
         }
       }
 
-      // ✅ Pregătește liniile facturii
+      // ✅ Pregătește liniile facturii cu TVA 21% implicit
       let liniiFacturaPregatite = dateComplete.liniiFactura || [{
         denumire: proiectInfo.denumire || factura.proiect_denumire || 'Servicii',
         cantitate: 1,
         pretUnitar: factura.subtotal,
-        cotaTva: factura.total_tva > 0 ? 19 : 0,
+        cotaTva: factura.total_tva > 0 ? 21 : 0, // ✅ CORECTAT: 21% în loc de 19%
         monedaOriginala: proiectInfo.moneda || 'RON',
         valoareOriginala: proiectInfo.valoare,
         cursValutar: proiectInfo.curs_valutar || 1
@@ -194,9 +202,41 @@ export default function EditFacturaModal({
         }));
       }
 
-      // ✅ Date finale cu ID proiect corect
+      // ✅ CRUCIAL: Încarcă și subproiectele pentru proiectul identificat
+      let subproiecteDisponibile = [];
+      if (proiectIdActual && proiectIdActual !== 'UNKNOWN') {
+        try {
+          addDebugLog(`Încarc subproiectele pentru proiectul ${proiectIdActual}...`);
+          
+          const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdActual)}`);
+          const subproiecteData = await subproiecteResponse.json();
+          
+          if (subproiecteData.success && subproiecteData.data) {
+            subproiecteDisponibile = subproiecteData.data;
+            addDebugLog(`✅ Găsite ${subproiecteDisponibile.length} subproiecte`);
+            
+            // ✅ IMPORTANT: Marchează subproiectele care sunt deja în factură
+            if (dateComplete.liniiFactura) {
+              const subproiecteInFactura = dateComplete.liniiFactura
+                .filter((l: any) => l.tip === 'subproiect')
+                .map((l: any) => l.subproiect_id);
+              
+              if (subproiecteInFactura.length > 0) {
+                addDebugLog(`Marchează ${subproiecteInFactura.length} subproiecte ca fiind în factură`);
+              }
+            }
+          } else {
+            addDebugLog(`Nu s-au găsit subproiecte pentru proiectul ${proiectIdActual}`);
+          }
+        } catch (error) {
+          addDebugLog(`EROARE încărcare subproiecte: ${error}`);
+          console.error('Eroare la încărcarea subproiectelor:', error);
+        }
+      }
+
+      // ✅ Date finale cu ID proiect corect și subproiecte
       const dateFinale = {
-        ID_Proiect: proiectIdActual || 'UNKNOWN',
+        ID_Proiect: proiectIdActual,
         Denumire: proiectInfo.denumire || factura.proiect_denumire || 'Proiect necunoscut',
         Client: dateComplete.clientInfo?.nume || dateComplete.clientInfo?.denumire || factura.client_nume,
         Status: proiectInfo.status || 'Activ',
@@ -210,7 +250,7 @@ export default function EditFacturaModal({
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
         
-        // ✅ IMPORTANT: Date inițiale complete cu ID și cursuri
+        // ✅ IMPORTANT: Date inițiale complete cu ID corect și subproiecte
         _initialData: {
           ...dateComplete,
           liniiFactura: liniiFacturaPregatite,
@@ -227,13 +267,16 @@ export default function EditFacturaModal({
           numarFactura: mode === 'edit' ? factura.numar : null,
           facturaId: mode === 'edit' ? factura.id : null,
           
-          // ✅ CRUCIAL: Transmite toate variantele de ID
+          // ✅ CRUCIAL: Transmite ID-ul corect din BigQuery
           proiectId: proiectIdActual,
           proiectInfo: {
             ...proiectInfo,
             ID_Proiect: proiectIdActual,
             id: proiectIdActual
           },
+          
+          // ✅ IMPORTANT: Include subproiectele pentru afișare
+          subproiecteDisponibile: subproiecteDisponibile,
           
           isEdit: mode === 'edit',
           isStorno: mode === 'storno',
@@ -243,8 +286,16 @@ export default function EditFacturaModal({
         }
       };
 
-      addDebugLog(`Date finale pregătite. ID Proiect final: ${dateFinale.ID_Proiect}`);
-      console.log('📤 Date finale pentru FacturaHibridModal:', dateFinale);
+      addDebugLog(`Date finale pregătite. ID Proiect final: ${dateFinale.ID_Proiect}, Subproiecte: ${subproiecteDisponibile.length}`);
+      
+      console.log('📤 Date finale pentru FacturaHibridModal cu subproiecte:', {
+        ...dateFinale,
+        _initialData: {
+          ...dateFinale._initialData,
+          subproiecte_count: subproiecteDisponibile.length,
+          linii_factura_count: liniiFacturaPregatite.length
+        }
+      });
       
       setProiectData(dateFinale);
       setLoading(false);
@@ -315,28 +366,43 @@ export default function EditFacturaModal({
           padding: '2rem',
           borderRadius: '8px',
           textAlign: 'center',
-          maxWidth: '600px'
+          maxWidth: '700px',
+          width: '90%'
         }}>
-          <div style={{ marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '1rem', fontSize: '18px', fontWeight: 'bold' }}>
             ⏳ Se încarcă datele complete ale facturii...
           </div>
+          <div style={{ marginBottom: '1rem', fontSize: '14px', color: '#666' }}>
+            {mode === 'edit' ? '✏️ Pregătesc datele pentru editare' : '↩️ Pregătesc datele pentru stornare'}
+          </div>
+          
+          {/* ✅ DEBUGGING: Afișează progresul încărcării */}
           {debugInfo.length > 0 && (
             <div style={{
               textAlign: 'left',
               fontSize: '11px',
               fontFamily: 'monospace',
-              maxHeight: '200px',
+              maxHeight: '300px',
               overflowY: 'auto',
               background: '#f0f0f0',
               padding: '8px',
               borderRadius: '4px',
               marginTop: '10px'
             }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                📋 Progres încărcare date:
+              </div>
               {debugInfo.map((log, i) => (
-                <div key={i} style={{ marginBottom: '2px' }}>{log}</div>
+                <div key={i} style={{ marginBottom: '2px', fontSize: '10px' }}>
+                  {log}
+                </div>
               ))}
             </div>
           )}
+          
+          <div style={{ marginTop: '1rem', fontSize: '12px', color: '#888' }}>
+            Se verifică ID proiect din BigQuery și se încarcă subproiectele...
+          </div>
         </div>
       </div>
     );

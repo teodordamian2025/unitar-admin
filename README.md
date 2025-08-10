@@ -82,8 +82,6 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 
 ## 📁 Structura Fișiere Key
 
-find | sed 's|[^/]*/|- |g'
-.
 - .env.local
 - package-lock.json
 - package.json
@@ -141,6 +139,7 @@ find | sed 's|[^/]*/|- |g'
 - - - - - - FacturaHibridModal.tsx
 - - - - - - ProiectFilters.tsx
 - - - - - - FacturiList.tsx
+- - - - - - EditFacturaModal.tsx
 - - - - components
 - - - - - ActionDropdown.tsx
 - - - - - FilterBar.tsx
@@ -164,6 +163,10 @@ find | sed 's|[^/]*/|- |g'
 - - - - - - [id]
 - - - - - - - route.ts
 - - - - - generate-xml
+- - - - - - route.ts
+- - - - - update
+- - - - - - route.ts
+- - - - - delete
 - - - - - - route.ts
 - - - - - list
 - - - - - - route.ts
@@ -225,6 +228,9 @@ find | sed 's|[^/]*/|- |g'
 - - - - - route.ts
 - - - - clienti
 - - - - - route.ts
+- - - - facturi
+- - - - - last-number
+- - - - - - route.ts
 - - - - proiecte
 - - - - - export
 - - - - - - route.ts
@@ -276,6 +282,7 @@ find | sed 's|[^/]*/|- |g'
 - - contracte
 - - facturi
 - git-filter-repo.py
+
 
 
 

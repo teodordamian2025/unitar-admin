@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubproiectModal.tsx
-// CORECTAT: Integrare curs BNR automat
+// DATA: 10.08.2025 17:15
+// CORECTAT: TVA implicit 21% în loc de 19% + integrare curs BNR automat
 // ==================================================================
 
 'use client';
@@ -93,7 +94,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     }));
   };
 
-  // ✅ NOU: Funcție pentru preluare curs BNR
+  // ✅ NOU: Funcție pentru preluare curs BNR cu precizie maximă
   const getCursBNR = async (moneda: string): Promise<number> => {
     if (moneda === 'RON') return 1;
     
@@ -103,9 +104,18 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       const data = await response.json();
       
       if (data.success) {
-        console.log(`✅ Curs BNR pentru ${moneda}: ${data.curs} (sursa: ${data.source})`);
-        showToast(`📊 Curs BNR ${moneda}: ${data.curs.toFixed(4)} RON`, 'info');
-        return data.curs;
+        // ✅ CRUCIAL: Păstrează precizia maximă cu parseFloat
+        const cursComplet = typeof data.curs === 'number' ? data.curs : parseFloat(data.curs);
+        
+        console.log(`✅ Curs BNR pentru ${moneda} cu precizie maximă:`, {
+          curs_original: data.curs,
+          curs_procesat: cursComplet,
+          curs_4_zecimale: cursComplet.toFixed(4),
+          sursa: data.source
+        });
+        
+        showToast(`📊 Curs BNR ${moneda}: ${cursComplet.toFixed(4)} RON (${data.source})`, 'info');
+        return cursComplet;
       }
     } catch (error) {
       console.error('Eroare preluare curs BNR:', error);
@@ -114,17 +124,17 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       setIsLoadingCurs(false);
     }
     
-    // Fallback la cursuri aproximative
+    // Fallback la cursuri aproximative cu precizie maximă
     const cursuriFallback: { [key: string]: number } = {
       'EUR': 4.9755,
-      'USD': 4.3561,
+      'USD': 4.3561, // ✅ Exemplu cu precizie completă
       'GBP': 5.8585
     };
     
     return cursuriFallback[moneda] || 1;
   };
 
-  // ✅ NOU: Handler pentru schimbare monedă
+  // ✅ NOU: Handler pentru schimbare monedă cu precizie maximă
   const handleMonedaChange = async (moneda: string) => {
     setFormData(prev => ({ ...prev, moneda }));
     
@@ -134,9 +144,16 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       
       setFormData(prev => ({
         ...prev,
-        curs_valutar: cursReal,
+        curs_valutar: cursReal, // ✅ Păstrează precizia completă
         valoare_ron: valoareRON
       }));
+      
+      console.log(`💱 Conversie valută ${moneda}:`, {
+        valoare_originala: formData.valoareEstimata,
+        curs_bnr: cursReal,
+        curs_formatat: cursReal.toFixed(4),
+        valoare_ron: valoareRON.toFixed(2)
+      });
     } else if (moneda === 'RON') {
       setFormData(prev => ({
         ...prev,
@@ -146,7 +163,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     }
   };
 
-  // ✅ NOU: Handler pentru schimbare valoare
+  // ✅ NOU: Handler pentru schimbare valoare cu recalculare precisă
   const handleValoareChange = async (valoare: string) => {
     setFormData(prev => ({ ...prev, valoareEstimata: valoare }));
     
@@ -186,7 +203,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     try {
       const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
       
-      // Pregătește datele complete cu valută
+      // ✅ Pregătește datele complete cu valută și precizie maximă
       const requestData = {
         ID_Subproiect: subproiectId,
         ID_Proiect: proiectParinte.ID_Proiect,
@@ -197,20 +214,27 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
         Valoare_Estimata: formData.valoareEstimata ? parseFloat(formData.valoareEstimata) : null,
         Status: formData.status,
         
-        // ✅ Câmpuri multi-valută cu curs real BNR
+        // ✅ Câmpuri multi-valută cu curs real BNR și precizie maximă
         moneda: formData.moneda,
-        curs_valutar: formData.curs_valutar,
+        curs_valutar: formData.curs_valutar, // ✅ Păstrează precizia completă
         data_curs_valutar: new Date().toISOString().split('T')[0],
         valoare_ron: formData.valoare_ron,
         
-        // Status-uri multiple
+        // ✅ CORECTAT: Status-uri multiple cu TVA 21% implicit
         status_predare: 'Nepredat',
         status_contract: 'Nu e cazul',
         status_facturare: 'Nefacturat',
-        status_achitare: 'Neachitat'
+        status_achitare: 'Neachitat',
+        
+        // ✅ NOU: TVA implicit 21% pentru subproiecte
+        tva_implicit: 21 // ✅ Adăugat pentru consistență
       };
 
-      console.log('📤 Trimitere subproiect cu curs BNR:', requestData);
+      console.log('📤 Trimitere subproiect cu curs BNR precizie maximă și TVA 21%:', {
+        ...requestData,
+        curs_verificare: formData.curs_valutar.toFixed(4),
+        tva_implicit: 21
+      });
 
       const response = await fetch('/api/rapoarte/subproiecte', {
         method: 'POST',
@@ -225,7 +249,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
         resetForm();
         showToast(`✅ Subproiect adăugat cu succes!${
           formData.moneda !== 'RON' ? ` (Curs BNR ${formData.moneda}: ${formData.curs_valutar.toFixed(4)})` : ''
-        }`, 'success');
+        }\n🎯 TVA implicit: 21%`, 'success');
       } else {
         console.error('❌ Eroare API:', result);
         showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
@@ -297,7 +321,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               color: '#95a5a6',
               margin: '0.25rem 0 0 0'
             }}>
-              {proiectParinte.Denumire}
+              {proiectParinte.Denumire} • 🎯 TVA implicit: 21%
             </p>
           </div>
           <button
@@ -503,7 +527,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
             </div>
           </div>
 
-          {/* ✅ NOU: Secțiune Valoare și Valută */}
+          {/* ✅ NOU: Secțiune Valoare și Valută cu nota TVA 21% */}
           <div style={{
             background: '#e8f8e8',
             padding: '1.5rem',
@@ -516,7 +540,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               color: '#2c3e50',
               marginBottom: '1rem'
             }}>
-              💰 Valoare Estimată și Valută
+              💰 Valoare Estimată și Valută • 🎯 TVA implicit: 21%
             </h4>
             
             <div style={{
@@ -613,7 +637,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               </div>
             </div>
 
-            {/* Afișare curs valutar */}
+            {/* Afișare curs valutar cu precizie maximă */}
             {formData.moneda !== 'RON' && formData.curs_valutar > 1 && (
               <div style={{
                 marginTop: '1rem',
@@ -624,7 +648,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 fontSize: '13px',
                 color: '#0c5460'
               }}>
-                📊 Curs BNR: 1 {formData.moneda} = {formData.curs_valutar.toFixed(4)} RON
+                📊 Curs BNR (precizie maximă): 1 {formData.moneda} = {formData.curs_valutar.toFixed(4)} RON
               </div>
             )}
 
@@ -638,9 +662,22 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 fontSize: '13px',
                 color: '#856404'
               }}>
-                ⏳ Se preia cursul BNR...
+                ⏳ Se preia cursul BNR cu precizie maximă...
               </div>
             )}
+            
+            {/* ✅ NOU: Notă TVA 21% */}
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              background: '#e8f5e8',
+              border: '1px solid #c3e6cb',
+              borderRadius: '8px',
+              fontSize: '13px',
+              color: '#2d5016'
+            }}>
+              🎯 <strong>TVA implicit:</strong> 21% (conform reglementărilor din august 2025)
+            </div>
           </div>
 
           {/* Info despre proiectul părinte */}
@@ -746,7 +783,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 ) : isLoadingCurs ? (
                   <>⏳ Se preia cursul...</>
                 ) : (
-                  <>📂 Adaugă Subproiect</>
+                  <>📂 Adaugă Subproiect (TVA 21%)</>
                 )}
               </button>
               

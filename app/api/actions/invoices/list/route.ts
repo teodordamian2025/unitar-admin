@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/list/route.ts
-// DESCRIERE: Lista facturilor generate (hibride) - VERSIUNE CORECTATĂ + E-FACTURA
+// DATA: 10.08.2025 16:45
+// CORECTAT: Include fg.proiect_id în SELECT pentru Edit/Storno
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -41,10 +42,16 @@ export async function GET(request: NextRequest) {
         fg.status,
         fg.data_creare,
         fg.data_actualizare,
+        fg.date_complete_json, -- ✅ ADĂUGAT: Pentru datele complete
+        
+        -- ✅ CRUCIAL: Include proiect_id din BigQuery pentru Edit/Storno
+        fg.proiect_id,
+        
+        -- ✅ Date proiect din JOIN
         p.Denumire as proiect_denumire,
         p.Status as proiect_status,
         
-        -- ✅ NOU: Câmpuri e-factura
+        -- ✅ Câmpuri e-factura
         fg.efactura_enabled,
         fg.efactura_status,
         fg.anaf_upload_id,
@@ -73,20 +80,24 @@ export async function GET(request: NextRequest) {
     `;
     
     const params: any = {};
+    const types: any = {};
     
     if (proiectId) {
       query += ' AND fg.proiect_id = @proiectId';
       params.proiectId = proiectId;
+      types.proiectId = 'STRING';
     }
     
     if (clientId) {
       query += ' AND fg.client_id = @clientId';
       params.clientId = clientId;
+      types.clientId = 'STRING';
     }
     
     if (status) {
       query += ' AND fg.status = @status';
       params.status = status;
+      types.status = 'STRING';
     }
     
     query += ' ORDER BY fg.data_creare DESC';
@@ -95,15 +106,27 @@ export async function GET(request: NextRequest) {
       query += ` LIMIT @limit OFFSET @offset`;
       params.limit = limit;
       params.offset = offset;
+      types.limit = 'INT64';
+      types.offset = 'INT64';
     }
     
-    console.log('Query facturi:', query);
-    console.log('Params:', params);
+    console.log('📋 Query facturi cu proiect_id:', query);
+    console.log('📋 Params:', params);
     
     const [rows] = await bigquery.query({
       query,
       params,
+      types,
       location: 'EU'
+    });
+    
+    // ✅ DEBUGGING: Verifică că proiect_id este inclus
+    console.log('🔍 DEBUG: Prima factură returnată:', {
+      id: rows[0]?.id,
+      numar: rows[0]?.numar,
+      proiect_id: rows[0]?.proiect_id,
+      proiect_denumire: rows[0]?.proiect_denumire,
+      are_date_complete_json: !!rows[0]?.date_complete_json
     });
     
     // Query pentru total count (pentru paginare)
@@ -114,25 +137,30 @@ export async function GET(request: NextRequest) {
     `;
     
     const countParams: any = {};
+    const countTypes: any = {};
     
     if (proiectId) {
       countQuery += ' AND fg.proiect_id = @proiectId';
       countParams.proiectId = proiectId;
+      countTypes.proiectId = 'STRING';
     }
     
     if (clientId) {
       countQuery += ' AND fg.client_id = @clientId';
       countParams.clientId = clientId;
+      countTypes.clientId = 'STRING';
     }
     
     if (status) {
       countQuery += ' AND fg.status = @status';
       countParams.status = status;
+      countTypes.status = 'STRING';
     }
     
     const [countRows] = await bigquery.query({
       query: countQuery,
       params: countParams,
+      types: countTypes,
       location: 'EU'
     });
     
@@ -222,6 +250,7 @@ export async function POST(request: NextRequest) {
     const [rows] = await bigquery.query({
       query: statsQuery,
       params: { perioada: parseInt(perioada) },
+      types: { perioada: 'INT64' },
       location: 'EU'
     });
     

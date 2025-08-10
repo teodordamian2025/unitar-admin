@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturiList.tsx
-// MODIFICAT: Fix ștergere + butoane Edit/Storno complete
+// DATA: 10.08.2025 16:30
+// CORECTAT: Fix ID Proiect pentru Edit/Storno - include proiect_id din BigQuery
 // ==================================================================
 
 'use client';
@@ -24,7 +25,7 @@ interface Factura {
   data_scadenta: string | { value: string };
   client_nume: string;
   client_cui: string;
-  proiect_id?: string;
+  proiect_id?: string; // ✅ IMPORTANT: Câmpul din BigQuery
   proiect_denumire: string;
   proiect_status: string;
   subtotal: number;
@@ -487,37 +488,59 @@ export default function FacturiList({
     }
   };
 
-  // ✅ MODIFICAT: Deschide modal editare cu mod corect
+  // ✅ CORECTAT: Deschide modal editare cu ID proiect corect din BigQuery
 	const handleEditFactura = (factura: Factura, mode: 'edit' | 'storno' = 'edit') => {
 	  try {
-	    // Parsează JSON-ul din BigQuery
-	    const dateComplete = typeof factura.date_complete_json === 'string' 
-	      ? JSON.parse(factura.date_complete_json) 
-	      : factura.date_complete_json;
+	    // ✅ IMPORTANT: Folosește mai întâi proiect_id din BigQuery
+	    const proiectIdDinBigQuery = factura.proiect_id;
 	    
-	    // ✅ IMPORTANT: Extrage ID-ul din toate locurile posibile
-	    const proiectId = dateComplete?.proiectId || 
-		             dateComplete?.proiectInfo?.ID_Proiect || 
-		             dateComplete?.proiectInfo?.id || 
-		             factura.proiect_id || // din coloana directă
-		             'UNKNOWN';
+	    // Parsează JSON-ul din BigQuery pentru date suplimentare
+	    let dateComplete: any = {};
+	    try {
+	      if (factura.date_complete_json) {
+	        dateComplete = typeof factura.date_complete_json === 'string' 
+	          ? JSON.parse(factura.date_complete_json) 
+	          : factura.date_complete_json;
+	      }
+	    } catch (error) {
+	      console.warn('Nu s-au putut parsa datele complete JSON:', error);
+	    }
 	    
-	    console.log('🔍 DEBUG handleEditFactura:', {
+	    // ✅ CRUCIAL: Prioritizează proiect_id din BigQuery, apoi din JSON
+	    const proiectIdFinal = proiectIdDinBigQuery || 
+	                          dateComplete?.proiectId || 
+	                          dateComplete?.proiectInfo?.ID_Proiect || 
+	                          dateComplete?.proiectInfo?.id || 
+	                          'UNKNOWN';
+	    
+	    console.log('🔍 DEBUG handleEditFactura - ID PROIECT CORECT:', {
 	      mode,
 	      facturaNumar: factura.numar,
-	      proiectId_gasit: proiectId,
-	      din_dateComplete: dateComplete?.proiectId,
-	      din_proiectInfo: dateComplete?.proiectInfo,
-	      din_factura: factura.proiect_id,
+	      proiect_id_din_BigQuery: proiectIdDinBigQuery, // ✅ PRIORITATEA 1
+	      proiectId_din_JSON: dateComplete?.proiectId,
+	      proiectInfo_din_JSON: dateComplete?.proiectInfo,
+	      proiectId_FINAL: proiectIdFinal,
+	      are_date_complete: !!factura.date_complete_json,
 	      cursuriUtilizate: dateComplete?.cursuriUtilizate
 	    });
 	    
-	    // ✅ Pregătește datele pentru EditFacturaModal
+	    // ✅ Pregătește datele pentru EditFacturaModal cu ID corect
 	    const facturaCompleta = {
 	      ...factura,
 	      dateComplete: dateComplete,
-	      proiectId: proiectId // ✅ IMPORTANT: Adaugă ID-ul găsit
+	      // ✅ CRUCIAL: Transmite ID-ul corect din BigQuery
+	      proiectId: proiectIdFinal,
+	      // ✅ BONUS: Adaugă și câmpul direct pentru siguranță
+	      proiect_id_bigquery: proiectIdDinBigQuery
 	    };
+	    
+	    console.log('📤 Datele trimise către EditFacturaModal:', {
+	      id: facturaCompleta.id,
+	      numar: facturaCompleta.numar,
+	      proiectId: facturaCompleta.proiectId,
+	      proiect_id_bigquery: facturaCompleta.proiect_id_bigquery,
+	      hasSubproiecte: !!dateComplete?.liniiFactura?.some((l: any) => l.tip === 'subproiect')
+	    });
 	    
 	    setSelectedFactura(facturaCompleta);
 	    setEditMode(mode);
@@ -526,8 +549,13 @@ export default function FacturiList({
 	  } catch (error) {
 	    console.error('❌ Eroare la pregătirea datelor pentru editare:', error);
 	    showToast('Eroare la încărcarea datelor facturii', 'error');
-	    // Continuă cu datele de bază
-	    setSelectedFactura(factura);
+	    // Continuă cu datele de bază dar cu ID corect din BigQuery
+	    const facturaFallback = {
+	      ...factura,
+	      proiectId: factura.proiect_id || 'UNKNOWN', // ✅ Folosește proiect_id din BigQuery
+	      proiect_id_bigquery: factura.proiect_id
+	    };
+	    setSelectedFactura(facturaFallback);
 	    setEditMode(mode);
 	    setShowEditModal(true);
 	  }
@@ -922,13 +950,17 @@ export default function FacturiList({
                         <div className="font-medium text-gray-900">{factura.client_nume}</div>
                         <div className="text-xs text-gray-500">{factura.client_cui}</div>
                       </td>
-                      {/* ✅ MODIFICAT: Text wrap pentru proiect */}
+                      {/* ✅ MODIFICAT: Text wrap pentru proiect cu debugging ID */}
                       <td className="px-4 py-3 max-w-32">
                         <div className="font-medium text-gray-900 break-words leading-tight">
                           {factura.proiect_denumire}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           Status: {factura.proiect_status}
+                        </div>
+                        {/* ✅ DEBUGGING: Afișează ID-ul proiectului pentru verificare */}
+                        <div className="text-xs text-blue-600 mt-1 font-mono">
+                          ID: {factura.proiect_id || 'LIPSEȘTE'}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -966,23 +998,23 @@ export default function FacturiList({
                             📄 PDF
                           </button>
 
-                          {/* ✅ NOU: Buton EDITARE */}
+                          {/* ✅ CORECTAT: Buton EDITARE cu ID proiect corect */}
                           {canEdit && (
                             <button
                               onClick={() => handleEditFactura(factura, 'edit')}
                               className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                              title="Editează factură"
+                              title={`Editează factură (ID: ${factura.proiect_id || 'NECUNOSCUT'})`}
                             >
                               ✏️ Edit
                             </button>
                           )}
 
-                          {/* ✅ NOU: Buton STORNARE */}
+                          {/* ✅ CORECTAT: Buton STORNARE cu ID proiect corect */}
                           {canStorno && (
                             <button
                               onClick={() => handleEditFactura(factura, 'storno')}
                               className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
-                              title="Creează factură de stornare"
+                              title={`Creează factură de stornare (ID: ${factura.proiect_id || 'NECUNOSCUT'})`}
                             >
                               ↩️ Storno
                             </button>
@@ -1062,7 +1094,7 @@ export default function FacturiList({
         </div>
       )}
 
-      {/* ✅ NOU: Modal pentru editare factură */}
+      {/* ✅ CORECTAT: Modal pentru editare factură cu ID proiect corect */}
       {showEditModal && selectedFactura && (
         <EditFacturaModal
           factura={selectedFactura}
