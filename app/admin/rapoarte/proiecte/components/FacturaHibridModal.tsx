@@ -749,9 +749,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 	      cursSubproiect = parseFloat(subproiect.curs_valutar);
 	    } else if (typeof subproiect.curs_valutar === 'number') {
 	      cursSubproiect = subproiect.curs_valutar;
-	    } else if (subproiect.curs_valutar.value) {
+	    } else if (subproiect.curs_valutar && typeof subproiect.curs_valutar === 'object' && 'value' in subproiect.curs_valutar) {
 	      // Pentru format BigQuery object
-	      cursSubproiect = parseFloat(subproiect.curs_valutar.value.toString());
+	      cursSubproiect = parseFloat((subproiect.curs_valutar as any).value.toString());
 	    }
 	    
 	    // Verifică validitatea
