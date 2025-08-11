@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// MODIFICAT: Fix types pentru Edit + caractere PDF + debugging
+// MODIFICAT: Fix cursuri BNR + Edit factură - TOATE FUNCȚIONALITĂȚILE PĂSTRATE
+// DATA: 11.08.2025 18:30
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -123,10 +124,10 @@ export async function POST(request: NextRequest) {
       numarFactura,
       setariFacturare,
       sendToAnaf = false,
-      cursuriUtilizate = {}, // ✅ NOU: Primește cursurile utilizate
-      isEdit = false,        // ✅ NOU: Flag pentru edit
+      cursuriUtilizate = {}, // ✅ MODIFICAT: Primește cursurile utilizate cu precizie maximă
+      isEdit = false,        // ✅ ADĂUGAT: Flag pentru edit
       isStorno = false,      // ✅ NOU: Flag pentru storno
-      facturaId = null,      // ✅ NOU: ID factură pentru edit
+      facturaId = null,      // ✅ ADĂUGAT: ID factură pentru edit
       facturaOriginala = null // ✅ NOU: Număr factură originală pentru storno
     } = body;
 
@@ -134,13 +135,15 @@ export async function POST(request: NextRequest) {
       proiectId, 
       liniiFactura: liniiFactura?.length, 
       observatii: observatii?.length, 
-      clientInfo: clientInfo?.nume,
+      clientInfo: clientInfo?.nume || clientInfo?.denumire,
       numarFactura,
       sendToAnaf,
       isEdit,
       isStorno,
       facturaId,
-      cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? cursuriUtilizate : 'Niciun curs',
+      cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? 
+        Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') : 
+        'Niciun curs',
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf
     });
 
@@ -179,33 +182,43 @@ export async function POST(request: NextRequest) {
     
     const total = subtotal + totalTva;
 
-    // ✅ NOU: Pentru Edit, folosește facturaId existent
+    // ✅ MODIFICAT: Pentru Edit, folosește facturaId existent
     const currentFacturaId = isEdit && facturaId ? facturaId : crypto.randomUUID();
 
-    // ✅ MODIFICAT: Generează nota despre cursurile valutare cu verificare tip
+    // ✅ MODIFICAT: Generează nota despre cursurile valutare cu precizie maximă BNR
     let notaCursValutar = '';
     if (Object.keys(cursuriUtilizate).length > 0) {
       const monede = Object.keys(cursuriUtilizate);
-      notaCursValutar = `Curs valutar folosit: ${monede.map(m => {
+      notaCursValutar = `Curs valutar BNR: ${monede.map(m => {
         const cursInfo = cursuriUtilizate[m];
-        // Verifică că avem curs și este număr
-        const curs = typeof cursInfo.curs === 'number' ? cursInfo.curs : 
-                     (typeof cursInfo.curs === 'string' ? parseFloat(cursInfo.curs) : 1);
-        return `1 ${m} = ${curs.toFixed(4)} RON (${cursInfo.data})`;
+        
+        // ✅ CRUCIAL: Folosește precizia originală dacă există, altfel cursul numeric
+        let cursFormatat: string;
+        if (cursInfo.precizie_originala) {
+          cursFormatat = cursInfo.precizie_originala;
+        } else {
+          const curs = typeof cursInfo.curs === 'number' ? cursInfo.curs : 
+                       (typeof cursInfo.curs === 'string' ? parseFloat(cursInfo.curs) : 1);
+          cursFormatat = curs.toFixed(4);
+        }
+        
+        return `1 ${m} = ${cursFormatat} RON (${cursInfo.data})`;
       }).join(', ')}`;
+      
+      console.log('💱 Nota curs BNR generată cu precizie maximă:', notaCursValutar);
     }
 
     // ✅ MODIFICAT: Adaugă nota cursului la observații pentru PDF
     const observatiiFinale = observatii + (notaCursValutar ? `\n\n${notaCursValutar}` : '');
 
-    // ✅ CLIENT DATA HANDLING - păstrat identic
+    // ✅ CLIENT DATA HANDLING - păstrat identic cu suport dual pentru denumire/nume
     const primeaLinie = liniiFactura[0];
     const descrierePrincipala = primeaLinie.denumire || 'Servicii de consultanță';
     
     const safeClientData = clientInfo ? {
-      nume: clientInfo.denumire || 'Client din Proiect',
+      nume: clientInfo.denumire || clientInfo.nume || 'Client din Proiect',
       cui: clientInfo.cui || 'RO00000000',
-      nr_reg_com: clientInfo.nrRegCom || 'J40/0000/2024',
+      nr_reg_com: clientInfo.nrRegCom || clientInfo.nr_reg_com || 'J40/0000/2024',
       adresa: clientInfo.adresa || 'Adresa client',
       telefon: clientInfo.telefon || 'N/A',
       email: clientInfo.email || 'N/A'
@@ -229,7 +242,7 @@ export async function POST(request: NextRequest) {
       termenPlata: setariFacturare?.termen_plata_standard ? `${setariFacturare.termen_plata_standard} zile` : '30 zile'
     };
 
-    // ✅ TEMPLATE HTML - cu coloane optimizate și TVA dinamic + note curs valutar
+    // ✅ TEMPLATE HTML - cu coloane optimizate și TVA dinamic + note curs valutar BNR
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${numarFactura || proiectId}-${timestamp}.pdf`;
@@ -507,6 +520,7 @@ export async function POST(request: NextRequest) {
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
                 <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
+                ${isEdit ? '<div><strong>Status:</strong> EDITATA</div>' : ''}
                 ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>MODE:</strong> TEST e-Factura</div>' : ''}
             </div>
@@ -536,10 +550,12 @@ export async function POST(request: NextRequest) {
                       
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
-                      // ✅ NOU: Adaugă informații despre valoarea originală în valută
+                      // ✅ MODIFICAT: Adaugă informații despre valoarea originală în valută cu precizie BNR
                       let descriereCompleta = linie.denumire || 'N/A';
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-                        descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala})</small>`;
+                        // ✅ Afișează și cursul folosit cu precizie maximă
+                        const cursInfo = linie.cursValutar ? ` @ ${Number(linie.cursValutar).toFixed(4)}` : '';
+                        descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
                       }
                       
                       return `
@@ -579,7 +595,7 @@ export async function POST(request: NextRequest) {
         ${notaCursValutarClean ? `
         <div class="currency-note">
             <div class="currency-note-content">
-                <strong>Note curs valutar:</strong><br/>
+                <strong>Cursuri BNR (precizie maxima):</strong><br/>
                 ${notaCursValutarClean}
             </div>
         </div>
@@ -619,7 +635,7 @@ export async function POST(request: NextRequest) {
             <div class="generated-info">
                 <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
                 Data generarii: ${new Date().toLocaleString('ro-RO')}
-                ${isEdit ? '<br><strong>EDITATA - Versiune actualizata</strong>' : ''}
+                ${isEdit ? '<br><strong>EDITATA - Versiune actualizata cu cursuri BNR precise</strong>' : ''}
                 ${isStorno ? '<br><strong>STORNARE - Anuleaza factura originala</strong>' : ''}
                 ${sendToAnaf ? (MOCK_EFACTURA_MODE ? 
                   '<br><strong>TEST MODE: Simulare e-Factura (NU trimis la ANAF)</strong>' : 
@@ -643,7 +659,8 @@ export async function POST(request: NextRequest) {
           facturaId: currentFacturaId,
           clientCUI: safeClientData.cui,
           totalFactura: safeFormat(total),
-          liniiFactura: liniiFactura.length
+          liniiFactura: liniiFactura.length,
+          cursuriUtilizate: Object.keys(cursuriUtilizate).length
         });
 
         const mockXmlId = `MOCK_XML_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -708,10 +725,14 @@ export async function POST(request: NextRequest) {
       const table = dataset.table('FacturiGenerate');
 
       if (isEdit && facturaId) {
-        // ✅ FIX: Specificare types pentru parametrii care pot fi null
+        console.log('📝 EDIT MODE: Actualizez factură existentă în BigQuery...');
+        
+        // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile
         const updateQuery = `
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
           SET 
+            client_nume = @client_nume,
+            client_cui = @client_cui,
             subtotal = @subtotal,
             total_tva = @totalTva,
             total = @total,
@@ -723,36 +744,43 @@ export async function POST(request: NextRequest) {
           WHERE id = @facturaId
         `;
 
-        // ✅ FIX: Parameters cu types specificate explicit
+        // ✅ Construiește date_complete_json cu cursuri BNR precise
+        const dateCompleteJson = JSON.stringify({
+          liniiFactura,
+          observatii: observatiiFinale,
+          clientInfo: safeClientData,
+          proiectInfo: {
+            id: proiectId,
+            ID_Proiect: proiectId,
+            denumire: safeInvoiceData.denumireProiect
+          },
+          proiectId: proiectId,
+          contariBancare: contariFinale,
+          setariFacturare,
+          cursuriUtilizate, // ✅ INCLUDE cursurile BNR cu precizie maximă
+          isEdit: true,
+          dataUltimeiActualizari: new Date().toISOString(),
+          versiune: 2 // ✅ Versiune pentru tracking
+        });
+
         const params = {
           facturaId: facturaId,
+          client_nume: safeClientData.nume,
+          client_cui: safeClientData.cui,
           subtotal: Number(subtotal.toFixed(2)),
           totalTva: Number(totalTva.toFixed(2)),
           total: Number(total.toFixed(2)),
-          dateCompleteJson: JSON.stringify({
-            liniiFactura,
-            observatii: observatiiFinale,
-            clientInfo: safeClientData,
-            proiectInfo: {
-              id: proiectId,
-              ID_Proiect: proiectId, // ✅ IMPORTANT: Adaugă și ID_Proiect pentru compatibilitate
-              denumire: safeInvoiceData.denumireProiect
-            },
-            proiectId: proiectId, // ✅ IMPORTANT: Salvează și direct pentru debugging
-            contariBancare: contariFinale,
-            setariFacturare,
-            cursuriUtilizate,
-            isEdit: true,
-            dataActualizare: new Date().toISOString()
-          }),
+          dateCompleteJson: dateCompleteJson,
           efacturaEnabled: sendToAnaf,
           efacturaStatus: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
           anafUploadId: xmlResult?.xmlId || null
         };
 
-        // ✅ FIX: Types pentru BigQuery - IMPORTANT pentru null values
+        // ✅ CRUCIAL: Types pentru BigQuery - foarte important pentru null values
         const types: any = {
           facturaId: 'STRING',
+          client_nume: 'STRING',
+          client_cui: 'STRING',
           subtotal: 'NUMERIC',
           totalTva: 'NUMERIC', 
           total: 'NUMERIC',
@@ -761,10 +789,10 @@ export async function POST(request: NextRequest) {
         };
 
         // Adaugă types doar pentru câmpurile care pot fi null
-        if (params.efacturaStatus === null) {
+        if (params.efacturaStatus !== null) {
           types.efacturaStatus = 'STRING';
         }
-        if (params.anafUploadId === null) {
+        if (params.anafUploadId !== null) {
           types.anafUploadId = 'STRING';
         }
 
@@ -775,10 +803,12 @@ export async function POST(request: NextRequest) {
           location: 'EU'
         });
 
-        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery`);
+        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu cursuri BNR precise`);
         
       } else {
         // ✅ Creează factură nouă (inclusiv storno)
+        console.log('📝 NEW MODE: Creez factură nouă în BigQuery...');
+        
         const facturaData = [{
           id: currentFacturaId,
           proiect_id: proiectId,
@@ -805,13 +835,13 @@ export async function POST(request: NextRequest) {
             clientInfo: safeClientData,
             proiectInfo: {
               id: proiectId,
-              ID_Proiect: proiectId, // ✅ IMPORTANT: Adaugă și ID_Proiect
+              ID_Proiect: proiectId,
               denumire: safeInvoiceData.denumireProiect
             },
-            proiectId: proiectId, // ✅ IMPORTANT: Salvează și direct
+            proiectId: proiectId,
             contariBancare: contariFinale,
             setariFacturare,
-            cursuriUtilizate,
+            cursuriUtilizate, // ✅ INCLUDE cursurile BNR cu precizie maximă
             isStorno,
             facturaOriginala: facturaOriginala || null,
             mockMode: MOCK_EFACTURA_MODE && sendToAnaf
@@ -824,7 +854,7 @@ export async function POST(request: NextRequest) {
         }];
 
         await table.insert(facturaData);
-        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery`);
+        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu cursuri BNR precise`);
       }
 
       // ✅ NOU: Actualizează numărul curent în setări doar pentru facturi noi (nu edit)
@@ -858,23 +888,24 @@ export async function POST(request: NextRequest) {
           facturaId,
           hasXmlResult: !!xmlResult,
           xmlId: xmlResult?.xmlId,
-          sendToAnaf
+          sendToAnaf,
+          cursuriCount: Object.keys(cursuriUtilizate).length
         });
       }
     }
 
-    // ✅ RESPONSE complet cu informații Mock/Producție/Edit/Storno
+    // ✅ RESPONSE complet cu informații Mock/Producție/Edit/Storno și cursuri BNR
     const response = {
       success: true,
       message: isEdit ? 
-        '✏️ Factură actualizată cu succes' :
+        '✏️ Factură actualizată cu succes (cursuri BNR precise)' :
         (isStorno ? 
           '↩️ Factură de stornare generată cu succes' :
           (sendToAnaf ? 
             (MOCK_EFACTURA_MODE ? 
               '🧪 Factură pregătită pentru PDF + e-factura TEST (Mock Mode)' : 
               '🚀 Factură pregătită pentru PDF + e-factura ANAF') : 
-            '📄 Factură pregătită pentru generare PDF')),
+            '📄 Factură pregătită pentru generare PDF cu cursuri BNR precise')),
       fileName: fileName,
       htmlContent: htmlTemplate,
       invoiceData: {
@@ -885,7 +916,16 @@ export async function POST(request: NextRequest) {
         contariBancare: contariFinale.length,
         isEdit,
         isStorno,
-        cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? cursuriUtilizate : null
+        cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? {
+          count: Object.keys(cursuriUtilizate).length,
+          monede: Object.keys(cursuriUtilizate),
+          cursuri_precisie_maxima: Object.keys(cursuriUtilizate).map(m => ({
+            moneda: m,
+            curs: cursuriUtilizate[m].curs,
+            precizie_originala: cursuriUtilizate[m].precizie_originala,
+            data: cursuriUtilizate[m].data
+          }))
+        } : null
       },
       efactura: sendToAnaf ? {
         enabled: true,
@@ -1008,7 +1048,7 @@ async function saveMockEfacturaRecord(data: any) {
       console.log('✅ FacturiGenerate actualizat cu info mock pentru factura:', data.facturaId);
 
     } catch (updateError) {
-      console.log('⚠️ Nu s-a putut actualiza FacturiGenerate (nu e critico):', updateError);
+      console.log('⚠️ Nu s-a putut actualiza FacturiGenerate (nu e critic):', updateError);
     }
 
   } catch (error) {

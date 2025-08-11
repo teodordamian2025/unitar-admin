@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 11.08.2025 16:30
-// CORECTAT: Fix denumire client goală și buton inactiv în Edit
+// DATA: 11.08.2025 18:15
+// MODIFICAT: Handler pentru trimiterea datelor complete către API-ul de update
 // ==================================================================
 
 'use client';
@@ -334,11 +334,14 @@ export default function EditFacturaModal({
     }
   };
 
+  // ✅ MODIFICAT: Handler pentru salvare cu API-ul nou de update complet
   const handleFacturaSuccess = async (invoiceId: string, downloadUrl: string) => {
     try {
       console.log('🔍 DEBUG: Success handler:', { mode, invoiceId });
       
       if (mode === 'edit') {
+        // ✅ Pentru Edit, se salvează automat în FacturaHibridModal prin generate-hibrid
+        // Nu mai e nevoie de apel separat la /update aici
         showToast('✅ Factură actualizată cu succes', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {

@@ -284,6 +284,19 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - git-filter-repo.py
 
 
+Coduri care au lagatura cu facturarea:
+app/admin/rapoarte/proiecte/[id]/page.tsx
+app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
+app/api/actions/invoices/generate-hibrid/route.ts
+app/api/curs-valutar/route.ts
+app/api/rapoarte/subproiecte/route.ts
+app/admin/rapoarte/facturi/page.tsx
+app/admin/rapoarte/proiecte/components/FacturiList.tsx
+app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
+app/api/rapoarte/proiecte/[id]/route.ts
+app/api/actions/invoices/list/route.ts
+app/api/actions/invoices/update/route.ts
+app/api/actions/invoices/regenerate-pdf/route.ts
 
 
 ### 📋 Descriere Componente Cheie
