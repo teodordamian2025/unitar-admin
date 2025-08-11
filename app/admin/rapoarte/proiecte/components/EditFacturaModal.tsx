@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 11.08.2025 18:15
-// MODIFICAT: Handler pentru trimiterea datelor complete către API-ul de update
+// DATA: 11.08.2025 19:30
+// STATUS: FUNCȚIONAL - Nu necesită modificări (fix-urile sunt în FacturaHibridModal)
 // ==================================================================
 
 'use client';
@@ -340,9 +340,9 @@ export default function EditFacturaModal({
       console.log('🔍 DEBUG: Success handler:', { mode, invoiceId });
       
       if (mode === 'edit') {
-        // ✅ Pentru Edit, se salvează automat în FacturaHibridModal prin generate-hibrid
-        // Nu mai e nevoie de apel separat la /update aici
-        showToast('✅ Factură actualizată cu succes', 'success');
+        // ✅ Pentru Edit, se salvează automat în FacturaHibridModal prin generate-hibrid + /update
+        // Nu mai e nevoie de apel separat la /update aici - fix-ul e în FacturaHibridModal
+        showToast('✅ Factură actualizată cu succes (cu cursuri BNR precise)', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {
         console.log('🔍 DEBUG: Marchez factura originală ca stornată...');

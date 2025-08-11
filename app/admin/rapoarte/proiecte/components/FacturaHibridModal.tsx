@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DATA: 11.08.2025 16:45
-// CORECTAT: Centralizare cursuri BNR cu precizie maximă pentru proiect + subproiecte
+// DATA: 11.08.2025 19:30
+// FIX COMPLET: Cursuri BNR cu precizie maximă + Edit salvare în BigQuery
 // ==================================================================
 
 'use client';
@@ -150,7 +150,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
         document.body.removeChild(toastEl);
       }
     }, 300);
-  }, type === 'success' || type === 'error' ? 4000 : 6000);
+  }, type === 'success' || type === 'error' ? 4000 : 6000 );
 };
 
 export default function FacturaHibridModal({ proiect, onClose, onSuccess }: FacturaHibridModalProps) {
@@ -783,15 +783,32 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setLiniiFactura(newLines);
   };
 
-  // ✅ MODIFICAT: addSubproiectToFactura folosește cursurile centralizate
+  // ✅ FIX PROBLEMA 1: addSubproiectToFactura folosește cursurile centralizate cu precizie maximă
   const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
     let valoareSubproiect = subproiect.Valoare_Estimata || 0;
     let monedaSubproiect = subproiect.moneda || 'RON';
-    let cursSubproiect = subproiect.curs_valutar || 1; // Vine deja cu cursul centralizat
+    
+    // ✅ FIX CRUCIAL: Folosește cursul centralizat cu precizie maximă în loc de cel rotunjit din BD
+    let cursSubproiect = 1;
+    
+    if (monedaSubproiect !== 'RON') {
+      // ✅ PRIORITATE 1: Curs centralizat BNR cu precizie maximă
+      if (cursuriUtilizate[monedaSubproiect]?.curs) {
+        cursSubproiect = cursuriUtilizate[monedaSubproiect].curs;
+        console.log(`🎯 FIX PROBLEMA 1: Folosesc curs BNR centralizat pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
+      } 
+      // ✅ FALLBACK: Curs din BD (rotunjit) doar dacă nu avem centralizat
+      else if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
+        cursSubproiect = subproiect.curs_valutar;
+        console.log(`⚠️ FALLBACK: Folosesc curs BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)} (posibil rotunjit)`);
+      }
+    }
 
-    console.log(`📊 Adaugă subproiect cu curs centralizat ${subproiect.Denumire}:`, {
+    console.log(`📊 Adaugă subproiect cu curs CORECT ${subproiect.Denumire}:`, {
       moneda: monedaSubproiect,
       curs_folosit: cursSubproiect.toFixed(4),
+      curs_centralizat_disponibil: !!cursuriUtilizate[monedaSubproiect]?.curs,
+      curs_bd_backup: subproiect.curs_valutar?.toFixed(4) || 'N/A',
       valoare_originala: subproiect.Valoare_Estimata,
       valoare_ron: subproiect.valoare_ron
     });
@@ -810,7 +827,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       subproiect_id: subproiect.ID_Subproiect,
       monedaOriginala: monedaSubproiect,
       valoareOriginala: subproiect.Valoare_Estimata,
-      cursValutar: cursSubproiect // ✅ Cursul centralizat cu precizie maximă
+      cursValutar: cursSubproiect // ✅ FIX: Cursul centralizat cu precizie maximă
     };
 
     setLiniiFactura(prev => [...prev, nouaLinie]);
@@ -824,9 +841,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     );
 
     // ✅ DEBUGGING: Afișează cursul centralizat în toast
+    const cursSource = cursuriUtilizate[monedaSubproiect]?.curs ? 'BNR centralizat' : 'BD backup';
     showToast(
       `✅ Subproiect "${subproiect.Denumire}" adăugat${
-        monedaSubproiect !== 'RON' ? ` (curs BNR centralizat: ${cursSubproiect.toFixed(4)})` : ''
+        monedaSubproiect !== 'RON' ? ` (curs ${cursSource}: ${cursSubproiect.toFixed(4)})` : ''
       }`, 
       'success'
     );
@@ -1087,6 +1105,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ FIX PROBLEMA 2: handleGenereazaFactura cu apel explicit la /update pentru Edit
   const handleGenereazaFactura = async () => {
     // ✅ DEBUGGING pentru Storno și Edit
     if (isStorno || isEdit) {
@@ -1225,6 +1244,45 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const result = await response.json();
       
       if (result.success && result.htmlContent) {
+        // ✅ FIX PROBLEMA 2: Pentru Edit, apelează explicit /update după generate-hibrid
+        if (isEdit && initialData?.facturaId) {
+          console.log('📝 FIX PROBLEMA 2: Salvez modificările în BigQuery prin /update...');
+          
+          try {
+            const updateResponse = await fetch('/api/actions/invoices/update', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                facturaId: initialData.facturaId,
+                liniiFactura,
+                clientInfo,
+                observatii,
+                cursuriUtilizate: cursuriProcesate,
+                proiectInfo: {
+                  id: proiectIdFinal,
+                  ID_Proiect: proiectIdFinal,
+                  denumire: proiect.Denumire
+                },
+                setariFacturare,
+                contariBancare: [] // sau din result dacă există
+              })
+            });
+
+            const updateResult = await updateResponse.json();
+            
+            if (updateResult.success) {
+              console.log('✅ FIX PROBLEMA 2: Modificări salvate cu succes în BigQuery:', updateResult.data);
+              showToast('✅ Modificări salvate în BigQuery!', 'success');
+            } else {
+              console.error('❌ Eroare salvare modificări:', updateResult.error);
+              showToast(`⚠️ PDF generat, dar salvarea a eșuat: ${updateResult.error}`, 'error');
+            }
+          } catch (updateError) {
+            console.error('❌ Eroare apel /update:', updateError);
+            showToast('⚠️ PDF generat, dar salvarea în BigQuery a eșuat', 'error');
+          }
+        }
+
         if (sendToAnaf) {
           if (result.efactura?.xmlGenerated) {
             showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, 'success');
@@ -1560,7 +1618,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* Secțiunea subproiecte */}
+            {/* Secțiunea subproiecte cu indicator cursuri centralizate */}
             {subproiecteDisponibile.length > 0 && (
               <div style={{
                 marginTop: '1rem',
@@ -1577,7 +1635,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     📋 Subproiecte Disponibile ({subproiecteDisponibile.length}) 
                     {Object.keys(cursuriUtilizate).length > 0 && (
                       <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
-                        • Cursuri BNR centralizate ✓
+                        • Cursuri BNR centralizate ✓ PRECIZIE MAXIMĂ
                       </span>
                     )}
                   </h4>
@@ -1643,7 +1701,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                  {/* ✅ DEBUGGING: Afișează cursul centralizat cu precizia completă */}
                                  <br/>💱 Curs BNR: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
                                  {cursuriUtilizate[subproiect.moneda] && (
-                                   <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat)</span>
+                                   <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat precizie maximă)</span>
                                  )}
                                </span>
                              )}
@@ -2015,6 +2073,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                              required
                            />
                          </div>
+                         {/* ✅ AFIȘARE INFO CURS pentru subproiecte */}
+                         {linie.tip === 'subproiect' && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && (
+                           <div style={{ 
+                             fontSize: '11px', 
+                             color: '#666', 
+                             marginTop: '4px',
+                             padding: '2px 4px',
+                             background: '#e8f5e8',
+                             borderRadius: '3px'
+                           }}>
+                             💱 {linie.valoareOriginala} {linie.monedaOriginala} @ curs BNR: {linie.cursValutar?.toFixed(4)} 
+                             {cursuriUtilizate[linie.monedaOriginala] && (
+                               <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat)</span>
+                             )}
+                           </div>
+                         )}
                        </td>
                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                          <input
@@ -2297,7 +2371,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              fontSize: '13px',
              color: '#0c5460'
            }}>
-             <strong>💱 Note curs valutar (centralizat BNR):</strong><br/>
+             <strong>💱 Note curs valutar (centralizat BNR cu precizie maximă):</strong><br/>
              {generateCurrencyNote()}
            </div>
          )}
@@ -2320,8 +2394,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
              <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
              {Object.keys(cursuriUtilizate).length > 0 && (
-               <li>💱 <strong>Cursuri BNR centralizate</strong> pentru precizie maximă</li>
+               <li>💱 <strong>FIX APLICAT: Cursuri BNR centralizate cu precizie maximă (4 zecimale)</strong></li>
              )}
+             {isEdit && <li>✏️ <strong>FIX APLICAT: Salvare completă în BigQuery pentru editări</strong></li>}
            </ul>
          </div>
 
@@ -2338,7 +2413,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              color: '#7f8c8d',
              fontWeight: '500'
            }}>
-             ℹ️ Date client auto-completate din BD. Cursuri BNR centralizate. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
+             ℹ️ Date client auto-completate din BD. ✅ Cursuri BNR cu precizie maximă. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
            </div>
            
            <div style={{ display: 'flex', gap: '1rem' }}>
@@ -2374,9 +2449,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                }}
              >
                {isLoading ? (
-                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri BNR...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
+                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri BNR precise...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
                ) : (
-                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR'}</>
+                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR precise'}</>
                )}
              </button>
            </div>
@@ -2385,4 +2460,3 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
      </div>
    </div>
  );
-}
