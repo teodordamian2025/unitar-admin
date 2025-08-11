@@ -2460,3 +2460,4 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
      </div>
    </div>
  );
+}
