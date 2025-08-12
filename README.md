@@ -297,6 +297,7 @@ app/api/rapoarte/proiecte/[id]/route.ts
 app/api/actions/invoices/list/route.ts
 app/api/actions/invoices/update/route.ts
 app/api/actions/invoices/regenerate-pdf/route.ts
+app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
 
 
 ### 📋 Descriere Componente Cheie

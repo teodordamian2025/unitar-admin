@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// MODIFICAT: Afișare monedă originală + RON în lista de proiecte
+// DATA: 12.08.2025 09:45
+// FIX PRINCIPAL: Cursuri BNR live + Data Start/Final populare
 // ==================================================================
 
 'use client';
@@ -20,7 +21,7 @@ interface Proiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
-  // ✅ NOUĂ: Câmpuri pentru multi-valută
+  // ✅ MODIFICAT: Câmpuri pentru multi-valută cu suport pentru recalculare live
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
@@ -46,7 +47,7 @@ interface Subproiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
-  // ✅ NOUĂ: Câmpuri pentru multi-valută la subproiecte
+  // ✅ MODIFICAT: Câmpuri pentru multi-valută la subproiecte cu suport pentru recalculare live
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
@@ -61,6 +62,17 @@ interface Subproiect {
 
 interface ProiecteTableProps {
   searchParams?: { [key: string]: string | undefined };
+}
+
+// ✅ NOU: Interfață pentru cursuri BNR live cu tracking precizie maximă
+interface CursuriLive {
+  [moneda: string]: {
+    curs: number;
+    data: string;
+    precizie_originala?: string;
+    loading?: boolean;
+    error?: string;
+  };
 }
 
 // ✅ Toast system optimizat cu Z-index compatibil cu modalele
@@ -113,6 +125,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
+  // ✅ NOU: State pentru cursuri BNR live cu precizie maximă
+  const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
+  const [loadingCursuri, setLoadingCursuri] = useState(false);
+  
   // ✅ State management centralizat pentru toate modalele
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -126,7 +142,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     loadData();
   }, [searchParams, refreshTrigger]);
 
-  // ✅ Auto-expand subproiecte când datele se schimbă
+  // ✅ AUTO-EXPAND și PRELUARE CURSURI BNR LIVE
   useEffect(() => {
     if (proiecte.length > 0 && subproiecte.length > 0) {
       const proiecteCuSubproiecte = proiecte
@@ -138,7 +154,117 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         console.log('🔍 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
       }
     }
+    
+    // ✅ FIX PRINCIPAL: Preiau cursuri BNR live pentru toate valutele găsite
+    if (proiecte.length > 0 || subproiecte.length > 0) {
+      identificaSiPreiaCursuriLive();
+    }
   }, [proiecte, subproiecte]);
+
+  // ✅ NOU: Funcție pentru identificarea și preluarea cursurilor BNR live
+  const identificaSiPreiaCursuriLive = async () => {
+    const valuteNecesare = new Set<string>();
+    
+    // Identifică valutele din proiecte
+    proiecte.forEach(p => {
+      if (p.moneda && p.moneda !== 'RON') {
+        valuteNecesare.add(p.moneda);
+      }
+    });
+    
+    // Identifică valutele din subproiecte
+    subproiecte.forEach(s => {
+      if (s.moneda && s.moneda !== 'RON') {
+        valuteNecesare.add(s.moneda);
+      }
+    });
+    
+    if (valuteNecesare.size === 0) {
+      console.log('💱 Nu sunt necesare cursuri valutare - toate proiectele sunt în RON');
+      return;
+    }
+    
+    const monede = Array.from(valuteNecesare);
+    console.log(`💱 FIX CURSURI: Preiau cursuri BNR live pentru: ${monede.join(', ')}`);
+    
+    setLoadingCursuri(true);
+    
+    try {
+      // Preiau cursurile în paralel pentru toate valutele
+      const promisesCursuri = monede.map(async (moneda) => {
+        try {
+          const response = await fetch(`/api/curs-valutar?moneda=${encodeURIComponent(moneda)}`);
+          const data = await response.json();
+          
+          if (data.success && data.curs) {
+            const cursNumeric = typeof data.curs === 'number' ? data.curs : parseFloat(data.curs.toString());
+            const cursOriginal = data.precizie_originala || data.curs.toString();
+            
+            console.log(`✅ Curs BNR live pentru ${moneda}: ${cursNumeric.toFixed(4)} (precizie originală: ${cursOriginal})`);
+            
+            return {
+              moneda,
+              curs: cursNumeric,
+              data: data.data || new Date().toISOString().split('T')[0],
+              precizie_originala: cursOriginal,
+              loading: false
+            };
+          } else {
+            console.warn(`⚠️ Nu s-a putut prelua cursul live pentru ${moneda}:`, data.error || 'Eroare necunoscută');
+            return {
+              moneda,
+              error: data.error || 'Curs indisponibil',
+              loading: false
+            };
+          }
+        } catch (error) {
+          console.error(`❌ Eroare la preluarea cursului live pentru ${moneda}:`, error);
+          return {
+            moneda,
+            error: 'Eroare de conectare',
+            loading: false
+          };
+        }
+      });
+      
+      const rezultateCursuri = await Promise.all(promisesCursuri);
+      
+      // Actualizează state-ul cu cursurile live
+      const cursuriNoi: CursuriLive = {};
+      let cursuriObtinute = 0;
+      
+      rezultateCursuri.forEach((rezultat) => {
+        if (rezultat) {
+          cursuriNoi[rezultat.moneda] = {
+            curs: rezultat.curs || 1,
+            data: rezultat.data || new Date().toISOString().split('T')[0],
+            precizie_originala: rezultat.precizie_originala,
+            loading: false,
+            error: rezultat.error
+          };
+          
+          if (!rezultat.error) {
+            cursuriObtinute++;
+          }
+        }
+      });
+      
+      setCursuriLive(cursuriNoi);
+      
+      if (cursuriObtinute > 0) {
+        console.log(`🎯 FIX APLICAT: ${cursuriObtinute}/${monede.length} cursuri BNR live preluate cu precizie maximă`);
+        showToast(`💱 FIX APLICAT: Cursuri BNR live cu precizie maximă (${cursuriObtinute}/${monede.length})`, 'success');
+      } else {
+        showToast('⚠️ Nu s-au putut prelua cursuri BNR live. Afișez cu cursuri din BD.', 'error');
+      }
+      
+    } catch (error) {
+      console.error('❌ Eroare generală la preluarea cursurilor live:', error);
+      showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri din BD.', 'error');
+    } finally {
+      setLoadingCursuri(false);
+    }
+  };
 
   // Verifică notificări pentru statusul facturii din URL
   useEffect(() => {
@@ -378,45 +504,129 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ FIX: Formatare dată în format românesc (dd/mm/yyyy)
+  // ✅ FIX PROBLEMA 2: Formatare dată în format românesc (dd/mm/yyyy) și indicare când lipsește
   const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
+    if (!dateString) {
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Lipsește data
+        </span>
+      );
+    }
     
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
+      if (isNaN(date.getTime())) {
+        return (
+          <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+            Data invalidă
+          </span>
+        );
+      }
       
       // ✅ Format românesc dd/mm/yyyy
-      return date.toLocaleDateString('ro-RO', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
+      return (
+        <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+          {date.toLocaleDateString('ro-RO', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })}
+        </span>
+      );
     } catch {
-      return '';
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Eroare formatare
+        </span>
+      );
     }
   };
 
-  // ✅ FIX: Funcție pentru formatarea valorii cu moneda originală + RON
-  const formatCurrencyWithOriginal = (amount?: number, currency?: string, ronValue?: number, isSubproiect = false) => {
+  // ✅ FIX PROBLEMA 1: Funcție pentru recalcularea valorii cu cursuri BNR live cu precizie maximă
+  const recalculeazaValoareaCuCursBNRLive = (
+    valoareOriginala: number, 
+    monedaOriginala: string, 
+    valoareRonBD?: number, 
+    cursVechiDinBD?: number
+  ) => {
+    // Dacă e RON, returnează valoarea originală
+    if (monedaOriginala === 'RON' || !monedaOriginala) {
+      return valoareOriginala;
+    }
+    
+    // ✅ PRIORITATE 1: Folosește cursul BNR live cu precizie maximă
+    const cursLive = cursuriLive[monedaOriginala];
+    if (cursLive && !cursLive.error && cursLive.curs) {
+      const valoareRecalculata = valoareOriginala * cursLive.curs;
+      
+      console.log(`🎯 FIX APLICAT pentru ${monedaOriginala}:`, {
+        valoare_originala: valoareOriginala,
+        curs_live_bnr: cursLive.curs.toFixed(4),
+        precizie_originala: cursLive.precizie_originala,
+        valoare_recalculata: valoareRecalculata.toFixed(2),
+        valoare_veche_bd: valoareRonBD?.toFixed(2) || 'N/A',
+        diferenta: valoareRonBD ? (valoareRecalculata - valoareRonBD).toFixed(2) : 'N/A'
+      });
+      
+      return valoareRecalculata;
+    }
+    
+    // ✅ FALLBACK: Folosește valoarea din BD dacă există
+    if (valoareRonBD) {
+      console.log(`⚠️ FALLBACK BD pentru ${monedaOriginala}: ${valoareRonBD.toFixed(2)} RON (curs live indisponibil)`);
+      return valoareRonBD;
+    }
+    
+    // ✅ ULTIMUL RESORT: Calculează cu cursul din BD
+    if (cursVechiDinBD && cursVechiDinBD > 0) {
+      const valoareCalculataCuCursVechi = valoareOriginala * cursVechiDinBD;
+      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${valoareCalculataCuCursVechi.toFixed(2)} RON (curs BD: ${cursVechiDinBD.toFixed(4)})`);
+      return valoareCalculataCuCursVechi;
+    }
+    
+    // Returnează valoarea originală dacă nu avem cursuri
+    console.warn(`❌ Nu există cursuri pentru ${monedaOriginala}, returnez valoarea originală`);
+    return valoareOriginala;
+  };
+
+  // ✅ FIX: Funcție pentru formatarea valorii cu moneda originală + RON recalculat live
+  const formatCurrencyWithOriginal = (
+    amount?: number, 
+    currency?: string, 
+    ronValueBD?: number, 
+    cursVechiDinBD?: number,
+    isSubproiect = false
+  ) => {
     if (!amount && amount !== 0) return '';
     
     const originalCurrency = currency || 'RON';
     const colorClass = isSubproiect ? '#3498db' : '#27ae60';
     
-    // Dacă moneda este RON sau nu avem valoare RON
-    if (originalCurrency === 'RON' || !ronValue) {
+    // Dacă moneda este RON sau nu avem valoare
+    if (originalCurrency === 'RON' || !currency) {
       return (
         <div style={{ textAlign: 'right', fontWeight: '700', color: colorClass, fontSize: '14px' }}>
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
-            currency: originalCurrency
+            currency: 'RON'
           }).format(amount)}
         </div>
       );
     }
     
-    // Pentru alte monede, afișează original + RON
+    // ✅ FIX PRINCIPAL: Recalculează cu cursuri BNR live
+    const valoareRecalculataRON = recalculeazaValoareaCuCursBNRLive(
+      amount, 
+      originalCurrency, 
+      ronValueBD, 
+      cursVechiDinBD
+    );
+    
+    // Verifică dacă avem curs live pentru această monedă
+    const cursLive = cursuriLive[originalCurrency];
+    const areaCursLive = cursLive && !cursLive.error;
+    
     return (
       <div style={{ textAlign: 'right', fontWeight: '700', color: colorClass, fontSize: '13px' }}>
         <div style={{ fontSize: '14px', marginBottom: '2px' }}>
@@ -425,12 +635,53 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             currency: originalCurrency
           }).format(amount)}
         </div>
-        <div style={{ fontSize: '11px', color: '#7f8c8d', fontWeight: '500' }}>
+        <div style={{ 
+          fontSize: '11px', 
+          color: areaCursLive ? '#27ae60' : '#7f8c8d', 
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '4px'
+        }}>
           ≈ {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: 'RON'
-          }).format(ronValue)}
+          }).format(valoareRecalculataRON)}
+          {areaCursLive && (
+            <span style={{ 
+              backgroundColor: '#d4edda', 
+              color: '#155724', 
+              padding: '1px 4px', 
+              borderRadius: '3px', 
+              fontSize: '9px',
+              fontWeight: 'bold'
+            }}>
+              LIVE
+            </span>
+          )}
+          {loadingCursuri && (
+            <span style={{ 
+              backgroundColor: '#fff3cd', 
+              color: '#856404', 
+              padding: '1px 4px', 
+              borderRadius: '3px', 
+              fontSize: '9px'
+            }}>
+              ⏳
+            </span>
+          )}
         </div>
+        {areaCursLive && cursLive.precizie_originala && (
+          <div style={{ 
+            fontSize: '10px', 
+            color: '#6c757d', 
+            marginTop: '1px',
+            fontFamily: 'monospace'
+          }}>
+            1 {originalCurrency} = {cursLive.curs.toFixed(4)} RON
+          </div>
+        )}
       </div>
     );
   };
@@ -464,22 +715,46 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ FIX: Calculează totalul combinat folosind valorile RON pentru acuratețe
+  // ✅ FIX: Calculează totalul combinat folosind valorile recalculate cu cursuri BNR live
   const calculateTotalValue = () => {
-    const totalProiecte = proiecte.reduce((sum, p) => {
-      // ✅ Folosește valoare_ron dacă există, altfel valoarea originală
-      const valoare = Number(p.valoare_ron) || Number(p.Valoare_Estimata) || 0;
-      return sum + valoare;
-    }, 0);
+    let totalProiecte = 0;
+    let totalSubproiecte = 0;
     
-    const totalSubproiecte = subproiecte.reduce((sum, s) => {
-      // ✅ Folosește valoare_ron dacă există, altfel valoarea originală
-      const valoare = Number(s.valoare_ron) || Number(s.Valoare_Estimata) || 0;
-      return sum + valoare;
-    }, 0);
+    // Calculează totalul pentru proiecte cu cursuri live
+    proiecte.forEach(p => {
+      if (p.Valoare_Estimata) {
+        const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
+          p.Valoare_Estimata,
+          p.moneda || 'RON',
+          p.valoare_ron,
+          p.curs_valutar
+        );
+        totalProiecte += valoareRecalculata;
+      }
+    });
+    
+    // Calculează totalul pentru subproiecte cu cursuri live
+    subproiecte.forEach(s => {
+      if (s.Valoare_Estimata) {
+        const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
+          s.Valoare_Estimata,
+          s.moneda || 'RON',
+          s.valoare_ron,
+          s.curs_valutar
+        );
+        totalSubproiecte += valoareRecalculata;
+      }
+    });
     
     const total = totalProiecte + totalSubproiecte;
-    console.log('💰 Calcul totaluri cu RON:', { totalProiecte, totalSubproiecte, total });
+    
+    console.log('💰 Calcul totaluri cu cursuri BNR live:', { 
+      totalProiecte: totalProiecte.toFixed(2), 
+      totalSubproiecte: totalSubproiecte.toFixed(2), 
+      total: total.toFixed(2),
+      cursuriLive: Object.keys(cursuriLive).length
+    });
+    
     return total;
   };
 
@@ -508,7 +783,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       zIndex: 1,
       position: 'relative' as const
     }}>
-      {/* ✅ Header cu acțiuni - Backdrop redus */}
+      {/* ✅ Header cu acțiuni și indicator cursuri live */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -542,6 +817,20 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               ? 'Rezultate filtrate' 
               : 'Toate proiectele și subproiectele'
             }
+            {/* ✅ INDICATOR CURSURI LIVE */}
+            {Object.keys(cursuriLive).length > 0 && (
+              <span style={{ 
+                marginLeft: '10px',
+                padding: '2px 8px',
+                backgroundColor: loadingCursuri ? '#fff3cd' : '#d4edda',
+                color: loadingCursuri ? '#856404' : '#155724',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>
+                {loadingCursuri ? '⏳ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
+              </span>
+            )}
           </p>
         </div>
         
@@ -714,6 +1003,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Data Finalizare
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
                     textAlign: 'right',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -871,7 +1171,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         <td style={{ 
                           padding: '0.75rem',
                           textAlign: 'center',
-                          color: '#7f8c8d',
                           fontFamily: 'monospace',
                           fontSize: '13px',
                           fontWeight: '500'
@@ -880,13 +1179,23 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
+                          textAlign: 'center',
+                          fontFamily: 'monospace',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}>
+                          {formatDate(proiect.Data_Final)}
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
                           textAlign: 'right'
                         }}>
-                          {/* ✅ FIX: Afișare moneda originală + RON */}
+                          {/* ✅ FIX: Afișare moneda originală + RON cu cursuri BNR live */}
                           {formatCurrencyWithOriginal(
                             proiect.Valoare_Estimata,
                             proiect.moneda,
                             proiect.valoare_ron,
+                            proiect.curs_valutar,
                             false
                           )}
                         </td>
@@ -993,7 +1302,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center',
-                            color: '#7f8c8d',
                             fontFamily: 'monospace',
                             fontSize: '12px'
                           }}>
@@ -1001,13 +1309,22 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            fontFamily: 'monospace',
+                            fontSize: '12px'
+                          }}>
+                            {formatDate(subproiect.Data_Final)}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
                             textAlign: 'right'
                           }}>
-                            {/* ✅ FIX: Afișare moneda originală + RON pentru subproiecte */}
+                            {/* ✅ FIX: Afișare moneda originală + RON cu cursuri BNR live pentru subproiecte */}
                             {formatCurrencyWithOriginal(
                               subproiect.Valoare_Estimata,
                               subproiect.moneda,
                               subproiect.valoare_ron,
+                              subproiect.curs_valutar,
                               true
                             )}
                           </td>
@@ -1054,7 +1371,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* ✅ Footer cu statistici - Backdrop redus */}
+          {/* ✅ Footer cu statistici - Include indicator cursuri live */}
           {proiecte.length > 0 && (
             <div style={{
               padding: '1.5rem',
@@ -1091,20 +1408,37 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {subproiecte.length}
                 </div>
               </div>
+              {Object.keys(cursuriLive).length > 0 && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(93, 173, 226, 0.1) 100%)',
+                  padding: '1rem',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(52, 152, 219, 0.2)',
+                  boxShadow: '0 4px 12px rgba(52, 152, 219, 0.1)'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#3498db', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cursuri BNR Live</div>
+                  <div style={{ fontSize: '20px', fontWeight: '700', color: '#3498db', marginTop: '0.25rem' }}>
+                    {Object.keys(cursuriLive).filter(m => !cursuriLive[m].error).length}/{Object.keys(cursuriLive).length}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
+                    Precizie maximă (4 zecimale)
+                  </div>
+                </div>
+              )}
               <div style={{
                 background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
                 padding: '1rem',
                 borderRadius: '12px',
                 border: '1px solid rgba(39, 174, 96, 0.2)',
                 boxShadow: '0 4px 12px rgba(39, 174, 96, 0.1)',
-                gridColumn: 'span 2'
+                gridColumn: Object.keys(cursuriLive).length > 0 ? 'span 1' : 'span 2'
               }}>
                 <div style={{ fontSize: '12px', color: '#27ae60', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Totală Portofoliu</div>
                 <div style={{ fontSize: '24px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  Proiecte + Subproiecte combinate (în RON)
+                  {Object.keys(cursuriLive).length > 0 ? 'Recalculat cu cursuri BNR LIVE' : 'Proiecte + Subproiecte combinate (în RON)'}
                 </div>
               </div>
             </div>

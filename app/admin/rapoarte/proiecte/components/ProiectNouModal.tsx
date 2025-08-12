@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// MODIFICAT: Fix salvare subproiecte cu toate câmpurile + păstrare funcționalități complete
+// DATA: 12.08.2025 10:00
+// FIX PRINCIPAL: Popularea câmpurilor Data_Start și Data_Final în format corect
 // ==================================================================
 
 'use client';
@@ -54,8 +55,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     selectedClientId: '',
     Adresa: '',
     Descriere: '',
-    Data_Start: '',
-    Data_Final: '',
+    Data_Start: '', // ✅ FIX: Inițializare corectă pentru date
+    Data_Final: '', // ✅ FIX: Inițializare corectă pentru date
     Status: 'Activ',
     
     // Valoare și monedă
@@ -91,7 +92,22 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     cheltuieli: [] as CheltuialaProiect[]
   });
 
-  // Funcție pentru formatarea datei în format românesc pentru afișare
+  // ✅ FIX PRINCIPAL: Funcție pentru formatarea datei în format ISO pentru input date (yyyy-mm-dd)
+  const formatDateForInput = (dateValue: string): string => {
+    if (!dateValue) return '';
+    try {
+      // Convertește data în format ISO pentru input-ul de tip date
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return '';
+      
+      // Returnează în format yyyy-mm-dd pentru input date
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
+  // ✅ FIX: Funcție pentru formatarea datei în format românesc pentru afișare (dd/mm/yyyy)
   const formatDateForDisplay = (dateValue: string): string => {
     if (!dateValue) return '';
     try {
@@ -101,17 +117,30 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
+  // ✅ FIX: Funcție pentru validarea datei
+  const isValidDate = (dateString: string): boolean => {
+    if (!dateString) return true; // Date opționale sunt valide
+    try {
+      const date = new Date(dateString);
+      return !isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100;
+    } catch {
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadClienti();
-      // Setează data actuală în format ISO pentru input date
+      // ✅ FIX: Setează data actuală în format ISO pentru input date și data_curs_valutar
       const today = new Date();
       const todayISO = today.toISOString().split('T')[0];
       
       setFormData(prev => ({
         ...prev,
         ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
-        data_curs_valutar: todayISO
+        data_curs_valutar: todayISO,
+        // ✅ FIX: Setează implicit Data_Start la data curentă
+        Data_Start: todayISO
       }));
     }
   }, [isOpen]);
@@ -181,7 +210,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     setLoading(true);
 
     try {
-      // Validări
+      // ✅ FIX: Validări îmbunătățite cu verificare date
       if (!formData.ID_Proiect.trim()) {
         toast.error('ID proiect este obligatoriu');
         setLoading(false);
@@ -200,16 +229,42 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         return;
       }
 
-      console.log('📤 Trimitere date proiect complet:', formData);
+      // ✅ FIX: Validare date
+      if (formData.Data_Start && !isValidDate(formData.Data_Start)) {
+        toast.error('Data de început nu este validă');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.Data_Final && !isValidDate(formData.Data_Final)) {
+        toast.error('Data de finalizare nu este validă');
+        setLoading(false);
+        return;
+      }
+
+      // ✅ FIX: Verificare logică între date
+      if (formData.Data_Start && formData.Data_Final) {
+        const dataStart = new Date(formData.Data_Start);
+        const dataFinal = new Date(formData.Data_Final);
+        
+        if (dataFinal <= dataStart) {
+          toast.error('Data de finalizare trebuie să fie după data de început');
+          setLoading(false);
+          return;
+        }
+      }
+
+      console.log('📤 Trimitere date proiect complet cu date corecte:', formData);
       toast.info('Se adaugă proiectul...');
 
-      // Adaugă proiectul principal cu toate câmpurile
+      // ✅ FIX: Adaugă proiectul principal cu toate câmpurile și date corect formatate
       const proiectData = {
         ID_Proiect: formData.ID_Proiect.trim(),
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
         Adresa: formData.Adresa.trim(),
         Descriere: formData.Descriere.trim(),
+        // ✅ FIX PRINCIPAL: Transmite datele în format corect pentru BigQuery (yyyy-mm-dd)
         Data_Start: formData.Data_Start || null,
         Data_Final: formData.Data_Final || null,
         Status: formData.Status,
@@ -230,6 +285,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         Responsabil: formData.Responsabil.trim(),
         Observatii: formData.Observatii.trim()
       };
+
+      console.log('📤 Date proiect formatate pentru BigQuery:', proiectData);
 
       const response = await fetch('/api/rapoarte/proiecte', {
         method: 'POST',
@@ -254,7 +311,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           await addCheltuieli(formData.ID_Proiect);
         }
 
-        toast.success('✅ Proiect adăugat cu succes cu toate componentele!');
+        // ✅ FIX: Mesaj de succes îmbunătățit cu informații despre date
+        const dataInfo = formData.Data_Start ? 
+          ` (Start: ${formatDateForDisplay(formData.Data_Start)}${formData.Data_Final ? `, Final: ${formatDateForDisplay(formData.Data_Final)}` : ''})` : '';
+        toast.success(`✅ Proiect adăugat cu succes cu toate componentele!${dataInfo}`);
+        
         onProiectAdded();
         onClose();
         resetForm();
@@ -270,89 +331,97 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-	// ✅ FUNCȚIE CORECTATĂ pentru adăugarea subproiectelor cu TOATE câmpurile
-	const addSubproiecte = async (proiectId: string) => {
-	  console.log(`📋 Începe adăugarea subproiectelor pentru ${proiectId}`);
-	  
-	  for (const subproiect of formData.subproiecte) {
-	    try {
-	      // Calculăm valoarea în RON pentru subproiect dacă e în altă monedă
-	      let valoareRonSubproiect: number | null = null;
-	      let cursSubproiect: number | null = null;
-	      
-	      if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
-		// Folosim același curs ca la proiectul principal sau calculăm unul nou
-		if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
-		  cursSubproiect = parseFloat(formData.curs_valutar);
-		  valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
-		} else {
-		  // În producție, aici ar trebui să apelăm API-ul pentru curs
-		  // Pentru moment folosim valori default
-		  switch(subproiect.moneda) {
-		    case 'EUR':
-		      cursSubproiect = 4.97;
-		      break;
-		    case 'USD':
-		      cursSubproiect = 4.50;
-		      break;
-		    case 'GBP':
-		      cursSubproiect = 5.80;
-		      break;
-		    default:
-		      cursSubproiect = 1;
-		  }
-		  valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
-		}
-	      } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
-		valoareRonSubproiect = parseFloat(subproiect.valoare);
-		cursSubproiect = 1;
-	      }
-	      
-	      const subproiectData = {
-		ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
-		ID_Proiect: proiectId,
-		Denumire: subproiect.denumire,
-		Responsabil: subproiect.responsabil || null,
-		Status: subproiect.status || 'Planificat',
-		Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
-		
-		// ✅ NOUĂ: Câmpuri multi-valută pentru subproiect
-		moneda: subproiect.moneda || 'RON',
-		curs_valutar: cursSubproiect,
-		data_curs_valutar: formData.data_curs_valutar || null,
-		valoare_ron: valoareRonSubproiect,
-		
-		// ✅ NOUĂ: Status-uri multiple pentru subproiect (moștenite de la proiect)
-		status_predare: 'Nepredat',
-		status_contract: 'Nu e cazul',
-		status_facturare: 'Nefacturat',
-		status_achitare: 'Neachitat'
-	      };
+  // ✅ FUNCȚIE CORECTATĂ pentru adăugarea subproiectelor cu TOATE câmpurile și date corecte
+  const addSubproiecte = async (proiectId: string) => {
+    console.log(`📋 Începe adăugarea subproiectelor pentru ${proiectId}`);
+    
+    for (const subproiect of formData.subproiecte) {
+      try {
+        // Calculăm valoarea în RON pentru subproiect dacă e în altă monedă
+        let valoareRonSubproiect: number | null = null;
+        let cursSubproiect: number | null = null;
+        
+        if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
+          // Folosim același curs ca la proiectul principal sau calculăm unul nou
+          if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
+            cursSubproiect = parseFloat(formData.curs_valutar);
+            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+          } else {
+            // În producție, aici ar trebui să apelăm API-ul pentru curs
+            // Pentru moment folosim valori default
+            switch(subproiect.moneda) {
+              case 'EUR':
+                cursSubproiect = 4.97;
+                break;
+              case 'USD':
+                cursSubproiect = 4.50;
+                break;
+              case 'GBP':
+                cursSubproiect = 5.80;
+                break;
+              default:
+                cursSubproiect = 1;
+            }
+            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+          }
+        } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
+          valoareRonSubproiect = parseFloat(subproiect.valoare);
+          cursSubproiect = 1;
+        }
+        
+        // ✅ FIX: Date pentru subproiecte - moștenite din proiectul principal sau setate implicit
+        const dataStartSubproiect = formData.Data_Start || null;
+        const dataFinalSubproiect = formData.Data_Final || null;
+        
+        const subproiectData = {
+          ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
+          ID_Proiect: proiectId,
+          Denumire: subproiect.denumire,
+          Responsabil: subproiect.responsabil || null,
+          Status: subproiect.status || 'Planificat',
+          Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+          
+          // ✅ FIX: Date moștenite din proiectul principal
+          Data_Start: dataStartSubproiect,
+          Data_Final: dataFinalSubproiect,
+          
+          // ✅ NOUĂ: Câmpuri multi-valută pentru subproiect
+          moneda: subproiect.moneda || 'RON',
+          curs_valutar: cursSubproiect,
+          data_curs_valutar: formData.data_curs_valutar || null,
+          valoare_ron: valoareRonSubproiect,
+          
+          // ✅ NOUĂ: Status-uri multiple pentru subproiect (moștenite de la proiect)
+          status_predare: 'Nepredat',
+          status_contract: 'Nu e cazul',
+          status_facturare: 'Nefacturat',
+          status_achitare: 'Neachitat'
+        };
 
-	      console.log(`📤 Trimitere subproiect ${subproiect.denumire}:`, subproiectData);
+        console.log(`📤 Trimitere subproiect ${subproiect.denumire} cu date:`, subproiectData);
 
-	      const response = await fetch('/api/rapoarte/subproiecte', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(subproiectData)
-	      });
-	      
-	      const result = await response.json();
-	      
-	      if (result.success) {
-		console.log(`✅ Subproiect "${subproiect.denumire}" adăugat cu succes`);
-	      } else {
-		console.error(`❌ Eroare la subproiect ${subproiect.denumire}:`, result);
-		toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
-	      }
-	    } catch (error) {
-	      console.error(`❌ Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
-	      toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
-	    }
-	  }
-	  
-	  console.log(`✅ Procesare subproiecte finalizată pentru ${proiectId}`);
-	};
+        const response = await fetch('/api/rapoarte/subproiecte', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subproiectData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log(`✅ Subproiect "${subproiect.denumire}" adăugat cu succes cu date corecte`);
+        } else {
+          console.error(`❌ Eroare la subproiect ${subproiect.denumire}:`, result);
+          toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
+        }
+      } catch (error) {
+        console.error(`❌ Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
+        toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
+      }
+    }
+    
+    console.log(`✅ Procesare subproiecte finalizată pentru ${proiectId}`);
+  };
 
   // Funcție pentru adăugarea cheltuielilor (păstrată neschimbată)
   const addCheltuieli = async (proiectId: string) => {
@@ -399,8 +468,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       selectedClientId: '',
       Adresa: '',
       Descriere: '',
-      Data_Start: '',
-      Data_Final: '',
+      Data_Start: '', // ✅ FIX: Reset la gol, va fi setat la deschiderea modalului
+      Data_Final: '', // ✅ FIX: Reset la gol
       Status: 'Activ',
       Valoare_Estimata: '',
       moneda: 'RON',
@@ -425,6 +494,39 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       ...prev,
       [field]: value
     }));
+  };
+
+  // ✅ FIX: Handler special pentru date cu validare
+  const handleDateChange = (field: 'Data_Start' | 'Data_Final', value: string) => {
+    // Validare de bază înainte de setare
+    if (value && !isValidDate(value)) {
+      toast.warning(`Data introdusă pentru ${field === 'Data_Start' ? 'început' : 'finalizare'} nu este validă`);
+      return;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Validare logică între date
+    if (field === 'Data_Start' && value && formData.Data_Final) {
+      const dataStart = new Date(value);
+      const dataFinal = new Date(formData.Data_Final);
+      
+      if (dataFinal <= dataStart) {
+        toast.warning('Data de finalizare trebuie să fie după data de început');
+      }
+    }
+    
+    if (field === 'Data_Final' && value && formData.Data_Start) {
+      const dataStart = new Date(formData.Data_Start);
+      const dataFinal = new Date(value);
+      
+      if (dataFinal <= dataStart) {
+        toast.warning('Data de finalizare trebuie să fie după data de început');
+      }
+    }
   };
 
   const handleClientSearch = (value: string) => {
@@ -566,6 +668,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           </div>
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
             Completează informațiile pentru noul proiect cu suport multi-valută și status-uri avansate
+            {/* ✅ FIX: Indicator că datele sunt obligatorii pentru afișare corectă */}
+            <br/>
+            <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>
+              💡 Completează datele de început și finalizare pentru afișare corectă în listă
+            </span>
           </p>
         </div>
 
@@ -966,80 +1073,121 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             </div>
           </div>
 
-          {/* Date și responsabil */}
+          {/* ✅ FIX PRINCIPAL: SECȚIUNE Date și responsabil cu validare îmbunătățită */}
           <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '1rem',
-            marginBottom: '1rem'
+            background: '#f0f8ff',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #cce7ff'
           }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Data Început
-                {formData.Data_Start && (
-                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
-                    ({formatDateForDisplay(formData.Data_Start)})
-                  </span>
-                )}
-              </label>
-              <input
-                type="date"
-                value={formData.Data_Start}
-                onChange={(e) => handleInputChange('Data_Start', e.target.value)}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>📅 Perioada Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Început
+                  {formData.Data_Start && (
+                    <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: 'normal' }}>
+                      ({formatDateForDisplay(formData.Data_Start)})
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.Data_Start}
+                  onChange={(e) => handleDateChange('Data_Start', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>
+                  💡 Completează pentru afișare corectă în listă
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Finalizare (estimată)
+                  {formData.Data_Final && (
+                    <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: 'normal' }}>
+                      ({formatDateForDisplay(formData.Data_Final)})
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={formData.Data_Final}
+                  onChange={(e) => handleDateChange('Data_Final', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>
+                  💡 Opțional, dar recomandat pentru planificare
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Responsabil
+                </label>
+                <input
+                  type="text"
+                  value={formData.Responsabil}
+                  onChange={(e) => handleInputChange('Responsabil', e.target.value)}
+                  disabled={loading}
+                  placeholder="Numele responsabilului"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Data Finalizare
-                {formData.Data_Final && (
-                  <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
-                    ({formatDateForDisplay(formData.Data_Final)})
-                  </span>
-                )}
-              </label>
-              <input
-                type="date"
-                value={formData.Data_Final}
-                onChange={(e) => handleInputChange('Data_Final', e.target.value)}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Responsabil
-              </label>
-              <input
-                type="text"
-                value={formData.Responsabil}
-                onChange={(e) => handleInputChange('Responsabil', e.target.value)}
-                disabled={loading}
-                placeholder="Numele responsabilului"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
+            {/* ✅ Informație despre perioada proiectului */}
+            {formData.Data_Start && formData.Data_Final && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: '#d4edda',
+                border: '1px solid #c3e6cb',
+                borderRadius: '6px',
+                fontSize: '14px',
+                color: '#155724'
+              }}>
+                ✅ <strong>Perioada proiect:</strong> {formatDateForDisplay(formData.Data_Start)} → {formatDateForDisplay(formData.Data_Final)}
+                {(() => {
+                  try {
+                    const start = new Date(formData.Data_Start);
+                    const end = new Date(formData.Data_Final);
+                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return ` (${diffDays} ${diffDays === 1 ? 'zi' : 'zile'})`;
+                  } catch {
+                    return '';
+                  }
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Descriere */}
@@ -1362,7 +1510,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     🗑️
                   </button>
                 </div>
-
+                
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
