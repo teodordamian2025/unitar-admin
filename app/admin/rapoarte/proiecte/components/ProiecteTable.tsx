@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 12.08.2025 09:45
-// FIX PRINCIPAL: Cursuri BNR live + Data Start/Final populare
+// DATA: 12.08.2025 09:45 - FIX APLICAT: cursVechi.toFixed error
+// FIX PRINCIPAL: Cursuri BNR live + Data Start/Final populare + FIX cursVechi.toFixed
 // ==================================================================
 
 'use client';
@@ -543,7 +543,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ FIX PROBLEMA 1: Funcție pentru recalcularea valorii cu cursuri BNR live cu precizie maximă
+  // ✅ FIX PROBLEMA 1 + FIX URGENT: Funcție pentru recalcularea valorii cu cursuri BNR live cu precizie maximă
+  // 🔥 FIX APLICAT: Rezolvă eroarea "cursVechiDinBD.toFixed is not a function"
   const recalculeazaValoareaCuCursBNRLive = (
     valoareOriginala: number, 
     monedaOriginala: string, 
@@ -578,10 +579,35 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       return valoareRonBD;
     }
     
-    // ✅ ULTIMUL RESORT: Calculează cu cursul din BD
+    // ✅ ULTIMUL RESORT: Calculează cu cursul din BD + FIX URGENT pentru .toFixed()
     if (cursVechiDinBD && cursVechiDinBD > 0) {
-      const valoareCalculataCuCursVechi = valoareOriginala * cursVechiDinBD;
-      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${valoareCalculataCuCursVechi.toFixed(2)} RON (curs BD: ${cursVechiDinBD.toFixed(4)})`);
+      // 🔥 FIX URGENT: Verificare tip pentru cursVechiDinBD înainte de .toFixed()
+      let cursVechiNumeric: number;
+      
+      if (typeof cursVechiDinBD === 'number') {
+        cursVechiNumeric = cursVechiDinBD;
+      } else if (typeof cursVechiDinBD === 'string') {
+        cursVechiNumeric = parseFloat(cursVechiDinBD);
+        if (isNaN(cursVechiNumeric)) {
+          cursVechiNumeric = 1;
+        }
+      } else if (cursVechiDinBD && typeof cursVechiDinBD === 'object' && 'value' in cursVechiDinBD) {
+        // Pentru cazurile în care cursVechiDinBD vine ca { value: number }
+        cursVechiNumeric = parseFloat((cursVechiDinBD as any).value.toString());
+        if (isNaN(cursVechiNumeric)) {
+          cursVechiNumeric = 1;
+        }
+      } else {
+        cursVechiNumeric = 1;
+      }
+      
+      // ✅ SIGURANȚĂ SUPLIMENTARĂ: Verifică că avem un număr valid
+      if (isNaN(cursVechiNumeric) || cursVechiNumeric <= 0) {
+        cursVechiNumeric = 1;
+      }
+      
+      const valoareCalculataCuCursVechi = valoareOriginala * cursVechiNumeric;
+      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${valoareCalculataCuCursVechi.toFixed(2)} RON (curs BD: ${cursVechiNumeric.toFixed(4)})`);
       return valoareCalculataCuCursVechi;
     }
     
