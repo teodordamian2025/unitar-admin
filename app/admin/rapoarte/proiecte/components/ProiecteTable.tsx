@@ -75,6 +75,37 @@ interface CursuriLive {
   };
 }
 
+// ✅ HELPER FUNCTION pentru .toFixed() sigur - previne eroarea "toFixed is not a function"
+const safeToFixed = (value: any, decimals: number = 2): string => {
+  if (value === null || value === undefined || value === '') {
+    return '0.00';
+  }
+  
+  let numericValue: number;
+  
+  if (typeof value === 'number') {
+    numericValue = value;
+  } else if (typeof value === 'string') {
+    numericValue = parseFloat(value);
+    if (isNaN(numericValue)) {
+      return '0.00';
+    }
+  } else if (typeof value === 'object' && value !== null && 'value' in value) {
+    numericValue = parseFloat((value as any).value.toString());
+    if (isNaN(numericValue)) {
+      return '0.00';
+    }
+  } else {
+    return '0.00';
+  }
+  
+  if (isNaN(numericValue) || !isFinite(numericValue)) {
+    return '0.00';
+  }
+  
+  return numericValue.toFixed(decimals);
+};
+
 // ✅ Toast system optimizat cu Z-index compatibil cu modalele
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
@@ -566,8 +597,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         curs_live_bnr: cursLive.curs.toFixed(4),
         precizie_originala: cursLive.precizie_originala,
         valoare_recalculata: valoareRecalculata.toFixed(2),
-        valoare_veche_bd: valoareRonBD?.toFixed(2) || 'N/A',
-        diferenta: valoareRonBD ? (valoareRecalculata - valoareRonBD).toFixed(2) : 'N/A'
+        valoare_veche_bd: safeToFixed(valoareRonBD, 2),
+        diferenta: valoareRonBD ? safeToFixed(valoareRecalculata - valoareRonBD, 2) : 'N/A'
       });
       
       return valoareRecalculata;
@@ -575,7 +606,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     
     // ✅ FALLBACK: Folosește valoarea din BD dacă există
     if (valoareRonBD) {
-      console.log(`⚠️ FALLBACK BD pentru ${monedaOriginala}: ${valoareRonBD.toFixed(2)} RON (curs live indisponibil)`);
+      console.log(`⚠️ FALLBACK BD pentru ${monedaOriginala}: ${safeToFixed(valoareRonBD, 2)} RON (curs live indisponibil)`);
       return valoareRonBD;
     }
     
@@ -607,7 +638,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
       
       const valoareCalculataCuCursVechi = valoareOriginala * cursVechiNumeric;
-      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${valoareCalculataCuCursVechi.toFixed(2)} RON (curs BD: ${cursVechiNumeric.toFixed(4)})`);
+      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${safeToFixed(valoareCalculataCuCursVechi, 2)} RON (curs BD: ${safeToFixed(cursVechiNumeric, 4)})`);
       return valoareCalculataCuCursVechi;
     }
     
@@ -775,9 +806,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     const total = totalProiecte + totalSubproiecte;
     
     console.log('💰 Calcul totaluri cu cursuri BNR live:', { 
-      totalProiecte: totalProiecte.toFixed(2), 
-      totalSubproiecte: totalSubproiecte.toFixed(2), 
-      total: total.toFixed(2),
+      totalProiecte: safeToFixed(totalProiecte, 2), 
+      totalSubproiecte: safeToFixed(totalSubproiecte, 2), 
+      total: safeToFixed(total, 2),
       cursuriLive: Object.keys(cursuriLive).length
     });
     
