@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 13.08.2025 21:30
+// DATA: 13.08.2025 21:45 - FIX CLEAN COMPLET
 // FIX APLICAT: formatDate() + cursuri BNR live + calculul totalului + eroarea "toFixed"
 // ==================================================================
 
@@ -21,7 +21,6 @@ interface Proiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
-  // 🎯 FIX: Câmpuri pentru multi-valută cu suport pentru recalculare live
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
@@ -47,7 +46,6 @@ interface Subproiect {
   Data_Start?: string;
   Data_Final?: string;
   Valoare_Estimata?: number;
-  // 🎯 FIX: Câmpuri pentru multi-valută la subproiecte cu suport pentru recalculare live
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
@@ -64,7 +62,6 @@ interface ProiecteTableProps {
   searchParams?: { [key: string]: string | undefined };
 }
 
-// 🎯 FIX: Interfață pentru cursuri BNR live cu tracking precizie maximă
 interface CursuriLive {
   [moneda: string]: {
     curs: number;
@@ -75,7 +72,7 @@ interface CursuriLive {
   };
 }
 
-// 🔥 FIX URGENT: HELPER FUNCTION pentru .toFixed() sigur - previne eroarea "toFixed is not a function"
+// 🔥 FIX URGENT: HELPER FUNCTION pentru .toFixed() sigur
 const safeToFixed = (value: any, decimals: number = 2): string => {
   if (value === null || value === undefined || value === '') {
     return '0.00';
@@ -106,7 +103,7 @@ const safeToFixed = (value: any, decimals: number = 2): string => {
   return numericValue.toFixed(decimals);
 };
 
-// 🎯 FIX: FuncțIE PENTRU PRELUAREA CURSURILOR BNR LIVE cu precizie maximă
+// 🎯 FIX: FuncțIE PENTRU PRELUAREA CURSURILOR BNR LIVE
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
   if (moneda === 'RON') return 1;
   
@@ -122,16 +119,14 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
     }
     
     console.warn(`⚠️ Nu s-a putut prelua cursul live pentru ${moneda}, folosesc fallback`);
-    // 🎯 FIX: Fallback-uri actualizate (mai apropiate de realitate)
     switch(moneda) {
-      case 'EUR': return 5.0683; // Actualizat BNR
-      case 'USD': return 4.3688; // Actualizat BNR  
-      case 'GBP': return 5.8777; // Actualizat BNR
+      case 'EUR': return 5.0683;
+      case 'USD': return 4.3688;
+      case 'GBP': return 5.8777;
       default: return 1;
     }
   } catch (error) {
     console.error(`❌ Eroare la preluarea cursului pentru ${moneda}:`, error);
-    // Fallback în caz de eroare
     switch(moneda) {
       case 'EUR': return 5.0683;
       case 'USD': return 4.3688;
@@ -141,7 +136,6 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
   }
 };
 
-// 🎯 Toast system optimizat cu Z-index compatibil cu modalele
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -168,7 +162,6 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
-  // Smooth entrance animation
   setTimeout(() => {
     toastEl.style.transform = 'translateY(0)';
     toastEl.style.opacity = '1';
@@ -191,11 +184,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // 🎯 FIX: State pentru cursuri BNR live cu precizie maximă
   const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
   const [loadingCursuri, setLoadingCursuri] = useState(false);
   
-  // 🎯 State management centralizat pentru toate modalele
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showSubproiectModal, setShowSubproiectModal] = useState(false);
@@ -208,7 +199,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     loadData();
   }, [searchParams, refreshTrigger]);
 
-  // 🎯 AUTO-EXPAND și PRELUARE CURSURI BNR LIVE
   useEffect(() => {
     if (proiecte.length > 0 && subproiecte.length > 0) {
       const proiecteCuSubproiecte = proiecte
@@ -217,28 +207,23 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       
       if (proiecteCuSubproiecte.length > 0) {
         setExpandedProjects(new Set(proiecteCuSubproiecte));
-        console.log('📂 Auto-expanded proiecte cu subproiecte:', proiecteCuSubproiecte);
       }
     }
     
-    // 🎯 FIX PRINCIPAL: Preiau cursuri BNR live pentru toate valutele găsite
     if (proiecte.length > 0 || subproiecte.length > 0) {
       identificaSiPreiaCursuriLive();
     }
   }, [proiecte, subproiecte]);
 
-  // 🎯 FIX: Funcție pentru identificarea și preluarea cursurilor BNR live
   const identificaSiPreiaCursuriLive = async () => {
     const valuteNecesare = new Set<string>();
     
-    // Identifică valutele din proiecte
     proiecte.forEach(p => {
       if (p.moneda && p.moneda !== 'RON') {
         valuteNecesare.add(p.moneda);
       }
     });
     
-    // Identifică valutele din subproiecte
     subproiecte.forEach(s => {
       if (s.moneda && s.moneda !== 'RON') {
         valuteNecesare.add(s.moneda);
@@ -246,17 +231,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     });
     
     if (valuteNecesare.size === 0) {
-      console.log('💱 Nu sunt necesare cursuri valutare - toate proiectele sunt în RON');
       return;
     }
     
     const monede = Array.from(valuteNecesare);
-    console.log(`💱 FIX CURSURI: Preiau cursuri BNR live pentru: ${monede.join(', ')}`);
-    
     setLoadingCursuri(true);
     
     try {
-      // Preiau cursurile în paralel pentru toate valutele
       const promisesCursuri = monede.map(async (moneda) => {
         try {
           const cursLive = await getCursBNRLive(moneda);
@@ -268,7 +249,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             loading: false
           };
         } catch (error) {
-          console.error(`❌ Eroare la preluarea cursului live pentru ${moneda}:`, error);
           return {
             moneda,
             error: 'Eroare de conectare',
@@ -279,7 +259,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       
       const rezultateCursuri = await Promise.all(promisesCursuri);
       
-      // Actualizează state-ul cu cursurile live
       const cursuriNoi: CursuriLive = {};
       let cursuriObtinute = 0;
       
@@ -302,21 +281,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       setCursuriLive(cursuriNoi);
       
       if (cursuriObtinute > 0) {
-        console.log(`🎯 FIX APLICAT: ${cursuriObtinute}/${monede.length} cursuri BNR live preluate cu precizie maximă`);
         showToast(`💱 FIX APLICAT: Cursuri BNR live cu precizie maximă (${cursuriObtinute}/${monede.length})`, 'success');
-      } else {
-        showToast('⚠️ Nu s-au putut prelua cursuri BNR live. Afișez cu cursuri din BD.', 'error');
       }
       
     } catch (error) {
       console.error('❌ Eroare generală la preluarea cursurilor live:', error);
-      showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri din BD.', 'error');
     } finally {
       setLoadingCursuri(false);
     }
   };
 
-  // Verifică notificări pentru statusul facturii din URL
   useEffect(() => {
     if (searchParams?.invoice_status && searchParams?.project_id) {
       const status = searchParams.invoice_status;
@@ -349,7 +323,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const loadProiecte = async () => {
     try {
-      // Construiește query string din searchParams
       const queryParams = new URLSearchParams();
       if (searchParams) {
         Object.entries(searchParams).forEach(([key, value]) => {
@@ -377,14 +350,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
     } catch (error) {
       console.error('Eroare la încărcarea proiectelor:', error);
-      showToast('Eroare la încărcarea proiectelor', 'error');
       setProiecte([]);
     }
   };
 
   const loadSubproiecte = async () => {
     try {
-      // Construiește query string din searchParams
       const queryParams = new URLSearchParams();
       if (searchParams) {
         Object.entries(searchParams).forEach(([key, value]) => {
@@ -394,30 +365,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         });
       }
 
-      console.log('📂 Loading subproiecte with params:', queryParams.toString());
-
       const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('📋 Subproiecte API response:', data);
       
       if (data.success) {
         setSubproiecte(data.data || []);
-        console.log('✅ Subproiecte încărcate:', data.data?.length || 0, 'items');
-        console.log('📊 Subproiecte data:', data.data);
-        
-        if (data.data && data.data.length > 0) {
-          const groupedByProject = data.data.reduce((acc: any, sub: any) => {
-            acc[sub.ID_Proiect] = (acc[sub.ID_Proiect] || 0) + 1;
-            return acc;
-          }, {});
-          console.log('📈 Subproiecte grupate pe proiecte:', groupedByProject);
-        }
       } else {
-        console.warn('⚠️ Nu s-au găsit subproiecte sau eroare:', data.error);
         setSubproiecte([]);
       }
     } catch (error) {
@@ -431,21 +388,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     showToast('Date actualizate!', 'success');
   };
 
-  // 🎯 Handler-e pentru modalele externe
   const handleShowFacturaModal = (proiect: any) => {
-    console.log('📄 Deschidere modal factură pentru:', proiect);
     setSelectedProiect(proiect);
     setShowFacturaModal(true);
   };
 
   const handleShowSubproiectModal = (proiect: any) => {
-    console.log('📂 Deschidere modal subproiect pentru:', proiect);
     setSelectedProiect(proiect);
     setShowSubproiectModal(true);
   };
 
   const handleShowEditModal = (proiect: any) => {
-    console.log('✏️ Deschidere modal editare pentru:', proiect);
     setSelectedProiect(proiect);
     setShowEditModal(true);
   };
@@ -506,16 +459,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
   const getSubproiecteForProject = (proiectId: string): Subproiect[] => {
-    const result = subproiecte.filter(sub => sub.ID_Proiect === proiectId);
-    console.log(`📂 Pentru proiectul ${proiectId} găsite ${result.length} subproiecte:`, result);
-    return result;
+    return subproiecte.filter(sub => sub.ID_Proiect === proiectId);
   };
 
   const handleExportExcel = async () => {
     try {
       showToast('Se generează fișierul Excel...', 'info');
       
-      // Construiește query string pentru export cu aceleași filtre
       const queryParams = new URLSearchParams();
       if (searchParams) {
         Object.entries(searchParams).forEach(([key, value]) => {
@@ -533,7 +483,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         const link = document.createElement('a');
         link.href = url;
         
-        // Obține numele fișierului din header sau folosește unul default
         const contentDisposition = response.headers.get('Content-Disposition');
         const fileName = contentDisposition 
           ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
@@ -554,7 +503,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🔥 FIX PROBLEMA 1: Formatare dată în format românesc (dd/mm/yyyy) și indicare când lipsește
+  // 🔥 FIX PROBLEMA 1: Formatare dată în format românesc (dd/mm/yyyy)
   const formatDate = (dateString?: string) => {
     if (!dateString) {
       return (
@@ -565,11 +514,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
     
     try {
-      // 🎯 FIX PRINCIPAL: Parse explicit pentru formatul BigQuery yyyy-mm-dd
       const dateParts = dateString.split('-');
       if (dateParts.length === 3) {
         const year = parseInt(dateParts[0]);
-        const month = parseInt(dateParts[1]) - 1; // Luna în JS este 0-indexed
+        const month = parseInt(dateParts[1]) - 1;
         const day = parseInt(dateParts[2]);
         const date = new Date(year, month, day);
         
@@ -586,7 +534,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         }
       }
       
-      // Fallback pentru alte formate
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
         return (
@@ -614,45 +561,28 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🎯 FIX PROBLEMA 1 + FIX URGENT: Funcție pentru recalcularea valorii cu cursuri BNR live cu precizie maximă
-  // 🔥 FIX APLICAT: Rezolvă eroarea "cursVechiDinBD.toFixed is not a function"
+  // 🎯 FIX: Funcție pentru recalcularea valorii cu cursuri BNR live
   const recalculeazaValoareaCuCursBNRLive = (
     valoareOriginala: number, 
     monedaOriginala: string, 
     valoareRonBD?: number, 
     cursVechiDinBD?: number
   ) => {
-    // Dacă e RON, returnează valoarea originală
     if (monedaOriginala === 'RON' || !monedaOriginala) {
       return valoareOriginala;
     }
     
-    // 🎯 PRIORITATE 1: Folosește cursul BNR live cu precizie maximă
     const cursLive = cursuriLive[monedaOriginala];
     if (cursLive && !cursLive.error && cursLive.curs) {
       const valoareRecalculata = valoareOriginala * cursLive.curs;
-      
-      console.log(`🎯 FIX APLICAT pentru ${monedaOriginala}:`, {
-        valoare_originala: valoareOriginala,
-        curs_live_bnr: cursLive.curs.toFixed(4),
-        precizie_originala: cursLive.precizie_originala,
-        valoare_recalculata: valoareRecalculata.toFixed(2),
-        valoare_veche_bd: safeToFixed(valoareRonBD, 2),
-        diferenta: valoareRonBD ? safeToFixed(valoareRecalculata - valoareRonBD, 2) : 'N/A'
-      });
-      
       return valoareRecalculata;
     }
     
-    // 🎯 FALLBACK: Folosește valoarea din BD dacă există
     if (valoareRonBD) {
-      console.log(`⚠️ FALLBACK BD pentru ${monedaOriginala}: ${safeToFixed(valoareRonBD, 2)} RON (curs live indisponibil)`);
       return valoareRonBD;
     }
     
-    // 🎯 ULTIMUL RESORT: Calculează cu cursul din BD + FIX URGENT pentru .toFixed()
     if (cursVechiDinBD && cursVechiDinBD > 0) {
-      // 🔥 FIX URGENT: Verificare tip pentru cursVechiDinBD înainte de .toFixed()
       let cursVechiNumeric: number;
       
       if (typeof cursVechiDinBD === 'number') {
@@ -663,7 +593,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           cursVechiNumeric = 1;
         }
       } else if (cursVechiDinBD && typeof cursVechiDinBD === 'object' && 'value' in cursVechiDinBD) {
-        // Pentru cazurile în care cursVechiDinBD vine ca { value: number }
         cursVechiNumeric = parseFloat((cursVechiDinBD as any).value.toString());
         if (isNaN(cursVechiNumeric)) {
           cursVechiNumeric = 1;
@@ -672,22 +601,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         cursVechiNumeric = 1;
       }
       
-      // 🎯 SIGURANȚĂ SUPLIMENTARĂ: Verifică că avem un număr valid
       if (isNaN(cursVechiNumeric) || cursVechiNumeric <= 0) {
         cursVechiNumeric = 1;
       }
       
       const valoareCalculataCuCursVechi = valoareOriginala * cursVechiNumeric;
-      console.log(`⚠️ ULTIMUL RESORT pentru ${monedaOriginala}: ${safeToFixed(valoareCalculataCuCursVechi, 2)} RON (curs BD: ${safeToFixed(cursVechiNumeric, 4)})`);
       return valoareCalculataCuCursVechi;
     }
     
-    // Returnează valoarea originală dacă nu avem cursuri
-    console.warn(`❌ Nu există cursuri pentru ${monedaOriginala}, returnez valoarea originală`);
     return valoareOriginala;
   };
 
-  // 🎯 FIX: Funcție pentru formatarea valorii cu moneda originală + RON recalculat live
   const formatCurrencyWithOriginal = (
     amount?: number, 
     currency?: string, 
@@ -700,7 +624,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     const originalCurrency = currency || 'RON';
     const colorClass = isSubproiect ? '#3498db' : '#27ae60';
     
-    // Dacă moneda este RON sau nu avem valoare
     if (originalCurrency === 'RON' || !currency) {
       return (
         <div style={{ textAlign: 'right', fontWeight: '700', color: colorClass, fontSize: '14px' }}>
@@ -712,7 +635,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       );
     }
     
-    // 🎯 FIX PRINCIPAL: Recalculează cu cursuri BNR live
     const valoareRecalculataRON = recalculeazaValoareaCuCursBNRLive(
       amount, 
       originalCurrency, 
@@ -720,7 +642,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       cursVechiDinBD
     );
     
-    // Verifică dacă avem curs live pentru această monedă
     const cursLive = cursuriLive[originalCurrency];
     const areaCursLive = cursLive && !cursLive.error;
     
@@ -783,7 +704,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     );
   };
 
-  // 🎯 Funcție păstrată pentru legacy (totaluri)
   const formatCurrency = (amount?: number) => {
     if (!amount && amount !== 0) return '';
     return new Intl.NumberFormat('ro-RO', {
@@ -812,11 +732,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🔥 FIX PROBLEMA 4: Calculează totalul DOAR pentru proiecte principale, nu și subproiecte
+  // 🔥 FIX PROBLEMA 4: Calculează totalul DOAR pentru proiecte principale
   const calculateTotalValue = () => {
     let totalProiecte = 0;
     
-    // 🎯 FIX PRINCIPAL: Calculează totalul DOAR pentru proiecte cu cursuri live
     proiecte.forEach(p => {
       if (p.Valoare_Estimata) {
         const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
@@ -827,14 +746,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         );
         totalProiecte += valoareRecalculata;
       }
-    });
-    
-    // 🔥 FIX: NU mai adun subproiectele - doar proiectele principale
-    console.log('💰 Calcul total portofoliu (DOAR PROIECTE):', { 
-      totalProiecte: safeToFixed(totalProiecte, 2), 
-      numarProiecte: proiecte.length,
-      cursuriLive: Object.keys(cursuriLive).length,
-      notaImportanta: 'Subproiectele NU sunt incluse în total pentru a evita dubla numărare'
     });
     
     return totalProiecte;
@@ -865,7 +776,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       zIndex: 1,
       position: 'relative' as const
     }}>
-      {/* 🎯 Header cu acțiuni și indicator cursuri live */}
+      {/* Header cu acțiuni și indicator cursuri live */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -899,7 +810,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               ? 'Rezultate filtrate' 
               : 'Toate proiectele și subproiectele'
             }
-            {/* 🎯 INDICATOR CURSURI LIVE */}
             {Object.keys(cursuriLive).length > 0 && (
               <span style={{ 
                 marginLeft: '10px',
@@ -932,14 +842,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               transition: 'all 0.3s ease',
               zIndex: 11
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.5)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.4)';
-            }}
           >
             + Proiect Nou
           </button>
@@ -959,14 +861,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               transition: 'all 0.3s ease',
               zIndex: 11
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.5)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.4)';
-            }}
           >
             🔄 Reîmprospătează
           </button>
@@ -985,14 +879,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               boxShadow: '0 4px 12px rgba(243, 156, 18, 0.4)',
               transition: 'all 0.3s ease',
               zIndex: 11
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(243, 156, 18, 0.5)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(243, 156, 18, 0.4)';
             }}
           >
             📊 Export Excel
@@ -1131,16 +1017,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
                         background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
                         transition: 'all 0.3s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.08)';
-                        e.currentTarget.style.transform = 'translateX(4px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)';
-                        e.currentTarget.style.transform = 'translateX(0)';
-                      }}
-                      >
+                      }}>
                         <td style={{ 
                           padding: '0.75rem',
                           color: '#2c3e50',
@@ -1148,7 +1025,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           minWidth: '250px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                            {/* Expand/Collapse Button */}
                             {hasSubprojects && (
                               <button
                                 onClick={() => toggleProjectExpansion(proiect.ID_Proiect)}
@@ -1159,15 +1035,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                   padding: '0.25rem',
                                   fontSize: '12px',
                                   color: '#3498db',
-                                  borderRadius: '4px',
-                                  transition: 'all 0.2s ease'
-                                }}
-                                title={isExpanded ? 'Ascunde subproiectele' : 'Afișează subproiectele'}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = 'rgba(52, 152, 219, 0.1)';
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = 'none';
+                                  borderRadius: '4px'
                                 }}
                               >
                                 {isExpanded ? '📂' : '📁'}
@@ -1180,10 +1048,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                 fontWeight: 'bold',
                                 fontSize: '12px',
                                 color: '#2c3e50',
-                                marginBottom: '0.25rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
+                                marginBottom: '0.25rem'
                               }}>
                                 🗃️ {proiect.ID_Proiect}
                               </div>
@@ -1222,10 +1087,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             <div style={{ 
                               fontSize: '12px', 
                               color: '#7f8c8d',
-                              marginTop: '0.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
+                              marginTop: '0.25rem'
                             }}>
                               👤 {proiect.Responsabil}
                             </div>
@@ -1244,8 +1106,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             fontSize: '12px',
                             fontWeight: '600',
                             color: 'white',
-                            background: `linear-gradient(135deg, ${getStatusColor(proiect.Status)} 0%, ${getStatusColor(proiect.Status)}dd 100%)`,
-                            boxShadow: `0 2px 8px ${getStatusColor(proiect.Status)}40`
+                            background: `linear-gradient(135deg, ${getStatusColor(proiect.Status)} 0%, ${getStatusColor(proiect.Status)}dd 100%)`
                           }}>
                             {getStatusIcon(proiect.Status)} {proiect.Status}
                           </span>
@@ -1272,7 +1133,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           padding: '0.75rem',
                           textAlign: 'right'
                         }}>
-                          {/* 🎯 FIX: Afișare moneda originală + RON cu cursuri BNR live */}
                           {formatCurrencyWithOriginal(
                             proiect.Valoare_Estimata,
                             proiect.moneda,
@@ -1285,7 +1145,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           padding: '0.75rem',
                           textAlign: 'center' as const
                         }}>
-                          {/* 🎯 MODIFICAT: Adăugat callback-uri pentru modalele externe */}
                           <ProiectActions 
                             proiect={{
                               ...proiect,
@@ -1299,25 +1158,54 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         </td>
                       </tr>
 
-                      {/* Rândurile subproiectelor (dacă sunt expandate) */}
+                      {/* Rândurile subproiectelor */}
                       {isExpanded && subproiecteProiect.map((subproiect, subIndex) => (
                         <tr 
                           key={subproiect.ID_Subproiect}
                           style={{ 
                             background: 'rgba(52, 152, 219, 0.05)',
                             borderLeft: '4px solid #3498db',
-                            borderBottom: '1px solid rgba(52, 152, 219, 0.1)',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = 'rgba(52, 152, 219, 0.1)';
-                            e.currentTarget.style.transform = 'translateX(8px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'rgba(52, 152, 219, 0.05)';
-                            e.currentTarget.style.transform = 'translateX(0)';
+                            borderBottom: '1px solid rgba(52, 152, 219, 0.1)'
                           }}
                         >
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            paddingLeft: '3rem',
+                            color: '#2c3e50'
+                          }}>
+                            <div style={{ 
+                              fontFamily: 'monospace',
+                              fontWeight: 'bold',
+                              fontSize: '11px',
+                              color: '#3498db',
+                              marginBottom: '0.25rem'
+                            }}>
+                              └─ 📋 {subproiect.ID_Subproiect}
+                            </div>
+                            <div style={{ 
+                              color: '#2c3e50',
+                              fontStyle: 'italic',
+                              fontSize: '13px',
+                              fontWeight: '500'
+                            }}>
+                              {subproiect.Denumire}
+                            </div>
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            color: '#2c3e50'
+                          }}>
+                            <div style={{ fontSize: '13px', fontWeight: '500' }}>{subproiect.Client || proiect.Client}</div>
+                            {subproiect.Responsabil && (
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: '#7f8c8d',
+                                marginTop: '0.25rem'
+                              }}>
+                                👤 {subproiect.Responsabil}
+                              </div>
+                            )}
+                          </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center'
@@ -1331,8 +1219,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               fontSize: '11px',
                               fontWeight: '600',
                               color: 'white',
-                              background: `linear-gradient(135deg, ${getStatusColor(subproiect.Status)} 0%, ${getStatusColor(subproiect.Status)}dd 100%)`,
-                              boxShadow: `0 2px 6px ${getStatusColor(subproiect.Status)}30`
+                              background: `linear-gradient(135deg, ${getStatusColor(subproiect.Status)} 0%, ${getStatusColor(subproiect.Status)}dd 100%)`
                             }}>
                               {getStatusIcon(subproiect.Status)} {subproiect.Status}
                             </span>
@@ -1357,7 +1244,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             padding: '0.5rem 0.75rem',
                             textAlign: 'right'
                           }}>
-                            {/* 🎯 FIX: Afișare moneda originală + RON cu cursuri BNR live pentru subproiecte */}
                             {formatCurrencyWithOriginal(
                               subproiect.Valoare_Estimata,
                               subproiect.moneda,
@@ -1370,7 +1256,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center' as const
                           }}>
-                            {/* 🎯 MODIFICAT: Adăugat callback-uri pentru subproiecte */}
                             <ProiectActions 
                               proiect={{
                                 ID_Proiect: subproiect.ID_Subproiect,
@@ -1409,7 +1294,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* 🎯 Footer cu statistici - Include indicator cursuri live */}
+          {/* Footer cu statistici */}
           {proiecte.length > 0 && (
             <div style={{
               padding: '1.5rem',
@@ -1484,9 +1369,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🎯 TOATE MODALELE GESTIONATE CENTRALIZAT CU Z-INDEX 50000 */}
-      
-      {/* Modal Proiect Nou */}
+      {/* Toate modalele */}
       {showProiectModal && (
         <div style={{ zIndex: 50000 }}>
           <ProiectNouModal
@@ -1497,7 +1380,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🎯 Modal Factură Hibridă */}
       {showFacturaModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <FacturaHibridModal
@@ -1508,7 +1390,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🎯 Modal Subproiect */}
       {showSubproiectModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <SubproiectModal
@@ -1520,7 +1401,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🎯 Modal Editare Proiect */}
       {showEditModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <ProiectEditModal
@@ -1535,47 +1415,3 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     </div>
   );
 }
-                            paddingLeft: '3rem',
-                            color: '#2c3e50'
-                          }}>
-                            <div style={{ 
-                              fontFamily: 'monospace',
-                              fontWeight: 'bold',
-                              fontSize: '11px',
-                              color: '#3498db',
-                              marginBottom: '0.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem'
-                            }}>
-                              └─ 📋 {subproiect.ID_Subproiect}
-                            </div>
-                            <div style={{ 
-                              color: '#2c3e50',
-                              fontStyle: 'italic',
-                              fontSize: '13px',
-                              fontWeight: '500'
-                            }}>
-                              {subproiect.Denumire}
-                            </div>
-                          </td>
-                          <td style={{ 
-                            padding: '0.5rem 0.75rem',
-                            color: '#2c3e50'
-                          }}>
-                            <div style={{ fontSize: '13px', fontWeight: '500' }}>{subproiect.Client || proiect.Client}</div>
-                            {subproiect.Responsabil && (
-                              <div style={{ 
-                                fontSize: '11px', 
-                                color: '#7f8c8d',
-                                marginTop: '0.25rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem'
-                              }}>
-                                👤 {subproiect.Responsabil}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ 
-                            padding: '0.5rem 0.75rem',
