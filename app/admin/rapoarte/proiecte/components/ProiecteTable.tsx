@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 13.08.2025 22:45 - FIX TOTAL NaN + FORMATARE DATE
-// FIX APLICAT: Total folosește valoare_ron + formatare date îmbunătățită
+// DATA: 13.08.2025 22:55 - FIX URGENT TypeError: e.trim is not a function
+// FIX APLICAT: Verificare tip de date înainte de .trim()
 // ==================================================================
 
 'use client';
@@ -472,10 +472,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       showToast('Eroare la exportul Excel', 'error');
     }
   };
-  // 🔥 FIX PRINCIPAL 1: FORMATARE DATĂ ÎMBUNĂTĂȚITĂ - gestionare corectă null/undefined
+
+  // 🔥 FIX URGENT: FORMATARE DATĂ ÎMBUNĂTĂȚITĂ - VERIFICARE TIP ÎNAINTE DE .trim()
   const formatDate = (dateString?: string | null) => {
-    // Gestionare explicită pentru null, undefined, string gol
-    if (!dateString || dateString === 'null' || dateString.trim() === '') {
+    // 🎯 FIX PRINCIPAL: Verificare explicită pentru null, undefined, și tip de date
+    if (!dateString || 
+        dateString === null || 
+        dateString === undefined || 
+        dateString === 'null' || 
+        dateString === 'undefined' ||
+        (typeof dateString === 'string' && dateString.trim() === '')) {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
           📅 Dată lipsă
@@ -483,9 +489,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       );
     }
     
+    // Convertim la string dacă nu este deja
+    const dateStr = typeof dateString === 'string' ? dateString : String(dateString);
+    
     try {
       // BigQuery returnează date în format yyyy-mm-dd
-      const date = new Date(dateString);
+      const date = new Date(dateStr);
       if (isNaN(date.getTime())) {
         return (
           <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -653,7 +662,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     switch (status) {
       case 'Activ': return '🟢';
       case 'Finalizat': return '✅';
-      case 'Suspendat': return 'ⸯⸯ';
+      case 'Suspendat': return '⏸️';
       case 'Arhivat': return '📦';
       default: return '⚪';
     }
@@ -759,6 +768,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                 {loadingCursuri ? '⏳ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
               </span>
             )}
+            <br/>
+            <span style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '12px' }}>
+              🔥 FIX APLICAT: Verificare tip de date + Total folosește valoare_ron
+            </span>
           </p>
         </div>
         
