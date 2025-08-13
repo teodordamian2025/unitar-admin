@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 13.08.2025 22:30 - FIX INTERFEȚE SIMPLE + REACT ERROR #31
-// FIX APLICAT: Interfețe simple conform BigQuery + focus pe adevărata problemă
+// DATA: 13.08.2025 22:45 - FIX TOTAL NaN + FORMATARE DATE
+// FIX APLICAT: Total folosește valoare_ron + formatare date îmbunătățită
 // ==================================================================
 
 'use client';
@@ -472,13 +472,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       showToast('Eroare la exportul Excel', 'error');
     }
   };
-
-  // ✅ FORMATARE DATĂ SIMPLĂ - fără helper functions complicate
-  const formatDate = (dateString?: string) => {
-    if (!dateString) {
+  // 🔥 FIX PRINCIPAL 1: FORMATARE DATĂ ÎMBUNĂTĂȚITĂ - gestionare corectă null/undefined
+  const formatDate = (dateString?: string | null) => {
+    // Gestionare explicită pentru null, undefined, string gol
+    if (!dateString || dateString === 'null' || dateString.trim() === '') {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Lipsește data
+          📅 Dată lipsă
         </span>
       );
     }
@@ -489,7 +489,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       if (isNaN(date.getTime())) {
         return (
           <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-            Data invalidă
+            ❌ Dată invalidă
           </span>
         );
       }
@@ -506,7 +506,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     } catch {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Eroare formatare
+          ⚠️ Eroare formatare
         </span>
       );
     }
@@ -659,19 +659,28 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ✅ CALCULARE TOTAL SIMPLU - doar proiecte principale
+  // 🔥 FIX PRINCIPAL 2: CALCULARE TOTAL CORECTĂ - folosește valoare_ron din BigQuery
   const calculateTotalValue = () => {
     let totalProiecte = 0;
     
     proiecte.forEach(p => {
-      if (p.Valoare_Estimata) {
-        const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
-          p.Valoare_Estimata,
-          p.moneda || 'RON',
-          p.valoare_ron,
-          p.curs_valutar
-        );
-        totalProiecte += valoareRecalculata;
+      // 🎯 FIX PRINCIPAL: Folosește valoare_ron în loc de Valoare_Estimata
+      if (p.valoare_ron && p.valoare_ron > 0) {
+        // valoare_ron conține deja valoarea convertită în RON din BigQuery
+        totalProiecte += p.valoare_ron;
+      } else if (p.Valoare_Estimata && (!p.moneda || p.moneda === 'RON')) {
+        // Fallback pentru proiecte vechi fără valoare_ron, dar doar dacă sunt în RON
+        totalProiecte += p.Valoare_Estimata;
+      } else if (p.Valoare_Estimata && p.moneda && p.moneda !== 'RON') {
+        // Pentru proiecte vechi cu valută străină, încearcă să calculeze cu cursul live
+        const cursLive = cursuriLive[p.moneda];
+        if (cursLive && !cursLive.error && cursLive.curs) {
+          totalProiecte += p.Valoare_Estimata * cursLive.curs;
+        } else if (p.curs_valutar && p.curs_valutar > 0) {
+          // Folosește cursul salvat în BD
+          totalProiecte += p.Valoare_Estimata * p.curs_valutar;
+        }
+        // Altfel nu adăugăm valoarea pentru a evita calculele greșite
       }
     });
     
@@ -1218,7 +1227,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* Footer cu statistici */}
+          {/* 🔥 FIX PRINCIPAL 3: Footer cu statistici și TOTAL CORECTAT */}
           {proiecte.length > 0 && (
             <div style={{
               padding: '1.5rem',
@@ -1280,12 +1289,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                 boxShadow: '0 4px 12px rgba(39, 174, 96, 0.1)',
                 gridColumn: Object.keys(cursuriLive).length > 0 ? 'span 1' : 'span 2'
               }}>
-                <div style={{ fontSize: '12px', color: '#27ae60', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valoare Totală Portofoliu</div>
+                <div style={{ fontSize: '12px', color: '#27ae60', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Valoare Totală Portofoliu
+                </div>
                 <div style={{ fontSize: '24px', fontWeight: '700', color: '#27ae60', marginTop: '0.25rem' }}>
+                  {/* 🎯 FIX PRINCIPAL: Folosește funcția corectată calculateTotalValue() */}
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  DOAR proiecte principale (fără subproiecte) {Object.keys(cursuriLive).length > 0 ? 'cu cursuri BNR LIVE' : ''}
+                  🔥 FIX APLICAT: Folosește valoare_ron din BigQuery pentru precizie maximă
+                  <br/>
+                  (DOAR proiecte principale, fără subproiecte)
                 </div>
               </div>
             </div>
@@ -1293,7 +1307,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🔥 MODALELE - LOCUL PROBABIL AL REACT ERROR #31 */}
+      {/* Toate modalele */}
       {showProiectModal && (
         <div style={{ zIndex: 50000 }}>
           <ProiectNouModal
@@ -1314,7 +1328,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* 🎯 MODAL SUBPROIECT - AICI E PROBABIL REACT ERROR #31 */}
       {showSubproiectModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <SubproiectModal
