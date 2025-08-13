@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 13.08.2025 21:45 - FIX CLEAN COMPLET
-// FIX APLICAT: formatDate() + cursuri BNR live + calculul totalului + eroarea "toFixed"
+// DATA: 13.08.2025 22:15 - FIX REACT ERROR #31
+// FIX APLICAT: Helper functions pentru gestionarea obiectelor BigQuery {value: "..."} 
 // ==================================================================
 
 'use client';
@@ -18,13 +18,13 @@ interface Proiect {
   Denumire: string;
   Client: string;
   Status: string;
-  Data_Start?: string;
-  Data_Final?: string;
-  Valoare_Estimata?: number;
+  Data_Start?: string | { value: string };
+  Data_Final?: string | { value: string };
+  Valoare_Estimata?: number | { value: number };
   moneda?: string;
-  valoare_ron?: number;
-  curs_valutar?: number;
-  data_curs_valutar?: string;
+  valoare_ron?: number | { value: number };
+  curs_valutar?: number | { value: number };
+  data_curs_valutar?: string | { value: string };
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -43,13 +43,13 @@ interface Subproiect {
   Denumire: string;
   Responsabil?: string;
   Status: string;
-  Data_Start?: string;
-  Data_Final?: string;
-  Valoare_Estimata?: number;
+  Data_Start?: string | { value: string };
+  Data_Final?: string | { value: string };
+  Valoare_Estimata?: number | { value: number };
   moneda?: string;
-  valoare_ron?: number;
-  curs_valutar?: number;
-  data_curs_valutar?: string;
+  valoare_ron?: number | { value: number };
+  curs_valutar?: number | { value: number };
+  data_curs_valutar?: string | { value: string };
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -72,38 +72,42 @@ interface CursuriLive {
   };
 }
 
+// 🔥 FIX URGENT: HELPER FUNCTIONS pentru obiecte BigQuery
+const extractValue = (field: any): any => {
+  if (field === null || field === undefined) return null;
+  if (typeof field === 'object' && field !== null && 'value' in field) {
+    return field.value;
+  }
+  return field;
+};
+
+const extractStringValue = (field: any): string => {
+  const value = extractValue(field);
+  if (value === null || value === undefined) return '';
+  return String(value);
+};
+
+const extractNumberValue = (field: any): number => {
+  const value = extractValue(field);
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
 // 🔥 FIX URGENT: HELPER FUNCTION pentru .toFixed() sigur
 const safeToFixed = (value: any, decimals: number = 2): string => {
-  if (value === null || value === undefined || value === '') {
-    return '0.00';
-  }
-  
-  let numericValue: number;
-  
-  if (typeof value === 'number') {
-    numericValue = value;
-  } else if (typeof value === 'string') {
-    numericValue = parseFloat(value);
-    if (isNaN(numericValue)) {
-      return '0.00';
-    }
-  } else if (typeof value === 'object' && value !== null && 'value' in value) {
-    numericValue = parseFloat((value as any).value.toString());
-    if (isNaN(numericValue)) {
-      return '0.00';
-    }
-  } else {
-    return '0.00';
-  }
-  
+  const numericValue = extractNumberValue(value);
   if (isNaN(numericValue) || !isFinite(numericValue)) {
     return '0.00';
   }
-  
   return numericValue.toFixed(decimals);
 };
 
-// 🎯 FIX: FuncțIE PENTRU PRELUAREA CURSURILOR BNR LIVE
+// 🎯 FIX: FUNCȚIE PENTRU PRELUAREA CURSURILOR BNR LIVE
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
   if (moneda === 'RON') return 1;
   
@@ -503,8 +507,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🔥 FIX PROBLEMA 1: Formatare dată în format românesc (dd/mm/yyyy)
-  const formatDate = (dateString?: string) => {
+  // 🔥 FIX PROBLEMA 1: Formatare dată în format românesc (dd/mm/yyyy) cu suport BigQuery
+  const formatDate = (dateField?: string | { value: string }) => {
+    const dateString = extractStringValue(dateField);
+    
     if (!dateString) {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -563,63 +569,46 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   // 🎯 FIX: Funcție pentru recalcularea valorii cu cursuri BNR live
   const recalculeazaValoareaCuCursBNRLive = (
-    valoareOriginala: number, 
+    valoareOriginala: number | { value: number }, 
     monedaOriginala: string, 
-    valoareRonBD?: number, 
-    cursVechiDinBD?: number
+    valoareRonBD?: number | { value: number }, 
+    cursVechiDinBD?: number | { value: number }
   ) => {
+    const valoare = extractNumberValue(valoareOriginala);
+    const valoareRon = extractNumberValue(valoareRonBD);
+    const cursVechi = extractNumberValue(cursVechiDinBD);
+    
     if (monedaOriginala === 'RON' || !monedaOriginala) {
-      return valoareOriginala;
+      return valoare;
     }
     
     const cursLive = cursuriLive[monedaOriginala];
     if (cursLive && !cursLive.error && cursLive.curs) {
-      const valoareRecalculata = valoareOriginala * cursLive.curs;
+      const valoareRecalculata = valoare * cursLive.curs;
       return valoareRecalculata;
     }
     
-    if (valoareRonBD) {
-      return valoareRonBD;
+    if (valoareRon) {
+      return valoareRon;
     }
     
-    if (cursVechiDinBD && cursVechiDinBD > 0) {
-      let cursVechiNumeric: number;
-      
-      if (typeof cursVechiDinBD === 'number') {
-        cursVechiNumeric = cursVechiDinBD;
-      } else if (typeof cursVechiDinBD === 'string') {
-        cursVechiNumeric = parseFloat(cursVechiDinBD);
-        if (isNaN(cursVechiNumeric)) {
-          cursVechiNumeric = 1;
-        }
-      } else if (cursVechiDinBD && typeof cursVechiDinBD === 'object' && 'value' in cursVechiDinBD) {
-        cursVechiNumeric = parseFloat((cursVechiDinBD as any).value.toString());
-        if (isNaN(cursVechiNumeric)) {
-          cursVechiNumeric = 1;
-        }
-      } else {
-        cursVechiNumeric = 1;
-      }
-      
-      if (isNaN(cursVechiNumeric) || cursVechiNumeric <= 0) {
-        cursVechiNumeric = 1;
-      }
-      
-      const valoareCalculataCuCursVechi = valoareOriginala * cursVechiNumeric;
+    if (cursVechi && cursVechi > 0) {
+      const valoareCalculataCuCursVechi = valoare * cursVechi;
       return valoareCalculataCuCursVechi;
     }
     
-    return valoareOriginala;
+    return valoare;
   };
 
   const formatCurrencyWithOriginal = (
-    amount?: number, 
+    amount?: number | { value: number }, 
     currency?: string, 
-    ronValueBD?: number, 
-    cursVechiDinBD?: number,
+    ronValueBD?: number | { value: number }, 
+    cursVechiDinBD?: number | { value: number },
     isSubproiect = false
   ) => {
-    if (!amount && amount !== 0) return '';
+    const amountValue = extractNumberValue(amount);
+    if (!amountValue && amountValue !== 0) return '';
     
     const originalCurrency = currency || 'RON';
     const colorClass = isSubproiect ? '#3498db' : '#27ae60';
@@ -630,13 +619,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: 'RON'
-          }).format(amount)}
+          }).format(amountValue)}
         </div>
       );
     }
     
     const valoareRecalculataRON = recalculeazaValoareaCuCursBNRLive(
-      amount, 
+      amountValue, 
       originalCurrency, 
       ronValueBD, 
       cursVechiDinBD
@@ -651,7 +640,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: originalCurrency
-          }).format(amount)}
+          }).format(amountValue)}
         </div>
         <div style={{ 
           fontSize: '11px', 
@@ -704,12 +693,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     );
   };
 
-  const formatCurrency = (amount?: number) => {
-    if (!amount && amount !== 0) return '';
+  const formatCurrency = (amount?: number | { value: number }) => {
+    const amountValue = extractNumberValue(amount);
+    if (!amountValue && amountValue !== 0) return '';
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
       currency: 'RON'
-    }).format(amount);
+    }).format(amountValue);
   };
 
   const getStatusColor = (status: string) => {
@@ -726,7 +716,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     switch (status) {
       case 'Activ': return '🟢';
       case 'Finalizat': return '✅';
-      case 'Suspendat': return '⏸️';
+      case 'Suspendat': return 'ⸯⸯ';
       case 'Arhivat': return '📦';
       default: return '⚪';
     }
@@ -737,9 +727,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     let totalProiecte = 0;
     
     proiecte.forEach(p => {
-      if (p.Valoare_Estimata) {
+      const valoareEstimata = extractNumberValue(p.Valoare_Estimata);
+      if (valoareEstimata) {
         const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
-          p.Valoare_Estimata,
+          valoareEstimata,
           p.moneda || 'RON',
           p.valoare_ron,
           p.curs_valutar
