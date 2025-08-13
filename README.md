@@ -668,9 +668,9 @@ Componente de modificat:
 ProiectNouModal.tsx - adaugă câmpuri noi = implementat
 ProiecteTable.tsx - afișare status-uri multiple = este implementat
 ProiectActions.tsx - acțiuni pentru cheltuieli = este implementat
-La pagina Proiecte Actuni/Editeaza pagina ar trebui sa fie identica cu cea pentru Proiect nou, in plus cu optiunea sterge proiect = nu este implementat
+La pagina Proiecte Actuni/Editeaza pagina ar trebui sa fie identica cu cea pentru Proiect nou, in plus cu optiunea sterge proiect = este implementat
 La pagina Proiecte Totalul estimat este aratat in RON, nu este coroborat cu moneda si valoarea din Proiect Nou= nu este implementat
-La Pagina Proiect Nou data este in format mm/dd/year, ar trebui dd/mm/year, de corectat.
+
 
 ETAPA 3: SISTEM MULTI-VALUTĂ 💱
 Prioritate: MEDIE - necesită API BNR
@@ -683,9 +683,9 @@ ETAPA 4: EDITARE/STORNARE FACTURI ✏️
 Prioritate: ÎNALTĂ - funcționalitate critică
 Componente noi:
 
-EditareFacturaModal.tsx - modal editare identic cu generarea = nu este implementat
-Modificare FacturiList.tsx - buton editare = nu este implementat
+EditareFacturaModal.tsx - modal editare identic cu generarea = este implementat
+Modificare FacturiList.tsx - buton editare = este implementat
 
 API-uri modificate:
 
-app/api/actions/invoices/ - endpoints pentru editare/stornare = nu este implementat
+app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
