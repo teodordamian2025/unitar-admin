@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 13.08.2025 22:15 - FIX REACT ERROR #31
-// FIX APLICAT: Helper functions pentru gestionarea obiectelor BigQuery {value: "..."} 
+// DATA: 13.08.2025 22:30 - FIX INTERFEȚE SIMPLE + REACT ERROR #31
+// FIX APLICAT: Interfețe simple conform BigQuery + focus pe adevărata problemă
 // ==================================================================
 
 'use client';
@@ -13,18 +13,19 @@ import FacturaHibridModal from './FacturaHibridModal';
 import SubproiectModal from './SubproiectModal';
 import ProiectEditModal from './ProiectEditModal';
 
+// ✅ INTERFEȚE SIMPLE - conform BigQuery Schema
 interface Proiect {
   ID_Proiect: string;
   Denumire: string;
   Client: string;
   Status: string;
-  Data_Start?: string | { value: string };
-  Data_Final?: string | { value: string };
-  Valoare_Estimata?: number | { value: number };
+  Data_Start?: string;          // DATE din BigQuery → string
+  Data_Final?: string;          // DATE din BigQuery → string
+  Valoare_Estimata?: number;    // NUMERIC din BigQuery → number
   moneda?: string;
-  valoare_ron?: number | { value: number };
-  curs_valutar?: number | { value: number };
-  data_curs_valutar?: string | { value: string };
+  valoare_ron?: number;         // NUMERIC(15,2) din BigQuery → number
+  curs_valutar?: number;        // NUMERIC(10,4) din BigQuery → number
+  data_curs_valutar?: string;   // DATE din BigQuery → string
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -43,13 +44,13 @@ interface Subproiect {
   Denumire: string;
   Responsabil?: string;
   Status: string;
-  Data_Start?: string | { value: string };
-  Data_Final?: string | { value: string };
-  Valoare_Estimata?: number | { value: number };
+  Data_Start?: string;          // DATE din BigQuery → string
+  Data_Final?: string;          // DATE din BigQuery → string
+  Valoare_Estimata?: number;    // NUMERIC(10,2) din BigQuery → number
   moneda?: string;
-  valoare_ron?: number | { value: number };
-  curs_valutar?: number | { value: number };
-  data_curs_valutar?: string | { value: string };
+  valoare_ron?: number;         // NUMERIC(15,2) din BigQuery → number
+  curs_valutar?: number;        // NUMERIC(10,4) din BigQuery → number
+  data_curs_valutar?: string;   // DATE din BigQuery → string
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -71,41 +72,6 @@ interface CursuriLive {
     error?: string;
   };
 }
-
-// 🔥 FIX URGENT: HELPER FUNCTIONS pentru obiecte BigQuery
-const extractValue = (field: any): any => {
-  if (field === null || field === undefined) return null;
-  if (typeof field === 'object' && field !== null && 'value' in field) {
-    return field.value;
-  }
-  return field;
-};
-
-const extractStringValue = (field: any): string => {
-  const value = extractValue(field);
-  if (value === null || value === undefined) return '';
-  return String(value);
-};
-
-const extractNumberValue = (field: any): number => {
-  const value = extractValue(field);
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    return isNaN(parsed) ? 0 : parsed;
-  }
-  return 0;
-};
-
-// 🔥 FIX URGENT: HELPER FUNCTION pentru .toFixed() sigur
-const safeToFixed = (value: any, decimals: number = 2): string => {
-  const numericValue = extractNumberValue(value);
-  if (isNaN(numericValue) || !isFinite(numericValue)) {
-    return '0.00';
-  }
-  return numericValue.toFixed(decimals);
-};
 
 // 🎯 FIX: FUNCȚIE PENTRU PRELUAREA CURSURILOR BNR LIVE
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
@@ -285,7 +251,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       setCursuriLive(cursuriNoi);
       
       if (cursuriObtinute > 0) {
-        showToast(`💱 FIX APLICAT: Cursuri BNR live cu precizie maximă (${cursuriObtinute}/${monede.length})`, 'success');
+        showToast(`💱 Cursuri BNR live actualizate (${cursuriObtinute}/${monede.length})`, 'success');
       }
       
     } catch (error) {
@@ -507,10 +473,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🔥 FIX PROBLEMA 1: Formatare dată în format românesc (dd/mm/yyyy) cu suport BigQuery
-  const formatDate = (dateField?: string | { value: string }) => {
-    const dateString = extractStringValue(dateField);
-    
+  // ✅ FORMATARE DATĂ SIMPLĂ - fără helper functions complicate
+  const formatDate = (dateString?: string) => {
     if (!dateString) {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -520,31 +484,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
     
     try {
-      const dateParts = dateString.split('-');
-      if (dateParts.length === 3) {
-        const year = parseInt(dateParts[0]);
-        const month = parseInt(dateParts[1]) - 1;
-        const day = parseInt(dateParts[2]);
-        const date = new Date(year, month, day);
-        
-        if (!isNaN(date.getTime())) {
-          return (
-            <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-              {date.toLocaleDateString('ro-RO', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-              })}
-            </span>
-          );
-        }
-      }
-      
+      // BigQuery returnează date în format yyyy-mm-dd
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
         return (
           <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-            Data invalidă: {dateString}
+            Data invalidă
           </span>
         );
       }
@@ -561,54 +506,47 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     } catch {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Eroare formatare: {dateString}
+          Eroare formatare
         </span>
       );
     }
   };
 
-  // 🎯 FIX: Funcție pentru recalcularea valorii cu cursuri BNR live
+  // ✅ RECALCULARE VALOARE CU CURSURI BNR LIVE - funcție simplificată
   const recalculeazaValoareaCuCursBNRLive = (
-    valoareOriginala: number | { value: number }, 
+    valoareOriginala: number, 
     monedaOriginala: string, 
-    valoareRonBD?: number | { value: number }, 
-    cursVechiDinBD?: number | { value: number }
+    valoareRonBD?: number, 
+    cursVechiDinBD?: number
   ) => {
-    const valoare = extractNumberValue(valoareOriginala);
-    const valoareRon = extractNumberValue(valoareRonBD);
-    const cursVechi = extractNumberValue(cursVechiDinBD);
-    
     if (monedaOriginala === 'RON' || !monedaOriginala) {
-      return valoare;
+      return valoareOriginala;
     }
     
     const cursLive = cursuriLive[monedaOriginala];
     if (cursLive && !cursLive.error && cursLive.curs) {
-      const valoareRecalculata = valoare * cursLive.curs;
-      return valoareRecalculata;
+      return valoareOriginala * cursLive.curs;
     }
     
-    if (valoareRon) {
-      return valoareRon;
+    if (valoareRonBD && valoareRonBD > 0) {
+      return valoareRonBD;
     }
     
-    if (cursVechi && cursVechi > 0) {
-      const valoareCalculataCuCursVechi = valoare * cursVechi;
-      return valoareCalculataCuCursVechi;
+    if (cursVechiDinBD && cursVechiDinBD > 0) {
+      return valoareOriginala * cursVechiDinBD;
     }
     
-    return valoare;
+    return valoareOriginala;
   };
 
   const formatCurrencyWithOriginal = (
-    amount?: number | { value: number }, 
+    amount?: number, 
     currency?: string, 
-    ronValueBD?: number | { value: number }, 
-    cursVechiDinBD?: number | { value: number },
+    ronValueBD?: number, 
+    cursVechiDinBD?: number,
     isSubproiect = false
   ) => {
-    const amountValue = extractNumberValue(amount);
-    if (!amountValue && amountValue !== 0) return '';
+    if (!amount && amount !== 0) return '';
     
     const originalCurrency = currency || 'RON';
     const colorClass = isSubproiect ? '#3498db' : '#27ae60';
@@ -619,13 +557,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: 'RON'
-          }).format(amountValue)}
+          }).format(amount)}
         </div>
       );
     }
     
     const valoareRecalculataRON = recalculeazaValoareaCuCursBNRLive(
-      amountValue, 
+      amount, 
       originalCurrency, 
       ronValueBD, 
       cursVechiDinBD
@@ -640,7 +578,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: originalCurrency
-          }).format(amountValue)}
+          }).format(amount)}
         </div>
         <div style={{ 
           fontSize: '11px', 
@@ -693,13 +631,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     );
   };
 
-  const formatCurrency = (amount?: number | { value: number }) => {
-    const amountValue = extractNumberValue(amount);
-    if (!amountValue && amountValue !== 0) return '';
+  const formatCurrency = (amount?: number) => {
+    if (!amount && amount !== 0) return '';
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
       currency: 'RON'
-    }).format(amountValue);
+    }).format(amount);
   };
 
   const getStatusColor = (status: string) => {
@@ -722,15 +659,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // 🔥 FIX PROBLEMA 4: Calculează totalul DOAR pentru proiecte principale
+  // ✅ CALCULARE TOTAL SIMPLU - doar proiecte principale
   const calculateTotalValue = () => {
     let totalProiecte = 0;
     
     proiecte.forEach(p => {
-      const valoareEstimata = extractNumberValue(p.Valoare_Estimata);
-      if (valoareEstimata) {
+      if (p.Valoare_Estimata) {
         const valoareRecalculata = recalculeazaValoareaCuCursBNRLive(
-          valoareEstimata,
+          p.Valoare_Estimata,
           p.moneda || 'RON',
           p.valoare_ron,
           p.curs_valutar
@@ -1137,10 +1073,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           textAlign: 'center' as const
                         }}>
                           <ProiectActions 
-                            proiect={{
-                              ...proiect,
-                              tip: 'proiect' as const
-                            }} 
+                            proiect={proiect}
                             onRefresh={handleRefresh}
                             onShowFacturaModal={handleShowFacturaModal}
                             onShowSubproiectModal={handleShowSubproiectModal}
@@ -1352,7 +1285,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  {Object.keys(cursuriLive).length > 0 ? '🔥 FIX APLICAT: DOAR proiecte principale (fără subproiecte) cu cursuri BNR LIVE' : 'DOAR proiecte principale (fără subproiecte)'}
+                  DOAR proiecte principale (fără subproiecte) {Object.keys(cursuriLive).length > 0 ? 'cu cursuri BNR LIVE' : ''}
                 </div>
               </div>
             </div>
@@ -1360,7 +1293,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
-      {/* Toate modalele */}
+      {/* 🔥 MODALELE - LOCUL PROBABIL AL REACT ERROR #31 */}
       {showProiectModal && (
         <div style={{ zIndex: 50000 }}>
           <ProiectNouModal
@@ -1381,6 +1314,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       )}
 
+      {/* 🎯 MODAL SUBPROIECT - AICI E PROBABIL REACT ERROR #31 */}
       {showSubproiectModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <SubproiectModal
