@@ -795,7 +795,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           cursuriCentralizate = await preluaCursuriCentralizat(valuteNecesare);
           
           // Setează cursurile centralizate
-          setcursuriEditabile(prev => ({
+          setCursuriEditabile(prev => ({
             ...prev,
             ...cursuriCentralizate
           }));
