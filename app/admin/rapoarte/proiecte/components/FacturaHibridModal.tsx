@@ -795,10 +795,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           cursuriCentralizate = await preluaCursuriCentralizat(valuteNecesare);
           
           // Setează cursurile centralizate
-          setCursuriEditabile(prev => ({
-            ...prev,
-            ...cursuriCentralizate
-          }));
+	setCursuriEditabile(prev => {
+	  const cursuriNoi = { ...prev };
+	  
+	  Object.keys(cursuriCentralizate).forEach(moneda => {
+	    const cursData = cursuriCentralizate[moneda];
+	    cursuriNoi[moneda] = {
+	      moneda: moneda,
+	      curs: cursData.curs,
+	      editabil: true,
+	      sursa: 'BNR' as const
+	    };
+	  });
+	  
+	  return cursuriNoi;
+	});
         }
 
         const subproiecteFormatate = result.data.map((sub: any) => {
