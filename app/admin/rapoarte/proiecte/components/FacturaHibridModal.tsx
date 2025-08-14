@@ -1313,7 +1313,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         moneda: m,
         curs_numeric: cursuriEditabile[m].curs,
         curs_formatat_4_zecimale: cursuriEditabile[m].curs.toFixed(4),
-        precizie_originala: cursuriEditabile[m].precizie_originala,
+        precizie_originala: cursuriEditabile[m].curs.toString(),
         sursa: 'BNR_CENTRALIZAT'
       }))
     });
