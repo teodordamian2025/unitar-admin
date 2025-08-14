@@ -116,7 +116,7 @@ function cleanNonAscii(text: string): string {
 // ✅ FIX PRINCIPAL: Funcție pentru recalcularea liniilor cu cursuri centralizate BNR
 // 🔥 URGENT FIX: Rezolvă eroarea "cursVechi.toFixed is not a function"
 function recalculateWithCentralizedRates(liniiFactura: any[], cursuriUtilizate: any) {
-  console.log('🔄 RECALCULARE cu cursuri centralizate BNR...');
+  console.log('📄 RECALCULARE cu cursuri centralizate BNR...');
   
   return liniiFactura.map((linie: any, index: number) => {
     const cantitate = Number(linie.cantitate) || 0;
@@ -129,11 +129,11 @@ function recalculateWithCentralizedRates(liniiFactura: any[], cursuriUtilizate: 
       const cursCentralizat = cursuriUtilizate[linie.monedaOriginala];
       
       if (cursCentralizat && cursCentralizat.curs) {
-        // ✅ FIX URGENT: Verificare tip pentru cursVechi înainte de .toFixed()
+        // 🔥 FIX URGENT: Safe type conversion pentru cursVechi
         const cursVechi = linie.cursValutar || 1;
         let cursVechiNumeric: number;
         
-        // 🔥 PRINCIPALA PROBLEMĂ REZOLVATĂ AICI:
+        // 🎯 PRINCIPALA PROBLEMĂ REZOLVATĂ AICI:
         if (typeof cursVechi === 'number') {
           cursVechiNumeric = cursVechi;
         } else if (typeof cursVechi === 'string') {
@@ -166,11 +166,11 @@ function recalculateWithCentralizedRates(liniiFactura: any[], cursuriUtilizate: 
           moneda: linie.monedaOriginala,
           valoare_originala: linie.valoareOriginala,
           curs_vechi_original: cursVechi,
-          curs_vechi_numeric: cursVechiNumeric.toFixed(4), // ✅ ACUM FUNCȚIONEAZĂ!
+          curs_vechi_numeric_safe: cursVechiNumeric.toFixed(4), // ✅ ACUM FUNCȚIONEAZĂ!
           curs_nou_centralizat: cursNou.toFixed(4),
-          pret_vechi: (linie.pretUnitar || 0).toFixed(2),
+          pret_vechi: (Number(linie.pretUnitar) || 0).toFixed(2), // ✅ FIX: Safe conversion
           pret_nou: pretUnitar.toFixed(2),
-          diferenta: (pretUnitar - (linie.pretUnitar || 0)).toFixed(2)
+          diferenta: (pretUnitar - (Number(linie.pretUnitar) || 0)).toFixed(2) // ✅ FIX: Safe conversion
         });
       } else {
         console.log(`⚠️ Nu există curs centralizat pentru ${linie.monedaOriginala}, păstrez cursul existent`);

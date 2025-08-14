@@ -676,7 +676,7 @@ ETAPA 3: SISTEM MULTI-VALUTĂ 💱
 Prioritate: MEDIE - necesită API BNR
 API-uri noi:
 
-app/api/bnr/curs-valutar/route.ts - Integrare BNR = implementat
+app/api/curs-valutar/route.ts - Integrare BNR = implementat
 Modificare generate-hibrid/route.ts - calcule multi-valută
 
 ETAPA 4: EDITARE/STORNARE FACTURI ✏️
@@ -689,3 +689,7 @@ Modificare FacturiList.tsx - buton editare = este implementat
 API-uri modificate:
 
 app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
+Probleme actuale:
+1.La generarea facturii este cumva legat de valoarea proiectului in RON din tabelul Proiecte si Subproiecte din Bigquery pentru articolele care sunt initial in valuta si cat am cautat nu am gasit cum sa dezlegam aceasta legatura astfel atunci cand facem factura sa folosim cursul valutar din ziua facturarii, nu cea din ziua crearii proiectului si subproiectelor. Ideal ar fi ca la meniul de generare a facturii sa fie o rubrica "Data curs valutar" unde sa alegem data, iar la fiecare articol sa mai fie o coloana cu valorile editabile ale cursului valutar pentru valutele prezente in articole, iar acestea sa fie folosite mai departe pentru a calcula valoarea articolului respectiv. Nota de la finalul facturii despre cursul valutar poate sa ramana, dar pot fi scoase celelalte note intermediare de la meniul de la generarea facturii referitoare la cursul valutar, acesta se va afisa doar in coloana noua, corespunzator datei alese.
+2. La partea de Lista Proiecte : https://admin.unitarproiect.eu/admin/rapoarte/proiecte sa se afiseze valoarea echivalenta in RON pentru cele care sunt in valuta, asa cum au fost definite cand s-a creat proiectul.
+3. Cand se editeaza proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage si la subproiecte.
