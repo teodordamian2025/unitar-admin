@@ -170,11 +170,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       return initialData.liniiFactura;
     }
     
-    let valoareProiect = proiect.Valoare_Estimata || 0;
+    // ✅ FIX: Conversie corectă BigQuery NUMERIC → number
+    const valoareEstimata = convertBigQueryNumeric(proiect.Valoare_Estimata);
+    let valoareProiect = valoareEstimata;
     let monedaProiect = proiect.moneda || 'RON';
     
+    // Folosește valoarea RON dacă există și moneda nu e RON
     if (proiect.valoare_ron && monedaProiect !== 'RON') {
-      valoareProiect = proiect.valoare_ron;
+      valoareProiect = convertBigQueryNumeric(proiect.valoare_ron);
     }
     
     return [{
@@ -184,8 +187,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       cotaTva: 21,
       tip: 'proiect',
       monedaOriginala: monedaProiect,
-      valoareOriginala: proiect.Valoare_Estimata,
-      cursValutar: proiect.curs_valutar || 1
+      valoareOriginala: valoareEstimata, // ✅ FIX: Întotdeauna număr
+      cursValutar: convertBigQueryNumeric(proiect.curs_valutar) || 1
     }];
   });
 
@@ -210,6 +213,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     loading: true
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
+
+  // ✅ NOU: Helper pentru conversii BigQuery NUMERIC → JavaScript number
+  const convertBigQueryNumeric = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    
+    // BigQuery poate returna NUMERIC ca obiect cu .value
+    if (typeof value === 'object' && value.value !== undefined) {
+      return parseFloat(value.value.toString()) || 0;
+    }
+    
+    // Sau ca string direct
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    
+    // Sau ca număr
+    if (typeof value === 'number') {
+      return value;
+    }
+    
+    return 0;
+  };
+
+  // ✅ NOU: Safe toFixed pentru afișare
+  const safeToFixed = (value: any, decimals: number = 2): string => {
+    const num = convertBigQueryNumeric(value);
+    return num.toFixed(decimals);
+  };
 
   // ✅ PĂSTRAT: Helper functions
   const formatDate = (date?: string | { value: string }): string => {
@@ -689,29 +720,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           let cursSubproiect = 1;
           let monedaSubproiect = sub.moneda || 'RON';
           
+          // ✅ FIX: Conversie BigQuery NUMERIC pentru curs_valutar
           if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
-            if (typeof sub.curs_valutar === 'string') {
-              cursSubproiect = parseFloat(sub.curs_valutar);
-            } else if (typeof sub.curs_valutar === 'number') {
-              cursSubproiect = sub.curs_valutar;
-            } else if (sub.curs_valutar && typeof sub.curs_valutar === 'object' && 'value' in sub.curs_valutar) {
-              cursSubproiect = parseFloat((sub.curs_valutar as any).value.toString());
-            }
-            
-            if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
-              cursSubproiect = 1;
-            }
+            cursSubproiect = convertBigQueryNumeric(sub.curs_valutar);
+            if (cursSubproiect <= 0) cursSubproiect = 1;
           }
           
           return {
             ID_Subproiect: sub.ID_Subproiect,
             Denumire: sub.Denumire,
-            Valoare_Estimata: sub.Valoare_Estimata,
+            Valoare_Estimata: convertBigQueryNumeric(sub.Valoare_Estimata), // ✅ FIX: Conversie NUMERIC
             Status: sub.Status,
             adaugat: false,
             moneda: monedaSubproiect,
             curs_valutar: cursSubproiect,
-            valoare_ron: sub.valoare_ron
+            valoare_ron: convertBigQueryNumeric(sub.valoare_ron) // ✅ FIX: Conversie NUMERIC
           };
         });
         
@@ -759,7 +782,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ SIMPLIFICAT: addSubproiectToFactura cu cursuri din state
   const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
-    let valoareSubproiect = subproiect.Valoare_Estimata || 0;
+    // ✅ FIX: Conversie corectă BigQuery NUMERIC
+    const valoareEstimata = convertBigQueryNumeric(subproiect.Valoare_Estimata);
+    let valoareSubproiect = valoareEstimata;
     let monedaSubproiect = subproiect.moneda || 'RON';
     let cursSubproiect = 1;
     
@@ -770,14 +795,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         cursSubproiect = cursState.curs;
         console.log(`🎯 Folosesc curs din state pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
       } else if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
-        cursSubproiect = subproiect.curs_valutar;
+        cursSubproiect = convertBigQueryNumeric(subproiect.curs_valutar);
         console.log(`📊 Folosesc curs din BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
       }
     }
 
     // Folosește valoarea în RON dacă există
     if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
-      valoareSubproiect = subproiect.valoare_ron;
+      valoareSubproiect = convertBigQueryNumeric(subproiect.valoare_ron);
     }
 
     const nouaLinie: LineFactura = {
@@ -788,7 +813,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       tip: 'subproiect',
       subproiect_id: subproiect.ID_Subproiect,
       monedaOriginala: monedaSubproiect,
-      valoareOriginala: subproiect.Valoare_Estimata,
+      valoareOriginala: valoareEstimata, // ✅ FIX: Întotdeauna număr
       cursValutar: cursSubproiect
     };
 
@@ -1497,10 +1522,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   color: '#27ae60',
                   fontWeight: 'bold'
                 }}>
-                  {proiect.Valoare_Estimata ? `${(Number(proiect.Valoare_Estimata) || 0).toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}
+                  {proiect.Valoare_Estimata ? `${safeToFixed(proiect.Valoare_Estimata, 0)} ${proiect.moneda || 'RON'}` : 'N/A'}
                   {proiect.moneda && proiect.moneda !== 'RON' && proiect.valoare_ron && (
                     <span style={{ fontSize: '12px', color: '#7f8c8d', display: 'block' }}>
-                      ≈ {Number(proiect.valoare_ron).toLocaleString('ro-RO')} RON
+                      ≈ {safeToFixed(proiect.valoare_ron, 0)} RON
                     </span>
                   )}
                 </div>
@@ -1593,13 +1618,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
                               💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>
                                 {subproiect.Valoare_Estimata ? 
-                                  `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} ${subproiect.moneda || 'RON'}` : 
+                                  `${safeToFixed(subproiect.Valoare_Estimata, 2)} ${subproiect.moneda || 'RON'}` : 
                                   'Fără valoare'}
                               </span>
                               {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
                                 <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
-                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
-                                  <br/>💱 Curs: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
+                                  ≈ {safeToFixed(subproiect.valoare_ron, 2)} RON
+                                  <br/>💱 Curs: {safeToFixed(subproiect.curs_valutar, 4)}
                                   {cursuri[subproiect.moneda || ''] && (
                                     <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (BNR)</span>
                                   )}
@@ -2022,7 +2047,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
                         {/* Valoare Originală */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px' }}>
-                          {linie.valoareOriginala ? linie.valoareOriginala.toFixed(2) : pretUnitar.toFixed(2)}
+                          {safeToFixed(linie.valoareOriginala, 2)}
                         </td>
 
                         {/* Valută */}
