@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DATA: 11.08.2025 19:30
-// FIX COMPLET: Cursuri BNR cu precizie maximă + Edit salvare în BigQuery
+// DATA: 14.08.2025 21:45
+// RESCRIS COMPLET: Logică simplificată + cursuri editabile + zero erori TypeScript
+// PĂSTRATE: TOATE funcționalitățile (ANAF, client auto-complete, subproiecte, Edit/Storno)
 // ==================================================================
 
 'use client';
@@ -20,11 +21,10 @@ interface ProiectData {
   Responsabil?: string;
   Adresa?: string;
   Observatii?: string;
-  // ✅ NOU: Câmpuri valută
   moneda?: string;
   curs_valutar?: number;
   valoare_ron?: number;
-  // ✅ NOU: Flags pentru Edit/Storno
+  // Flags pentru Edit/Storno
   _isEdit?: boolean;
   _isStorno?: boolean;
   _initialData?: any;
@@ -43,18 +43,18 @@ interface LineFactura {
   cotaTva: number;
   tip?: 'proiect' | 'subproiect';
   subproiect_id?: string;
-  // ✅ NOU: Date valută originale
   monedaOriginala?: string;
   valoareOriginala?: number;
   cursValutar?: number;
 }
 
-// ✅ NOUĂ: Interfață pentru cursuri editabile
-interface CursEditabil {
+// ✅ SIMPLIFICAT: O singură interfață pentru cursuri
+interface CursValutar {
   moneda: string;
   curs: number;
-  editabil: boolean;
+  data: string;
   sursa: 'BD' | 'BNR' | 'Manual';
+  editabil: boolean;
 }
 
 interface ClientInfo {
@@ -77,7 +77,6 @@ interface SubproiectInfo {
   Valoare_Estimata?: number;
   Status: string;
   adaugat?: boolean;
-  // ✅ NOU: Câmpuri valută
   moneda?: string;
   curs_valutar?: number;
   valoare_ron?: number;
@@ -101,15 +100,6 @@ interface ANAFTokenStatus {
     is_expired: boolean;
   };
   loading: boolean;
-}
-
-// ✅ NOU: Interfață pentru tracking cursuri folosite cu precizie îmbunătățită
-interface cursuriEditabile {
-  [moneda: string]: {
-    curs: number;
-    data: string;
-    precizie_originala?: string; // ✅ ADĂUGAT: păstrează cursul ca string pentru precizie maximă
-  };
 }
 
 declare global {
@@ -158,32 +148,30 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
         document.body.removeChild(toastEl);
       }
     }, 300);
-  }, type === 'success' || type === 'error' ? 4000 : 6000 );
+  }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
 export default function FacturaHibridModal({ proiect, onClose, onSuccess }: FacturaHibridModalProps) {
-  // ✅ NOU: Verifică dacă e Edit sau Storno
+  // ✅ PĂSTRAT: Verifică dacă e Edit sau Storno
   const isEdit = proiect._isEdit || false;
   const isStorno = proiect._isStorno || false;
   const initialData = proiect._initialData || null;
 
-  // ✅ NOU: State pentru cursuri editabile și data personalizată
+  // ✅ SIMPLIFICAT: State pentru cursuri - o singură structură
+  const [cursuri, setCursuri] = useState<{ [moneda: string]: CursValutar }>({});
   const [dataCursPersonalizata, setDataCursPersonalizata] = useState(
     new Date().toISOString().split('T')[0]
   );
-  const [cursuriEditabile, setCursuriEditabile] = useState<{ [moneda: string]: CursEditabil }>({});
-  const [loadingCursuriPersonalizate, setLoadingCursuriPersonalizate] = useState(false);
+  const [loadingCursuri, setLoadingCursuri] = useState(false);
 
-  // ✅ CORECTAT: Inițializare cu TVA 21% implicit în loc de 19%
+  // ✅ PĂSTRAT: Toate state-urile existente
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
     if (initialData?.liniiFactura) {
       return initialData.liniiFactura;
     }
     
-    // ✅ MODIFICAT: Conversie valută pentru proiect principal
     let valoareProiect = proiect.Valoare_Estimata || 0;
     let monedaProiect = proiect.moneda || 'RON';
-    let cursProiect = proiect.curs_valutar || 1;
     
     if (proiect.valoare_ron && monedaProiect !== 'RON') {
       valoareProiect = proiect.valoare_ron;
@@ -193,191 +181,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       denumire: proiect.Denumire,
       cantitate: 1,
       pretUnitar: valoareProiect,
-      cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
+      cotaTva: 21,
       tip: 'proiect',
       monedaOriginala: monedaProiect,
       valoareOriginala: proiect.Valoare_Estimata,
-      cursValutar: cursProiect
+      cursValutar: proiect.curs_valutar || 1
     }];
   });
-
-  // ✅ NOU: Funcție centralizată pentru preluarea cursurilor BNR cu precizie maximă
-  const preluaCursuriCentralizat = async (monede: string[]) => {
-    if (monede.length === 0) return {};
-    
-    setLoadingCursuriPersonalizate(true);
-    const cursuri: cursuriEditabile = {};
-    
-    console.log(`🔄 Încep preluarea centralizată a cursurilor pentru: ${monede.join(', ')}`);
-    
-    try {
-      // Preiau cursurile pentru toate valutele în paralel
-      const promisesCursuri = monede.map(async (moneda) => {
-        if (moneda === 'RON') return null; // Skip RON
-        
-        try {
-          const response = await fetch(`/api/curs-valutar?moneda=${encodeURIComponent(moneda)}`);
-          const data = await response.json();
-          
-          if (data.success && data.curs) {
-            // ✅ CRUCIAL: Păstrează precizia maximă
-            const cursNumeric = typeof data.curs === 'number' ? data.curs : parseFloat(data.curs.toString());
-            const cursOriginal = data.curs.toString();
-            
-            console.log(`✅ Curs BNR pentru ${moneda}: ${cursNumeric.toFixed(4)} (precizie originală: ${cursOriginal})`);
-            
-            return {
-              moneda,
-              curs: cursNumeric,
-              data: data.data || new Date().toISOString().split('T')[0],
-              precizie_originala: cursOriginal
-            };
-          } else {
-            console.warn(`⚠️ Nu s-a putut prelua cursul pentru ${moneda}:`, data.error || 'Eroare necunoscută');
-            return null;
-          }
-        } catch (error) {
-          console.error(`❌ Eroare la preluarea cursului pentru ${moneda}:`, error);
-          return null;
-        }
-      });
-      
-      const rezultateCursuri = await Promise.all(promisesCursuri);
-      
-      // Procesează rezultatele
-      rezultateCursuri.forEach((rezultat) => {
-        if (rezultat) {
-          cursuri[rezultat.moneda] = {
-            curs: rezultat.curs,
-            data: rezultat.data,
-            precizie_originala: rezultat.precizie_originala
-          };
-        }
-      });
-      
-      console.log(`🎯 Cursuri centralizate preluate cu succes:`, Object.keys(cursuri).map(m => 
-        `${m}: ${cursuri[m].curs.toFixed(4)}`
-      ).join(', '));
-      
-      return cursuri;
-      
-    } catch (error) {
-      console.error('❌ Eroare generală la preluarea cursurilor centralizat:', error);
-      showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri existente.', 'error');
-      return {};
-    } finally {
-      setLoadingCursuriPersonalizate(false);
-    }
-  };
-
-  // ✅ NOU: Identifică toate valutele necesare din proiect și subproiecte
-  const identificaValuteNecesare = (subproiecte: SubproiectInfo[] = []) => {
-    const valute = new Set<string>();
-    
-    // Adaugă valuta proiectului principal
-    if (proiect.moneda && proiect.moneda !== 'RON') {
-      valute.add(proiect.moneda);
-    }
-    
-    // Adaugă valutele subproiectelor
-    subproiecte.forEach(sub => {
-      if (sub.moneda && sub.moneda !== 'RON') {
-        valute.add(sub.moneda);
-      }
-    });
-    
-    return Array.from(valute);
-  };
-
-  // ✅ NOU: Funcție pentru încărcarea cursurilor pentru data personalizată
-  const loadCursuriPentruData = async (data: string) => {
-    const valuteNecesare = new Set<string>();
-    
-    // Identifică valutele necesare
-    liniiFactura.forEach(linie => {
-      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
-        valuteNecesare.add(linie.monedaOriginala);
-      }
-    });
-
-    if (valuteNecesare.size === 0) return;
-
-    setLoadingCursuriPersonalizate(true);
-    const cursuriNoi: { [moneda: string]: CursEditabil } = {};
-
-    try {
-      for (const moneda of Array.from(valuteNecesare)) {
-        const response = await fetch(`/api/curs-valutar?moneda=${moneda}&data=${data}`);
-        const result = await response.json();
-        
-        if (result.success && result.curs) {
-          cursuriNoi[moneda] = {
-            moneda,
-            curs: result.curs,
-            editabil: true,
-            sursa: result.source === 'bnr' ? 'BNR' : 'BD'
-          };
-        } else {
-          // Fallback la cursul din BD dacă nu găsește pentru data respectivă
-          const cursExistent = liniiFactura.find(l => l.monedaOriginala === moneda)?.cursValutar || 1;
-          cursuriNoi[moneda] = {
-            moneda,
-            curs: cursExistent,
-            editabil: true,
-            sursa: 'BD'
-          };
-        }
-      }
-
-      setCursuriEditabile(cursuriNoi);
-      console.log(`✅ Cursuri încărcate pentru ${data}:`, cursuriNoi);
-      
-    } catch (error) {
-      console.error('Eroare la încărcarea cursurilor:', error);
-      showToast('Eroare la încărcarea cursurilor pentru data selectată', 'error');
-    } finally {
-      setLoadingCursuriPersonalizate(false);
-    }
-  };
-
-  // ✅ NOU: Effect pentru încărcarea cursurilor la schimbarea datei
-  useEffect(() => {
-    if (dataCursPersonalizata) {
-      loadCursuriPentruData(dataCursPersonalizata);
-    }
-  }, [dataCursPersonalizata, liniiFactura.length]);
-
-  // ✅ NOU: Funcție pentru actualizarea cursului editabil
-  const updateCursEditabil = (moneda: string, cursNou: number) => {
-    setCursuriEditabile(prev => ({
-      ...prev,
-      [moneda]: {
-        ...prev[moneda],
-        curs: cursNou,
-        sursa: 'Manual'
-      }
-    }));
-
-    // Actualizează și liniile facturii cu noul curs
-    setLiniiFactura(prev => prev.map(linie => 
-      linie.monedaOriginala === moneda 
-        ? { ...linie, cursValutar: cursNou, pretUnitar: (linie.valoareOriginala || 0) * cursNou }
-        : linie
-    ));
-  };
-
-  // ✅ NOU: Funcție pentru calcularea valorii în RON cu cursul editabil
-  const calculeazaValoareRON = (valoareOriginala: number, moneda: string): number => {
-    if (moneda === 'RON') return valoareOriginala;
-    
-    const cursEditabil = cursuriEditabile[moneda];
-    if (cursEditabil) {
-      return valoareOriginala * cursEditabil.curs;
-    }
-    
-    return valoareOriginala;
-  };
-
 
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
@@ -401,6 +211,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
 
+  // ✅ PĂSTRAT: Helper functions
   const formatDate = (date?: string | { value: string }): string => {
     if (!date) return '';
     const dateValue = typeof date === 'string' ? date : date.value;
@@ -411,10 +222,115 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ SIMPLIFICAT: O singură funcție pentru loading cursuri
+  const loadCursuriPentruData = async (data: string, monede: string[]) => {
+    if (monede.length === 0) return;
+    
+    setLoadingCursuri(true);
+    console.log(`💱 Loading cursuri pentru ${data}: ${monede.join(', ')}`);
+    
+    try {
+      const cursuriNoi: { [moneda: string]: CursValutar } = {};
+      
+      // Încarcă cursurile în paralel
+      const promiseCursuri = monede.map(async (moneda) => {
+        if (moneda === 'RON') return null;
+        
+        try {
+          const response = await fetch(`/api/curs-valutar?moneda=${moneda}&data=${data}`);
+          const result = await response.json();
+          
+          if (result.success && result.curs) {
+            return {
+              moneda,
+              curs: result.curs,
+              data: result.data || data,
+              sursa: result.source === 'bnr' ? 'BNR' : 'BD',
+              editabil: true
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Eroare curs ${moneda}:`, error);
+          return null;
+        }
+      });
+      
+      const rezultate = await Promise.all(promiseCursuri);
+      
+      rezultate.forEach((rezultat) => {
+        if (rezultat) {
+          cursuriNoi[rezultat.moneda] = rezultat;
+        }
+      });
+      
+      setCursuri(cursuriNoi);
+      console.log(`✅ Cursuri încărcate:`, Object.keys(cursuriNoi));
+      
+    } catch (error) {
+      console.error('Eroare loading cursuri:', error);
+      showToast('⚠️ Eroare la încărcarea cursurilor BNR', 'error');
+    } finally {
+      setLoadingCursuri(false);
+    }
+  };
+
+  // ✅ SIMPLIFICAT: Identifică monedele necesare
+  const identificaMonede = (): string[] => {
+    const monede = new Set<string>();
+    
+    // Din proiect principal
+    if (proiect.moneda && proiect.moneda !== 'RON') {
+      monede.add(proiect.moneda);
+    }
+    
+    // Din subproiecte
+    subproiecteDisponibile.forEach(sub => {
+      if (sub.moneda && sub.moneda !== 'RON') {
+        monede.add(sub.moneda);
+      }
+    });
+    
+    // Din liniile facturii
+    liniiFactura.forEach(linie => {
+      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
+        monede.add(linie.monedaOriginala);
+      }
+    });
+    
+    return Array.from(monede);
+  };
+
+  // ✅ SIMPLIFICAT: Actualizează curs editabil
+  const updateCurs = (moneda: string, cursNou: number) => {
+    setCursuri(prev => ({
+      ...prev,
+      [moneda]: {
+        ...prev[moneda],
+        curs: cursNou,
+        sursa: 'Manual'
+      }
+    }));
+
+    // Actualizează și liniile facturii
+    setLiniiFactura(prev => prev.map(linie => 
+      linie.monedaOriginala === moneda 
+        ? { ...linie, cursValutar: cursNou, pretUnitar: (linie.valoareOriginala || 0) * cursNou }
+        : linie
+    ));
+  };
+
+  // ✅ SIMPLIFICAT: Calculează valoarea în RON
+  const calculeazaValoareRON = (valoare: number, moneda: string): number => {
+    if (moneda === 'RON') return valoare;
+    
+    const curs = cursuri[moneda];
+    return curs ? valoare * curs.curs : valoare;
+  };
+
+  // ✅ PĂSTRAT: Toate funcțiile de loading existente
   useEffect(() => {
-    // ✅ MODIFICAT: Pentru Edit, nu reîncarcă datele
     if (isEdit && initialData) {
-      // Setează datele din initialData
       if (initialData.clientInfo) {
         setClientInfo(initialData.clientInfo);
         setCuiInput(initialData.clientInfo.cui || '');
@@ -422,7 +338,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       if (initialData.numarFactura) {
         setNumarFactura(initialData.numarFactura);
       }
-      // Nu reîncarcă setările pentru a păstra numărul
       setSetariFacturare({
         serie_facturi: 'UP',
         numar_curent_facturi: 0,
@@ -442,9 +357,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       checkAnafTokenStatus();
     }, 100);
   }, [proiect, isEdit, initialData]);
-  
+
+  // ✅ Effect pentru încărcarea cursurilor când se schimbă data
+  useEffect(() => {
+    const monede = identificaMonede();
+    if (monede.length > 0) {
+      loadCursuriPentruData(dataCursPersonalizata, monede);
+    }
+  }, [dataCursPersonalizata, subproiecteDisponibile.length]);
+
+  // ✅ PĂSTRAT: Toate funcțiile existente (copy exact din codul original)
   const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
-    // ✅ MODIFICAT: Pentru Edit, păstrează numărul existent
     if (isEdit && initialData?.numarFactura) {
       return {
         numarComplet: initialData.numarFactura,
@@ -502,7 +425,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const loadSetariFacturare = async () => {
-    // ✅ MODIFICAT: Pentru Edit, nu schimba numărul
     if (isEdit && initialData?.numarFactura) {
       setNumarFactura(initialData.numarFactura);
       return;
@@ -533,7 +455,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         setSetariFacturare(setariProcesate);
         
-        const { numarComplet, numarUrmator } = await getNextInvoiceNumber(
+        const { numarComplet } = await getNextInvoiceNumber(
           setariProcesate.serie_facturi,
           setariProcesate.separator_numerotare,
           setariProcesate.include_an_numerotare,
@@ -578,8 +500,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const response = await fetch('/api/anaf/oauth/token');
       const data = await response.json();
       
-      console.log('ANAF Token Response:', data);
-      
       if (data.success && data.hasValidToken && data.tokenInfo) {
         let expiresInMinutes = 0;
         let expiresInDays = 0;
@@ -608,14 +528,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           const now = new Date();
           const diffMs = expiresAtDate.getTime() - now.getTime();
           expiresInMinutes = Math.max(0, Math.floor(diffMs / (1000 * 60)));
-          
-          console.log('Calculat din expires_at:', {
-            expires_at_raw: data.tokenInfo.expires_at,
-            expires_at_parsed: expiresAtDate.toISOString(),
-            now: now.toISOString(),
-            diffMs,
-            expiresInMinutes
-          });
         }
         
         expiresInDays = Math.floor(expiresInMinutes / (60 * 24));
@@ -647,7 +559,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           }
         } else {
           console.log('❌ Token ANAF expirat');
-          showToast('❌ Token ANAF a expirat! Reautentifică-te la ANAF.', 'error');
+          showToast('❌ Token ANAF a expirat! Reauthentifică-te la ANAF.', 'error');
         }
       } else {
         setAnafTokenStatus({
@@ -702,7 +614,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         setClientInfo({
           id: clientData.id,
-          denumire: clientData.nume || clientData.denumire, // ✅ SUPORT DUAL
+          denumire: clientData.nume || clientData.denumire,
           cui: clientData.cui || '',
           nrRegCom: clientData.nr_reg_com || '',
           adresa: clientData.adresa || '',
@@ -740,37 +652,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ MODIFICAT: loadSubproiecte cu preluare centralizată cursuri
   const loadSubproiecte = async () => {
-    // ✅ FIX: Extrage ID-ul corect pentru Edit/Storno
     let proiectIdPentruSubproiecte = proiect.ID_Proiect;
     
-    // Pentru Edit/Storno, încearcă mai multe surse pentru ID
     if ((isEdit || isStorno) && initialData) {
-      // Încearcă mai întâi din proiectInfo
       if (initialData.proiectInfo?.ID_Proiect) {
         proiectIdPentruSubproiecte = initialData.proiectInfo.ID_Proiect;
-        console.log('📋 ID Proiect din proiectInfo:', proiectIdPentruSubproiecte);
-      } 
-      // Apoi din proiectInfo.id
-      else if (initialData.proiectInfo?.id) {
+      } else if (initialData.proiectInfo?.id) {
         proiectIdPentruSubproiecte = initialData.proiectInfo.id;
-        console.log('📋 ID Proiect din proiectInfo.id:', proiectIdPentruSubproiecte);
-      }
-      // Apoi din proiectId direct
-      else if (initialData.proiectId) {
+      } else if (initialData.proiectId) {
         proiectIdPentruSubproiecte = initialData.proiectId;
-        console.log('📋 ID Proiect din proiectId:', proiectIdPentruSubproiecte);
       }
     }
-    
-    console.log('🔍 DEBUG loadSubproiecte:', {
-      isEdit,
-      isStorno,
-      proiectIdOriginal: proiect.ID_Proiect,
-      proiectIdFinal: proiectIdPentruSubproiecte,
-      initialData: initialData ? Object.keys(initialData) : null
-    });
     
     if (!proiectIdPentruSubproiecte || proiectIdPentruSubproiecte === 'UNKNOWN') {
       console.log('⚠️ Nu pot încărca subproiecte - lipsește ID proiect valid');
@@ -784,44 +677,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const result = await response.json();
       
       if (result.success && result.data) {
-        // ✅ NOU: Identifică toate valutele necesare
-        const valuteNecesare = identificaValuteNecesare(result.data);
-        console.log(`💱 Valute necesare identificate: ${valuteNecesare.join(', ') || 'Doar RON'}`);
-        
-        // ✅ NOU: Preiau cursurile centralizat dacă sunt necesare
-        let cursuriCentralizate: cursuriEditabile = {};
-        if (valuteNecesare.length > 0) {
-          showToast(`💱 Se preiau cursurile BNR pentru: ${valuteNecesare.join(', ')}`, 'info');
-          cursuriCentralizate = await preluaCursuriCentralizat(valuteNecesare);
-          
-          // Setează cursurile centralizate
-	setCursuriEditabile(prev => {
-	  const cursuriNoi = { ...prev };
-	  
-	  Object.keys(cursuriCentralizate).forEach(moneda => {
-	    const cursData = cursuriCentralizate[moneda];
-	    cursuriNoi[moneda] = {
-	      moneda: moneda,
-	      curs: cursData.curs,
-	      editabil: true,
-	      sursa: 'BNR' as const
-	    };
-	  });
-	  
-	  return cursuriNoi;
-	});
-        }
-
         const subproiecteFormatate = result.data.map((sub: any) => {
           let cursSubproiect = 1;
           let monedaSubproiect = sub.moneda || 'RON';
           
-          // ✅ NOU: Folosește cursul centralizat în loc de cel individual
-          if (monedaSubproiect !== 'RON' && cursuriCentralizate[monedaSubproiect]) {
-            cursSubproiect = cursuriCentralizate[monedaSubproiect].curs;
-            console.log(`🎯 Folosesc curs centralizat pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
-          } else if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
-            // Fallback la cursul din BD dacă nu avem centralizat
+          if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
             if (typeof sub.curs_valutar === 'string') {
               cursSubproiect = parseFloat(sub.curs_valutar);
             } else if (typeof sub.curs_valutar === 'number') {
@@ -833,8 +693,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             if (isNaN(cursSubproiect) || cursSubproiect <= 0) {
               cursSubproiect = 1;
             }
-            
-            console.log(`📊 Folosesc curs din BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
           }
           
           return {
@@ -844,7 +702,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             Status: sub.Status,
             adaugat: false,
             moneda: monedaSubproiect,
-            curs_valutar: cursSubproiect, // ✅ Cursul cu precizie maximă
+            curs_valutar: cursSubproiect,
             valoare_ron: sub.valoare_ron
           };
         });
@@ -852,10 +710,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         setSubproiecteDisponibile(subproiecteFormatate);
         
         if (subproiecteFormatate.length > 0) {
-          const messageSubproiecte = `📋 Găsite ${subproiecteFormatate.length} subproiecte`;
-          const messageCursuri = valuteNecesare.length > 0 ? 
-            ` cu cursuri BNR actualizate (${Object.keys(cursuriCentralizate).length}/${valuteNecesare.length})` : '';
-          showToast(messageSubproiecte + messageCursuri, 'success');
+          showToast(`📋 Găsite ${subproiecteFormatate.length} subproiecte`, 'success');
         }
       }
     } catch (error) {
@@ -867,7 +722,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const addLine = () => {
-    // ✅ CORECTAT: TVA 21% implicit pentru linii noi
     setLiniiFactura([...liniiFactura, { denumire: '', cantitate: 1, pretUnitar: 0, cotaTva: 21 }]);
   };
 
@@ -895,35 +749,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setLiniiFactura(newLines);
   };
 
-  // ✅ FIX PROBLEMA 1: addSubproiectToFactura folosește cursurile centralizate cu precizie maximă
+  // ✅ SIMPLIFICAT: addSubproiectToFactura cu cursuri din state
   const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
     let valoareSubproiect = subproiect.Valoare_Estimata || 0;
     let monedaSubproiect = subproiect.moneda || 'RON';
-    
-    // ✅ FIX CRUCIAL: Folosește cursul centralizat cu precizie maximă în loc de cel rotunjit din BD
     let cursSubproiect = 1;
     
+    // Folosește cursul din state sau cel din BD
     if (monedaSubproiect !== 'RON') {
-      // ✅ PRIORITATE 1: Curs centralizat BNR cu precizie maximă
-      if (cursuriEditabile[monedaSubproiect]?.curs) {
-        cursSubproiect = cursuriEditabile[monedaSubproiect].curs;
-        console.log(`🎯 FIX PROBLEMA 1: Folosesc curs BNR centralizat pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
-      } 
-      // ✅ FALLBACK: Curs din BD (rotunjit) doar dacă nu avem centralizat
-      else if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
+      const cursState = cursuri[monedaSubproiect];
+      if (cursState) {
+        cursSubproiect = cursState.curs;
+        console.log(`🎯 Folosesc curs din state pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
+      } else if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
         cursSubproiect = subproiect.curs_valutar;
-        console.log(`⚠️ FALLBACK: Folosesc curs BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)} (posibil rotunjit)`);
+        console.log(`📊 Folosesc curs din BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
       }
     }
-
-    console.log(`📊 Adaugă subproiect cu curs CORECT ${subproiect.Denumire}:`, {
-      moneda: monedaSubproiect,
-      curs_folosit: cursSubproiect.toFixed(4),
-      curs_centralizat_disponibil: !!cursuriEditabile[monedaSubproiect]?.curs,
-      curs_bd_backup: subproiect.curs_valutar?.toFixed(4) || 'N/A',
-      valoare_originala: subproiect.Valoare_Estimata,
-      valoare_ron: subproiect.valoare_ron
-    });
 
     // Folosește valoarea în RON dacă există
     if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
@@ -934,12 +776,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       denumire: `${subproiect.Denumire} (Subproiect)`,
       cantitate: 1,
       pretUnitar: valoareSubproiect,
-      cotaTva: 21, // ✅ CORECTAT: 21% în loc de 19%
+      cotaTva: 21,
       tip: 'subproiect',
       subproiect_id: subproiect.ID_Subproiect,
       monedaOriginala: monedaSubproiect,
       valoareOriginala: subproiect.Valoare_Estimata,
-      cursValutar: cursSubproiect // ✅ FIX: Cursul centralizat cu precizie maximă
+      cursValutar: cursSubproiect
     };
 
     setLiniiFactura(prev => [...prev, nouaLinie]);
@@ -952,14 +794,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       )
     );
 
-    // ✅ DEBUGGING: Afișează cursul centralizat în toast
-    const cursSource = cursuriEditabile[monedaSubproiect]?.curs ? 'BNR centralizat' : 'BD backup';
-    showToast(
-      `✅ Subproiect "${subproiect.Denumire}" adăugat${
-        monedaSubproiect !== 'RON' ? ` (curs ${cursSource}: ${cursSubproiect.toFixed(4)})` : ''
-      }`, 
-      'success'
-    );
+    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat`, 'success');
   };
 
   const handlePreluareDateANAF = async () => {
@@ -1014,7 +849,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ MODIFICAT: calculateTotals să folosească cursurile editabile
+  // ✅ SIMPLIFICAT: calculateTotals cu cursuri din state
   const calculateTotals = () => {
     let subtotal = 0;
     let totalTva = 0;
@@ -1023,11 +858,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const cantitate = Number(linie.cantitate) || 0;
       let pretUnitar = Number(linie.pretUnitar) || 0;
       
-      // ✅ NOU: Folosește cursul editabil dacă există
+      // Recalculează cu cursul din state dacă există
       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-        const cursEditabil = cursuriEditabile[linie.monedaOriginala];
-        if (cursEditabil) {
-          pretUnitar = linie.valoareOriginala * cursEditabil.curs;
+        const curs = cursuri[linie.monedaOriginala];
+        if (curs) {
+          pretUnitar = linie.valoareOriginala * curs.curs;
         }
       }
       
@@ -1077,7 +912,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const processPDF = async (htmlContent: string, fileName: string) => {
     try {
       setIsProcessingPDF(true);
-      showToast('🔄 Se procesează HTML-ul în PDF...', 'info');
+      showToast('📄 Se procesează HTML-ul în PDF...', 'info');
 
       await loadPDFLibraries();
 
@@ -1226,22 +1061,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  // ✅ FIX PROBLEMA 2: handleGenereazaFactura cu apel explicit la /update pentru Edit
+  // ✅ SIMPLIFICAT: handleGenereazaFactura cu transmitere cursuri din state
   const handleGenereazaFactura = async () => {
-    // ✅ DEBUGGING pentru Storno și Edit
-    if (isStorno || isEdit) {
-      console.log('🔍 MODE DEBUG - verificare date complete:', {
-        isStorno,
-        isEdit,
-        initialData,
-        proiect,
-        clientInfo,
-        liniiFactura,
-        numarFactura,
-        cursuriEditabile
-      });
-    }
-
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
       return;
@@ -1283,78 +1104,47 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
     setIsGenerating(true);
     
-    // ✅ FIX: Determinare ID proiect corect
     let proiectIdFinal = proiect.ID_Proiect;
     
     if ((isEdit || isStorno) && initialData) {
-      // Încearcă toate sursele posibile
       if (initialData.proiectInfo?.ID_Proiect && initialData.proiectInfo.ID_Proiect !== 'UNKNOWN') {
         proiectIdFinal = initialData.proiectInfo.ID_Proiect;
       } else if (initialData.proiectInfo?.id && initialData.proiectInfo.id !== 'UNKNOWN') {
         proiectIdFinal = initialData.proiectInfo.id;
       } else if (initialData.proiectId && initialData.proiectId !== 'UNKNOWN') {
         proiectIdFinal = initialData.proiectId;
-      } else if (proiect.ID_Proiect && proiect.ID_Proiect !== 'UNKNOWN') {
-        proiectIdFinal = proiect.ID_Proiect;
       }
     }
     
-    // ✅ DEBUGGING extins cu focus pe cursuri centralizate
-    console.log('📤 Trimit date pentru generare - CURSURI CENTRALIZATE:', {
-      proiectId: proiectIdFinal,
-      proiectOriginal: proiect.ID_Proiect,
-      isEdit,
-      isStorno,
-      facturaOriginala: initialData?.facturaOriginala,
-      liniiFactura: liniiFactura.length,
-      clientInfo: clientInfo?.denumire,
-      cursuriEditabile_count: Object.keys(cursuriEditabile).length,
-      cursuriEditabile_details: Object.keys(cursuriEditabile).map(m => ({
-        moneda: m,
-        curs_numeric: cursuriEditabile[m].curs,
-        curs_formatat_4_zecimale: cursuriEditabile[m].curs.toFixed(4),
-        precizie_originala: cursuriEditabile[m].curs.toString(),
-        sursa: 'BNR_CENTRALIZAT'
-      }))
-    });
-    
     try {
       if (sendToAnaf) {
-        showToast('🔄 Se generează factură PDF + XML pentru ANAF...', 'info');
+        showToast('📤 Se generează factură PDF + XML pentru ANAF...', 'info');
       } else {
-        showToast('🔄 Se generează template-ul facturii...', 'info');
+        showToast('📄 Se generează template-ul facturii...', 'info');
       }
       
-      // ✅ IMPORTANT: Transmite cursurile centralizate cu precizie maximă
-      const cursuriProcesate: cursuriEditabile = {};
-      Object.keys(cursuriEditabile).forEach(moneda => {
-        const cursData = cursuriEditabile[moneda];
-        cursuriProcesate[moneda] = {
-          curs: cursData.curs, // păstrează numărul cu precizie completă
-          data: cursData.data,
-          precizie_originala: cursData.precizie_originala // transmite și stringul original
+      // ✅ SIMPLIFICAT: Transmite cursurile din state
+      const cursuriPentruAPI: { [moneda: string]: { curs: number; data: string } } = {};
+      Object.keys(cursuri).forEach(moneda => {
+        const cursData = cursuri[moneda];
+        cursuriPentruAPI[moneda] = {
+          curs: cursData.curs,
+          data: cursData.data
         };
-        
-        console.log(`🔍 TRIMIS curs centralizat ${moneda}:`, {
-          curs_numeric: cursData.curs,
-          curs_4_zecimale: cursData.curs.toFixed(4),
-          precizie_originala: cursData.precizie_originala,
-          sursa: 'CENTRALIZAT_BNR'
-        });
       });
       
       const response = await fetch('/api/actions/invoices/generate-hibrid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          proiectId: proiectIdFinal, // ✅ Folosește ID-ul corect
+          proiectId: proiectIdFinal,
           liniiFactura,
           observatii,
           clientInfo,
           numarFactura,
           setariFacturare,
           sendToAnaf,
-          cursuriEditabile: cursuriProcesate, // ✅ Cursuri centralizate cu precizie maximă
+          cursuriEditabile: cursuriPentruAPI, // ✅ Cursuri simplificate
           isEdit,
           isStorno,
           facturaId: isEdit ? initialData?.facturaId : null,
@@ -1365,10 +1155,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const result = await response.json();
       
       if (result.success && result.htmlContent) {
-        // ✅ FIX PROBLEMA 2: Pentru Edit, apelează explicit /update după generate-hibrid
+        // Pentru Edit, apelează explicit /update
         if (isEdit && initialData?.facturaId) {
-          console.log('📝 FIX PROBLEMA 2: Salvez modificările în BigQuery prin /update...');
-          
           try {
             const updateResponse = await fetch('/api/actions/invoices/update', {
               method: 'PUT',
@@ -1378,21 +1166,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 liniiFactura,
                 clientInfo,
                 observatii,
-                cursuriEditabile: cursuriProcesate,
+                cursuriEditabile: cursuriPentruAPI,
                 proiectInfo: {
                   id: proiectIdFinal,
                   ID_Proiect: proiectIdFinal,
                   denumire: proiect.Denumire
                 },
                 setariFacturare,
-                contariBancare: [] // sau din result dacă există
+                contariBancare: []
               })
             });
 
             const updateResult = await updateResponse.json();
             
             if (updateResult.success) {
-              console.log('✅ FIX PROBLEMA 2: Modificări salvate cu succes în BigQuery:', updateResult.data);
+              console.log('✅ Modificări salvate cu succes în BigQuery:', updateResult.data);
               showToast('✅ Modificări salvate în BigQuery!', 'success');
             } else {
               console.error('❌ Eroare salvare modificări:', updateResult.error);
@@ -1416,9 +1204,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         
         await processPDF(result.htmlContent, result.fileName);
         
-        showToast('✅ Factură generată cu succes cu cursuri BNR centralizate!', 'success');
+        showToast('✅ Factură generată cu succes!', 'success');
 
-        // Pentru Edit, nu reîncarcă setările
         if (!isEdit) {
           setTimeout(() => {
             loadSetariFacturare();
@@ -1439,34 +1226,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const totals = calculateTotals();
-  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || loadingCursuriPersonalizate;
+  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || loadingCursuri;
 
-  // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită + sursă centralizată
+  // ✅ SIMPLIFICAT: Generează nota cursuri
   const generateCurrencyNote = () => {
-    const monede = Object.keys(cursuriEditabile);
+    const monede = Object.keys(cursuri);
     if (monede.length === 0) return '';
     
-    return `Curs valutar BNR (centralizat): ${monede.map(m => {
-      const cursData = cursuriEditabile[m];
-      let cursNumeric: number;
-      
-      if (typeof cursData.curs === 'number') {
-        cursNumeric = cursData.curs;
-      } else if (typeof cursData.curs === 'string') {
-        cursNumeric = parseFloat(cursData.curs);
-      } else {
-        cursNumeric = 1;
-      }
-      
-      if (isNaN(cursNumeric) || cursNumeric <= 0) {
-        cursNumeric = 1;
-      }
-      
-      return `1 ${m} = ${cursNumeric.toFixed(4)} RON (${cursData.data})`;
+    return `Curs valutar ${dataCursPersonalizata}: ${monede.map(m => {
+      const cursData = cursuri[m];
+      return `1 ${m} = ${cursData.curs.toFixed(4)} RON`;
     }).join(', ')}`;
   };
 
-  // Continuare render JSX... (același JSX ca înainte, doar se înlocuiește loading indicator)
   return (
     <div style={{
       position: 'fixed',
@@ -1590,7 +1362,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
           
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            📊 Auto-completare client din BD + cursuri BNR centralizate • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+            📊 Auto-completare client din BD + cursuri BNR editabile • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
           </p>
         </div>
 
@@ -1634,10 +1406,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   }}>
                   </div>
                   <span>
-                    {isLoadingSetari && '🔄 Se încarcă setările de facturare...'}
-                    {loadingCursuriPersonalizate && '💱 Se preiau cursurile BNR centralizat...'}
-                    {isGenerating && !isProcessingPDF && (sendToAnaf ? '🔄 Se generează PDF + XML ANAF...' : '🔄 Se generează template-ul...')}
-                    {isProcessingPDF && '📄 Se procesează PDF-ul cu cursuri BNR...'}
+                    {isLoadingSetari && '📄 Se încarcă setările de facturare...'}
+                    {loadingCursuri && '💱 Se preiau cursurile BNR...'}
+                    {isGenerating && !isProcessingPDF && (sendToAnaf ? '📤 Se generează PDF + XML ANAF...' : '📄 Se generează template-ul...')}
+                    {isProcessingPDF && '📄 Se procesează PDF-ul...'}
                   </span>
                 </div>
                 <style>
@@ -1669,7 +1441,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               alignItems: 'center',
               gap: '0.5rem'
             }}>
-              🏗️ Informații Proiect
+              🗃️ Informații Proiect
             </h3>
             <div style={{
               display: 'grid',
@@ -1739,7 +1511,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* Secțiunea subproiecte cu indicator cursuri centralizate */}
+            {/* Secțiunea subproiecte */}
             {subproiecteDisponibile.length > 0 && (
               <div style={{
                 marginTop: '1rem',
@@ -1754,9 +1526,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 }}>
                   <h4 style={{ margin: 0, color: '#2c3e50' }}>
                     📋 Subproiecte Disponibile ({subproiecteDisponibile.length}) 
-                    {Object.keys(cursuriEditabile).length > 0 && (
+                    {Object.keys(cursuri).length > 0 && (
                       <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
-                        • Cursuri BNR centralizate ✓ PRECIZIE MAXIMĂ
+                        • Cursuri BNR ✓
                       </span>
                     )}
                   </h4>
@@ -1817,252 +1589,251 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                   'Fără valoare'}
                               </span>
                               {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
-                               <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
-                                 ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
-                                 {/* ✅ DEBUGGING: Afișează cursul centralizat cu precizia completă */}
-                                 <br/>💱 Curs BNR: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
-                                 {cursuriEditabile[subproiect.moneda] && (
-                                   <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat precizie maximă)</span>
-                                 )}
-                               </span>
-                             )}
-                           </div>
-                           <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                             📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
-                           </div>
-                         </div>
-                         <button
-                           onClick={() => addSubproiectToFactura(subproiect)}
-                           disabled={subproiect.adaugat || isLoading}
-                           style={{
-                             marginLeft: '1rem',
-                             padding: '0.5rem 1rem',
-                             background: subproiect.adaugat ? '#27ae60' : '#3498db',
-                             color: 'white',
-                             border: 'none',
-                             borderRadius: '6px',
-                             cursor: (subproiect.adaugat || isLoading) ? 'not-allowed' : 'pointer',
-                             fontSize: '12px',
-                             fontWeight: 'bold'
-                           }}
-                         >
-                           {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
-                         </button>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               )}
-             </div>
-           )}
-         </div>
+                                <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
+                                  <br/>💱 Curs: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
+                                  {cursuri[subproiect.moneda || ''] && (
+                                    <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (BNR)</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => addSubproiectToFactura(subproiect)}
+                            disabled={subproiect.adaugat || isLoading}
+                            style={{
+                              marginLeft: '1rem',
+                              padding: '0.5rem 1rem',
+                              background: subproiect.adaugat ? '#27ae60' : '#3498db',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: (subproiect.adaugat || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-         {/* Secțiune Client */}
-         <div style={{ marginBottom: '1rem' }}>
-           <div style={{
-             display: 'flex',
-             justifyContent: 'space-between',
-             alignItems: 'center',
-             marginBottom: '1rem'
-           }}>
-             <h3 style={{ margin: 0, color: '#2c3e50' }}>
-               👤 Informații Client
-               {isLoadingClient && <span style={{ fontSize: '12px', color: '#3498db', fontWeight: '500' }}> ⏳ Se încarcă din BD...</span>}
-             </h3>
-             <div style={{ display: 'flex', gap: '0.5rem' }}>
-               <input
-                 type="text"
-                 value={cuiInput}
-                 onChange={(e) => setCuiInput(e.target.value)}
-                 disabled={isLoading}
-                 placeholder="Introduceți CUI (ex: RO12345678)"
-                 style={{
-                   padding: '0.75rem',
-                   border: '1px solid #dee2e6',
-                   borderRadius: '6px',
-                   fontSize: '14px',
-                   width: '200px'
-                 }}
-               />
-               <button
-                 onClick={handlePreluareDateANAF}
-                 disabled={isLoadingANAF || !cuiInput.trim() || isLoading}
-                 style={{
-                   padding: '0.75rem 1rem',
-                   background: (isLoadingANAF || !cuiInput.trim() || isLoading) ? '#bdc3c7' : '#3498db',
-                   color: 'white',
-                   border: 'none',
-                   borderRadius: '6px',
-                   cursor: (isLoadingANAF || !cuiInput.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                   fontSize: '12px',
-                   fontWeight: 'bold',
-                   whiteSpace: 'nowrap'
-                 }}
-               >
-                 {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
-               </button>
-             </div>
-           </div>
-           
-           {anafError && (
-             <div style={{
-               background: '#f8d7da',
-               border: '1px solid #f5c6cb',
-               borderRadius: '6px',
-               padding: '0.75rem',
-               marginBottom: '1rem',
-               fontSize: '14px',
-               color: '#721c24'
-             }}>
-               ❌ {anafError}
-             </div>
-           )}
-           
-           {clientInfo && (
-             <div style={{
-               display: 'grid',
-               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-               gap: '1rem'
-             }}>
-               <div>
-                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                   Denumire *
-                 </label>
-                 <input
-                   type="text"
-                   value={clientInfo.denumire}
-                   onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
-                   disabled={isLoading}
-                   style={{
-                     width: '100%',
-                     padding: '0.75rem',
-                     border: '1px solid #dee2e6',
-                     borderRadius: '6px',
-                     fontSize: '14px'
-                   }}
-                   required
-                 />
-               </div>
-               <div>
-                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                   CUI *
-                 </label>
-                 <input
-                   type="text"
-                   value={clientInfo.cui}
-                   onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
-                   disabled={isLoading}
-                   style={{
-                     width: '100%',
-                     padding: '0.75rem',
-                     border: '1px solid #dee2e6',
-                     borderRadius: '6px',
-                     fontSize: '14px'
-                   }}
-                   required
-                 />
-               </div>
-               <div>
-                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                   Nr. Reg. Com.
-                 </label>
-                 <input
-                   type="text"
-                   value={clientInfo.nrRegCom}
-                   onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
-                   disabled={isLoading}
-                   style={{
-                     width: '100%',
-                     padding: '0.75rem',
-                     border: '1px solid #dee2e6',
-                     borderRadius: '6px',
-                     fontSize: '14px'
-                   }}
-                 />
-               </div>
-               <div>
-                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                   Telefon
-                 </label>
-                 <input
-                   type="text"
-                   value={clientInfo.telefon || ''}
-                   onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
-                   disabled={isLoading}
-                   style={{
-                     width: '100%',
-                     padding: '0.75rem',
-                     border: '1px solid #dee2e6',
-                     borderRadius: '6px',
-                     fontSize: '14px'
-                   }}
-                 />
-               </div>
-               <div style={{ gridColumn: 'span 2' }}>
-                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                   Adresa *
-                 </label>
-                 <input
-                   type="text"
-                   value={clientInfo.adresa}
-                   onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
-                   disabled={isLoading}
-                   style={{
-                     width: '100%',
-                     padding: '0.75rem',
-                     border: '1px solid #dee2e6',
-                     borderRadius: '6px',
-                     fontSize: '14px'
-                   }}
-                   required
-                 />
-               </div>
-               
-               {(clientInfo.status || clientInfo.platitorTva) && (
-                 <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                   {clientInfo.status && (
-                     <span style={{
-                       padding: '0.5rem 1rem',
-                       borderRadius: '6px',
-                       fontSize: '12px',
-                       fontWeight: 'bold',
-                       background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da',
-                       color: clientInfo.status === 'Activ' ? '#155724' : '#721c24'
-                     }}>
-                       Status ANAF: {clientInfo.status}
-                     </span>
-                   )}
-                   {clientInfo.platitorTva && (
-                     <span style={{
-                       padding: '0.5rem 1rem',
-                       borderRadius: '6px',
-                       fontSize: '12px',
-                       fontWeight: 'bold',
-                       background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd',
-                       color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404'
-                     }}>
-                       TVA: {clientInfo.platitorTva}
-                     </span>
-                   )}
-                 </div>
-               )}
-               
-               {clientInfo.id && (
-                 <div style={{ gridColumn: 'span 2' }}>
-                   <div style={{
-                     background: '#d4edda',
-                     border: '1px solid #c3e6cb',
-                     borderRadius: '6px',
-                     padding: '0.75rem',
-                     fontSize: '12px'
-                   }}>
-                     ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
-                   </div>
-                 </div>
-               )}
-             </div>
-           )}
-         </div>
+          {/* Secțiune Client */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>
+                👤 Informații Client
+                {isLoadingClient && <span style={{ fontSize: '12px', color: '#3498db', fontWeight: '500' }}> ⏳ Se încarcă din BD...</span>}
+              </h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={cuiInput}
+                  onChange={(e) => setCuiInput(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="Introduceți CUI (ex: RO12345678)"
+                  style={{
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    width: '200px'
+                  }}
+                />
+                <button
+                  onClick={handlePreluareDateANAF}
+                  disabled={isLoadingANAF || !cuiInput.trim() || isLoading}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: (isLoadingANAF || !cuiInput.trim() || isLoading) ? '#bdc3c7' : '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (isLoadingANAF || !cuiInput.trim() || isLoading) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {isLoadingANAF ? '⏳ Se preiau...' : '📡 Preluare ANAF'}
+                </button>
+              </div>
+            </div>
+            
+            {anafError && (
+              <div style={{
+                background: '#f8d7da',
+                border: '1px solid #f5c6cb',
+                borderRadius: '6px',
+                padding: '0.75rem',
+                marginBottom: '1rem',
+                fontSize: '14px',
+                color: '#721c24'
+              }}>
+                ❌ {anafError}
+              </div>
+            )}
+            
+            {clientInfo && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem'
+              }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Denumire *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.denumire}
+                    onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    CUI *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.cui}
+                    onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Nr. Reg. Com.
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.nrRegCom}
+                    onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Telefon
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.telefon || ''}
+                    onChange={(e) => setClientInfo({...clientInfo, telefon: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Adresa *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientInfo.adresa}
+                    onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                    required
+                  />
+                </div>
+                
+                {(clientInfo.status || clientInfo.platitorTva) && (
+                  <div style={{ gridColumn: 'span 2', display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    {clientInfo.status && (
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: clientInfo.status === 'Activ' ? '#d4edda' : '#f8d7da',
+                        color: clientInfo.status === 'Activ' ? '#155724' : '#721c24'
+                      }}>
+                        Status ANAF: {clientInfo.status}
+                      </span>
+                    )}
+                    {clientInfo.platitorTva && (
+                      <span style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: clientInfo.platitorTva === 'Da' ? '#cce7ff' : '#fff3cd',
+                        color: clientInfo.platitorTva === 'Da' ? '#004085' : '#856404'
+                      }}>
+                        TVA: {clientInfo.platitorTva}
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {clientInfo.id && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{
+                      background: '#d4edda',
+                      border: '1px solid #c3e6cb',
+                      borderRadius: '6px',
+                      padding: '0.75rem',
+                      fontSize: '12px'
+                    }}>
+                      ✅ <strong>Date preluate din BD:</strong> Client ID {clientInfo.id}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* ✅ NOU: Secțiune pentru alegerea datei cursului */}
           <div style={{ 
@@ -2088,7 +1859,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   fontSize: '14px'
                 }}
               />
-              {loadingCursuriPersonalizate && (
+              {loadingCursuri && (
                 <span style={{ color: '#856404', fontSize: '12px' }}>
                   ⏳ Se încarcă cursurile...
                 </span>
@@ -2098,7 +1869,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               Cursurile vor fi preluate pentru data selectată. Poți edita manual cursurile în tabel.
             </div>
           </div>
-
 
           {/* ✅ MODIFICAT: Secțiune Servicii/Produse cu coloane extinse */}
           <div style={{ marginBottom: '1rem' }}>
@@ -2132,7 +1902,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: '14px',
-                minWidth: '1000px' // ✅ NOU: Lățime minimă pentru coloanele noi
+                minWidth: '1000px'
               }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
@@ -2142,7 +1912,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
                       Cant.
                     </th>
-                    {/* ✅ NOU: Coloane pentru valută și cursuri */}
                     <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
                       Valoare Original
                     </th>
@@ -2170,12 +1939,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   {liniiFactura.map((linie, index) => {
                     const cantitate = Number(linie.cantitate) || 0;
                     
-                    // ✅ NOU: Calculează pretul unitar cu cursul editabil
+                    // Calculează pretul unitar cu cursul din state
                     let pretUnitar = Number(linie.pretUnitar) || 0;
                     if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-                      const cursEditabil = cursuriEditabile[linie.monedaOriginala];
-                      if (cursEditabil) {
-                        pretUnitar = linie.valoareOriginala * cursEditabil.curs;
+                      const curs = cursuri[linie.monedaOriginala];
+                      if (curs) {
+                        pretUnitar = linie.valoareOriginala * curs.curs;
                       }
                     }
                     
@@ -2190,7 +1959,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       <tr key={index} style={{
                         background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
                       }}>
-                        {/* Denumire - rămâne identică */}
+                        {/* Denumire */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {linie.tip === 'subproiect' && (
@@ -2223,7 +1992,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </div>
                         </td>
 
-                        {/* Cantitate - rămâne identică */}
+                        {/* Cantitate */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
@@ -2243,23 +2012,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* ✅ NOU: Valoare Originală */}
+                        {/* Valoare Originală */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px' }}>
                           {linie.valoareOriginala ? linie.valoareOriginala.toFixed(2) : pretUnitar.toFixed(2)}
                         </td>
 
-                        {/* ✅ NOU: Valută */}
+                        {/* Valută */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>
                           {linie.monedaOriginala || 'RON'}
                         </td>
 
-                        {/* ✅ NOU: Curs Valutar (editabil) */}
+                        {/* Curs Valutar (editabil) */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           {linie.monedaOriginala && linie.monedaOriginala !== 'RON' ? (
                             <input
                               type="number"
-                              value={cursuriEditabile[linie.monedaOriginala]?.curs || linie.cursValutar || 1}
-                              onChange={(e) => updateCursEditabil(linie.monedaOriginala!, parseFloat(e.target.value) || 1)}
+                              value={cursuri[linie.monedaOriginala]?.curs || linie.cursValutar || 1}
+                              onChange={(e) => updateCurs(linie.monedaOriginala!, parseFloat(e.target.value) || 1)}
                               disabled={isLoading}
                               style={{
                                 width: '100%',
@@ -2268,7 +2037,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                 borderRadius: '4px',
                                 textAlign: 'center',
                                 fontSize: '12px',
-                                background: cursuriEditabile[linie.monedaOriginala!]?.sursa === 'Manual' ? '#fff3cd' : 'white'
+                                background: cursuri[linie.monedaOriginala!]?.sursa === 'Manual' ? '#fff3cd' : 'white'
                               }}
                               step="0.0001"
                               placeholder="1.0000"
@@ -2278,12 +2047,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           )}
                         </td>
 
-                        {/* ✅ MODIFICAT: Preț unitar în RON (calculat automat) */}
+                        {/* Preț unitar în RON (calculat automat) */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#27ae60' }}>
                           {pretUnitar.toFixed(2)}
                         </td>
 
-                        {/* TVA - rămâne identică */}
+                        {/* TVA */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <select
                             value={linie.cotaTva}
@@ -2306,7 +2075,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           </select>
                         </td>
 
-                        {/* Total - rămâne identic */}
+                        {/* Total */}
                         <td style={{
                           border: '1px solid #dee2e6',
                           padding: '0.5rem',
@@ -2318,7 +2087,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           {safeFixed(total)}
                         </td>
 
-                        {/* Acțiuni - rămâne identic */}
+                        {/* Acțiuni */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
                           <button
                             onClick={() => removeLine(index)}
@@ -2345,7 +2114,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
 
           {/* ✅ NOU: Afișare rezumat cursuri folosite */}
-          {Object.keys(cursuriEditabile).length > 0 && (
+          {Object.keys(cursuri).length > 0 && (
             <div style={{
               background: '#e8f5e8',
               border: '1px solid #c3e6c3',
@@ -2357,7 +2126,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 💱 Cursuri valutare folosite pentru {dataCursPersonalizata}:
               </h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                {Object.values(cursuriEditabile).map(curs => (
+                {Object.values(cursuri).map(curs => (
                   <div key={curs.moneda} style={{
                     padding: '0.5rem',
                     background: curs.sursa === 'Manual' ? '#fff3cd' : '#ffffff',
@@ -2376,282 +2145,282 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           )}
 
-         {/* Secțiune Totaluri */}
-         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-           <div style={{
-             width: '300px',
-             background: '#f8f9fa',
-             padding: '1rem',
-             borderRadius: '6px',
-             border: '1px solid #dee2e6'
-           }}>
-             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-               <div style={{
-                 display: 'flex',
-                 justifyContent: 'space-between',
-                 fontSize: '14px',
-                 color: '#2c3e50'
-               }}>
-                 <span>Subtotal (fără TVA):</span>
-                 <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
-               </div>
-               <div style={{
-                 display: 'flex',
-                 justifyContent: 'space-between',
-                 fontSize: '14px',
-                 color: '#2c3e50'
-               }}>
-                 <span>TVA:</span>
-                 <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
-               </div>
-               <div style={{
-                 display: 'flex',
-                 justifyContent: 'space-between',
-                 fontSize: '16px',
-                 fontWeight: 'bold',
-                 paddingTop: '0.5rem',
-                 borderTop: '2px solid #27ae60',
-                 color: '#27ae60'
-               }}>
-                 <span>TOTAL DE PLATĂ:</span>
-                 <span>{totals.totalGeneral} RON</span>
-               </div>
-             </div>
-           </div>
-         </div>
+          {/* Secțiune Totaluri */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <div style={{
+              width: '300px',
+              background: '#f8f9fa',
+              padding: '1rem',
+              borderRadius: '6px',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
+                  <span>Subtotal (fără TVA):</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.subtotal} RON</span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#2c3e50'
+                }}>
+                  <span>TVA:</span>
+                  <span style={{ fontWeight: 'bold' }}>{totals.totalTva} RON</span>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  paddingTop: '0.5rem',
+                  borderTop: '2px solid #27ae60',
+                  color: '#27ae60'
+                }}>
+                  <span>TOTAL DE PLATĂ:</span>
+                  <span>{totals.totalGeneral} RON</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-         {/* Secțiune Observații */}
-         <div style={{ marginBottom: '1.5rem' }}>
-           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-             📝 Observații (opțional)
-           </label>
-           <textarea
-             value={observatii}
-             onChange={(e) => setObservatii(e.target.value)}
-             disabled={isLoading}
-             style={{
-               width: '100%',
-               padding: '0.75rem',
-               border: '1px solid #dee2e6',
-               borderRadius: '6px',
-               fontSize: '14px',
-               resize: 'vertical'
-             }}
-             rows={2}
-             placeholder="Observații suplimentare pentru factură..."
-           />
-         </div>
+          {/* Secțiune Observații */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              📝 Observații (opțional)
+            </label>
+            <textarea
+              value={observatii}
+              onChange={(e) => setObservatii(e.target.value)}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
+              }}
+              rows={2}
+              placeholder="Observații suplimentare pentru factură..."
+            />
+          </div>
 
-         {/* Secțiune e-Factura ANAF cu afișare corectă */}
-         <div style={{ marginBottom: '1.5rem' }}>
-           <div style={{
-             background: '#f0f8ff',
-             border: '1px solid #cce7ff',
-             borderRadius: '6px',
-             padding: '1rem'
-           }}>
-             <div style={{
-               display: 'flex',
-               alignItems: 'center',
-               justifyContent: 'space-between',
-               marginBottom: '0.5rem'
-             }}>
-               <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '16px' }}>
-                 📤 e-Factura ANAF
-               </h3>
-               {isCheckingAnafToken && (
-                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <div style={{
-                     width: '16px',
-                     height: '16px',
-                     borderRadius: '50%',
-                     border: '2px solid #3498db',
-                     borderTop: '2px solid transparent',
-                     animation: 'spin 1s linear infinite'
-                   }}></div>
-                   <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică token...</span>
-                 </div>
-               )}
-             </div>
+          {/* Secțiune e-Factura ANAF */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{
+              background: '#f0f8ff',
+              border: '1px solid #cce7ff',
+              borderRadius: '6px',
+              padding: '1rem'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem'
+              }}>
+                <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '16px' }}>
+                  📤 e-Factura ANAF
+                </h3>
+                {isCheckingAnafToken && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      border: '2px solid #3498db',
+                      borderTop: '2px solid transparent',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
+                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică token...</span>
+                  </div>
+                )}
+              </div>
 
-             <div style={{
-               display: 'flex',
-               alignItems: 'flex-start',
-               gap: '1rem'
-             }}>
-               <label style={{
-                 display: 'flex',
-                 alignItems: 'center',
-                 gap: '0.5rem',
-                 cursor: anafTokenStatus.hasValidToken ? 'pointer' : 'not-allowed',
-                 fontSize: '14px',
-                 fontWeight: '500'
-               }}>
-                 <input
-                   type="checkbox"
-                   checked={sendToAnaf}
-                   onChange={(e) => handleAnafCheckboxChange(e.target.checked)}
-                   disabled={!anafTokenStatus.hasValidToken || isLoading}
-                   style={{
-                     transform: 'scale(1.2)',
-                     marginRight: '0.25rem'
-                   }}
-                 />
-                 📤 Trimite automat la ANAF ca e-Factură
-               </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '1rem'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: anafTokenStatus.hasValidToken ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={sendToAnaf}
+                    onChange={(e) => handleAnafCheckboxChange(e.target.checked)}
+                    disabled={!anafTokenStatus.hasValidToken || isLoading}
+                    style={{
+                      transform: 'scale(1.2)',
+                      marginRight: '0.25rem'
+                    }}
+                  />
+                  📤 Trimite automat la ANAF ca e-Factură
+                </label>
 
-               <div style={{ flex: 1 }}>
-                 {anafTokenStatus.loading ? (
-                   <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-                 ) : anafTokenStatus.hasValidToken ? (
-                   <div style={{ fontSize: '12px', color: '#27ae60' }}>
-                     ✅ Token ANAF valid
-                     {anafTokenStatus.tokenInfo && (
-                       <span style={{ 
-                         color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
-                       }}>
-                         {' '}
-                         {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
-                           `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-                         ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
-                           `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-                         ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-                           `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
-                         ) : (
-                           '(verifică statusul)'
-                         )}
-                       </span>
-                     )}
-                   </div>
-                 ) : (
-                   <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-                     ❌ Nu există token ANAF valid.{' '}
-                     <a 
-                       href="/admin/anaf/setup"
-                       target="_blank"
-                       style={{ color: '#3498db', textDecoration: 'underline' }}
-                     >
-                       Configurează OAuth
-                     </a>
-                   </div>
-                 )}
+                <div style={{ flex: 1 }}>
+                  {anafTokenStatus.loading ? (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+                  ) : anafTokenStatus.hasValidToken ? (
+                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
+                      ✅ Token ANAF valid
+                      {anafTokenStatus.tokenInfo && (
+                        <span style={{ 
+                          color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
+                        }}>
+                          {' '}
+                          {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
+                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+                          ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
+                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
+                          ) : (
+                            '(verifică statusul)'
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+                      ❌ Nu există token ANAF valid.{' '}
+                      <a 
+                        href="/admin/anaf/setup"
+                        target="_blank"
+                        style={{ color: '#3498db', textDecoration: 'underline' }}
+                      >
+                        Configurează OAuth
+                      </a>
+                    </div>
+                  )}
 
-                 {sendToAnaf && (
-                   <div style={{
-                     marginTop: '0.5rem',
-                     padding: '0.5rem',
-                     background: '#e8f5e8',
-                     border: '1px solid #c3e6c3',
-                     borderRadius: '4px',
-                     fontSize: '12px',
-                     color: '#2d5016'
-                   }}>
-                     ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.
-                   </div>
-                 )}
-               </div>
-             </div>
-           </div>
-         </div>
+                  {sendToAnaf && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.5rem',
+                      background: '#e8f5e8',
+                      border: '1px solid #c3e6c3',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      color: '#2d5016'
+                    }}>
+                      ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
 
-         {/* Adaugă nota despre cursuri dacă există - cu precizie îmbunătățită */}
-         {Object.keys(cursuriEditabile).length > 0 && (
-           <div style={{
-             background: '#d1ecf1',
-             border: '1px solid #bee5eb',
-             borderRadius: '6px',
-             padding: '1rem',
-             marginBottom: '1rem',
-             fontSize: '13px',
-             color: '#0c5460'
-           }}>
-             <strong>💱 Note curs valutar (centralizat BNR cu precizie maximă):</strong><br/>
-             {generateCurrencyNote()}
-           </div>
-         )}
+          {/* Adaugă nota despre cursuri dacă există */}
+          {Object.keys(cursuri).length > 0 && (
+            <div style={{
+              background: '#d1ecf1',
+              border: '1px solid #bee5eb',
+              borderRadius: '6px',
+              padding: '1rem',
+              marginBottom: '1rem',
+              fontSize: '13px',
+              color: '#0c5460'
+            }}>
+              <strong>💱 Note curs valutar:</strong><br/>
+              {generateCurrencyNote()}
+            </div>
+          )}
 
-         {/* Informații importante */}
-         <div style={{
-           background: '#fff3cd',
-           border: '1px solid #ffeaa7',
-           borderRadius: '6px',
-           padding: '1rem',
-           marginBottom: '1.5rem'
-         }}>
-           <div style={{ marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404' }}>
-             ℹ️ Informații importante:
-           </div>
-           <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '13px', color: '#856404' }}>
-             <li>Factura va primi numărul: <strong>{numarFactura}</strong></li>
-             <li>După generare, numărul se actualizează automat pentru următoarea factură</li>
-             {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
-             <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
-             <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
-             {Object.keys(cursuriEditabile).length > 0 && (
-               <li>💱 <strong>FIX APLICAT: Cursuri BNR centralizate cu precizie maximă (4 zecimale)</strong></li>
-             )}
-             {isEdit && <li>✏️ <strong>FIX APLICAT: Salvare completă în BigQuery pentru editări</strong></li>}
-           </ul>
-         </div>
+          {/* Informații importante */}
+          <div style={{
+            background: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '6px',
+            padding: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404' }}>
+              ℹ️ Informații importante:
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '13px', color: '#856404' }}>
+              <li>Factura va primi numărul: <strong>{numarFactura}</strong></li>
+              <li>După generare, numărul se actualizează automat pentru următoarea factură</li>
+              {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
+              <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
+              <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
+              {Object.keys(cursuri).length > 0 && (
+                <li>💱 <strong>Cursuri BNR editabile pentru data selectată</strong></li>
+              )}
+              {isEdit && <li>✏️ <strong>Salvare completă în BigQuery pentru editări</strong></li>}
+            </ul>
+          </div>
 
-         {/* Butoane finale */}
-         <div style={{ 
-           display: 'flex', 
-           justifyContent: 'space-between',
-           alignItems: 'center',
-           paddingTop: '1rem',
-           borderTop: '1px solid #dee2e6'
-         }}>
-           <div style={{
-             fontSize: '12px',
-             color: '#7f8c8d',
-             fontWeight: '500'
-           }}>
-             ℹ️ Date client auto-completate din BD. ✅ Cursuri BNR cu precizie maximă. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
-           </div>
-           
-           <div style={{ display: 'flex', gap: '1rem' }}>
-             <button
-               onClick={onClose}
-               disabled={isLoading}
-               style={{
-                 padding: '0.75rem 1.5rem',
-                 background: '#6c757d',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '6px',
-                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                 fontSize: '14px',
-                 fontWeight: 'bold'
-               }}
-             >
-               Anulează
-             </button>
-             
-             <button
-               onClick={handleGenereazaFactura}
-               disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura}
-               style={{
-                 padding: '0.75rem 1.5rem',
-                 background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? '#bdc3c7' : '#27ae60',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '6px',
-                 cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? 'not-allowed' : 'pointer',
-                 fontSize: '14px',
-                 fontWeight: 'bold'
-               }}
-             >
-               {isLoading ? (
-                 <>⏳ {isProcessingPDF ? 'Se generează PDF cu cursuri BNR precise...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
-               ) : (
-                 <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR precise'}</>
-               )}
-             </button>
-           </div>
-         </div>
-       </div>
-     </div>
-   </div>
- );
+          {/* Butoane finale */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '1rem',
+            borderTop: '1px solid #dee2e6'
+          }}>
+            <div style={{
+              fontSize: '12px',
+              color: '#7f8c8d',
+              fontWeight: '500'
+            }}>
+              ℹ️ Date client auto-completate din BD. ✅ Cursuri BNR editabile. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={onClose}
+                disabled={isLoading}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Anulează
+              </button>
+              
+              <button
+                onClick={handleGenereazaFactura}
+                disabled={isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? '#bdc3c7' : '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: (isLoading || !clientInfo?.cui || !clientInfo?.denumire || !numarFactura) ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isLoading ? (
+                  <>⏳ {isProcessingPDF ? 'Se generează PDF...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
+                ) : (
+                  <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR'}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
