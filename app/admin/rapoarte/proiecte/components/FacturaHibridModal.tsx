@@ -104,7 +104,7 @@ interface ANAFTokenStatus {
 }
 
 // ✅ NOU: Interfață pentru tracking cursuri folosite cu precizie îmbunătățită
-interface CursuriUtilizate {
+interface cursuriEditabile {
   [moneda: string]: {
     curs: number;
     data: string;
@@ -206,7 +206,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (monede.length === 0) return {};
     
     setLoadingCursuriPersonalizate(true);
-    const cursuri: CursuriUtilizate = {};
+    const cursuri: cursuriEditabile = {};
     
     console.log(`🔄 Încep preluarea centralizată a cursurilor pentru: ${monede.join(', ')}`);
     
@@ -789,13 +789,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         console.log(`💱 Valute necesare identificate: ${valuteNecesare.join(', ') || 'Doar RON'}`);
         
         // ✅ NOU: Preiau cursurile centralizat dacă sunt necesare
-        let cursuriCentralizate: CursuriUtilizate = {};
+        let cursuriCentralizate: cursuriEditabile = {};
         if (valuteNecesare.length > 0) {
           showToast(`💱 Se preiau cursurile BNR pentru: ${valuteNecesare.join(', ')}`, 'info');
           cursuriCentralizate = await preluaCursuriCentralizat(valuteNecesare);
           
           // Setează cursurile centralizate
-          setCursuriUtilizate(prev => ({
+          setcursuriEditabile(prev => ({
             ...prev,
             ...cursuriCentralizate
           }));
@@ -894,8 +894,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     
     if (monedaSubproiect !== 'RON') {
       // ✅ PRIORITATE 1: Curs centralizat BNR cu precizie maximă
-      if (cursuriUtilizate[monedaSubproiect]?.curs) {
-        cursSubproiect = cursuriUtilizate[monedaSubproiect].curs;
+      if (cursuriEditabile[monedaSubproiect]?.curs) {
+        cursSubproiect = cursuriEditabile[monedaSubproiect].curs;
         console.log(`🎯 FIX PROBLEMA 1: Folosesc curs BNR centralizat pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
       } 
       // ✅ FALLBACK: Curs din BD (rotunjit) doar dacă nu avem centralizat
@@ -908,7 +908,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     console.log(`📊 Adaugă subproiect cu curs CORECT ${subproiect.Denumire}:`, {
       moneda: monedaSubproiect,
       curs_folosit: cursSubproiect.toFixed(4),
-      curs_centralizat_disponibil: !!cursuriUtilizate[monedaSubproiect]?.curs,
+      curs_centralizat_disponibil: !!cursuriEditabile[monedaSubproiect]?.curs,
       curs_bd_backup: subproiect.curs_valutar?.toFixed(4) || 'N/A',
       valoare_originala: subproiect.Valoare_Estimata,
       valoare_ron: subproiect.valoare_ron
@@ -942,7 +942,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     );
 
     // ✅ DEBUGGING: Afișează cursul centralizat în toast
-    const cursSource = cursuriUtilizate[monedaSubproiect]?.curs ? 'BNR centralizat' : 'BD backup';
+    const cursSource = cursuriEditabile[monedaSubproiect]?.curs ? 'BNR centralizat' : 'BD backup';
     showToast(
       `✅ Subproiect "${subproiect.Denumire}" adăugat${
         monedaSubproiect !== 'RON' ? ` (curs ${cursSource}: ${cursSubproiect.toFixed(4)})` : ''
@@ -1227,7 +1227,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         clientInfo,
         liniiFactura,
         numarFactura,
-        cursuriUtilizate
+        cursuriEditabile
       });
     }
 
@@ -1297,12 +1297,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       facturaOriginala: initialData?.facturaOriginala,
       liniiFactura: liniiFactura.length,
       clientInfo: clientInfo?.denumire,
-      cursuriUtilizate_count: Object.keys(cursuriUtilizate).length,
-      cursuriUtilizate_details: Object.keys(cursuriUtilizate).map(m => ({
+      cursuriEditabile_count: Object.keys(cursuriEditabile).length,
+      cursuriEditabile_details: Object.keys(cursuriEditabile).map(m => ({
         moneda: m,
-        curs_numeric: cursuriUtilizate[m].curs,
-        curs_formatat_4_zecimale: cursuriUtilizate[m].curs.toFixed(4),
-        precizie_originala: cursuriUtilizate[m].precizie_originala,
+        curs_numeric: cursuriEditabile[m].curs,
+        curs_formatat_4_zecimale: cursuriEditabile[m].curs.toFixed(4),
+        precizie_originala: cursuriEditabile[m].precizie_originala,
         sursa: 'BNR_CENTRALIZAT'
       }))
     });
@@ -1315,9 +1315,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
       
       // ✅ IMPORTANT: Transmite cursurile centralizate cu precizie maximă
-      const cursuriProcesate: CursuriUtilizate = {};
-      Object.keys(cursuriUtilizate).forEach(moneda => {
-        const cursData = cursuriUtilizate[moneda];
+      const cursuriProcesate: cursuriEditabile = {};
+      Object.keys(cursuriEditabile).forEach(moneda => {
+        const cursData = cursuriEditabile[moneda];
         cursuriProcesate[moneda] = {
           curs: cursData.curs, // păstrează numărul cu precizie completă
           data: cursData.data,
@@ -1343,7 +1343,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           numarFactura,
           setariFacturare,
           sendToAnaf,
-          cursuriUtilizate: cursuriProcesate, // ✅ Cursuri centralizate cu precizie maximă
+          cursuriEditabile: cursuriProcesate, // ✅ Cursuri centralizate cu precizie maximă
           isEdit,
           isStorno,
           facturaId: isEdit ? initialData?.facturaId : null,
@@ -1367,7 +1367,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 liniiFactura,
                 clientInfo,
                 observatii,
-                cursuriUtilizate: cursuriProcesate,
+                cursuriEditabile: cursuriProcesate,
                 proiectInfo: {
                   id: proiectIdFinal,
                   ID_Proiect: proiectIdFinal,
@@ -1432,11 +1432,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită + sursă centralizată
   const generateCurrencyNote = () => {
-    const monede = Object.keys(cursuriUtilizate);
+    const monede = Object.keys(cursuriEditabile);
     if (monede.length === 0) return '';
     
     return `Curs valutar BNR (centralizat): ${monede.map(m => {
-      const cursData = cursuriUtilizate[m];
+      const cursData = cursuriEditabile[m];
       let cursNumeric: number;
       
       if (typeof cursData.curs === 'number') {
@@ -1743,7 +1743,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 }}>
                   <h4 style={{ margin: 0, color: '#2c3e50' }}>
                     📋 Subproiecte Disponibile ({subproiecteDisponibile.length}) 
-                    {Object.keys(cursuriUtilizate).length > 0 && (
+                    {Object.keys(cursuriEditabile).length > 0 && (
                       <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
                         • Cursuri BNR centralizate ✓ PRECIZIE MAXIMĂ
                       </span>
@@ -1810,7 +1810,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                  ≈ {Number(subproiect.valoare_ron).toLocaleString('ro-RO')} RON
                                  {/* ✅ DEBUGGING: Afișează cursul centralizat cu precizia completă */}
                                  <br/>💱 Curs BNR: {subproiect.curs_valutar ? subproiect.curs_valutar.toFixed(4) : 'N/A'}
-                                 {cursuriUtilizate[subproiect.moneda] && (
+                                 {cursuriEditabile[subproiect.moneda] && (
                                    <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat precizie maximă)</span>
                                  )}
                                </span>
@@ -2544,7 +2544,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
          </div>
 
          {/* Adaugă nota despre cursuri dacă există - cu precizie îmbunătățită */}
-         {Object.keys(cursuriUtilizate).length > 0 && (
+         {Object.keys(cursuriEditabile).length > 0 && (
            <div style={{
              background: '#d1ecf1',
              border: '1px solid #bee5eb',
@@ -2576,7 +2576,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
              {sendToAnaf && <li>Factura va fi trimisă automat la ANAF ca e-Factură</li>}
              <li>Toate modificările ulterioare necesită stornare dacă factura a fost trimisă la ANAF</li>
              <li>✅ <strong>TVA implicit: 21%</strong> (conform noilor reglementări)</li>
-             {Object.keys(cursuriUtilizate).length > 0 && (
+             {Object.keys(cursuriEditabile).length > 0 && (
                <li>💱 <strong>FIX APLICAT: Cursuri BNR centralizate cu precizie maximă (4 zecimale)</strong></li>
              )}
              {isEdit && <li>✏️ <strong>FIX APLICAT: Salvare completă în BigQuery pentru editări</strong></li>}
