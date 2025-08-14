@@ -152,6 +152,43 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function FacturaHibridModal({ proiect, onClose, onSuccess }: FacturaHibridModalProps) {
+  // ✅ MOVED: Helper functions LA ÎNCEPUT pentru a evita ReferenceError
+  const convertBigQueryNumeric = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    
+    // BigQuery poate returna NUMERIC ca obiect cu .value
+    if (typeof value === 'object' && value.value !== undefined) {
+      return parseFloat(value.value.toString()) || 0;
+    }
+    
+    // Sau ca string direct
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    
+    // Sau ca număr
+    if (typeof value === 'number') {
+      return value;
+    }
+    
+    return 0;
+  };
+
+  const safeToFixed = (value: any, decimals: number = 2): string => {
+    const num = convertBigQueryNumeric(value);
+    return num.toFixed(decimals);
+  };
+
+  const formatDate = (date?: string | { value: string }): string => {
+    if (!date) return '';
+    const dateValue = typeof date === 'string' ? date : date.value;
+    try {
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    } catch {
+      return '';
+    }
+  };
+
   // ✅ PĂSTRAT: Verifică dacă e Edit sau Storno
   const isEdit = proiect._isEdit || false;
   const isStorno = proiect._isStorno || false;
@@ -214,44 +251,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
 
-  // ✅ NOU: Helper pentru conversii BigQuery NUMERIC → JavaScript number
-  const convertBigQueryNumeric = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    
-    // BigQuery poate returna NUMERIC ca obiect cu .value
-    if (typeof value === 'object' && value.value !== undefined) {
-      return parseFloat(value.value.toString()) || 0;
-    }
-    
-    // Sau ca string direct
-    if (typeof value === 'string') {
-      return parseFloat(value) || 0;
-    }
-    
-    // Sau ca număr
-    if (typeof value === 'number') {
-      return value;
-    }
-    
-    return 0;
-  };
-
-  // ✅ NOU: Safe toFixed pentru afișare
-  const safeToFixed = (value: any, decimals: number = 2): string => {
-    const num = convertBigQueryNumeric(value);
-    return num.toFixed(decimals);
-  };
-
-  // ✅ PĂSTRAT: Helper functions
-  const formatDate = (date?: string | { value: string }): string => {
-    if (!date) return '';
-    const dateValue = typeof date === 'string' ? date : date.value;
-    try {
-      return new Date(dateValue).toLocaleDateString('ro-RO');
-    } catch {
-      return '';
-    }
-  };
+  // ✅ PĂSTRAT: Toate funcțiile de loading existente
 
   // ✅ SIMPLIFICAT: O singură funcție pentru loading cursuri
   const loadCursuriPentruData = async (data: string, monede: string[]) => {
