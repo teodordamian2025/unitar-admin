@@ -205,7 +205,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const preluaCursuriCentralizat = async (monede: string[]) => {
     if (monede.length === 0) return {};
     
-    setIsLoadingCursuri(true);
+    setIsLoadingCursuriPersonalizate(true);
     const cursuri: CursuriUtilizate = {};
     
     console.log(`🔄 Încep preluarea centralizată a cursurilor pentru: ${monede.join(', ')}`);
@@ -266,7 +266,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri existente.', 'error');
       return {};
     } finally {
-      setIsLoadingCursuri(false);
+      setIsLoadingCursuriPersonalizate(false);
     }
   };
 
@@ -1428,7 +1428,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const totals = calculateTotals();
-  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || isLoadingCursuri;
+  const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || loadingCursuriPersonalizate;
 
   // ✅ NOU: Generează nota despre cursuri utilizate cu precizie îmbunătățită + sursă centralizată
   const generateCurrencyNote = () => {
@@ -1624,7 +1624,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </div>
                   <span>
                     {isLoadingSetari && '🔄 Se încarcă setările de facturare...'}
-                    {isLoadingCursuri && '💱 Se preiau cursurile BNR centralizat...'}
+                    {loadingCursuriPersonalizate && '💱 Se preiau cursurile BNR centralizat...'}
                     {isGenerating && !isProcessingPDF && (sendToAnaf ? '🔄 Se generează PDF + XML ANAF...' : '🔄 Se generează template-ul...')}
                     {isProcessingPDF && '📄 Se procesează PDF-ul cu cursuri BNR...'}
                   </span>
