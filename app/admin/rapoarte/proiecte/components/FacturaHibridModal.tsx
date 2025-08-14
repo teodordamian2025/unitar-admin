@@ -241,11 +241,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           const result = await response.json();
           
           if (result.success && result.curs) {
+            // ✅ FIX: Mapare corectă sursa API → interfață
+            let sursa: 'BD' | 'BNR' | 'Manual' = 'BD';
+            if (result.source === 'bnr') {
+              sursa = 'BNR';
+            } else if (result.source === 'cache' || result.source === 'fallback_actual') {
+              sursa = 'BD';
+            }
+            
             return {
               moneda,
               curs: result.curs,
               data: result.data || data,
-              sursa: result.source === 'bnr' ? 'BNR' : 'BD',
+              sursa: sursa,
               editabil: true
             };
           }
