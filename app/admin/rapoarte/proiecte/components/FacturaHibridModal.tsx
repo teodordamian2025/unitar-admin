@@ -49,6 +49,14 @@ interface LineFactura {
   cursValutar?: number;
 }
 
+// ✅ NOUĂ: Interfață pentru cursuri editabile
+interface CursEditabil {
+  moneda: string;
+  curs: number;
+  editabil: boolean;
+  sursa: 'BD' | 'BNR' | 'Manual';
+}
+
 interface ClientInfo {
   id?: string;
   denumire: string;
@@ -159,9 +167,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const isStorno = proiect._isStorno || false;
   const initialData = proiect._initialData || null;
 
-  // ✅ NOU: Track cursuri folosite cu precizie îmbunătățită - CENTRALIZAT
-  const [cursuriUtilizate, setCursuriUtilizate] = useState<CursuriUtilizate>({});
-  const [isLoadingCursuri, setIsLoadingCursuri] = useState(false);
+  // ✅ NOU: State pentru cursuri editabile și data personalizată
+  const [dataCursPersonalizata, setDataCursPersonalizata] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [cursuriEditabile, setCursuriEditabile] = useState<{ [moneda: string]: CursEditabil }>({});
+  const [loadingCursuriPersonalizate, setLoadingCursuriPersonalizate] = useState(false);
 
   // ✅ CORECTAT: Inițializare cu TVA 21% implicit în loc de 19%
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
@@ -277,6 +288,96 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     
     return Array.from(valute);
   };
+
+  // ✅ NOU: Funcție pentru încărcarea cursurilor pentru data personalizată
+  const loadCursuriPentruData = async (data: string) => {
+    const valuteNecesare = new Set<string>();
+    
+    // Identifică valutele necesare
+    liniiFactura.forEach(linie => {
+      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
+        valuteNecesare.add(linie.monedaOriginala);
+      }
+    });
+
+    if (valuteNecesare.size === 0) return;
+
+    setLoadingCursuriPersonalizate(true);
+    const cursuriNoi: { [moneda: string]: CursEditabil } = {};
+
+    try {
+      for (const moneda of Array.from(valuteNecesare)) {
+        const response = await fetch(`/api/curs-valutar?moneda=${moneda}&data=${data}`);
+        const result = await response.json();
+        
+        if (result.success && result.curs) {
+          cursuriNoi[moneda] = {
+            moneda,
+            curs: result.curs,
+            editabil: true,
+            sursa: result.source === 'bnr' ? 'BNR' : 'BD'
+          };
+        } else {
+          // Fallback la cursul din BD dacă nu găsește pentru data respectivă
+          const cursExistent = liniiFactura.find(l => l.monedaOriginala === moneda)?.cursValutar || 1;
+          cursuriNoi[moneda] = {
+            moneda,
+            curs: cursExistent,
+            editabil: true,
+            sursa: 'BD'
+          };
+        }
+      }
+
+      setCursuriEditabile(cursuriNoi);
+      console.log(`✅ Cursuri încărcate pentru ${data}:`, cursuriNoi);
+      
+    } catch (error) {
+      console.error('Eroare la încărcarea cursurilor:', error);
+      showToast('Eroare la încărcarea cursurilor pentru data selectată', 'error');
+    } finally {
+      setLoadingCursuriPersonalizate(false);
+    }
+  };
+
+  // ✅ NOU: Effect pentru încărcarea cursurilor la schimbarea datei
+  useEffect(() => {
+    if (dataCursPersonalizata) {
+      loadCursuriPentruData(dataCursPersonalizata);
+    }
+  }, [dataCursPersonalizata, liniiFactura.length]);
+
+  // ✅ NOU: Funcție pentru actualizarea cursului editabil
+  const updateCursEditabil = (moneda: string, cursNou: number) => {
+    setCursuriEditabile(prev => ({
+      ...prev,
+      [moneda]: {
+        ...prev[moneda],
+        curs: cursNou,
+        sursa: 'Manual'
+      }
+    }));
+
+    // Actualizează și liniile facturii cu noul curs
+    setLiniiFactura(prev => prev.map(linie => 
+      linie.monedaOriginala === moneda 
+        ? { ...linie, cursValutar: cursNou, pretUnitar: (linie.valoareOriginala || 0) * cursNou }
+        : linie
+    ));
+  };
+
+  // ✅ NOU: Funcție pentru calcularea valorii în RON cu cursul editabil
+  const calculeazaValoareRON = (valoareOriginala: number, moneda: string): number => {
+    if (moneda === 'RON') return valoareOriginala;
+    
+    const cursEditabil = cursuriEditabile[moneda];
+    if (cursEditabil) {
+      return valoareOriginala * cursEditabil.curs;
+    }
+    
+    return valoareOriginala;
+  };
+
 
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
@@ -902,15 +1003,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ MODIFICAT: calculateTotals să folosească cursurile editabile
   const calculateTotals = () => {
     let subtotal = 0;
     let totalTva = 0;
     
     liniiFactura.forEach(linie => {
       const cantitate = Number(linie.cantitate) || 0;
-      const pretUnitar = Number(linie.pretUnitar) || 0;
-      const cotaTva = Number(linie.cotaTva) || 0;
+      let pretUnitar = Number(linie.pretUnitar) || 0;
       
+      // ✅ NOU: Folosește cursul editabil dacă există
+      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+        const cursEditabil = cursuriEditabile[linie.monedaOriginala];
+        if (cursEditabil) {
+          pretUnitar = linie.valoareOriginala * cursEditabil.curs;
+        }
+      }
+      
+      const cotaTva = Number(linie.cotaTva) || 0;
       const valoare = cantitate * pretUnitar;
       const tva = valoare * (cotaTva / 100);
       
@@ -1364,7 +1474,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         background: 'white',
         borderRadius: '8px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        maxWidth: '1000px',
+        maxWidth: '1200px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -1943,244 +2053,317 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
            )}
          </div>
 
-         {/* Secțiune Servicii/Produse */}
-         <div style={{ marginBottom: '1rem' }}>
-           <div style={{
-             display: 'flex',
-             justifyContent: 'space-between',
-             alignItems: 'center',
-             marginBottom: '1rem'
-           }}>
-             <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Servicii/Produse</h3>
-             <button
-               onClick={addLine}
-               disabled={isLoading}
-               style={{
-                 padding: '0.5rem 1rem',
-                 background: '#27ae60',
-                 color: 'white',
-                 border: 'none',
-                 borderRadius: '6px',
-                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                 fontSize: '12px',
-                 fontWeight: 'bold'
-               }}
-             >
-               + Adaugă linie
-             </button>
-           </div>
+          {/* ✅ NOU: Secțiune pentru alegerea datei cursului */}
+          <div style={{ 
+            background: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '6px',
+            padding: '1rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+              <label style={{ fontWeight: 'bold', color: '#856404' }}>
+                💱 Data pentru cursul valutar:
+              </label>
+              <input
+                type="date"
+                value={dataCursPersonalizata}
+                onChange={(e) => setDataCursPersonalizata(e.target.value)}
+                disabled={isLoading}
+                style={{
+                  padding: '0.5rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }}
+              />
+              {loadingCursuriPersonalizate && (
+                <span style={{ color: '#856404', fontSize: '12px' }}>
+                  ⏳ Se încarcă cursurile...
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '12px', color: '#856404' }}>
+              Cursurile vor fi preluate pentru data selectată. Poți edita manual cursurile în tabel.
+            </div>
+          </div>
 
-           <div style={{ overflowX: 'auto' }}>
-             <table style={{
-               width: '100%',
-               borderCollapse: 'collapse',
-               fontSize: '14px'
-             }}>
-               <thead>
-                 <tr style={{ background: '#f8f9fa' }}>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'left',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Denumire serviciu/produs *</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '80px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Cant.</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '120px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Preț unit. (RON)</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '80px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>TVA %</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '120px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Total (RON)</th>
-                   <th style={{
-                     border: '1px solid #dee2e6',
-                     padding: '0.75rem',
-                     textAlign: 'center',
-                     width: '60px',
-                     fontWeight: 'bold',
-                     color: '#2c3e50'
-                   }}>Acț.</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 {liniiFactura.map((linie, index) => {
-                   const cantitate = Number(linie.cantitate) || 0;
-                   const pretUnitar = Number(linie.pretUnitar) || 0;
-                   const cotaTva = Number(linie.cotaTva) || 0;
-                   
-                   const valoare = cantitate * pretUnitar;
-                   const tva = valoare * (cotaTva / 100);
-                   const total = valoare + tva;
-                   
-                   const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
-                   
-                   return (
-                     <tr key={index} style={{
-                       background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
-                     }}>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                           {linie.tip === 'subproiect' && (
-                             <span style={{
-                               background: '#3498db',
-                               color: 'white',
-                               padding: '0.25rem 0.5rem',
-                               borderRadius: '4px',
-                               fontSize: '10px',
-                               fontWeight: 'bold'
-                             }}>
-                               SUB
-                             </span>
-                           )}
-                           <input
-                             type="text"
-                             value={linie.denumire}
-                             onChange={(e) => updateLine(index, 'denumire', e.target.value)}
-                             disabled={isLoading}
-                             style={{
-                               flex: 1,
-                               padding: '0.5rem',
-                               border: '1px solid #dee2e6',
-                               borderRadius: '4px',
-                               fontSize: '14px'
-                             }}
-                             placeholder="Descrierea serviciului sau produsului..."
-                             required
-                           />
-                         </div>
-                         {/* ✅ AFIȘARE INFO CURS pentru subproiecte */}
-                         {linie.tip === 'subproiect' && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && (
-                           <div style={{ 
-                             fontSize: '11px', 
-                             color: '#666', 
-                             marginTop: '4px',
-                             padding: '2px 4px',
-                             background: '#e8f5e8',
-                             borderRadius: '3px'
-                           }}>
-                             💱 {linie.valoareOriginala} {linie.monedaOriginala} @ curs BNR: {linie.cursValutar?.toFixed(4)} 
-                             {cursuriUtilizate[linie.monedaOriginala] && (
-                               <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (centralizat)</span>
-                             )}
-                           </div>
-                         )}
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <input
-                           type="number"
-                           value={linie.cantitate}
-                           onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'center',
-                             fontSize: '14px'
-                           }}
-                           min="0"
-                           step="0.01"
-                         />
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <input
-                           type="number"
-                           value={linie.pretUnitar}
-                           onChange={(e) => updateLine(index, 'pretUnitar', parseFloat(e.target.value) || 0)}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'right',
-                             fontSize: '14px'
-                           }}
-                           step="0.01"
-                         />
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                         <select
-                           value={linie.cotaTva}
-                           onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
-                           disabled={isLoading}
-                           style={{
-                             width: '100%',
-                             padding: '0.5rem',
-                             border: '1px solid #dee2e6',
-                             borderRadius: '4px',
-                             textAlign: 'center',
-                             fontSize: '14px'
-                           }}
-                         >
-                           <option value={0}>0%</option>
-                           <option value={5}>5%</option>
-                           <option value={9}>9%</option>
-                           <option value={19}>19%</option>
-                           <option value={21}>21%</option>
-                         </select>
-                       </td>
-                       <td style={{
-                         border: '1px solid #dee2e6',
-                         padding: '0.5rem',
-                         textAlign: 'right',
-                         fontSize: '14px',
-                         fontWeight: 'bold',
-                         color: '#27ae60'
-                       }}>
-                         {safeFixed(total)}
-                       </td>
-                       <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
-                         <button
-                           onClick={() => removeLine(index)}
-                           disabled={liniiFactura.length === 1 || isLoading}
-                           style={{
-                             background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
-                             color: 'white',
-                             border: 'none',
-                             borderRadius: '4px',
-                             padding: '0.5rem',
-                             cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
-                             fontSize: '12px'
-                           }}
-                           title={linie.tip === 'subproiect' ? 'Șterge subproiectul din factură' : 'Șterge linia'}
-                         >
-                           🗑️
-                         </button>
-                       </td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
-         </div>
+
+          {/* ✅ MODIFICAT: Secțiune Servicii/Produse cu coloane extinse */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
+            }}>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Servicii/Produse</h3>
+              <button
+                onClick={addLine}
+                disabled={isLoading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Adaugă linie
+              </button>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px',
+                minWidth: '1000px' // ✅ NOU: Lățime minimă pentru coloanele noi
+              }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'left', fontWeight: 'bold', color: '#2c3e50', width: '200px' }}>
+                      Denumire serviciu/produs *
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Cant.
+                    </th>
+                    {/* ✅ NOU: Coloane pentru valută și cursuri */}
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Valoare Original
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Valută
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Curs Valutar
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Preț unit. (RON)
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      TVA %
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Total (RON)
+                    </th>
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '40px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Acț.
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liniiFactura.map((linie, index) => {
+                    const cantitate = Number(linie.cantitate) || 0;
+                    
+                    // ✅ NOU: Calculează pretul unitar cu cursul editabil
+                    let pretUnitar = Number(linie.pretUnitar) || 0;
+                    if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+                      const cursEditabil = cursuriEditabile[linie.monedaOriginala];
+                      if (cursEditabil) {
+                        pretUnitar = linie.valoareOriginala * cursEditabil.curs;
+                      }
+                    }
+                    
+                    const cotaTva = Number(linie.cotaTva) || 0;
+                    const valoare = cantitate * pretUnitar;
+                    const tva = valoare * (cotaTva / 100);
+                    const total = valoare + tva;
+                    
+                    const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                    
+                    return (
+                      <tr key={index} style={{
+                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}>
+                        {/* Denumire - rămâne identică */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {linie.tip === 'subproiect' && (
+                              <span style={{
+                                background: '#3498db',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                SUB
+                              </span>
+                            )}
+                            <input
+                              type="text"
+                              value={linie.denumire}
+                              onChange={(e) => updateLine(index, 'denumire', e.target.value)}
+                              disabled={isLoading}
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '14px'
+                              }}
+                              placeholder="Descrierea serviciului..."
+                              required
+                            />
+                          </div>
+                        </td>
+
+                        {/* Cantitate - rămâne identică */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={linie.cantitate}
+                            onChange={(e) => updateLine(index, 'cantitate', parseFloat(e.target.value) || 0)}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+
+                        {/* ✅ NOU: Valoare Originală */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px' }}>
+                          {linie.valoareOriginala ? linie.valoareOriginala.toFixed(2) : pretUnitar.toFixed(2)}
+                        </td>
+
+                        {/* ✅ NOU: Valută */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>
+                          {linie.monedaOriginala || 'RON'}
+                        </td>
+
+                        {/* ✅ NOU: Curs Valutar (editabil) */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          {linie.monedaOriginala && linie.monedaOriginala !== 'RON' ? (
+                            <input
+                              type="number"
+                              value={cursuriEditabile[linie.monedaOriginala]?.curs || linie.cursValutar || 1}
+                              onChange={(e) => updateCursEditabil(linie.monedaOriginala!, parseFloat(e.target.value) || 1)}
+                              disabled={isLoading}
+                              style={{
+                                width: '100%',
+                                padding: '0.3rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                background: cursuriEditabile[linie.monedaOriginala!]?.sursa === 'Manual' ? '#fff3cd' : 'white'
+                              }}
+                              step="0.0001"
+                              placeholder="1.0000"
+                            />
+                          ) : (
+                            <div style={{ textAlign: 'center', fontSize: '12px', color: '#6c757d' }}>1.0000</div>
+                          )}
+                        </td>
+
+                        {/* ✅ MODIFICAT: Preț unitar în RON (calculat automat) */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'right', fontSize: '12px', fontWeight: 'bold', color: '#27ae60' }}>
+                          {pretUnitar.toFixed(2)}
+                        </td>
+
+                        {/* TVA - rămâne identică */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <select
+                            value={linie.cotaTva}
+                            onChange={(e) => updateLine(index, 'cotaTva', parseFloat(e.target.value))}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={9}>9%</option>
+                            <option value={19}>19%</option>
+                            <option value={21}>21%</option>
+                          </select>
+                        </td>
+
+                        {/* Total - rămâne identic */}
+                        <td style={{
+                          border: '1px solid #dee2e6',
+                          padding: '0.5rem',
+                          textAlign: 'right',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          color: '#27ae60'
+                        }}>
+                          {safeFixed(total)}
+                        </td>
+
+                        {/* Acțiuni - rămâne identic */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center' }}>
+                          <button
+                            onClick={() => removeLine(index)}
+                            disabled={liniiFactura.length === 1 || isLoading}
+                            style={{
+                              background: (liniiFactura.length === 1 || isLoading) ? '#bdc3c7' : '#e74c3c',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              cursor: (liniiFactura.length === 1 || isLoading) ? 'not-allowed' : 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ✅ NOU: Afișare rezumat cursuri folosite */}
+          {Object.keys(cursuriEditabile).length > 0 && (
+            <div style={{
+              background: '#e8f5e8',
+              border: '1px solid #c3e6c3',
+              borderRadius: '6px',
+              padding: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50', fontSize: '14px' }}>
+                💱 Cursuri valutare folosite pentru {dataCursPersonalizata}:
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                {Object.values(cursuriEditabile).map(curs => (
+                  <div key={curs.moneda} style={{
+                    padding: '0.5rem',
+                    background: curs.sursa === 'Manual' ? '#fff3cd' : '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    <strong>1 {curs.moneda} = {curs.curs.toFixed(4)} RON</strong>
+                    <br />
+                    <span style={{ color: '#6c757d' }}>
+                      Sursă: {curs.sursa === 'Manual' ? '✏️ Manual' : curs.sursa === 'BNR' ? '🏦 BNR' : '💾 BD'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
          {/* Secțiune Totaluri */}
          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
