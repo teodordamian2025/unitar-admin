@@ -205,7 +205,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const preluaCursuriCentralizat = async (monede: string[]) => {
     if (monede.length === 0) return {};
     
-    setIsLoadingCursuriPersonalizate(true);
+    setLoadingCursuriPersonalizate(true);
     const cursuri: CursuriUtilizate = {};
     
     console.log(`🔄 Încep preluarea centralizată a cursurilor pentru: ${monede.join(', ')}`);
@@ -266,7 +266,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       showToast('⚠️ Eroare la preluarea cursurilor BNR. Folosesc cursuri existente.', 'error');
       return {};
     } finally {
-      setIsLoadingCursuriPersonalizate(false);
+      setLoadingCursuriPersonalizate(false);
     }
   };
 
