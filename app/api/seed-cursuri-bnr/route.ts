@@ -52,7 +52,12 @@ async function parseXMLBNR2025(): Promise<CursEntry[]> {
     
     // Regex pentru extragerea date-urilor
     const dateRegex = /<Cube date="([^"]+)"[^>]*>/g;
-    const dateMatches = [...xmlText.matchAll(dateRegex)];
+    // ✅ FIX TypeScript: Înlocuire matchAll cu exec pentru compatibilitate
+    const dateMatches: RegExpExecArray[] = [];
+    let dateMatch;
+    while ((dateMatch = dateRegex.exec(xmlText)) !== null) {
+      dateMatches.push(dateMatch);
+    }
     
     console.log(`📅 Găsite ${dateMatches.length} date în XML`);
 
@@ -69,7 +74,13 @@ async function parseXMLBNR2025(): Promise<CursEntry[]> {
       
       // Extrage cursurile pentru această dată
       const rateRegex = /<Cube currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?/g;
-      const rateMatches = [...dateBlock.matchAll(rateRegex)];
+      // ✅ FIX TypeScript: Înlocuire matchAll cu exec pentru parsing cursuri
+        const rateMatches: RegExpExecArray[] = [];
+        const rateRegex = /<Cube currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?/g;
+        let rateMatch;
+        while ((rateMatch = rateRegex.exec(dateBlock)) !== null) {
+          rateMatches.push(rateMatch);
+        }
       
       rateMatches.forEach(rateMatch => {
         const moneda = rateMatch[1];
