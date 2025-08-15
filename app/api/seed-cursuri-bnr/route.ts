@@ -72,15 +72,14 @@ async function parseXMLBNR2025(): Promise<CursEntry[]> {
       
       const dateBlock = xmlText.substring(dateIndex, endIndex);
       
-      // Extrage cursurile pentru această dată
-      const rateRegex = /<Cube currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?/g;
+// Extrage cursurile pentru această dată
       // ✅ FIX TypeScript: Înlocuire matchAll cu exec pentru parsing cursuri
-        const rateMatches: RegExpExecArray[] = [];
-        const rateRegex = /<Cube currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?/g;
-        let rateMatch;
-        while ((rateMatch = rateRegex.exec(dateBlock)) !== null) {
-          rateMatches.push(rateMatch);
-        }
+      const rateMatches: RegExpExecArray[] = [];
+      const rateRegex = /<Cube currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?/g;
+      let rateMatch;
+      while ((rateMatch = rateRegex.exec(dateBlock)) !== null) {
+        rateMatches.push(rateMatch);
+      }
       
       rateMatches.forEach(rateMatch => {
         const moneda = rateMatch[1];
