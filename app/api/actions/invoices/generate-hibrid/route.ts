@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
 	let pretUnitar = Number(linie.pretUnitar) || 0;
 
 	// ✅ DEBUGGING: Verifică că folosește frontend
-	console.log(`💰 PDF Calc - Linia ${index}: pretUnitar=${pretUnitar} (din frontend)`);
+	console.log(`💰 PDF Calc - pretUnitar=${pretUnitar} (din frontend)`);
       const cotaTva = Number(linie.cotaTva) || 0;
       
       const valoare = cantitate * pretUnitar;
