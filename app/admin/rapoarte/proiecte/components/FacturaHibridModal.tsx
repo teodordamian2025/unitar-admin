@@ -408,6 +408,37 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   }, [dataCursPersonalizata, subproiecteDisponibile.length, liniiFactura.length]); // ✅ FIX: Adăugat liniiFactura.length
 
+  // ✅ NOU: Effect pentru recalcularea liniilor când se schimbă cursurile
+  useEffect(() => {
+    console.log('🔄 Recalculez liniile facturii cu cursurile actualizate...');
+    
+    setLiniiFactura(prev => prev.map((linie, index) => {
+      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+        const cursNou = cursuri[linie.monedaOriginala]?.curs;
+        
+        if (cursNou && cursNou !== linie.cursValutar) {
+          const pretUnitarNou = linie.valoareOriginala * cursNou;
+          
+          console.log(`📊 Linia ${index}: ${linie.denumire}`, {
+            moneda: linie.monedaOriginala,
+            valoare_originala: linie.valoareOriginala,
+            curs_vechi: linie.cursValutar?.toFixed(4),
+            curs_nou: cursNou.toFixed(4),
+            pret_vechi: linie.pretUnitar?.toFixed(2),
+            pret_nou: pretUnitarNou.toFixed(2)
+          });
+          
+          return {
+            ...linie,
+            cursValutar: cursNou,
+            pretUnitar: pretUnitarNou
+          };
+        }
+      }
+      return linie;
+    }));
+  }, [cursuri]); // ✅ CRUCIAL: Recalculează când se schimbă cursurile
+
   // ✅ PĂSTRAT: Toate funcțiile existente (copy exact din codul original)
   const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
     if (isEdit && initialData?.numarFactura) {
@@ -1282,14 +1313,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const totals = calculateTotals();
   const isLoading = isGenerating || isProcessingPDF || isLoadingSetari || loadingCursuri;
 
-  // ✅ SIMPLIFICAT: Generează nota cursuri
+  // ✅ SIMPLIFICAT: Generează nota cursuri cu data corectă
   const generateCurrencyNote = () => {
     const monede = Object.keys(cursuri);
     if (monede.length === 0) return '';
     
     return `Curs valutar ${dataCursPersonalizata}: ${monede.map(m => {
       const cursData = cursuri[m];
-      return `1 ${m} = ${cursData.curs.toFixed(4)} RON`;
+      return `1 ${m} = ${cursData.curs.toFixed(4)} RON (${cursData.data || dataCursPersonalizata})`;
     }).join(', ')}`;
   };
 
@@ -2066,11 +2097,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* ✅ FIX PROBLEMA 1: Valoare Originală EDITABILĂ */}
+                        {/* ✅ FIX PROBLEMA 1: Valoare Originală EDITABILĂ cu input direct */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
-                            value={convertBigQueryNumeric(linie.valoareOriginala)}
+                            value={linie.valoareOriginala || 0}
                             onChange={(e) => {
                               const novaValoare = parseFloat(e.target.value) || 0;
                               updateLine(index, 'valoareOriginala', novaValoare);
@@ -2096,24 +2127,30 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* ✅ FIX PROBLEMA 1: Valută EDITABILĂ */}
+                        {/* ✅ FIX PROBLEMA 2-3: Valută EDITABILĂ fără CHF + logică corectă */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <select
                             value={linie.monedaOriginala || 'RON'}
                             onChange={(e) => {
                               const novaMoneda = e.target.value;
+                              console.log(`🔄 Schimb moneda pentru linia ${index}: ${linie.monedaOriginala} → ${novaMoneda}`);
+                              
+                              // Actualizează moneda
                               updateLine(index, 'monedaOriginala', novaMoneda);
                               
                               if (novaMoneda === 'RON') {
+                                // Pentru RON, cursul e 1 și pretul = valoarea originală
                                 updateLine(index, 'cursValutar', 1);
-                                updateLine(index, 'pretUnitar', convertBigQueryNumeric(linie.valoareOriginala));
+                                updateLine(index, 'pretUnitar', linie.valoareOriginala || 0);
                               } else {
+                                // Pentru alte monede, folosește cursul din state sau 1 ca fallback
                                 const cursExistent = cursuri[novaMoneda]?.curs || 1;
                                 updateLine(index, 'cursValutar', cursExistent);
-                                updateLine(index, 'pretUnitar', convertBigQueryNumeric(linie.valoareOriginala) * cursExistent);
+                                updateLine(index, 'pretUnitar', (linie.valoareOriginala || 0) * cursExistent);
                                 
                                 // Încarcă cursul pentru moneda nouă dacă nu există
                                 if (!cursuri[novaMoneda]) {
+                                  console.log(`📡 Încărcare curs pentru ${novaMoneda}...`);
                                   loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
                                 }
                               }
@@ -2132,7 +2169,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             <option value="EUR">EUR</option>
                             <option value="USD">USD</option>
                             <option value="GBP">GBP</option>
-                            <option value="CHF">CHF</option>
                           </select>
                         </td>
 
