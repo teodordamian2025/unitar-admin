@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
     // ✅ MODIFICAT: Pentru Edit, folosește facturaId existent
     const currentFacturaId = isEdit && facturaId ? facturaId : crypto.randomUUID();
 
-    // ✅ MODIFICAT: Generează nota despre cursurile valutare cu precizie maximă BNR
+// ✅ MODIFICAT: Generează nota despre cursurile valutare cu precizie maximă BNR (FIX [object Object])
     let notaCursValutar = '';
     if (Object.keys(cursuriUtilizate).length > 0) {
       const monede = Object.keys(cursuriUtilizate);
@@ -233,8 +233,21 @@ export async function POST(request: NextRequest) {
           cursFormatat = curs.toFixed(4);
         }
         
-        return `1 ${m} = ${cursFormatat} RON (${cursInfo.data})`;
+        // ✅ FIX: Formatează data corect (nu [object Object])
+        let dataFormatata: string;
+        if (typeof cursInfo.data === 'string') {
+          dataFormatata = cursInfo.data;
+        } else if (cursInfo.data && typeof cursInfo.data === 'object' && cursInfo.data.value) {
+          dataFormatata = cursInfo.data.value;
+        } else {
+          dataFormatata = dataCursPersonalizata || new Date().toISOString().split('T')[0];
+        }
+        
+        return `1 ${m} = ${cursFormatat} RON (${dataFormatata})`;
       }).join(', ')}`;
+      
+      console.log('💱 Nota curs BNR generată FĂRĂ [object Object]:', notaCursValutar);
+    }
       
       console.log('💱 Nota curs BNR generată cu precizie maximă:', notaCursValutar);
     }
