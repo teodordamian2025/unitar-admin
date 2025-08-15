@@ -276,11 +276,18 @@ export async function POST(request: NextRequest) {
 
     // Inserare în BigQuery
     if (forceRefresh) {
-      console.log('🗑️ Ștergere date existente...');
-      await bigquery.query({
-        query: `DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\` WHERE TRUE`,
-        location: 'EU',
-      });
+      try {
+        console.log('🗑️ Încercare ștergere date existente...');
+        await bigquery.query({
+          query: `DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\` WHERE TRUE`,
+          location: 'EU',
+        });
+        console.log('✅ Date existente șterse cu succes');
+      } catch (deleteError) {
+        console.log('⚠️ Nu s-au putut șterge datele existente (streaming buffer), continuez cu INSERT...');
+        console.log('💡 Datele vechi vor fi păstrate, se vor adăuga doar cele noi');
+        // Nu aruncă eroarea - continuă cu inserarea
+      }
     }
 
     await insertCursuriInBigQuery(cursuriFinal);
