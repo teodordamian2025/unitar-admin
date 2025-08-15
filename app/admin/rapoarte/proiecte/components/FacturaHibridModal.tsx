@@ -251,6 +251,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
 
+  // ✅ NOU: State pentru termen plată editabil
+  const [termenPlata, setTermenPlata] = useState(setariFacturare?.termen_plata_standard || 30);
+
   // ✅ PĂSTRAT: Toate funcțiile de loading existente
 
   // ✅ SIMPLIFICAT: O singură funcție pentru loading cursuri
@@ -330,7 +333,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     });
     
-    // Din liniile facturii
+    // ✅ FIX PROBLEMA 3: Din liniile facturii existente
     liniiFactura.forEach(linie => {
       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
         monede.add(linie.monedaOriginala);
@@ -403,7 +406,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (monede.length > 0) {
       loadCursuriPentruData(dataCursPersonalizata, monede);
     }
-  }, [dataCursPersonalizata, subproiecteDisponibile.length]);
+  }, [dataCursPersonalizata, subproiecteDisponibile.length, liniiFactura.length]); // ✅ FIX: Adăugat liniiFactura.length
 
   // ✅ PĂSTRAT: Toate funcțiile existente (copy exact din codul original)
   const getNextInvoiceNumber = async (serie: string, separator: string, includeYear: boolean, includeMonth: boolean) => {
@@ -494,6 +497,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         setSetariFacturare(setariProcesate);
         
+        // ✅ NOU: Setează și termen plată
+        setTermenPlata(setariProcesate.termen_plata_standard || 30);
+        
         const { numarComplet } = await getNextInvoiceNumber(
           setariProcesate.serie_facturi,
           setariProcesate.separator_numerotare,
@@ -516,6 +522,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         };
         
         setSetariFacturare(defaultSetari);
+        
+        // ✅ NOU: Setează termen plată default
+        setTermenPlata(30);
         
         const { numarComplet } = await getNextInvoiceNumber('UP', '-', true, false);
         setNumarFactura(numarComplet);
@@ -753,7 +762,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const addLine = () => {
-    setLiniiFactura([...liniiFactura, { denumire: '', cantitate: 1, pretUnitar: 0, cotaTva: 21 }]);
+    // ✅ FIX PROBLEMA 1: Linie nouă cu toate câmpurile necesare
+    setLiniiFactura([...liniiFactura, { 
+      denumire: '', 
+      cantitate: 1, 
+      pretUnitar: 0, 
+      cotaTva: 21,
+      monedaOriginala: 'RON',      // ✅ NOU: Monedă editabilă
+      valoareOriginala: 0,         // ✅ NOU: Valoare editabilă
+      cursValutar: 1              // ✅ NOU: Curs default RON
+    }]);
   };
 
   const removeLine = (index: number) => {
@@ -1156,7 +1174,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         showToast('📄 Se generează template-ul facturii...', 'info');
       }
       
-      // ✅ SIMPLIFICAT: Transmite cursurile din state
+      // ✅ SIMPLIFICAT: Transmite cursurile din state cu KEY CORECT
       const cursuriPentruAPI: { [moneda: string]: { curs: number; data: string } } = {};
       Object.keys(cursuri).forEach(moneda => {
         const cursData = cursuri[moneda];
@@ -1175,9 +1193,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           observatii,
           clientInfo,
           numarFactura,
-          setariFacturare,
+          setariFacturare: {
+            ...setariFacturare,
+            termen_plata_standard: termenPlata // ✅ FIX: Trimite termen plată editabil
+          },
           sendToAnaf,
-          cursuriEditabile: cursuriPentruAPI, // ✅ Cursuri simplificate
+          cursuriUtilizate: cursuriPentruAPI, // ✅ FIX PROBLEMA 4: KEY CORECT
           isEdit,
           isStorno,
           facturaId: isEdit ? initialData?.facturaId : null,
@@ -1199,7 +1220,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 liniiFactura,
                 clientInfo,
                 observatii,
-                cursuriEditabile: cursuriPentruAPI,
+                cursuriEditabile: cursuriPentruAPI, // ✅ FIX: KEY schimbat la cursuriUtilizate în apelul de sus
                 proiectInfo: {
                   id: proiectIdFinal,
                   ID_Proiect: proiectIdFinal,
@@ -1375,7 +1396,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   fontWeight: '600', 
                   color: '#27ae60'
                 }}>
-                  {setariFacturare?.termen_plata_standard || 30} zile
+                  {termenPlata} zile
                 </div>
               </div>
             </div>
@@ -2045,14 +2066,74 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* Valoare Originală */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px' }}>
-                          {safeToFixed(linie.valoareOriginala, 2)}
+                        {/* ✅ FIX PROBLEMA 1: Valoare Originală EDITABILĂ */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <input
+                            type="number"
+                            value={convertBigQueryNumeric(linie.valoareOriginala)}
+                            onChange={(e) => {
+                              const novaValoare = parseFloat(e.target.value) || 0;
+                              updateLine(index, 'valoareOriginala', novaValoare);
+                              // Recalculează pretUnitar când se schimbă valoarea originală
+                              if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
+                                const curs = cursuri[linie.monedaOriginala]?.curs || linie.cursValutar || 1;
+                                updateLine(index, 'pretUnitar', novaValoare * curs);
+                              } else {
+                                updateLine(index, 'pretUnitar', novaValoare);
+                              }
+                            }}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.3rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '12px'
+                            }}
+                            step="0.01"
+                            placeholder="0.00"
+                          />
                         </td>
 
-                        {/* Valută */}
-                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem', textAlign: 'center', fontSize: '12px', fontWeight: 'bold' }}>
-                          {linie.monedaOriginala || 'RON'}
+                        {/* ✅ FIX PROBLEMA 1: Valută EDITABILĂ */}
+                        <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
+                          <select
+                            value={linie.monedaOriginala || 'RON'}
+                            onChange={(e) => {
+                              const novaMoneda = e.target.value;
+                              updateLine(index, 'monedaOriginala', novaMoneda);
+                              
+                              if (novaMoneda === 'RON') {
+                                updateLine(index, 'cursValutar', 1);
+                                updateLine(index, 'pretUnitar', convertBigQueryNumeric(linie.valoareOriginala));
+                              } else {
+                                const cursExistent = cursuri[novaMoneda]?.curs || 1;
+                                updateLine(index, 'cursValutar', cursExistent);
+                                updateLine(index, 'pretUnitar', convertBigQueryNumeric(linie.valoareOriginala) * cursExistent);
+                                
+                                // Încarcă cursul pentru moneda nouă dacă nu există
+                                if (!cursuri[novaMoneda]) {
+                                  loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
+                                }
+                              }
+                            }}
+                            disabled={isLoading}
+                            style={{
+                              width: '100%',
+                              padding: '0.3rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              textAlign: 'center',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <option value="RON">RON</option>
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                            <option value="GBP">GBP</option>
+                            <option value="CHF">CHF</option>
+                          </select>
                         </td>
 
                         {/* Curs Valutar (editabil) */}
@@ -2220,6 +2301,32 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* ✅ FIX PROBLEMA 5: Termen plată editabil */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              📅 Termen de plată (zile)
+            </label>
+            <input
+              type="number"
+              value={termenPlata}
+              onChange={(e) => setTermenPlata(parseInt(e.target.value) || 30)}
+              disabled={isLoading}
+              style={{
+                width: '150px',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+              min="1"
+              max="365"
+              placeholder="30"
+            />
+            <span style={{ marginLeft: '0.5rem', fontSize: '14px', color: '#7f8c8d' }}>
+              zile (implicit: 30)
+            </span>
           </div>
 
           {/* Secțiune Observații */}

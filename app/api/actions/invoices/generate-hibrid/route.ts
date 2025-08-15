@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// DATA: 12.08.2025 09:30
-// FIX URGENT: Rezolvă eroarea "cursVechi.toFixed is not a function"
+// DATA: 14.08.2025 22:30
+// FIX PROBLEMA 4: Stop recalculare - folosește direct datele din frontend
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -113,77 +114,8 @@ function cleanNonAscii(text: string): string {
     .replace(/[^\x00-\x7F]/g, ''); // Elimină orice alt caracter non-ASCII
 }
 
-// ✅ FIX PRINCIPAL: Funcție pentru recalcularea liniilor cu cursuri centralizate BNR
-// 🔥 URGENT FIX: Rezolvă eroarea "cursVechi.toFixed is not a function"
-function recalculateWithCentralizedRates(liniiFactura: any[], cursuriUtilizate: any) {
-  console.log('📄 RECALCULARE cu cursuri centralizate BNR...');
-  
-  return liniiFactura.map((linie: any, index: number) => {
-    const cantitate = Number(linie.cantitate) || 0;
-    let pretUnitar = Number(linie.pretUnitar) || 0;
-    let cursActualizat = linie.cursValutar || 1;
-    
-    // ✅ CRUCIAL: Pentru subproiecte cu valută diferită, folosește cursul centralizat
-    if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-      // Verifică dacă avem curs centralizat pentru această monedă
-      const cursCentralizat = cursuriUtilizate[linie.monedaOriginala];
-      
-      if (cursCentralizat && cursCentralizat.curs) {
-        // 🔥 FIX URGENT: Safe type conversion pentru cursVechi
-        const cursVechi = linie.cursValutar || 1;
-        let cursVechiNumeric: number;
-        
-        // 🎯 PRINCIPALA PROBLEMĂ REZOLVATĂ AICI:
-        if (typeof cursVechi === 'number') {
-          cursVechiNumeric = cursVechi;
-        } else if (typeof cursVechi === 'string') {
-          cursVechiNumeric = parseFloat(cursVechi);
-          if (isNaN(cursVechiNumeric)) {
-            cursVechiNumeric = 1;
-          }
-        } else if (cursVechi && typeof cursVechi === 'object' && 'value' in cursVechi) {
-          // Pentru cazurile în care cursVechi vine ca { value: number }
-          cursVechiNumeric = parseFloat((cursVechi as any).value.toString());
-          if (isNaN(cursVechiNumeric)) {
-            cursVechiNumeric = 1;
-          }
-        } else {
-          cursVechiNumeric = 1;
-        }
-        
-        // ✅ SIGURANȚĂ SUPLIMENTARĂ: Verifică că avem un număr valid
-        if (isNaN(cursVechiNumeric) || cursVechiNumeric <= 0) {
-          cursVechiNumeric = 1;
-        }
-        
-        const cursNou = cursCentralizat.curs;
-        
-        // Recalculează pretul unitar în RON cu cursul nou
-        pretUnitar = (linie.valoareOriginala || 0) * cursNou;
-        cursActualizat = cursNou;
-        
-        console.log(`🎯 RECALCULAT linia ${index}: ${linie.denumire}`, {
-          moneda: linie.monedaOriginala,
-          valoare_originala: linie.valoareOriginala,
-          curs_vechi_original: cursVechi,
-          curs_vechi_numeric_safe: cursVechiNumeric.toFixed(4), // ✅ ACUM FUNCȚIONEAZĂ!
-          curs_nou_centralizat: cursNou.toFixed(4),
-          pret_vechi: (Number(linie.pretUnitar) || 0).toFixed(2), // ✅ FIX: Safe conversion
-          pret_nou: pretUnitar.toFixed(2),
-          diferenta: (pretUnitar - (Number(linie.pretUnitar) || 0)).toFixed(2) // ✅ FIX: Safe conversion
-        });
-      } else {
-        console.log(`⚠️ Nu există curs centralizat pentru ${linie.monedaOriginala}, păstrez cursul existent`);
-      }
-    }
-    
-    return {
-      ...linie,
-      pretUnitar: pretUnitar,
-      cursValutar: cursActualizat
-    };
-  });
-}
+// ❌ ELIMINAT: recalculateWithCentralizedRates() - CAUZA PROBLEMEI 4
+// Această funcție SUPRASCRIA datele corecte din frontend!
 
 export async function POST(request: NextRequest) {
   try {
@@ -196,11 +128,11 @@ export async function POST(request: NextRequest) {
       numarFactura,
       setariFacturare,
       sendToAnaf = false,
-      cursuriUtilizate = {}, // ✅ MODIFICAT: Primește cursurile utilizate cu precizie maximă
-      isEdit = false,        // ✅ ADĂUGAT: Flag pentru edit
-      isStorno = false,      // ✅ NOU: Flag pentru storno
-      facturaId = null,      // ✅ ADĂUGAT: ID factură pentru edit
-      facturaOriginala = null // ✅ NOU: Număr factură originală pentru storno
+      cursuriUtilizate = {}, // ✅ CORECT: Primește cursurile cu key-ul corect
+      isEdit = false,        
+      isStorno = false,      
+      facturaId = null,      
+      facturaOriginala = null 
     } = body;
 
     console.log('📋 Date primite pentru factură:', { 
@@ -228,9 +160,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
     }
 
-    // ✅ FIX PRINCIPAL: Recalculează liniile cu cursuri centralizate ÎNAINTE de orice calcul
-    // 🔥 ACUM NU MAI DAR EROARE "cursVechi.toFixed is not a function"
-    const liniiFacturaActualizate = recalculateWithCentralizedRates(liniiFactura, cursuriUtilizate);
+    // ✅ FIX PROBLEMA 4: FOLOSEȘTE DIRECT datele din frontend (STOP recalculare!)
+    const liniiFacturaActualizate = liniiFactura; // ← SIMPLU: folosește datele corecte din frontend
+    
+    console.log('🎯 FIX PROBLEMA 4: Folosesc direct datele din frontend - STOP recalculare!', {
+      linii_primite: liniiFactura.length,
+      linii_procesate: liniiFacturaActualizate.length,
+      cursuri_frontend: Object.keys(cursuriUtilizate).length,
+      sample_linie: liniiFacturaActualizate[0] ? {
+        denumire: liniiFacturaActualizate[0].denumire,
+        monedaOriginala: liniiFacturaActualizate[0].monedaOriginala,
+        valoareOriginala: liniiFacturaActualizate[0].valoareOriginala,
+        cursValutar: liniiFacturaActualizate[0].cursValutar,
+        pretUnitar: liniiFacturaActualizate[0].pretUnitar
+      } : 'Nicio linie'
+    });
 
     // ✅ ÎNCĂRCARE CONTURI BANCARE din BigQuery
     const contariBancare = await loadContariBancare();
@@ -240,7 +184,7 @@ export async function POST(request: NextRequest) {
       contariFinale.map(c => `${c.nume_banca} (${c.cont_principal ? 'Principal' : 'Secundar'})`).join(', ')
     );
 
-    // ✅ CALCULE TOTALE - FOLOSEȘTE liniile actualizate cu cursuri centralizate
+    // ✅ CALCULE TOTALE - FOLOSEȘTE liniile din frontend (fără recalculare)
     let subtotal = 0;
     let totalTva = 0;
     
@@ -258,7 +202,7 @@ export async function POST(request: NextRequest) {
     
     const total = subtotal + totalTva;
 
-    console.log('💰 TOTALURI RECALCULATE cu cursuri centralizate:', {
+    console.log('💰 TOTALURI din datele frontend (fără recalculare):', {
       subtotal: subtotal.toFixed(2),
       totalTva: totalTva.toFixed(2),
       total: total.toFixed(2),
@@ -603,7 +547,7 @@ export async function POST(request: NextRequest) {
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
                 <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
-                ${isEdit ? '<div><strong>Status:</strong> EDITATA cu cursuri BNR actualizate</div>' : ''}
+                ${isEdit ? '<div><strong>Status:</strong> EDITATA cu cursuri corecte din frontend</div>' : ''}
                 ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>MODE:</strong> TEST e-Factura</div>' : ''}
             </div>
@@ -633,10 +577,10 @@ export async function POST(request: NextRequest) {
                       
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
-                      // ✅ FIX PRINCIPAL: Afișează informații cu cursul centralizat BNR
+                      // ✅ FIX PRINCIPAL: Afișează informații EXACTE din frontend (fără recalculare)
                       let descriereCompleta = linie.denumire || 'N/A';
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-                        // ✅ FOLOSEȘTE cursul actualizat din recalculare
+                        // ✅ FOLOSEȘTE cursul EXACT din frontend
                         const cursInfo = linie.cursValutar ? ` @ ${Number(linie.cursValutar).toFixed(4)}` : '';
                         descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
                       }
@@ -678,7 +622,7 @@ export async function POST(request: NextRequest) {
         ${notaCursValutarClean ? `
         <div class="currency-note">
             <div class="currency-note-content">
-                <strong>Cursuri BNR (precizie maxima - UTILIZATE în calcule):</strong><br/>
+                <strong>Cursuri BNR (din frontend - FARA recalculare):</strong><br/>
                 ${notaCursValutarClean}
             </div>
         </div>
@@ -718,7 +662,7 @@ export async function POST(request: NextRequest) {
             <div class="generated-info">
                 <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
                 Data generarii: ${new Date().toLocaleString('ro-RO')}
-                ${isEdit ? '<br><strong>EDITATA - Versiune actualizata cu cursuri BNR precise</strong>' : ''}
+                ${isEdit ? '<br><strong>EDITATA - Date exacte din frontend (fara recalculare)</strong>' : ''}
                 ${isStorno ? '<br><strong>STORNARE - Anuleaza factura originala</strong>' : ''}
                 ${sendToAnaf ? (MOCK_EFACTURA_MODE ? 
                   '<br><strong>TEST MODE: Simulare e-Factura (NU trimis la ANAF)</strong>' : 
@@ -802,15 +746,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ MODIFICAT: Salvare în BigQuery cu suport pentru Edit și types corecte + CURSURI ACTUALIZATE
+    // ✅ MODIFICAT: Salvare în BigQuery cu suport pentru Edit și types corecte + DATE EXACTE DIN FRONTEND
     try {
       const dataset = bigquery.dataset('PanouControlUnitar');
       const table = dataset.table('FacturiGenerate');
 
       if (isEdit && facturaId) {
-        console.log('📝 EDIT MODE: Actualizez factură existentă în BigQuery cu cursuri centralizate...');
+        console.log('🔍 EDIT MODE: Actualizez factură existentă în BigQuery cu date exacte din frontend...');
         
-        // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile + cursuri actualizate
+        // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile + date exacte din frontend
         const updateQuery = `
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
           SET 
@@ -827,9 +771,9 @@ export async function POST(request: NextRequest) {
           WHERE id = @facturaId
         `;
 
-        // ✅ CRUCIAL: Construiește date_complete_json cu liniile actualizate și cursuri centralizate
+        // ✅ CRUCIAL: Construiește date_complete_json cu datele EXACTE din frontend
         const dateCompleteJson = JSON.stringify({
-          liniiFactura: liniiFacturaActualizate, // ✅ Folosește liniile cu cursuri actualizate
+          liniiFactura: liniiFacturaActualizate, // ✅ Date EXACTE din frontend - fără recalculare
           observatii: observatiiFinale,
           clientInfo: safeClientData,
           proiectInfo: {
@@ -840,12 +784,12 @@ export async function POST(request: NextRequest) {
           proiectId: proiectId,
           contariBancare: contariFinale,
           setariFacturare,
-          cursuriUtilizate, // ✅ INCLUDE cursurile BNR cu precizie maximă
+          cursuriUtilizate, // ✅ INCLUDE cursurile primite din frontend
           isEdit: true,
           dataUltimeiActualizari: new Date().toISOString(),
-          versiune: 4, // ✅ Versiune actualizată pentru tracking fix cursVechi.toFixed
-          cursoriActualizate: true, // ✅ Flag că folosește cursuri centralizate
-          fixAplicat: 'cursVechi_toFixed_bug_resolved' // ✅ Marker pentru debugging
+          versiune: 5, // ✅ Versiune nouă pentru fix problema 4
+          fara_recalculare: true, // ✅ Flag că folosește date exacte din frontend
+          fixAplicat: 'problema_4_resolved_frontend_data_exact' // ✅ Marker pentru debugging
         });
 
         const params = {
@@ -888,11 +832,11 @@ export async function POST(request: NextRequest) {
           location: 'EU'
         });
 
-        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu cursuri BNR centralizate precise și fix cursVechi.toFixed`);
+        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu date EXACTE din frontend (fix problema 4)`);
         
       } else {
-        // ✅ Creează factură nouă (inclusiv storno) cu cursuri centralizate
-        console.log('📝 NEW MODE: Creez factură nouă în BigQuery cu cursuri centralizate...');
+        // ✅ Creează factură nouă (inclusiv storno) cu date exacte din frontend
+        console.log('🔍 NEW MODE: Creez factură nouă în BigQuery cu date exacte din frontend...');
         
         const facturaData = [{
           id: currentFacturaId,
@@ -915,7 +859,7 @@ export async function POST(request: NextRequest) {
           data_trimitere: null,
           data_plata: null,
           date_complete_json: JSON.stringify({
-            liniiFactura: liniiFacturaActualizate, // ✅ Folosește liniile cu cursuri actualizate
+            liniiFactura: liniiFacturaActualizate, // ✅ Date EXACTE din frontend - fără recalculare
             observatii: observatiiFinale,
             clientInfo: safeClientData,
             proiectInfo: {
@@ -926,12 +870,12 @@ export async function POST(request: NextRequest) {
             proiectId: proiectId,
             contariBancare: contariFinale,
             setariFacturare,
-            cursuriUtilizate, // ✅ INCLUDE cursurile BNR cu precizie maximă
+            cursuriUtilizate, // ✅ INCLUDE cursurile primite din frontend
             isStorno,
             facturaOriginala: facturaOriginala || null,
             mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
-            cursoriActualizate: true, // ✅ Flag că folosește cursuri centralizate
-            fixAplicat: 'cursVechi_toFixed_bug_resolved' // ✅ Marker pentru debugging
+            fara_recalculare: true, // ✅ Flag că folosește date exacte din frontend
+            fixAplicat: 'problema_4_resolved_frontend_data_exact' // ✅ Marker pentru debugging
           }),
           data_creare: new Date().toISOString(),
           data_actualizare: new Date().toISOString(),
@@ -941,7 +885,7 @@ export async function POST(request: NextRequest) {
         }];
 
         await table.insert(facturaData);
-        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu cursuri BNR centralizate precise și fix cursVechi.toFixed`);
+        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu date EXACTE din frontend (fix problema 4)`);
       }
 
       // ✅ NOU: Actualizează numărul curent în setări doar pentru facturi noi (nu edit)
@@ -981,18 +925,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ RESPONSE complet cu informații Mock/Producție/Edit/Storno și cursuri BNR centralizate
+    // ✅ RESPONSE complet cu informații Mock/Producție/Edit/Storno și date exacte din frontend
     const response = {
       success: true,
       message: isEdit ? 
-        '✏️ Factură actualizată cu succes (cursuri BNR centralizate precise + fix cursVechi.toFixed)' :
+        '✏️ Factură actualizată cu succes (date EXACTE din frontend - fix problema 4)' :
         (isStorno ? 
-          '↩️ Factură de stornare generată cu succes cu cursuri actualizate + fix aplicat' :
+          '↩️ Factură de stornare generată cu succes cu date exacte din frontend' :
           (sendToAnaf ? 
             (MOCK_EFACTURA_MODE ? 
-              '🧪 Factură pregătită pentru PDF + e-factura TEST (Mock Mode) cu cursuri centralizate + fix aplicat' : 
-              '🚀 Factură pregătită pentru PDF + e-factura ANAF cu cursuri BNR precise + fix aplicat') : 
-            '📄 Factură pregătită pentru generare PDF cu cursuri BNR centralizate precise + fix cursVechi.toFixed aplicat')),
+              '🧪 Factură pregătită pentru PDF + e-factura TEST (Mock Mode) cu date exacte din frontend' : 
+              '🚀 Factură pregătită pentru PDF + e-factura ANAF cu date exacte din frontend') : 
+            '📄 Factură pregătită pentru generare PDF cu date EXACTE din frontend (fix problema 4)')),
       fileName: fileName,
       htmlContent: htmlTemplate,
       invoiceData: {
@@ -1006,24 +950,25 @@ export async function POST(request: NextRequest) {
         cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? {
           count: Object.keys(cursuriUtilizate).length,
           monede: Object.keys(cursuriUtilizate),
-          cursuri_precisie_maxima: Object.keys(cursuriUtilizate).map(m => ({
+          cursuri_din_frontend: Object.keys(cursuriUtilizate).map(m => ({
             moneda: m,
             curs: cursuriUtilizate[m].curs,
-            precizie_originala: cursuriUtilizate[m].precizie_originala,
             data: cursuriUtilizate[m].data
           }))
         } : null,
-        // ✅ DEBUGGING: Afișează diferența de totaluri
-        recalculare_info: {
-          total_original: liniiFactura.reduce((sum: number, l: any) => sum + ((l.cantitate || 0) * (l.pretUnitar || 0)), 0).toFixed(2),
-          total_cu_cursuri_centralizate: subtotal.toFixed(2),
-          diferenta: (subtotal - liniiFactura.reduce((sum: number, l: any) => sum + ((l.cantitate || 0) * (l.pretUnitar || 0)), 0)).toFixed(2)
+        // ✅ DEBUGGING: Afișează că NU s-a făcut recalculare
+        procesare_info: {
+          total_din_frontend: subtotal.toFixed(2),
+          recalculare_aplicata: false, // ✅ FIX PROBLEMA 4: NU s-a recalculat
+          sursa_date: 'frontend_exact',
+          fix_aplicat: 'problema_4_resolved'
         },
         // ✅ MARKER pentru debugging fix
         fix_aplicat: {
-          cursVechi_toFixed_bug: 'RESOLVED',
-          versiune: 4,
-          data_fix: new Date().toISOString()
+          problema_4_recalculare: 'RESOLVED',
+          versiune: 5,
+          data_fix: new Date().toISOString(),
+          sursa_date: 'frontend_exact_fara_recalculare'
         }
       },
       efactura: sendToAnaf ? {
