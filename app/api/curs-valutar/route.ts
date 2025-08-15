@@ -165,54 +165,43 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ FIX: getCursFromBigQuery cu debugging intensiv
+// ✅ FIX FINAL: getCursFromBigQuery cu debugging complet
 async function getCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
-    console.log(`🔍 DEBUGGING BigQuery: căutare ${moneda} pentru ${data}`);
+    console.log(`🔍 BigQuery SEARCH: ${moneda} pentru ${data}`);
 
+    // ✅ SIMPLIFICAT: Query mai simplu pentru debugging
     const query = `
       SELECT 
         moneda,
         curs,
         data,
-        sursa,
-        data_actualizare
+        sursa
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
-      WHERE data = @data AND moneda = @moneda
-      ORDER BY data_actualizare DESC
+      WHERE data = '${data}' AND moneda = '${moneda}'
       LIMIT 1
     `;
 
-    console.log(`📝 Query BigQuery:`, query);
-    console.log(`🔧 Params: data=${data}, moneda=${moneda}`);
-    console.log(`🏗️ Project ID: ${process.env.GOOGLE_CLOUD_PROJECT_ID}`);
+    console.log(`📝 Query executat:`, query);
 
     const [rows] = await bigquery.query({
       query: query,
-      params: {
-        data: data,
-        moneda: moneda
-      },
-      types: {
-        data: 'DATE',
-        moneda: 'STRING'
-      },
       location: 'EU',
     });
 
-    console.log(`📊 BigQuery response:`, {
+    console.log(`📊 Rezultat BigQuery:`, {
       rowCount: rows ? rows.length : 0,
-      firstRow: rows && rows.length > 0 ? rows[0] : null
+      rows: rows
     });
 
     if (rows && rows.length > 0) {
       const row = rows[0];
-      console.log(`✅ Curs găsit în BigQuery:`, row);
+      console.log(`✅ ROW GĂSIT:`, row);
       
-      // ✅ FIX: Handling pentru FLOAT vs NUMERIC
-      const cursValue = typeof row.curs === 'number' ? row.curs : parseFloat(row.curs?.toString() || '0');
+      // ✅ Safe conversion pentru FLOAT
+      const cursValue = parseFloat(row.curs?.toString() || '0');
       
-      console.log(`🔢 Curs procesat: ${cursValue} (tip: ${typeof row.curs})`);
+      console.log(`💰 Curs procesat: ${cursValue}`);
       
       return {
         moneda: row.moneda,
@@ -222,15 +211,25 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
       };
     }
 
-    console.log(`❌ Nu s-a găsit curs în BigQuery pentru ${moneda} (${data})`);
+    console.log(`❌ NICIUN RÂND găsit pentru ${moneda} (${data})`);
+    
+    // ✅ DEBUG: Verifică ce date există pentru această monedă
+    const debugQuery = `
+      SELECT data, curs 
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+      WHERE moneda = '${moneda}'
+      ORDER BY data DESC
+      LIMIT 5
+    `;
+    
+    console.log(`🔍 DEBUG: Verificare date disponibile pentru ${moneda}:`);
+    const [debugRows] = await bigquery.query({ query: debugQuery, location: 'EU' });
+    console.log(`📅 Date disponibile:`, debugRows);
+    
     return null;
 
   } catch (error) {
-    console.error(`💥 EROARE BigQuery pentru ${moneda} (${data}):`, error);
-    console.error(`🔍 Error details:`, {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack'
-    });
+    console.error(`💥 EROARE BigQuery ${moneda} (${data}):`, error);
     return null;
   }
 }
