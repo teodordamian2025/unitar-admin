@@ -27,75 +27,133 @@ interface CursEntry {
   multiplicator?: number;
 }
 
-// ✅ FIX DEFINITIV: Parsing XML BNR complet pentru toate datele 2025
-async function parseXMLBNR2025(): Promise<CursEntry[]> {
-  try {
-    console.log('🔡 Descărcare XML BNR 2025...');
-    
-    const response = await fetch('https://www.bnr.ro/files/xml/years/nbrfxrates2025.xml', {
-      headers: {
-        'User-Agent': 'UNITAR-PROIECT-SEED-CLIENT/1.0',
-        'Accept': 'application/xml, text/xml',
-      },
-      signal: AbortSignal.timeout(30000) // 30 secunde timeout
-    });
+	// ✅ FIX DEFINITIV: Debugging XML intensiv cu sample real
+	async function parseXMLBNR2025(): Promise<CursEntry[]> {
+	  try {
+	    console.log('🔡 Descărcare XML BNR 2025...');
+	    
+	    const response = await fetch('https://www.bnr.ro/files/xml/years/nbrfxrates2025.xml', {
+	      headers: {
+		'User-Agent': 'UNITAR-PROIECT-SEED-CLIENT/1.0',
+		'Accept': 'application/xml, text/xml',
+	      },
+	      signal: AbortSignal.timeout(30000)
+	    });
 
-    if (!response.ok) {
-      throw new Error(`BNR XML API returned ${response.status}`);
-    }
+	    if (!response.ok) {
+	      throw new Error(`BNR XML API returned ${response.status}`);
+	    }
 
-    const xmlText = await response.text();
-    console.log(`📄 XML descărcat: ${xmlText.length} caractere`);
+	    const xmlText = await response.text();
+	    console.log(`📄 XML descărcat: ${xmlText.length} caractere`);
 
-    const cursuri: CursEntry[] = [];
-    
-    // ✅ FIX: Parsing robust cu split și indexOf
-    const cubeBlocks = xmlText.split('<Cube date="');
-    console.log(`📅 Găsite ${cubeBlocks.length - 1} blocuri de date în XML`);
-    
-    // Skip primul element care e header-ul
-    for (let i = 1; i < cubeBlocks.length; i++) {
-      const block = cubeBlocks[i];
-      
-      // Extrage data din începutul blocului
-      const dateEndIndex = block.indexOf('"');
-      if (dateEndIndex === -1) continue;
-      
-      const data = block.substring(0, dateEndIndex);
-      console.log(`📅 Procesez data ${i}/${cubeBlocks.length - 1}: ${data}`);
-      
-      // Extrage toate cursurile pentru această dată
-      const ratePattern = /<Rate currency="([^"]+)" rate="([^"]+)"(?: multiplier="([^"]+)")?[^>]*>/g;
-      let rateMatch;
-      let countForDate = 0;
-      
-      // Reset regex pentru acest bloc
-      ratePattern.lastIndex = 0;
-      
-      while ((rateMatch = ratePattern.exec(block)) !== null) {
-        const moneda = rateMatch[1];
-        const cursString = rateMatch[2];
-        const multiplicatorString = rateMatch[3];
-        
-        // Filtrează doar monedele de care avem nevoie
-        if (['EUR', 'USD', 'GBP'].includes(moneda)) {
-          const cursValue = parseFloat(cursString);
-          const multiplicator = multiplicatorString ? parseFloat(multiplicatorString) : 1;
-          const cursCalculat = cursValue / multiplicator;
-          
-          cursuri.push({
-            data: data,
-            moneda: moneda,
-            curs: cursCalculat,
-            sursa: 'XML_ISTORIC',
-            precizie_originala: cursString,
-            multiplicator: multiplicator
-          });
-          
-          countForDate++;
-          console.log(`✅ ${data} - ${moneda} = ${cursCalculat.toFixed(4)} RON`);
-        }
-      }
+	    // ✅ DEBUGGING FORȚAT: Analiză sample XML
+	    console.log('🔍 DEBUGGING XML SAMPLE:');
+	    console.log('📝 Primele 2000 caractere din XML:');
+	    console.log(xmlText.substring(0, 2000));
+	    
+	    console.log('\n🔍 CĂUTARE DIRECTĂ PENTRU 2025-01-03:');
+	    const sample2025_01_03 = xmlText.includes('2025-01-03');
+	    console.log(`📅 Conține "2025-01-03": ${sample2025_01_03}`);
+	    
+	    if (sample2025_01_03) {
+	      const idx = xmlText.indexOf('2025-01-03');
+	      const sampleBlock = xmlText.substring(idx - 50, idx + 500);
+	      console.log('📊 Sample bloc pentru 2025-01-03:');
+	      console.log(sampleBlock);
+	    }
+	    
+	    console.log('\n🔍 TEST REGEX DIRECT PE SAMPLE:');
+	    const testBlock = xmlText.substring(xmlText.indexOf('2025-01-03'), xmlText.indexOf('2025-01-03') + 1000);
+	    const testRegex = /<Rate currency="EUR" rate="([^"]+)"/g;
+	    const testMatches = testBlock.match(testRegex);
+	    console.log(`🧪 Regex test pentru EUR în sample: ${testMatches ? testMatches.length : 0} matches`);
+	    if (testMatches) {
+	      console.log('✅ Primul match găsit:', testMatches[0]);
+	    }
+
+	    const cursuri: CursEntry[] = [];
+	    
+	    // ✅ CONTINUĂ cu logica existentă dar cu debugging intensiv
+	    const cubeBlocks = xmlText.split('<Cube date="');
+	    console.log(`📅 Găsite ${cubeBlocks.length - 1} blocuri de date în XML`);
+	    
+	    // LIMITEAZĂ la primele 3 blocuri pentru debugging
+	    const maxBlocks = Math.min(3, cubeBlocks.length - 1);
+	    console.log(`🔍 PROCESEZ DOAR ${maxBlocks} blocuri pentru debugging`);
+	    
+	    for (let i = 1; i <= maxBlocks; i++) {
+	      const block = cubeBlocks[i];
+	      
+	      const dateEndIndex = block.indexOf('"');
+	      if (dateEndIndex === -1) {
+		console.log(`❌ Nu pot extrage data din blocul ${i}`);
+		continue;
+	      }
+	      
+	      const data = block.substring(0, dateEndIndex);
+	      console.log(`\n📅 === PROCESEZ BLOCUL ${i}: ${data} ===`);
+	      console.log(`📏 Mărimea blocului: ${block.length} caractere`);
+	      
+	      // Sample din bloc
+	      console.log('📝 Primele 300 caractere din bloc:');
+	      console.log(block.substring(0, 300));
+	      
+	      // Test manual pentru EUR, USD, GBP
+	      const eurExists = block.includes('currency="EUR"');
+	      const usdExists = block.includes('currency="USD"');
+	      const gbpExists = block.includes('currency="GBP"');
+	      console.log(`🔍 Căutare manuală: EUR=${eurExists}, USD=${usdExists}, GBP=${gbpExists}`);
+	      
+	      if (eurExists) {
+		// Găsește linia cu EUR
+		const eurLine = block.split('\n').find(line => line.includes('currency="EUR"'));
+		console.log(`💰 Linia EUR găsită: "${eurLine ? eurLine.trim() : 'NONE'}"`);
+	      }
+	      
+	      // Test cu regex simplu
+	      const simpleRegex = /currency="(EUR|USD|GBP)" rate="([^"]+)"/g;
+	      const simpleMatches: RegExpExecArray[] = [];
+	      let simpleMatch;
+	      
+	      while ((simpleMatch = simpleRegex.exec(block)) !== null) {
+		simpleMatches.push(simpleMatch);
+		console.log(`✅ REGEX GĂSIT: ${simpleMatch[1]} = ${simpleMatch[2]}`);
+	      }
+	      
+	      console.log(`🎯 Total matches pentru ${data}: ${simpleMatches.length}`);
+	      
+	      // Adaugă la cursuri
+	      simpleMatches.forEach(match => {
+		const moneda = match[1];
+		const cursString = match[2];
+		const cursValue = parseFloat(cursString);
+		
+		cursuri.push({
+		  data: data,
+		  moneda: moneda,
+		  curs: cursValue,
+		  sursa: 'XML_ISTORIC',
+		  precizie_originala: cursString,
+		  multiplicator: 1
+		});
+		
+		console.log(`✅ ADĂUGAT LA ARRAY: ${data} - ${moneda} = ${cursValue} RON`);
+	      });
+	    }
+
+	    console.log(`\n🎯 REZULTAT FINAL DEBUGGING: ${cursuri.length} cursuri extrase`);
+	    cursuri.forEach(c => console.log(`📊 ${c.data} - ${c.moneda} = ${c.curs}`));
+
+	    return cursuri;
+
+	  } catch (error) {
+	    console.error('❌ Eroare la parsarea XML BNR:', error);
+	    throw error;
+	  }
+	}
+
+
       
       console.log(`💱 Extrase ${countForDate} cursuri pentru ${data}`);
       
