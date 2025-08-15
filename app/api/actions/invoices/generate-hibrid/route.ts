@@ -248,9 +248,6 @@ export async function POST(request: NextRequest) {
       
       console.log('💱 Nota curs BNR generată FĂRĂ [object Object]:', notaCursValutar);
     }
-      
-      console.log('💱 Nota curs BNR generată cu precizie maximă:', notaCursValutar);
-    }
 
     // ✅ MODIFICAT: Adaugă nota cursului la observații pentru PDF
     const observatiiFinale = observatii + (notaCursValutar ? `\n\n${notaCursValutar}` : '');
