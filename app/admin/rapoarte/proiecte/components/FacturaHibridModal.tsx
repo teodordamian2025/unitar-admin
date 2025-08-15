@@ -1290,6 +1290,30 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }
 
+    // ✅ DEBUGGING: Ce se trimite la API
+    console.log('🔍 === DEBUGGING LINII FACTURA ===');
+    console.log('📊 Total linii:', liniiFactura.length);
+    liniiFactura.forEach((linie, index) => {
+      console.log(`📋 Linia ${index}:`, {
+        denumire: linie.denumire,
+        valoareOriginala: linie.valoareOriginala,
+        monedaOriginala: linie.monedaOriginala,
+        cursValutar: linie.cursValutar,
+        pretUnitar: linie.pretUnitar,
+        tip: linie.tip,
+        subproiect_id: linie.subproiect_id
+      });
+    });
+    
+    console.log('💱 === DEBUGGING CURSURI STATE ===');
+    Object.keys(cursuri).forEach(moneda => {
+      console.log(`💰 ${moneda}:`, {
+        curs: cursuri[moneda].curs,
+        data: cursuri[moneda].data,
+        sursa: cursuri[moneda].sursa
+      });
+    });
+
     setIsGenerating(true);
     
     let proiectIdFinal = proiect.ID_Proiect;
@@ -2231,33 +2255,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* ✅ FIX PROBLEMA 2-3: Valută EDITABILĂ fără CHF + logică corectă */}
+{/* ✅ FIX DROPDOWN BLOCAT: React controlled component forțat */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <select
+                            key={`valuta-${index}-${linie.monedaOriginala || 'RON'}`} // ✅ CRUCIAL: Key unic forțează re-render
                             value={linie.monedaOriginala || 'RON'}
                             onChange={(e) => {
                               const novaMoneda = e.target.value;
-                              console.log(`🔄 Schimb moneda pentru linia ${index}: ${linie.monedaOriginala} → ${novaMoneda}`);
+                              console.log(`🔄 DROPDOWN CHANGE: ${linie.monedaOriginala} → ${novaMoneda} pentru linia ${index}`);
                               
-                              // Actualizează moneda
+                              // ✅ FIX: Update direct cu delay pentru re-render
                               updateLine(index, 'monedaOriginala', novaMoneda);
                               
-                              if (novaMoneda === 'RON') {
-                                // Pentru RON, cursul e 1 și pretul = valoarea originală
-                                updateLine(index, 'cursValutar', 1);
-                                updateLine(index, 'pretUnitar', linie.valoareOriginala || 0);
-                              } else {
-                                // Pentru alte monede, folosește cursul din state sau 1 ca fallback
-                                const cursExistent = cursuri[novaMoneda]?.curs || 1;
-                                updateLine(index, 'cursValutar', cursExistent);
-                                updateLine(index, 'pretUnitar', (linie.valoareOriginala || 0) * cursExistent);
-                                
-                                // Încarcă cursul pentru moneda nouă dacă nu există
-                                if (!cursuri[novaMoneda]) {
-                                  console.log(`📡 Încărcare curs pentru ${novaMoneda}...`);
-                                  loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
-                                }
-                              }
+                              // ✅ FORCE RE-RENDER cu timeout
+                              setTimeout(() => {
+                                console.log(`✅ Re-render forțat pentru linia ${index}`);
+                                setLiniiFactura(prev => [...prev]); // Force re-render
+                              }, 100);
                             }}
                             disabled={isLoading}
                             style={{
@@ -2266,7 +2280,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               border: '1px solid #dee2e6',
                               borderRadius: '4px',
                               textAlign: 'center',
-                              fontSize: '12px'
+                              fontSize: '12px',
+                              backgroundColor: 'white' // ✅ Force white background
                             }}
                           >
                             <option value="RON">RON</option>
