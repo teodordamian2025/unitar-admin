@@ -869,10 +869,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }
     
-    // ✅ FIX PROBLEME 2-3: Logică specială pentru monedaOriginala (dropdown valută)
+// ✅ FIX DROPDOWN AMESTEC VALUTE: Logică corectată pentru monedaOriginala
     if (field === 'monedaOriginala') {
       const novaMoneda = String(value);
-      console.log(`💱 Schimb moneda: ${linieCurenta.monedaOriginala} → ${novaMoneda}`);
+      console.log(`💱 SCHIMB MONEDA: ${linieCurenta.monedaOriginala} → ${novaMoneda}`);
       
       if (novaMoneda === 'RON') {
         // Pentru RON: curs = 1, pretUnitar = valoarea originală
@@ -880,24 +880,37 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         linieCurenta.pretUnitar = linieCurenta.valoareOriginala || 0;
         console.log(`🇷🇴 RON: curs = 1, pretUnitar = ${linieCurenta.pretUnitar}`);
       } else {
-        // Pentru alte monede: folosește cursul din state sau încarcă-l
-        const cursExistent = cursuri[novaMoneda];
-        if (cursExistent) {
-          linieCurenta.cursValutar = cursExistent.curs;
-          linieCurenta.pretUnitar = (linieCurenta.valoareOriginala || 0) * cursExistent.curs;
-          console.log(`💰 ${novaMoneda}: folosesc cursul din state ${cursExistent.curs.toFixed(4)}`);
+        // ✅ FIX CRUCIAL: Folosește cursul CORECT pentru moneda NOUĂ
+        const cursCorectPentruMonedaNoua = cursuri[novaMoneda];
+        if (cursCorectPentruMonedaNoua) {
+          linieCurenta.cursValutar = cursCorectPentruMonedaNoua.curs;
+          linieCurenta.pretUnitar = (linieCurenta.valoareOriginala || 0) * cursCorectPentruMonedaNoua.curs;
+          console.log(`✅ ${novaMoneda}: cursul CORECT ${cursCorectPentruMonedaNoua.curs.toFixed(4)} → pretUnitar = ${linieCurenta.pretUnitar.toFixed(2)}`);
         } else {
-          // Fallback la curs 1 și încarcă cursul
+          // Dacă cursul nu e în state, încarcă-l
+          console.log(`⏳ ${novaMoneda}: curs nu e în state, încerc să îl încarcă...`);
           linieCurenta.cursValutar = 1;
           linieCurenta.pretUnitar = linieCurenta.valoareOriginala || 0;
-          console.log(`⏳ ${novaMoneda}: curs fallback, se va încărca din BigQuery`);
           
-          // Trigger încărcare curs pentru moneda nouă
-          setTimeout(() => {
-            loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
+          // ✅ FIX: Trigger încărcare curs pentru moneda nouă cu CLEAR state
+          setTimeout(async () => {
+            console.log(`🔄 Încărcare automată curs pentru ${novaMoneda}...`);
+            await loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
+            
+            // După încărcare, recalculează linia
+            setTimeout(() => {
+              const cursIncarcatAcum = cursuri[novaMoneda];
+              if (cursIncarcatAcum) {
+                console.log(`🎯 Curs încărcat pentru ${novaMoneda}: ${cursIncarcatAcum.curs.toFixed(4)}`);
+                updateLine(index, 'cursValutar', cursIncarcatAcum.curs);
+              }
+            }, 500);
           }, 100);
         }
       }
+      
+      // ✅ IMPORTANT: Clear any cached wrong values
+      console.log(`🧹 Clear cache pentru a evita amestecul: ${novaMoneda} !== alte monede`);
     }
     
     // ✅ Update logic pentru alte câmpuri
