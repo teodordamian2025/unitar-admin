@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
 
     // Statistici finale
     const totalCursuri = cursuriFinal.length;
-    const monede = Array.from(new Set(cursuriFinal.map(c => c.moneda))];
+    const monede = Array.from(new Set(cursuriFinal.map(c => c.moneda)));
     const perioadaStart = cursuriFinal[0]?.data;
     const perioadaEnd = cursuriFinal[cursuriFinal.length - 1]?.data;
 
