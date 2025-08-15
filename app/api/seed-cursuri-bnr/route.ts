@@ -157,13 +157,6 @@ interface CursEntry {
       
       console.log(`💱 Extrase ${countForDate} cursuri pentru ${data}`);
       
-      // Oprește dacă am procesat suficiente blocuri pentru test
-      if (i > 50) {
-        console.log(`⚡ LIMITARE PENTRU TEST: Procesat ${i} date (în loc de toate)`);
-        break;
-      }
-    }
-
     console.log(`✅ TOTAL extrase ${cursuri.length} cursuri din XML`);
     
     // Sortează după dată pentru debugging
