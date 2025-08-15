@@ -115,7 +115,7 @@ async function parseXMLBNR2025(): Promise<CursEntry[]> {
       console.log('📊 Ultimul curs:', cursuri[cursuri.length - 1]);
       
       // Statistici pe monede
-      const monede = [...new Set(cursuri.map(c => c.moneda))];
+      const monede = Array.from(new Set(cursuri.map(c => c.moneda)));
       console.log(`💱 Monede găsite: ${monede.join(', ')}`);
       monede.forEach(moneda => {
         const count = cursuri.filter(c => c.moneda === moneda).length;
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
 
     // Statistici finale
     const totalCursuri = cursuriFinal.length;
-    const monede = [...new Set(cursuriFinal.map(c => c.moneda))];
+    const monede = Array.from(new Set(cursuriFinal.map(c => c.moneda))];
     const perioadaStart = cursuriFinal[0]?.data;
     const perioadaEnd = cursuriFinal[cursuriFinal.length - 1]?.data;
 
