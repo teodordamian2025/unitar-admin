@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
         } else if (cursInfo.data && typeof cursInfo.data === 'object' && cursInfo.data.value) {
           dataFormatata = cursInfo.data.value;
         } else {
-          dataFormatata = dataCursPersonalizata || new Date().toISOString().split('T')[0];
+          dataFormatata = new Date().toISOString().split('T')[0];
         }
         
         return `1 ${m} = ${cursFormatat} RON (${dataFormatata})`;
