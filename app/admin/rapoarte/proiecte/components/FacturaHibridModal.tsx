@@ -935,42 +935,56 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     });
   };
 
-  // ✅ SIMPLIFICAT: addSubproiectToFactura cu cursuri din state
+// ✅ SIMPLIFICAT: addSubproiectToFactura cu refresh automat după adăugare
   const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
+    console.log('📋 ADĂUGARE SUBPROIECT: Start cu refresh automat...');
+    
     // ✅ FIX: Conversie corectă BigQuery NUMERIC
     const valoareEstimata = convertBigQueryNumeric(subproiect.Valoare_Estimata);
     let valoareSubproiect = valoareEstimata;
     let monedaSubproiect = subproiect.moneda || 'RON';
     let cursSubproiect = 1;
     
-    // Folosește cursul din state sau cel din BD
+    console.log(`📊 Subproiect original: ${valoareEstimata} ${monedaSubproiect} (din BD)`);
+    
+    // ✅ CRUCIAL: Folosește cursul din STATE, NU din BD
     if (monedaSubproiect !== 'RON') {
       const cursState = cursuri[monedaSubproiect];
       if (cursState) {
         cursSubproiect = cursState.curs;
-        console.log(`🎯 Folosesc curs din state pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
-      } else if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
-        cursSubproiect = convertBigQueryNumeric(subproiect.curs_valutar);
-        console.log(`📊 Folosesc curs din BD pentru ${monedaSubproiect}: ${cursSubproiect.toFixed(4)}`);
+        valoareSubproiect = valoareEstimata * cursState.curs; // Calculează în RON cu cursul actual
+        console.log(`🔄 REFRESH APLICAT: ${valoareEstimata} ${monedaSubproiect} × ${cursState.curs.toFixed(4)} = ${valoareSubproiect.toFixed(2)} RON`);
+      } else {
+        console.log(`⚠️ Curs nu găsit în state pentru ${monedaSubproiect}, folosesc din BD`);
+        if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
+          cursSubproiect = convertBigQueryNumeric(subproiect.curs_valutar);
+          if (subproiect.valoare_ron) {
+            valoareSubproiect = convertBigQueryNumeric(subproiect.valoare_ron);
+          }
+        }
       }
-    }
-
-    // Folosește valoarea în RON dacă există
-    if (subproiect.valoare_ron && monedaSubproiect !== 'RON') {
-      valoareSubproiect = convertBigQueryNumeric(subproiect.valoare_ron);
     }
 
     const nouaLinie: LineFactura = {
       denumire: `${subproiect.Denumire} (Subproiect)`,
       cantitate: 1,
-      pretUnitar: valoareSubproiect,
+      pretUnitar: valoareSubproiect, // ✅ Folosește valoarea calculată cu cursul actual
       cotaTva: 21,
       tip: 'subproiect',
       subproiect_id: subproiect.ID_Subproiect,
       monedaOriginala: monedaSubproiect,
-      valoareOriginala: valoareEstimata, // ✅ FIX: Întotdeauna număr
-      cursValutar: cursSubproiect
+      valoareOriginala: valoareEstimata, // ✅ Valoarea originală din BD
+      cursValutar: cursSubproiect // ✅ Cursul din STATE (actual)
     };
+
+    console.log('✅ Linie nouă creată:', {
+      denumire: nouaLinie.denumire,
+      valoareOriginala: nouaLinie.valoareOriginala,
+      monedaOriginala: nouaLinie.monedaOriginala,
+      cursValutar: nouaLinie.cursValutar?.toFixed(4),
+      pretUnitar: nouaLinie.pretUnitar?.toFixed(2),
+      sursa_curs: cursuri[monedaSubproiect] ? 'STATE_ACTUAL' : 'BD_FALLBACK'
+    });
 
     setLiniiFactura(prev => [...prev, nouaLinie]);
 
@@ -982,7 +996,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       )
     );
 
-    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat`, 'success');
+    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat cu cursul actual ${cursSubproiect.toFixed(4)}`, 'success');
+    
+    // ✅ BONUS: Force re-render pentru a actualiza UI
+    setTimeout(() => {
+      console.log('🔄 Force re-render după adăugare subproiect');
+      setLiniiFactura(prev => [...prev]); // Trigger re-render
+    }, 100);
   };
 
   const handlePreluareDateANAF = async () => {
@@ -1251,44 +1271,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ SIMPLIFICAT: handleGenereazaFactura cu transmitere cursuri din state
   const handleGenereazaFactura = async () => {
-  
-  // ✅ MAGIC REFRESH: Forțează actualizarea valorilor înainte de generare
-    console.log('🔄 MAGIC REFRESH: Actualizez toate liniile pentru consistență...');
-    
-    // Salvează starea actuală pentru restaurare
-    const liniiOriginale = [...liniiFactura];
-    
-    // Pentru fiecare linie, trigger o schimbare micro pentru refresh
-    const liniiActualizate = liniiFactura.map((linie, index) => {
-      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
-        console.log(`🔄 Refresh linia ${index}: ${linie.monedaOriginala}`);
-        
-        // Găsește cursul corect din state
-        const cursCorect = cursuri[linie.monedaOriginala];
-        if (cursCorect) {
-          // Recalculează complet cu cursul din state
-          const pretUnitarNou = (linie.valoareOriginala || 0) * cursCorect.curs;
-          
-          console.log(`✅ Refresh aplicat: ${linie.valoareOriginala} ${linie.monedaOriginala} × ${cursCorect.curs.toFixed(4)} = ${pretUnitarNou.toFixed(2)} RON`);
-          
-          return {
-            ...linie,
-            cursValutar: cursCorect.curs,
-            pretUnitar: pretUnitarNou
-          };
-        }
-      }
-      return linie;
-    });
-    
-    // Aplică refresh-ul
-    setLiniiFactura(liniiActualizate);
-    
-    // Mic delay pentru ca state-ul să se actualizeze
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    console.log('✅ MAGIC REFRESH COMPLET - toate valorile sunt din frontend');
-  
+ 
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
       return;

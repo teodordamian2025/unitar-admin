@@ -587,7 +587,7 @@ export async function POST(request: NextRequest) {
                       // ✅ CRUCIAL: Folosește DOAR valorile din frontend, nu din BD
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
                         // ✅ FORȚAT: Cursul și moneda din FRONTEND (nu BD)
-                        const cursInfo = linie.cursValutar ? ` @ ${Number(linie.cursValutar).toFixed(4)}` : '';
+                        const cursInfo = linie.cursValutar ? ` x ${Number(linie.cursValutar).toFixed(4)}` : '';
                         descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
                         
                         console.log(`📊 PDF Template - Linia ${index}: FRONTEND FORCED`, {
