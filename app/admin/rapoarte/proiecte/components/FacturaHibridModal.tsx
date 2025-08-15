@@ -1251,6 +1251,44 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ SIMPLIFICAT: handleGenereazaFactura cu transmitere cursuri din state
   const handleGenereazaFactura = async () => {
+  
+  // ✅ MAGIC REFRESH: Forțează actualizarea valorilor înainte de generare
+    console.log('🔄 MAGIC REFRESH: Actualizez toate liniile pentru consistență...');
+    
+    // Salvează starea actuală pentru restaurare
+    const liniiOriginale = [...liniiFactura];
+    
+    // Pentru fiecare linie, trigger o schimbare micro pentru refresh
+    const liniiActualizate = liniiFactura.map((linie, index) => {
+      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
+        console.log(`🔄 Refresh linia ${index}: ${linie.monedaOriginala}`);
+        
+        // Găsește cursul corect din state
+        const cursCorect = cursuri[linie.monedaOriginala];
+        if (cursCorect) {
+          // Recalculează complet cu cursul din state
+          const pretUnitarNou = (linie.valoareOriginala || 0) * cursCorect.curs;
+          
+          console.log(`✅ Refresh aplicat: ${linie.valoareOriginala} ${linie.monedaOriginala} × ${cursCorect.curs.toFixed(4)} = ${pretUnitarNou.toFixed(2)} RON`);
+          
+          return {
+            ...linie,
+            cursValutar: cursCorect.curs,
+            pretUnitar: pretUnitarNou
+          };
+        }
+      }
+      return linie;
+    });
+    
+    // Aplică refresh-ul
+    setLiniiFactura(liniiActualizate);
+    
+    // Mic delay pentru ca state-ul să se actualizeze
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    console.log('✅ MAGIC REFRESH COMPLET - toate valorile sunt din frontend');
+  
     if (!clientInfo?.cui) {
       showToast('CUI-ul clientului este obligatoriu', 'error');
       return;
