@@ -165,17 +165,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ NOU: Funcție pentru căutarea cursului în BigQuery
+// ✅ FIX: getCursFromBigQuery cu debugging intensiv
 async function getCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
-    console.log(`🔍 Căutare curs în BigQuery: ${moneda} pentru ${data}`);
+    console.log(`🔍 DEBUGGING BigQuery: căutare ${moneda} pentru ${data}`);
 
     const query = `
       SELECT 
         moneda,
         curs,
         data,
-        precizie_originala,
         sursa,
         data_actualizare
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
@@ -183,6 +182,10 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
       ORDER BY data_actualizare DESC
       LIMIT 1
     `;
+
+    console.log(`📝 Query BigQuery:`, query);
+    console.log(`🔧 Params: data=${data}, moneda=${moneda}`);
+    console.log(`🏗️ Project ID: ${process.env.GOOGLE_CLOUD_PROJECT_ID}`);
 
     const [rows] = await bigquery.query({
       query: query,
@@ -197,15 +200,25 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
       location: 'EU',
     });
 
+    console.log(`📊 BigQuery response:`, {
+      rowCount: rows ? rows.length : 0,
+      firstRow: rows && rows.length > 0 ? rows[0] : null
+    });
+
     if (rows && rows.length > 0) {
       const row = rows[0];
-      console.log(`✅ Curs găsit în BigQuery: ${moneda} = ${row.curs} (${row.data})`);
+      console.log(`✅ Curs găsit în BigQuery:`, row);
+      
+      // ✅ FIX: Handling pentru FLOAT vs NUMERIC
+      const cursValue = typeof row.curs === 'number' ? row.curs : parseFloat(row.curs?.toString() || '0');
+      
+      console.log(`🔢 Curs procesat: ${cursValue} (tip: ${typeof row.curs})`);
       
       return {
         moneda: row.moneda,
-        curs: parseFloat(row.curs.toString()),
+        curs: cursValue,
         data: row.data,
-        precizie_originala: row.precizie_originala
+        precizie_originala: row.curs?.toString() || cursValue.toString()
       };
     }
 
@@ -213,7 +226,11 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
     return null;
 
   } catch (error) {
-    console.error(`❌ Eroare căutare BigQuery pentru ${moneda} (${data}):`, error);
+    console.error(`💥 EROARE BigQuery pentru ${moneda} (${data}):`, error);
+    console.error(`🔍 Error details:`, {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack'
+    });
     return null;
   }
 }
