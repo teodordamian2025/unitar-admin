@@ -190,7 +190,11 @@ export async function POST(request: NextRequest) {
     
     liniiFacturaActualizate.forEach((linie: any) => {
       const cantitate = Number(linie.cantitate) || 0;
-      const pretUnitar = Number(linie.pretUnitar) || 0;
+      // ✅ FIX: Folosește pretUnitar direct din frontend (fără recalculare)
+	let pretUnitar = Number(linie.pretUnitar) || 0;
+
+	// ✅ DEBUGGING: Verifică că folosește frontend
+	console.log(`💰 PDF Calc - Linia ${index}: pretUnitar=${pretUnitar} (din frontend)`);
       const cotaTva = Number(linie.cotaTva) || 0;
       
       const valoare = cantitate * pretUnitar;
@@ -577,12 +581,22 @@ export async function POST(request: NextRequest) {
                       
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
-                      // ✅ FIX PRINCIPAL: Afișează informații EXACTE din frontend (fără recalculare)
+// ✅ FIX FINAL: FOLOSEȘTE EXCLUSIV datele din frontend (STOP BD lookup)
                       let descriereCompleta = linie.denumire || 'N/A';
+                      
+                      // ✅ CRUCIAL: Folosește DOAR valorile din frontend, nu din BD
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
-                        // ✅ FOLOSEȘTE cursul EXACT din frontend
+                        // ✅ FORȚAT: Cursul și moneda din FRONTEND (nu BD)
                         const cursInfo = linie.cursValutar ? ` @ ${Number(linie.cursValutar).toFixed(4)}` : '';
                         descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
+                        
+                        console.log(`📊 PDF Template - Linia ${index}: FRONTEND FORCED`, {
+                          moneda: linie.monedaOriginala,
+                          valoare: linie.valoareOriginala,
+                          curs: linie.cursValutar,
+                          pretUnitar: linie.pretUnitar,
+                          sursa: 'FRONTEND_ONLY'
+                        });
                       }
                       
                       return `
