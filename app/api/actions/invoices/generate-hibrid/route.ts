@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
     // ✅ MODIFICAT: Folosește numărul primit din frontend
     const safeInvoiceData = {
       numarFactura: numarFactura || `INV-${proiectId}-${Date.now()}`,
-      denumireProiect: `Proiect #${proiectId}`,
+      denumireProiect: `${proiectId}`,
       descriere: descrierePrincipala,
       subtotal: Number(subtotal.toFixed(2)),
       tva: Number(totalTva.toFixed(2)),
