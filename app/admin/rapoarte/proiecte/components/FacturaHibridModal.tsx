@@ -256,32 +256,40 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ PĂSTRAT: Toate funcțiile de loading existente
 
-  // ✅ SIMPLIFICAT: O singură funcție pentru loading cursuri
+  // ✅ FIX PROBLEMA 4: Încărcare cursuri din BigQuery pentru data exactă
   const loadCursuriPentruData = async (data: string, monede: string[]) => {
     if (monede.length === 0) return;
     
     setLoadingCursuri(true);
-    console.log(`💱 Loading cursuri pentru ${data}: ${monede.join(', ')}`);
+    console.log(`🔄 LOADING cursuri din BigQuery pentru ${data}: ${monede.join(', ')}`);
     
     try {
       const cursuriNoi: { [moneda: string]: CursValutar } = {};
       
-      // Încarcă cursurile în paralel
+      // Încarcă cursurile în paralel DIN BIGQUERY
       const promiseCursuri = monede.map(async (moneda) => {
         if (moneda === 'RON') return null;
         
         try {
+          console.log(`📡 API call: /api/curs-valutar?moneda=${moneda}&data=${data}`);
+          
           const response = await fetch(`/api/curs-valutar?moneda=${moneda}&data=${data}`);
           const result = await response.json();
           
+          console.log(`📊 Rezultat pentru ${moneda}:`, result);
+          
           if (result.success && result.curs) {
-            // ✅ FIX: Mapare corectă sursa API → interfață
+            // ✅ FIX: Mapare corectă sursă API → interfață
             let sursa: 'BD' | 'BNR' | 'Manual' = 'BD';
-            if (result.source === 'bnr') {
+            if (result.source === 'bigquery' || result.source === 'bigquery_closest') {
+              sursa = 'BD';
+            } else if (result.source === 'bnr_live') {
               sursa = 'BNR';
-            } else if (result.source === 'cache' || result.source === 'fallback_actual') {
+            } else if (result.source === 'cache') {
               sursa = 'BD';
             }
+            
+            console.log(`✅ Curs găsit pentru ${moneda}: ${result.curs} (sursă: ${sursa})`);
             
             return {
               moneda,
@@ -290,10 +298,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               sursa: sursa,
               editabil: true
             };
+          } else {
+            console.log(`❌ Nu s-a găsit curs pentru ${moneda}:`, result.error);
+            return null;
           }
-          return null;
         } catch (error) {
-          console.error(`Eroare curs ${moneda}:`, error);
+          console.error(`❌ Eroare curs ${moneda}:`, error);
           return null;
         }
       });
@@ -303,15 +313,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       rezultate.forEach((rezultat) => {
         if (rezultat) {
           cursuriNoi[rezultat.moneda] = rezultat;
+          console.log(`💾 Salvat în state: ${rezultat.moneda} = ${rezultat.curs.toFixed(4)}`);
         }
       });
       
       setCursuri(cursuriNoi);
-      console.log(`✅ Cursuri încărcate:`, Object.keys(cursuriNoi));
+      console.log(`🎯 FIX PROBLEMA 4: Cursuri încărcate din BigQuery:`, Object.keys(cursuriNoi));
+      
+      if (Object.keys(cursuriNoi).length > 0) {
+        showToast(`✅ Cursuri BigQuery încărcate pentru ${data}: ${Object.keys(cursuriNoi).join(', ')}`, 'success');
+      } else {
+        showToast(`⚠️ Nu s-au găsit cursuri în BigQuery pentru ${data}`, 'error');
+      }
       
     } catch (error) {
-      console.error('Eroare loading cursuri:', error);
-      showToast('⚠️ Eroare la încărcarea cursurilor BNR', 'error');
+      console.error('❌ Eroare loading cursuri din BigQuery:', error);
+      showToast('⚠️ Eroare la încărcarea cursurilor din BigQuery', 'error');
     } finally {
       setLoadingCursuri(false);
     }
@@ -823,10 +840,86 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ FIX PROBLEME 1-3: updateLine cu logică completă pentru valoare/monedă/curs
   const updateLine = (index: number, field: keyof LineFactura, value: string | number) => {
+    console.log(`🔧 UPDATE linia ${index}, câmpul ${field} = ${value}`);
+    
     const newLines = [...liniiFactura];
-    newLines[index] = { ...newLines[index], [field]: value };
+    const linieCurenta = { ...newLines[index] };
+    
+    // Update direct pentru câmpul specificat
+    (linieCurenta as any)[field] = value;
+    
+    // ✅ FIX PROBLEMA 1: Logică specială pentru valoareOriginala
+    if (field === 'valoareOriginala') {
+      const novaValoare = Number(value) || 0;
+      console.log(`💰 Valoare originală nouă: ${novaValoare} ${linieCurenta.monedaOriginala || 'RON'}`);
+      
+      // Recalculează pretUnitar cu cursul curent
+      if (linieCurenta.monedaOriginala && linieCurenta.monedaOriginala !== 'RON') {
+        const cursActual = cursuri[linieCurenta.monedaOriginala]?.curs || linieCurenta.cursValutar || 1;
+        linieCurenta.pretUnitar = novaValoare * cursActual;
+        linieCurenta.cursValutar = cursActual;
+        
+        console.log(`🔄 Recalculat pretUnitar: ${novaValoare} × ${cursActual.toFixed(4)} = ${linieCurenta.pretUnitar.toFixed(2)} RON`);
+      } else {
+        // Pentru RON, pretUnitar = valoarea originală
+        linieCurenta.pretUnitar = novaValoare;
+        linieCurenta.cursValutar = 1;
+      }
+    }
+    
+    // ✅ FIX PROBLEME 2-3: Logică specială pentru monedaOriginala (dropdown valută)
+    if (field === 'monedaOriginala') {
+      const novaMoneda = String(value);
+      console.log(`💱 Schimb moneda: ${linieCurenta.monedaOriginala} → ${novaMoneda}`);
+      
+      if (novaMoneda === 'RON') {
+        // Pentru RON: curs = 1, pretUnitar = valoarea originală
+        linieCurenta.cursValutar = 1;
+        linieCurenta.pretUnitar = linieCurenta.valoareOriginala || 0;
+        console.log(`🇷🇴 RON: curs = 1, pretUnitar = ${linieCurenta.pretUnitar}`);
+      } else {
+        // Pentru alte monede: folosește cursul din state sau încarcă-l
+        const cursExistent = cursuri[novaMoneda];
+        if (cursExistent) {
+          linieCurenta.cursValutar = cursExistent.curs;
+          linieCurenta.pretUnitar = (linieCurenta.valoareOriginala || 0) * cursExistent.curs;
+          console.log(`💰 ${novaMoneda}: folosesc cursul din state ${cursExistent.curs.toFixed(4)}`);
+        } else {
+          // Fallback la curs 1 și încarcă cursul
+          linieCurenta.cursValutar = 1;
+          linieCurenta.pretUnitar = linieCurenta.valoareOriginala || 0;
+          console.log(`⏳ ${novaMoneda}: curs fallback, se va încărca din BigQuery`);
+          
+          // Trigger încărcare curs pentru moneda nouă
+          setTimeout(() => {
+            loadCursuriPentruData(dataCursPersonalizata, [novaMoneda]);
+          }, 100);
+        }
+      }
+    }
+    
+    // ✅ Update logic pentru alte câmpuri
+    if (field === 'cursValutar') {
+      const cursNou = Number(value) || 1;
+      if (linieCurenta.valoareOriginala && linieCurenta.monedaOriginala !== 'RON') {
+        linieCurenta.pretUnitar = linieCurenta.valoareOriginala * cursNou;
+        console.log(`📈 Curs actualizat: ${linieCurenta.valoareOriginala} × ${cursNou.toFixed(4)} = ${linieCurenta.pretUnitar.toFixed(2)} RON`);
+      }
+    }
+    
+    // Salvează linia actualizată
+    newLines[index] = linieCurenta;
     setLiniiFactura(newLines);
+    
+    console.log(`✅ Linia ${index} actualizată:`, {
+      denumire: linieCurenta.denumire,
+      valoareOriginala: linieCurenta.valoareOriginala,
+      monedaOriginala: linieCurenta.monedaOriginala,
+      cursValutar: linieCurenta.cursValutar?.toFixed(4),
+      pretUnitar: linieCurenta.pretUnitar?.toFixed(2)
+    });
   };
 
   // ✅ SIMPLIFICAT: addSubproiectToFactura cu cursuri din state
@@ -2097,32 +2190,30 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-                        {/* ✅ FIX PROBLEMA 1: Valoare Originală EDITABILĂ cu input direct */}
+
+                        {/* ✅ FIX PROBLEMA 1: Valoare Originală COMPLET EDITABILĂ */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
                             value={linie.valoareOriginala || 0}
                             onChange={(e) => {
                               const novaValoare = parseFloat(e.target.value) || 0;
+                              console.log(`🔧 Input valoare originală: ${novaValoare} ${linie.monedaOriginala || 'RON'}`);
                               updateLine(index, 'valoareOriginala', novaValoare);
-                              // Recalculează pretUnitar când se schimbă valoarea originală
-                              if (linie.monedaOriginala && linie.monedaOriginala !== 'RON') {
-                                const curs = cursuri[linie.monedaOriginala]?.curs || linie.cursValutar || 1;
-                                updateLine(index, 'pretUnitar', novaValoare * curs);
-                              } else {
-                                updateLine(index, 'pretUnitar', novaValoare);
-                              }
                             }}
                             disabled={isLoading}
                             style={{
                               width: '100%',
-                              padding: '0.3rem',
+                              padding: '0.4rem',
                               border: '1px solid #dee2e6',
                               borderRadius: '4px',
                               textAlign: 'center',
-                              fontSize: '12px'
+                              fontSize: '12px',
+                              backgroundColor: 'white', // ✅ FIX: Forțează fundal alb
+                              color: '#000000' // ✅ FIX: Forțează text negru
                             }}
                             step="0.01"
+                            min="0"
                             placeholder="0.00"
                           />
                         </td>

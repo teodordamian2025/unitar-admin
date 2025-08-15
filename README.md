@@ -192,6 +192,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - route.ts
 - - - - pdf
 - - - - - route.ts
+- - - seed-cursuri-bnr
+- - - - route.ts
 - - - user-database
 - - - - route.ts
 - - - anaf
@@ -282,6 +284,7 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - contracte
 - - facturi
 - git-filter-repo.py
+
 
 
 Coduri care au legatura cu facturarea:
@@ -426,161 +429,7 @@ Pentru întrebări tehnice sau probleme:
 
 **Status:** ✅ **COMPLET FUNCȚIONAL** - Sistem hibrid de facturare cu management proiecte și subproiecte implementat integral.
 
-Ultimele lucruri implementate:
-Rezumat Toate Problemele Rezolvate:
-✅ 1. ProiectNouModal - Adăugat câmp Adresa:
-app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-Câmp nou "Adresa Proiect" în formular
-Validare și trimitere în API
-Reset form include și adresa=functional
 
-✅ 2. API Proiecte - Suport pentru Adresa:
-app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-POST include câmpul Adresa în INSERT
-PUT permite actualizarea Adresei
-GET include căutare și în câmpul Adresa=functional
-
-✅ 3. Dropdown Actions - Poziționare Inteligentă:
-app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-Calculează spațiul disponibil automat
-Se afișează deasupra când e aproape de jos
-useRef pentru referința butonului=functional
-
-✅ 4. Vezi Detalii și Editează - Implementate:
-app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-"Vezi Detalii" afișează informații complete în toast
-"Editează" pregătit pentru modal/pagină de editare
-Console.log pentru debugging=functional
-
-✅ 5. TVA 21% - Adăugat în dropdown:
-app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-Opțiune nouă "21%" pentru noua reglementare din august 2025
-
-
-2025-07-25 19:10
-REZUMAT FINAL - Fix-uri Complete UnitarProiect
-🎯 Probleme Rezolvate Complet
-✅ 1. Butonul "Proiect Nou" - READĂUGAT
-Problema: Butonul "Proiect Nou" a dispărut din pagina principală
-Soluția:
-
-Fișier: app/admin/rapoarte/proiecte/page.tsx
-Fix: Readăugat butonul în header-ul paginii, între titlu și filtre
-Funcționalitate: Deschide modalul ProiectNouModal pentru crearea de proiecte noi
-
-✅ 2. Erori HTTP 500 API - REZOLVATE COMPLET
-Problema: "Parameter types must be provided for null values via the 'types' field"
-Soluția:
-
-Fișiere: app/api/rapoarte/proiecte/route.ts și app/api/rapoarte/subproiecte/route.ts
-Fix Principal: Adăugat câmpul types în toate query-urile BigQuery
-Implementări:
-
-Types specificate pentru toate parametrii (STRING, DATE, FLOAT64)
-Null handling explicit pentru câmpuri opționale
-Error handling îmbunătățit cu success: false în răspunsuri
-Debug logging pentru troubleshooting
-
-
-
-✅ 3. React Error #31 - ELIMINAT COMPLET
-Problema: "object with keys {value}" la deschiderea modalului subproiect
-Soluția:
-
-Fișier: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-Fix Principal:
-
-Implementare safe state management cu strings
-Helper pentru formatarea datelor cu support dual (string | {value: string})
-Toast sistem propriu fără dependențe externe (react-toastify)
-Modal subproiect implementat complet în aceeași componentă
-
-
-
-📁 Fișiere Actualizate
-🎯 Frontend Components:
-
-app/admin/rapoarte/proiecte/page.tsx
-
-✅ Readăugat butonul "Proiect Nou" în header
-✅ Handler pentru refresh după adăugarea proiectelor
-✅ Layout optimizat cu butonul vizibil
-
-
-app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-
-✅ Fix React Error #31 cu state management safe
-✅ Toast sistem propriu fără dependențe externe
-✅ Modal subproiect implementat în aceeași componentă
-✅ Handler-e funcționale pentru toate acțiunile
-✅ Support dual pentru formate de date (string | {value: string})
-
-
-
-🎯 Backend API Routes:
-
-app/api/rapoarte/proiecte/route.ts
-
-✅ Types specificate pentru toate query-urile BigQuery
-✅ Null handling explicit pentru câmpuri opționale
-✅ Error handling îmbunătățit cu success: false
-✅ Support complet pentru câmpul Adresa
-✅ Debug logging pentru troubleshooting
-
-
-app/api/rapoarte/subproiecte/route.ts
-
-✅ Types specificate pentru toate parametrii
-✅ Query simplificat fără câmpuri inexistente (activ, data_creare)
-✅ Join optimizat cu tabelul Proiecte
-✅ Null handling explicit și error handling complet
-
-
-
-🚀 Funcționalități Restaurate/Implementate
-✅ Management Proiecte Complet:
-
-✅ Butonul "Proiect Nou" functional în header
-✅ Vezi detalii cu toast formatat elegant
-✅ Editează cu modal de confirmare
-✅ Toate acțiunile din dropdown funcționale
-
-✅ Management Subproiecte Complet:
-
-✅ Modal adăugare subproiect functional
-✅ API backend pentru CRUD subproiecte
-✅ Afișare ierarhică în tabel (funcția există deja)
-✅ Includere în facturi (funcția există deja)
-
-✅ API Backend Robust:
-
-✅ BigQuery queries cu types specificate
-✅ Error handling complet cu logging
-✅ Support pentru câmpuri nullable
-✅ Răspunsuri standardizate cu success: true/false
-
-🔍 Test Plan Pentru Verificare
-1. Test Buton Proiect Nou:
-✅ Accesează /admin/rapoarte/proiecte
-✅ Verifică că butonul "Proiect Nou" apare în header (verde, dreapta sus)
-✅ Click pe buton → se deschide modalul ProiectNouModal
-✅ Completează și submit → proiectul se adaugă fără erori BigQuery
-2. Test Vezi Detalii:
-✅ Click pe "Acțiuni" pentru orice proiect
-✅ Click "Vezi Detalii" → apare toast cu informații complete
-✅ Verifică că toate câmpurile sunt afișate corect=functional
-3. Test Adăugare Subproiect:
-✅ Click pe "Acțiuni" pentru un proiect principal
-✅ Click "Adaugă Subproiect" → se deschide modalul fără erori React
-✅ Completează și submit → subproiectul se creează
-✅ Verifică în listă că subproiectul apare=functional
-4. Test Generare Factură:
-✅ Click pe "Acțiuni" → "Generare Factură"
-✅ Verifică că se încarcă subproiectele disponibile
-✅ Verifică că butonul de adăugare subproiecte funcționează
-✅ Generează PDF cu succes
-⚡ Quick Fix Implementation=functional
-De facut:
 1. Integrare Clienti noi cu baza de date ANAF
 Este adaugata adresa publica fara autentiticare:
 https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva
@@ -677,6 +526,7 @@ Prioritate: MEDIE - necesită API BNR
 API-uri noi:
 
 app/api/curs-valutar/route.ts - Integrare BNR = implementat
+De facut tabel in Bigquery cu cursul valutar din 2025 si sa se scrie zilnic cursul zilei, ma intereseaza doar EUR, USD, GBP.
 Modificare generate-hibrid/route.ts - calcule multi-valută
 
 ETAPA 4: EDITARE/STORNARE FACTURI ✏️
