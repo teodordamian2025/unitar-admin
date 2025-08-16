@@ -81,12 +81,12 @@ export default function FacturiPage() {
               📊 ANAF Monitoring
             </button>
 
-            {/* ADÄ‚UGAT: Buton pentru generare facturÄƒ nouÄƒ */}
+            {/* ADĂUGAT: Buton pentru generare factură nouă */}
             <button
               onClick={() => window.location.href = '/admin/rapoarte/proiecte'}
               className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 flex items-center gap-2"
             >
-              ➕ GenereazÄƒ FacturÄƒ NouÄƒ
+              ➕ Generează Factură Nouă
             </button>
             
             {/* Selector perioada */}
@@ -96,8 +96,8 @@ export default function FacturiPage() {
               onChange={(e) => setPerioada(parseInt(e.target.value))}
               className="border border-gray-300 rounded px-3 py-2 text-sm"
             >
-              <option value={7}>Ultima sÄƒptÄƒmÃ¢nÄƒ</option>
-              <option value={30}>Ultima lunÄƒ</option>
+              <option value={7}>Ultima săptămână</option>
+              <option value={30}>Ultima lună</option>
               <option value={90}>Ultimele 3 luni</option>
               <option value={365}>Ultimul an</option>
             </select>
@@ -147,7 +147,7 @@ export default function FacturiPage() {
           <div className="bg-white p-6 rounded-lg shadow border border-purple-200">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">ÃŽncasate</p>
+                <p className="text-sm font-medium text-gray-600">Încasate</p>
                 <p className="text-2xl font-bold text-purple-600">
                   {formatCurrency(stats.valoare_platita)}
                 </p>
@@ -162,11 +162,11 @@ export default function FacturiPage() {
             </div>
           </div>
 
-          {/* Rest de platÄƒ */}
+          {/* Rest de plată */}
           <div className="bg-white p-6 rounded-lg shadow border border-orange-200">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">Rest de platÄƒ</p>
+                <p className="text-sm font-medium text-gray-600">Rest de plată</p>
                 <p className="text-2xl font-bold text-orange-600">
                   {formatCurrency(stats.rest_de_plata)}
                 </p>
@@ -213,13 +213,13 @@ export default function FacturiPage() {
           <div 
             className="bg-white p-6 rounded-lg shadow border border-red-200 cursor-pointer hover:bg-red-50 transition-colors"
             onClick={() => window.location.href = '/admin/anaf/monitoring'}
-            title="Click pentru a vedea detalii Ã®n ANAF Monitoring"
+            title="Click pentru a vedea detalii În ANAF Monitoring"
           >
             <div className="flex items-center">
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-600">Erori ANAF</p>
                 <p className="text-2xl font-bold text-red-600">{stats.facturi_eroare}</p>
-                <p className="text-xs text-blue-600 underline">🔍 Vezi Ã®n Monitoring</p>
+                <p className="text-xs text-blue-600 underline">🔍 Vezi În Monitoring</p>
               </div>
               <div className="text-3xl">❌</div>
             </div>
@@ -233,7 +233,7 @@ export default function FacturiPage() {
                 <p className="text-2xl font-bold text-red-600">{stats.facturi_expirate}</p>
                 {stats.facturi_expira_curand > 0 && (
                   <p className="text-xs text-orange-600">
-                    +{stats.facturi_expira_curand} expirÄƒ curÃ¢nd
+                    +{stats.facturi_expira_curand} expiră curând
                   </p>
                 )}
               </div>
@@ -243,20 +243,20 @@ export default function FacturiPage() {
         </div>
       )}
 
-      {/* Alerte - MODIFICAT: Include link cÄƒtre monitoring */}
+      {/* Alerte - MODIFICAT: Include link către monitoring */}
       {stats && (stats.facturi_expirate > 0 || stats.facturi_expira_curand > 0 || stats.facturi_eroare > 0) && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
           <div className="flex items-start justify-between">
             <div className="flex items-start">
               <div className="flex-shrink-0 text-2xl">⚠️</div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">AtenÈ›ie necesarÄƒ</h3>
+                <h3 className="text-sm font-medium text-yellow-800">Atenție necesară</h3>
                 <div className="mt-2 text-sm text-yellow-700 space-y-1">
                   {stats.facturi_expirate > 0 && (
                     <div>• {stats.facturi_expirate} facturi expirate</div>
                   )}
                   {stats.facturi_expira_curand > 0 && (
-                    <div>• {stats.facturi_expira_curand} facturi expirÄƒ Ã®n curÃ¢nd</div>
+                    <div>• {stats.facturi_expira_curand} facturi care expiră curând</div>
                   )}
                   {stats.facturi_eroare > 0 && (
                     <div>• {stats.facturi_eroare} erori ANAF de rezolvat</div>
@@ -265,7 +265,7 @@ export default function FacturiPage() {
               </div>
             </div>
             
-            {/* ADÄ‚UGAT: Buton rapid pentru monitoring cÃ¢nd sunt erori */}
+            {/* ADĂUGAT: Buton rapid pentru monitoring când sunt erori */}
             {stats.facturi_eroare > 0 && (
               <button
                 onClick={() => window.location.href = '/admin/anaf/monitoring'}
@@ -278,7 +278,7 @@ export default function FacturiPage() {
         </div>
       )}
 
-      {/* ADÄ‚UGAT: Banner informativ pentru ANAF Monitoring */}
+      {/* ADĂUGAT: Banner informativ pentru ANAF Monitoring */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -286,7 +286,7 @@ export default function FacturiPage() {
             <div>
               <h3 className="text-sm font-medium text-blue-800">ANAF e-Factura Monitoring</h3>
               <p className="text-sm text-blue-700">
-                MonitorizeazÄƒ Ã®n timp real statusul sistem OAuth, performanÈ›e È™i erori ANAF
+                Monitorizează în timp real statusul sistem OAuth, performanțe și erori ANAF
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ export default function FacturiPage() {
             onClick={() => window.location.href = '/admin/anaf/monitoring'}
             className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center gap-2"
           >
-            🔍 AcceseazÄƒ Dashboard
+            🔍 Accesează Dashboard
           </button>
         </div>
       </div>
