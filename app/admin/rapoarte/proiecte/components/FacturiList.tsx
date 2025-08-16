@@ -1306,13 +1306,14 @@ function EnhancedActionDropdown({
     let finalTop = 0;
     let finalLeft = buttonRect.right - 260;
     
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-      finalTop = buttonRect.top - dropdownHeight - 8;
-      setDropdownPosition('top');
-    } else {
-      finalTop = buttonRect.bottom + 8;
-      setDropdownPosition('bottom');
-    }
+	if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+	  // Aliniază partea de jos a dropdown-ului cu partea de sus a butonului
+	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2;
+	  setDropdownPosition('top');
+	} else {
+	  finalTop = buttonRect.bottom + 8;
+	  setDropdownPosition('bottom');
+	}
     
     if (finalLeft < 10) finalLeft = 10;
     if (finalLeft + 260 > window.innerWidth - 10) {
