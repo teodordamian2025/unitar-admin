@@ -1301,14 +1301,14 @@ function EnhancedActionDropdown({
     const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
     
     const spaceBelow = viewportHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top - rowHeight;
+    const spaceAbove = buttonRect.top; // Elimină scăderea rowHeight
     
     let finalTop = 0;
     let finalLeft = buttonRect.right - 260;
     
-	if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+	if (spaceBelow < dropdownHeight && spaceAbove > (dropdownHeight + 50)) {
 	  // Aliniază partea de jos a dropdown-ului cu partea de sus a butonului
-	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2 - 20;
+	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2;
 	  setDropdownPosition('top');
 	} else {
 	  finalTop = buttonRect.bottom + 8;
