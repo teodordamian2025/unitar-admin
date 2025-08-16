@@ -509,9 +509,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
 // Pentru string-uri ISO de la BigQuery (YYYY-MM-DD)
+    const formatDate = (dateString?: string | null) => {
+  if (!dateString || dateString === 'null' || dateString === 'undefined') {
+    return (
+      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+        Data lipsă
+      </span>
+    );
+  }
+  
+  try {
+    // Pentru string-uri ISO de la BigQuery (YYYY-MM-DD)
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (isoDateRegex.test(dateString)) {
-      // Adaugă timpul pentru a evita probleme de timezone
       const date = new Date(dateString + 'T00:00:00');
       
       if (!isNaN(date.getTime())) {
@@ -522,6 +532,30 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         );
       }
     }
+    
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return (
+        <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+          {date.toLocaleDateString()}
+        </span>
+      );
+    }
+    
+    return (
+      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+        Data invalidă
+      </span>
+    );
+  } catch (error) {
+    console.warn('Eroare formatare dată:', dateString, error);
+    return (
+      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+        Eroare formatare
+      </span>
+    );
+  }
+};
     
     // Fallback pentru alte formate
     const date = new Date(dateString);
