@@ -312,87 +312,96 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [searchParams]);
 
-  // Toate funcțiile de încărcare date - PĂSTRATE identic
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([loadProiecte(), loadSubproiecte()]);
-    } catch (error) {
-      console.error('Eroare la încărcarea datelor:', error);
-      showToast('Eroare de conectare la baza de date', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProiecte = async () => {
-    try {
-      const queryParams = new URLSearchParams();
-      if (searchParams) {
-        Object.entries(searchParams).forEach(([key, value]) => {
-          if (value && key !== 'invoice_status' && key !== 'project_id') {
-            queryParams.append(key, value);
-          }
-        });
-      }
-
-      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      console.log('=== DEBUG: Date RAW din BigQuery ===');
-      console.log('Sample proiect din API:', data.data[0]);
-      console.log('Data_Start raw:', data.data[0]?.Data_Start);
-      console.log('Data_Final raw:', data.data[0]?.Data_Final);
-      console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
-      
-      
-	if (data.success) {
-	  // FIX: Procesează obiectele DATE de la BigQuery
-	  const proiecteFormatate = (data.data || []).map((p: any) => ({
-	    ...p,
-	    Data_Start: p.Data_Start?.value || p.Data_Start,
-	    Data_Final: p.Data_Final?.value || p.Data_Final,
-	    data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
-	    tip: 'proiect' as const
-	  }));
-	  setProiecte(proiecteFormatate);
-	} else {
-	  throw new Error(data.error || 'Eroare la încărcarea proiectelor');
+	// Toate funcțiile de încărcare date - PĂSTRATE identic
+	const loadData = async () => {
+	  try {
+	    setLoading(true);
+	    await Promise.all([loadProiecte(), loadSubproiecte()]);
+	  } catch (error) {
+	    console.error('Eroare la încărcarea datelor:', error);
+	    showToast('Eroare de conectare la baza de date', 'error');
+	  } finally {
+	    setLoading(false);
+	  }
 	};
 
-  const loadSubproiecte = async () => {
-    try {
-      const queryParams = new URLSearchParams();
-      if (searchParams) {
-        Object.entries(searchParams).forEach(([key, value]) => {
-          if (value && key !== 'invoice_status' && key !== 'project_id') {
-            queryParams.append(key, value);
-          }
-        });
-      }
+	const loadProiecte = async () => {
+	  try {
+	    const queryParams = new URLSearchParams();
+	    if (searchParams) {
+	      Object.entries(searchParams).forEach(([key, value]) => {
+		if (value && key !== 'invoice_status' && key !== 'project_id') {
+		  queryParams.append(key, value);
+		}
+	      });
+	    }
 
-      const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-	if (data.success) {
-	  // FIX: Procesează obiectele DATE de la BigQuery pentru subproiecte
-	  const subproiecteFormatate = (data.data || []).map((s: any) => ({
-	    ...s,
-	    Data_Start: s.Data_Start?.value || s.Data_Start,
-	    Data_Final: s.Data_Final?.value || s.Data_Final,
-	    data_curs_valutar: s.data_curs_valutar?.value || s.data_curs_valutar
-	  }));
-	  setSubproiecte(subproiecteFormatate);
-	} else {
-	  setSubproiecte([]);
+	    const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+	    if (!response.ok) {
+	      throw new Error(`HTTP ${response.status}`);
+	    }
+	    
+	    const data = await response.json();
+	    
+	    console.log('=== DEBUG: Date RAW din BigQuery ===');
+	    console.log('Sample proiect din API:', data.data[0]);
+	    console.log('Data_Start raw:', data.data[0]?.Data_Start);
+	    console.log('Data_Final raw:', data.data[0]?.Data_Final);
+	    console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
+	    
+	    if (data.success) {
+	      // FIX: Procesează obiectele DATE de la BigQuery
+	      const proiecteFormatate = (data.data || []).map((p: any) => ({
+		...p,
+		Data_Start: p.Data_Start?.value || p.Data_Start,
+		Data_Final: p.Data_Final?.value || p.Data_Final,
+		data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
+		tip: 'proiect' as const
+	      }));
+	      setProiecte(proiecteFormatate);
+	    } else {
+	      throw new Error(data.error || 'Eroare la încărcarea proiectelor');
+	    }
+	  } catch (error) {
+	    console.error('Eroare la încărcarea proiectelor:', error);
+	    setProiecte([]);
+	  }
+	};
+
+	const loadSubproiecte = async () => {
+	  try {
+	    const queryParams = new URLSearchParams();
+	    if (searchParams) {
+	      Object.entries(searchParams).forEach(([key, value]) => {
+		if (value && key !== 'invoice_status' && key !== 'project_id') {
+		  queryParams.append(key, value);
+		}
+	      });
+	    }
+
+	    const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+	    if (!response.ok) {
+	      throw new Error(`HTTP ${response.status}`);
+	    }
+	    
+	    const data = await response.json();
+	    
+	    if (data.success) {
+	      // FIX: Procesează obiectele DATE de la BigQuery pentru subproiecte
+	      const subproiecteFormatate = (data.data || []).map((s: any) => ({
+		...s,
+		Data_Start: s.Data_Start?.value || s.Data_Start,
+		Data_Final: s.Data_Final?.value || s.Data_Final,
+		data_curs_valutar: s.data_curs_valutar?.value || s.data_curs_valutar
+	      }));
+	      setSubproiecte(subproiecteFormatate);
+	    } else {
+	      setSubproiecte([]);
+	    }
+	  } catch (error) {
+	    console.error('Eroare la încărcarea subproiectelor:', error);
+	    setSubproiecte([]);
+	  }
 	};
 
   // Toate handler-ele - PĂSTRATE identic
