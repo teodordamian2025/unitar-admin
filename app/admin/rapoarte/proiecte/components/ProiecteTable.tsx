@@ -342,25 +342,27 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
       
       const data = await response.json();
+      
       console.log('=== DEBUG: Date RAW din BigQuery ===');
       console.log('Sample proiect din API:', data.data[0]);
       console.log('Data_Start raw:', data.data[0]?.Data_Start);
       console.log('Data_Final raw:', data.data[0]?.Data_Final);
       console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
-      if (data.success) {
-        const proiecteFormatate = (data.data || []).map((p: any) => ({
-          ...p,
-          tip: 'proiect' as const
-        }));
-        setProiecte(proiecteFormatate);
-      } else {
-        throw new Error(data.error || 'Eroare la încărcarea proiectelor');
-      }
-    } catch (error) {
-      console.error('Eroare la încărcarea proiectelor:', error);
-      setProiecte([]);
-    }
-  };
+      
+      
+	if (data.success) {
+	  // FIX: Procesează obiectele DATE de la BigQuery
+	  const proiecteFormatate = (data.data || []).map((p: any) => ({
+	    ...p,
+	    Data_Start: p.Data_Start?.value || p.Data_Start,
+	    Data_Final: p.Data_Final?.value || p.Data_Final,
+	    data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
+	    tip: 'proiect' as const
+	  }));
+	  setProiecte(proiecteFormatate);
+	} else {
+	  throw new Error(data.error || 'Eroare la încărcarea proiectelor');
+	}
 
   const loadSubproiecte = async () => {
     try {
@@ -380,16 +382,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       
       const data = await response.json();
       
-      if (data.success) {
-        setSubproiecte(data.data || []);
-      } else {
-        setSubproiecte([]);
-      }
-    } catch (error) {
-      console.error('Eroare la încărcarea subproiectelor:', error);
-      setSubproiecte([]);
-    }
-  };
+	if (data.success) {
+	  // FIX: Procesează obiectele DATE de la BigQuery pentru subproiecte
+	  const subproiecteFormatate = (data.data || []).map((s: any) => ({
+	    ...s,
+	    Data_Start: s.Data_Start?.value || s.Data_Start,
+	    Data_Final: s.Data_Final?.value || s.Data_Final,
+	    data_curs_valutar: s.data_curs_valutar?.value || s.data_curs_valutar
+	  }));
+	  setSubproiecte(subproiecteFormatate);
+	} else {
+	  setSubproiecte([]);
+	}
 
   // Toate handler-ele - PĂSTRATE identic
   const handleRefresh = () => {
