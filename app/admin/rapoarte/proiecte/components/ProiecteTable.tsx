@@ -362,7 +362,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 	  setProiecte(proiecteFormatate);
 	} else {
 	  throw new Error(data.error || 'Eroare la încărcarea proiectelor');
-	}
+	};
 
   const loadSubproiecte = async () => {
     try {
@@ -393,7 +393,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 	  setSubproiecte(subproiecteFormatate);
 	} else {
 	  setSubproiecte([]);
-	}
+	};
 
   // Toate handler-ele - PĂSTRATE identic
   const handleRefresh = () => {
