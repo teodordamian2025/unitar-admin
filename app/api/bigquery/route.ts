@@ -1,3 +1,4 @@
+// app/api/bigquery/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
