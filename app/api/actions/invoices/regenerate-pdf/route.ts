@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/regenerate-pdf/route.ts
-// DESCRIERE: Regenerează PDF din BD folosind template-ul identic cu generate-hibrid
+// DATA: 16.08.2025 10:50
+// FIX PROBLEMA 1d: Template HTML identic cu generate-hibrid/route.ts
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,7 +16,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// ✅ ÎNCĂRCARE CONTURI BANCARE - Identic cu generate-hibrid
+// Încărcare conturi bancare - identic cu generate-hibrid
 async function loadContariBancare() {
   try {
     const query = `
@@ -30,7 +31,7 @@ async function loadContariBancare() {
     });
 
     if (rows && rows.length > 0) {
-      console.log(`✅ Încărcat ${rows.length} conturi bancare din BigQuery`);
+      console.log(`Încărcat ${rows.length} conturi bancare din BigQuery`);
       return rows.map((row: any) => ({
         nume_banca: row.nume_banca,
         iban: row.iban,
@@ -38,16 +39,16 @@ async function loadContariBancare() {
         observatii: row.observatii
       }));
     } else {
-      console.log('⚠️ Nu s-au găsit conturi bancare în BigQuery - folosesc fallback');
+      console.log('Nu s-au găsit conturi bancare în BigQuery - folosesc fallback');
       return null;
     }
   } catch (error) {
-    console.log('⚠️ Eroare la încărcarea conturilor bancare din BigQuery:', error);
+    console.log('Eroare la încărcarea conturilor bancare din BigQuery:', error);
     return null;
   }
 }
 
-// ✅ FALLBACK CONTURI - Identic cu generate-hibrid
+// Fallback conturi - identic cu generate-hibrid
 const FALLBACK_CONTURI = [
   {
     nume_banca: 'ING Bank',
@@ -63,7 +64,7 @@ const FALLBACK_CONTURI = [
   }
 ];
 
-// ✅ TEMPLATE HTML - Identic cu generate-hibrid
+// Template HTML conturi bancare - identic cu generate-hibrid
 function generateBankDetailsHTML(conturi: any[]) {
   if (!conturi || conturi.length === 0) {
     conturi = FALLBACK_CONTURI;
@@ -88,18 +89,34 @@ function generateBankDetailsHTML(conturi: any[]) {
   }).join('');
 }
 
+// Curățare caractere non-ASCII - identic cu generate-hibrid
+function cleanNonAscii(text: string): string {
+  return text
+    .replace(/ă/g, 'a')
+    .replace(/Ă/g, 'A')
+    .replace(/â/g, 'a')
+    .replace(/Â/g, 'A')
+    .replace(/î/g, 'i')
+    .replace(/Î/g, 'I')
+    .replace(/ș/g, 's')
+    .replace(/Ș/g, 'S')
+    .replace(/ț/g, 't')
+    .replace(/Ț/g, 'T')
+    .replace(/[^\x00-\x7F]/g, '');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { facturaId, numar } = body;
 
-    console.log('📋 Regenerez PDF pentru factură:', { facturaId, numar });
+    console.log('Regenerez PDF pentru factură:', { facturaId, numar });
 
     if (!facturaId) {
       return NextResponse.json({ error: 'facturaId este obligatoriu' }, { status: 400 });
     }
 
-    // ✅ ÎNCARCĂ DATELE FACTURII DIN BigQuery
+    // Încarcă datele facturii din BigQuery
     const facturaQuery = `
       SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
       WHERE id = @facturaId
@@ -118,26 +135,26 @@ export async function POST(request: NextRequest) {
 
     const facturaData = facturaRows[0];
     
-    // ✅ PARSEAZĂ DATELE COMPLETE DIN JSON
+    // Parsează datele complete din JSON
     let dateComplete: any = {};
     try {
       if (facturaData.date_complete_json) {
         dateComplete = JSON.parse(facturaData.date_complete_json);
       }
     } catch (error) {
-      console.log('⚠️ Nu s-au putut parsa datele complete JSON:', error);
+      console.log('Nu s-au putut parsa datele complete JSON:', error);
     }
 
-    // ✅ ÎNCARCĂ CONTURI BANCARE
+    // Încarcă conturi bancare
     const contariBancare = await loadContariBancare();
     const contariFinale = contariBancare || dateComplete.contariBancare || FALLBACK_CONTURI;
 
-    // ✅ RECONSTITUIE DATELE PENTRU TEMPLATE
+    // Reconstituie datele pentru template
     const clientInfo = dateComplete.clientInfo || {
       nume: facturaData.client_nume || 'Client necunoscut',
       cui: facturaData.client_cui || 'CUI necunoscut',
       nr_reg_com: 'N/A',
-      adresa: 'Adresa necunoscută',
+      adresa: 'Adresă necunoscută',
       telefon: 'N/A',
       email: 'N/A'
     };
@@ -146,7 +163,7 @@ export async function POST(request: NextRequest) {
       denumire: 'Servicii facturate',
       cantitate: 1,
       pretUnitar: facturaData.subtotal || 0,
-      cotaTva: facturaData.total_tva > 0 ? 19 : 0,
+      cotaTva: facturaData.total_tva > 0 ? 21 : 0, // Schimbat de la 19% la 21%
       tip: 'proiect'
     }];
 
@@ -155,14 +172,43 @@ export async function POST(request: NextRequest) {
       denumire: `Proiect #${facturaData.proiect_id || 'NECUNOSCUT'}`
     };
 
-    // ✅ CALCULE TOTALE
+    // Calcule totale
     const subtotal = facturaData.subtotal || 0;
     const totalTva = facturaData.total_tva || 0;
     const total = facturaData.total || 0;
 
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
 
-    // ✅ TEMPLATE HTML IDENTIC CU generate-hibrid
+    // FIX PROBLEMA 1d: Generează nota cursuri cu formatul corect
+    let notaCursValutar = '';
+    if (dateComplete.cursuriUtilizate && Object.keys(dateComplete.cursuriUtilizate).length > 0) {
+      const monede = Object.keys(dateComplete.cursuriUtilizate);
+      notaCursValutar = `Cursuri BNR (din frontend - FARA recalculare): ${monede.map(m => {
+        const cursInfo = dateComplete.cursuriUtilizate[m];
+        
+        let cursFormatat: string;
+        if (cursInfo.precizie_originala) {
+          cursFormatat = cursInfo.precizie_originala;
+        } else {
+          const curs = typeof cursInfo.curs === 'number' ? cursInfo.curs : 
+                       (typeof cursInfo.curs === 'string' ? parseFloat(cursInfo.curs) : 1);
+          cursFormatat = curs.toFixed(4);
+        }
+        
+        let dataFormatata: string;
+        if (typeof cursInfo.data === 'string') {
+          dataFormatata = cursInfo.data;
+        } else if (cursInfo.data && typeof cursInfo.data === 'object' && cursInfo.data.value) {
+          dataFormatata = cursInfo.data.value;
+        } else {
+          dataFormatata = new Date().toISOString().split('T')[0];
+        }
+        
+        return `Curs valutar BNR: 1 ${m} = ${cursFormatat} RON (${dataFormatata})`;
+      }).join(', ')}`;
+    }
+
+    // TEMPLATE HTML IDENTIC CU generate-hibrid/route.ts
     const htmlTemplate = `
     <!DOCTYPE html>
     <html>
@@ -238,40 +284,49 @@ export async function POST(request: NextRequest) {
             .table-container {
                 margin-bottom: 20px;
                 flex-grow: 1;
+                width: 100%;
+                overflow: visible;
+                padding-right: 10px;
             }
             table {
-                width: 100%;
+                width: 98%;
+                margin: 0 auto;
                 border-collapse: collapse;
                 background: white;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                font-size: 10px;
+                font-size: 9px;
+                table-layout: fixed;
             }
             th {
                 background: #34495e;
                 color: white;
-                padding: 8px 4px;
+                padding: 6px 3px;
                 text-align: left;
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: bold;
+                white-space: nowrap;
             }
             td {
-                padding: 6px 4px;
+                padding: 5px 3px;
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 10px;
+                font-size: 9px;
+                word-break: break-word;
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
             .totals-section {
                 margin-top: 2px;
                 margin-left: auto;
-                width: 150px;
+                width: 180px;
+                padding-right: 5px;
             }
             .totals-row {
                 display: flex;
                 justify-content: space-between;
-                padding: 4px 0;
+                padding: 4px 2px;
                 border-bottom: 1px solid #ecf0f1;
-                font-size: 10px;
+                font-size: 9px;
+                gap: 5px;
             }
             .totals-row.final {
                 border-top: 2px solid #34495e;
@@ -312,6 +367,17 @@ export async function POST(request: NextRequest) {
                 margin-bottom: 5px;
                 border-bottom: 1px solid #eee;
                 padding-bottom: 2px;
+            }
+            .currency-note {
+                margin-top: 10px;
+                padding: 8px;
+                background: #e8f5e8;
+                border: 1px solid #c3e6c3;
+                border-radius: 3px;
+            }
+            .currency-note-content {
+                font-size: 9px;
+                color: #2d5016;
             }
             .signatures {
                 margin-top: 25px;
@@ -359,7 +425,7 @@ export async function POST(request: NextRequest) {
     </head>
     <body>
         <div class="regenerated-badge">
-            📄 PDF REGENERAT din baza de date - ${new Date().toLocaleDateString('ro-RO')} ${new Date().toLocaleTimeString('ro-RO')}
+            PDF REGENERAT din baza de date - ${new Date().toLocaleDateString('ro-RO')} ${new Date().toLocaleTimeString('ro-RO')}
         </div>
         
         <div class="header">
@@ -400,11 +466,12 @@ export async function POST(request: NextRequest) {
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 40px;">Nr.</th>
-                        <th style="width: 300px;">Descriere</th>
-                        <th style="width: 60px;" class="text-center">Cant.</th>
-                        <th style="width: 80px;" class="text-right">Pret Unitar</th>
-                        <th style="width: 80px;" class="text-right">Total</th>
+                        <th style="width: 25px;">Nr.</th>
+                        <th style="width: 200px;">Descriere</th>
+                        <th style="width: 45px;" class="text-center">Cant.</th>
+                        <th style="width: 65px;" class="text-right">Pret Unitar</th>
+                        <th style="width: 70px;" class="text-center">TVA 21%</th>
+                        <th style="width: 75px;" class="text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -414,14 +481,29 @@ export async function POST(request: NextRequest) {
                       const cotaTva = Number(linie.cotaTva) || 0;
                       
                       const valoare = cantitate * pretUnitar;
+                      const tva = valoare * (cotaTva / 100);
+                      const totalLinie = valoare + tva;
+                      
+                      const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
+                      
+                      let descriereCompleta = linie.denumire || 'N/A';
+                      
+                      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+                        const cursInfo = linie.cursValutar ? ` x ${Number(linie.cursValutar).toFixed(4)}` : '';
+                        descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
+                      }
                       
                       return `
                     <tr>
-                        <td class="text-center">${index + 1}</td>
-                        <td>${linie.denumire || 'N/A'}${linie.tip === 'subproiect' ? ' <small>[SUBPROIECT]</small>' : ''}</td>
-                        <td class="text-center">${safeFormat(cantitate)}</td>
-                        <td class="text-right">${safeFormat(pretUnitar)} RON</td>
-                        <td class="text-right">${safeFormat(valoare)} RON</td>
+                        <td class="text-center" style="font-size: 8px;">${index + 1}</td>
+                        <td style="font-size: 8px; padding: 2px;">
+                            ${descriereCompleta}
+                            ${linie.tip === 'subproiect' ? ' <small style="color: #3498db;">[SUB]</small>' : ''}
+                        </td>
+                        <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
+                        <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
+                        <td class="text-center" style="font-size: 8px;">${safeFixed(tva)}</td>
+                        <td class="text-right" style="font-weight: bold; font-size: 8px;">${safeFixed(totalLinie)}</td>
                     </tr>`;
                     }).join('')}
                 </tbody>
@@ -429,25 +511,42 @@ export async function POST(request: NextRequest) {
 
             <div class="totals-section">
                 <div class="totals-row">
-                    <span>Subtotal:</span>
-                    <span>${safeFormat(subtotal)} RON</span>
+                    <span style="font-size: 9px;">Subtotal:</span>
+                    <span style="font-size: 9px; white-space: nowrap;">${safeFormat(subtotal)} RON</span>
                 </div>
                 ${totalTva > 0 ? `
                 <div class="totals-row">
-                    <span>TVA:</span>
-                    <span>${safeFormat(totalTva)} RON</span>
+                    <span style="font-size: 9px;">TVA:</span>
+                    <span style="font-size: 9px; white-space: nowrap;">${safeFormat(totalTva)} RON</span>
                 </div>
                 ` : ''}
                 <div class="totals-row final">
-                    <span>TOTAL DE PLATA:</span>
-                    <span>${safeFormat(total)} RON</span>
+                    <span style="font-size: 10px;">TOTAL:</span>
+                    <span style="font-size: 10px; white-space: nowrap;">${safeFormat(total)} RON</span>
                 </div>
             </div>
         </div>
 
+        ${notaCursValutar ? `
+        <div class="currency-note">
+            <div class="currency-note-content">
+                <strong>${cleanNonAscii(notaCursValutar)}</strong>
+            </div>
+        </div>
+        ` : ''}
+
+        ${dateComplete.observatii ? `
+        <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #cce7ff; border-radius: 3px;">
+            <div style="font-size: 9px; color: #0c5460;">
+                <strong>Observatii:</strong><br/>
+                ${cleanNonAscii(dateComplete.observatii || '').replace(/\n/g, '<br/>')}
+            </div>
+        </div>
+        ` : ''}
+
         <div class="payment-info">
             <h4>Conditii de plata</h4>
-            <div class="info-line">Termen de plata: 30 zile</div>
+            <div class="info-line">Termen de plata: ${dateComplete.setariFacturare?.termen_plata_standard || 30} zile</div>
             <div class="info-line">Metoda de plata: Transfer bancar</div>
             
             <div class="bank-details">
@@ -480,7 +579,7 @@ export async function POST(request: NextRequest) {
     </body>
     </html>`;
 
-    // ✅ RETURN HTML pentru regenerare în browser (ca în FacturiList.tsx)
+    // Return HTML pentru regenerare în browser (ca în FacturiList.tsx)
     return NextResponse.json({
       success: true,
       htmlContent: htmlTemplate,
@@ -496,10 +595,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Eroare la regenerarea PDF:', error);
+    console.error('Eroare la regenerarea PDF:', error);
     return NextResponse.json({
       error: 'Eroare la regenerarea PDF',
-      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+      details: error instanceof Error ? error.message : 'Eroare necunoscuta'
     }, { status: 500 });
   }
 }
