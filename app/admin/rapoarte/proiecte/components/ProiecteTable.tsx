@@ -508,8 +508,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-// Pentru string-uri ISO de la BigQuery (YYYY-MM-DD)
-    const formatDate = (dateString?: string | null) => {
+// FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ
+const formatDate = (dateString?: string | null) => {
   if (!dateString || dateString === 'null' || dateString === 'undefined') {
     return (
       <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -519,7 +519,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   }
   
   try {
-    // Pentru string-uri ISO de la BigQuery (YYYY-MM-DD)
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (isoDateRegex.test(dateString)) {
       const date = new Date(dateString + 'T00:00:00');
@@ -556,32 +555,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     );
   }
 };
-    
-    // Fallback pentru alte formate
-    const date = new Date(dateString);
-    
-    if (!isNaN(date.getTime())) {
-        return (
-          <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-            Data invalidă
-          </span>
-        );
-      }
-      
-      return (
-        <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-          {date.toLocaleDateString()}
-        </span>
-      );
-    } catch (error) {
-      console.warn('Eroare formatare dată:', dateString, error);
-      return (
-        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Eroare formatare
-        </span>
-      );
-    }
-  };
 
   // FIX PRINCIPAL: Funcții pentru currency cu validări sigure și precizie originală
   const recalculeazaValoareaCuCursBNRLive = (
