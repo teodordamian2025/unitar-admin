@@ -285,7 +285,61 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - facturi
 - git-filter-repo.py
 
-
+package.json:
+{
+  "name": "unitar-admin",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "node ./scripts/setup-uploads.js"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pdfkit": "^0.17.2",
+    "@types/puppeteer": "^7.0.4",
+    "@types/react-google-recaptcha": "^2.1.9",
+    "docx": "^9.5.1",
+    "dotenv": "^17.2.1",
+    "exceljs": "^4.4.0",
+    "fast-xml-parser": "^4.5.3",
+    "firebase": "^11.10.0",
+    "framer-motion": "^10.18.0",
+    "get-stream": "^9.0.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.525.0",
+    "mammoth": "^1.9.1",
+    "next": "^13.4.19",
+    "nodemailer": "^7.0.5",
+    "openai": "^5.10.2",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.17.1",
+    "puppeteer": "^24.15.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.3.8",
+    "react-firebase-hooks": "^5.1.1",
+    "react-google-recaptcha": "^3.1.0",
+    "react-hot-toast": "^2.5.2",
+    "react-toastify": "^11.0.5",
+    "recharts": "^3.1.0",
+    "tailwindcss": "^4.1.11",
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5",
+    "xmlbuilder2": "^3.1.1"
+  },
+  "devDependencies": {
+    "@types/jszip": "^3.4.0",
+    "@types/node": "^20.19.9",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@types/react-dropzone": "^4.2.2",
+    "typescript": "^5.8.3"
+  }
+}
 
 Coduri care au legatura cu facturarea:
 app/admin/rapoarte/proiecte/[id]/page.tsx

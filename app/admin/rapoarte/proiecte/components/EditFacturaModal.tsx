@@ -1,13 +1,24 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 17.08.2025 09:30
-// FIX UTF-8 ENCODING: Toast-uri și mesaje cu caractere corecte
+// DATA: 17.08.2025 15:35
+// FIX COMPLET: Lucide-react icons + Eliminare UTF-8 encoding issues
 // PĂSTRATE: TOATE funcționalitățile existente
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { 
+  Clock,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Edit,
+  RotateCcw,
+  Search,
+  Loader
+} from 'lucide-react';
 import FacturaHibridModal from './FacturaHibridModal';
 
 interface Factura {
@@ -38,118 +49,48 @@ interface EditFacturaModalProps {
   mode?: 'edit' | 'storno';
 }
 
-// ✅ FIX UTF-8: Funcție centralizată pentru curățarea encoding-ului
-const fixUTF8Encoding = (text: string): string => {
-  return text
-    // Fix emoji-uri corupte
-    .replace(/Ã°Å¸Â§Âª/g, '🧪')
-    .replace(/Ã°Å¸"â€ž/g, '📄')
-    .replace(/Ã°Å¸"Â´/g, '🔴')
-    .replace(/Ã°Å¸Å¸Â¡/g, '⏳')
-    .replace(/Ã°Å¸"Â¤/g, '📤')
-    .replace(/Ã°Å¸Å¸ /g, '⏰')
-    .replace(/Ã°Å¸"Âµ/g, '📵')
-    .replace(/Ã°Å¸Å¸Â¢/g, '⏢')
-    .replace(/Ã°Å¸"Â/g, '📋')
-    .replace(/Ã°Å¸—'ï¸/g, '🗑️')
-    // Fix caractere speciale
-    .replace(/â"'/g, '❓')
-    .replace(/âœ…/g, '✅')
-    .replace(/âŒ/g, '❌')
-    .replace(/â¸ï¸/g, '⏸️')
-    .replace(/â†©ï¸/g, '↩️')
-    .replace(/âœï¸/g, '✏️')
-    .replace(/â³/g, '⏳')
-    .replace(/âš ï¸/g, '⚠️')
-    .replace(/â„¹ï¸/g, 'ℹ️')
-    .replace(/â‰ˆ/g, '≈')
-    .replace(/Ã¢Å"â€¦/g, '✓')
-    .replace(/Ã¢â€ Â©Ã¯Â¸/g, '↩')
-    .replace(/Ã¢Å¡ Ã¯Â¸/g, '⚠')
-    // Fix diacritice românești
-    .replace(/IncarcÄƒ/g, 'Incarcare')
-    .replace(/ÃŽncarcÄƒ/g, 'Incarcare')
-    .replace(/încarcÄƒ/g, 'incarcare')
-    .replace(/gÄƒsit/g, 'gasit')
-    .replace(/gÄƒsite/g, 'gasite')
-    .replace(/completÄƒ/g, 'completa')
-    .replace(/CreatÄƒ/g, 'Creata')
-    .replace(/creatÄƒ/g, 'creata')
-    .replace(/ActualizatÄƒ/g, 'Actualizata')
-    .replace(/actualizatÄƒ/g, 'actualizata')
-    .replace(/SalvatÄƒ/g, 'Salvata')
-    .replace(/salvatÄƒ/g, 'salvata')
-    .replace(/StornatÄƒ/g, 'Stornata')
-    .replace(/StornatÄ‚/g, 'Stornata')
-    .replace(/GeneratÄƒ/g, 'Generata')
-    .replace(/GeneratÄ‚/g, 'Generata')
-    .replace(/PregÄƒtesc/g, 'Pregatesc')
-    .replace(/pregÄƒtesc/g, 'pregatesc')
-    .replace(/Pentru/g, 'Pentru')
-    .replace(/pentru/g, 'pentru')
-    .replace(/Ã®ncÄƒrcarea/g, 'incarcarea')
-    .replace(/Ã®ncÄƒrcÄƒ/g, 'incarca')
-    .replace(/Ã®n/g, 'in')
-    .replace(/ÃŽn/g, 'In')
-    .replace(/sÄƒ/g, 'sa')
-    .replace(/SÄƒ/g, 'Sa')
-    .replace(/È™i/g, 'si')
-    .replace(/È˜i/g, 'Si')
-    .replace(/È™tergi/g, 'stergi')
-    .replace(/È™ters/g, 'sters')
-    .replace(/È™tergerea/g, 'stergerea')
-    .replace(/È™tergere/g, 'stergere')
-    .replace(/modificÄƒri/g, 'modificari')
-    .replace(/ModificÄƒri/g, 'Modificari')
-    .replace(/eÈ™uat/g, 'esuat')
-    .replace(/EÈ™uat/g, 'Esuat')
-    .replace(/BigQueryÈ™i/g, 'BigQuery si')
-    .replace(/verificÄƒ/g, 'verifica')
-    .replace(/VerificÄƒ/g, 'Verifica')
-    .replace(/necunoscutÄƒ/g, 'necunoscuta')
-    .replace(/NecunoscutÄƒ/g, 'Necunoscuta')
-    // Fix alte caractere problematice
-    .replace(/Ã„Æ'/g, 'a')
-    .replace(/Ã„â€š/g, 'A')
-    .replace(/Ã¢/g, 'a')
-    .replace(/Ã‚/g, 'A')
-    .replace(/Ã®/g, 'i')
-    .replace(/ÃŽ/g, 'I')
-    .replace(/È™/g, 's')
-    .replace(/È˜/g, 'S')
-    .replace(/È›/g, 't')
-    .replace(/Èš/g, 'T');
-};
-
-// ✅ FIX UTF-8: Toast system cu encoding corect
+// Toast system cu Z-index compatibil cu modalele externe
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-  // Aplică fix-ul de encoding la mesaj
-  const cleanMessage = fixUTF8Encoding(message);
-  
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    padding: 12px 16px;
-    border-radius: 8px;
+    padding: 16px 20px;
+    border-radius: 16px;
     z-index: 100000;
+    font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border: 1px solid #e0e0e0;
-    max-width: 350px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 400px;
+    word-wrap: break-word;
+    white-space: pre-line;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
-  toastEl.textContent = cleanMessage;
+  toastEl.textContent = message;
   document.body.appendChild(toastEl);
   
   setTimeout(() => {
-    if (document.body.contains(toastEl)) {
-      document.body.removeChild(toastEl);
-    }
-  }, 4000);
+    toastEl.style.transform = 'translateY(0)';
+    toastEl.style.opacity = '1';
+  }, 10);
+  
+  setTimeout(() => {
+    toastEl.style.transform = 'translateY(-10px)';
+    toastEl.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toastEl)) {
+        document.body.removeChild(toastEl);
+      }
+    }, 300);
+  }, type === 'success' ? 4000 : type === 'error' ? 5000 : type === 'info' && message.length > 200 ? 10000 : 6000);
 };
 
 export default function EditFacturaModal({ 
@@ -163,11 +104,10 @@ export default function EditFacturaModal({
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  // ✅ FIX UTF-8: Funcție helper pentru log cu encoding corect
+  // Funcție helper pentru log cu encoding corect
   const addDebugLog = (message: string) => {
-    const cleanMessage = fixUTF8Encoding(message);
-    console.log(`🔍 DEBUG: ${cleanMessage}`);
-    setDebugInfo(prev => [...prev, `${new Date().toISOString().substr(11, 8)}: ${cleanMessage}`]);
+    console.log(`DEBUG: ${message}`);
+    setDebugInfo(prev => [...prev, `${new Date().toISOString().substr(11, 8)}: ${message}`]);
   };
 
   useEffect(() => {
@@ -208,7 +148,7 @@ export default function EditFacturaModal({
       const proiectIdActual = proiectIdPrioritar || 'UNKNOWN';
       addDebugLog(`Proiect ID pentru incarcarea datelor: ${proiectIdActual}`);
       
-      console.log('🔍 Verificare completa ID proiect - NOUA ABORDARE:', {
+      console.log('Verificare completa ID proiect - NOUA ABORDARE:', {
         proiect_id_din_BigQuery: factura.proiect_id,
         proiect_id_backup: factura.proiect_id_bigquery,
         proiectId_transmis: factura.proiectId,
@@ -218,8 +158,8 @@ export default function EditFacturaModal({
       });
 
       if (!proiectIdActual || proiectIdActual === 'UNKNOWN') {
-        addDebugLog('⚠️ ATENTIE: Nu s-a gasit un ID de proiect valid!');
-        console.error('❌ ID proiect invalid sau lipsa chiar si din BigQuery');
+        addDebugLog('ATENTIE: Nu s-a gasit un ID de proiect valid!');
+        console.error('ID proiect invalid sau lipsa chiar si din BigQuery');
       }
 
       // Încarcă date proiect din BD dacă avem ID valid
@@ -251,13 +191,13 @@ export default function EditFacturaModal({
                 status: proiect.Status,
                 adresa: proiect.Adresa
               };
-              addDebugLog(`✅ Proiect gasit: ${proiect.Denumire}`);
+              addDebugLog(`Proiect gasit: ${proiect.Denumire}`);
             }
           } else {
-            addDebugLog(`⚠️ Proiectul ${proiectIdActual} nu a fost gasit in BD`);
+            addDebugLog(`Proiectul ${proiectIdActual} nu a fost gasit in BD`);
           }
         } catch (error) {
-          addDebugLog(`EROARE incarcarre proiect: ${error}`);
+          addDebugLog(`EROARE incarcare proiect: ${error}`);
           console.error('Eroare la incarcarea datelor proiectului:', error);
         }
       }
@@ -295,7 +235,7 @@ export default function EditFacturaModal({
           
           if (subproiecteData.success && subproiecteData.data) {
             subproiecteDisponibile = subproiecteData.data;
-            addDebugLog(`✅ Gasite ${subproiecteDisponibile.length} subproiecte`);
+            addDebugLog(`Gasite ${subproiecteDisponibile.length} subproiecte`);
             
             if (dateComplete.liniiFactura) {
               const subproiecteInFactura = dateComplete.liniiFactura
@@ -310,12 +250,12 @@ export default function EditFacturaModal({
             addDebugLog(`Nu s-au gasit subproiecte pentru proiectul ${proiectIdActual}`);
           }
         } catch (error) {
-          addDebugLog(`EROARE incarcareate subproiecte: ${error}`);
+          addDebugLog(`EROARE incarcare subproiecte: ${error}`);
           console.error('Eroare la incarcarea subproiectelor:', error);
         }
       }
 
-      // ✅ FIX PRINCIPAL: Standardizare clientInfo cu suport dual denumire/nume
+      // Standardizare clientInfo cu suport dual denumire/nume
       const clientInfoPregatit = (() => {
         if (dateComplete.clientInfo) {
           return {
@@ -358,12 +298,12 @@ export default function EditFacturaModal({
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
         
-        // ✅ FIX PROBLEMA 1b: Observațiile NU se precompleteaza, raman goale
+        // Observațiile NU se precompletează, rămân goale
         _initialData: {
           ...dateComplete,
           liniiFactura: liniiFacturaPregatite,
           clientInfo: clientInfoPregatit,
-          observatii: '', // ✅ FIX PROBLEMA 1b: Gol in loc de dateComplete.observatii
+          observatii: '', // Gol în loc de dateComplete.observatii
           numarFactura: mode === 'edit' ? factura.numar : null,
           facturaId: mode === 'edit' ? factura.id : null,
           
@@ -386,7 +326,7 @@ export default function EditFacturaModal({
 
       addDebugLog(`Date finale pregatite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Subproiecte: ${subproiecteDisponibile.length}`);
       
-      console.log('📤 Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
+      console.log('Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
         ...dateFinale,
         _initialData: {
           ...dateFinale._initialData,
@@ -411,18 +351,18 @@ export default function EditFacturaModal({
     }
   };
 
-  // ✅ MODIFICAT: Handler pentru salvare cu API-ul nou de update complet
+  // Handler pentru salvare cu API-ul nou de update complet
   const handleFacturaSuccess = async (invoiceId: string, downloadUrl: string) => {
     try {
-      console.log('🔍 DEBUG: Success handler:', { mode, invoiceId });
+      console.log('DEBUG: Success handler:', { mode, invoiceId });
       
       if (mode === 'edit') {
-        // Pentru Edit, se salveaza automat in FacturaHibridModal prin generate-hibrid + /update
-        // Nu mai e nevoie de apel separat la /update aici - fix-ul e in FacturaHibridModal
-        showToast('✅ Factura actualizata cu succes (cu cursuri BNR precise)', 'success');
+        // Pentru Edit, se salvează automat în FacturaHibridModal prin generate-hibrid + /update
+        // Nu mai e nevoie de apel separat la /update aici - fix-ul e în FacturaHibridModal
+        showToast('Factura actualizata cu succes (cu cursuri BNR precise)', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {
-        console.log('🔍 DEBUG: Marchez factura originala ca stornata...');
+        console.log('DEBUG: Marchez factura originala ca stornata...');
         
         // Marchează factura originală ca stornată
         try {
@@ -437,8 +377,8 @@ export default function EditFacturaModal({
           });
 
           if (response.ok) {
-            console.log('🔍 DEBUG: ✅ Factura marcata ca stornata');
-            showToast('✅ Factura de stornare creata cu succes', 'success');
+            console.log('DEBUG: Factura marcata ca stornata');
+            showToast('Factura de stornare creata cu succes', 'success');
             onSuccess('reversed', invoiceId);
           }
         } catch (err) {
@@ -470,19 +410,48 @@ export default function EditFacturaModal({
         <div style={{
           background: 'white',
           padding: '2rem',
-          borderRadius: '8px',
+          borderRadius: '12px',
           textAlign: 'center',
           maxWidth: '700px',
-          width: '90%'
+          width: '90%',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
         }}>
-          <div style={{ marginBottom: '1rem', fontSize: '18px', fontWeight: 'bold' }}>
-            ⏳ Se incarca datele complete ale facturii...
-          </div>
-          <div style={{ marginBottom: '1rem', fontSize: '14px', color: '#666' }}>
-            {mode === 'edit' ? '✏️ Pregatesc datele pentru editare' : '↩️ Pregatesc datele pentru stornare'}
+          <div style={{ 
+            marginBottom: '1rem', 
+            fontSize: '18px', 
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px'
+          }}>
+            <Clock size={24} className="animate-spin" style={{ color: '#3498db' }} />
+            Se incarca datele complete ale facturii...
           </div>
           
-          {/* ✅ DEBUGGING: Afișează progresul încărcării */}
+          <div style={{ 
+            marginBottom: '1rem', 
+            fontSize: '14px', 
+            color: '#666',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            {mode === 'edit' ? (
+              <>
+                <Edit size={16} style={{ color: '#27ae60' }} />
+                Pregatesc datele pentru editare
+              </>
+            ) : (
+              <>
+                <RotateCcw size={16} style={{ color: '#f39c12' }} />
+                Pregatesc datele pentru stornare
+              </>
+            )}
+          </div>
+          
+          {/* Debugging: Afișează progresul încărcării */}
           {debugInfo.length > 0 && (
             <div style={{
               textAlign: 'left',
@@ -490,23 +459,46 @@ export default function EditFacturaModal({
               fontFamily: 'monospace',
               maxHeight: '300px',
               overflowY: 'auto',
-              background: '#f0f0f0',
-              padding: '8px',
-              borderRadius: '4px',
-              marginTop: '10px'
+              background: '#f8f9fa',
+              padding: '12px',
+              borderRadius: '8px',
+              marginTop: '16px',
+              border: '1px solid #e9ecef'
             }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                🔍 Progres incarcare date:
+              <div style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#495057'
+              }}>
+                <Search size={14} />
+                Progres incarcare date:
               </div>
               {debugInfo.map((log, i) => (
-                <div key={i} style={{ marginBottom: '2px', fontSize: '10px' }}>
+                <div key={i} style={{ 
+                  marginBottom: '3px', 
+                  fontSize: '10px',
+                  color: '#6c757d',
+                  paddingLeft: '20px'
+                }}>
                   {log}
                 </div>
               ))}
             </div>
           )}
           
-          <div style={{ marginTop: '1rem', fontSize: '12px', color: '#888' }}>
+          <div style={{ 
+            marginTop: '1rem', 
+            fontSize: '12px', 
+            color: '#888',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}>
+            <Loader size={12} className="animate-spin" />
             Se verifica ID proiect din BigQuery si se incarca subproiectele...
           </div>
         </div>

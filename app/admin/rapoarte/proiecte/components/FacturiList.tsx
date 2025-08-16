@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturiList.tsx
-// DATA: 17.08.2025 09:15
-// FIX COMPLET: UTF-8 encoding + Dropdown poziționare + PDF sincronizare
+// DATA: 17.08.2025 15:30
+// FIX COMPLET: Lucide-react icons + Dropdown logic IDENTIC cu ProiectActions
 // PĂSTRATE: TOATE funcționalitățile existente
 // ==================================================================
 
@@ -9,6 +9,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { 
+  Download, 
+  Edit, 
+  RotateCcw, 
+  Upload, 
+  RefreshCw, 
+  Info, 
+  Trash2, 
+  ChevronDown,
+  FileText,
+  Send,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  XCircle
+} from 'lucide-react';
 import EditFacturaModal from './EditFacturaModal';
 
 // Declare global pentru jsPDF
@@ -68,63 +84,9 @@ interface EFacturaDetails {
   }>;
 }
 
-// ✅ FIX PROBLEMA 1: Funcție centralizată pentru curățarea encoding-ului UTF-8
-const fixUTF8Encoding = (text: string): string => {
-  return text
-    // Fix emoji-uri corupte
-    .replace(/Ã°Å¸Â§Âª/g, '🧪')
-    .replace(/Ã°Å¸"â€ž/g, '📄')
-    .replace(/Ã°Å¸"Â´/g, '🔴')
-    .replace(/Ã°Å¸Å¸Â¡/g, '⏳')
-    .replace(/Ã°Å¸"Â¤/g, '📤')
-    .replace(/Ã°Å¸Å¸ /g, '⏰')
-    .replace(/Ã°Å¸"Âµ/g, '📵')
-    .replace(/Ã°Å¸Å¸Â¢/g, '⏢')
-    .replace(/Ã°Å¸"â€ž/g, '📄')
-    .replace(/Ã°Å¸"Â/g, '📋')
-    .replace(/Ã°Å¸—'ï¸/g, '🗑️')
-    // Fix caractere speciale
-    .replace(/â"'/g, '❓')
-    .replace(/âœ…/g, '✅')
-    .replace(/âŒ/g, '❌')
-    .replace(/â¸ï¸/g, '⏸️')
-    .replace(/â†©ï¸/g, '↩️')
-    .replace(/âœï¸/g, '✏️')
-    .replace(/â³/g, '⏳')
-    .replace(/âš ï¸/g, '⚠️')
-    .replace(/â„¹ï¸/g, 'ℹ️')
-    .replace(/â‰ˆ/g, '≈')
-    .replace(/Ã¢Å"â€¦/g, '✓')
-    .replace(/Ã¢â€ Â©Ã¯Â¸/g, '↩')
-    .replace(/Ã¢Å¡ Ã¯Â¸/g, '⚠')
-    // Fix diacritice românești
-    .replace(/GeneratÄƒ/g, 'Generata')
-    .replace(/GeneratÄ‚/g, 'Generata')
-    .replace(/StornatÄƒ/g, 'Stornata')
-    .replace(/StornatÄ‚/g, 'Stornata')
-    .replace(/ÃŽn regulÄƒ/g, 'In regula')
-    .replace(/ÃŽn regulÄ‚/g, 'In regula')
-    .replace(/ExpiratÄƒ/g, 'Expirata')
-    .replace(/ExpiratÄ‚/g, 'Expirata')
-    .replace(/ExpirÄƒ curÃ¢nd/g, 'Expira curand')
-    .replace(/ExpirÄ‚ curÃ¢nd/g, 'Expira curand')
-    .replace(/PlÄƒtitÄƒ/g, 'Platita')
-    .replace(/PlÄ‚titÄƒ/g, 'Platita')
-    .replace(/EroareÄƒ/g, 'Eroare')
-    .replace(/TrimisÄƒ/g, 'Trimisa')
-    .replace(/ValidatÄƒ/g, 'Validata')
-    // Fix alte caractere problematice
-    .replace(/Ã„Æ'/g, 'a')
-    .replace(/Ã„â€š/g, 'A')
-    .replace(/Ã¢/g, 'a')
-    .replace(/Ã‚/g, 'A')
-    .replace(/Ã®/g, 'i')
-    .replace(/ÃŽ/g, 'I')
-    .replace(/È™/g, 's')
-    .replace(/È˜/g, 'S')
-    .replace(/È›/g, 't')
-    .replace(/Èš/g, 'T');
-};
+// System global pentru management dropdown-uri multiple - IDENTIC cu ProiectActions
+let currentOpenDropdown: string | null = null;
+const openDropdowns = new Map<string, () => void>();
 
 export default function FacturiList({ 
   proiectId, 
@@ -156,28 +118,9 @@ export default function FacturiList({
   const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
   const [editMode, setEditMode] = useState<'edit' | 'storno'>('edit');
 
-  // ✅ FIX PROBLEMA 2: State pentru dropdown management cu Portal
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [dropdownCoords, setDropdownCoords] = useState<{[key: string]: {top: number, left: number, width: number}}>({});
-
   useEffect(() => {
     loadFacturi();
   }, [proiectId, clientId, filters, customPeriod]);
-
-  // ✅ FIX PROBLEMA 2: Închide dropdown-urile la click global
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.dropdown-container') && !target.closest('.dropdown-portal')) {
-        setOpenDropdown(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const loadFacturi = async () => {
     setLoading(true);
@@ -235,49 +178,6 @@ export default function FacturiList({
     }
   };
 
-  // ✅ FIX PROBLEMA 2: Funcție pentru calculul poziției dropdown-ului
-  const calculateDropdownPosition = (facturaId: string, buttonElement: HTMLElement) => {
-    const buttonRect = buttonElement.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = 400; // Estimare înălțime dropdown
-    
-    let finalTop = 0;
-    let finalLeft = buttonRect.right - 250; // Dropdown pe dreapta butonului
-    
-    // Verifică dacă încape în jos
-    if (buttonRect.bottom + dropdownHeight <= viewportHeight - 20) {
-      finalTop = buttonRect.bottom + 8;
-    } else {
-      // Pune în sus
-      finalTop = buttonRect.top - dropdownHeight - 8;
-    }
-    
-    // Ajustează horizontal dacă iese din viewport
-    if (finalLeft < 10) finalLeft = 10;
-    if (finalLeft + 250 > window.innerWidth - 10) {
-      finalLeft = window.innerWidth - 260;
-    }
-    
-    setDropdownCoords(prev => ({
-      ...prev,
-      [facturaId]: {
-        top: finalTop,
-        left: finalLeft,
-        width: 250
-      }
-    }));
-  };
-
-  // ✅ FIX PROBLEMA 2: Toggle dropdown cu poziționare dinamică
-  const toggleDropdown = (facturaId: string, buttonElement: HTMLElement) => {
-    if (openDropdown === facturaId) {
-      setOpenDropdown(null);
-    } else {
-      calculateDropdownPosition(facturaId, buttonElement);
-      setOpenDropdown(facturaId);
-    }
-  };
-
   const loadEFacturaDetails = async (efacturaFacturi: Factura[]) => {
     const details: {[key: string]: EFacturaDetails} = {};
     
@@ -332,12 +232,12 @@ export default function FacturiList({
     }
   };
 
-  // ✅ FIX PROBLEMA 1: Status badge cu encoding UTF-8 corect
+  // Status badge cu Lucide icons
   const getStatusBadge = (factura: Factura) => {
     let displayStatus = '';
     let bgClass = '';
     let textClass = '';
-    let emoji = '';
+    let IconComponent = FileText;
 
     if (factura.efactura_enabled) {
       const eDetails = eFacturaDetails[factura.id];
@@ -349,97 +249,101 @@ export default function FacturiList({
           displayStatus = 'Mock Test';
           bgClass = 'bg-purple-100';
           textClass = 'text-purple-800';
-          emoji = '🧪';
+          IconComponent = AlertCircle;
           break;
         case 'draft':
           displayStatus = 'XML Generat';
           bgClass = 'bg-blue-100';
           textClass = 'text-blue-800';
-          emoji = '📵';
+          IconComponent = FileText;
           break;
         case 'pending':
           displayStatus = 'ANAF Pending';
           bgClass = 'bg-yellow-100';
           textClass = 'text-yellow-800';
-          emoji = '⏳';
+          IconComponent = Clock;
           break;
         case 'sent':
           displayStatus = 'Trimis la ANAF';
           bgClass = 'bg-indigo-100';
           textClass = 'text-indigo-800';
-          emoji = '📤';
+          IconComponent = Send;
           break;
         case 'validated':
           displayStatus = 'ANAF Validat';
           bgClass = 'bg-green-100';
           textClass = 'text-green-800';
-          emoji = '✓';
+          IconComponent = CheckCircle;
           break;
         case 'error':
           displayStatus = 'Eroare ANAF';
           bgClass = 'bg-red-100';
           textClass = 'text-red-800';
-          emoji = '🔴';
+          IconComponent = XCircle;
           break;
         case 'stornata':
           displayStatus = 'Stornata';
           bgClass = 'bg-gray-100';
           textClass = 'text-gray-800';
-          emoji = '↩';
+          IconComponent = RotateCcw;
           break;
         default:
           displayStatus = 'Gata pentru ANAF';
           bgClass = 'bg-orange-100';
           textClass = 'text-orange-800';
-          emoji = '⏰';
+          IconComponent = Clock;
       }
     } else {
       const statusConfig = {
-        'pdf_generated': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'PDF Generat', emoji: '📄' },
-        'generata': { bg: 'bg-green-100', text: 'text-green-800', label: 'Generata', emoji: '📄' },
-        'anaf_processing': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ANAF in curs', emoji: '⏳' },
-        'anaf_success': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'ANAF Succes', emoji: '✓' },
-        'anaf_error': { bg: 'bg-red-100', text: 'text-red-800', label: 'Eroare ANAF', emoji: '🔴' },
-        'stornata': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Stornata', emoji: '↩' }
+        'pdf_generated': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'PDF Generat', icon: FileText },
+        'generata': { bg: 'bg-green-100', text: 'text-green-800', label: 'Generata', icon: FileText },
+        'anaf_processing': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ANAF in curs', icon: Clock },
+        'anaf_success': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'ANAF Succes', icon: CheckCircle },
+        'anaf_error': { bg: 'bg-red-100', text: 'text-red-800', label: 'Eroare ANAF', icon: XCircle },
+        'stornata': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Stornata', icon: RotateCcw }
       };
       
       const config = statusConfig[factura.status as keyof typeof statusConfig] || 
-        { bg: 'bg-gray-100', text: 'text-gray-800', label: factura.status, emoji: '📄' };
+        { bg: 'bg-gray-100', text: 'text-gray-800', label: factura.status, icon: FileText };
       
       displayStatus = config.label;
       bgClass = config.bg;
       textClass = config.text;
-      emoji = config.emoji;
+      IconComponent = config.icon;
     }
     
     return (
       <span 
-        className={`px-2 py-1 rounded text-xs font-medium ${bgClass} ${textClass}`}
+        className={`px-2 py-1 rounded text-xs font-medium ${bgClass} ${textClass} flex items-center gap-1`}
         title={factura.efactura_enabled ? 'Factura cu e-factura ANAF' : 'Factura doar PDF'}
       >
-        {emoji} {displayStatus}
+        <IconComponent size={12} />
+        {displayStatus}
       </span>
     );
   };
 
-  // ✅ FIX PROBLEMA 1: Scadenta badge cu encoding UTF-8 corect
+  // Scadenta badge cu Lucide icons  
   const getScadentaBadge = (statusScadenta: string, zile: number) => {
     const scadentaConfig = {
-      'Expirata': { bg: 'bg-red-100', text: 'text-red-800', icon: '🔴' },
-      'Expira curand': { bg: 'bg-orange-100', text: 'text-orange-800', icon: '⚠' },
-      'Platita': { bg: 'bg-green-100', text: 'text-green-800', icon: '✓' },
-      'In regula': { bg: 'bg-gray-100', text: 'text-gray-800', icon: '⏢' }
+      'Expirata': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle },
+      'Expira curand': { bg: 'bg-orange-100', text: 'text-orange-800', icon: AlertCircle },
+      'Platita': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle },
+      'In regula': { bg: 'bg-gray-100', text: 'text-gray-800', icon: Clock }
     };
     
     const config = scadentaConfig[statusScadenta as keyof typeof scadentaConfig] || 
-      { bg: 'bg-gray-100', text: 'text-gray-800', icon: '❓' };
+      { bg: 'bg-gray-100', text: 'text-gray-800', icon: AlertCircle };
+    
+    const IconComponent = config.icon;
     
     return (
       <span 
-        className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text}`}
+        className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text} flex items-center gap-1`}
         title={`${zile} zile pana la scadenta`}
       >
-        {config.icon} {statusScadenta}
+        <IconComponent size={12} />
+        {statusScadenta}
       </span>
     );
   };
@@ -464,7 +368,7 @@ export default function FacturiList({
     }
   };
 
-  // ✅ FIX PROBLEMA 3: Download PDF cu metoda IDENTICĂ cu FacturaHibridModal
+  // PDF processing cu metoda optimizată identică cu FacturaHibridModal
   const handleDownload = async (factura: Factura) => {
     try {
       showToast('Se regenereaza PDF-ul din datele facturii...', 'info');
@@ -501,7 +405,6 @@ export default function FacturiList({
         const data = await response.json();
         
         if (data.success && data.htmlContent) {
-          // ✅ FIX PROBLEMA 3: Folosește processPDF identic cu FacturaHibridModal
           await processPDFOptimized(data.htmlContent, `Factura_${factura.numar}.pdf`);
           showToast(`PDF regenerat si descarcat pentru factura ${factura.numar}`, 'success');
         } else {
@@ -515,7 +418,7 @@ export default function FacturiList({
     }
   };
 
-  // ✅ FIX PROBLEMA 3: processPDF OPTIMIZAT identic cu FacturaHibridModal.tsx
+  // processPDF OPTIMIZAT identic cu FacturaHibridModal.tsx
   const processPDFOptimized = async (htmlContent: string, fileName: string) => {
     try {
       await loadPDFLibraries();
@@ -523,7 +426,6 @@ export default function FacturiList({
       const tempDiv = document.createElement('div');
       tempDiv.id = 'pdf-content-optimized';
       
-      // ✅ IDENTIC cu FacturaHibridModal - stiluri complete
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '0px';
       tempDiv.style.top = '0px';
@@ -574,7 +476,6 @@ export default function FacturiList({
       
       const targetElement = document.getElementById('pdf-content-optimized');
       
-      // ✅ FIX PROBLEMA 3: IDENTIC cu FacturaHibridModal - parametri completi
       await pdf.html(targetElement || tempDiv, {
         callback: function (pdf: any) {
           document.body.removeChild(tempDiv);
@@ -595,7 +496,7 @@ export default function FacturiList({
           dpi: 96,
           letterRendering: true,
           logging: false,
-          scale: 0.75, // ✅ FIX PROBLEMA 3: CRUCIAL - scale identic
+          scale: 0.75,
           useCORS: true,
           backgroundColor: '#ffffff',
           height: 1000,
@@ -604,7 +505,6 @@ export default function FacturiList({
           scrollY: 0,
           windowWidth: pageWidth - 20,
           windowHeight: 1000,
-          // ✅ FIX PROBLEMA 3: CRUCIAL - onclone callback identic
           onclone: (clonedDoc: any) => {
             const clonedElement = clonedDoc.getElementById('pdf-content-optimized');
             if (clonedElement) {
@@ -687,6 +587,7 @@ export default function FacturiList({
     });
   };
 
+  // Funcții pentru acțiuni e-factura - păstrate identice
   const handleDownloadXML = async (factura: Factura) => {
     try {
       const response = await fetch(`/api/actions/invoices/generate-xml?facturaId=${factura.id}`);
@@ -864,36 +765,48 @@ export default function FacturiList({
     setShowEFacturaModal(factura.id);
   };
 
-  // ✅ FIX PROBLEMA 1: Toast system cu encoding UTF-8 corect
+  // Toast system cu Z-index compatibil cu modalele externe - IDENTIC cu ProiectActions
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    // Aplică fix-ul de encoding la mesaj
-    const cleanMessage = fixUTF8Encoding(message);
-    
     const toastEl = document.createElement('div');
     toastEl.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
       color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-      padding: 12px 16px;
-      border-radius: 8px;
-      z-index: 60000;
+      padding: 16px 20px;
+      border-radius: 16px;
+      z-index: 70000;
+      font-family: 'Inter', Arial, sans-serif;
       font-size: 14px;
       font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      border: 1px solid #e0e0e0;
-      max-width: 350px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      max-width: 400px;
       word-wrap: break-word;
+      white-space: pre-line;
+      transform: translateY(-10px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     `;
-    toastEl.textContent = cleanMessage;
+    toastEl.textContent = message;
     document.body.appendChild(toastEl);
     
     setTimeout(() => {
-      if (document.body.contains(toastEl)) {
-        document.body.removeChild(toastEl);
-      }
-    }, 4000);
+      toastEl.style.transform = 'translateY(0)';
+      toastEl.style.opacity = '1';
+    }, 10);
+    
+    setTimeout(() => {
+      toastEl.style.transform = 'translateY(-10px)';
+      toastEl.style.opacity = '0';
+      setTimeout(() => {
+        if (document.body.contains(toastEl)) {
+          document.body.removeChild(toastEl);
+        }
+      }, 300);
+    }, type === 'success' ? 4000 : type === 'error' ? 5000 : type === 'info' && message.length > 200 ? 10000 : 6000);
   };
 
   const formatCurrency = (amount: number) => {
@@ -944,8 +857,9 @@ export default function FacturiList({
           </h3>
           <button
             onClick={loadFacturi}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
           >
+            <RefreshCw size={14} />
             Reincarcare
           </button>
         </div>
@@ -1041,7 +955,9 @@ export default function FacturiList({
       {/* Content */}
       {facturi.length === 0 ? (
         <div className="p-8 text-center text-gray-500">
-          <div className="text-4xl mb-4">📄</div>
+          <div className="text-4xl mb-4">
+            <FileText size={48} className="mx-auto text-gray-300" />
+          </div>
           <div>
             {filters.search || filters.status || filters.scadenta ? 
               'Nu s-au gasit facturi cu criteriile specificate' : 
@@ -1095,9 +1011,6 @@ export default function FacturiList({
                                     factura.status !== 'stornata';
                   const canStorno = factura.status !== 'stornata';
                   
-                  const isDropdownOpen = openDropdown === factura.id;
-                  const coords = dropdownCoords[factura.id];
-                  
                   return (
                     <tr 
                       key={factura.id} 
@@ -1117,10 +1030,10 @@ export default function FacturiList({
                           {factura.numar}
                           {factura.efactura_enabled && (
                             <span 
-                              className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded"
+                              className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded flex items-center gap-1"
                               title="Factura cu e-factura ANAF"
                             >
-                              📤
+                              <Send size={10} />
                             </span>
                           )}
                         </div>
@@ -1168,171 +1081,22 @@ export default function FacturiList({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {/* ✅ FIX PROBLEMA 2: Dropdown cu Portal și poziționare dinamică */}
-                        <div className="dropdown-container relative">
-                          <button
-                            onClick={(e) => toggleDropdown(factura.id, e.currentTarget)}
-                            className="bg-gray-600 text-white px-3 py-1.5 rounded text-xs hover:bg-gray-700 flex items-center gap-1"
-                          >
-                            Actiuni
-                            <svg className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                          
-                          {/* ✅ FIX PROBLEMA 2: Portal dropdown pentru poziționare corectă */}
-                          {isDropdownOpen && coords && typeof window !== 'undefined' && createPortal(
-                            <>
-                              {/* Overlay */}
-                              <div
-                                style={{
-                                  position: 'fixed',
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  background: 'rgba(0, 0, 0, 0.1)',
-                                  zIndex: 49000
-                                }}
-                                onClick={() => setOpenDropdown(null)}
-                              />
-                              
-                              {/* Dropdown Menu */}
-                              <div 
-                                className="dropdown-portal"
-                                style={{
-                                  position: 'fixed',
-                                  top: coords.top,
-                                  left: coords.left,
-                                  width: coords.width,
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                                  border: '1px solid #e5e7eb',
-                                  zIndex: 50000,
-                                  overflow: 'hidden'
-                                }}
-                              >
-                                {/* PDF Download */}
-                                <button
-                                  onClick={() => {
-                                    handleDownload(factura);
-                                    setOpenDropdown(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
-                                >
-                                  📄 Descarca PDF
-                                </button>
-
-                                {/* Edit */}
-                                {canEdit && (
-                                  <button
-                                    onClick={() => {
-                                      handleEditFactura(factura, 'edit');
-                                      setOpenDropdown(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2"
-                                  >
-                                    ✏️ Editeaza
-                                  </button>
-                                )}
-
-                                {/* Storno */}
-                                {canStorno && (
-                                  <button
-                                    onClick={() => {
-                                      handleEditFactura(factura, 'storno');
-                                      setOpenDropdown(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2"
-                                  >
-                                    ↩️ Storno
-                                  </button>
-                                )}
-
-                                {/* E-factura actions */}
-                                {factura.efactura_enabled && (
-                                  <>
-                                    <hr className="border-gray-200" />
-                                    
-                                    {/* Download XML */}
-                                    {(factura.efactura_status === 'draft' || 
-                                      factura.efactura_status === 'sent' || 
-                                      factura.efactura_status === 'validated' ||
-                                      factura.efactura_status === 'mock_pending') && (
-                                      <button
-                                        onClick={() => {
-                                          handleDownloadXML(factura);
-                                          setOpenDropdown(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2"
-                                      >
-                                        📄 Descarca XML
-                                      </button>
-                                    )}
-
-                                    {/* Send to ANAF */}
-                                    {(!factura.efactura_status || 
-                                      factura.efactura_status === 'draft') && (
-                                      <button
-                                        onClick={() => {
-                                          handleSendToANAF(factura);
-                                          setOpenDropdown(null);
-                                        }}
-                                        disabled={processingActions[factura.id]}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 disabled:opacity-50"
-                                      >
-                                        {processingActions[factura.id] ? '⏳' : '📤'} Trimite ANAF
-                                      </button>
-                                    )}
-
-                                    {/* Retry ANAF */}
-                                    {factura.efactura_status === 'error' && (
-                                      <button
-                                        onClick={() => {
-                                          handleRetryANAF(factura);
-                                          setOpenDropdown(null);
-                                        }}
-                                        disabled={processingActions[factura.id]}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 flex items-center gap-2 disabled:opacity-50"
-                                      >
-                                        {processingActions[factura.id] ? '⏳' : '🔄'} Retry ANAF
-                                      </button>
-                                    )}
-
-                                    {/* Details */}
-                                    <button
-                                      onClick={() => {
-                                        showEFacturaDetailsModal(factura);
-                                        setOpenDropdown(null);
-                                      }}
-                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
-                                    >
-                                      📋 Detalii e-factura
-                                    </button>
-                                  </>
-                                )}
-
-                                {/* Delete */}
-                                {canDelete && (
-                                  <>
-                                    <hr className="border-gray-200" />
-                                    <button
-                                      onClick={() => {
-                                        handleDeleteFactura(factura);
-                                        setOpenDropdown(null);
-                                      }}
-                                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
-                                    >
-                                      🗑️ Sterge
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </>,
-                            document.body
-                          )}
-                        </div>
+                        {/* Enhanced Action Dropdown - IDENTIC cu ProiectActions */}
+                        <EnhancedActionDropdown
+                          factura={factura}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          canStorno={canStorno}
+                          onDownload={() => handleDownload(factura)}
+                          onEdit={() => handleEditFactura(factura, 'edit')}
+                          onStorno={() => handleEditFactura(factura, 'storno')}
+                          onDownloadXML={() => handleDownloadXML(factura)}
+                          onSendToANAF={() => handleSendToANAF(factura)}
+                          onRetryANAF={() => handleRetryANAF(factura)}
+                          onShowDetails={() => showEFacturaDetailsModal(factura)}
+                          onDelete={() => handleDeleteFactura(factura)}
+                          isProcessing={processingActions[factura.id]}
+                        />
                       </td>
                     </tr>
                   );
@@ -1370,7 +1134,7 @@ export default function FacturiList({
                   onClick={() => setShowEFacturaModal(null)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  ✕
+                  <XCircle size={20} />
                 </button>
               </div>
             </div>
@@ -1420,7 +1184,7 @@ export default function FacturiList({
                       ))
                     ) : (
                       <div className="text-center py-8 text-gray-500">
-                        <div className="text-4xl mb-2">📄</div>
+                        <FileText size={48} className="mx-auto text-gray-300 mb-2" />
                         <div>Se incarca istoricul e-facturii...</div>
                       </div>
                     )}
@@ -1430,6 +1194,549 @@ export default function FacturiList({
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Enhanced Action Dropdown - IDENTIC cu ProiectActions.tsx
+interface EnhancedActionDropdownProps {
+  factura: Factura;
+  canEdit: boolean;
+  canDelete: boolean;
+  canStorno: boolean;
+  onDownload: () => void;
+  onEdit: () => void;
+  onStorno: () => void;
+  onDownloadXML: () => void;
+  onSendToANAF: () => void;
+  onRetryANAF: () => void;
+  onShowDetails: () => void;
+  onDelete: () => void;
+  isProcessing: boolean;
+}
+
+function EnhancedActionDropdown({
+  factura,
+  canEdit,
+  canDelete,
+  canStorno,
+  onDownload,
+  onEdit,
+  onStorno,
+  onDownloadXML,
+  onSendToANAF,
+  onRetryANAF,
+  onShowDetails,
+  onDelete,
+  isProcessing
+}: EnhancedActionDropdownProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState<'bottom' | 'top'>('bottom');
+  const [dropdownCoords, setDropdownCoords] = React.useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  
+  const dropdownId = React.useMemo(() => `dropdown-${factura.id}-${Math.random().toString(36).substr(2, 9)}`, [factura.id]);
+
+  React.useEffect(() => {
+    openDropdowns.set(dropdownId, () => setIsOpen(false));
+    
+    return () => {
+      openDropdowns.delete(dropdownId);
+    };
+  }, [dropdownId]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (currentOpenDropdown && currentOpenDropdown !== dropdownId) {
+        const closeFunction = openDropdowns.get(currentOpenDropdown);
+        if (closeFunction) {
+          closeFunction();
+        }
+      }
+      currentOpenDropdown = dropdownId;
+      calculateDropdownPosition();
+      
+      window.addEventListener('resize', calculateDropdownPosition);
+      return () => window.removeEventListener('resize', calculateDropdownPosition);
+    } else {
+      if (currentOpenDropdown === dropdownId) {
+        currentOpenDropdown = null;
+      }
+    }
+  }, [isOpen, dropdownId]);
+
+  const calculateDropdownPosition = () => {
+    if (!buttonRef.current) return;
+
+    const buttonRect = buttonRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 350;
+    
+    const tableRow = buttonRef.current.closest('tr');
+    const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
+    
+    const spaceBelow = viewportHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top - rowHeight;
+    
+    let finalTop = 0;
+    let finalLeft = buttonRect.right - 260;
+    
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      finalTop = buttonRect.top - dropdownHeight - 8;
+      setDropdownPosition('top');
+    } else {
+      finalTop = buttonRect.bottom + 8;
+      setDropdownPosition('bottom');
+    }
+    
+    if (finalLeft < 10) finalLeft = 10;
+    if (finalLeft + 260 > window.innerWidth - 10) {
+      finalLeft = window.innerWidth - 270;
+    }
+    
+    setDropdownCoords({
+      top: finalTop,
+      left: finalLeft,
+      width: 260
+    });
+  };
+
+  const handleActionClick = async (actionKey: string, actionFn: () => void) => {
+    if (loading) return;
+    
+    setLoading(actionKey);
+    setIsOpen(false);
+    
+    try {
+      await actionFn();
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'generata': return '#27ae60';
+      case 'stornata': return '#95a5a6';
+      case 'error': return '#e74c3c';
+      default: return '#3498db';
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        ref={buttonRef}
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={loading !== null}
+        style={{
+          background: loading ? '#f8f9fa' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: loading ? '#6c757d' : 'white',
+          border: 'none',
+          borderRadius: '12px',
+          padding: '0.5rem 1rem',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '600',
+          boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+          transition: 'all 0.3s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}
+      >
+        {loading ? <Clock size={16} /> : <Download size={16} />}
+        Actiuni
+        <ChevronDown size={16} className={isOpen ? 'rotate-180' : ''} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 40000
+            }}
+            onClick={() => setIsOpen(false)}
+          />
+
+          {typeof window !== 'undefined' && createPortal(
+            <div style={{
+              position: 'fixed',
+              top: dropdownCoords.top,
+              left: dropdownCoords.left,
+              width: dropdownCoords.width,
+              background: '#ffffff',
+              opacity: 1,
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+              border: '1px solid #e0e0e0',
+              zIndex: 45000,
+              overflow: 'hidden'
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: '1rem',
+                borderBottom: '1px solid #e0e0e0',
+                background: '#f8f9fa'
+              }}>
+                <div style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '700',
+                  color: '#2c3e50',
+                  marginBottom: '0.5rem',
+                  fontFamily: 'monospace'
+                }}>
+                  {factura.numar}
+                </div>
+                <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                  Status: <span style={{ 
+                    color: getStatusColor(factura.status),
+                    fontWeight: '600'
+                  }}>
+                    {factura.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ padding: '0.5rem 0' }}>
+                {/* PDF Download */}
+                <button
+                  onClick={() => handleActionClick('download', onDownload)}
+                  disabled={loading === 'download'}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    background: 'transparent',
+                    border: 'none',
+                    textAlign: 'left',
+                    cursor: loading === 'download' ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    color: '#2c3e50',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    transition: 'all 0.3s ease',
+                    fontWeight: '500'
+                  }}
+                  onMouseOver={(e) => {
+                    if (loading !== 'download') {
+                      e.currentTarget.style.background = '#3498db15';
+                      e.currentTarget.style.color = '#3498db';
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#2c3e50';
+                    e.currentTarget.style.transform = 'translateX(0)';
+                  }}
+                >
+                  {loading === 'download' ? <Clock size={16} /> : <Download size={16} />}
+                  Descarca PDF
+                </button>
+
+                {/* Edit */}
+                {canEdit && (
+                  <button
+                    onClick={() => handleActionClick('edit', onEdit)}
+                    disabled={loading === 'edit'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: loading === 'edit' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      color: '#2c3e50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => {
+                      if (loading !== 'edit') {
+                        e.currentTarget.style.background = '#27ae6015';
+                        e.currentTarget.style.color = '#27ae60';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    {loading === 'edit' ? <Clock size={16} /> : <Edit size={16} />}
+                    Editeaza
+                  </button>
+                )}
+
+                {/* Storno */}
+                {canStorno && (
+                  <button
+                    onClick={() => handleActionClick('storno', onStorno)}
+                    disabled={loading === 'storno'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: loading === 'storno' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      color: '#2c3e50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => {
+                      if (loading !== 'storno') {
+                        e.currentTarget.style.background = '#f39c1215';
+                        e.currentTarget.style.color = '#f39c12';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    {loading === 'storno' ? <Clock size={16} /> : <RotateCcw size={16} />}
+                    Storno
+                  </button>
+                )}
+
+                {/* E-factura actions */}
+                {factura.efactura_enabled && (
+                  <>
+                    <div style={{
+                      height: '1px',
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
+                      margin: '0.5rem 0'
+                    }} />
+                    
+                    {/* Download XML */}
+                    {(factura.efactura_status === 'draft' || 
+                      factura.efactura_status === 'sent' || 
+                      factura.efactura_status === 'validated' ||
+                      factura.efactura_status === 'mock_pending') && (
+                      <button
+                        onClick={() => handleActionClick('downloadXML', onDownloadXML)}
+                        disabled={loading === 'downloadXML'}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: loading === 'downloadXML' ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          color: '#2c3e50',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          transition: 'all 0.3s ease',
+                          fontWeight: '500'
+                        }}
+                        onMouseOver={(e) => {
+                          if (loading !== 'downloadXML') {
+                            e.currentTarget.style.background = '#27ae6015';
+                            e.currentTarget.style.color = '#27ae60';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#2c3e50';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        {loading === 'downloadXML' ? <Clock size={16} /> : <FileText size={16} />}
+                        Descarca XML
+                      </button>
+                    )}
+
+                    {/* Send to ANAF */}
+                    {(!factura.efactura_status || 
+                      factura.efactura_status === 'draft') && (
+                      <button
+                        onClick={() => handleActionClick('sendANAF', onSendToANAF)}
+                        disabled={loading === 'sendANAF' || isProcessing}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: (loading === 'sendANAF' || isProcessing) ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          color: '#2c3e50',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          transition: 'all 0.3s ease',
+                          fontWeight: '500',
+                          opacity: (loading === 'sendANAF' || isProcessing) ? 0.5 : 1
+                        }}
+                        onMouseOver={(e) => {
+                          if (loading !== 'sendANAF' && !isProcessing) {
+                            e.currentTarget.style.background = '#f39c1215';
+                            e.currentTarget.style.color = '#f39c12';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#2c3e50';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        {(loading === 'sendANAF' || isProcessing) ? <Clock size={16} /> : <Send size={16} />}
+                        Trimite ANAF
+                      </button>
+                    )}
+
+                    {/* Retry ANAF */}
+                    {factura.efactura_status === 'error' && (
+                      <button
+                        onClick={() => handleActionClick('retryANAF', onRetryANAF)}
+                        disabled={loading === 'retryANAF' || isProcessing}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: (loading === 'retryANAF' || isProcessing) ? 'not-allowed' : 'pointer',
+                          fontSize: '14px',
+                          color: '#2c3e50',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          transition: 'all 0.3s ease',
+                          fontWeight: '500',
+                          opacity: (loading === 'retryANAF' || isProcessing) ? 0.5 : 1
+                        }}
+                        onMouseOver={(e) => {
+                          if (loading !== 'retryANAF' && !isProcessing) {
+                            e.currentTarget.style.background = '#f39c1215';
+                            e.currentTarget.style.color = '#f39c12';
+                            e.currentTarget.style.transform = 'translateX(4px)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#2c3e50';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        {(loading === 'retryANAF' || isProcessing) ? <Clock size={16} /> : <RefreshCw size={16} />}
+                        Retry ANAF
+                      </button>
+                    )}
+
+                    {/* Details */}
+                    <button
+                      onClick={() => handleActionClick('details', onShowDetails)}
+                      disabled={loading === 'details'}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        background: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: loading === 'details' ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        color: '#2c3e50',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        transition: 'all 0.3s ease',
+                        fontWeight: '500'
+                      }}
+                      onMouseOver={(e) => {
+                        if (loading !== 'details') {
+                          e.currentTarget.style.background = '#9b59b615';
+                          e.currentTarget.style.color = '#9b59b6';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#2c3e50';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      {loading === 'details' ? <Clock size={16} /> : <Info size={16} />}
+                      Detalii e-factura
+                    </button>
+                  </>
+                )}
+
+                {/* Delete */}
+                {canDelete && (
+                  <>
+                    <div style={{
+                      height: '1px',
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%)',
+                      margin: '0.5rem 0'
+                    }} />
+                    <button
+                      onClick={() => handleActionClick('delete', onDelete)}
+                      disabled={loading === 'delete'}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        background: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: loading === 'delete' ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        color: '#2c3e50',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        transition: 'all 0.3s ease',
+                        fontWeight: '500'
+                      }}
+                      onMouseOver={(e) => {
+                        if (loading !== 'delete') {
+                          e.currentTarget.style.background = '#e74c3c15';
+                          e.currentTarget.style.color = '#e74c3c';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#2c3e50';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      {loading === 'delete' ? <Clock size={16} /> : <Trash2 size={16} />}
+                      Sterge
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
       )}
     </div>
   );
