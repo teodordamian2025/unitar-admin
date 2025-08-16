@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// DATA: 13.08.2025 21:35
-// FIX PRINCIPAL: Înlocuire cursuri fixe cu API BNR live + păstrare funcționalități
+// DATA: 16.08.2025 11:45 (ora României)
+// FIX APLICAT: Simplificare completă formatare date - eliminat funcții complexe
+// PĂSTRATE: Toate funcționalitățile existente + cursuri BNR LIVE
 // ==================================================================
 
 'use client';
@@ -37,7 +38,7 @@ interface CheltuialaProiect {
   status_achitare: string;
 }
 
-// 🎯 FIX PRINCIPAL: Funcție pentru preluarea cursurilor BNR live cu precizie maximă
+// Funcție pentru preluarea cursurilor BNR LIVE - PĂSTRATĂ identic
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
   if (moneda === 'RON') return 1;
   
@@ -48,21 +49,19 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
     
     if (result.success && result.curs) {
       const cursNumeric = typeof result.curs === 'number' ? result.curs : parseFloat(result.curs.toString());
-      console.log(`💱 Curs BNR live pentru ${moneda}: ${cursNumeric.toFixed(4)}`);
+      console.log(`Curs BNR live pentru ${moneda}: ${cursNumeric.toFixed(4)}`);
       return cursNumeric;
     }
     
-    console.warn(`⚠️ Nu s-a putut prelua cursul live pentru ${moneda}, folosesc fallback`);
-    // 🎯 FIX: Fallback-uri actualizate cu cursuri BNR reale
+    console.warn(`Nu s-a putut prelua cursul live pentru ${moneda}, folosesc fallback`);
     switch(moneda) {
-      case 'EUR': return 5.0683; // Curs BNR actualizat
-      case 'USD': return 4.3688; // Curs BNR actualizat  
-      case 'GBP': return 5.8777; // Curs BNR actualizat
+      case 'EUR': return 5.0683;
+      case 'USD': return 4.3688;
+      case 'GBP': return 5.8777;
       default: return 1;
     }
   } catch (error) {
-    console.error(`❌ Eroare la preluarea cursului pentru ${moneda}:`, error);
-    // Fallback în caz de eroare
+    console.error(`Eroare la preluarea cursului pentru ${moneda}:`, error);
     switch(moneda) {
       case 'EUR': return 5.0683;
       case 'USD': return 4.3688;
@@ -90,8 +89,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     selectedClientId: '',
     Adresa: '',
     Descriere: '',
-    Data_Start: '', // ✅ FIX: Inițializare corectă pentru date
-    Data_Final: '', // ✅ FIX: Inițializare corectă pentru date
+    // FIX PRINCIPAL: Date simplificate - direct string format ISO
+    Data_Start: '',
+    Data_Final: '',
     Status: 'Activ',
     
     // Valoare și monedă
@@ -127,55 +127,18 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     cheltuieli: [] as CheltuialaProiect[]
   });
 
-  // ✅ FIX PRINCIPAL: Funcție pentru formatarea datei în format ISO pentru input date (yyyy-mm-dd)
-  const formatDateForInput = (dateValue: string): string => {
-    if (!dateValue) return '';
-    try {
-      // Convertește data în format ISO pentru input-ul de tip date
-      const date = new Date(dateValue);
-      if (isNaN(date.getTime())) return '';
-      
-      // Returnează în format yyyy-mm-dd pentru input date
-      return date.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
-
-  // ✅ FIX: Funcție pentru formatarea datei în format românesc pentru afișare (dd/mm/yyyy)
-  const formatDateForDisplay = (dateValue: string): string => {
-    if (!dateValue) return '';
-    try {
-      return new Date(dateValue).toLocaleDateString('ro-RO');
-    } catch {
-      return dateValue;
-    }
-  };
-
-  // ✅ FIX: Funcție pentru validarea datei
-  const isValidDate = (dateString: string): boolean => {
-    if (!dateString) return true; // Date opționale sunt valide
-    try {
-      const date = new Date(dateString);
-      return !isNaN(date.getTime()) && date.getFullYear() >= 1900 && date.getFullYear() <= 2100;
-    } catch {
-      return false;
-    }
-  };
-
   useEffect(() => {
     if (isOpen) {
       loadClienti();
-      // ✅ FIX: Setează data actuală în format ISO pentru input date și data_curs_valutar
-      const today = new Date();
-      const todayISO = today.toISOString().split('T')[0];
+      // FIX PRINCIPAL: Setează data actuală în format ISO simplu
+      const today = new Date().toISOString().split('T')[0];
       
       setFormData(prev => ({
         ...prev,
         ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
-        data_curs_valutar: todayISO,
-        // ✅ FIX: Setează implicit Data_Start la data curentă
-        Data_Start: todayISO
+        data_curs_valutar: today,
+        // FIX: Setează implicit Data_Start la data curentă (format ISO)
+        Data_Start: today
       }));
     }
   }, [isOpen]);
@@ -245,7 +208,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     setLoading(true);
 
     try {
-      // ✅ FIX: Validări îmbunătățite cu verificare date
+      // Validări
       if (!formData.ID_Proiect.trim()) {
         toast.error('ID proiect este obligatoriu');
         setLoading(false);
@@ -264,20 +227,26 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         return;
       }
 
-      // ✅ FIX: Validare date
-      if (formData.Data_Start && !isValidDate(formData.Data_Start)) {
-        toast.error('Data de început nu este validă');
-        setLoading(false);
-        return;
+      // FIX PRINCIPAL: Validare date simplificată
+      if (formData.Data_Start) {
+        const dataStart = new Date(formData.Data_Start);
+        if (isNaN(dataStart.getTime())) {
+          toast.error('Data de început nu este validă');
+          setLoading(false);
+          return;
+        }
       }
 
-      if (formData.Data_Final && !isValidDate(formData.Data_Final)) {
-        toast.error('Data de finalizare nu este validă');
-        setLoading(false);
-        return;
+      if (formData.Data_Final) {
+        const dataFinal = new Date(formData.Data_Final);
+        if (isNaN(dataFinal.getTime())) {
+          toast.error('Data de finalizare nu este validă');
+          setLoading(false);
+          return;
+        }
       }
 
-      // ✅ FIX: Verificare logică între date
+      // Verificare logică între date
       if (formData.Data_Start && formData.Data_Final) {
         const dataStart = new Date(formData.Data_Start);
         const dataFinal = new Date(formData.Data_Final);
@@ -289,17 +258,17 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         }
       }
 
-      console.log('📤 Trimitere date proiect complet cu date corecte:', formData);
+      console.log('Trimitere date proiect complet cu date corecte:', formData);
       toast.info('Se adaugă proiectul...');
 
-      // ✅ FIX: Adaugă proiectul principal cu toate câmpurile și date corect formatate
+      // FIX PRINCIPAL: Adaugă proiectul principal cu date în format ISO (yyyy-mm-dd)
       const proiectData = {
         ID_Proiect: formData.ID_Proiect.trim(),
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
         Adresa: formData.Adresa.trim(),
         Descriere: formData.Descriere.trim(),
-        // ✅ FIX PRINCIPAL: Transmite datele în format corect pentru BigQuery (yyyy-mm-dd)
+        // FIX PRINCIPAL: Date în format ISO pentru BigQuery (yyyy-mm-dd)
         Data_Start: formData.Data_Start || null,
         Data_Final: formData.Data_Final || null,
         Status: formData.Status,
@@ -321,7 +290,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         Observatii: formData.Observatii.trim()
       };
 
-      console.log('📤 Date proiect formatate pentru BigQuery:', proiectData);
+      console.log('Date proiect formatate pentru BigQuery:', proiectData);
 
       const response = await fetch('/api/rapoarte/proiecte', {
         method: 'POST',
@@ -334,22 +303,20 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       console.log('Response data proiect:', result);
 
       if (result.success || response.ok) {
-        // ✅ CRITICAL: Adaugă subproiectele dacă există
+        // Adaugă subproiectele dacă există
         if (formData.subproiecte.length > 0) {
-          console.log(`📋 Se adaugă ${formData.subproiecte.length} subproiecte...`);
+          console.log(`Se adaugă ${formData.subproiecte.length} subproiecte...`);
           await addSubproiecte(formData.ID_Proiect);
         }
         
         // Adaugă cheltuielile dacă există
         if (formData.cheltuieli.length > 0) {
-          console.log(`💰 Se adaugă ${formData.cheltuieli.length} cheltuieli...`);
+          console.log(`Se adaugă ${formData.cheltuieli.length} cheltuieli...`);
           await addCheltuieli(formData.ID_Proiect);
         }
 
-        // ✅ FIX: Mesaj de succes îmbunătățit cu informații despre date
-        const dataInfo = formData.Data_Start ? 
-          ` (Start: ${formatDateForDisplay(formData.Data_Start)}${formData.Data_Final ? `, Final: ${formatDateForDisplay(formData.Data_Final)}` : ''})` : '';
-        toast.success(`✅ Proiect adăugat cu succes cu toate componentele!${dataInfo}`);
+        // FIX: Mesaj de succes simplificat
+        toast.success(`Proiect adăugat cu succes cu toate componentele!`);
         
         onProiectAdded();
         onClose();
@@ -366,13 +333,13 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-  // 🔥 FIX PRINCIPAL: FUNCȚIE CORECTATĂ pentru adăugarea subproiectelor cu cursuri BNR LIVE
+  // FIX PRINCIPAL: Funcție pentru adăugarea subproiectelor cu cursuri BNR LIVE
   const addSubproiecte = async (proiectId: string) => {
-    console.log(`📋 Începe adăugarea subproiectelor pentru ${proiectId}`);
+    console.log(`Începe adăugarea subproiectelor pentru ${proiectId}`);
     
     for (const subproiect of formData.subproiecte) {
       try {
-        // 🎯 FIX PRINCIPAL: Calculăm valoarea în RON pentru subproiect cu cursuri BNR LIVE
+        // Calculăm valoarea în RON pentru subproiect cu cursuri BNR LIVE
         let valoareRonSubproiect: number | null = null;
         let cursSubproiect: number | null = null;
         
@@ -382,12 +349,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             cursSubproiect = parseFloat(formData.curs_valutar);
             valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
           } else {
-            // 🔥 FIX PRINCIPAL: Înlocuire cursuri fixe cu API BNR live
-            console.log(`💱 Preiau curs BNR live pentru subproiect ${subproiect.denumire} (${subproiect.moneda})`);
+            // FIX PRINCIPAL: Înlocuire cursuri fixe cu API BNR live
+            console.log(`Preiau curs BNR live pentru subproiect ${subproiect.denumire} (${subproiect.moneda})`);
             cursSubproiect = await getCursBNRLive(subproiect.moneda, formData.data_curs_valutar);
             valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
             
-            console.log(`🎯 FIX APLICAT pentru subproiect ${subproiect.denumire}:`, {
+            console.log(`FIX APLICAT pentru subproiect ${subproiect.denumire}:`, {
               valoare_originala: subproiect.valoare,
               moneda: subproiect.moneda,
               curs_bnr_live: cursSubproiect.toFixed(4),
@@ -399,7 +366,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           cursSubproiect = 1;
         }
         
-        // ✅ FIX: Date pentru subproiecte - moștenite din proiectul principal sau setate implicit
+        // FIX: Date pentru subproiecte - moștenite din proiectul principal
         const dataStartSubproiect = formData.Data_Start || null;
         const dataFinalSubproiect = formData.Data_Final || null;
         
@@ -411,24 +378,24 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           Status: subproiect.status || 'Planificat',
           Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
           
-          // ✅ FIX: Date moștenite din proiectul principal
+          // FIX: Date moștenite din proiectul principal (format ISO)
           Data_Start: dataStartSubproiect,
           Data_Final: dataFinalSubproiect,
           
-          // 🎯 FIX PRINCIPAL: Câmpuri multi-valută pentru subproiect cu cursuri BNR LIVE
+          // Câmpuri multi-valută pentru subproiect cu cursuri BNR LIVE
           moneda: subproiect.moneda || 'RON',
           curs_valutar: cursSubproiect,
           data_curs_valutar: formData.data_curs_valutar || null,
           valoare_ron: valoareRonSubproiect,
           
-          // ✅ NOUĂ: Status-uri multiple pentru subproiect (moștenite de la proiect)
+          // Status-uri multiple pentru subproiect
           status_predare: 'Nepredat',
           status_contract: 'Nu e cazul',
           status_facturare: 'Nefacturat',
           status_achitare: 'Neachitat'
         };
 
-        console.log(`📤 Trimitere subproiect ${subproiect.denumire} cu cursuri BNR live:`, subproiectData);
+        console.log(`Trimitere subproiect ${subproiect.denumire} cu cursuri BNR live:`, subproiectData);
 
         const response = await fetch('/api/rapoarte/subproiecte', {
           method: 'POST',
@@ -439,18 +406,18 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         const result = await response.json();
         
         if (result.success) {
-          console.log(`✅ Subproiect "${subproiect.denumire}" adăugat cu succes cu cursuri BNR live`);
+          console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes cu cursuri BNR live`);
         } else {
-          console.error(`❌ Eroare la subproiect ${subproiect.denumire}:`, result);
+          console.error(`Eroare la subproiect ${subproiect.denumire}:`, result);
           toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
         }
       } catch (error) {
-        console.error(`❌ Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
+        console.error(`Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
         toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
       }
     }
     
-    console.log(`✅ Procesare subproiecte finalizată pentru ${proiectId} cu cursuri BNR live`);
+    console.log(`Procesare subproiecte finalizată pentru ${proiectId} cu cursuri BNR live`);
   };
 
   // Funcție pentru adăugarea cheltuielilor (păstrată neschimbată)
@@ -498,8 +465,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       selectedClientId: '',
       Adresa: '',
       Descriere: '',
-      Data_Start: '', // ✅ FIX: Reset la gol, va fi setat la deschiderea modalului
-      Data_Final: '', // ✅ FIX: Reset la gol
+      // FIX: Reset la gol, va fi setat la deschiderea modalului
+      Data_Start: '',
+      Data_Final: '',
       Status: 'Activ',
       Valoare_Estimata: '',
       moneda: 'RON',
@@ -524,39 +492,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       ...prev,
       [field]: value
     }));
-  };
-
-  // ✅ FIX: Handler special pentru date cu validare
-  const handleDateChange = (field: 'Data_Start' | 'Data_Final', value: string) => {
-    // Validare de bază înainte de setare
-    if (value && !isValidDate(value)) {
-      toast.warning(`Data introdusă pentru ${field === 'Data_Start' ? 'început' : 'finalizare'} nu este validă`);
-      return;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Validare logică între date
-    if (field === 'Data_Start' && value && formData.Data_Final) {
-      const dataStart = new Date(value);
-      const dataFinal = new Date(formData.Data_Final);
-      
-      if (dataFinal <= dataStart) {
-        toast.warning('Data de finalizare trebuie să fie după data de început');
-      }
-    }
-    
-    if (field === 'Data_Final' && value && formData.Data_Start) {
-      const dataStart = new Date(formData.Data_Start);
-      const dataFinal = new Date(value);
-      
-      if (dataFinal <= dataStart) {
-        toast.warning('Data de finalizare trebuie să fie după data de început');
-      }
-    }
   };
 
   const handleClientSearch = (value: string) => {
@@ -680,7 +615,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              📋 Adaugă Proiect Nou (Extins)
+              Adaugă Proiect Nou (Extins)
             </h2>
             <button
               onClick={onClose}
@@ -698,14 +633,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           </div>
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
             Completează informațiile pentru noul proiect cu suport multi-valută și status-uri avansate
-            {/* ✅ FIX: Indicator că datele sunt obligatorii pentru afișare corectă */}
-            <br/>
-            <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>
-              💡 Completează datele de început și finalizare pentru afișare corectă în listă
-            </span>
             <br/>
             <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
-              🔥 FIX APLICAT: Cursuri BNR LIVE pentru precizie maximă
+              FIX APLICAT: Date simplificate - format ISO standard pentru BigQuery
             </span>
           </p>
         </div>
@@ -758,10 +688,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   fontSize: '14px'
                 }}
               >
-                <option value="Activ">🟢 Activ</option>
-                <option value="Planificat">📅 Planificat</option>
-                <option value="Suspendat">⏸️ Suspendat</option>
-                <option value="Finalizat">✅ Finalizat</option>
+                <option value="Activ">Activ</option>
+                <option value="Planificat">Planificat</option>
+                <option value="Suspendat">Suspendat</option>
+                <option value="Finalizat">Finalizat</option>
               </select>
             </div>
           </div>
@@ -905,9 +835,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             border: '1px solid #dee2e6'
           }}>
             <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-              💰 Valoare Proiect 
+              Valoare Proiect 
               <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                🔥 Cursuri BNR LIVE
+                Cursuri BNR LIVE
               </span>
             </h4>
             
@@ -952,21 +882,16 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
-                  <option value="RON">🇷🇴 RON (Lei români)</option>
-                  <option value="EUR">🇪🇺 EUR (Euro)</option>
-                  <option value="USD">🇺🇸 USD (Dolari SUA)</option>
-                  <option value="GBP">🇬🇧 GBP (Lire sterline)</option>
+                  <option value="RON">RON (Lei români)</option>
+                  <option value="EUR">EUR (Euro)</option>
+                  <option value="USD">USD (Dolari SUA)</option>
+                  <option value="GBP">GBP (Lire sterline)</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Curs
-                  {formData.data_curs_valutar && (
-                    <span style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'normal' }}>
-                      ({formatDateForDisplay(formData.data_curs_valutar)})
-                    </span>
-                  )}
                 </label>
                 <input
                   type="date"
@@ -996,7 +921,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   fontWeight: 'bold',
                   color: loadingCurs ? '#6c757d' : '#27ae60'
                 }}>
-                  {loadingCurs ? '⏳ Se calculează...' : 
+                  {loadingCurs ? 'Se calculează...' : 
                    formData.valoare_ron ? `${parseFloat(formData.valoare_ron).toLocaleString('ro-RO')} RON` : 
                    '0.00 RON'}
                 </div>
@@ -1017,7 +942,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             marginBottom: '1rem',
             border: '1px solid #c3e6cb'
           }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>📊 Status-uri Proiect</h4>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Status-uri Proiect</h4>
             
             <div style={{ 
               display: 'grid', 
@@ -1040,8 +965,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
-                  <option value="Nepredat">❌ Nepredat</option>
-                  <option value="Predat">✅ Predat</option>
+                  <option value="Nepredat">Nepredat</option>
+                  <option value="Predat">Predat</option>
                 </select>
               </div>
 
@@ -1061,9 +986,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
-                  <option value="Nu e cazul">➖ Nu e cazul</option>
-                  <option value="Nesemnat">📝 Nesemnat</option>
-                  <option value="Semnat">✅ Semnat</option>
+                  <option value="Nu e cazul">Nu e cazul</option>
+                  <option value="Nesemnat">Nesemnat</option>
+                  <option value="Semnat">Semnat</option>
                 </select>
               </div>
 
@@ -1083,8 +1008,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
-                  <option value="Nefacturat">❌ Nefacturat</option>
-                  <option value="Facturat">✅ Facturat</option>
+                  <option value="Nefacturat">Nefacturat</option>
+                  <option value="Facturat">Facturat</option>
                 </select>
               </div>
 
@@ -1104,15 +1029,15 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     fontSize: '14px'
                   }}
                 >
-                  <option value="Neachitat">❌ Neachitat</option>
-                  <option value="Achitat">✅ Achitat</option>
-                  <option value="Nu e cazul">➖ Nu e cazul</option>
+                  <option value="Neachitat">Neachitat</option>
+                  <option value="Achitat">Achitat</option>
+                  <option value="Nu e cazul">Nu e cazul</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* ✅ FIX PRINCIPAL: SECȚIUNE Date și responsabil cu validare îmbunătățită */}
+          {/* FIX PRINCIPAL: SECȚIUNE Date simplificată */}
           <div style={{ 
             background: '#f0f8ff',
             padding: '1rem',
@@ -1120,7 +1045,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             marginBottom: '1rem',
             border: '1px solid #cce7ff'
           }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>📅 Perioada Proiect</h4>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Perioada Proiect</h4>
             
             <div style={{ 
               display: 'grid', 
@@ -1130,16 +1055,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Început
-                  {formData.Data_Start && (
-                    <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: 'normal' }}>
-                      ({formatDateForDisplay(formData.Data_Start)})
-                    </span>
-                  )}
                 </label>
                 <input
                   type="date"
                   value={formData.Data_Start}
-                  onChange={(e) => handleDateChange('Data_Start', e.target.value)}
+                  onChange={(e) => handleInputChange('Data_Start', e.target.value)}
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -1150,23 +1070,18 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   }}
                 />
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>
-                  💡 Completează pentru afișare corectă în listă
+                  FIX: Format ISO standard (yyyy-mm-dd) pentru BigQuery
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Data Finalizare (estimată)
-                  {formData.Data_Final && (
-                    <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: 'normal' }}>
-                      ({formatDateForDisplay(formData.Data_Final)})
-                    </span>
-                  )}
                 </label>
                 <input
                   type="date"
                   value={formData.Data_Final}
-                  onChange={(e) => handleDateChange('Data_Final', e.target.value)}
+                  onChange={(e) => handleInputChange('Data_Final', e.target.value)}
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -1177,7 +1092,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   }}
                 />
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>
-                  💡 Opțional, dar recomandat pentru planificare
+                  Opțional, dar recomandat pentru planificare
                 </div>
               </div>
 
@@ -1202,7 +1117,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               </div>
             </div>
 
-            {/* ✅ Informație despre perioada proiectului */}
+            {/* Informație despre perioada proiectului */}
             {formData.Data_Start && formData.Data_Final && (
               <div style={{
                 marginTop: '1rem',
@@ -1213,7 +1128,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 fontSize: '14px',
                 color: '#155724'
               }}>
-                ✅ <strong>Perioada proiect:</strong> {formatDateForDisplay(formData.Data_Start)} → {formatDateForDisplay(formData.Data_Final)}
+                <strong>Perioada proiect:</strong> {new Date(formData.Data_Start).toLocaleDateString()} → {new Date(formData.Data_Final).toLocaleDateString()}
                 {(() => {
                   try {
                     const start = new Date(formData.Data_Start);
@@ -1251,10 +1166,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             />
           </div>
 
-          {/* SECȚIUNE: Cheltuieli Proiect */}
+          {/* SECȚIUNE: Cheltuieli Proiect - PĂSTRATĂ identic */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h4 style={{ margin: 0, color: '#2c3e50' }}>💰 Cheltuieli Proiect</h4>
+              <h4 style={{ margin: 0, color: '#2c3e50' }}>Cheltuieli Proiect</h4>
               <button
                 type="button"
                 onClick={addCheltuiala}
@@ -1308,7 +1223,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    🗑️
+                    Șterge
                   </button>
                 </div>
 
@@ -1329,10 +1244,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '14px'
                     }}
                   >
-                    <option value="subcontractant">👷 Subcontractant</option>
-                    <option value="materiale">🧱 Materiale</option>
-                    <option value="transport">🚚 Transport</option>
-                    <option value="alte">📦 Alte cheltuieli</option>
+                    <option value="subcontractant">Subcontractant</option>
+                    <option value="materiale">Materiale</option>
+                    <option value="transport">Transport</option>
+                    <option value="alte">Alte cheltuieli</option>
                   </select>
                   
                   <input
@@ -1434,8 +1349,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    <option value="Nepredat">❌ Nepredat</option>
-                    <option value="Predat">✅ Predat</option>
+                    <option value="Nepredat">Nepredat</option>
+                    <option value="Predat">Predat</option>
                   </select>
                   
                   <select
@@ -1449,9 +1364,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    <option value="Nu e cazul">➖ Nu e cazul</option>
-                    <option value="Nesemnat">📝 Nesemnat</option>
-                    <option value="Semnat">✅ Semnat</option>
+                    <option value="Nu e cazul">Nu e cazul</option>
+                    <option value="Nesemnat">Nesemnat</option>
+                    <option value="Semnat">Semnat</option>
                   </select>
                   
                   <select
@@ -1465,8 +1380,8 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    <option value="Nefacturat">❌ Nefacturat</option>
-                    <option value="Facturat">✅ Facturat</option>
+                    <option value="Nefacturat">Nefacturat</option>
+                    <option value="Facturat">Facturat</option>
                   </select>
                   
                   <select
@@ -1480,22 +1395,22 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    <option value="Neachitat">❌ Neachitat</option>
-                    <option value="Achitat">✅ Achitat</option>
-                    <option value="Nu e cazul">➖ Nu e cazul</option>
+                    <option value="Neachitat">Neachitat</option>
+                    <option value="Achitat">Achitat</option>
+                    <option value="Nu e cazul">Nu e cazul</option>
                   </select>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* ✅ SECȚIUNE: Subproiecte cu câmpuri complete */}
+          {/* SECȚIUNE: Subproiecte cu câmpuri complete - PĂSTRATĂ identic */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                📋 Subproiecte
+                Subproiecte
                 <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                  🔥 Cursuri BNR LIVE
+                  Cursuri BNR LIVE
                 </span>
               </h4>
               <button
@@ -1537,7 +1452,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   <h5 style={{ margin: 0, color: '#2c3e50' }}>
                     Subproiect #{index + 1}
                     <span style={{ fontSize: '10px', color: '#27ae60', marginLeft: '0.5rem' }}>
-                      🔥 Curs BNR LIVE
+                      Curs BNR LIVE
                     </span>
                   </h5>
                   <button
@@ -1554,7 +1469,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '12px'
                     }}
                   >
-                    🗑️
+                    Șterge
                   </button>
                 </div>
                 
@@ -1633,9 +1548,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                       fontSize: '14px'
                     }}
                   >
-                    <option value="Planificat">📅 Planificat</option>
-                    <option value="Activ">🟢 Activ</option>
-                    <option value="Finalizat">✅ Finalizat</option>
+                    <option value="Planificat">Planificat</option>
+                    <option value="Activ">Activ</option>
+                    <option value="Finalizat">Finalizat</option>
                   </select>
                 </div>
               </div>
@@ -1704,7 +1619,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 fontWeight: 'bold'
               }}
             >
-              {loading ? '⏳ Se adaugă...' : '💾 Adaugă Proiect'}
+              {loading ? 'Se adaugă...' : 'Adaugă Proiect'}
             </button>
           </div>
         </form>

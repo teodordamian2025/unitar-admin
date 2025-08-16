@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 16.08.2025 10:15 (ora României)
-// FIX APLICAT: Corectare formatDate() pentru eliminarea "Data invalidă"
+// DATA: 16.08.2025 11:30 (ora României)
+// FIX APLICAT: Simplificare completă formatare date + îmbunătățire calcul total
 // PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
@@ -480,27 +480,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
   // ============================================================================
-  // FIX PRINCIPAL: Funcție formatDate îmbunătățită pentru eliminarea "Data invalidă"
+  // FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ - folosește doar browser locale
   // ============================================================================
   const formatDate = (dateString?: string | null) => {
-    // VERIFICARE EXPLICITĂ pentru toate cazurile problematice
-    if (!dateString || 
-        dateString === null || 
-        dateString === undefined ||
-        dateString === 'null' || 
-        dateString === 'undefined') {
-      return (
-        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Data lipsă
-        </span>
-      );
-    }
-
-    // ASIGURARE că avem string pentru procesare
-    const dateStr = typeof dateString === 'string' ? dateString : String(dateString);
-    
-    // VERIFICARE dacă string-ul este gol după conversie
-    if (dateStr.trim() === '') {
+    // Verificare simplă pentru date inexistente
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
           Data lipsă
@@ -509,10 +493,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
     
     try {
-      // BigQuery returnează date în format yyyy-mm-dd
-      const date = new Date(dateStr);
+      // Creează Date object direct din string-ul BigQuery (yyyy-mm-dd)
+      const date = new Date(dateString);
       
-      // VERIFICARE validitate dată
+      // Verificare simplă de validitate
       if (isNaN(date.getTime())) {
         return (
           <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -521,29 +505,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         );
       }
       
-      // VERIFICARE range rezonabil pentru date
-      const year = date.getFullYear();
-      if (year < 2000 || year > 2050) {
-        return (
-          <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-            An invalid
-          </span>
-        );
-      }
-      
-      // FORMATARE corectă pentru afișare
+      // Folosește localizarea automată a browser-ului
       return (
         <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-          {date.toLocaleDateString('ro-RO', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-          })}
+          {date.toLocaleDateString()}
         </span>
       );
     } catch (error) {
-      // CAPTURARE orice eroare de formatare
-      console.warn('Eroare formatare dată:', dateStr, error);
+      console.warn('Eroare formatare dată:', dateString, error);
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
           Eroare formatare
@@ -700,33 +669,76 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
   // ============================================================================
-  // FIX PĂSTRAT: CALCULARE TOTAL CORECTĂ - folosește valoare_ron din BigQuery
+  // FIX ETAPA 2: CALCULARE TOTAL ÎMBUNĂTĂȚITĂ cu validări robuste
   // ============================================================================
   const calculateTotalValue = () => {
     let totalProiecte = 0;
+    let proiecteCalculate = 0;
+    let proiecteIgnorate = 0;
     
-    proiecte.forEach(p => {
-      // FIX PRINCIPAL: Folosește valoare_ron în loc de Valoare_Estimata
-      if (p.valoare_ron && p.valoare_ron > 0) {
-        // valoare_ron conține deja valoarea convertită în RON din BigQuery
-        totalProiecte += p.valoare_ron;
-      } else if (p.Valoare_Estimata && (!p.moneda || p.moneda === 'RON')) {
-        // Fallback pentru proiecte vechi fără valoare_ron, dar doar dacă sunt în RON
-        totalProiecte += p.Valoare_Estimata;
-      } else if (p.Valoare_Estimata && p.moneda && p.moneda !== 'RON') {
-        // Pentru proiecte vechi cu valută străină, încearcă să calculeze cu cursul live
-        const cursLive = cursuriLive[p.moneda];
-        if (cursLive && !cursLive.error && cursLive.curs) {
-          totalProiecte += p.Valoare_Estimata * cursLive.curs;
-        } else if (p.curs_valutar && p.curs_valutar > 0) {
-          // Folosește cursul salvat în BD
-          totalProiecte += p.Valoare_Estimata * p.curs_valutar;
+    console.log('Calculare total portofoliu...');
+    
+    proiecte.forEach((p, index) => {
+      try {
+        // PRIORITATE 1: valoare_ron din BigQuery (cel mai precis)
+        if (p.valoare_ron && !isNaN(p.valoare_ron) && p.valoare_ron > 0) {
+          totalProiecte += p.valoare_ron;
+          proiecteCalculate++;
+          console.log(`Proiect ${p.ID_Proiect}: ${p.valoare_ron} RON (din valoare_ron BD)`);
+          return;
         }
-        // Altfel nu adăugăm valoarea pentru a evita calculele greșite
+        
+        // PRIORITATE 2: Proiecte în RON cu Valoare_Estimata
+        if (p.Valoare_Estimata && !isNaN(p.Valoare_Estimata) && p.Valoare_Estimata > 0 && 
+            (!p.moneda || p.moneda === 'RON')) {
+          totalProiecte += p.Valoare_Estimata;
+          proiecteCalculate++;
+          console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} RON (direct)`);
+          return;
+        }
+        
+        // PRIORITATE 3: Proiecte cu valută străină + curs live
+        if (p.Valoare_Estimata && !isNaN(p.Valoare_Estimata) && p.Valoare_Estimata > 0 && 
+            p.moneda && p.moneda !== 'RON') {
+          
+          const cursLive = cursuriLive[p.moneda];
+          if (cursLive && !cursLive.error && cursLive.curs && !isNaN(cursLive.curs)) {
+            const valoareCalculata = p.Valoare_Estimata * cursLive.curs;
+            totalProiecte += valoareCalculata;
+            proiecteCalculate++;
+            console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} ${p.moneda} * ${cursLive.curs} = ${valoareCalculata} RON (curs live)`);
+            return;
+          }
+          
+          // PRIORITATE 4: Folosește cursul salvat în BD
+          if (p.curs_valutar && !isNaN(p.curs_valutar) && p.curs_valutar > 0) {
+            const valoareCalculata = p.Valoare_Estimata * p.curs_valutar;
+            totalProiecte += valoareCalculata;
+            proiecteCalculate++;
+            console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} ${p.moneda} * ${p.curs_valutar} = ${valoareCalculata} RON (curs BD)`);
+            return;
+          }
+          
+          // Nu putem calcula - ignorăm să nu stricăm totalul
+          console.warn(`Proiect ${p.ID_Proiect}: Nu pot calcula valoarea (${p.Valoare_Estimata} ${p.moneda}, fără curs valid)`);
+          proiecteIgnorate++;
+          return;
+        }
+        
+        // Proiect fără valoare sau cu valoare invalidă
+        console.warn(`Proiect ${p.ID_Proiect}: Valoare lipsă sau invalidă`);
+        proiecteIgnorate++;
+        
+      } catch (error) {
+        console.error(`Eroare la calculul proiectului ${p.ID_Proiect}:`, error);
+        proiecteIgnorate++;
       }
     });
     
-    return totalProiecte;
+    console.log(`Total calculat: ${totalProiecte.toFixed(2)} RON din ${proiecteCalculate} proiecte (${proiecteIgnorate} ignorate)`);
+    
+    // Returnează 0 dacă avem NaN sau valoare negativă
+    return isNaN(totalProiecte) || totalProiecte < 0 ? 0 : totalProiecte;
   };
 
   // Loading state - PĂSTRAT identic
@@ -750,7 +762,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     );
   }
 
-  // RENDER principal - PĂSTRAT identic cu singura modificare la formatDate
+  // RENDER principal - Aici e singura modificare vizibilă
   return (
     <div style={{
       zIndex: 1,
@@ -805,7 +817,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             )}
             <br/>
             <span style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '12px' }}>
-              ✅ FIX APLICAT: Formatare date corrigită - eliminat "Data invalidă"
+              ✅ FIX APLICAT: Date simplificate + Total îmbunătățit cu validări robuste
             </span>
           </p>
         </div>
@@ -870,7 +882,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       </div>
 
-      {/* Tabel cu afișare ierarhică */}
+      {/* Tabel cu afișare ierarhică - PĂSTRAT identic cu formatDate simplificat */}
       {proiecte.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
@@ -1275,7 +1287,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             </table>
           </div>
 
-          {/* Footer cu statistici și TOTAL CORECTAT */}
+          {/* Footer cu statistici și TOTAL ÎMBUNĂTĂȚIT */}
           {proiecte.length > 0 && (
             <div style={{
               padding: '1.5rem',
@@ -1344,9 +1356,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  ✅ FIX APLICAT: Folosește valoare_ron din BigQuery pentru precizie maximă
+                  ✅ FIX APLICAT: Calcul robust cu validări și logging
                   <br/>
-                  (DOAR proiecte principale, fără subproiecte)
+                  (Console log pentru debugging - doar proiecte principale)
                 </div>
               </div>
             </div>
