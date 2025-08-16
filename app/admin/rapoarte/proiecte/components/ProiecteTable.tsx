@@ -342,7 +342,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
       
       const data = await response.json();
-      
+      console.log('=== DEBUG: Date RAW din BigQuery ===');
+      console.log('Sample proiect din API:', data.data[0]);
+      console.log('Data_Start raw:', data.data[0]?.Data_Start);
+      console.log('Data_Final raw:', data.data[0]?.Data_Final);
+      console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
       if (data.success) {
         const proiecteFormatate = (data.data || []).map((p: any) => ({
           ...p,
@@ -510,6 +514,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
 // FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ
 const formatDate = (dateString?: string | null) => {
+  console.log('formatDate primește:', dateString, 'tip:', typeof dateString);
   if (!dateString || dateString === 'null' || dateString === 'undefined') {
     return (
       <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
