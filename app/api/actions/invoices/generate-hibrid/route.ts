@@ -561,7 +561,7 @@ export async function POST(request: NextRequest) {
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
                 <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
-                ${isEdit ? '<div><strong>Status:</strong> EDITATA cu cursuri corecte din frontend</div>' : ''}
+                ${isEdit ? '<div><strong>Status:</strong> EDITATA</div>' : ''}
                 ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>MODE:</strong> TEST e-Factura</div>' : ''}
             </div>
