@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/curs-valutar/route.ts
-// DATA: 15.08.2025 14:40 (ora României)
-// MODIFICAT: Citește cursuri din BigQuery în loc de BNR API live
-// PĂSTRATE: Toate funcționalitățile existente + fallback și cache
+// DATA: 16.08.2025 13:00 (ora României)
+// FIX PRINCIPAL: Eliminare forțare 4 zecimale + validări sigure pentru parseFloat
+// PĂSTRATE: Toate funcționalitățile existente + precizie originală cursuri
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,7 +31,33 @@ const bigquery = new BigQuery({
   },
 });
 
-// ✅ PĂSTRAT: Cache îmbunătățit cu precizie originală
+// FIX PRINCIPAL: Funcție helper pentru validări sigure
+const ensureNumber = (value: any, defaultValue: number = 0): number => {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return !isNaN(parsed) && isFinite(parsed) ? parsed : defaultValue;
+  }
+  
+  return defaultValue;
+};
+
+// FIX PRINCIPAL: Funcție pentru formatare sigură cu precizie originală
+const formatWithOriginalPrecision = (value: any, originalPrecision?: string): string => {
+  // Dacă avem precizia originală, o folosim
+  if (originalPrecision && originalPrecision !== 'undefined' && originalPrecision !== 'null') {
+    return originalPrecision;
+  }
+  
+  // Altfel, formatez cu precizia naturală
+  const num = ensureNumber(value);
+  return num.toString();
+};
+
+// FIX PRINCIPAL: Cache îmbunătățit cu precizie originală
 let cursCache: { 
   [key: string]: { 
     curs: number; 
@@ -49,12 +75,12 @@ export async function GET(request: NextRequest) {
   const data = searchParams.get('data') || new Date().toISOString().split('T')[0];
 
   try {
-    // ✅ PĂSTRAT: Verifică cache-ul mai întâi cu precizie originală
+    // Verifică cache-ul mai întâi cu precizie originală
     const cacheKey = `${moneda}_${data}`;
     const cachedData = cursCache[cacheKey];
     
     if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-      console.log(`📊 Returning cached rate for ${moneda} (${data}): ${cachedData.curs} (precizie: ${cachedData.precizie_originala})`);
+      console.log(`📊 Returning cached rate for ${moneda} (${data}): ${formatWithOriginalPrecision(cachedData.curs, cachedData.precizie_originala)}`);
       return NextResponse.json({
         success: true,
         curs: cachedData.curs,
@@ -66,11 +92,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ✅ NOU: Încearcă să găsească cursul în BigQuery mai întâi
+    // Încearcă să găsească cursul în BigQuery mai întâi
     const cursValutar = await getCursFromBigQuery(moneda, data);
     
     if (cursValutar) {
-      // ✅ Salvează în cache
+      // Salvează în cache
       cursCache[cacheKey] = {
         curs: cursValutar.curs,
         data: cursValutar.data,
@@ -89,7 +115,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ✅ FALLBACK 1: Încearcă BNR API live dacă data este foarte recentă
+    // FALLBACK 1: Încearcă BNR API live dacă data este foarte recentă
     const cursLive = await getCursBNRLive(moneda, data);
     if (cursLive) {
       // Salvează cursul live în BigQuery pentru viitor
@@ -113,7 +139,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ✅ FALLBACK 2: Găsește cel mai apropiat curs din BigQuery
+    // FALLBACK 2: Găsește cel mai apropiat curs din BigQuery
     const cursApropriat = await getClosestCursFromBigQuery(moneda, data);
     if (cursApropriat) {
       console.log(`📅 Folosesc cursul cel mai apropiat pentru ${moneda}: ${cursApropriat.data} (cerut: ${data})`);
@@ -137,7 +163,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ✅ FALLBACK 3: API extern (păstrat din versiunea originală)
+    // FALLBACK 3: API extern
     const fallbackActual = await getFallbackRateActual(moneda);
     
     if (fallbackActual) {
@@ -165,24 +191,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ FIX FINAL: getCursFromBigQuery cu debugging complet
+// FIX PRINCIPAL: getCursFromBigQuery cu validări sigure
 async function getCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
     console.log(`🔍 BigQuery SEARCH: ${moneda} pentru ${data}`);
 
-    // ✅ SIMPLIFICAT: Query mai simplu pentru debugging
     const query = `
       SELECT 
         moneda,
         curs,
         data,
+        precizie_originala,
         sursa
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
       WHERE data = '${data}' AND moneda = '${moneda}'
       LIMIT 1
     `;
 
-    console.log(`📝 Query executat:`, query);
+    console.log(`🔍 Query executat:`, query);
 
     const [rows] = await bigquery.query({
       query: query,
@@ -198,24 +224,24 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
       const row = rows[0];
       console.log(`✅ ROW GĂSIT:`, row);
       
-      // ✅ Safe conversion pentru FLOAT
-      const cursValue = parseFloat(row.curs?.toString() || '0');
+      // FIX PRINCIPAL: Safe conversion pentru FLOAT cu validări
+      const cursValue = ensureNumber(row.curs, 1);
       
-      console.log(`💰 Curs procesat: ${cursValue}`);
+      console.log(`💰 Curs procesat: ${formatWithOriginalPrecision(cursValue, row.precizie_originala)}`);
       
       return {
         moneda: row.moneda,
         curs: cursValue,
         data: row.data,
-        precizie_originala: row.curs?.toString() || cursValue.toString()
+        precizie_originala: row.precizie_originala || cursValue.toString()
       };
     }
 
     console.log(`❌ NICIUN RÂND găsit pentru ${moneda} (${data})`);
     
-    // ✅ DEBUG: Verifică ce date există pentru această monedă
+    // DEBUG: Verifică ce date există pentru această monedă
     const debugQuery = `
-      SELECT data, curs 
+      SELECT data, curs, precizie_originala 
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
       WHERE moneda = '${moneda}'
       ORDER BY data DESC
@@ -234,7 +260,7 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
   }
 }
 
-// ✅ NOU: Funcție pentru găsirea celui mai apropiat curs
+// Funcție pentru găsirea celui mai apropiat curs - ACTUALIZATĂ
 async function getClosestCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
     console.log(`🔍 Căutare curs apropiat în BigQuery: ${moneda} pentru ${data}`);
@@ -269,13 +295,15 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
 
     if (rows && rows.length > 0) {
       const row = rows[0];
-      console.log(`✅ Curs apropiat găsit în BigQuery: ${moneda} = ${row.curs} (${row.data}, diferență: ${row.diferenta_zile} zile)`);
+      const cursValue = ensureNumber(row.curs, 1);
+      
+      console.log(`✅ Curs apropiat găsit în BigQuery: ${moneda} = ${formatWithOriginalPrecision(cursValue, row.precizie_originala)} (${row.data}, diferență: ${row.diferenta_zile} zile)`);
       
       return {
         moneda: row.moneda,
-        curs: parseFloat(row.curs.toString()),
+        curs: cursValue,
         data: row.data,
-        precizie_originala: row.precizie_originala
+        precizie_originala: row.precizie_originala || cursValue.toString()
       };
     }
 
@@ -288,10 +316,10 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
   }
 }
 
-// ✅ NOU: Funcție pentru salvarea cursului live în BigQuery
+// Funcție pentru salvarea cursului live în BigQuery - ACTUALIZATĂ
 async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
   try {
-    console.log(`💾 Salvare curs live în BigQuery: ${curs.moneda} = ${curs.curs} (${curs.data})`);
+    console.log(`💾 Salvare curs live în BigQuery: ${curs.moneda} = ${formatWithOriginalPrecision(curs.curs, curs.precizie_originala)} (${curs.data})`);
 
     const dataset = bigquery.dataset('PanouControlUnitar');
     const table = dataset.table('CursuriValutare');
@@ -310,7 +338,7 @@ async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
     }];
 
     await table.insert(record);
-    console.log(`✅ Curs salvat în BigQuery: ${curs.moneda} = ${curs.curs}`);
+    console.log(`✅ Curs salvat în BigQuery: ${curs.moneda} = ${formatWithOriginalPrecision(curs.curs, curs.precizie_originala)}`);
 
   } catch (error) {
     console.error(`❌ Eroare salvare curs în BigQuery:`, error);
@@ -318,7 +346,7 @@ async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
   }
 }
 
-// ✅ PĂSTRAT: Funcție BNR live (pentru cursuri foarte recente)
+// FIX PRINCIPAL: Funcție BNR live cu validări sigure și precizie originală
 async function getCursBNRLive(moneda: string, data?: string): Promise<CursValutar | null> {
   try {
     const targetDate = data || new Date().toISOString().split('T')[0];
@@ -357,19 +385,19 @@ async function getCursBNRLive(moneda: string, data?: string): Promise<CursValuta
     
     if (cursMatch) {
       const cursStringOriginal = cursMatch[1].trim();
-      const cursValue = parseFloat(cursStringOriginal);
-      const multiplier = multiplierMatch ? parseFloat(multiplierMatch[1]) : 1;
+      const cursValue = ensureNumber(cursStringOriginal, 1);
+      const multiplier = multiplierMatch ? ensureNumber(multiplierMatch[1], 1) : 1;
       const bnrDate = dateMatch ? dateMatch[1] : targetDate;
       
       const finalRate = cursValue / multiplier;
       
-      console.log(`✅ BNR live rate found: ${moneda} = ${finalRate.toFixed(4)} (${bnrDate})`);
+      console.log(`✅ BNR live rate found: ${moneda} = ${formatWithOriginalPrecision(finalRate, cursStringOriginal)} (${bnrDate})`);
       
       return {
         moneda,
         curs: finalRate,
         data: bnrDate,
-        precizie_originala: cursStringOriginal
+        precizie_originala: cursStringOriginal  // FIX: Păstrez precizia originală din XML
       };
     }
 
@@ -382,7 +410,7 @@ async function getCursBNRLive(moneda: string, data?: string): Promise<CursValuta
   }
 }
 
-// ✅ PĂSTRAT: Funcție fallback pentru API-uri alternative (din versiunea originală)
+// Funcție fallback pentru API-uri alternative - ACTUALIZATĂ
 async function getFallbackRateActual(moneda: string): Promise<CursValutar | null> {
   const alternativeAPIs = [
     {
@@ -390,10 +418,10 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
       url: `https://api.exchangerate-api.com/v4/latest/RON`,
       parse: (data: any) => {
         if (data.rates && data.rates[moneda]) {
-          const rate = 1 / data.rates[moneda];
+          const rate = 1 / ensureNumber(data.rates[moneda], 1);
           return {
             curs: rate,
-            precizie_originala: rate.toFixed(4)
+            precizie_originala: rate.toString()  // FIX: Păstrez precizia naturală
           };
         }
         return null;
@@ -404,10 +432,10 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
       url: `https://api.fixer.io/latest?base=RON&symbols=${moneda}`,
       parse: (data: any) => {
         if (data.rates && data.rates[moneda]) {
-          const rate = 1 / data.rates[moneda];
+          const rate = 1 / ensureNumber(data.rates[moneda], 1);
           return {
             curs: rate,
-            precizie_originala: rate.toFixed(4)
+            precizie_originala: rate.toString()  // FIX: Păstrez precizia naturală
           };
         }
         return null;
@@ -428,7 +456,7 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
         const result = api.parse(data);
         
         if (result) {
-          console.log(`✅ Fallback rate found from ${api.name}: ${moneda} = ${result.curs.toFixed(4)} RON`);
+          console.log(`✅ Fallback rate found from ${api.name}: ${moneda} = ${formatWithOriginalPrecision(result.curs, result.precizie_originala)} RON`);
           
           return {
             moneda,
@@ -444,7 +472,7 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
     }
   }
 
-  // ✅ ULTIMUL RESORT: Cursuri estimate actuale (actualizate)
+  // ULTIMUL RESORT: Cursuri estimate actuale (actualizate) - FIX: Fără forțare zecimale
   console.log(`🔄 Using last resort estimated rates for ${moneda}`);
   
   const cursuriEstimate: { [key: string]: number } = {
@@ -455,13 +483,13 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
   
   if (cursuriEstimate[moneda]) {
     const cursEstimat = cursuriEstimate[moneda];
-    console.log(`📊 Using estimated rate for ${moneda}: ${cursEstimat.toFixed(4)} RON`);
+    console.log(`📊 Using estimated rate for ${moneda}: ${formatWithOriginalPrecision(cursEstimat)} RON`);
     
     return {
       moneda,
       curs: cursEstimat,
       data: new Date().toISOString().split('T')[0],
-      precizie_originala: cursEstimat.toFixed(4)
+      precizie_originala: cursEstimat.toString()  // FIX: Păstrez precizia naturală
     };
   }
 
@@ -469,7 +497,7 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
   return null;
 }
 
-// ✅ PĂSTRAT: POST endpoint pentru conversii (din versiunea originală)
+// POST endpoint pentru conversii - ACTUALIZAT cu validări sigure
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -482,12 +510,21 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // FIX PRINCIPAL: Validare sigură pentru valoare
+    const valoareSigura = ensureNumber(valoare, 0);
+    if (valoareSigura <= 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Valoarea trebuie să fie un număr pozitiv'
+      }, { status: 400 });
+    }
+
     // Dacă ambele monede sunt RON, nu e nevoie de conversie
     if (monedaSursa === 'RON' && monedaDestinatie === 'RON') {
       return NextResponse.json({
         success: true,
-        valoareOriginala: valoare,
-        valoareConvertita: valoare,
+        valoareOriginala: valoareSigura,
+        valoareConvertita: valoareSigura,
         curs: 1,
         monedaSursa,
         monedaDestinatie,
@@ -496,7 +533,7 @@ export async function POST(request: NextRequest) {
     }
 
     let curs = 1;
-    let valoareConvertita = valoare;
+    let valoareConvertita = valoareSigura;
 
     if (monedaSursa === 'RON') {
       // Convertește din RON în altă monedă - folosește BigQuery
@@ -504,7 +541,7 @@ export async function POST(request: NextRequest) {
                              await getCursBNRLive(monedaDestinatie, data);
       if (cursDestinatie) {
         curs = 1 / cursDestinatie.curs;
-        valoareConvertita = valoare / cursDestinatie.curs;
+        valoareConvertita = valoareSigura / cursDestinatie.curs;
       }
     } else if (monedaDestinatie === 'RON') {
       // Convertește din altă monedă în RON - folosește BigQuery
@@ -512,7 +549,7 @@ export async function POST(request: NextRequest) {
                         await getCursBNRLive(monedaSursa, data);
       if (cursSursa) {
         curs = cursSursa.curs;
-        valoareConvertita = valoare * cursSursa.curs;
+        valoareConvertita = valoareSigura * cursSursa.curs;
       }
     } else {
       // Convertește între două monede străine prin RON - folosește BigQuery
@@ -522,17 +559,21 @@ export async function POST(request: NextRequest) {
                              await getCursBNRLive(monedaDestinatie, data);
       
       if (cursSursa && cursDestinatie) {
-        const valoareRON = valoare * cursSursa.curs;
+        const valoareRON = valoareSigura * cursSursa.curs;
         valoareConvertita = valoareRON / cursDestinatie.curs;
         curs = cursSursa.curs / cursDestinatie.curs;
       }
     }
 
+    // FIX PRINCIPAL: Validări sigure pentru rezultate
+    const valoareConvertitataSigura = ensureNumber(valoareConvertita, 0);
+    const cursSigur = ensureNumber(curs, 1);
+
     return NextResponse.json({
       success: true,
-      valoareOriginala: valoare,
-      valoareConvertita: Number(valoareConvertita.toFixed(2)),
-      curs: Number(curs.toFixed(6)),
+      valoareOriginala: valoareSigura,
+      valoareConvertita: Number(valoareConvertitataSigura.toFixed(2)),
+      curs: Number(cursSigur.toFixed(6)),
       monedaSursa,
       monedaDestinatie,
       data: data || new Date().toISOString().split('T')[0]
@@ -548,7 +589,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ PĂSTRAT: Endpoint pentru curățarea cache-ului
+// Endpoint pentru curățarea cache-ului - PĂSTRAT
 export async function DELETE() {
   cursCache = {};
   console.log('🧹 Cache curs valutar șters complet');

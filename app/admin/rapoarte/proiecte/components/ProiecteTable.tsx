@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 16.08.2025 11:30 (ora României)
-// FIX APLICAT: Simplificare completă formatare date + îmbunătățire calcul total
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 16.08.2025 12:30 (ora RomÃ¢niei)
+// FIX PRINCIPAL: Eliminare fortare 4 zecimale + validari sigure pentru .toFixed()
+// PĂSTRATE: Toate funcționalitățile existente + precizie originala cursuri
 // ==================================================================
 
 'use client';
@@ -20,13 +20,13 @@ interface Proiect {
   Denumire: string;
   Client: string;
   Status: string;
-  Data_Start?: string;          // DATE din BigQuery → string
-  Data_Final?: string;          // DATE din BigQuery → string
-  Valoare_Estimata?: number;    // NUMERIC din BigQuery → number
+  Data_Start?: string;
+  Data_Final?: string;
+  Valoare_Estimata?: number;
   moneda?: string;
-  valoare_ron?: number;         // NUMERIC(15,2) din BigQuery → number
-  curs_valutar?: number;        // NUMERIC(10,4) din BigQuery → number
-  data_curs_valutar?: string;   // DATE din BigQuery → string
+  valoare_ron?: number;
+  curs_valutar?: number;
+  data_curs_valutar?: string;
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -45,13 +45,13 @@ interface Subproiect {
   Denumire: string;
   Responsabil?: string;
   Status: string;
-  Data_Start?: string;          // DATE din BigQuery → string
-  Data_Final?: string;          // DATE din BigQuery → string
-  Valoare_Estimata?: number;    // NUMERIC(10,2) din BigQuery → number
+  Data_Start?: string;
+  Data_Final?: string;
+  Valoare_Estimata?: number;
   moneda?: string;
-  valoare_ron?: number;         // NUMERIC(15,2) din BigQuery → number
-  curs_valutar?: number;        // NUMERIC(10,4) din BigQuery → number
-  data_curs_valutar?: string;   // DATE din BigQuery → string
+  valoare_ron?: number;
+  curs_valutar?: number;
+  data_curs_valutar?: string;
   status_predare?: string;
   status_contract?: string;
   status_facturare?: string;
@@ -74,7 +74,33 @@ interface CursuriLive {
   };
 }
 
-// Funcție pentru preluarea cursurilor BNR LIVE - PĂSTRATĂ identic
+// FIX PRINCIPAL: Funcție helper pentru validări sigure
+const ensureNumber = (value: any, defaultValue: number = 0): number => {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return !isNaN(parsed) && isFinite(parsed) ? parsed : defaultValue;
+  }
+  
+  return defaultValue;
+};
+
+// FIX PRINCIPAL: Funcție pentru formatare sigură cu precizie originală
+const formatWithOriginalPrecision = (value: any, originalPrecision?: string): string => {
+  // Dacă avem precizia originală, o folosim
+  if (originalPrecision && originalPrecision !== 'undefined' && originalPrecision !== 'null') {
+    return originalPrecision;
+  }
+  
+  // Altfel, formatez cu precizia naturală
+  const num = ensureNumber(value);
+  return num.toString();
+};
+
+// Funcție pentru preluarea cursurilor BNR LIVE - ACTUALIZATĂ
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
   if (moneda === 'RON') return 1;
   
@@ -84,8 +110,8 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
     const result = await response.json();
     
     if (result.success && result.curs) {
-      const cursNumeric = typeof result.curs === 'number' ? result.curs : parseFloat(result.curs.toString());
-      console.log(`Curs BNR live pentru ${moneda}: ${cursNumeric.toFixed(4)}`);
+      const cursNumeric = ensureNumber(result.curs, 1);
+      console.log(`Curs BNR live pentru ${moneda}: ${formatWithOriginalPrecision(cursNumeric, result.precizie_originala)}`);
       return cursNumeric;
     }
     
@@ -189,7 +215,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [proiecte, subproiecte]);
 
-  // Toate funcțiile de încărcare date - PĂSTRATE identic
+  // FIX PRINCIPAL: Funcție pentru identificare și preluare cursuri ACTUALIZATĂ
   const identificaSiPreiaCursuriLive = async () => {
     const valuteNecesare = new Set<string>();
     
@@ -216,11 +242,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       const promisesCursuri = monede.map(async (moneda) => {
         try {
           const cursLive = await getCursBNRLive(moneda);
+          
+          // FIX: Nu forțez 4 zecimale, păstrez precizia originală
           return {
             moneda,
             curs: cursLive,
             data: new Date().toISOString().split('T')[0],
-            precizie_originala: cursLive.toString(),
+            precizie_originala: cursLive.toString(), // Păstrez precizia naturală
             loading: false
           };
         } catch (error) {
@@ -284,6 +312,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [searchParams]);
 
+  // Toate funcțiile de încărcare date - PĂSTRATE identic
   const loadData = async () => {
     try {
       setLoading(true);
@@ -479,11 +508,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // ============================================================================
-  // FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ - folosește doar browser locale
-  // ============================================================================
+  // FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ - PĂSTRATĂ din versiunea anterioară
   const formatDate = (dateString?: string | null) => {
-    // Verificare simplă pentru date inexistente
     if (!dateString || dateString === 'null' || dateString === 'undefined') {
       return (
         <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -493,10 +519,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
     
     try {
-      // Creează Date object direct din string-ul BigQuery (yyyy-mm-dd)
       const date = new Date(dateString);
       
-      // Verificare simplă de validitate
       if (isNaN(date.getTime())) {
         return (
           <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
@@ -505,7 +529,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         );
       }
       
-      // Folosește localizarea automată a browser-ului
       return (
         <span style={{ color: '#2c3e50', fontWeight: '500' }}>
           {date.toLocaleDateString()}
@@ -521,7 +544,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  // Funcții pentru currency - PĂSTRATE identic
+  // FIX PRINCIPAL: Funcții pentru currency cu validări sigure și precizie originală
   const recalculeazaValoareaCuCursBNRLive = (
     valoareOriginala: number, 
     monedaOriginala: string, 
@@ -529,23 +552,27 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     cursVechiDinBD?: number
   ) => {
     if (monedaOriginala === 'RON' || !monedaOriginala) {
-      return valoareOriginala;
+      return ensureNumber(valoareOriginala);
     }
     
     const cursLive = cursuriLive[monedaOriginala];
     if (cursLive && !cursLive.error && cursLive.curs) {
-      return valoareOriginala * cursLive.curs;
+      const valoareSigura = ensureNumber(valoareOriginala);
+      const cursSigur = ensureNumber(cursLive.curs, 1);
+      return valoareSigura * cursSigur;
     }
     
     if (valoareRonBD && valoareRonBD > 0) {
-      return valoareRonBD;
+      return ensureNumber(valoareRonBD);
     }
     
     if (cursVechiDinBD && cursVechiDinBD > 0) {
-      return valoareOriginala * cursVechiDinBD;
+      const valoareSigura = ensureNumber(valoareOriginala);
+      const cursSigur = ensureNumber(cursVechiDinBD, 1);
+      return valoareSigura * cursSigur;
     }
     
-    return valoareOriginala;
+    return ensureNumber(valoareOriginala);
   };
 
   const formatCurrencyWithOriginal = (
@@ -555,7 +582,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     cursVechiDinBD?: number,
     isSubproiect = false
   ) => {
-    if (!amount && amount !== 0) return '';
+    const amountSigur = ensureNumber(amount);
+    if (amountSigur === 0 && !amount) return '';
     
     const originalCurrency = currency || 'RON';
     const colorClass = isSubproiect ? '#3498db' : '#27ae60';
@@ -566,13 +594,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: 'RON'
-          }).format(amount)}
+          }).format(amountSigur)}
         </div>
       );
     }
     
     const valoareRecalculataRON = recalculeazaValoareaCuCursBNRLive(
-      amount, 
+      amountSigur, 
       originalCurrency, 
       ronValueBD, 
       cursVechiDinBD
@@ -587,7 +615,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           {new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: originalCurrency
-          }).format(amount)}
+          }).format(amountSigur)}
         </div>
         <div style={{ 
           fontSize: '11px', 
@@ -622,7 +650,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
               borderRadius: '3px', 
               fontSize: '9px'
             }}>
-              ⏳
+              ⳼
             </span>
           )}
         </div>
@@ -633,7 +661,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             marginTop: '1px',
             fontFamily: 'monospace'
           }}>
-            1 {originalCurrency} = {cursLive.curs.toFixed(4)} RON
+            {/* FIX: Păstrez precizia originală, nu forțez la 4 zecimale */}
+            1 {originalCurrency} = {formatWithOriginalPrecision(cursLive.curs, cursLive.precizie_originala)} RON
           </div>
         )}
       </div>
@@ -641,11 +670,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   };
 
   const formatCurrency = (amount?: number) => {
-    if (!amount && amount !== 0) return '';
+    const amountSigur = ensureNumber(amount);
+    if (amountSigur === 0 && !amount) return '';
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
       currency: 'RON'
-    }).format(amount);
+    }).format(amountSigur);
   };
 
   const getStatusColor = (status: string) => {
@@ -662,70 +692,67 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     switch (status) {
       case 'Activ': return '🟢';
       case 'Finalizat': return '✅';
-      case 'Suspendat': return '⸸️';
+      case 'Suspendat': return '⏸️';
       case 'Arhivat': return '📦';
       default: return '⚪';
     }
   };
 
-  // ============================================================================
-  // FIX ETAPA 2: CALCULARE TOTAL ÎMBUNĂTĂȚITĂ cu validări robuste
-  // ============================================================================
+  // FIX PRINCIPAL: Calculare total ÎMBUNĂTĂȚITĂ cu validări robuste
   const calculateTotalValue = () => {
     let totalProiecte = 0;
     let proiecteCalculate = 0;
     let proiecteIgnorate = 0;
     
-    console.log('Calculare total portofoliu...');
+    console.log('Calculare total portofoliu cu validări sigure...');
     
     proiecte.forEach((p, index) => {
       try {
         // PRIORITATE 1: valoare_ron din BigQuery (cel mai precis)
-        if (p.valoare_ron && !isNaN(p.valoare_ron) && p.valoare_ron > 0) {
-          totalProiecte += p.valoare_ron;
+        const valoareRonSigura = ensureNumber(p.valoare_ron);
+        if (valoareRonSigura > 0) {
+          totalProiecte += valoareRonSigura;
           proiecteCalculate++;
-          console.log(`Proiect ${p.ID_Proiect}: ${p.valoare_ron} RON (din valoare_ron BD)`);
+          console.log(`Proiect ${p.ID_Proiect}: ${valoareRonSigura} RON (din valoare_ron BD)`);
           return;
         }
         
         // PRIORITATE 2: Proiecte în RON cu Valoare_Estimata
-        if (p.Valoare_Estimata && !isNaN(p.Valoare_Estimata) && p.Valoare_Estimata > 0 && 
-            (!p.moneda || p.moneda === 'RON')) {
-          totalProiecte += p.Valoare_Estimata;
+        const valoareEstimataSigura = ensureNumber(p.Valoare_Estimata);
+        if (valoareEstimataSigura > 0 && (!p.moneda || p.moneda === 'RON')) {
+          totalProiecte += valoareEstimataSigura;
           proiecteCalculate++;
-          console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} RON (direct)`);
+          console.log(`Proiect ${p.ID_Proiect}: ${valoareEstimataSigura} RON (direct)`);
           return;
         }
         
         // PRIORITATE 3: Proiecte cu valută străină + curs live
-        if (p.Valoare_Estimata && !isNaN(p.Valoare_Estimata) && p.Valoare_Estimata > 0 && 
-            p.moneda && p.moneda !== 'RON') {
-          
+        if (valoareEstimataSigura > 0 && p.moneda && p.moneda !== 'RON') {
           const cursLive = cursuriLive[p.moneda];
-          if (cursLive && !cursLive.error && cursLive.curs && !isNaN(cursLive.curs)) {
-            const valoareCalculata = p.Valoare_Estimata * cursLive.curs;
+          if (cursLive && !cursLive.error && cursLive.curs) {
+            const cursSigur = ensureNumber(cursLive.curs, 1);
+            const valoareCalculata = valoareEstimataSigura * cursSigur;
             totalProiecte += valoareCalculata;
             proiecteCalculate++;
-            console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} ${p.moneda} * ${cursLive.curs} = ${valoareCalculata} RON (curs live)`);
+            console.log(`Proiect ${p.ID_Proiect}: ${valoareEstimataSigura} ${p.moneda} * ${formatWithOriginalPrecision(cursSigur, cursLive.precizie_originala)} = ${ensureNumber(valoareCalculata).toFixed(2)} RON (curs live)`);
             return;
           }
           
           // PRIORITATE 4: Folosește cursul salvat în BD
-          if (p.curs_valutar && !isNaN(p.curs_valutar) && p.curs_valutar > 0) {
-            const valoareCalculata = p.Valoare_Estimata * p.curs_valutar;
+          const cursVechi = ensureNumber(p.curs_valutar);
+          if (cursVechi > 0) {
+            const valoareCalculata = valoareEstimataSigura * cursVechi;
             totalProiecte += valoareCalculata;
             proiecteCalculate++;
-            console.log(`Proiect ${p.ID_Proiect}: ${p.Valoare_Estimata} ${p.moneda} * ${p.curs_valutar} = ${valoareCalculata} RON (curs BD)`);
+            console.log(`Proiect ${p.ID_Proiect}: ${valoareEstimataSigura} ${p.moneda} * ${cursVechi} = ${ensureNumber(valoareCalculata).toFixed(2)} RON (curs BD)`);
             return;
           }
           
-          // Nu putem calcula - ignorăm să nu stricăm totalul
-          console.warn(`Proiect ${p.ID_Proiect}: Nu pot calcula valoarea (${p.Valoare_Estimata} ${p.moneda}, fără curs valid)`);
+          console.warn(`Proiect ${p.ID_Proiect}: Nu pot calcula valoarea (${valoareEstimataSigura} ${p.moneda}, fără curs valid)`);
           proiecteIgnorate++;
           return;
         }
         
-        // Proiect fără valoare sau cu valoare invalidă
         console.warn(`Proiect ${p.ID_Proiect}: Valoare lipsă sau invalidă`);
         proiecteIgnorate++;
         
@@ -735,10 +762,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       }
     });
     
-    console.log(`Total calculat: ${totalProiecte.toFixed(2)} RON din ${proiecteCalculate} proiecte (${proiecteIgnorate} ignorate)`);
+    const totalSigur = ensureNumber(totalProiecte);
+    console.log(`Total calculat: ${totalSigur.toFixed(2)} RON din ${proiecteCalculate} proiecte (${proiecteIgnorate} ignorate)`);
     
-    // Returnează 0 dacă avem NaN sau valoare negativă
-    return isNaN(totalProiecte) || totalProiecte < 0 ? 0 : totalProiecte;
+    return totalSigur;
   };
 
   // Loading state - PĂSTRAT identic
@@ -757,12 +784,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         border: '1px solid rgba(255, 255, 255, 0.3)',
         zIndex: 1
       }}>
-        ⏳ Se încarcă proiectele...
+        ⳼ Se încarcă proiectele...
       </div>
     );
   }
 
-  // RENDER principal - Aici e singura modificare vizibilă
+  // RENDER principal - PĂSTRAT identic cu funcțiile actualizate
   return (
     <div style={{
       zIndex: 1,
@@ -812,12 +839,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                 fontSize: '11px',
                 fontWeight: 'bold'
               }}>
-                {loadingCursuri ? '⏳ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
+                {loadingCursuri ? '⳼ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
               </span>
             )}
             <br/>
             <span style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '12px' }}>
-              ✅ FIX APLICAT: Date simplificate + Total îmbunătățit cu validări robuste
+              ✅ FIX APLICAT: Eliminare forțare 4 zecimale + Validări sigure pentru .toFixed()
             </span>
           </p>
         </div>
@@ -882,7 +909,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         </div>
       </div>
 
-      {/* Tabel cu afișare ierarhică - PĂSTRAT identic cu formatDate simplificat */}
+      {/* Tabelul cu afișare ierarhică - PĂSTRAT identic cu funcțiile actualizate */}
       {proiecte.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
@@ -1337,7 +1364,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                     {Object.keys(cursuriLive).filter(m => !cursuriLive[m].error).length}/{Object.keys(cursuriLive).length}
                   </div>
                   <div style={{ fontSize: '10px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                    Precizie maximă (4 zecimale)
+                    Precizie originală (fără forțare zecimale)
                   </div>
                 </div>
               )}
@@ -1356,7 +1383,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   {formatCurrency(calculateTotalValue())}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                  ✅ FIX APLICAT: Calcul robust cu validări și logging
+                  ✅ FIX APLICAT: Validări sigure + Precizie originală cursuri
                   <br/>
                   (Console log pentru debugging - doar proiecte principale)
                 </div>
