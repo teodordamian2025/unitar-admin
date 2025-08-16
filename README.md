@@ -594,5 +594,7 @@ API-uri modificate:
 
 app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
 Probleme pentru viitor, nu pentru acum:
+1. La https://admin.unitarproiect.eu/admin/rapoarte/proiecte la Valoare Totală Portofoliu scrie NaN RON. Trebuie identificat sa se adune numai proiectele, numai valoarea in RON din Bigwuery coloana valoare_ron pentru proiectele afisate. 
 2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte pentru coloana Data Început si Data Finalizare scrie ❌ Dată invalidă pentru cele care au data in baza de date. In Bigquery Data_Start si Data_Final sunt de forma 2025-07-20. Trebuie corectat sa se vada data.
 3. Cand se editeaza proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage si la subproiecte. S-a modificat aplicatia pentru curs valutar, se citeste din Baza de date, iar curs_valutar actualizeaza zilnic baza de date.
+4. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte la meniul Proiect nou, asa cum la client se adauga intr-un rand in care tastez cateva litere si il aduc din baza de date, la fel vreau sa aduc si pentru Responsabil din tabelul utilizatori si pe Subcontractanti dintr-un tabel nou care nu exista, similar cu cel pentru clienti. Pe Subcontractanti trebuie sa ii adaugam identic ca la Clienti, dupa cui si sau nume tastand cateva litere. 
