@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 16.08.2025 10:30
-// FIX PROBLEMA 1b: Observațiile nu se precompletează, rămân goale cu placeholder
+// DATA: 17.08.2025 09:30
+// FIX UTF-8 ENCODING: Toast-uri și mesaje cu caractere corecte
+// PĂSTRATE: TOATE funcționalitățile existente
 // ==================================================================
 
 'use client';
@@ -15,7 +16,7 @@ interface Factura {
   data_factura: string | { value: string };
   client_nume: string;
   client_cui: string;
-  proiect_id?: string; // âœ… IMPORTANT: CÃ¢mpul din BigQuery
+  proiect_id?: string;
   proiect_denumire?: string;
   subtotal: number;
   total_tva: number;
@@ -24,7 +25,6 @@ interface Factura {
   date_complete_json?: string;
   efactura_enabled?: boolean;
   efactura_status?: string;
-  // âœ… ADÄ‚UGAT: CÃ¢mpuri transmise din FacturiList
   dateComplete?: any;
   proiectId?: string;
   proiect_id_bigquery?: string;
@@ -38,8 +38,94 @@ interface EditFacturaModalProps {
   mode?: 'edit' | 'storno';
 }
 
-// Toast system
+// ✅ FIX UTF-8: Funcție centralizată pentru curățarea encoding-ului
+const fixUTF8Encoding = (text: string): string => {
+  return text
+    // Fix emoji-uri corupte
+    .replace(/Ã°Å¸Â§Âª/g, '🧪')
+    .replace(/Ã°Å¸"â€ž/g, '📄')
+    .replace(/Ã°Å¸"Â´/g, '🔴')
+    .replace(/Ã°Å¸Å¸Â¡/g, '⏳')
+    .replace(/Ã°Å¸"Â¤/g, '📤')
+    .replace(/Ã°Å¸Å¸ /g, '⏰')
+    .replace(/Ã°Å¸"Âµ/g, '📵')
+    .replace(/Ã°Å¸Å¸Â¢/g, '⏢')
+    .replace(/Ã°Å¸"Â/g, '📋')
+    .replace(/Ã°Å¸—'ï¸/g, '🗑️')
+    // Fix caractere speciale
+    .replace(/â"'/g, '❓')
+    .replace(/âœ…/g, '✅')
+    .replace(/âŒ/g, '❌')
+    .replace(/â¸ï¸/g, '⏸️')
+    .replace(/â†©ï¸/g, '↩️')
+    .replace(/âœï¸/g, '✏️')
+    .replace(/â³/g, '⏳')
+    .replace(/âš ï¸/g, '⚠️')
+    .replace(/â„¹ï¸/g, 'ℹ️')
+    .replace(/â‰ˆ/g, '≈')
+    .replace(/Ã¢Å"â€¦/g, '✓')
+    .replace(/Ã¢â€ Â©Ã¯Â¸/g, '↩')
+    .replace(/Ã¢Å¡ Ã¯Â¸/g, '⚠')
+    // Fix diacritice românești
+    .replace(/IncarcÄƒ/g, 'Incarcare')
+    .replace(/ÃŽncarcÄƒ/g, 'Incarcare')
+    .replace(/încarcÄƒ/g, 'incarcare')
+    .replace(/gÄƒsit/g, 'gasit')
+    .replace(/gÄƒsite/g, 'gasite')
+    .replace(/completÄƒ/g, 'completa')
+    .replace(/CreatÄƒ/g, 'Creata')
+    .replace(/creatÄƒ/g, 'creata')
+    .replace(/ActualizatÄƒ/g, 'Actualizata')
+    .replace(/actualizatÄƒ/g, 'actualizata')
+    .replace(/SalvatÄƒ/g, 'Salvata')
+    .replace(/salvatÄƒ/g, 'salvata')
+    .replace(/StornatÄƒ/g, 'Stornata')
+    .replace(/StornatÄ‚/g, 'Stornata')
+    .replace(/GeneratÄƒ/g, 'Generata')
+    .replace(/GeneratÄ‚/g, 'Generata')
+    .replace(/PregÄƒtesc/g, 'Pregatesc')
+    .replace(/pregÄƒtesc/g, 'pregatesc')
+    .replace(/Pentru/g, 'Pentru')
+    .replace(/pentru/g, 'pentru')
+    .replace(/Ã®ncÄƒrcarea/g, 'incarcarea')
+    .replace(/Ã®ncÄƒrcÄƒ/g, 'incarca')
+    .replace(/Ã®n/g, 'in')
+    .replace(/ÃŽn/g, 'In')
+    .replace(/sÄƒ/g, 'sa')
+    .replace(/SÄƒ/g, 'Sa')
+    .replace(/È™i/g, 'si')
+    .replace(/È˜i/g, 'Si')
+    .replace(/È™tergi/g, 'stergi')
+    .replace(/È™ters/g, 'sters')
+    .replace(/È™tergerea/g, 'stergerea')
+    .replace(/È™tergere/g, 'stergere')
+    .replace(/modificÄƒri/g, 'modificari')
+    .replace(/ModificÄƒri/g, 'Modificari')
+    .replace(/eÈ™uat/g, 'esuat')
+    .replace(/EÈ™uat/g, 'Esuat')
+    .replace(/BigQueryÈ™i/g, 'BigQuery si')
+    .replace(/verificÄƒ/g, 'verifica')
+    .replace(/VerificÄƒ/g, 'Verifica')
+    .replace(/necunoscutÄƒ/g, 'necunoscuta')
+    .replace(/NecunoscutÄƒ/g, 'Necunoscuta')
+    // Fix alte caractere problematice
+    .replace(/Ã„Æ'/g, 'a')
+    .replace(/Ã„â€š/g, 'A')
+    .replace(/Ã¢/g, 'a')
+    .replace(/Ã‚/g, 'A')
+    .replace(/Ã®/g, 'i')
+    .replace(/ÃŽ/g, 'I')
+    .replace(/È™/g, 's')
+    .replace(/È˜/g, 'S')
+    .replace(/È›/g, 't')
+    .replace(/Èš/g, 'T');
+};
+
+// ✅ FIX UTF-8: Toast system cu encoding corect
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  // Aplică fix-ul de encoding la mesaj
+  const cleanMessage = fixUTF8Encoding(message);
+  
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
@@ -56,7 +142,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     border: 1px solid #e0e0e0;
     max-width: 350px;
   `;
-  toastEl.textContent = message;
+  toastEl.textContent = cleanMessage;
   document.body.appendChild(toastEl);
   
   setTimeout(() => {
@@ -77,10 +163,11 @@ export default function EditFacturaModal({
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  // âœ… DEBUGGING: FuncÈ›ie helper pentru log
+  // ✅ FIX UTF-8: Funcție helper pentru log cu encoding corect
   const addDebugLog = (message: string) => {
-    console.log(`ðŸ" DEBUG: ${message}`);
-    setDebugInfo(prev => [...prev, `${new Date().toISOString().substr(11, 8)}: ${message}`]);
+    const cleanMessage = fixUTF8Encoding(message);
+    console.log(`🔍 DEBUG: ${cleanMessage}`);
+    setDebugInfo(prev => [...prev, `${new Date().toISOString().substr(11, 8)}: ${cleanMessage}`]);
   };
 
   useEffect(() => {
@@ -92,23 +179,20 @@ export default function EditFacturaModal({
 
   const loadFacturaCompleteData = async () => {
     setLoading(true);
-    setDebugInfo([]); // Reset debug info
+    setDebugInfo([]);
     
     try {
-      addDebugLog(`ÃŽncep Ã®ncÄƒrcarea datelor pentru factura ID: ${factura.id}`);
+      addDebugLog(`Incep incarcarea datelor pentru factura ID: ${factura.id}`);
       
-      // âœ… CRUCIAL: PrioritizeazÄƒ proiect_id din BigQuery
-      const proiectIdPrioritar = factura.proiect_id || // din BigQuery (PRIORITATEA 1)
-                                factura.proiect_id_bigquery || // backup din FacturiList
-                                factura.proiectId; // din transmitere
+      const proiectIdPrioritar = factura.proiect_id || 
+                                factura.proiect_id_bigquery || 
+                                factura.proiectId;
       
       addDebugLog(`ID-uri proiect disponibile: BigQuery=${factura.proiect_id}, Backup=${factura.proiect_id_bigquery}, Transmis=${factura.proiectId}`);
       addDebugLog(`ID Proiect FINAL selectat: ${proiectIdPrioritar || 'NULL'}`);
       
-      // âœ… CORECTAT: FoloseÈ™te dateComplete dacÄƒ vine din FacturiList
       let dateComplete: any = factura.dateComplete || {};
       
-      // DacÄƒ nu avem dateComplete, parseazÄƒ din date_complete_json
       if (!factura.dateComplete && factura.date_complete_json) {
         try {
           dateComplete = typeof factura.date_complete_json === 'string' 
@@ -121,13 +205,11 @@ export default function EditFacturaModal({
         }
       }
 
-      // âœ… IMPORTANT: FoloseÈ™te ID-ul prioritar Ã®n loc de cÄƒutÄƒri complexe
       const proiectIdActual = proiectIdPrioritar || 'UNKNOWN';
-
-      addDebugLog(`Proiect ID pentru Ã®ncÄƒrcarea datelor: ${proiectIdActual}`);
+      addDebugLog(`Proiect ID pentru incarcarea datelor: ${proiectIdActual}`);
       
-      console.log('ðŸ"‹ Verificare completÄƒ ID proiect - NOUA ABORDARE:', {
-        proiect_id_din_BigQuery: factura.proiect_id, // âœ… ACEASTA E SURSA PRINCIPALÄ‚
+      console.log('🔍 Verificare completa ID proiect - NOUA ABORDARE:', {
+        proiect_id_din_BigQuery: factura.proiect_id,
         proiect_id_backup: factura.proiect_id_bigquery,
         proiectId_transmis: factura.proiectId,
         din_dateComplete_proiectId: dateComplete.proiectId,
@@ -136,15 +218,15 @@ export default function EditFacturaModal({
       });
 
       if (!proiectIdActual || proiectIdActual === 'UNKNOWN') {
-        addDebugLog('âš ï¸ ATENÈšIE: Nu s-a gÄƒsit un ID de proiect valid!');
-        console.error('âŒ ID proiect invalid sau lipsÄƒ chiar È™i din BigQuery');
+        addDebugLog('⚠️ ATENTIE: Nu s-a gasit un ID de proiect valid!');
+        console.error('❌ ID proiect invalid sau lipsa chiar si din BigQuery');
       }
 
-      // âœ… ÃŽncarcÄƒ date proiect din BD dacÄƒ avem ID valid
+      // Încarcă date proiect din BD dacă avem ID valid
       let proiectInfo = dateComplete.proiectInfo || {};
       if (proiectIdActual && proiectIdActual !== 'UNKNOWN') {
         try {
-          addDebugLog(`ÃŽncarc proiectul ${proiectIdActual} din BD...`);
+          addDebugLog(`Incarc proiectul ${proiectIdActual} din BD...`);
           
           const proiectResponse = await fetch(`/api/rapoarte/proiecte?search=${encodeURIComponent(proiectIdActual)}`);
           const proiectData = await proiectResponse.json();
@@ -169,29 +251,29 @@ export default function EditFacturaModal({
                 status: proiect.Status,
                 adresa: proiect.Adresa
               };
-              addDebugLog(`âœ… Proiect gÄƒsit: ${proiect.Denumire}`);
+              addDebugLog(`✅ Proiect gasit: ${proiect.Denumire}`);
             }
           } else {
-            addDebugLog(`âš ï¸ Proiectul ${proiectIdActual} nu a fost gÄƒsit Ã®n BD`);
+            addDebugLog(`⚠️ Proiectul ${proiectIdActual} nu a fost gasit in BD`);
           }
         } catch (error) {
-          addDebugLog(`EROARE Ã®ncÄƒrcare proiect: ${error}`);
-          console.error('Eroare la Ã®ncÄƒrcarea datelor proiectului:', error);
+          addDebugLog(`EROARE incarcarre proiect: ${error}`);
+          console.error('Eroare la incarcarea datelor proiectului:', error);
         }
       }
 
-      // âœ… PregÄƒteÈ™te liniile facturii cu TVA 21% implicit
+      // Pregătește liniile facturii cu TVA 21% implicit
       let liniiFacturaPregatite = dateComplete.liniiFactura || [{
         denumire: proiectInfo.denumire || factura.proiect_denumire || 'Servicii',
         cantitate: 1,
         pretUnitar: factura.subtotal,
-        cotaTva: factura.total_tva > 0 ? 21 : 0, // âœ… CORECTAT: 21% Ã®n loc de 19%
+        cotaTva: factura.total_tva > 0 ? 21 : 0,
         monedaOriginala: proiectInfo.moneda || 'RON',
         valoareOriginala: proiectInfo.valoare,
         cursValutar: proiectInfo.curs_valutar || 1
       }];
 
-      // Pentru STORNO, inverseazÄƒ valorile
+      // Pentru STORNO, inversează valorile
       if (mode === 'storno') {
         addDebugLog('Inversez valorile pentru STORNO');
         liniiFacturaPregatite = liniiFacturaPregatite.map((linie: any) => ({
@@ -202,41 +284,39 @@ export default function EditFacturaModal({
         }));
       }
 
-      // âœ… CRUCIAL: ÃŽncarcÄƒ È™i subproiectele pentru proiectul identificat
+      // Încarcă și subproiectele pentru proiectul identificat
       let subproiecteDisponibile = [];
       if (proiectIdActual && proiectIdActual !== 'UNKNOWN') {
         try {
-          addDebugLog(`ÃŽncarc subproiectele pentru proiectul ${proiectIdActual}...`);
+          addDebugLog(`Incarc subproiectele pentru proiectul ${proiectIdActual}...`);
           
           const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdActual)}`);
           const subproiecteData = await subproiecteResponse.json();
           
           if (subproiecteData.success && subproiecteData.data) {
             subproiecteDisponibile = subproiecteData.data;
-            addDebugLog(`âœ… GÄƒsite ${subproiecteDisponibile.length} subproiecte`);
+            addDebugLog(`✅ Gasite ${subproiecteDisponibile.length} subproiecte`);
             
-            // âœ… IMPORTANT: MarcheazÄƒ subproiectele care sunt deja Ã®n facturÄƒ
             if (dateComplete.liniiFactura) {
               const subproiecteInFactura = dateComplete.liniiFactura
                 .filter((l: any) => l.tip === 'subproiect')
                 .map((l: any) => l.subproiect_id);
               
               if (subproiecteInFactura.length > 0) {
-                addDebugLog(`MarcheazÄƒ ${subproiecteInFactura.length} subproiecte ca fiind Ã®n facturÄƒ`);
+                addDebugLog(`Marcheaza ${subproiecteInFactura.length} subproiecte ca fiind in factura`);
               }
             }
           } else {
-            addDebugLog(`Nu s-au gÄƒsit subproiecte pentru proiectul ${proiectIdActual}`);
+            addDebugLog(`Nu s-au gasit subproiecte pentru proiectul ${proiectIdActual}`);
           }
         } catch (error) {
-          addDebugLog(`EROARE Ã®ncÄƒrcare subproiecte: ${error}`);
-          console.error('Eroare la Ã®ncÄƒrcarea subproiectelor:', error);
+          addDebugLog(`EROARE incarcareate subproiecte: ${error}`);
+          console.error('Eroare la incarcarea subproiectelor:', error);
         }
       }
 
-      // âœ… FIX PRINCIPAL: Standardizare clientInfo cu suport dual denumire/nume
+      // ✅ FIX PRINCIPAL: Standardizare clientInfo cu suport dual denumire/nume
       const clientInfoPregatit = (() => {
-        // DacÄƒ avem dateComplete.clientInfo, foloseÈ™te-l cu suport dual
         if (dateComplete.clientInfo) {
           return {
             id: dateComplete.clientInfo.id || '',
@@ -249,7 +329,6 @@ export default function EditFacturaModal({
           };
         }
         
-        // Altfel, construieÈ™te din datele facturii
         return {
           id: '',
           denumire: factura.client_nume || 'Client din factura',
@@ -261,13 +340,13 @@ export default function EditFacturaModal({
         };
       })();
 
-      addDebugLog(`Client info pregÄƒtit: ${clientInfoPregatit.denumire} (CUI: ${clientInfoPregatit.cui})`);
+      addDebugLog(`Client info pregatit: ${clientInfoPregatit.denumire} (CUI: ${clientInfoPregatit.cui})`);
 
-      // âœ… Date finale cu ID proiect corect È™i subproiecte
+      // Date finale cu ID proiect corect și subproiecte
       const dateFinale = {
         ID_Proiect: proiectIdActual,
         Denumire: proiectInfo.denumire || factura.proiect_denumire || 'Proiect necunoscut',
-        Client: clientInfoPregatit.denumire, // âœ… FOLOSEÈ˜TE clientInfoPregatit
+        Client: clientInfoPregatit.denumire,
         Status: proiectInfo.status || 'Activ',
         Valoare_Estimata: proiectInfo.valoare || factura.subtotal,
         moneda: proiectInfo.moneda || 'RON',
@@ -279,16 +358,15 @@ export default function EditFacturaModal({
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
         
-        // âœ… FIX PROBLEMA 1b: Observațiile NU se precompletează, rămân goale
+        // ✅ FIX PROBLEMA 1b: Observațiile NU se precompleteaza, raman goale
         _initialData: {
           ...dateComplete,
           liniiFactura: liniiFacturaPregatite,
-          clientInfo: clientInfoPregatit, // âœ… FIX: FoloseÈ™te clientInfo standardizat
-          observatii: '', // âœ… FIX PROBLEMA 1b: Gol în loc de dateComplete.observatii
+          clientInfo: clientInfoPregatit,
+          observatii: '', // ✅ FIX PROBLEMA 1b: Gol in loc de dateComplete.observatii
           numarFactura: mode === 'edit' ? factura.numar : null,
           facturaId: mode === 'edit' ? factura.id : null,
           
-          // âœ… CRUCIAL: Transmite ID-ul corect din BigQuery
           proiectId: proiectIdActual,
           proiectInfo: {
             ...proiectInfo,
@@ -296,7 +374,6 @@ export default function EditFacturaModal({
             id: proiectIdActual
           },
           
-          // âœ… IMPORTANT: Include subproiectele pentru afiÈ™are
           subproiecteDisponibile: subproiecteDisponibile,
           
           isEdit: mode === 'edit',
@@ -307,9 +384,9 @@ export default function EditFacturaModal({
         }
       };
 
-      addDebugLog(`Date finale pregÄƒtite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Subproiecte: ${subproiecteDisponibile.length}`);
+      addDebugLog(`Date finale pregatite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Subproiecte: ${subproiecteDisponibile.length}`);
       
-      console.log('ðŸ"¤ Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
+      console.log('📤 Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
         ...dateFinale,
         _initialData: {
           ...dateFinale._initialData,
@@ -327,27 +404,27 @@ export default function EditFacturaModal({
       setLoading(false);
       
     } catch (error) {
-      addDebugLog(`EROARE GENERALÄ‚: ${error}`);
-      console.error('Eroare la Ã®ncÄƒrcarea datelor complete ale facturii:', error);
-      showToast('Eroare la Ã®ncÄƒrcarea datelor facturii', 'error');
+      addDebugLog(`EROARE GENERALA: ${error}`);
+      console.error('Eroare la incarcarea datelor complete ale facturii:', error);
+      showToast('Eroare la incarcarea datelor facturii', 'error');
       setLoading(false);
     }
   };
 
-  // âœ… MODIFICAT: Handler pentru salvare cu API-ul nou de update complet
+  // ✅ MODIFICAT: Handler pentru salvare cu API-ul nou de update complet
   const handleFacturaSuccess = async (invoiceId: string, downloadUrl: string) => {
     try {
-      console.log('ðŸ" DEBUG: Success handler:', { mode, invoiceId });
+      console.log('🔍 DEBUG: Success handler:', { mode, invoiceId });
       
       if (mode === 'edit') {
-        // âœ… Pentru Edit, se salveazÄƒ automat Ã®n FacturaHibridModal prin generate-hibrid + /update
-        // Nu mai e nevoie de apel separat la /update aici - fix-ul e Ã®n FacturaHibridModal
-        showToast('âœ… FacturÄƒ actualizatÄƒ cu succes (cu cursuri BNR precise)', 'success');
+        // Pentru Edit, se salveaza automat in FacturaHibridModal prin generate-hibrid + /update
+        // Nu mai e nevoie de apel separat la /update aici - fix-ul e in FacturaHibridModal
+        showToast('✅ Factura actualizata cu succes (cu cursuri BNR precise)', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {
-        console.log('ðŸ" DEBUG: Marchez factura originalÄƒ ca stornatÄƒ...');
+        console.log('🔍 DEBUG: Marchez factura originala ca stornata...');
         
-        // MarcheazÄƒ factura originalÄƒ ca stornatÄƒ
+        // Marchează factura originală ca stornată
         try {
           const response = await fetch('/api/actions/invoices/update', {
             method: 'PUT',
@@ -355,22 +432,22 @@ export default function EditFacturaModal({
             body: JSON.stringify({
               facturaId: factura.id,
               status: 'stornata',
-              observatii: `StornatÄƒ prin factura ${invoiceId}`
+              observatii: `Stornata prin factura ${invoiceId}`
             })
           });
 
           if (response.ok) {
-            console.log('ðŸ" DEBUG: âœ… FacturÄƒ marcatÄƒ ca stornatÄƒ');
-            showToast('âœ… FacturÄƒ de stornare creatÄƒ cu succes', 'success');
+            console.log('🔍 DEBUG: ✅ Factura marcata ca stornata');
+            showToast('✅ Factura de stornare creata cu succes', 'success');
             onSuccess('reversed', invoiceId);
           }
         } catch (err) {
-          console.error('Eroare la marcarea ca stornatÄƒ:', err);
+          console.error('Eroare la marcarea ca stornata:', err);
         }
       }
     } catch (error) {
       console.error('Eroare la procesarea facturii:', error);
-      showToast(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscutÄƒ'}`, 'error');
+      showToast(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscuta'}`, 'error');
     }
 
     onClose();
@@ -399,13 +476,13 @@ export default function EditFacturaModal({
           width: '90%'
         }}>
           <div style={{ marginBottom: '1rem', fontSize: '18px', fontWeight: 'bold' }}>
-            â³ Se Ã®ncarcÄƒ datele complete ale facturii...
+            ⏳ Se incarca datele complete ale facturii...
           </div>
           <div style={{ marginBottom: '1rem', fontSize: '14px', color: '#666' }}>
-            {mode === 'edit' ? 'âœï¸ PregÄƒtesc datele pentru editare' : 'â†©ï¸ PregÄƒtesc datele pentru stornare'}
+            {mode === 'edit' ? '✏️ Pregatesc datele pentru editare' : '↩️ Pregatesc datele pentru stornare'}
           </div>
           
-          {/* âœ… DEBUGGING: AfiÈ™eazÄƒ progresul Ã®ncÄƒrcÄƒrii */}
+          {/* ✅ DEBUGGING: Afișează progresul încărcării */}
           {debugInfo.length > 0 && (
             <div style={{
               textAlign: 'left',
@@ -419,7 +496,7 @@ export default function EditFacturaModal({
               marginTop: '10px'
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                ðŸ"‹ Progres Ã®ncÄƒrcare date:
+                🔍 Progres incarcare date:
               </div>
               {debugInfo.map((log, i) => (
                 <div key={i} style={{ marginBottom: '2px', fontSize: '10px' }}>
@@ -430,7 +507,7 @@ export default function EditFacturaModal({
           )}
           
           <div style={{ marginTop: '1rem', fontSize: '12px', color: '#888' }}>
-            Se verificÄƒ ID proiect din BigQuery È™i se Ã®ncarcÄƒ subproiectele...
+            Se verifica ID proiect din BigQuery si se incarca subproiectele...
           </div>
         </div>
       </div>

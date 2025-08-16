@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/regenerate-pdf/route.ts
-// DATA: 16.08.2025 10:50
-// FIX PROBLEMA 1d: Template HTML identic cu generate-hibrid/route.ts
+// DATA: 17.08.2025 09:45
+// FIX COMPLET: Template HTML IDENTIC cu generate-hibrid + UTF-8 encoding
+// PĂSTRATE: TOATE funcționalitățile existente
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,7 +32,7 @@ async function loadContariBancare() {
     });
 
     if (rows && rows.length > 0) {
-      console.log(`Încărcat ${rows.length} conturi bancare din BigQuery`);
+      console.log(`Incarcat ${rows.length} conturi bancare din BigQuery`);
       return rows.map((row: any) => ({
         nume_banca: row.nume_banca,
         iban: row.iban,
@@ -39,11 +40,11 @@ async function loadContariBancare() {
         observatii: row.observatii
       }));
     } else {
-      console.log('Nu s-au găsit conturi bancare în BigQuery - folosesc fallback');
+      console.log('Nu s-au gasit conturi bancare in BigQuery - folosesc fallback');
       return null;
     }
   } catch (error) {
-    console.log('Eroare la încărcarea conturilor bancare din BigQuery:', error);
+    console.log('Eroare la incarcarea conturilor bancare din BigQuery:', error);
     return null;
   }
 }
@@ -54,7 +55,7 @@ const FALLBACK_CONTURI = [
     nume_banca: 'ING Bank',
     iban: 'RO82INGB0000999905667533',
     cont_principal: true,
-    observatii: 'Cont principal pentru încasări'
+    observatii: 'Cont principal pentru incasari'
   },
   {
     nume_banca: 'Trezorerie',
@@ -89,9 +90,24 @@ function generateBankDetailsHTML(conturi: any[]) {
   }).join('');
 }
 
-// Curățare caractere non-ASCII - identic cu generate-hibrid
+// ✅ FIX UTF-8: Curățare caractere non-ASCII și diacritice corupte
 function cleanNonAscii(text: string): string {
   return text
+    // Fix caractere corupte specifice
+    .replace(/Ã°Å¸Â§Âª/g, 'Mock')
+    .replace(/Ã°Å¸"â€ž/g, 'PDF')
+    .replace(/Ã°Å¸"Â´/g, 'Eroare')
+    .replace(/Ã°Å¸Å¸Â¡/g, 'In proces')
+    .replace(/Ã°Å¸"Â¤/g, 'Trimis')
+    .replace(/Ã°Å¸Å¸ /g, 'Gata')
+    .replace(/â³/g, 'Se proceseaza')
+    .replace(/âœ…/g, 'Validat')
+    .replace(/âŒ/g, 'Eroare')
+    .replace(/â†©ï¸/g, 'Storno')
+    .replace(/âœï¸/g, 'Editare')
+    .replace(/âš ï¸/g, 'Atentie')
+    .replace(/â„¹ï¸/g, 'Info')
+    // Fix diacritice românești standard
     .replace(/ă/g, 'a')
     .replace(/Ă/g, 'A')
     .replace(/â/g, 'a')
@@ -102,6 +118,7 @@ function cleanNonAscii(text: string): string {
     .replace(/Ș/g, 'S')
     .replace(/ț/g, 't')
     .replace(/Ț/g, 'T')
+    // Curățare caractere non-ASCII rămase
     .replace(/[^\x00-\x7F]/g, '');
 }
 
@@ -110,7 +127,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { facturaId, numar } = body;
 
-    console.log('Regenerez PDF pentru factură:', { facturaId, numar });
+    console.log('Regenerez PDF pentru factura:', { facturaId, numar });
 
     if (!facturaId) {
       return NextResponse.json({ error: 'facturaId este obligatoriu' }, { status: 400 });
@@ -130,7 +147,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (facturaRows.length === 0) {
-      return NextResponse.json({ error: 'Factura nu a fost găsită' }, { status: 404 });
+      return NextResponse.json({ error: 'Factura nu a fost gasita' }, { status: 404 });
     }
 
     const facturaData = facturaRows[0];
@@ -154,7 +171,7 @@ export async function POST(request: NextRequest) {
       nume: facturaData.client_nume || 'Client necunoscut',
       cui: facturaData.client_cui || 'CUI necunoscut',
       nr_reg_com: 'N/A',
-      adresa: 'Adresă necunoscută',
+      adresa: 'Adresa necunoscuta',
       telefon: 'N/A',
       email: 'N/A'
     };
@@ -163,7 +180,7 @@ export async function POST(request: NextRequest) {
       denumire: 'Servicii facturate',
       cantitate: 1,
       pretUnitar: facturaData.subtotal || 0,
-      cotaTva: facturaData.total_tva > 0 ? 21 : 0, // Schimbat de la 19% la 21%
+      cotaTva: facturaData.total_tva > 0 ? 21 : 0,
       tip: 'proiect'
     }];
 
@@ -179,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
 
-    // FIX PROBLEMA 1d: Generează nota cursuri cu formatul corect
+    // ✅ FIX UTF-8: Generează nota cursuri cu formatul corect și encoding curat
     let notaCursValutar = '';
     if (dateComplete.cursuriUtilizate && Object.keys(dateComplete.cursuriUtilizate).length > 0) {
       const monede = Object.keys(dateComplete.cursuriUtilizate);
@@ -208,13 +225,13 @@ export async function POST(request: NextRequest) {
       }).join(', ')}`;
     }
 
-    // TEMPLATE HTML IDENTIC CU generate-hibrid/route.ts
+    // ✅ FIX PROBLEMA 3: TEMPLATE HTML IDENTIC CU generate-hibrid/route.ts
     const htmlTemplate = `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Factura ${facturaData.numar || numar}</title>
+        <title>Factura ${cleanNonAscii(facturaData.numar || numar)}</title>
         <style>
             * {
                 margin: 0;
@@ -444,20 +461,20 @@ export async function POST(request: NextRequest) {
             </div>
             <div class="company-right">
                 <h3>CLIENT</h3>
-                <div class="info-line"><strong>${clientInfo.nume}</strong></div>
-                <div class="info-line">CUI: ${clientInfo.cui}</div>
-                <div class="info-line">Nr. Reg. Com.: ${clientInfo.nr_reg_com}</div>
-                <div class="info-line">Adresa: ${clientInfo.adresa}</div>
-                <div class="info-line">Telefon: ${clientInfo.telefon}</div>
-                <div class="info-line">Email: ${clientInfo.email}</div>
+                <div class="info-line"><strong>${cleanNonAscii(clientInfo.nume)}</strong></div>
+                <div class="info-line">CUI: ${cleanNonAscii(clientInfo.cui)}</div>
+                <div class="info-line">Nr. Reg. Com.: ${cleanNonAscii(clientInfo.nr_reg_com)}</div>
+                <div class="info-line">Adresa: ${cleanNonAscii(clientInfo.adresa)}</div>
+                <div class="info-line">Telefon: ${cleanNonAscii(clientInfo.telefon)}</div>
+                <div class="info-line">Email: ${cleanNonAscii(clientInfo.email)}</div>
             </div>
         </div>
 
         <div class="invoice-details">
-            <div class="invoice-number">Factura nr: ${facturaData.numar || numar}</div>
+            <div class="invoice-number">Factura nr: ${cleanNonAscii(facturaData.numar || numar)}</div>
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${facturaData.data_factura ? new Date(facturaData.data_factura).toLocaleDateString('ro-RO') : new Date().toLocaleDateString('ro-RO')}</div>
-                <div><strong>Proiect:</strong> ${proiectInfo.denumire}</div>
+                <div><strong>Proiect:</strong> ${cleanNonAscii(proiectInfo.denumire)}</div>
                 <div><strong>Regenerat:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
             </div>
         </div>
@@ -486,7 +503,7 @@ export async function POST(request: NextRequest) {
                       
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
-                      let descriereCompleta = linie.denumire || 'N/A';
+                      let descriereCompleta = cleanNonAscii(linie.denumire || 'N/A');
                       
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
                         const cursInfo = linie.cursValutar ? ` x ${Number(linie.cursValutar).toFixed(4)}` : '';
@@ -583,12 +600,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       htmlContent: htmlTemplate,
-      fileName: `Factura_${facturaData.numar || numar}.pdf`,
+      fileName: `Factura_${cleanNonAscii(facturaData.numar || numar)}.pdf`,
       message: 'Template HTML generat pentru regenerare PDF',
       facturaData: {
         id: facturaData.id,
-        numar: facturaData.numar || numar,
-        client: clientInfo.nume,
+        numar: cleanNonAscii(facturaData.numar || numar),
+        client: cleanNonAscii(clientInfo.nume),
         total: total,
         contariCount: contariFinale.length
       }
