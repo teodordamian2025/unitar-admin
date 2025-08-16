@@ -1,8 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/regenerate-pdf/route.ts
-// DATA: 17.08.2025 09:45
-// FIX COMPLET: Template HTML IDENTIC cu generate-hibrid + UTF-8 encoding
-// PĂSTRATE: TOATE funcționalitățile existente
+// DATA: 17.08.2025 12:00
+// FIX FINAL: ID Proiect + Formatare date BigQuery + Nota cursuri BNR
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +16,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// Încărcare conturi bancare - identic cu generate-hibrid
+// Încărcare conturi bancare
 async function loadContariBancare() {
   try {
     const query = `
@@ -49,7 +48,7 @@ async function loadContariBancare() {
   }
 }
 
-// Fallback conturi - identic cu generate-hibrid
+// Fallback conturi
 const FALLBACK_CONTURI = [
   {
     nume_banca: 'ING Bank',
@@ -65,7 +64,7 @@ const FALLBACK_CONTURI = [
   }
 ];
 
-// Template HTML conturi bancare - identic cu generate-hibrid
+// Template HTML conturi bancare
 function generateBankDetailsHTML(conturi: any[]) {
   if (!conturi || conturi.length === 0) {
     conturi = FALLBACK_CONTURI;
@@ -90,24 +89,79 @@ function generateBankDetailsHTML(conturi: any[]) {
   }).join('');
 }
 
-// ✅ FIX UTF-8: Curățare caractere non-ASCII și diacritice corupte
+// FIX: Formatare date din BigQuery - identic cu FacturaHibridModal
+function formatDateFromBigQuery(dateValue: any): string {
+  if (!dateValue) {
+    return new Date().toLocaleDateString('ro-RO');
+  }
+  
+  try {
+    // DATE din BigQuery vine ca string simplu: "2025-07-25"
+    // TIMESTAMP din BigQuery vine ca string: "2025-07-31 05:22:45.101000 UTC"
+    
+    let actualDate: string;
+    
+    // BigQuery poate returna ca obiect cu .value sau direct ca string
+    if (typeof dateValue === 'object' && dateValue.value) {
+      actualDate = dateValue.value;
+    } else if (typeof dateValue === 'string') {
+      actualDate = dateValue;
+    } else {
+      return new Date().toLocaleDateString('ro-RO');
+    }
+    
+    // Curăță timezone-ul din TIMESTAMP dacă există
+    const cleanedDate = actualDate.replace(' UTC', '').replace('.101000', '');
+    
+    // Parsează și formatează
+    const parsedDate = new Date(cleanedDate);
+    
+    if (isNaN(parsedDate.getTime())) {
+      console.warn('Data invalidă din BigQuery:', dateValue);
+      return new Date().toLocaleDateString('ro-RO');
+    }
+    
+    return parsedDate.toLocaleDateString('ro-RO');
+  } catch (error) {
+    console.warn('Eroare la formatarea datei din BigQuery:', dateValue, error);
+    return new Date().toLocaleDateString('ro-RO');
+  }
+}
+
+// FIX: Formatare datetime pentru footer
+function formatDateTimeFromBigQuery(dateValue: any): string {
+  if (!dateValue) {
+    return 'N/A';
+  }
+  
+  try {
+    let actualDate: string;
+    
+    if (typeof dateValue === 'object' && dateValue.value) {
+      actualDate = dateValue.value;
+    } else if (typeof dateValue === 'string') {
+      actualDate = dateValue;
+    } else {
+      return 'N/A';
+    }
+    
+    const cleanedDate = actualDate.replace(' UTC', '').replace('.101000', '');
+    const parsedDate = new Date(cleanedDate);
+    
+    if (isNaN(parsedDate.getTime())) {
+      return 'N/A';
+    }
+    
+    return parsedDate.toLocaleString('ro-RO');
+  } catch (error) {
+    console.warn('Eroare la formatarea datetime din BigQuery:', dateValue, error);
+    return 'N/A';
+  }
+}
+
+// Curățare caractere non-ASCII
 function cleanNonAscii(text: string): string {
   return text
-    // Fix caractere corupte specifice
-    .replace(/Ã°Å¸Â§Âª/g, 'Mock')
-    .replace(/Ã°Å¸"â€ž/g, 'PDF')
-    .replace(/Ã°Å¸"Â´/g, 'Eroare')
-    .replace(/Ã°Å¸Å¸Â¡/g, 'In proces')
-    .replace(/Ã°Å¸"Â¤/g, 'Trimis')
-    .replace(/Ã°Å¸Å¸ /g, 'Gata')
-    .replace(/â³/g, 'Se proceseaza')
-    .replace(/âœ…/g, 'Validat')
-    .replace(/âŒ/g, 'Eroare')
-    .replace(/â†©ï¸/g, 'Storno')
-    .replace(/âœï¸/g, 'Editare')
-    .replace(/âš ï¸/g, 'Atentie')
-    .replace(/â„¹ï¸/g, 'Info')
-    // Fix diacritice românești standard
     .replace(/ă/g, 'a')
     .replace(/Ă/g, 'A')
     .replace(/â/g, 'a')
@@ -118,7 +172,6 @@ function cleanNonAscii(text: string): string {
     .replace(/Ș/g, 'S')
     .replace(/ț/g, 't')
     .replace(/Ț/g, 'T')
-    // Curățare caractere non-ASCII rămase
     .replace(/[^\x00-\x7F]/g, '');
 }
 
@@ -157,6 +210,12 @@ export async function POST(request: NextRequest) {
     try {
       if (facturaData.date_complete_json) {
         dateComplete = JSON.parse(facturaData.date_complete_json);
+        console.log('Date complete parsate:', {
+          hasClientInfo: !!dateComplete.clientInfo,
+          hasLiniiFactura: !!dateComplete.liniiFactura,
+          hasCursuriUtilizate: !!dateComplete.cursuriUtilizate,
+          cursuriKeys: dateComplete.cursuriUtilizate ? Object.keys(dateComplete.cursuriUtilizate) : []
+        });
       }
     } catch (error) {
       console.log('Nu s-au putut parsa datele complete JSON:', error);
@@ -184,8 +243,10 @@ export async function POST(request: NextRequest) {
       tip: 'proiect'
     }];
 
+    // FIX: Folosește proiect_id din BigQuery în loc de denumire
     const proiectInfo = dateComplete.proiectInfo || {
       id: facturaData.proiect_id || 'NECUNOSCUT',
+      ID_Proiect: facturaData.proiect_id || 'NECUNOSCUT',
       denumire: `Proiect #${facturaData.proiect_id || 'NECUNOSCUT'}`
     };
 
@@ -196,12 +257,15 @@ export async function POST(request: NextRequest) {
 
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
 
-    // ✅ FIX UTF-8: Generează nota cursuri cu formatul corect și encoding curat
+    // FIX: Generează nota cursuri BNR - debug complet
     let notaCursValutar = '';
     if (dateComplete.cursuriUtilizate && Object.keys(dateComplete.cursuriUtilizate).length > 0) {
       const monede = Object.keys(dateComplete.cursuriUtilizate);
-      notaCursValutar = `Cursuri BNR (din frontend - FARA recalculare): ${monede.map(m => {
+      console.log('Generez nota cursuri pentru monede:', monede);
+      
+      const cursuriFormatate = monede.map(m => {
         const cursInfo = dateComplete.cursuriUtilizate[m];
+        console.log(`Procesez moneda ${m}:`, cursInfo);
         
         let cursFormatat: string;
         if (cursInfo.precizie_originala) {
@@ -221,11 +285,16 @@ export async function POST(request: NextRequest) {
           dataFormatata = new Date().toISOString().split('T')[0];
         }
         
-        return `Curs valutar BNR: 1 ${m} = ${cursFormatat} RON (${dataFormatata})`;
-      }).join(', ')}`;
+        return `1 ${m} = ${cursFormatat} RON (${dataFormatata})`;
+      });
+      
+      notaCursValutar = `Curs valutar BNR: ${cursuriFormatate.join(', ')}`;
+      console.log('Nota cursuri generata:', notaCursValutar);
+    } else {
+      console.log('Nu exista cursuri utilizate in dateComplete.cursuriUtilizate');
     }
 
-    // ✅ FIX PROBLEMA 3: TEMPLATE HTML IDENTIC CU generate-hibrid/route.ts
+    // FIX: Template HTML cu toate corecturile
     const htmlTemplate = `
     <!DOCTYPE html>
     <html>
@@ -473,8 +542,8 @@ export async function POST(request: NextRequest) {
         <div class="invoice-details">
             <div class="invoice-number">Factura nr: ${cleanNonAscii(facturaData.numar || numar)}</div>
             <div class="invoice-meta">
-                <div><strong>Data:</strong> ${facturaData.data_factura ? new Date(facturaData.data_factura).toLocaleDateString('ro-RO') : new Date().toLocaleDateString('ro-RO')}</div>
-                <div><strong>Proiect:</strong> ${cleanNonAscii(proiectInfo.denumire)}</div>
+                <div><strong>Data:</strong> ${formatDateFromBigQuery(facturaData.data_factura)}</div>
+                <div><strong>Proiect:</strong> ${cleanNonAscii(proiectInfo.id || proiectInfo.ID_Proiect || facturaData.proiect_id || 'NECUNOSCUT')}</div>
                 <div><strong>Regenerat:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
             </div>
         </div>
@@ -544,7 +613,7 @@ export async function POST(request: NextRequest) {
             </div>
         </div>
 
-        ${notaCursValutar ? `
+        ${notaCursValutar && notaCursValutar.trim() ? `
         <div class="currency-note">
             <div class="currency-note-content">
                 <strong>${cleanNonAscii(notaCursValutar)}</strong>
@@ -585,7 +654,7 @@ export async function POST(request: NextRequest) {
         <div class="footer">
             <div class="generated-info">
                 <strong>Factura regenerata din sistemul UNITAR PROIECT TDA</strong><br>
-                Original: ${facturaData.data_creare ? new Date(facturaData.data_creare).toLocaleString('ro-RO') : 'N/A'}<br>
+                Original: ${formatDateTimeFromBigQuery(facturaData.data_creare)}<br>
                 Regenerat: ${new Date().toLocaleString('ro-RO')}
             </div>
             <div>
@@ -596,7 +665,7 @@ export async function POST(request: NextRequest) {
     </body>
     </html>`;
 
-    // Return HTML pentru regenerare în browser (ca în FacturiList.tsx)
+    // Return HTML pentru regenerare în browser
     return NextResponse.json({
       success: true,
       htmlContent: htmlTemplate,
@@ -607,7 +676,8 @@ export async function POST(request: NextRequest) {
         numar: cleanNonAscii(facturaData.numar || numar),
         client: cleanNonAscii(clientInfo.nume),
         total: total,
-        contariCount: contariFinale.length
+        contariCount: contariFinale.length,
+        hasNotaCursuri: !!notaCursValutar
       }
     });
 
