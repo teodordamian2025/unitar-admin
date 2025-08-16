@@ -1267,12 +1267,35 @@ function EnhancedActionDropdown({
     }
   }, [isOpen, dropdownId]);
 
-  const calculateDropdownPosition = () => {
-    if (!buttonRef.current) return;
+	const calculateDropdownPosition = () => {
+	  if (!buttonRef.current) return;
 
-    const buttonRect = buttonRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const dropdownHeight = 350;
+	  const buttonRect = buttonRef.current.getBoundingClientRect();
+	  const viewportHeight = window.innerHeight;
+	  
+	  // Calculează înălțimea reală bazată pe numărul de acțiuni disponibile
+	  const baseHeight = 120; // Header + padding
+	  const actionHeight = 45; // Înălțime per acțiune
+	  let actionsCount = 1; // PDF download mereu prezent
+	  
+	  if (canEdit) actionsCount++;
+	  if (canStorno) actionsCount++;
+	  if (factura.efactura_enabled) {
+	    actionsCount += 2; // Divider + detalii
+	    if (factura.efactura_status === 'draft' || factura.efactura_status === 'sent' || 
+		factura.efactura_status === 'validated' || factura.efactura_status === 'mock_pending') {
+	      actionsCount++; // Download XML
+	    }
+	    if (!factura.efactura_status || factura.efactura_status === 'draft') {
+	      actionsCount++; // Send ANAF
+	    }
+	    if (factura.efactura_status === 'error') {
+	      actionsCount++; // Retry ANAF
+	    }
+	  }
+	  if (canDelete) actionsCount += 2; // Divider + delete
+	  
+	  const dropdownHeight = baseHeight + (actionsCount * actionHeight);
     
     const tableRow = buttonRef.current.closest('tr');
     const rowHeight = tableRow ? tableRow.getBoundingClientRect().height : 50;
