@@ -1311,7 +1311,7 @@ function EnhancedActionDropdown({
 	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2;
 	  setDropdownPosition('top');
 	} else {
-	  finalTop = buttonRect.bottom + 8;
+	  finalTop = buttonRect.bottom + 3;
 	  setDropdownPosition('bottom');
 	}
     
