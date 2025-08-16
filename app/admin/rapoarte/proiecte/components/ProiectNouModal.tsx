@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectNouModal.tsx
-// DATA: 16.08.2025 11:45 (ora României)
-// FIX APLICAT: Simplificare completă formatare date - eliminat funcții complexe
-// PĂSTRATE: Toate funcționalitățile existente + cursuri BNR LIVE
+// DATA: 16.08.2025 14:30 (ora României)
+// COMPLET: Validări corecte pentru DATE fields + fix cursuri fără rotunjire
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 'use client';
@@ -38,9 +38,64 @@ interface CheltuialaProiect {
   status_achitare: string;
 }
 
-// Funcție pentru preluarea cursurilor BNR LIVE - PĂSTRATĂ identic
-const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
-  if (moneda === 'RON') return 1;
+// Funcție helper pentru validări sigure
+const ensureNumber = (value: any, defaultValue: number = 0): number => {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return !isNaN(parsed) && isFinite(parsed) ? parsed : defaultValue;
+  }
+  
+  return defaultValue;
+};
+
+// FIX PRINCIPAL: Funcție pentru formatare cu precizie originală (fără rotunjire forțată)
+const formatWithOriginalPrecision = (value: any, originalPrecision?: string): string => {
+  if (originalPrecision && originalPrecision !== 'undefined' && originalPrecision !== 'null') {
+    return originalPrecision;
+  }
+  
+  const num = ensureNumber(value);
+  return num.toString();
+};
+
+// FIX PRINCIPAL: Validare și formatare corectă pentru DATE fields BigQuery
+const formatDateForBigQuery = (dateString: string): string | null => {
+  if (!dateString || dateString.trim() === '') {
+    return null;
+  }
+  
+  try {
+    // Verifică dacă este deja în format ISO (YYYY-MM-DD)
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoDateRegex.test(dateString)) {
+      // Validează că data este reală
+      const date = new Date(dateString + 'T00:00:00');
+      if (!isNaN(date.getTime())) {
+        return dateString;
+      }
+    }
+    
+    // Încearcă să parseze data în alte formate
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    console.warn('Data nu poate fi parsată:', dateString);
+    return null;
+  } catch (error) {
+    console.error('Eroare la formatarea datei pentru BigQuery:', dateString, error);
+    return null;
+  }
+};
+
+// Funcție pentru preluarea cursurilor BNR LIVE - fără rotunjire
+const getCursBNRLive = async (moneda: string, data?: string): Promise<{ curs: number, precizie: string }> => {
+  if (moneda === 'RON') return { curs: 1, precizie: '1' };
   
   try {
     const url = `/api/curs-valutar?moneda=${encodeURIComponent(moneda)}${data ? `&data=${data}` : ''}`;
@@ -48,26 +103,30 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
     const result = await response.json();
     
     if (result.success && result.curs) {
-      const cursNumeric = typeof result.curs === 'number' ? result.curs : parseFloat(result.curs.toString());
-      console.log(`Curs BNR live pentru ${moneda}: ${cursNumeric.toFixed(4)}`);
-      return cursNumeric;
+      const cursNumeric = ensureNumber(result.curs, 1);
+      const precizie = result.precizie_originala || cursNumeric.toString();
+      
+      console.log(`Curs BNR live pentru ${moneda}: ${precizie} (nu rotunjit)`);
+      return { curs: cursNumeric, precizie };
     }
     
     console.warn(`Nu s-a putut prelua cursul live pentru ${moneda}, folosesc fallback`);
-    switch(moneda) {
-      case 'EUR': return 5.0683;
-      case 'USD': return 4.3688;
-      case 'GBP': return 5.8777;
-      default: return 1;
-    }
+    const fallbackCursuri: { [key: string]: { curs: number, precizie: string } } = {
+      'EUR': { curs: 5.0683, precizie: '5.0683' },
+      'USD': { curs: 4.3688, precizie: '4.3688' },
+      'GBP': { curs: 5.8777, precizie: '5.8777' }
+    };
+    
+    return fallbackCursuri[moneda] || { curs: 1, precizie: '1' };
   } catch (error) {
     console.error(`Eroare la preluarea cursului pentru ${moneda}:`, error);
-    switch(moneda) {
-      case 'EUR': return 5.0683;
-      case 'USD': return 4.3688;
-      case 'GBP': return 5.8777;
-      default: return 1;
-    }
+    const fallbackCursuri: { [key: string]: { curs: number, precizie: string } } = {
+      'EUR': { curs: 5.0683, precizie: '5.0683' },
+      'USD': { curs: 4.3688, precizie: '4.3688' },
+      'GBP': { curs: 5.8777, precizie: '5.8777' }
+    };
+    
+    return fallbackCursuri[moneda] || { curs: 1, precizie: '1' };
   }
 };
 
@@ -81,6 +140,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   // State pentru conversii valutare
   const [cursValutar, setCursValutar] = useState<number | null>(null);
   const [loadingCurs, setLoadingCurs] = useState(false);
+  const [precizieOriginala, setPrecizieOriginala] = useState<string>('');
   
   const [formData, setFormData] = useState({
     ID_Proiect: '',
@@ -89,7 +149,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     selectedClientId: '',
     Adresa: '',
     Descriere: '',
-    // FIX PRINCIPAL: Date simplificate - direct string format ISO
+    // Date în format ISO pentru BigQuery
     Data_Start: '',
     Data_Final: '',
     Status: 'Activ',
@@ -110,7 +170,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     Responsabil: '',
     Observatii: '',
     
-    // Pentru subproiecte cu câmpuri extinse
+    // Pentru subproiecte
     subproiecte: [] as Array<{
       id: string;
       denumire: string;
@@ -130,14 +190,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   useEffect(() => {
     if (isOpen) {
       loadClienti();
-      // FIX PRINCIPAL: Setează data actuală în format ISO simplu
       const today = new Date().toISOString().split('T')[0];
       
       setFormData(prev => ({
         ...prev,
         ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
         data_curs_valutar: today,
-        // FIX: Setează implicit Data_Start la data curentă (format ISO)
         Data_Start: today
       }));
     }
@@ -154,6 +212,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         curs_valutar: '1',
       }));
       setCursValutar(1);
+      setPrecizieOriginala('1');
     }
   }, [formData.moneda, formData.Valoare_Estimata, formData.data_curs_valutar]);
 
@@ -169,7 +228,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-  // Funcție pentru încărcarea cursului valutar
+  // FIX: Funcție pentru încărcarea cursului valutar fără rotunjire forțată
   const loadCursValutar = async () => {
     if (formData.moneda === 'RON') return;
     
@@ -179,14 +238,18 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       const data = await response.json();
       
       if (data.success) {
-        setCursValutar(data.curs);
+        const cursSigur = ensureNumber(data.curs, 1);
+        const valoareSigura = ensureNumber(formData.Valoare_Estimata, 0);
         
-        const valoareRON = parseFloat(formData.Valoare_Estimata) * data.curs;
+        setCursValutar(cursSigur);
+        setPrecizieOriginala(data.precizie_originala || cursSigur.toString());
+        
+        const valoareRON = valoareSigura * cursSigur;
         
         setFormData(prev => ({
           ...prev,
-          curs_valutar: data.curs.toString(),
-          valoare_ron: valoareRON.toFixed(2)
+          curs_valutar: cursSigur.toString(),
+          valoare_ron: ensureNumber(valoareRON, 0).toFixed(2)
         }));
         
         if (data.source === 'fallback') {
@@ -208,7 +271,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     setLoading(true);
 
     try {
-      // Validări
+      // Validări de bază
       if (!formData.ID_Proiect.trim()) {
         toast.error('ID proiect este obligatoriu');
         setLoading(false);
@@ -227,29 +290,14 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         return;
       }
 
-      // FIX PRINCIPAL: Validare date simplificată
-      if (formData.Data_Start) {
-        const dataStart = new Date(formData.Data_Start);
-        if (isNaN(dataStart.getTime())) {
-          toast.error('Data de început nu este validă');
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (formData.Data_Final) {
-        const dataFinal = new Date(formData.Data_Final);
-        if (isNaN(dataFinal.getTime())) {
-          toast.error('Data de finalizare nu este validă');
-          setLoading(false);
-          return;
-        }
-      }
+      // FIX PRINCIPAL: Validare și formatare corectă pentru DATE fields
+      const dataStartFormatted = formatDateForBigQuery(formData.Data_Start);
+      const dataFinalFormatted = formatDateForBigQuery(formData.Data_Final);
 
       // Verificare logică între date
-      if (formData.Data_Start && formData.Data_Final) {
-        const dataStart = new Date(formData.Data_Start);
-        const dataFinal = new Date(formData.Data_Final);
+      if (dataStartFormatted && dataFinalFormatted) {
+        const dataStart = new Date(dataStartFormatted);
+        const dataFinal = new Date(dataFinalFormatted);
         
         if (dataFinal <= dataStart) {
           toast.error('Data de finalizare trebuie să fie după data de început');
@@ -258,27 +306,24 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         }
       }
 
-      console.log('Trimitere date proiect complet cu date corecte:', formData);
-      toast.info('Se adaugă proiectul...');
-
-      // FIX PRINCIPAL: Adaugă proiectul principal cu date în format ISO (yyyy-mm-dd)
+      // FIX PRINCIPAL: Construire payload cu date formatate corect pentru BigQuery
       const proiectData = {
         ID_Proiect: formData.ID_Proiect.trim(),
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
-        Adresa: formData.Adresa.trim(),
-        Descriere: formData.Descriere.trim(),
-        // FIX PRINCIPAL: Date în format ISO pentru BigQuery (yyyy-mm-dd)
-        Data_Start: formData.Data_Start || null,
-        Data_Final: formData.Data_Final || null,
+        Adresa: formData.Adresa.trim() || null,
+        Descriere: formData.Descriere.trim() || null,
+        // FIX PRINCIPAL: Date formatate corect pentru BigQuery DATE fields
+        Data_Start: dataStartFormatted,
+        Data_Final: dataFinalFormatted,
         Status: formData.Status,
-        Valoare_Estimata: formData.Valoare_Estimata ? parseFloat(formData.Valoare_Estimata) : null,
+        Valoare_Estimata: formData.Valoare_Estimata ? ensureNumber(formData.Valoare_Estimata) : null,
         
         // Monedă și conversii
         moneda: formData.moneda,
-        curs_valutar: formData.curs_valutar ? parseFloat(formData.curs_valutar) : null,
-        data_curs_valutar: formData.data_curs_valutar || null,
-        valoare_ron: formData.valoare_ron ? parseFloat(formData.valoare_ron) : null,
+        curs_valutar: formData.curs_valutar ? ensureNumber(formData.curs_valutar) : null,
+        data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar),
+        valoare_ron: formData.valoare_ron ? ensureNumber(formData.valoare_ron) : null,
         
         // Status-uri multiple
         status_predare: formData.status_predare,
@@ -286,11 +331,18 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         status_facturare: formData.status_facturare,
         status_achitare: formData.status_achitare,
         
-        Responsabil: formData.Responsabil.trim(),
-        Observatii: formData.Observatii.trim()
+        Responsabil: formData.Responsabil.trim() || null,
+        Observatii: formData.Observatii.trim() || null
       };
 
-      console.log('Date proiect formatate pentru BigQuery:', proiectData);
+      console.log('=== DEBUG: Date trimise către API ===');
+      console.log('Data_Start original:', formData.Data_Start);
+      console.log('Data_Start formatată:', dataStartFormatted);
+      console.log('Data_Final original:', formData.Data_Final);
+      console.log('Data_Final formatată:', dataFinalFormatted);
+      console.log('Payload complet:', proiectData);
+
+      toast.info('Se adaugă proiectul...');
 
       const response = await fetch('/api/rapoarte/proiecte', {
         method: 'POST',
@@ -306,7 +358,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         // Adaugă subproiectele dacă există
         if (formData.subproiecte.length > 0) {
           console.log(`Se adaugă ${formData.subproiecte.length} subproiecte...`);
-          await addSubproiecte(formData.ID_Proiect);
+          await addSubproiecte(formData.ID_Proiect, dataStartFormatted, dataFinalFormatted);
         }
         
         // Adaugă cheltuielile dacă există
@@ -315,7 +367,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           await addCheltuieli(formData.ID_Proiect);
         }
 
-        // FIX: Mesaj de succes simplificat
         toast.success(`Proiect adăugat cu succes cu toate componentele!`);
         
         onProiectAdded();
@@ -333,42 +384,39 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-  // FIX PRINCIPAL: Funcție pentru adăugarea subproiectelor cu cursuri BNR LIVE
-  const addSubproiecte = async (proiectId: string) => {
+  // FIX: Funcție pentru adăugarea subproiectelor cu cursuri BNR fără rotunjire
+  const addSubproiecte = async (proiectId: string, dataStart: string | null, dataFinal: string | null) => {
     console.log(`Începe adăugarea subproiectelor pentru ${proiectId}`);
     
     for (const subproiect of formData.subproiecte) {
       try {
-        // Calculăm valoarea în RON pentru subproiect cu cursuri BNR LIVE
+        // Calculăm valoarea în RON pentru subproiect cu cursuri BNR fără rotunjire
         let valoareRonSubproiect: number | null = null;
         let cursSubproiect: number | null = null;
         
         if (subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare) {
           // Folosim același curs ca la proiectul principal sau calculăm unul nou
           if (subproiect.moneda === formData.moneda && formData.curs_valutar) {
-            cursSubproiect = parseFloat(formData.curs_valutar);
-            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+            cursSubproiect = ensureNumber(formData.curs_valutar, 1);
+            valoareRonSubproiect = ensureNumber(subproiect.valoare, 0) * cursSubproiect;
           } else {
-            // FIX PRINCIPAL: Înlocuire cursuri fixe cu API BNR live
+            // Preiau curs BNR live fără rotunjire
             console.log(`Preiau curs BNR live pentru subproiect ${subproiect.denumire} (${subproiect.moneda})`);
-            cursSubproiect = await getCursBNRLive(subproiect.moneda, formData.data_curs_valutar);
-            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+            const cursData = await getCursBNRLive(subproiect.moneda, formData.data_curs_valutar);
+            cursSubproiect = cursData.curs;
+            valoareRonSubproiect = ensureNumber(subproiect.valoare, 0) * cursSubproiect;
             
-            console.log(`FIX APLICAT pentru subproiect ${subproiect.denumire}:`, {
+            console.log(`Subproiect ${subproiect.denumire}:`, {
               valoare_originala: subproiect.valoare,
               moneda: subproiect.moneda,
-              curs_bnr_live: cursSubproiect.toFixed(4),
-              valoare_ron_calculata: valoareRonSubproiect.toFixed(2)
+              curs_bnr_live: cursData.precizie,
+              valoare_ron_calculata: ensureNumber(valoareRonSubproiect, 0).toFixed(2)
             });
           }
         } else if (subproiect.moneda === 'RON' && subproiect.valoare) {
-          valoareRonSubproiect = parseFloat(subproiect.valoare);
+          valoareRonSubproiect = ensureNumber(subproiect.valoare, 0);
           cursSubproiect = 1;
         }
-        
-        // FIX: Date pentru subproiecte - moștenite din proiectul principal
-        const dataStartSubproiect = formData.Data_Start || null;
-        const dataFinalSubproiect = formData.Data_Final || null;
         
         const subproiectData = {
           ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
@@ -376,16 +424,16 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           Denumire: subproiect.denumire,
           Responsabil: subproiect.responsabil || null,
           Status: subproiect.status || 'Planificat',
-          Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
+          Valoare_Estimata: subproiect.valoare ? ensureNumber(subproiect.valoare) : null,
           
-          // FIX: Date moștenite din proiectul principal (format ISO)
-          Data_Start: dataStartSubproiect,
-          Data_Final: dataFinalSubproiect,
+          // Date moștenite din proiectul principal (format BigQuery DATE)
+          Data_Start: dataStart,
+          Data_Final: dataFinal,
           
-          // Câmpuri multi-valută pentru subproiect cu cursuri BNR LIVE
+          // Câmpuri multi-valută pentru subproiect cu cursuri BNR fără rotunjire
           moneda: subproiect.moneda || 'RON',
           curs_valutar: cursSubproiect,
-          data_curs_valutar: formData.data_curs_valutar || null,
+          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar),
           valoare_ron: valoareRonSubproiect,
           
           // Status-uri multiple pentru subproiect
@@ -395,7 +443,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           status_achitare: 'Neachitat'
         };
 
-        console.log(`Trimitere subproiect ${subproiect.denumire} cu cursuri BNR live:`, subproiectData);
+        console.log(`Trimitere subproiect ${subproiect.denumire} cu cursuri BNR fără rotunjire:`, subproiectData);
 
         const response = await fetch('/api/rapoarte/subproiecte', {
           method: 'POST',
@@ -406,7 +454,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         const result = await response.json();
         
         if (result.success) {
-          console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes cu cursuri BNR live`);
+          console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes cu cursuri BNR fără rotunjire`);
         } else {
           console.error(`Eroare la subproiect ${subproiect.denumire}:`, result);
           toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
@@ -417,10 +465,10 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       }
     }
     
-    console.log(`Procesare subproiecte finalizată pentru ${proiectId} cu cursuri BNR live`);
+    console.log(`Procesare subproiecte finalizată pentru ${proiectId} cu cursuri BNR fără rotunjire`);
   };
 
-  // Funcție pentru adăugarea cheltuielilor (păstrată neschimbată)
+  // Funcție pentru adăugarea cheltuielilor
   const addCheltuieli = async (proiectId: string) => {
     for (const cheltuiala of formData.cheltuieli) {
       try {
@@ -431,7 +479,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           furnizor_nume: cheltuiala.furnizor_nume,
           furnizor_cui: cheltuiala.furnizor_cui,
           descriere: cheltuiala.descriere,
-          valoare: parseFloat(cheltuiala.valoare),
+          valoare: ensureNumber(cheltuiala.valoare),
           moneda: cheltuiala.moneda,
           status_predare: cheltuiala.status_predare,
           status_contract: cheltuiala.status_contract,
@@ -465,7 +513,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       selectedClientId: '',
       Adresa: '',
       Descriere: '',
-      // FIX: Reset la gol, va fi setat la deschiderea modalului
       Data_Start: '',
       Data_Final: '',
       Status: 'Activ',
@@ -485,6 +532,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     });
     setClientSearch('');
     setCursValutar(null);
+    setPrecizieOriginala('');
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -635,7 +683,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             Completează informațiile pentru noul proiect cu suport multi-valută și status-uri avansate
             <br/>
             <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
-              FIX APLICAT: Date simplificate - format ISO standard pentru BigQuery
+              FIX APLICAT: Validări corecte DATE fields + Cursuri fără rotunjire forțată
             </span>
           </p>
         </div>
@@ -837,7 +885,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
               Valoare Proiect 
               <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                Cursuri BNR LIVE
+                Cursuri BNR LIVE (Precizie originală - fără rotunjire)
               </span>
             </h4>
             
@@ -922,12 +970,13 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   color: loadingCurs ? '#6c757d' : '#27ae60'
                 }}>
                   {loadingCurs ? 'Se calculează...' : 
-                   formData.valoare_ron ? `${parseFloat(formData.valoare_ron).toLocaleString('ro-RO')} RON` : 
+                   formData.valoare_ron ? `${ensureNumber(formData.valoare_ron, 0).toLocaleString('ro-RO')} RON` : 
                    '0.00 RON'}
                 </div>
                 {cursValutar && formData.moneda !== 'RON' && (
                   <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
-                    Curs: 1 {formData.moneda} = {cursValutar.toFixed(4)} RON
+                    {/* FIX: Păstrez precizia originală, nu rotunjez forțat */}
+                    Curs: 1 {formData.moneda} = {formatWithOriginalPrecision(cursValutar, precizieOriginala)} RON
                   </div>
                 )}
               </div>
@@ -1037,7 +1086,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             </div>
           </div>
 
-          {/* FIX PRINCIPAL: SECȚIUNE Date simplificată */}
+          {/* FIX PRINCIPAL: SECȚIUNE Date cu validări corecte pentru BigQuery */}
           <div style={{ 
             background: '#f0f8ff',
             padding: '1rem',
@@ -1045,7 +1094,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             marginBottom: '1rem',
             border: '1px solid #cce7ff'
           }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Perioada Proiect</h4>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+              Perioada Proiect 
+              <span style={{ fontSize: '12px', color: '#e74c3c', marginLeft: '1rem' }}>
+                FIX: Validări corecte pentru BigQuery DATE fields
+              </span>
+            </h4>
             
             <div style={{ 
               display: 'grid', 
@@ -1070,7 +1124,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   }}
                 />
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '4px' }}>
-                  FIX: Format ISO standard (yyyy-mm-dd) pentru BigQuery
+                  Format: YYYY-MM-DD pentru BigQuery DATE (sau gol pentru NULL)
                 </div>
               </div>
 
@@ -1166,7 +1220,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             />
           </div>
 
-          {/* SECȚIUNE: Cheltuieli Proiect - PĂSTRATĂ identic */}
+          {/* SECȚIUNE: Cheltuieli Proiect */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ margin: 0, color: '#2c3e50' }}>Cheltuieli Proiect</h4>
@@ -1404,13 +1458,13 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
             ))}
           </div>
 
-          {/* SECȚIUNE: Subproiecte cu câmpuri complete - PĂSTRATĂ identic */}
+          {/* SECȚIUNE: Subproiecte cu câmpuri complete */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ margin: 0, color: '#2c3e50' }}>
                 Subproiecte
                 <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                  Cursuri BNR LIVE
+                  Cursuri BNR LIVE (Precizie originală - fără rotunjire)
                 </span>
               </h4>
               <button
@@ -1452,7 +1506,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   <h5 style={{ margin: 0, color: '#2c3e50' }}>
                     Subproiect #{index + 1}
                     <span style={{ fontSize: '10px', color: '#27ae60', marginLeft: '0.5rem' }}>
-                      Curs BNR LIVE
+                      Curs BNR LIVE (Precizie originală - fără rotunjire)
                     </span>
                   </h5>
                   <button
