@@ -594,5 +594,5 @@ API-uri modificate:
 
 app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
 Probleme pentru viitor, nu pentru acum:
-2. La partea de Lista Proiecte : https://admin.unitarproiect.eu/admin/rapoarte/proiecte sa se afiseze valoarea echivalenta in RON pentru cele care sunt in valuta, asa cum au fost definite cand s-a creat proiectul.
-3. Cand se editeaza proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage si la subproiecte.
+2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte pentru coloana Data Început si Data Finalizare scrie ❌ Dată invalidă pentru cele care au data in baza de date. In Bigquery Data_Start si Data_Final sunt de forma 2025-07-20. Trebuie corectat sa se vada data.
+3. Cand se editeaza proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage si la subproiecte. S-a modificat aplicatia pentru curs valutar, se citeste din Baza de date, iar curs_valutar actualizeaza zilnic baza de date.
