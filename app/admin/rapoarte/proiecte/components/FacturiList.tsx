@@ -1308,10 +1308,10 @@ function EnhancedActionDropdown({
     
 	if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
 	  // Aliniază partea de jos a dropdown-ului cu partea de sus a butonului
-	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2;
+	  finalTop = buttonRect.top - dropdownHeight + buttonRect.height / 2 - 8;
 	  setDropdownPosition('top');
 	} else {
-	  finalTop = buttonRect.bottom + 3;
+	  finalTop = buttonRect.bottom + 8;
 	  setDropdownPosition('bottom');
 	}
     
