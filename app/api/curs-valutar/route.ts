@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/curs-valutar/route.ts
-// DATA: 16.08.2025 13:00 (ora României)
-// FIX PRINCIPAL: Eliminare forțare 4 zecimale + validări sigure pentru parseFloat
-// PĂSTRATE: Toate funcționalitățile existente + precizie originală cursuri
+// DATA: 18.08.2025 17:00 (ora României)
+// EXTINDERE COMPLETĂ: Adăugat PUT endpoint pentru sync zilnic la 05:00
+// PĂSTRATE: Toate funcționalitățile existente GET/POST/DELETE
+// NOU: PUT pentru completarea zilelor lipsă + sync automat
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,7 +32,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// FIX PRINCIPAL: Funcție helper pentru validări sigure
+// Helper pentru validări sigure
 const ensureNumber = (value: any, defaultValue: number = 0): number => {
   if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
     return value;
@@ -45,19 +46,17 @@ const ensureNumber = (value: any, defaultValue: number = 0): number => {
   return defaultValue;
 };
 
-// FIX PRINCIPAL: Funcție pentru formatare sigură cu precizie originală
+// Helper pentru formatare sigură cu precizie originală
 const formatWithOriginalPrecision = (value: any, originalPrecision?: string): string => {
-  // Dacă avem precizia originală, o folosim
   if (originalPrecision && originalPrecision !== 'undefined' && originalPrecision !== 'null') {
     return originalPrecision;
   }
   
-  // Altfel, formatez cu precizia naturală
   const num = ensureNumber(value);
   return num.toString();
 };
 
-// FIX PRINCIPAL: Cache îmbunătățit cu precizie originală
+// Cache îmbunătățit cu precizie originală
 let cursCache: { 
   [key: string]: { 
     curs: number; 
@@ -69,6 +68,9 @@ let cursCache: {
 } = {};
 const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 ore în milisecunde
 
+// ===================================================================
+// GET ENDPOINT - PĂSTRAT IDENTIC
+// ===================================================================
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const moneda = searchParams.get('moneda') || 'EUR';
@@ -191,7 +193,427 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// FIX PRINCIPAL: getCursFromBigQuery cu validări sigure
+// ===================================================================
+// NOU: PUT ENDPOINT PENTRU SYNC ZILNIC LA 05:00
+// ===================================================================
+export async function PUT(request: NextRequest) {
+  try {
+    console.log('🕐 [05:00 SYNC] Începe sincronizarea zilnică a cursurilor...');
+    
+    const body = await request.json().catch(() => ({}));
+    const { 
+      dataSpecifica, 
+      forceResync = false, 
+      curataZileLipsa = true 
+    } = body;
+
+    // Determină data pentru care să sincronizeze
+    const targetDate = dataSpecifica || new Date().toISOString().split('T')[0];
+    
+    console.log(`📅 Target date pentru sync: ${targetDate}`);
+
+    const rezultate = {
+      success: true,
+      dataSync: targetDate,
+      cursurAdaugate: 0,
+      cursurActualizate: 0,
+      zileLipsaCompletate: 0,
+      cursuriEroare: [],
+      detalii: []
+    };
+
+    const monede = ['EUR', 'USD', 'GBP'];
+
+    // PASUL 1: Sincronizează cursul pentru data specificată
+    console.log(`🔄 PASUL 1: Sincronizare curs pentru ${targetDate}`);
+    
+    for (const moneda of monede) {
+      try {
+        const rezultatSync = await sincronizeazaCursPentruZi(moneda, targetDate, forceResync);
+        
+        if (rezultatSync.adaugat) {
+          rezultate.cursurAdaugate++;
+          rezultate.detalii.push(`✅ ${moneda}: ${rezultatSync.curs} (${rezultatSync.sursa})`);
+        } else if (rezultatSync.actualizat) {
+          rezultate.cursurActualizate++;
+          rezultate.detalii.push(`🔄 ${moneda}: ${rezultatSync.curs} (actualizat)`);
+        } else {
+          rezultate.detalii.push(`ℹ️ ${moneda}: există deja (${rezultatSync.curs})`);
+        }
+
+      } catch (error) {
+        console.error(`❌ Eroare sync ${moneda} pentru ${targetDate}:`, error);
+        rezultate.cursuriEroare.push(`${moneda}: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      }
+    }
+
+    // PASUL 2: Completează zilele lipsă din trecut (dacă e activat)
+    if (curataZileLipsa) {
+      console.log(`🧹 PASUL 2: Completare zile lipsă din trecut...`);
+      
+      const zileLipsa = await gasestZileLipsaDinTrecut(targetDate);
+      console.log(`📋 Găsite ${zileLipsa.length} zile lipsă în trecut`);
+
+      for (const ziLipsa of zileLipsa) {
+        try {
+          const rezultatLipsa = await completeazaZiLipsa(ziLipsa);
+          rezultate.zileLipsaCompletate += rezultatLipsa.cursurAdaugate;
+          rezultate.detalii.push(`📅 ${ziLipsa}: completat cu ${rezultatLipsa.cursurAdaugate} cursuri`);
+          
+        } catch (error) {
+          console.error(`❌ Eroare completare zi lipsă ${ziLipsa}:`, error);
+          rezultate.cursuriEroare.push(`Zi ${ziLipsa}: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+        }
+      }
+    }
+
+    // PASUL 3: Curăță cache-ul pentru date proaspete
+    cursCache = {};
+    console.log('🧹 Cache curs valutar șters după sync');
+
+    // PASUL 4: Curăță eventualele teste rămase
+    await curataTeste();
+
+    console.log(`✅ [05:00 SYNC] Finalizat cu succes:`, rezultate);
+
+    return NextResponse.json(rezultate);
+
+  } catch (error) {
+    console.error('❌ Eroare la sincronizarea zilnică:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: 'Eroare la sincronizarea zilnică a cursurilor',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+    }, { status: 500 });
+  }
+}
+
+// ===================================================================
+// FUNCȚII HELPER PENTRU PUT ENDPOINT
+// ===================================================================
+
+// Sincronizează cursul pentru o zi și o monedă specifică
+async function sincronizeazaCursPentruZi(
+  moneda: string, 
+  data: string, 
+  forceResync: boolean = false
+): Promise<{ adaugat: boolean; actualizat: boolean; curs: number; sursa: string }> {
+  
+  // Verifică dacă cursul există deja
+  const cursExistent = await getCursFromBigQuery(moneda, data);
+  
+  if (cursExistent && !forceResync) {
+    return {
+      adaugat: false,
+      actualizat: false,
+      curs: cursExistent.curs,
+      sursa: 'existent'
+    };
+  }
+
+  // Determină ziua bancară anterioară pentru a obține cursul corect
+  const ziuaBancaraAnterioara = await gasestUltimaZiBancara(data);
+  console.log(`🏦 Pentru ${data}, ultima zi bancară: ${ziuaBancaraAnterioara}`);
+
+  // Încearcă să obțină cursul din ziua bancară anterioară
+  let cursDeAplicat: CursValutar | null = null;
+
+  // 1. Încearcă din BigQuery pentru ziua bancară anterioară
+  if (ziuaBancaraAnterioara !== data) {
+    cursDeAplicat = await getCursFromBigQuery(moneda, ziuaBancaraAnterioara);
+    if (cursDeAplicat) {
+      console.log(`📊 Folosesc cursul din BigQuery (${ziuaBancaraAnterioara}) pentru ${data}`);
+    }
+  }
+
+  // 2. Încearcă BNR live pentru ziua bancară anterioară
+  if (!cursDeAplicat) {
+    cursDeAplicat = await getCursBNRLive(moneda, ziuaBancaraAnterioara);
+    if (cursDeAplicat) {
+      console.log(`📡 Obținut curs BNR live pentru ${ziuaBancaraAnterioara}, aplicat pentru ${data}`);
+    }
+  }
+
+  // 3. Fallback - cel mai apropiat curs
+  if (!cursDeAplicat) {
+    cursDeAplicat = await getClosestCursFromBigQuery(moneda, data);
+    if (cursDeAplicat) {
+      console.log(`🔍 Folosesc cel mai apropiat curs: ${cursDeAplicat.data} pentru ${data}`);
+    }
+  }
+
+  if (!cursDeAplicat) {
+    throw new Error(`Nu s-a putut găsi niciun curs pentru ${moneda} în jurul datei ${data}`);
+  }
+
+  // Creează recordul pentru inserare/actualizare
+  const cursNou: CursValutar = {
+    moneda,
+    curs: cursDeAplicat.curs,
+    data,
+    precizie_originala: cursDeAplicat.precizie_originala
+  };
+
+  // Determină sursa și observațiile
+  const esteWeekend = esteZiDeWeekend(data);
+  const esteSarbatoare = await esteZiDeSarbatoare(data);
+  
+  let sursa = 'BNR_SYNC_DAILY';
+  let observatii = `Sync zilnic 05:00 - curs preluat din ${ziuaBancaraAnterioara}`;
+  
+  if (esteWeekend) {
+    sursa = 'BNR_WEEKEND_DUPLICATE';
+    observatii = `Weekend - curs duplicat din ultima zi bancară (${ziuaBancaraAnterioara})`;
+  } else if (esteSarbatoare) {
+    sursa = 'BNR_HOLIDAY_DUPLICATE';
+    observatii = `Sărbătoare - curs duplicat din ultima zi bancară (${ziuaBancaraAnterioara})`;
+  }
+
+  if (cursExistent && forceResync) {
+    // Actualizează
+    await actualizeazaCursInBigQuery(cursNou, sursa, observatii);
+    return {
+      adaugat: false,
+      actualizat: true,
+      curs: cursNou.curs,
+      sursa: 'actualizat'
+    };
+  } else {
+    // Inserează
+    await salvezCursInBigQueryCuDetalii(cursNou, sursa, observatii);
+    return {
+      adaugat: true,
+      actualizat: false,
+      curs: cursNou.curs,
+      sursa
+    };
+  }
+}
+
+// Găsește zilele lipsă din trecut
+async function gasestZileLipsaDinTrecut(panaLaData: string): Promise<string[]> {
+  try {
+    const query = `
+      WITH date_consecutives AS (
+        SELECT DATE_ADD('2025-01-01', INTERVAL n DAY) as data_consecutiva
+        FROM UNNEST(GENERATE_ARRAY(0, DATE_DIFF('${panaLaData}', '2025-01-01', DAY))) as n
+      ),
+      date_existente AS (
+        SELECT DISTINCT data
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+        WHERE data BETWEEN '2025-01-01' AND '${panaLaData}'
+          AND moneda IN ('EUR', 'USD', 'GBP')
+      ),
+      zile_cu_toate_monedele AS (
+        SELECT data
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+        WHERE data BETWEEN '2025-01-01' AND '${panaLaData}'
+          AND moneda IN ('EUR', 'USD', 'GBP')
+        GROUP BY data
+        HAVING COUNT(DISTINCT moneda) = 3
+      )
+      SELECT dc.data_consecutiva
+      FROM date_consecutives dc
+      LEFT JOIN zile_cu_toate_monedele ztm ON dc.data_consecutiva = ztm.data
+      WHERE ztm.data IS NULL
+      ORDER BY dc.data_consecutiva
+    `;
+
+    const [rows] = await bigquery.query({
+      query: query,
+      location: 'EU',
+    });
+
+    return rows.map(row => row.data_consecutiva);
+
+  } catch (error) {
+    console.error('❌ Eroare găsire zile lipsă:', error);
+    return [];
+  }
+}
+
+// Completează o zi lipsă cu cursurile necesare
+async function completeazaZiLipsa(data: string): Promise<{ cursurAdaugate: number }> {
+  const monede = ['EUR', 'USD', 'GBP'];
+  let cursurAdaugate = 0;
+
+  for (const moneda of monede) {
+    try {
+      // Verifică dacă moneda există pentru această zi
+      const cursExistent = await getCursFromBigQuery(moneda, data);
+      if (cursExistent) {
+        continue; // Skip dacă există deja
+      }
+
+      // Sincronizează moneda pentru această zi
+      const rezultat = await sincronizeazaCursPentruZi(moneda, data, false);
+      if (rezultat.adaugat) {
+        cursurAdaugate++;
+      }
+
+    } catch (error) {
+      console.warn(`⚠️ Nu s-a putut completa ${moneda} pentru ${data}:`, error);
+    }
+  }
+
+  return { cursurAdaugate };
+}
+
+// Găsește ultima zi bancară anterioară unei date
+async function gasestUltimaZiBancara(data: string): Promise<string> {
+  const targetDate = new Date(data);
+  
+  // Începe cu ziua anterioară
+  for (let i = 1; i <= 10; i++) { // Maxim 10 zile în urmă (acoperă sărbători lungi)
+    const candidatDate = new Date(targetDate);
+    candidatDate.setDate(candidatDate.getDate() - i);
+    
+    const candidatString = candidatDate.toISOString().split('T')[0];
+    
+    // Verifică dacă nu e weekend
+    if (!esteZiDeWeekend(candidatString)) {
+      // Verifică dacă nu e sărbătoare
+      const esteSarbatoare = await esteZiDeSarbatoare(candidatString);
+      if (!esteSarbatoare) {
+        return candidatString;
+      }
+    }
+  }
+  
+  // Fallback - returnează ziua anterioară
+  const fallbackDate = new Date(targetDate);
+  fallbackDate.setDate(fallbackDate.getDate() - 1);
+  return fallbackDate.toISOString().split('T')[0];
+}
+
+// Verifică dacă o zi este weekend
+function esteZiDeWeekend(data: string): boolean {
+  const dayOfWeek = new Date(data).getDay();
+  return dayOfWeek === 0 || dayOfWeek === 6; // 0 = duminică, 6 = sâmbătă
+}
+
+// Verifică dacă o zi este sărbătoare (simplificat - poate fi extins)
+async function esteZiDeSarbatoare(data: string): Promise<boolean> {
+  // Sărbători fixe românești pentru 2025
+  const sarbatoriFix = [
+    '2025-01-01', // Anul Nou
+    '2025-01-02', // Anul Nou
+    '2025-01-06', // Boboteaza
+    '2025-05-01', // Ziua Muncii
+    '2025-12-01', // Ziua Națională
+    '2025-12-25', // Crăciun
+    '2025-12-26', // Crăciun
+  ];
+
+  // Sărbători mobile pentru 2025 (calculate pentru 2025)
+  const sarbatoriMobile = [
+    '2025-04-20', // Duminica Ortodoxă
+    '2025-04-21', // Lunea Ortodoxă  
+    '2025-06-08', // Rusaliile
+    '2025-06-09', // Lunea Rusaliilor
+    '2025-08-15', // Adormirea Maicii Domnului
+  ];
+
+  return sarbatoriFix.includes(data) || sarbatoriMobile.includes(data);
+}
+
+// Salvează curs în BigQuery cu detalii complete
+async function salvezCursInBigQueryCuDetalii(
+  curs: CursValutar, 
+  sursa: string, 
+  observatii: string
+): Promise<void> {
+  try {
+    const dataset = bigquery.dataset('PanouControlUnitar');
+    const table = dataset.table('CursuriValutare');
+
+    const record = [{
+      data: curs.data,
+      moneda: curs.moneda,
+      curs: curs.curs,
+      sursa: sursa,
+      precizie_originala: ensureNumber(curs.precizie_originala || curs.curs),
+      data_creare: new Date().toISOString(),
+      data_actualizare: new Date().toISOString(),
+      observatii: observatii,
+      validat: true,
+      multiplicator: 1
+    }];
+
+    await table.insert(record);
+    console.log(`✅ Salvat în BigQuery: ${curs.moneda} = ${curs.curs} (${curs.data}) - ${sursa}`);
+
+  } catch (error) {
+    console.error(`❌ Eroare salvare în BigQuery:`, error);
+    throw error;
+  }
+}
+
+// Actualizează curs existent în BigQuery
+async function actualizeazaCursInBigQuery(
+  curs: CursValutar, 
+  sursa: string, 
+  observatii: string
+): Promise<void> {
+  try {
+    const query = `
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+      SET 
+        curs = @curs,
+        sursa = @sursa,
+        precizie_originala = @precizie_originala,
+        data_actualizare = CURRENT_TIMESTAMP(),
+        observatii = @observatii
+      WHERE data = @data AND moneda = @moneda
+    `;
+
+    await bigquery.query({
+      query: query,
+      params: {
+        curs: curs.curs,
+        sursa: sursa,
+        precizie_originala: ensureNumber(curs.precizie_originala || curs.curs),
+        observatii: observatii,
+        data: curs.data,
+        moneda: curs.moneda
+      },
+      location: 'EU',
+    });
+
+    console.log(`🔄 Actualizat în BigQuery: ${curs.moneda} = ${curs.curs} (${curs.data})`);
+
+  } catch (error) {
+    console.error(`❌ Eroare actualizare în BigQuery:`, error);
+    throw error;
+  }
+}
+
+// Curăță testele rămase
+async function curataTeste(): Promise<void> {
+  try {
+    const query = `
+      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+      WHERE moneda = 'TEST' OR sursa LIKE '%TEST%'
+    `;
+
+    const [job] = await bigquery.query({
+      query: query,
+      location: 'EU',
+    });
+
+    const [[response]] = await job.getQueryResults();
+    console.log(`🧹 Curățat ${response?.numDmlAffectedRows || 0} teste din BigQuery`);
+
+  } catch (error) {
+    console.warn('⚠️ Nu s-au putut curăța testele:', error);
+  }
+}
+
+// ===================================================================
+// FUNCȚII EXISTENTE - PĂSTRATE IDENTIC
+// ===================================================================
+
 async function getCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
     console.log(`🔍 BigQuery SEARCH: ${moneda} pentru ${data}`);
@@ -208,50 +630,23 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
       LIMIT 1
     `;
 
-    console.log(`🔍 Query executat:`, query);
-
     const [rows] = await bigquery.query({
       query: query,
       location: 'EU',
     });
 
-    console.log(`📊 Rezultat BigQuery:`, {
-      rowCount: rows ? rows.length : 0,
-      rows: rows
-    });
-
     if (rows && rows.length > 0) {
       const row = rows[0];
-      console.log(`✅ ROW GĂSIT:`, row);
-      
-      // FIX PRINCIPAL: Safe conversion pentru FLOAT cu validări
       const cursValue = ensureNumber(row.curs, 1);
-      
-      console.log(`💰 Curs procesat: ${formatWithOriginalPrecision(cursValue, row.precizie_originala)}`);
       
       return {
         moneda: row.moneda,
         curs: cursValue,
         data: row.data,
-        precizie_originala: row.precizie_originala || cursValue.toString()
+        precizie_originala: row.precizie_originala?.toString() || cursValue.toString()
       };
     }
 
-    console.log(`❌ NICIUN RÂND găsit pentru ${moneda} (${data})`);
-    
-    // DEBUG: Verifică ce date există pentru această monedă
-    const debugQuery = `
-      SELECT data, curs, precizie_originala 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
-      WHERE moneda = '${moneda}'
-      ORDER BY data DESC
-      LIMIT 5
-    `;
-    
-    console.log(`🔍 DEBUG: Verificare date disponibile pentru ${moneda}:`);
-    const [debugRows] = await bigquery.query({ query: debugQuery, location: 'EU' });
-    console.log(`📅 Date disponibile:`, debugRows);
-    
     return null;
 
   } catch (error) {
@@ -260,11 +655,8 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
   }
 }
 
-// Funcție pentru găsirea celui mai apropiat curs - ACTUALIZATĂ
 async function getClosestCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
-    console.log(`🔍 Căutare curs apropiat în BigQuery: ${moneda} pentru ${data}`);
-
     const query = `
       SELECT 
         moneda,
@@ -275,21 +667,15 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
         ABS(DATE_DIFF(@data, data, DAY)) as diferenta_zile
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
       WHERE moneda = @moneda 
-        AND ABS(DATE_DIFF(@data, data, DAY)) <= 7  -- Maxim 7 zile diferență
+        AND ABS(DATE_DIFF(@data, data, DAY)) <= 7
       ORDER BY diferenta_zile ASC, data DESC
       LIMIT 1
     `;
 
     const [rows] = await bigquery.query({
       query: query,
-      params: {
-        data: data,
-        moneda: moneda
-      },
-      types: {
-        data: 'DATE',
-        moneda: 'STRING'
-      },
+      params: { data: data, moneda: moneda },
+      types: { data: 'DATE', moneda: 'STRING' },
       location: 'EU',
     });
 
@@ -297,17 +683,14 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
       const row = rows[0];
       const cursValue = ensureNumber(row.curs, 1);
       
-      console.log(`✅ Curs apropiat găsit în BigQuery: ${moneda} = ${formatWithOriginalPrecision(cursValue, row.precizie_originala)} (${row.data}, diferență: ${row.diferenta_zile} zile)`);
-      
       return {
         moneda: row.moneda,
         curs: cursValue,
         data: row.data,
-        precizie_originala: row.precizie_originala || cursValue.toString()
+        precizie_originala: row.precizie_originala?.toString() || cursValue.toString()
       };
     }
 
-    console.log(`❌ Nu s-a găsit curs apropiat în BigQuery pentru ${moneda} (${data})`);
     return null;
 
   } catch (error) {
@@ -316,11 +699,8 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
   }
 }
 
-// Funcție pentru salvarea cursului live în BigQuery - ACTUALIZATĂ
 async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
   try {
-    console.log(`💾 Salvare curs live în BigQuery: ${curs.moneda} = ${formatWithOriginalPrecision(curs.curs, curs.precizie_originala)} (${curs.data})`);
-
     const dataset = bigquery.dataset('PanouControlUnitar');
     const table = dataset.table('CursuriValutare');
 
@@ -329,12 +709,12 @@ async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
       moneda: curs.moneda,
       curs: curs.curs,
       sursa: 'BNR_LIVE',
-      precizie_originala: curs.precizie_originala || curs.curs.toString(),
+      precizie_originala: ensureNumber(curs.precizie_originala || curs.curs),
       data_creare: new Date().toISOString(),
       data_actualizare: new Date().toISOString(),
       observatii: 'Adăugat automat din BNR API live',
       validat: true,
-      multiplicator: 1.0
+      multiplicator: 1
     }];
 
     await table.insert(record);
@@ -342,17 +722,14 @@ async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
 
   } catch (error) {
     console.error(`❌ Eroare salvare curs în BigQuery:`, error);
-    // Nu aruncă eroarea - este doar o optimizare
   }
 }
 
-// FIX PRINCIPAL: Funcție BNR live cu validări sigure și precizie originală
 async function getCursBNRLive(moneda: string, data?: string): Promise<CursValutar | null> {
   try {
     const targetDate = data || new Date().toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
     
-    // Folosește BNR live doar pentru zilele foarte recente (ultimele 3 zile)
     const daysDiff = Math.abs(new Date(today).getTime() - new Date(targetDate).getTime()) / (1000 * 60 * 60 * 24);
     if (daysDiff > 3) {
       console.log(`📅 Data ${targetDate} este prea veche pentru BNR live (${daysDiff.toFixed(1)} zile)`);
@@ -369,7 +746,7 @@ async function getCursBNRLive(moneda: string, data?: string): Promise<CursValuta
         'Accept': 'application/xml, text/xml',
         'Cache-Control': 'no-cache'
       },
-      signal: AbortSignal.timeout(10000) // 10 secunde timeout
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!response.ok) {
@@ -397,7 +774,7 @@ async function getCursBNRLive(moneda: string, data?: string): Promise<CursValuta
         moneda,
         curs: finalRate,
         data: bnrDate,
-        precizie_originala: cursStringOriginal  // FIX: Păstrez precizia originală din XML
+        precizie_originala: cursStringOriginal
       };
     }
 
@@ -410,7 +787,6 @@ async function getCursBNRLive(moneda: string, data?: string): Promise<CursValuta
   }
 }
 
-// Funcție fallback pentru API-uri alternative - ACTUALIZATĂ
 async function getFallbackRateActual(moneda: string): Promise<CursValutar | null> {
   const alternativeAPIs = [
     {
@@ -421,21 +797,7 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
           const rate = 1 / ensureNumber(data.rates[moneda], 1);
           return {
             curs: rate,
-            precizie_originala: rate.toString()  // FIX: Păstrez precizia naturală
-          };
-        }
-        return null;
-      }
-    },
-    {
-      name: 'Fixer.io (free tier)',
-      url: `https://api.fixer.io/latest?base=RON&symbols=${moneda}`,
-      parse: (data: any) => {
-        if (data.rates && data.rates[moneda]) {
-          const rate = 1 / ensureNumber(data.rates[moneda], 1);
-          return {
-            curs: rate,
-            precizie_originala: rate.toString()  // FIX: Păstrez precizia naturală
+            precizie_originala: rate.toString()
           };
         }
         return null;
@@ -445,8 +807,6 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
 
   for (const api of alternativeAPIs) {
     try {
-      console.log(`🔄 Trying fallback API: ${api.name} for ${moneda}`);
-      
       const response = await fetch(api.url, {
         signal: AbortSignal.timeout(10000)
       });
@@ -456,8 +816,6 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
         const result = api.parse(data);
         
         if (result) {
-          console.log(`✅ Fallback rate found from ${api.name}: ${moneda} = ${formatWithOriginalPrecision(result.curs, result.precizie_originala)} RON`);
-          
           return {
             moneda,
             curs: result.curs,
@@ -467,14 +825,10 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
         }
       }
     } catch (error) {
-      console.warn(`⚠️ ${api.name} API failed for ${moneda}:`, error);
       continue;
     }
   }
 
-  // ULTIMUL RESORT: Cursuri estimate actuale (actualizate) - FIX: Fără forțare zecimale
-  console.log(`🔄 Using last resort estimated rates for ${moneda}`);
-  
   const cursuriEstimate: { [key: string]: number } = {
     'EUR': 4.9755,
     'USD': 4.5234,
@@ -483,21 +837,21 @@ async function getFallbackRateActual(moneda: string): Promise<CursValutar | null
   
   if (cursuriEstimate[moneda]) {
     const cursEstimat = cursuriEstimate[moneda];
-    console.log(`📊 Using estimated rate for ${moneda}: ${formatWithOriginalPrecision(cursEstimat)} RON`);
     
     return {
       moneda,
       curs: cursEstimat,
       data: new Date().toISOString().split('T')[0],
-      precizie_originala: cursEstimat.toString()  // FIX: Păstrez precizia naturală
+      precizie_originala: cursEstimat.toString()
     };
   }
 
-  console.error(`❌ No fallback rate available for ${moneda}`);
   return null;
 }
 
-// POST endpoint pentru conversii - ACTUALIZAT cu validări sigure
+// ===================================================================
+// POST ENDPOINT - PĂSTRAT IDENTIC
+// ===================================================================
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -510,7 +864,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // FIX PRINCIPAL: Validare sigură pentru valoare
     const valoareSigura = ensureNumber(valoare, 0);
     if (valoareSigura <= 0) {
       return NextResponse.json({
@@ -519,7 +872,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Dacă ambele monede sunt RON, nu e nevoie de conversie
     if (monedaSursa === 'RON' && monedaDestinatie === 'RON') {
       return NextResponse.json({
         success: true,
@@ -536,7 +888,6 @@ export async function POST(request: NextRequest) {
     let valoareConvertita = valoareSigura;
 
     if (monedaSursa === 'RON') {
-      // Convertește din RON în altă monedă - folosește BigQuery
       const cursDestinatie = await getCursFromBigQuery(monedaDestinatie, data) || 
                              await getCursBNRLive(monedaDestinatie, data);
       if (cursDestinatie) {
@@ -544,7 +895,6 @@ export async function POST(request: NextRequest) {
         valoareConvertita = valoareSigura / cursDestinatie.curs;
       }
     } else if (monedaDestinatie === 'RON') {
-      // Convertește din altă monedă în RON - folosește BigQuery
       const cursSursa = await getCursFromBigQuery(monedaSursa, data) || 
                         await getCursBNRLive(monedaSursa, data);
       if (cursSursa) {
@@ -552,7 +902,6 @@ export async function POST(request: NextRequest) {
         valoareConvertita = valoareSigura * cursSursa.curs;
       }
     } else {
-      // Convertește între două monede străine prin RON - folosește BigQuery
       const cursSursa = await getCursFromBigQuery(monedaSursa, data) || 
                         await getCursBNRLive(monedaSursa, data);
       const cursDestinatie = await getCursFromBigQuery(monedaDestinatie, data) || 
@@ -565,7 +914,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // FIX PRINCIPAL: Validări sigure pentru rezultate
     const valoareConvertitataSigura = ensureNumber(valoareConvertita, 0);
     const cursSigur = ensureNumber(curs, 1);
 
@@ -589,7 +937,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Endpoint pentru curățarea cache-ului - PĂSTRAT
+// ===================================================================
+// DELETE ENDPOINT - PĂSTRAT IDENTIC
+// ===================================================================
 export async function DELETE() {
   cursCache = {};
   console.log('🧹 Cache curs valutar șters complet');

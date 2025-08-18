@@ -593,8 +593,11 @@ Modificare FacturiList.tsx - buton editare = este implementat
 API-uri modificate:
 
 app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
+Informare despre date:
+Extragere Date din Bigquery
+BigQuery prin Node.js client returnează DATE fields ca obiecte {value: "2025-08-16"} în loc de string-uri simple.
+
 Probleme pentru viitor, nu pentru acum:
-1. La https://admin.unitarproiect.eu/admin/rapoarte/proiecte la Valoare Totală Portofoliu scrie NaN RON. Trebuie identificat sa se adune numai proiectele, numai valoarea in RON din Bigwuery coloana valoare_ron pentru proiectele afisate. 
-2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte pentru coloana Data Început si Data Finalizare scrie ❌ Dată invalidă pentru cele care au data in baza de date. In Bigquery Data_Start si Data_Final sunt de forma 2025-07-20. Trebuie corectat sa se vada data.
-3. Cand se editeaza proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage si la subproiecte. S-a modificat aplicatia pentru curs valutar, se citeste din Baza de date, iar curs_valutar actualizeaza zilnic baza de date.
-4. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte la meniul Proiect nou, asa cum la client se adauga intr-un rand in care tastez cateva litere si il aduc din baza de date, la fel vreau sa aduc si pentru Responsabil din tabelul utilizatori si pe Subcontractanti dintr-un tabel nou care nu exista, similar cu cel pentru clienti. Pe Subcontractanti trebuie sa ii adaugam identic ca la Clienti, dupa cui si sau nume tastand cateva litere. 
+1. Codul pentru curs-valutar/route.ts trebuie ajutat ca sa sincronizeze zilnic cursul BNR in Bigquery pentru valutele EUR, USD si GBP. Probabil ca trebui facuta o apicatie care sa dea o pornire catre curs-valutar sa porneasca luarea cursului si scrierea in Bigquery
+2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte la meniul Proiect nou, asa cum la client se adauga intr-un rand in care tastez cateva litere si il aduc din baza de date, la fel vreau sa aduc si pentru Responsabil din tabelul utilizatori si pe Subcontractanti dintr-un tabel nou care nu exista, similar cu cel pentru clienti. Pe Subcontractanti trebuie sa ii adaugam identic ca la Clienti, dupa cui si sau nume tastand cateva litere. 
+3. Cand se editeaza proiectul, ar trebui deschis cursul valutar conform datei setate cand s-a creat proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage la proiect si la subproiecte. De asemenea trebuie facute corecturile care s-au facut si la ProiectNouModal.tsx si ProiecteTable.tsx: Eliminare functie .tofixed si fortarea rotunjirii cursului valutar la 4 zecimale. Se copiaza toate functionalitatile de la ProiectNouModal 
