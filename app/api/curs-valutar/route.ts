@@ -218,8 +218,8 @@ export async function PUT(request: NextRequest) {
       cursurAdaugate: 0,
       cursurActualizate: 0,
       zileLipsaCompletate: 0,
-      cursuriEroare: [],
-      detalii: []
+      cursuriEroare: [] as string[],
+      detalii: [] as string[]
     };
 
     const monede = ['EUR', 'USD', 'GBP'];
@@ -518,13 +518,20 @@ async function esteZiDeSarbatoare(data: string): Promise<boolean> {
   return sarbatoriFix.includes(data) || sarbatoriMobile.includes(data);
 }
 
-// Salvează curs în BigQuery cu detalii complete
+// Salvează curs în BigQuery cu detalii complete ȘI PROTECȚIE DUPLICATE
 async function salvezCursInBigQueryCuDetalii(
   curs: CursValutar, 
   sursa: string, 
   observatii: string
 ): Promise<void> {
   try {
+    // VERIFICARE EXPLICITĂ pentru duplicate
+    const cursExistent = await getCursFromBigQuery(curs.moneda, curs.data);
+    if (cursExistent) {
+      console.log(`ℹ️ Curs ${curs.moneda} pentru ${curs.data} există deja - skip insert`);
+      return; // NU inserează
+    }
+
     const dataset = bigquery.dataset('PanouControlUnitar');
     const table = dataset.table('CursuriValutare');
 
@@ -701,6 +708,13 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
 
 async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
   try {
+    // VERIFICARE EXPLICITĂ pentru duplicate
+    const cursExistent = await getCursFromBigQuery(curs.moneda, curs.data);
+    if (cursExistent) {
+      console.log(`ℹ️ Curs ${curs.moneda} pentru ${curs.data} există deja - skip insert`);
+      return; // NU inserează
+    }
+
     const dataset = bigquery.dataset('PanouControlUnitar');
     const table = dataset.table('CursuriValutare');
 
