@@ -131,13 +131,16 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - - page.tsx
 - - - - - page.tsx
 - - - - - components
+- - - - - - SubcontractantSearch.tsx
 - - - - - - ProiectEditModal.tsx
 - - - - - - ProiectActions.tsx
+- - - - - - ResponsabilSearch.tsx
 - - - - - - SubproiectModal.tsx
 - - - - - - ProiectNouModal.tsx
 - - - - - - ProiecteTable.tsx
 - - - - - - FacturaHibridModal.tsx
 - - - - - - ProiectFilters.tsx
+- - - - - - SubcontractantNouModal.tsx
 - - - - - - FacturiList.tsx
 - - - - - - EditFacturaModal.tsx
 - - - - components
@@ -192,8 +195,6 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - route.ts
 - - - - pdf
 - - - - - route.ts
-- - - seed-cursuri-bnr
-- - - - route.ts
 - - - user-database
 - - - - route.ts
 - - - anaf
@@ -226,6 +227,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - rapoarte
 - - - - subproiecte
 - - - - - route.ts
+- - - - utilizatori
+- - - - - route.ts
 - - - - cheltuieli
 - - - - - route.ts
 - - - - clienti
@@ -240,6 +243,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - [id]
 - - - - - - route.ts
 - - - - dashboard
+- - - - - route.ts
+- - - - subcontractanti
 - - - - - route.ts
 - - - queryOpenAI
 - - - - route.ts
@@ -284,6 +289,7 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - contracte
 - - facturi
 - git-filter-repo.py
+
 
 package.json:
 {
@@ -355,6 +361,19 @@ app/api/actions/invoices/list/route.ts
 app/api/actions/invoices/update/route.ts
 app/api/actions/invoices/regenerate-pdf/route.ts
 app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
+
+Coduri care au legatura cu Utilizatorii (Responsabili):
+app/admin/rapoarte/proiecte/components/ResponsabilSearch.tsx
+app/api/rapoarte/utilizatori/route.ts
+app/api/user-role/route.ts
+app/api/usr-database/route.ts
+Tabel Bigquery Utilizatori
+
+Coduri care au legatura cu subcontractantii:
+app/api/rapoarte/subcontractanti/route.ts
+app/admin/rapoarte/proiecte/components/SubcontractantSearch.tsx
+app/admin/rapoarte/proiecte/components/SubcontractantNouModal.tsx
+Tabel Bigquery Subcontractanti
 
 
 ### 📋 Descriere Componente Cheie
@@ -597,7 +616,7 @@ Informare despre date:
 Extragere Date din Bigquery
 BigQuery prin Node.js client returnează DATE fields ca obiecte {value: "2025-08-16"} în loc de string-uri simple.
 
+Probleme pentru acum:
+2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte la meniul Proiect nou, asa cum la client se adauga intr-un rand in care tastez cateva litere si il aduc din baza de date, la fel vreau sa aduc si pentru Responsabil din tabelul utilizatori si pe Subcontractanti dintr-un tabel nou care nu exista, similar cu cel pentru clienti. Pe Subcontractanti trebuie sa ii adaugam identic ca la Clienti, dupa cui si sau nume tastand cateva litere. In plus, la acest meniu ar trebui sa am si un buton pentru Sarcini, care banuiesc ca va trebui controlat cu alt modal, dar macar sa avem buton catre sarcini in dreptul Proiectului dar si in dreptul Subproiectelor.
 Probleme pentru viitor, nu pentru acum:
-1. Codul pentru curs-valutar/route.ts trebuie ajutat ca sa sincronizeze zilnic cursul BNR in Bigquery pentru valutele EUR, USD si GBP. Probabil ca trebui facuta o apicatie care sa dea o pornire catre curs-valutar sa porneasca luarea cursului si scrierea in Bigquery
-2. La pagina https://admin.unitarproiect.eu/admin/rapoarte/proiecte la meniul Proiect nou, asa cum la client se adauga intr-un rand in care tastez cateva litere si il aduc din baza de date, la fel vreau sa aduc si pentru Responsabil din tabelul utilizatori si pe Subcontractanti dintr-un tabel nou care nu exista, similar cu cel pentru clienti. Pe Subcontractanti trebuie sa ii adaugam identic ca la Clienti, dupa cui si sau nume tastand cateva litere. 
 3. Cand se editeaza proiectul, ar trebui deschis cursul valutar conform datei setate cand s-a creat proiectul, daca se vrea sa se modifice cursul valutar pentru alta zi, actiunea trebuie sa se propage la proiect si la subproiecte. De asemenea trebuie facute corecturile care s-au facut si la ProiectNouModal.tsx si ProiecteTable.tsx: Eliminare functie .tofixed si fortarea rotunjirii cursului valutar la 4 zecimale. Se copiaza toate functionalitatile de la ProiectNouModal 

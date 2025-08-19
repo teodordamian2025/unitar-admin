@@ -1,6 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// MODIFICAT: Fără buton pentru subproiecte și fără "Adaugă Subproiect"
+// DATA: 19.08.2025 22:00 (ora României)
+// DESCRIERE: Adăugat buton Sarcini pentru proiecte și subproiecte active
+// PĂSTRATE: Toate funcționalitățile existente + nou buton Sarcini
 // ==================================================================
 
 'use client';
@@ -104,10 +106,9 @@ export default function ProiectActions({
   onShowEditModal
 }: ProiectActionsProps) {
   
-  // ✅ FIX: Nu afișa butonul de acțiuni pentru subproiecte
-  if (proiect.tip === 'subproiect') {
-    return null;
-  }
+  // Afișează acțiuni pentru toate tipurile de proiecte
+  const isProiectPrincipal = proiect.tip !== 'subproiect';
+  const isActiv = proiect.Status === 'Activ';
 
   // Helper pentru formatarea datelor
   const formatDate = (date?: string | { value: string }): string => {
@@ -133,7 +134,21 @@ export default function ProiectActions({
       icon: '✏️',
       color: 'secondary'
     },
-    // ✅ FIX: ELIMINAT "Adaugă Subproiect"
+    // NOU: Buton Sarcini pentru proiecte și subproiecte active
+    ...(isActiv ? [{
+      key: 'sarcini',
+      label: proiect.tip === 'subproiect' ? 'Sarcini Subproiect' : 'Sarcini Proiect',
+      icon: '📋',
+      color: 'primary' as const
+    }] : []),
+    // Adaugă subproiect doar pentru proiecte principale
+    ...(isProiectPrincipal ? [{
+      key: 'add_subproiect',
+      label: 'Adaugă Subproiect',
+      icon: '📁',
+      color: 'primary' as const,
+      disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
+    }] : []),
     {
       key: 'divider1',
       label: '',
@@ -178,7 +193,7 @@ export default function ProiectActions({
     },
     {
       key: 'delete',
-      label: 'Șterge Proiect',
+      label: `Șterge ${proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}`,
       icon: '🗑️',
       color: 'danger'
     }
@@ -192,6 +207,12 @@ export default function ProiectActions({
           break;
         case 'edit':
           await handleEdit();
+          break;
+        case 'sarcini':
+          handleSarcini();
+          break;
+        case 'add_subproiect':
+          handleAddSubproiect();
           break;
         case 'generate_invoice':
           handleCreateInvoiceHibrid();
@@ -214,6 +235,25 @@ export default function ProiectActions({
     }
   };
 
+  // NOU: Handler pentru Sarcini (placeholder pentru dezvoltare viitoare)
+  const handleSarcini = () => {
+    const tipProiect = proiect.tip === 'subproiect' ? 'subproiectului' : 'proiectului';
+    showToast(
+      `🚧 Modulul Sarcini pentru ${tipProiect} "${proiect.Denumire}" va fi implementat în etapa următoare.\n\nFuncționalități planificate:\n• Management task-uri\n• Atribuire responsabili\n• Tracking progres\n• Deadline-uri și notificări`, 
+      'info'
+    );
+  };
+
+  // NOU: Handler pentru Adăugare Subproiect
+  const handleAddSubproiect = () => {
+    if (onShowSubproiectModal) {
+      onShowSubproiectModal(proiect);
+    } else {
+      console.warn('onShowSubproiectModal callback not provided');
+      showToast('Funcția de adăugare subproiect nu este disponibilă', 'error');
+    }
+  };
+
   const handleCreateInvoiceHibrid = () => {
     if (onShowFacturaModal) {
       onShowFacturaModal(proiect);
@@ -224,19 +264,20 @@ export default function ProiectActions({
   };
 
   const handleViewDetails = async () => {
+    const tipText = proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT';
     const monedaInfo = proiect.moneda && proiect.moneda !== 'RON' 
       ? `\n💱 Monedă: ${proiect.moneda}\n💰 Valoare RON: ${proiect.valoare_ron ? `${proiect.valoare_ron.toLocaleString('ro-RO')} RON` : 'N/A'}`
       : '';
     
     const statusuriInfo = proiect.status_predare || proiect.status_contract || proiect.status_facturare || proiect.status_achitare
-      ? `\n📊 Status Predare: ${proiect.status_predare || 'N/A'}\n📝 Status Contract: ${proiect.status_contract || 'N/A'}\n🧾 Status Facturare: ${proiect.status_facturare || 'N/A'}\n💳 Status Achitare: ${proiect.status_achitare || 'N/A'}`
+      ? `\n📊 Status Predare: ${proiect.status_predare || 'N/A'}\n📄 Status Contract: ${proiect.status_contract || 'N/A'}\n🧾 Status Facturare: ${proiect.status_facturare || 'N/A'}\n💳 Status Achitare: ${proiect.status_achitare || 'N/A'}`
       : '';
 
-    const detalii = `📋 PROIECT: ${proiect.ID_Proiect}
+    const detalii = `📋 ${tipText}: ${proiect.ID_Proiect}
 
 📝 Denumire: ${proiect.Denumire}
 👤 Client: ${proiect.Client}
-📊 Status: ${proiect.Status}
+📊 Status: ${proiect.Status}${isActiv ? ' ✅' : ''}
 💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}${monedaInfo}
 📅 Începe: ${formatDate(proiect.Data_Start)}
 📅 Finalizare: ${formatDate(proiect.Data_Final)}
@@ -245,7 +286,7 @@ export default function ProiectActions({
 📝 Observații: ${proiect.Observatii || 'Fără observații'}`;
     
     showToast(detalii, 'info');
-    console.log('Detalii proiect:', proiect);
+    console.log(`Detalii ${tipText.toLowerCase()}:`, proiect);
   };
 
   const handleEdit = async () => {
@@ -258,11 +299,14 @@ export default function ProiectActions({
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
-    const confirmare = confirm(`Sigur vrei să schimbi statusul la "${newStatus}"?`);
+    const tipText = proiect.tip === 'subproiect' ? 'subproiectului' : 'proiectului';
+    const confirmare = confirm(`Sigur vrei să schimbi statusul ${tipText} la "${newStatus}"?`);
     if (!confirmare) return;
 
     try {
-      const response = await fetch('/api/rapoarte/proiecte', {
+      const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
+      
+      const response = await fetch(apiEndpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -285,24 +329,27 @@ export default function ProiectActions({
   };
 
   const handleDelete = async () => {
-    const confirmed = confirm(`Sigur vrei să ștergi proiectul ${proiect.ID_Proiect}?\n\nAceastă acțiune nu poate fi anulată!`);
+    const tipText = proiect.tip === 'subproiect' ? 'subproiectul' : 'proiectul';
+    const confirmed = confirm(`Sigur vrei să ștergi ${tipText} ${proiect.ID_Proiect}?\n\nAceastă acțiune nu poate fi anulată!`);
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte?id=${encodeURIComponent(proiect.ID_Proiect)}`, {
+      const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
+      
+      const response = await fetch(`${apiEndpoint}?id=${encodeURIComponent(proiect.ID_Proiect)}`, {
         method: 'DELETE'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        showToast('Proiect șters cu succes!', 'success');
+        showToast(`${tipText.charAt(0).toUpperCase() + tipText.slice(1)} șters cu succes!`, 'success');
         onRefresh?.();
       } else {
-        showToast(result.error || 'Eroare la ștergerea proiectului', 'error');
+        showToast(result.error || `Eroare la ștergerea ${tipText}`, 'error');
       }
     } catch (error) {
-      showToast('Eroare la ștergerea proiectului', 'error');
+      showToast(`Eroare la ștergerea ${tipText}`, 'error');
     }
   };
 
@@ -429,6 +476,8 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
     }
   };
 
+  const isActiv = proiect.Status === 'Activ';
+
   return (
     <div style={{ position: 'relative' as const, display: 'inline-block' }}>
       <button
@@ -436,7 +485,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading !== null}
         style={{
-          background: loading ? '#f8f9fa' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: loading ? '#f8f9fa' : isActiv ? 
+            'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)' : 
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: loading ? '#6c757d' : 'white',
           border: 'none',
           borderRadius: '12px',
@@ -444,7 +495,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           cursor: loading ? 'not-allowed' : 'pointer',
           fontSize: '14px',
           fontWeight: '600',
-          boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+          boxShadow: loading ? 'none' : isActiv ? 
+            '0 4px 12px rgba(39, 174, 96, 0.4)' : 
+            '0 4px 12px rgba(102, 126, 234, 0.4)',
           transition: 'all 0.3s ease',
           display: 'flex',
           alignItems: 'center',
@@ -453,17 +506,32 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         onMouseOver={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+            e.currentTarget.style.boxShadow = isActiv ? 
+              '0 6px 16px rgba(39, 174, 96, 0.5)' : 
+              '0 6px 16px rgba(102, 126, 234, 0.5)';
           }
         }}
         onMouseOut={(e) => {
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            e.currentTarget.style.boxShadow = isActiv ? 
+              '0 4px 12px rgba(39, 174, 96, 0.4)' : 
+              '0 4px 12px rgba(102, 126, 234, 0.4)';
           }
         }}
       >
         {loading ? '⏳' : '⚙️'} Acțiuni
+        {isActiv && !loading && (
+          <span style={{ 
+            fontSize: '10px', 
+            background: 'rgba(255,255,255,0.2)', 
+            padding: '2px 6px', 
+            borderRadius: '8px',
+            fontWeight: 'bold'
+          }}>
+            ACTIV
+          </span>
+        )}
       </button>
 
       {isOpen && (
@@ -510,7 +578,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                   marginBottom: '0.5rem',
                   fontFamily: 'monospace'
                 }}>
-                  {proiect.ID_Proiect}
+                  {proiect.tip === 'subproiect' ? '📁' : '🗃️'} {proiect.ID_Proiect}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                   Status: <span style={{ 
@@ -519,6 +587,19 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                   }}>
                     {proiect.Status}
                   </span>
+                  {isActiv && (
+                    <span style={{
+                      marginLeft: '0.5rem',
+                      fontSize: '10px',
+                      background: '#27ae60',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '8px',
+                      fontWeight: 'bold'
+                    }}>
+                      SARCINI DISPONIBILE
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -580,6 +661,19 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                       </span>
                       <span>
                         {action.label}
+                        {action.key === 'sarcini' && isActiv && (
+                          <span style={{
+                            marginLeft: '0.5rem',
+                            fontSize: '10px',
+                            background: '#27ae60',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '8px',
+                            fontWeight: 'bold'
+                          }}>
+                            NOU
+                          </span>
+                        )}
                       </span>
                     </button>
                   );
