@@ -597,16 +597,15 @@ async function curataTeste(): Promise<void> {
       WHERE moneda = 'TEST' OR sursa LIKE '%TEST%'
     `;
 
-    const [job] = await bigquery.query({
+    await bigquery.query({
       query: query,
       location: 'EU',
     });
 
-    const [[response]] = await job.getQueryResults();
-    console.log(`🧹 Curățat ${response?.numDmlAffectedRows || 0} teste din BigQuery`);
+    console.log('Operațiune curățare teste executată cu succes');
 
   } catch (error) {
-    console.warn('⚠️ Nu s-au putut curăța testele:', error);
+    console.warn('Nu s-au putut curăța testele:', error);
   }
 }
 
