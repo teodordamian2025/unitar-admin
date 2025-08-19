@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubcontractantSearch.tsx
-// DATA: 19.08.2025 21:40 (ora României)
-// DESCRIERE: Componentă pentru căutare subcontractanți cu integrare ANAF
+// DATA: 20.08.2025 00:15 (ora României)
+// DESCRIERE: FIX pentru conflictul de nume selectedSubcontractant
 // ==================================================================
 
 'use client';
@@ -87,18 +87,18 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 export default function SubcontractantSearch({ 
   onSubcontractantSelected,
   onShowAddModal,
-  selectedSubcontractant = '',
+  selectedSubcontractant: initialSelectedSubcontractant = '',
   className = '',
   showInModal = false,
   disabled = false,
   placeholder = "Caută subcontractant sau CUI..."
 }: SubcontractantSearchProps) {
-  const [searchTerm, setSearchTerm] = useState(selectedSubcontractant);
+  const [searchTerm, setSearchTerm] = useState(initialSelectedSubcontractant);
   const [subcontractanti, setSubcontractanti] = useState<Subcontractant[]>([]);
   const [anafResults, setAnafResults] = useState<ANAFResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedSubcontractant, setSelectedSubcontractant] = useState<Subcontractant | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Subcontractant | null>(null);
   const [searchMode, setSearchMode] = useState<'local' | 'anaf'>('local');
   const [loadingAnaf, setLoadingAnaf] = useState(false);
 
@@ -109,18 +109,18 @@ export default function SubcontractantSearch({
 
   // Setează valoarea inițială
   useEffect(() => {
-    if (selectedSubcontractant && selectedSubcontractant !== searchTerm) {
-      setSearchTerm(selectedSubcontractant);
+    if (initialSelectedSubcontractant && initialSelectedSubcontractant !== searchTerm) {
+      setSearchTerm(initialSelectedSubcontractant);
       const foundSubcontractant = subcontractanti.find(s => 
-        s.nume === selectedSubcontractant || 
-        s.cui === selectedSubcontractant ||
-        s.id === selectedSubcontractant
+        s.nume === initialSelectedSubcontractant || 
+        s.cui === initialSelectedSubcontractant ||
+        s.id === initialSelectedSubcontractant
       );
       if (foundSubcontractant) {
-        setSelectedSubcontractant(foundSubcontractant);
+        setSelectedItem(foundSubcontractant);
       }
     }
-  }, [selectedSubcontractant, subcontractanti]);
+  }, [initialSelectedSubcontractant, subcontractanti]);
 
   const loadSubcontractanti = async (search?: string) => {
     setLoading(true);
@@ -182,7 +182,7 @@ export default function SubcontractantSearch({
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
-    setSelectedSubcontractant(null);
+    setSelectedItem(null);
     setAnafResults([]);
     
     // Detectează dacă este CUI (doar cifre)
@@ -216,7 +216,7 @@ export default function SubcontractantSearch({
 
   const handleSelectSubcontractant = (subcontractant: Subcontractant) => {
     setSearchTerm(subcontractant.nume);
-    setSelectedSubcontractant(subcontractant);
+    setSelectedItem(subcontractant);
     setShowSuggestions(false);
     
     if (onSubcontractantSelected) {
@@ -299,7 +299,7 @@ export default function SubcontractantSearch({
             color: '#2c3e50',
             marginBottom: '0.5rem'
           }}>
-            🏗️ Subcontractant
+            🗃️ Subcontractant
           </label>
           <p style={{
             margin: 0,
@@ -324,7 +324,7 @@ export default function SubcontractantSearch({
             width: '100%',
             padding: '0.75rem',
             paddingRight: '3.5rem',
-            border: `1px solid ${selectedSubcontractant ? '#27ae60' : '#dee2e6'}`,
+            border: `1px solid ${selectedItem ? '#27ae60' : '#dee2e6'}`,
             borderRadius: '8px',
             fontSize: '14px',
             backgroundColor: disabled ? '#f8f9fa' : 'white',
@@ -348,10 +348,10 @@ export default function SubcontractantSearch({
           {loading && (
             <span style={{ color: '#3498db', fontSize: '12px' }}>⏳</span>
           )}
-          {selectedSubcontractant && (
+          {selectedItem && (
             <span style={{ color: '#27ae60', fontSize: '12px' }}>✅</span>
           )}
-          {!loading && !selectedSubcontractant && searchTerm && (
+          {!loading && !selectedItem && searchTerm && (
             <span style={{ color: '#f39c12', fontSize: '12px' }}>⚠️</span>
           )}
           {searchMode === 'anaf' && (
@@ -642,7 +642,7 @@ export default function SubcontractantSearch({
       </div>
 
       {/* Info despre subcontractantul selectat */}
-      {selectedSubcontractant && (
+      {selectedItem && (
         <div style={{
           marginTop: '0.5rem',
           padding: '0.75rem',
@@ -668,14 +668,14 @@ export default function SubcontractantSearch({
                 color: '#7f8c8d',
                 marginTop: '0.25rem'
               }}>
-                {selectedSubcontractant.cui && `CUI: ${selectedSubcontractant.cui}`}
-                {selectedSubcontractant.telefon && ` • ${selectedSubcontractant.telefon}`}
+                {selectedItem.cui && `CUI: ${selectedItem.cui}`}
+                {selectedItem.telefon && ` • ${selectedItem.telefon}`}
               </div>
             </div>
             <button
               onClick={() => {
                 setSearchTerm('');
-                setSelectedSubcontractant(null);
+                setSelectedItem(null);
                 if (onSubcontractantSelected) {
                   onSubcontractantSelected(null);
                 }
