@@ -366,7 +366,11 @@ Coduri care au legatura cu Utilizatorii (Responsabili):
 app/admin/rapoarte/proiecte/components/ResponsabilSearch.tsx
 app/api/rapoarte/utilizatori/route.ts
 app/api/user-role/route.ts
-app/api/usr-database/route.ts
+app/api/user-database/route.ts
+app/api/utilizatori/curent/route.ts
+app/login/page.tsx
+lib/firebaseConfig.ts
+
 Tabel Bigquery Utilizatori
 
 Coduri care au legatura cu subcontractantii:
@@ -380,6 +384,9 @@ app/api/rapoarte/sarcini/route.ts
 app/api/rapoarte/comentarii/route.ts
 app/api/rapoarte/timetracking/route.ts
 app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
+app/admin/rapoarte/proiecte/components/SarcinaNouaModal.tsx
+app/admin/rapoarte/proiecte/components/TimeTrackingNouModal.tsx
+
 Tabele Bigquery: Sarcini, SarciniResponsabili, ProiectComentarii, TimeTracking
 
 ### 📋 Descriere Componente Cheie

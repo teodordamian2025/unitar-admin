@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// DATA: 20.08.2025 01:15 (ora României)
-// MODIFICAT: Integrare SarciniProiectModal real în loc de placeholder
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 21.08.2025 01:35 (ora României)
+// MODIFICAT: Acțiuni diferențiate - subproiecte active au doar "Sarcini"
+// PĂSTRATE: Toate funcționalitățile existente pentru proiecte
 // ==================================================================
 
 'use client';
@@ -107,11 +107,12 @@ export default function ProiectActions({
   onShowEditModal
 }: ProiectActionsProps) {
   
-  // NOU: State pentru modalul de sarcini
+  // State pentru modalul de sarcini
   const [showSarciniModal, setShowSarciniModal] = useState(false);
   
-  // Afișează acțiuni pentru toate tipurile de proiecte
+  // ACTUALIZAT: Logica pentru tipul de proiect și status
   const isProiectPrincipal = proiect.tip !== 'subproiect';
+  const isSubproiect = proiect.tip === 'subproiect';
   const isActiv = proiect.Status === 'Activ';
 
   // Helper pentru formatarea datelor
@@ -125,83 +126,102 @@ export default function ProiectActions({
     }
   };
 
-  const actions: ActionItem[] = [
-    {
-      key: 'view',
-      label: 'Vezi Detalii',
-      icon: '👁️',
-      color: 'primary'
-    },
-    {
-      key: 'edit',
-      label: 'Editează',
-      icon: '✏️',
-      color: 'secondary'
-    },
-    // ACTUALIZAT: Buton Sarcini cu funcționalitate reală
-    ...(isActiv ? [{
-      key: 'sarcini',
-      label: proiect.tip === 'subproiect' ? 'Sarcini Subproiect' : 'Sarcini Proiect',
-      icon: '📋',
-      color: 'primary' as const
-    }] : []),
-    // Adaugă subproiect doar pentru proiecte principale
-    ...(isProiectPrincipal ? [{
-      key: 'add_subproiect',
-      label: 'Adaugă Subproiect',
-      icon: '📁',
-      color: 'primary' as const,
-      disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
-    }] : []),
-    {
-      key: 'divider1',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'generate_invoice',
-      label: 'Generează Factură PDF',
-      icon: '💰',
-      color: 'warning',
-      disabled: proiect.Status === 'Anulat'
-    },
-    {
-      key: 'divider2',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'mark_completed',
-      label: 'Marchează Finalizat',
-      icon: '✅',
-      color: 'success',
-      disabled: proiect.Status === 'Finalizat' || proiect.Status === 'Anulat'
-    },
-    {
-      key: 'suspend',
-      label: 'Suspendă Proiect',
-      icon: '⸕',
-      color: 'warning',
-      disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
-    },
-    {
-      key: 'divider3',
-      label: '',
-      icon: '',
-      color: 'primary',
-      divider: true
-    },
-    {
-      key: 'delete',
-      label: `Șterge ${proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}`,
-      icon: '🗑️',
-      color: 'danger'
+  // ACTUALIZAT: Construire acțiuni în funcție de tip și status
+  const actions: ActionItem[] = (() => {
+    // Pentru subproiecte active: DOAR Sarcini
+    if (isSubproiect && isActiv) {
+      return [{
+        key: 'sarcini',
+        label: 'Sarcini Subproiect',
+        icon: '📋',
+        color: 'primary' as const
+      }];
     }
-  ];
+    
+    // Pentru subproiecte inactive: NICIO acțiune
+    if (isSubproiect && !isActiv) {
+      return [];
+    }
+    
+    // Pentru proiecte principale: toate acțiunile
+    return [
+      {
+        key: 'view',
+        label: 'Vezi Detalii',
+        icon: '👁️',
+        color: 'primary'
+      },
+      {
+        key: 'edit',
+        label: 'Editează',
+        icon: '✏️',
+        color: 'secondary'
+      },
+      // Sarcini doar pentru proiecte active
+      ...(isActiv ? [{
+        key: 'sarcini',
+        label: 'Sarcini Proiect',
+        icon: '📋',
+        color: 'primary' as const
+      }] : []),
+      // Adaugă subproiect doar pentru proiecte principale
+      {
+        key: 'add_subproiect',
+        label: 'Adaugă Subproiect',
+        icon: '📁',
+        color: 'primary' as const,
+        disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
+      },
+      {
+        key: 'divider1',
+        label: '',
+        icon: '',
+        color: 'primary',
+        divider: true
+      },
+      {
+        key: 'generate_invoice',
+        label: 'Generează Factură PDF',
+        icon: '💰',
+        color: 'warning',
+        disabled: proiect.Status === 'Anulat'
+      },
+      {
+        key: 'divider2',
+        label: '',
+        icon: '',
+        color: 'primary',
+        divider: true
+      },
+      {
+        key: 'mark_completed',
+        label: 'Marchează Finalizat',
+        icon: '✅',
+        color: 'success',
+        disabled: proiect.Status === 'Finalizat' || proiect.Status === 'Anulat'
+      },
+      {
+        key: 'suspend',
+        label: 'Suspendă Proiect',
+        icon: '⏸️',
+        color: 'warning',
+        disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
+      },
+      {
+        key: 'divider3',
+        label: '',
+        icon: '',
+        color: 'primary',
+        divider: true
+      },
+      {
+        key: 'delete',
+        label: 'Șterge Proiect',
+        icon: '🗑️',
+        color: 'danger'
+      }
+    ];
+  })();
 
   const handleAction = async (actionKey: string) => {
     try {
@@ -239,13 +259,13 @@ export default function ProiectActions({
     }
   };
 
-  // ACTUALIZAT: Handler pentru Sarcini cu modal real
+  // Handler pentru Sarcini
   const handleSarcini = () => {
     setShowSarciniModal(true);
     console.log('Deschidere modal sarcini pentru:', proiect.ID_Proiect);
   };
 
-  // Handler pentru Adăugare Subproiect
+  // Handler pentru Adăugare Subproiect (doar pentru proiecte principale)
   const handleAddSubproiect = () => {
     if (onShowSubproiectModal) {
       onShowSubproiectModal(proiect);
@@ -354,6 +374,11 @@ export default function ProiectActions({
     }
   };
 
+  // ACTUALIZAT: Nu afișa nimic pentru subproiecte inactive
+  if (isSubproiect && !isActiv) {
+    return null;
+  }
+
   return (
     <>
       <EnhancedActionDropdown
@@ -362,7 +387,7 @@ export default function ProiectActions({
         proiect={proiect}
       />
 
-      {/* ADĂUGAT: Modal pentru sarcini */}
+      {/* Modal pentru sarcini */}
       {showSarciniModal && (
         <SarciniProiectModal
           isOpen={showSarciniModal}
@@ -389,6 +414,11 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   
   const dropdownId = React.useMemo(() => `dropdown-${proiect.ID_Proiect}-${Math.random().toString(36).substr(2, 9)}`, [proiect.ID_Proiect]);
+
+  // ACTUALIZAT: Nu afișa buton dacă nu sunt acțiuni
+  if (actions.length === 0) {
+    return null;
+  }
 
   React.useEffect(() => {
     openDropdowns.set(dropdownId, () => setIsOpen(false));
@@ -489,6 +519,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
   };
 
   const isActiv = proiect.Status === 'Activ';
+  const isSubproiect = proiect.tip === 'subproiect';
 
   return (
     <div style={{ position: 'relative' as const, display: 'inline-block' }}>
@@ -498,7 +529,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
         disabled={loading !== null}
         style={{
           background: loading ? '#f8f9fa' : isActiv ? 
-            'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)' : 
+            (isSubproiect ? 
+              'linear-gradient(135deg, #3498db 0%, #5dade2 100%)' : 
+              'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)') : 
             'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: loading ? '#6c757d' : 'white',
           border: 'none',
@@ -508,7 +541,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           fontSize: '14px',
           fontWeight: '600',
           boxShadow: loading ? 'none' : isActiv ? 
-            '0 4px 12px rgba(39, 174, 96, 0.4)' : 
+            (isSubproiect ? 
+              '0 4px 12px rgba(52, 152, 219, 0.4)' : 
+              '0 4px 12px rgba(39, 174, 96, 0.4)') : 
             '0 4px 12px rgba(102, 126, 234, 0.4)',
           transition: 'all 0.3s ease',
           display: 'flex',
@@ -519,7 +554,9 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(-2px)';
             e.currentTarget.style.boxShadow = isActiv ? 
-              '0 6px 16px rgba(39, 174, 96, 0.5)' : 
+              (isSubproiect ? 
+                '0 6px 16px rgba(52, 152, 219, 0.5)' : 
+                '0 6px 16px rgba(39, 174, 96, 0.5)') : 
               '0 6px 16px rgba(102, 126, 234, 0.5)';
           }
         }}
@@ -527,12 +564,15 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
           if (!loading) {
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = isActiv ? 
-              '0 4px 12px rgba(39, 174, 96, 0.4)' : 
+              (isSubproiect ? 
+                '0 4px 12px rgba(52, 152, 219, 0.4)' : 
+                '0 4px 12px rgba(39, 174, 96, 0.4)') : 
               '0 4px 12px rgba(102, 126, 234, 0.4)';
           }
         }}
       >
-        {loading ? '⏳' : '⚙️'} Acțiuni
+        {loading ? '⏳' : (isSubproiect ? '📋' : '⚙️')} 
+        {isSubproiect ? 'Sarcini' : 'Acțiuni'}
         {isActiv && !loading && (
           <span style={{ 
             fontSize: '10px', 
@@ -541,7 +581,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
             borderRadius: '8px',
             fontWeight: 'bold'
           }}>
-            ACTIV
+            {isSubproiect ? 'SUB' : 'ACTIV'}
           </span>
         )}
       </button>
@@ -599,17 +639,17 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                   }}>
                     {proiect.Status}
                   </span>
-                  {isActiv && (
+                  {isSubproiect && isActiv && (
                     <span style={{
                       marginLeft: '0.5rem',
                       fontSize: '10px',
-                      background: '#27ae60',
+                      background: '#3498db',
                       color: 'white',
                       padding: '2px 6px',
                       borderRadius: '8px',
                       fontWeight: 'bold'
                     }}>
-                      SARCINI DISPONIBILE
+                      SUBPROIECT ACTIV
                     </span>
                   )}
                 </div>
@@ -677,13 +717,13 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                           <span style={{
                             marginLeft: '0.5rem',
                             fontSize: '10px',
-                            background: '#27ae60',
+                            background: isSubproiect ? '#3498db' : '#27ae60',
                             color: 'white',
                             padding: '2px 6px',
                             borderRadius: '8px',
                             fontWeight: 'bold'
                           }}>
-                            NOU
+                            {isSubproiect ? 'SUB' : 'NOU'}
                           </span>
                         )}
                       </span>

@@ -1,14 +1,18 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
-// DATA: 20.08.2025 01:00 (ora României)
-// DESCRIERE: Modal principal pentru managementul sarcinilor unui proiect/subproiect
-// FUNCTIONALITATI: Sarcini, Comentarii, Time Tracking cu tab-uri
+// DATA: 21.08.2025 01:40 (ora României)
+// MODIFICAT: Fix utilizator curent real din Firebase Auth + BigQuery
+// PĂSTRATE: Toate funcționalitățile existente + formatDate BigQuery compatibility
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
 import ResponsabilSearch from './ResponsabilSearch';
+import SarcinaNouaModal from './SarcinaNouaModal';
+import TimeTrackingNouModal from './TimeTrackingNouModal';
 
 interface SarciniProiectModalProps {
   isOpen: boolean;
@@ -31,8 +35,8 @@ interface Sarcina {
   prioritate: string;
   status: string;
   data_creare: string;
-  data_scadenta?: string;
-  data_finalizare?: string;
+  data_scadenta?: string | { value: string };
+  data_finalizare?: string | { value: string };
   observatii?: string;
   responsabili: Array<{
     responsabil_uid: string;
@@ -48,7 +52,7 @@ interface Comentariu {
   autor_uid: string;
   autor_nume: string;
   comentariu: string;
-  data_comentariu: string;
+  data_comentariu: string | { value: string };
   tip_comentariu: string;
 }
 
@@ -57,10 +61,19 @@ interface TimeTracking {
   sarcina_id: string;
   utilizator_uid: string;
   utilizator_nume: string;
-  data_lucru: string;
+  data_lucru: string | { value: string };
   ore_lucrate: number;
   descriere_lucru: string;
   sarcina_titlu: string;
+}
+
+interface UtilizatorCurent {
+  uid: string;
+  email: string;
+  nume: string;
+  prenume: string;
+  nume_complet: string;
+  rol: string;
 }
 
 // Toast system
@@ -110,6 +123,13 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('sarcini');
   const [loading, setLoading] = useState(false);
   
+  // ACTUALIZAT: Hook Firebase pentru utilizatorul autentificat
+  const [firebaseUser, firebaseLoading, firebaseError] = useAuthState(auth);
+  
+  // State pentru utilizatorul curent
+  const [utilizatorCurent, setUtilizatorCurent] = useState<UtilizatorCurent | null>(null);
+  const [loadingUtilizator, setLoadingUtilizator] = useState(false);
+  
   // State pentru sarcini
   const [sarcini, setSarcini] = useState<Sarcina[]>([]);
   const [showSarcinaNouaModal, setShowSarcinaNouaModal] = useState(false);
@@ -124,11 +144,115 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const [timeTracking, setTimeTracking] = useState<TimeTracking[]>([]);
   const [showTimeModal, setShowTimeModal] = useState(false);
 
+  // FIX: Funcție formatDate compatibilă cu obiectele BigQuery
+  const formatDate = (date?: string | { value: string } | any): string => {
+    if (!date) return 'N/A';
+    
+    try {
+      // Extrage valoarea reală din obiectul BigQuery sau folosește string-ul direct
+      const dateValue = typeof date === 'string' ? date : 
+                      typeof date === 'object' && date.value ? date.value : 
+                      date.toString();
+      
+      // Parsează și formatează data
+      const parsedDate = new Date(dateValue);
+      
+      if (isNaN(parsedDate.getTime())) {
+        console.warn('Data invalidă primită:', date);
+        return 'Data invalidă';
+      }
+      
+      return parsedDate.toLocaleDateString('ro-RO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Eroare la formatarea datei:', date, error);
+      return 'Eroare dată';
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadData();
     }
   }, [isOpen, activeTab]);
+
+  // ACTUALIZAT: Încarcă utilizatorul curent real din Firebase + BigQuery
+  useEffect(() => {
+    if (isOpen && firebaseUser && !firebaseLoading) {
+      loadUtilizatorCurent();
+    }
+  }, [isOpen, firebaseUser, firebaseLoading]);
+
+  const loadUtilizatorCurent = async () => {
+    if (!firebaseUser) {
+      console.error('Nu există utilizator Firebase autentificat');
+      showToast('Nu există utilizator autentificat', 'error');
+      return;
+    }
+
+    setLoadingUtilizator(true);
+    
+    try {
+      console.log('Preiau datele pentru utilizatorul Firebase:', firebaseUser.uid);
+      
+      const response = await fetch('/api/utilizatori/curent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: firebaseUser.uid })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        const user = data.data;
+        setUtilizatorCurent({
+          uid: user.uid,
+          email: user.email,
+          nume: user.nume || '',
+          prenume: user.prenume || '',
+          nume_complet: user.nume_complet,
+          rol: user.rol
+        });
+        
+        console.log('Utilizator curent încărcat:', user.nume_complet);
+      } else {
+        console.error('Eroare la preluarea utilizatorului:', data.error);
+        
+        // Fallback cu datele din Firebase
+        setUtilizatorCurent({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || 'email@necunoscut.com',
+          nume: '',
+          prenume: '',
+          nume_complet: firebaseUser.displayName || firebaseUser.email || 'Utilizator Necunoscut',
+          rol: 'normal'
+        });
+        
+        showToast('S-au folosit datele Firebase ca fallback', 'info');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea utilizatorului curent:', error);
+      
+      // Fallback final cu datele din Firebase
+      setUtilizatorCurent({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || 'email@necunoscut.com',
+        nume: '',
+        prenume: '',
+        nume_complet: firebaseUser.displayName || firebaseUser.email || 'Utilizator Necunoscut',
+        rol: 'normal'
+      });
+      
+      showToast('Eroare la încărcarea datelor utilizator, se folosesc datele Firebase', 'error');
+    } finally {
+      setLoadingUtilizator(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -200,9 +324,15 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
+  // ACTUALIZAT: Folosește datele reale ale utilizatorului curent
   const handleAddComentariu = async () => {
     if (!newComentariu.trim()) {
       showToast('Comentariul nu poate fi gol', 'error');
+      return;
+    }
+
+    if (!utilizatorCurent) {
+      showToast('Nu s-au putut prelua datele utilizatorului curent', 'error');
       return;
     }
 
@@ -215,8 +345,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
           id: `COM_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           proiect_id: proiect.ID_Proiect,
           tip_proiect: proiect.tip || 'proiect',
-          autor_uid: 'current_user', // TODO: Din context utilizator autentificat
-          autor_nume: 'Utilizator Curent', // TODO: Din context utilizator autentificat
+          autor_uid: utilizatorCurent.uid,
+          autor_nume: utilizatorCurent.nume_complet,
           comentariu: newComentariu.trim(),
           tip_comentariu: tipComentariu
         })
@@ -240,18 +370,16 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  const formatDate = (dateString: string): string => {
-    try {
-      return new Date(dateString).toLocaleDateString('ro-RO', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateString;
-    }
+  const handleSarcinaAdded = () => {
+    setShowSarcinaNouaModal(false);
+    loadSarcini(); // Refresh lista sarcinilor
+    showToast('Sarcină adăugată cu succes', 'success');
+  };
+
+  const handleTimeAdded = () => {
+    setShowTimeModal(false);
+    loadTimeTracking(); // Refresh lista time tracking
+    showToast('Timp înregistrat cu succes', 'success');
   };
 
   const getPriorityColor = (prioritate: string) => {
@@ -274,7 +402,41 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  if (!isOpen) return null;
+  // Nu afișa modalul dacă nu este deschis sau există erori Firebase
+  if (!isOpen || firebaseError) {
+    if (firebaseError) {
+      console.error('Eroare Firebase Auth:', firebaseError);
+    }
+    return null;
+  }
+
+  // Loading pentru Firebase Auth
+  if (firebaseLoading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        zIndex: 50000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          textAlign: 'center',
+          color: '#2c3e50'
+        }}>
+          Se încarcă autentificarea...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -315,6 +477,17 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
                 {proiect.Denumire} • Client: {proiect.Client}
               </p>
+              {/* ACTUALIZAT: Afișează utilizatorul curent real */}
+              {utilizatorCurent && (
+                <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                  Conectat ca: {utilizatorCurent.nume_complet} ({utilizatorCurent.rol})
+                </p>
+              )}
+              {loadingUtilizator && (
+                <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                  Se încarcă datele utilizatorului...
+                </p>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -380,13 +553,14 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 <h3 style={{ margin: 0, color: '#2c3e50' }}>Sarcini ({sarcini.length})</h3>
                 <button
                   onClick={() => setShowSarcinaNouaModal(true)}
+                  disabled={!utilizatorCurent}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                    background: !utilizatorCurent ? '#bdc3c7' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: 'pointer',
+                    cursor: !utilizatorCurent ? 'not-allowed' : 'pointer',
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}
@@ -545,14 +719,14 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 
                 <button
                   onClick={handleAddComentariu}
-                  disabled={loading || !newComentariu.trim()}
+                  disabled={loading || !newComentariu.trim() || !utilizatorCurent}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: loading || !newComentariu.trim() ? '#bdc3c7' : '#27ae60',
+                    background: loading || !newComentariu.trim() || !utilizatorCurent ? '#bdc3c7' : '#27ae60',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: loading || !newComentariu.trim() ? 'not-allowed' : 'pointer',
+                    cursor: loading || !newComentariu.trim() || !utilizatorCurent ? 'not-allowed' : 'pointer',
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}
@@ -638,13 +812,14 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 </h3>
                 <button
                   onClick={() => setShowTimeModal(true)}
+                  disabled={!utilizatorCurent}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
+                    background: !utilizatorCurent ? '#bdc3c7' : 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: 'pointer',
+                    cursor: !utilizatorCurent ? 'not-allowed' : 'pointer',
                     fontSize: '14px',
                     fontWeight: 'bold'
                   }}
@@ -798,41 +973,26 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
         </div>
       </div>
 
-      {/* Placeholder pentru modale suplimentare care vor fi implementate */}
-      {showSarcinaNouaModal && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'white',
-          padding: '2rem',
-          borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-          zIndex: 60000
-        }}>
-          <h3>Modal Sarcină Nouă</h3>
-          <p>Aici va fi implementat modalul pentru adăugarea unei sarcini noi</p>
-          <button onClick={() => setShowSarcinaNouaModal(false)}>Închide</button>
-        </div>
+      {/* Modale suplimentare */}
+      {showSarcinaNouaModal && utilizatorCurent && (
+        <SarcinaNouaModal
+          isOpen={showSarcinaNouaModal}
+          onClose={() => setShowSarcinaNouaModal(false)}
+          onSarcinaAdded={handleSarcinaAdded}
+          proiect={proiect}
+          utilizatorCurent={utilizatorCurent}
+        />
       )}
 
-      {showTimeModal && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'white',
-          padding: '2rem',
-          borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-          zIndex: 60000
-        }}>
-          <h3>Modal Înregistrare Timp</h3>
-          <p>Aici va fi implementat modalul pentru înregistrarea timpului</p>
-          <button onClick={() => setShowTimeModal(false)}>Închide</button>
-        </div>
+      {showTimeModal && utilizatorCurent && (
+        <TimeTrackingNouModal
+          isOpen={showTimeModal}
+          onClose={() => setShowTimeModal(false)}
+          onTimeAdded={handleTimeAdded}
+          proiect={proiect}
+          sarcini={sarcini}
+          utilizatorCurent={utilizatorCurent}
+        />
       )}
     </div>
   );

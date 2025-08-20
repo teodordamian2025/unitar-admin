@@ -1,4 +1,4 @@
-// app/api/usr-database/route.ts
+// app/api/user-database/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 
