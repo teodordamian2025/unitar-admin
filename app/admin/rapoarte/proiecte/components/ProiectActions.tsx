@@ -1,14 +1,15 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// DATA: 19.08.2025 22:00 (ora României)
-// DESCRIERE: Adăugat buton Sarcini pentru proiecte și subproiecte active
-// PĂSTRATE: Toate funcționalitățile existente + nou buton Sarcini
+// DATA: 20.08.2025 01:15 (ora României)
+// MODIFICAT: Integrare SarciniProiectModal real în loc de placeholder
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import SarciniProiectModal from './SarciniProiectModal';
 
 interface ActionItem {
   key: string;
@@ -106,6 +107,9 @@ export default function ProiectActions({
   onShowEditModal
 }: ProiectActionsProps) {
   
+  // NOU: State pentru modalul de sarcini
+  const [showSarciniModal, setShowSarciniModal] = useState(false);
+  
   // Afișează acțiuni pentru toate tipurile de proiecte
   const isProiectPrincipal = proiect.tip !== 'subproiect';
   const isActiv = proiect.Status === 'Activ';
@@ -134,7 +138,7 @@ export default function ProiectActions({
       icon: '✏️',
       color: 'secondary'
     },
-    // NOU: Buton Sarcini pentru proiecte și subproiecte active
+    // ACTUALIZAT: Buton Sarcini cu funcționalitate reală
     ...(isActiv ? [{
       key: 'sarcini',
       label: proiect.tip === 'subproiect' ? 'Sarcini Subproiect' : 'Sarcini Proiect',
@@ -180,7 +184,7 @@ export default function ProiectActions({
     {
       key: 'suspend',
       label: 'Suspendă Proiect',
-      icon: '⏸️',
+      icon: '⸕',
       color: 'warning',
       disabled: proiect.Status === 'Suspendat' || proiect.Status === 'Finalizat'
     },
@@ -235,16 +239,13 @@ export default function ProiectActions({
     }
   };
 
-  // NOU: Handler pentru Sarcini (placeholder pentru dezvoltare viitoare)
+  // ACTUALIZAT: Handler pentru Sarcini cu modal real
   const handleSarcini = () => {
-    const tipProiect = proiect.tip === 'subproiect' ? 'subproiectului' : 'proiectului';
-    showToast(
-      `🚧 Modulul Sarcini pentru ${tipProiect} "${proiect.Denumire}" va fi implementat în etapa următoare.\n\nFuncționalități planificate:\n• Management task-uri\n• Atribuire responsabili\n• Tracking progres\n• Deadline-uri și notificări`, 
-      'info'
-    );
+    setShowSarciniModal(true);
+    console.log('Deschidere modal sarcini pentru:', proiect.ID_Proiect);
   };
 
-  // NOU: Handler pentru Adăugare Subproiect
+  // Handler pentru Adăugare Subproiect
   const handleAddSubproiect = () => {
     if (onShowSubproiectModal) {
       onShowSubproiectModal(proiect);
@@ -354,11 +355,22 @@ export default function ProiectActions({
   };
 
   return (
-    <EnhancedActionDropdown
-      actions={actions}
-      onAction={handleAction}
-      proiect={proiect}
-    />
+    <>
+      <EnhancedActionDropdown
+        actions={actions}
+        onAction={handleAction}
+        proiect={proiect}
+      />
+
+      {/* ADĂUGAT: Modal pentru sarcini */}
+      {showSarciniModal && (
+        <SarciniProiectModal
+          isOpen={showSarciniModal}
+          onClose={() => setShowSarciniModal(false)}
+          proiect={proiect}
+        />
+      )}
+    </>
   );
 }
 

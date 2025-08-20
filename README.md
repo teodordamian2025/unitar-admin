@@ -375,6 +375,12 @@ app/admin/rapoarte/proiecte/components/SubcontractantSearch.tsx
 app/admin/rapoarte/proiecte/components/SubcontractantNouModal.tsx
 Tabel Bigquery Subcontractanti
 
+Coduri pentru sarcini si timetracking:
+app/api/rapoarte/sarcini/route.ts
+app/api/rapoarte/comentarii/route.ts
+app/api/rapoarte/timetracking/route.ts
+app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
+Tabele Bigquery: Sarcini, SarciniResponsabili, ProiectComentarii, TimeTracking
 
 ### 📋 Descriere Componente Cheie
 
