@@ -335,17 +335,32 @@ export async function PUT(request: NextRequest) {
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP()');
 
-    const query = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-      SET ${updateFields.join(', ')}
-      WHERE id = @id
-    `;
+	const query = `
+	  UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+	  SET ${updateFields.join(', ')}
+	  WHERE id = @id
+	`;
 
-    await bigquery.query({
-      query: query,
-      params: params,
-      location: 'EU',
-    });
+	// Construiește types pentru valorile null
+	const types: any = {};
+	Object.keys(params).forEach(key => {
+	  if (key !== 'id') {
+	    if (key === 'data_scadenta') {
+	      types[key] = 'DATE';
+	    } else if (key === 'timp_estimat_zile' || key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
+	      types[key] = 'NUMERIC';
+	    } else {
+	      types[key] = 'STRING';
+	    }
+	  }
+	});
+
+	await bigquery.query({
+	  query: query,
+	  params: params,
+	  types: types,
+	  location: 'EU',
+	});
 
     // Actualizează responsabilii dacă sunt specificați
     if (data.responsabili && Array.isArray(data.responsabili)) {

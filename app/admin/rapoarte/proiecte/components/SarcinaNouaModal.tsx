@@ -506,16 +506,16 @@ export default function SarcinaNouaModal({
               </div>
 
               <div style={{
-                background: 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
-                color: 'white',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                textAlign: 'center',
-                minWidth: '120px'
-              }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                  {timpTotalOre.toFixed(1)}h
-                </div>
+		  background: 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
+		  color: 'white',
+		  padding: '0.75rem 1rem',
+		  borderRadius: '8px',
+		  textAlign: 'center',
+		  minWidth: '120px'
+		}}>
+		  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+		    {(timpTotalOre || 0).toFixed(1)}h
+		  </div>
                 <div style={{ fontSize: '12px', opacity: 0.9 }}>
                   Total estimat
                 </div>
