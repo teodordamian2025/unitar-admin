@@ -185,33 +185,38 @@ export async function POST(request: NextRequest) {
     // Inserare sarcină cu timp estimat
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
-    const insertSarcinaQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
-       created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
-      VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
-              @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
-    `;
+	const insertSarcinaQuery = `
+	  INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+	  (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
+	   created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
+	  VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
+		  @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
+	`;
 
-    await bigquery.query({
-      query: insertSarcinaQuery,
-      params: {
-        id: sarcinaId,
-        proiect_id: data.proiect_id,
-        tip_proiect: data.tip_proiect || 'proiect',
-        titlu: data.titlu,
-        descriere: data.descriere || null,
-        prioritate: data.prioritate,
-        status: data.status,
-        data_scadenta: data.data_scadenta || null,
-        observatii: data.observatii || null,
-        created_by: data.created_by,
-        timp_estimat_zile: zileEstimate,
-        timp_estimat_ore: oreEstimate,
-        timp_estimat_total_ore: timpTotalOre
-      },
-      location: 'EU',
-    });
+	await bigquery.query({
+	  query: insertSarcinaQuery,
+	  params: {
+	    id: sarcinaId,
+	    proiect_id: data.proiect_id,
+	    tip_proiect: data.tip_proiect || 'proiect',
+	    titlu: data.titlu,
+	    descriere: data.descriere || null,
+	    prioritate: data.prioritate,
+	    status: data.status,
+	    data_scadenta: data.data_scadenta || null,
+	    observatii: data.observatii || null,
+	    created_by: data.created_by,
+	    timp_estimat_zile: zileEstimate,
+	    timp_estimat_ore: oreEstimate,
+	    timp_estimat_total_ore: timpTotalOre
+	  },
+	  types: {
+	    descriere: data.descriere ? 'STRING' : 'STRING',
+	    data_scadenta: data.data_scadenta ? 'DATE' : 'DATE',
+	    observatii: data.observatii ? 'STRING' : 'STRING'
+	  },
+	  location: 'EU',
+	});
 
     // Inserare responsabili
     for (const responsabil of data.responsabili) {

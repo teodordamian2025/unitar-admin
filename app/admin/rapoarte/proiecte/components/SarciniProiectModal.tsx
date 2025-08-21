@@ -809,20 +809,18 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                   }}
                                 />
                               </div>
-                              <div style={{
-                                background: '#f39c12',
-                                color: 'white',
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                textAlign: 'center',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                minWidth: '60px'
-                              }}>
-                                {((parseInt(editData.timp_estimat_zile) || 0) * 8 + (parseFloat(editData.timp_estimat_ore) || 0)).toFixed(1)}h
-                              </div>
-                            </div>
-                          </div>
+				<div style={{
+				  background: '#f39c12',
+				  color: 'white',
+				  padding: '0.5rem',
+				  borderRadius: '4px',
+				  textAlign: 'center',
+				  fontSize: '12px',
+				  fontWeight: 'bold',
+				  minWidth: '60px'
+				}}>
+				  {(((parseInt(editData.timp_estimat_zile) || 0) * 8) + (parseFloat(editData.timp_estimat_ore) || 0)).toFixed(1)}h
+				</div>
 
                           {/* Data scadență și observații */}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
