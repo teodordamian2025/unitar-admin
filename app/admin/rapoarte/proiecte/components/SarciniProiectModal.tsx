@@ -181,13 +181,13 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  // ADĂUGAT: Funcție pentru formatarea timpului estimat
+// ADĂUGAT: Funcție pentru formatarea timpului estimat
   const formatTimpEstimat = (zile?: number, ore?: number, totalOre?: number) => {
     if (!totalOre || totalOre === 0) {
       return 'Nestabilit';
     }
 
-    const parts = [];
+    const parts: string[] = [];
     if (zile && zile > 0) {
       parts.push(`${zile} ${zile === 1 ? 'zi' : 'zile'}`);
     }
