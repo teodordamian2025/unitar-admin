@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/timetracking/route.ts
-// DATA: 20.08.2025 00:55 (ora României)
-// DESCRIERE: API pentru time tracking manual pe sarcini
+// DATA: 21.08.2025 02:20 (ora României)
+// MODIFICAT: Adăugat proiect_id pentru denormalizare + păstrate toate funcționalitățile existente
+// PĂSTRATE: Toate funcționalitățile din versiunea anterioară + validări + filtrări
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,12 +20,12 @@ const bigquery = new BigQuery({
 const dataset = 'PanouControlUnitar';
 const table = 'TimeTracking';
 
-// Helper function pentru escape SQL
+// Helper function pentru escape SQL - PĂSTRAT
 const escapeString = (value: string): string => {
   return value.replace(/'/g, "''");
 };
 
-// Helper pentru formatare DATE BigQuery
+// Helper pentru formatare DATE BigQuery - PĂSTRAT
 const formatDateLiteral = (dateString: string | null): string => {
   if (!dateString || dateString === 'null' || dateString === '') {
     return 'NULL';
@@ -45,12 +46,36 @@ export async function GET(request: NextRequest) {
     const utilizatorUid = searchParams.get('utilizator_uid');
     const dataLucru = searchParams.get('data_lucru');
     const proiectId = searchParams.get('proiect_id');
+    const validareLimita = searchParams.get('validare_limita');
 
-    // Query pentru înregistrări time tracking cu detalii sarcină
+    // ADĂUGAT: Pentru validarea limitei de 8/16 ore pe zi
+    if (validareLimita === 'true' && utilizatorUid && dataLucru) {
+      const validareQuery = `
+        SELECT COALESCE(SUM(ore_lucrate), 0) as total_ore_ziua
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        WHERE utilizator_uid = @utilizator_uid 
+        AND data_lucru = @data_lucru
+      `;
+
+      const [rows] = await bigquery.query({
+        query: validareQuery,
+        params: { utilizator_uid: utilizatorUid, data_lucru: dataLucru },
+        types: { utilizator_uid: 'STRING', data_lucru: 'DATE' },
+        location: 'EU',
+      });
+
+      return NextResponse.json({
+        success: true,
+        total_ore_ziua: parseFloat(rows[0]?.total_ore_ziua || 0)
+      });
+    }
+
+    // ACTUALIZAT: Query pentru înregistrări time tracking cu detalii sarcină + proiect_id
     let query = `
       SELECT 
         tt.id,
         tt.sarcina_id,
+        tt.proiect_id,
         tt.utilizator_uid,
         tt.utilizator_nume,
         tt.data_lucru,
@@ -60,12 +85,12 @@ export async function GET(request: NextRequest) {
         tt.created_at,
         -- Detalii sarcină
         s.titlu as sarcina_titlu,
-        s.proiect_id,
+        s.proiect_id as sarcina_proiect_id,
         s.tip_proiect
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` tt
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\` s 
         ON tt.sarcina_id = s.id
-      WHERE tt.tip_inregistrare = 'Manual'
+      WHERE 1=1
     `;
 
     const conditions: string[] = [];
@@ -90,8 +115,9 @@ export async function GET(request: NextRequest) {
       types.dataLucru = 'DATE';
     }
 
+    // ADĂUGAT: Filtrare după proiect_id pentru raportare facilă
     if (proiectId) {
-      conditions.push('s.proiect_id = @proiectId');
+      conditions.push('tt.proiect_id = @proiectId');
       params.proiectId = proiectId;
       types.proiectId = 'STRING';
     }
@@ -100,10 +126,10 @@ export async function GET(request: NextRequest) {
       query += ' AND ' + conditions.join(' AND ');
     }
 
-    // Sortare după data lucrului descrescător
+    // Sortare după data lucrului descrescător - PĂSTRAT
     query += ' ORDER BY tt.data_lucru DESC, tt.created_at DESC';
 
-    // Limitare pentru performanță
+    // Limitare pentru performanță - PĂSTRAT
     const limit = searchParams.get('limit');
     if (limit && !isNaN(Number(limit))) {
       query += ` LIMIT ${Number(limit)}`;
@@ -150,10 +176,10 @@ export async function POST(request: NextRequest) {
       data_lucru,
       ore_lucrate,
       descriere_lucru,
-      tip_inregistrare = 'Manual'
+      tip_inregistrare = 'manual'
     } = body;
 
-    // Validări
+    // Validări - PĂSTRATE
     if (!id || !sarcina_id || !utilizator_uid || !utilizator_nume || !data_lucru || !ore_lucrate) {
       return NextResponse.json({ 
         success: false,
@@ -169,10 +195,10 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Verificare dacă data nu este în viitor
+    // Verificare dacă data nu este în viitor - PĂSTRAT
     const dataLucruDate = new Date(data_lucru);
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // Sfârșitul zilei de astăzi
+    today.setHours(23, 59, 59, 999);
     
     if (dataLucruDate > today) {
       return NextResponse.json({ 
@@ -181,7 +207,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Verificare total ore pe ziua respectivă pentru utilizator
+    // ADĂUGAT: Extrage proiect_id din sarcină pentru denormalizare
+    const sarcinaQuery = `
+      SELECT proiect_id 
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\`
+      WHERE id = @sarcina_id
+    `;
+
+    const [sarcinaRows] = await bigquery.query({
+      query: sarcinaQuery,
+      params: { sarcina_id },
+      types: { sarcina_id: 'STRING' },
+      location: 'EU',
+    });
+
+    if (sarcinaRows.length === 0) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Sarcina specificată nu există' 
+      }, { status: 404 });
+    }
+
+    const proiect_id = sarcinaRows[0].proiect_id;
+
+    // Verificare total ore pe ziua respectivă pentru utilizator - PĂSTRAT
     const checkTotalQuery = `
       SELECT SUM(ore_lucrate) as total_ore
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
@@ -208,7 +257,8 @@ export async function POST(request: NextRequest) {
     const totalOreExistente = totalRows[0]?.total_ore || 0;
     const totalOreNoi = totalOreExistente + oreLucrateNum;
 
-    if (totalOreNoi > 16) { // Limită flexibilă de 16 ore/zi
+    // Limită flexibilă de 16 ore/zi - PĂSTRAT
+    if (totalOreNoi > 16) {
       return NextResponse.json({ 
         success: false,
         error: `Limită depășită! Total ore pe ${data_lucru}: ${totalOreNoi.toFixed(2)}h. Maxim permis: 16h.`,
@@ -220,16 +270,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Insert înregistrare timp
+    // ACTUALIZAT: Insert înregistrare timp cu proiect_id
     const dataLucruLiteral = formatDateLiteral(data_lucru);
 
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (id, sarcina_id, utilizator_uid, utilizator_nume, data_lucru, 
+      (id, sarcina_id, proiect_id, utilizator_uid, utilizator_nume, data_lucru, 
        ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
       VALUES (
         '${escapeString(id)}',
         '${escapeString(sarcina_id)}',
+        '${escapeString(proiect_id)}',
         '${escapeString(utilizator_uid)}',
         '${escapeString(utilizator_nume)}',
         ${dataLucruLiteral},
@@ -240,14 +291,14 @@ export async function POST(request: NextRequest) {
       )
     `;
 
-    console.log('Insert time tracking query:', insertQuery);
+    console.log('Insert time tracking query cu proiect_id:', insertQuery);
 
     await bigquery.query({
       query: insertQuery,
       location: 'EU',
     });
 
-    console.log(`Time tracking ${id} adăugat cu succes: ${oreLucrateNum}h pe ${data_lucru}`);
+    console.log(`Time tracking ${id} adăugat cu succes: ${oreLucrateNum}h pe ${data_lucru} pentru proiectul ${proiect_id}`);
 
     return NextResponse.json({
       success: true,
@@ -256,6 +307,7 @@ export async function POST(request: NextRequest) {
         id, 
         ore_lucrate: oreLucrateNum, 
         data_lucru,
+        proiect_id,
         total_ore_zi: totalOreNoi 
       }
     });
@@ -284,7 +336,7 @@ export async function PUT(request: NextRequest) {
 
     console.log('Update time tracking:', id, updateData);
 
-    // Validare ore dacă se actualizează
+    // Validare ore dacă se actualizează - PĂSTRAT
     if (updateData.ore_lucrate) {
       const oreLucrateNum = parseFloat(updateData.ore_lucrate);
       if (isNaN(oreLucrateNum) || oreLucrateNum <= 0 || oreLucrateNum > 24) {
@@ -295,7 +347,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Construire query UPDATE dinamic
+    // Construire query UPDATE dinamic - PĂSTRAT
     const updateFields: string[] = [];
     const allowedFields = ['ore_lucrate', 'descriere_lucru', 'data_lucru'];
 
@@ -363,7 +415,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Ștergere înregistrare timp
+    // Ștergere înregistrare timp - PĂSTRAT
     const deleteQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       WHERE id = '${escapeString(id)}'

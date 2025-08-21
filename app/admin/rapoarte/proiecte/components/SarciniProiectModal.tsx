@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
-// DATA: 21.08.2025 01:40 (ora României)
-// MODIFICAT: Fix utilizator curent real din Firebase Auth + BigQuery
-// PĂSTRATE: Toate funcționalitățile existente + formatDate BigQuery compatibility
+// DATA: 21.08.2025 02:15 (ora României)
+// MODIFICAT: Adăugat editare inline pentru sarcini + timp estimat
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 'use client';
@@ -38,6 +38,10 @@ interface Sarcina {
   data_scadenta?: string | { value: string };
   data_finalizare?: string | { value: string };
   observatii?: string;
+  // ADĂUGAT: Timp estimat
+  timp_estimat_zile?: number;
+  timp_estimat_ore?: number;
+  timp_estimat_total_ore?: number;
   responsabili: Array<{
     responsabil_uid: string;
     responsabil_nume: string;
@@ -123,7 +127,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('sarcini');
   const [loading, setLoading] = useState(false);
   
-  // ACTUALIZAT: Hook Firebase pentru utilizatorul autentificat
+  // Hook Firebase pentru utilizatorul autentificat
   const [firebaseUser, firebaseLoading, firebaseError] = useAuthState(auth);
   
   // State pentru utilizatorul curent
@@ -133,7 +137,11 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   // State pentru sarcini
   const [sarcini, setSarcini] = useState<Sarcina[]>([]);
   const [showSarcinaNouaModal, setShowSarcinaNouaModal] = useState(false);
-  const [selectedSarcina, setSelectedSarcina] = useState<Sarcina | null>(null);
+  
+  // ADĂUGAT: State pentru editare inline
+  const [editingSarcina, setEditingSarcina] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any>({});
+  const [savingEdit, setSavingEdit] = useState(false);
   
   // State pentru comentarii
   const [comentarii, setComentarii] = useState<Comentariu[]>([]);
@@ -144,17 +152,15 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const [timeTracking, setTimeTracking] = useState<TimeTracking[]>([]);
   const [showTimeModal, setShowTimeModal] = useState(false);
 
-  // FIX: Funcție formatDate compatibilă cu obiectele BigQuery
+  // Funcție formatDate compatibilă cu obiectele BigQuery
   const formatDate = (date?: string | { value: string } | any): string => {
     if (!date) return 'N/A';
     
     try {
-      // Extrage valoarea reală din obiectul BigQuery sau folosește string-ul direct
       const dateValue = typeof date === 'string' ? date : 
                       typeof date === 'object' && date.value ? date.value : 
                       date.toString();
       
-      // Parsează și formatează data
       const parsedDate = new Date(dateValue);
       
       if (isNaN(parsedDate.getTime())) {
@@ -175,13 +181,31 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
+  // ADĂUGAT: Funcție pentru formatarea timpului estimat
+  const formatTimpEstimat = (zile?: number, ore?: number, totalOre?: number) => {
+    if (!totalOre || totalOre === 0) {
+      return 'Nestabilit';
+    }
+
+    const parts = [];
+    if (zile && zile > 0) {
+      parts.push(`${zile} ${zile === 1 ? 'zi' : 'zile'}`);
+    }
+    if (ore && ore > 0) {
+      parts.push(`${ore}h`);
+    }
+
+    return parts.length > 0 
+      ? `${parts.join(', ')} (${totalOre.toFixed(1)}h total)`
+      : `${totalOre.toFixed(1)}h`;
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadData();
     }
   }, [isOpen, activeTab]);
 
-  // ACTUALIZAT: Încarcă utilizatorul curent real din Firebase + BigQuery
   useEffect(() => {
     if (isOpen && firebaseUser && !firebaseLoading) {
       loadUtilizatorCurent();
@@ -198,8 +222,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     setLoadingUtilizator(true);
     
     try {
-      console.log('Preiau datele pentru utilizatorul Firebase:', firebaseUser.uid);
-      
       const response = await fetch('/api/utilizatori/curent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -218,11 +240,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
           nume_complet: user.nume_complet,
           rol: user.rol
         });
-        
-        console.log('Utilizator curent încărcat:', user.nume_complet);
       } else {
-        console.error('Eroare la preluarea utilizatorului:', data.error);
-        
         // Fallback cu datele din Firebase
         setUtilizatorCurent({
           uid: firebaseUser.uid,
@@ -324,7 +342,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  // ACTUALIZAT: Folosește datele reale ale utilizatorului curent
   const handleAddComentariu = async () => {
     if (!newComentariu.trim()) {
       showToast('Comentariul nu poate fi gol', 'error');
@@ -370,15 +387,100 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
+  // ADĂUGAT: Funcții pentru editare inline sarcini
+  const startEdit = (sarcina: Sarcina) => {
+    setEditingSarcina(sarcina.id);
+    setEditData({
+      titlu: sarcina.titlu,
+      descriere: sarcina.descriere || '',
+      prioritate: sarcina.prioritate,
+      status: sarcina.status,
+      data_scadenta: sarcina.data_scadenta 
+        ? (typeof sarcina.data_scadenta === 'string' ? sarcina.data_scadenta : sarcina.data_scadenta.value)
+        : '',
+      observatii: sarcina.observatii || '',
+      timp_estimat_zile: sarcina.timp_estimat_zile || 0,
+      timp_estimat_ore: sarcina.timp_estimat_ore || 0
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingSarcina(null);
+    setEditData({});
+  };
+
+  const saveEdit = async (sarcinaId: string) => {
+    if (!utilizatorCurent) {
+      showToast('Nu s-au putut prelua datele utilizatorului curent', 'error');
+      return;
+    }
+
+    // Validări
+    if (!editData.titlu?.trim()) {
+      showToast('Titlul sarcinii este obligatoriu', 'error');
+      return;
+    }
+
+    const zile = parseInt(editData.timp_estimat_zile) || 0;
+    const ore = parseFloat(editData.timp_estimat_ore) || 0;
+
+    if (zile < 0 || ore < 0 || ore >= 8) {
+      showToast('Timp estimat invalid: zile >= 0, ore între 0-7.9', 'error');
+      return;
+    }
+
+    if (zile === 0 && ore === 0) {
+      showToast('Specifică cel puțin o estimare de timp', 'error');
+      return;
+    }
+
+    setSavingEdit(true);
+
+    try {
+      const response = await fetch('/api/rapoarte/sarcini', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: sarcinaId,
+          titlu: editData.titlu.trim(),
+          descriere: editData.descriere?.trim() || null,
+          prioritate: editData.prioritate,
+          status: editData.status,
+          data_scadenta: editData.data_scadenta || null,
+          observatii: editData.observatii?.trim() || null,
+          timp_estimat_zile: zile,
+          timp_estimat_ore: ore,
+          updated_by: utilizatorCurent.uid
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Sarcină actualizată cu succes', 'success');
+        setEditingSarcina(null);
+        setEditData({});
+        await loadSarcini();
+      } else {
+        showToast(result.error || 'Eroare la actualizarea sarcinii', 'error');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea sarcinii:', error);
+      showToast('Eroare la actualizarea sarcinii', 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleSarcinaAdded = () => {
     setShowSarcinaNouaModal(false);
-    loadSarcini(); // Refresh lista sarcinilor
+    loadSarcini();
     showToast('Sarcină adăugată cu succes', 'success');
   };
 
   const handleTimeAdded = () => {
     setShowTimeModal(false);
-    loadTimeTracking(); // Refresh lista time tracking
+    loadTimeTracking();
     showToast('Timp înregistrat cu succes', 'success');
   };
 
@@ -477,7 +579,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
                 {proiect.Denumire} • Client: {proiect.Client}
               </p>
-              {/* ACTUALIZAT: Afișează utilizatorul curent real */}
               {utilizatorCurent && (
                 <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
                   Conectat ca: {utilizatorCurent.nume_complet} ({utilizatorCurent.rol})
@@ -546,7 +647,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
             </div>
           )}
 
-          {/* TAB SARCINI */}
+          {/* TAB SARCINI cu editare inline */}
           {activeTab === 'sarcini' && !loading && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -588,87 +689,306 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                     <div
                       key={sarcina.id}
                       style={{
-                        border: '1px solid #dee2e6',
+                        border: editingSarcina === sarcina.id ? '2px solid #3498db' : '1px solid #dee2e6',
                         borderRadius: '8px',
                         padding: '1rem',
-                        background: 'white',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        background: editingSarcina === sarcina.id ? '#f8f9fa' : 'white',
+                        boxShadow: editingSarcina === sarcina.id ? '0 4px 12px rgba(52, 152, 219, 0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                        <h4 style={{ margin: 0, color: '#2c3e50' }}>{sarcina.titlu}</h4>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            background: getPriorityColor(sarcina.prioritate),
-                            color: 'white',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}>
-                            {sarcina.prioritate}
-                          </span>
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            background: getStatusColor(sarcina.status),
-                            color: 'white',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}>
-                            {sarcina.status}
-                          </span>
+                      {editingSarcina === sarcina.id ? (
+                        // ADĂUGAT: Form editabil inline
+                        <div>
+                          {/* Titlu editabil */}
+                          <input
+                            type="text"
+                            value={editData.titlu || ''}
+                            onChange={(e) => setEditData(prev => ({ ...prev, titlu: e.target.value }))}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              fontSize: '16px',
+                              fontWeight: 'bold',
+                              marginBottom: '0.5rem'
+                            }}
+                            placeholder="Titlu sarcină..."
+                          />
+
+                          {/* Badges prioritate și status */}
+                          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                            <select
+                              value={editData.prioritate || ''}
+                              onChange={(e) => setEditData(prev => ({ ...prev, prioritate: e.target.value }))}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '12px'
+                              }}
+                            >
+                              <option value="Scăzută">Scăzută</option>
+                              <option value="Medie">Medie</option>
+                              <option value="Înaltă">Înaltă</option>
+                              <option value="Critică">Critică</option>
+                            </select>
+
+                            <select
+                              value={editData.status || ''}
+                              onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value }))}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '12px'
+                              }}
+                            >
+                              <option value="De făcut">De făcut</option>
+                              <option value="În lucru">În lucru</option>
+                              <option value="În verificare">În verificare</option>
+                              <option value="Finalizată">Finalizată</option>
+                            </select>
+                          </div>
+
+                          {/* Descriere editabilă */}
+                          <textarea
+                            value={editData.descriere || ''}
+                            onChange={(e) => setEditData(prev => ({ ...prev, descriere: e.target.value }))}
+                            placeholder="Descrierea sarcinii..."
+                            rows={3}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              marginBottom: '1rem',
+                              resize: 'vertical'
+                            }}
+                          />
+
+                          {/* ADĂUGAT: Timp estimat editabil */}
+                          <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>
+                              Timp Estimat
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                              <div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={editData.timp_estimat_zile || ''}
+                                  onChange={(e) => setEditData(prev => ({ ...prev, timp_estimat_zile: e.target.value }))}
+                                  placeholder="Zile"
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    border: '1px solid #dee2e6',
+                                    borderRadius: '4px',
+                                    fontSize: '12px'
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="7.9"
+                                  step="0.1"
+                                  value={editData.timp_estimat_ore || ''}
+                                  onChange={(e) => setEditData(prev => ({ ...prev, timp_estimat_ore: e.target.value }))}
+                                  placeholder="Ore"
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    border: '1px solid #dee2e6',
+                                    borderRadius: '4px',
+                                    fontSize: '12px'
+                                  }}
+                                />
+                              </div>
+                              <div style={{
+                                background: '#f39c12',
+                                color: 'white',
+                                padding: '0.5rem',
+                                borderRadius: '4px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                minWidth: '60px'
+                              }}>
+                                {((parseInt(editData.timp_estimat_zile) || 0) * 8 + (parseFloat(editData.timp_estimat_ore) || 0)).toFixed(1)}h
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Data scadență și observații */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold' }}>
+                                Data Scadență
+                              </label>
+                              <input
+                                type="date"
+                                value={editData.data_scadenta || ''}
+                                onChange={(e) => setEditData(prev => ({ ...prev, data_scadenta: e.target.value }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem',
+                                  border: '1px solid #dee2e6',
+                                  borderRadius: '4px',
+                                  fontSize: '12px'
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold' }}>
+                                Observații
+                              </label>
+                              <input
+                                type="text"
+                                value={editData.observatii || ''}
+                                onChange={(e) => setEditData(prev => ({ ...prev, observatii: e.target.value }))}
+                                placeholder="Observații suplimentare..."
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem',
+                                  border: '1px solid #dee2e6',
+                                  borderRadius: '4px',
+                                  fontSize: '12px'
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Butoane salvare/anulare */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                              onClick={cancelEdit}
+                              disabled={savingEdit}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                background: '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              Anulează
+                            </button>
+                            <button
+                              onClick={() => saveEdit(sarcina.id)}
+                              disabled={savingEdit || !editData.titlu?.trim()}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                background: savingEdit || !editData.titlu?.trim() ? '#bdc3c7' : '#27ae60',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: savingEdit || !editData.titlu?.trim() ? 'not-allowed' : 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              {savingEdit ? 'Se salvează...' : 'Salvează'}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      
-                      {sarcina.descriere && (
-                        <p style={{ margin: '0.5rem 0', color: '#7f8c8d', fontSize: '14px' }}>
-                          {sarcina.descriere}
-                        </p>
-                      )}
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
-                        <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                          <span>Responsabili: {sarcina.responsabili.map(r => r.responsabil_nume).join(', ') || 'Neatribuit'}</span>
-                          <span style={{ marginLeft: '1rem' }}>Timp lucrat: {sarcina.total_ore_lucrate}h</span>
-                          {sarcina.data_scadenta && (
-                            <span style={{ marginLeft: '1rem' }}>
-                              Scadenta: {formatDate(sarcina.data_scadenta)}
-                            </span>
+                      ) : (
+                        // ACTUALIZAT: Afișare normală cu timp estimat
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                            <h4 style={{ margin: 0, color: '#2c3e50' }}>{sarcina.titlu}</h4>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                background: getPriorityColor(sarcina.prioritate),
+                                color: 'white',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                              }}>
+                                {sarcina.prioritate}
+                              </span>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                background: getStatusColor(sarcina.status),
+                                color: 'white',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'bold'
+                              }}>
+                                {sarcina.status}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {sarcina.descriere && (
+                            <p style={{ margin: '0.5rem 0', color: '#7f8c8d', fontSize: '14px' }}>
+                              {sarcina.descriere}
+                            </p>
                           )}
+
+                          {/* ADĂUGAT: Afișare timp estimat */}
+                          <div style={{ 
+                            background: 'rgba(243, 156, 18, 0.1)', 
+                            border: '1px solid rgba(243, 156, 18, 0.3)',
+                            borderRadius: '6px',
+                            padding: '0.5rem',
+                            margin: '0.5rem 0',
+                            fontSize: '13px'
+                          }}>
+                            <strong style={{ color: '#f39c12' }}>Timp estimat:</strong> {formatTimpEstimat(sarcina.timp_estimat_zile, sarcina.timp_estimat_ore, sarcina.timp_estimat_total_ore)}
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              <span>Responsabili: {sarcina.responsabili.map(r => r.responsabil_nume).join(', ') || 'Neatribuit'}</span>
+                              <span style={{ marginLeft: '1rem' }}>Timp lucrat: {sarcina.total_ore_lucrate}h</span>
+                              {sarcina.data_scadenta && (
+                                <span style={{ marginLeft: '1rem' }}>
+                                  Scadenta: {formatDate(sarcina.data_scadenta)}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => startEdit(sarcina)}
+                                disabled={editingSarcina !== null}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  background: editingSarcina !== null ? '#bdc3c7' : '#3498db',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: editingSarcina !== null ? 'not-allowed' : 'pointer',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                Editează
+                              </button>
+                              <button
+                                onClick={() => setShowTimeModal(true)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  background: '#f39c12',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                Adaugă Timp
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => setSelectedSarcina(sarcina)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#3498db',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '12px'
-                            }}
-                          >
-                            Editează
-                          </button>
-                          <button
-                            onClick={() => setShowTimeModal(true)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#f39c12',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '12px'
-                            }}
-                          >
-                            Adaugă Timp
-                          </button>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -676,7 +996,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
             </div>
           )}
 
-          {/* TAB COMENTARII */}
+          {/* TAB COMENTARII - PĂSTRAT identic */}
           {activeTab === 'comentarii' && !loading && (
             <div>
               <div style={{ marginBottom: '1.5rem' }}>
@@ -803,7 +1123,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
             </div>
           )}
 
-          {/* TAB TIME TRACKING */}
+          {/* TAB TIME TRACKING - PĂSTRAT identic */}
           {activeTab === 'timetracking' && !loading && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>

@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarcinaNouaModal.tsx
-// DATA: 20.08.2025 01:45 (ora României)
-// DESCRIERE: Modal pentru adăugarea unei sarcini noi cu responsabili multipli
+// DATA: 21.08.2025 02:10 (ora României)
+// MODIFICAT: Adăugat timp estimat (zile + ore) cu validări și conversie automată
+// PĂSTRATE: Toate funcționalitățile existente cu responsabili multipli
 // ==================================================================
 
 'use client';
@@ -90,8 +91,14 @@ export default function SarcinaNouaModal({
     prioritate: 'Medie',
     status: 'De făcut',
     data_scadenta: '',
-    observatii: ''
+    observatii: '',
+    // ADĂUGAT: Câmpuri pentru timp estimat
+    timp_estimat_zile: '',
+    timp_estimat_ore: ''
   });
+
+  // ADĂUGAT: State pentru calculul timpului total
+  const [timpTotalOre, setTimpTotalOre] = useState(0);
 
   const resetForm = () => {
     setFormData({
@@ -100,10 +107,20 @@ export default function SarcinaNouaModal({
       prioritate: 'Medie',
       status: 'De făcut',
       data_scadenta: '',
-      observatii: ''
+      observatii: '',
+      timp_estimat_zile: '',
+      timp_estimat_ore: ''
     });
     setResponsabiliSelectati([]);
+    setTimpTotalOre(0);
   };
+
+  // ADĂUGAT: Calculează timpul total când se schimbă zilele sau orele
+  useEffect(() => {
+    const zile = parseInt(formData.timp_estimat_zile) || 0;
+    const ore = parseFloat(formData.timp_estimat_ore) || 0;
+    setTimpTotalOre((zile * 8) + ore);
+  }, [formData.timp_estimat_zile, formData.timp_estimat_ore]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -143,6 +160,29 @@ export default function SarcinaNouaModal({
     );
   };
 
+  // ADĂUGAT: Validări pentru timp estimat
+  const validateTimpEstimat = () => {
+    const zile = parseInt(formData.timp_estimat_zile) || 0;
+    const ore = parseFloat(formData.timp_estimat_ore) || 0;
+
+    if (zile < 0) {
+      showToast('Zilele estimate nu pot fi negative', 'error');
+      return false;
+    }
+
+    if (ore < 0 || ore >= 8) {
+      showToast('Orele estimate trebuie să fie între 0 și 7.9', 'error');
+      return false;
+    }
+
+    if (zile === 0 && ore === 0) {
+      showToast('Specifică cel puțin o estimare de timp (zile sau ore)', 'error');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -169,6 +209,11 @@ export default function SarcinaNouaModal({
       return;
     }
 
+    // ADĂUGAT: Validări timp estimat
+    if (!validateTimpEstimat()) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -183,6 +228,9 @@ export default function SarcinaNouaModal({
         data_scadenta: formData.data_scadenta || null,
         observatii: formData.observatii.trim() || null,
         created_by: utilizatorCurent.uid,
+        // ADĂUGAT: Timp estimat
+        timp_estimat_zile: parseInt(formData.timp_estimat_zile) || 0,
+        timp_estimat_ore: parseFloat(formData.timp_estimat_ore) || 0,
         responsabili: responsabiliSelectati.map(r => ({
           uid: r.uid,
           nume_complet: r.nume_complet,
@@ -190,7 +238,7 @@ export default function SarcinaNouaModal({
         }))
       };
 
-      console.log('Creez sarcină:', sarcinaData);
+      console.log('Creez sarcină cu timp estimat:', sarcinaData);
 
       const response = await fetch('/api/rapoarte/sarcini', {
         method: 'POST',
@@ -201,7 +249,7 @@ export default function SarcinaNouaModal({
       const result = await response.json();
 
       if (result.success) {
-        showToast('Sarcină creată cu succes!', 'success');
+        showToast(`Sarcină creată cu succes! Timp estimat: ${timpTotalOre.toFixed(1)}h`, 'success');
         onSarcinaAdded();
         resetForm();
       } else {
@@ -235,7 +283,7 @@ export default function SarcinaNouaModal({
         background: 'white',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-        maxWidth: '800px',
+        maxWidth: '900px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -250,7 +298,7 @@ export default function SarcinaNouaModal({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: '700' }}>
-                📋 Sarcină Nouă
+                Sarcină Nouă
               </h2>
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
                 {proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}: {proiect.ID_Proiect} - {proiect.Denumire}
@@ -397,28 +445,116 @@ export default function SarcinaNouaModal({
                 />
               </div>
             </div>
+          </div>
 
-            {/* Observații */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Observații
-              </label>
-              <textarea
-                value={formData.observatii}
-                onChange={(e) => handleInputChange('observatii', e.target.value)}
-                disabled={loading}
-                placeholder="Observații suplimentare..."
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
-              />
+          {/* ADĂUGAT: Secțiune Timp Estimat */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
+              Timp Estimat *
+            </h3>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr auto', 
+              gap: '1rem',
+              alignItems: 'end',
+              marginBottom: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Zile
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.timp_estimat_zile}
+                  onChange={(e) => handleInputChange('timp_estimat_zile', e.target.value)}
+                  disabled={loading}
+                  placeholder="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Ore (0-7.9)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="7.9"
+                  step="0.1"
+                  value={formData.timp_estimat_ore}
+                  onChange={(e) => handleInputChange('timp_estimat_ore', e.target.value)}
+                  disabled={loading}
+                  placeholder="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                background: 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
+                color: 'white',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                textAlign: 'center',
+                minWidth: '120px'
+              }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                  {timpTotalOre.toFixed(1)}h
+                </div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                  Total estimat
+                </div>
+              </div>
             </div>
+
+            <div style={{ 
+              fontSize: '12px', 
+              color: '#7f8c8d',
+              background: '#f8f9fa',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #dee2e6'
+            }}>
+              <strong>Explicație:</strong> 1 zi = 8 ore de lucru. Poți combina zile și ore (ex: 2 zile + 4 ore = 20 ore total).
+              Orele suplimentare trebuie să fie sub 8 pentru a nu forma o zi completă.
+            </div>
+          </div>
+
+          {/* Observații */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Observații
+            </label>
+            <textarea
+              value={formData.observatii}
+              onChange={(e) => handleInputChange('observatii', e.target.value)}
+              disabled={loading}
+              placeholder="Observații suplimentare..."
+              rows={2}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
+              }}
+            />
           </div>
 
           {/* Responsabili */}
@@ -565,25 +701,25 @@ export default function SarcinaNouaModal({
 
             <button
               type="submit"
-              disabled={loading || !formData.titlu.trim() || responsabiliSelectati.length === 0}
+              disabled={loading || !formData.titlu.trim() || responsabiliSelectati.length === 0 || timpTotalOre === 0}
               style={{
                 padding: '0.75rem 1.5rem',
-                background: loading || !formData.titlu.trim() || responsabiliSelectati.length === 0 ? 
+                background: loading || !formData.titlu.trim() || responsabiliSelectati.length === 0 || timpTotalOre === 0 ? 
                   '#bdc3c7' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: loading || !formData.titlu.trim() || responsabiliSelectati.length === 0 ? 
+                cursor: loading || !formData.titlu.trim() || responsabiliSelectati.length === 0 || timpTotalOre === 0 ? 
                   'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              {loading ? '⏳ Se creează...' : '💾 Creează Sarcina'}
-            </button>
-          </div>
-        </form>
-      </div>
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            {loading ? '⏳ Se creează...' : '💾 Creează Sarcina'}
+          </button>
+        </div>
+      </form>
     </div>
-  );
+  </div>
+);
 }
