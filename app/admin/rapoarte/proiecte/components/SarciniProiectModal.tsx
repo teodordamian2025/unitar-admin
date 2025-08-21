@@ -182,23 +182,27 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   };
 
 // ADĂUGAT: Funcție pentru formatarea timpului estimat
-  const formatTimpEstimat = (zile?: number, ore?: number, totalOre?: number) => {
-    if (!totalOre || totalOre === 0) {
-      return 'Nestabilit';
-    }
+	const formatTimpEstimat = (zile?: number, ore?: number, totalOre?: number) => {
+	  const zileNum = Number(zile) || 0;
+	  const oreNum = Number(ore) || 0;
+	  const totalOreNum = Number(totalOre) || 0;
+	  
+	  if (totalOreNum === 0) {
+	    return 'Nestabilit';
+	  }
 
-    const parts: string[] = [];
-    if (zile && zile > 0) {
-      parts.push(`${zile} ${zile === 1 ? 'zi' : 'zile'}`);
-    }
-    if (ore && ore > 0) {
-      parts.push(`${ore}h`);
-    }
+	  const parts: string[] = [];
+	  if (zileNum > 0) {
+	    parts.push(`${zileNum} ${zileNum === 1 ? 'zi' : 'zile'}`);
+	  }
+	  if (oreNum > 0) {
+	    parts.push(`${oreNum}h`);
+	  }
 
-    return parts.length > 0 
-      ? `${parts.join(', ')} (${totalOre.toFixed(1)}h total)`
-      : `${totalOre.toFixed(1)}h`;
-  };
+	  return parts.length > 0 
+	    ? `${parts.join(', ')} (${totalOreNum.toFixed(1)}h total)`
+	    : `${totalOreNum.toFixed(1)}h`;
+	};
 
   useEffect(() => {
     if (isOpen) {
@@ -932,17 +936,21 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                             </p>
                           )}
 
-                          {/* ADĂUGAT: Afișare timp estimat */}
-                          <div style={{ 
-                            background: 'rgba(243, 156, 18, 0.1)', 
-                            border: '1px solid rgba(243, 156, 18, 0.3)',
-                            borderRadius: '6px',
-                            padding: '0.5rem',
-                            margin: '0.5rem 0',
-                            fontSize: '13px'
-                          }}>
-                            <strong style={{ color: '#f39c12' }}>Timp estimat:</strong> {formatTimpEstimat(sarcina.timp_estimat_zile, sarcina.timp_estimat_ore, sarcina.timp_estimat_total_ore)}
-                          </div>
+			{/* ADĂUGAT: Afișare timp estimat */}
+			<div style={{ 
+			  background: 'rgba(243, 156, 18, 0.1)', 
+			  border: '1px solid rgba(243, 156, 18, 0.3)',
+			  borderRadius: '6px',
+			  padding: '0.5rem',
+			  margin: '0.5rem 0',
+			  fontSize: '13px'
+			}}>
+			  <strong style={{ color: '#f39c12' }}>Timp estimat:</strong> {formatTimpEstimat(
+			    sarcina.timp_estimat_zile || 0, 
+			    sarcina.timp_estimat_ore || 0, 
+			    sarcina.timp_estimat_total_ore || 0
+			  )}
+			</div>
                           
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
                             <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
