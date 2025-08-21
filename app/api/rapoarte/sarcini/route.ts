@@ -261,8 +261,8 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Construiește query-ul de actualizare dinamic
-    const updateFields = [];
+// Construiește query-ul de actualizare dinamic
+    const updateFields: string[] = [];
     const params: any = { id: data.id };
 
     if (data.titlu !== undefined) {
