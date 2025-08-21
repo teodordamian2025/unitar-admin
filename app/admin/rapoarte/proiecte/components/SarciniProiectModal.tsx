@@ -504,7 +504,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  // Nu afișa modalul dacă nu este deschis sau există erori Firebase
+// Nu afișa modalul dacă nu este deschis sau există erori Firebase
   if (!isOpen || firebaseError) {
     if (firebaseError) {
       console.error('Eroare Firebase Auth:', firebaseError);
