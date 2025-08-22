@@ -564,8 +564,32 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     );
   }
 
+  const modalContent = typeof window !== 'undefined' ? createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      zIndex: 55000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+        maxWidth: '1200px',
+        width: '100%',
+        maxHeight: '90vh',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+
 	return typeof window !== 'undefined' ? createPortal(
-	  (
 	    <div style={{
 	    position: 'fixed',
 	    top: 0,
@@ -632,7 +656,9 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
               ×
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
+        ) : null;
 
         {/* Tab Navigation */}
         <div style={{
@@ -1344,11 +1370,18 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
               fontWeight: 'bold'
             }}
           >
-            Închide
+		Închide
           </button>
         </div>
       </div>
+    </div>,
+    document.body
+  ) : null;
 
+  return (
+    <>
+      {modalContent}
+      
       {/* Modale suplimentare */}
       {showSarcinaNouaModal && utilizatorCurent && (
         <SarcinaNouaModal
@@ -1369,9 +1402,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
           sarcini={sarcini}
           utilizatorCurent={utilizatorCurent}
         />
-	)}
-    </div>
-    </div>
-  ),
-  document.body
-) : null;
+      )}
+    </>
+  );
