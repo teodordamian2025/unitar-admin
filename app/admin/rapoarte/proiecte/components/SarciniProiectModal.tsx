@@ -565,7 +565,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   }
 
 	return typeof window !== 'undefined' ? createPortal(
-	  <div style={{
+	  (
+	    <div style={{
 	    position: 'fixed',
 	    top: 0,
 	    left: 0,
@@ -1370,7 +1371,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
         />
 	)}
     </div>
-  </div>,
+    </div>
+  ),
   document.body
 ) : null;
-}
