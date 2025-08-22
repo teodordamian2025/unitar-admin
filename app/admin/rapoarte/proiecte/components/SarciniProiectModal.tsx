@@ -419,24 +419,43 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
       return;
     }
 
-    // Validări
-    if (!editData.titlu?.trim()) {
-      showToast('Titlul sarcinii este obligatoriu', 'error');
-      return;
-    }
+	// Validări
+	if (!editData.titlu?.trim()) {
+	  showToast('Titlul sarcinii este obligatoriu', 'error');
+	  return;
+	}
 
-    const zile = parseInt(editData.timp_estimat_zile) || 0;
-    const ore = parseFloat(editData.timp_estimat_ore) || 0;
+	const zileString = editData.timp_estimat_zile?.toString() || '';
+	const oreString = editData.timp_estimat_ore?.toString() || '';
 
-    if (zile < 0 || ore < 0 || ore >= 8) {
-      showToast('Timp estimat invalid: zile >= 0, ore între 0-7.9', 'error');
-      return;
-    }
+	// Validare că zilele sunt numere întregi
+	if (zileString && zileString.includes('.')) {
+	  showToast('Zilele trebuie să fie numere întregi (ex: 1, 2, 3), nu zecimale!', 'error');
+	  return;
+	}
 
-    if (zile === 0 && ore === 0) {
-      showToast('Specifică cel puțin o estimare de timp', 'error');
-      return;
-    }
+	const zile = parseInt(editData.timp_estimat_zile) || 0;
+	const ore = parseFloat(editData.timp_estimat_ore) || 0;
+
+	if (zile < 0) {
+	  showToast('Zilele estimate nu pot fi negative', 'error');
+	  return;
+	}
+
+	if (!Number.isInteger(zile)) {
+	  showToast('Zilele trebuie să fie numere întregi (0, 1, 2, 3...)', 'error');
+	  return;
+	}
+
+	if (ore < 0 || ore >= 8) {
+	  showToast('Orele estimate trebuie să fie între 0 și 7.9', 'error');
+	  return;
+	}
+
+	if (zile === 0 && ore === 0) {
+	  showToast('Specifică cel puțin o estimare de timp', 'error');
+	  return;
+	}
 
     setSavingEdit(true);
 
@@ -779,22 +798,44 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                             </label>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
                               <div>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={editData.timp_estimat_zile || ''}
-                                  onChange={(e) => setEditData(prev => ({ ...prev, timp_estimat_zile: e.target.value }))}
-                                  placeholder="Zile"
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    border: '1px solid #dee2e6',
-                                    borderRadius: '4px',
-                                    fontSize: '12px'
-                                  }}
-                                />
-                              </div>
+				  <input
+				    type="number"
+				    min="0"
+				    step="1"
+				    value={editData.timp_estimat_zile || ''}
+				    onChange={(e) => {
+				      const value = e.target.value;
+				      // Blochează introducerea zecimalelor
+				      if (!value.includes('.')) {
+					setEditData(prev => ({ ...prev, timp_estimat_zile: value }));
+				      }
+				    }}
+				    onKeyPress={(e) => {
+				      // Blochează introducerea punctului/virgulei
+				      if (e.key === '.' || e.key === ',') {
+					e.preventDefault();
+				      }
+				    }}
+				    placeholder="Zile (întregi)"
+				    style={{
+				      width: '100%',
+				      padding: '0.5rem',
+				      border: editData.timp_estimat_zile?.toString().includes('.') ? 
+					'2px solid #e74c3c' : '1px solid #dee2e6',
+				      borderRadius: '4px',
+				      fontSize: '12px'
+				    }}
+				  />
+				  {editData.timp_estimat_zile?.toString().includes('.') && (
+				    <div style={{ 
+				      fontSize: '10px', 
+				      color: '#e74c3c', 
+				      marginTop: '0.25rem'
+				    }}>
+				      Doar numere întregi!
+				    </div>
+				  )}
+				</div>
                               <div>
                                 <input
                                   type="number"

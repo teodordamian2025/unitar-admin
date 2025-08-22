@@ -163,21 +163,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ADĂUGAT: Validări pentru timp estimat
-    const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
-    const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
+	// ADĂUGAT: Validări pentru timp estimat
+	const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
+	const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-    if (zileEstimate < 0) {
-      return NextResponse.json({ 
-        error: 'Zilele estimate nu pot fi negative' 
-      }, { status: 400 });
-    }
+	// Validare că zilele sunt numere întregi
+	if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
+	  return NextResponse.json({ 
+	    error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
+	  }, { status: 400 });
+	}
 
-    if (oreEstimate < 0 || oreEstimate >= 8) {
-      return NextResponse.json({ 
-        error: 'Orele estimate trebuie să fie între 0 și 7.9' 
-      }, { status: 400 });
-    }
+	if (oreEstimate < 0 || oreEstimate >= 8) {
+	  return NextResponse.json({ 
+	    error: 'Orele estimate trebuie să fie între 0 și 7.9' 
+	  }, { status: 400 });
+	}
 
     // ADĂUGAT: Calculează timpul total în ore
     const timpTotalOre = (zileEstimate * 8) + oreEstimate;
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
 	  (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
 	   created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
 	  VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
-		  @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
+	      @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
 	`;
 
 	await bigquery.query({
@@ -211,9 +212,19 @@ export async function POST(request: NextRequest) {
 	    timp_estimat_total_ore: timpTotalOre
 	  },
 	  types: {
-	    descriere: data.descriere ? 'STRING' : 'STRING',
-	    data_scadenta: data.data_scadenta ? 'DATE' : 'DATE',
-	    observatii: data.observatii ? 'STRING' : 'STRING'
+	    id: 'STRING',
+	    proiect_id: 'STRING',
+	    tip_proiect: 'STRING',
+	    titlu: 'STRING',
+	    descriere: 'STRING',
+	    prioritate: 'STRING',
+	    status: 'STRING',
+	    data_scadenta: 'DATE',
+	    observatii: 'STRING',
+	    created_by: 'STRING',
+	    timp_estimat_zile: 'INT64',
+	    timp_estimat_ore: 'NUMERIC',
+	    timp_estimat_total_ore: 'NUMERIC'
 	  },
 	  location: 'EU',
 	});
@@ -306,15 +317,22 @@ export async function PUT(request: NextRequest) {
     }
 
     // ADĂUGAT: Actualizare timp estimat
-    if (data.timp_estimat_zile !== undefined || data.timp_estimat_ore !== undefined) {
-      const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
-      const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
+	if (data.timp_estimat_zile !== undefined || data.timp_estimat_ore !== undefined) {
+	  const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
+	  const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-      if (zileEstimate < 0 || oreEstimate < 0 || oreEstimate >= 8) {
-        return NextResponse.json({ 
-          error: 'Timp estimat invalid: zile >= 0, ore între 0-7.9' 
-        }, { status: 400 });
-      }
+	  // Validare că zilele sunt numere întregi
+	  if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
+	    return NextResponse.json({ 
+	      error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
+	    }, { status: 400 });
+	  }
+
+	  if (oreEstimate < 0 || oreEstimate >= 8) {
+	    return NextResponse.json({ 
+	      error: 'Orele estimate trebuie să fie între 0 și 7.9' 
+	    }, { status: 400 });
+	  }
 
       const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
@@ -342,12 +360,14 @@ export async function PUT(request: NextRequest) {
 	`;
 
 	// Construiește types pentru valorile null
-	const types: any = {};
+	const types: any = { id: 'STRING' };
 	Object.keys(params).forEach(key => {
 	  if (key !== 'id') {
 	    if (key === 'data_scadenta') {
 	      types[key] = 'DATE';
-	    } else if (key === 'timp_estimat_zile' || key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
+	    } else if (key === 'timp_estimat_zile') {
+	      types[key] = 'INT64';
+	    } else if (key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
 	      types[key] = 'NUMERIC';
 	    } else {
 	      types[key] = 'STRING';

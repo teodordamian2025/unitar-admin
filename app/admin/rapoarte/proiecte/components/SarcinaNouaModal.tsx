@@ -115,12 +115,20 @@ export default function SarcinaNouaModal({
     setTimpTotalOre(0);
   };
 
-  // ADĂUGAT: Calculează timpul total când se schimbă zilele sau orele
-  useEffect(() => {
-    const zile = parseInt(formData.timp_estimat_zile) || 0;
-    const ore = parseFloat(formData.timp_estimat_ore) || 0;
-    setTimpTotalOre((zile * 8) + ore);
-  }, [formData.timp_estimat_zile, formData.timp_estimat_ore]);
+	// ADĂUGAT: Calculează timpul total când se schimbă zilele sau orele
+	useEffect(() => {
+	  const zile = parseInt(formData.timp_estimat_zile) || 0;
+	  const ore = parseFloat(formData.timp_estimat_ore) || 0;
+	  
+	  // Validează că zilele sunt întregi
+	  const zileInput = formData.timp_estimat_zile;
+	  if (zileInput && zileInput.includes('.')) {
+	    // Nu calculează dacă sunt zecimale la zile
+	    setTimpTotalOre(0);
+	  } else {
+	    setTimpTotalOre((zile * 8) + ore);
+	  }
+	}, [formData.timp_estimat_zile, formData.timp_estimat_ore]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -160,28 +168,42 @@ export default function SarcinaNouaModal({
     );
   };
 
-  // ADĂUGAT: Validări pentru timp estimat
-  const validateTimpEstimat = () => {
-    const zile = parseInt(formData.timp_estimat_zile) || 0;
-    const ore = parseFloat(formData.timp_estimat_ore) || 0;
+	// ADĂUGAT: Validări pentru timp estimat
+	const validateTimpEstimat = () => {
+	  const zileString = formData.timp_estimat_zile;
+	  const oreString = formData.timp_estimat_ore;
+	  
+	  // Validare că zilele sunt numere întregi
+	  if (zileString && zileString.includes('.')) {
+	    showToast('Zilele trebuie să fie numere întregi (ex: 1, 2, 3), nu zecimale!', 'error');
+	    return false;
+	  }
+	  
+	  const zile = parseInt(zileString) || 0;
+	  const ore = parseFloat(oreString) || 0;
 
-    if (zile < 0) {
-      showToast('Zilele estimate nu pot fi negative', 'error');
-      return false;
-    }
+	  if (zile < 0) {
+	    showToast('Zilele estimate nu pot fi negative', 'error');
+	    return false;
+	  }
 
-    if (ore < 0 || ore >= 8) {
-      showToast('Orele estimate trebuie să fie între 0 și 7.9', 'error');
-      return false;
-    }
+	  if (!Number.isInteger(zile)) {
+	    showToast('Zilele trebuie să fie numere întregi (0, 1, 2, 3...)', 'error');
+	    return false;
+	  }
 
-    if (zile === 0 && ore === 0) {
-      showToast('Specifică cel puțin o estimare de timp (zile sau ore)', 'error');
-      return false;
-    }
+	  if (ore < 0 || ore >= 8) {
+	    showToast('Orele estimate trebuie să fie între 0 și 7.9', 'error');
+	    return false;
+	  }
 
-    return true;
-  };
+	  if (zile === 0 && ore === 0) {
+	    showToast('Specifică cel puțin o estimare de timp (zile sau ore)', 'error');
+	    return false;
+	  }
+
+	  return true;
+	};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -460,27 +482,50 @@ export default function SarcinaNouaModal({
               alignItems: 'end',
               marginBottom: '1rem'
             }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Zile
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.timp_estimat_zile}
-                  onChange={(e) => handleInputChange('timp_estimat_zile', e.target.value)}
-                  disabled={loading}
-                  placeholder="0"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
+             <div>
+		  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+		    Zile (doar numere întregi)
+		  </label>
+		  <input
+		    type="number"
+		    min="0"
+		    step="1"
+		    value={formData.timp_estimat_zile}
+		    onChange={(e) => {
+		      const value = e.target.value;
+		      // Blochează introducerea zecimalelor
+		      if (!value.includes('.')) {
+			handleInputChange('timp_estimat_zile', value);
+		      }
+		    }}
+		    onKeyPress={(e) => {
+		      // Blochează introducerea punctului/virgulei
+		      if (e.key === '.' || e.key === ',') {
+			e.preventDefault();
+		      }
+		    }}
+		    disabled={loading}
+		    placeholder="0"
+		    style={{
+		      width: '100%',
+		      padding: '0.75rem',
+		      border: formData.timp_estimat_zile && formData.timp_estimat_zile.includes('.') ? 
+			'2px solid #e74c3c' : '1px solid #dee2e6',
+		      borderRadius: '6px',
+		      fontSize: '14px'
+		    }}
+		  />
+		  {formData.timp_estimat_zile && formData.timp_estimat_zile.includes('.') && (
+		    <div style={{ 
+		      fontSize: '12px', 
+		      color: '#e74c3c', 
+		      marginTop: '0.25rem',
+		      fontWeight: 'bold'
+		    }}>
+		      ⚠️ Zilele trebuie să fie numere întregi (1, 2, 3...), nu zecimale!
+		    </div>
+		  )}
+		</div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
