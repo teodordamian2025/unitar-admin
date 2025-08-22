@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import ResponsabilSearch from './ResponsabilSearch';
@@ -92,7 +93,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
     border-radius: 16px;
-    z-index: 70000;
+    z-index: 75000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -563,30 +564,30 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     );
   }
 
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.7)',
-      zIndex: 50000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '16px',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-        maxWidth: '1200px',
-        width: '100%',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+	return typeof window !== 'undefined' ? createPortal(
+	  <div style={{
+	    position: 'fixed',
+	    top: 0,
+	    left: 0,
+	    right: 0,
+	    bottom: 0,
+	    background: 'rgba(0,0,0,0.8)',
+	    zIndex: 55000,
+	    display: 'flex',
+	    alignItems: 'center',
+	    justifyContent: 'center',
+	    padding: '1rem'
+	  }}>
+	    <div style={{
+	      background: 'white',
+	      borderRadius: '16px',
+	      boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+	      maxWidth: '1200px',
+	      width: '100%',
+	      maxHeight: '90vh',
+	      display: 'flex',
+	      flexDirection: 'column'
+	    }}>
         {/* Header */}
         <div style={{
           padding: '1.5rem',
@@ -1367,7 +1368,9 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
           sarcini={sarcini}
           utilizatorCurent={utilizatorCurent}
         />
-      )}
+	)}
     </div>
-  );
+  </div>,
+  document.body
+) : null;
 }
