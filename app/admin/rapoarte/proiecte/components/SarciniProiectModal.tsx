@@ -1220,26 +1220,31 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                     borderRadius: '8px',
                     marginBottom: '1.5rem'
                   }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                          {timeTracking.reduce((sum, t) => sum + t.ore_lucrate, 0).toFixed(1)}h
-                        </div>
-                        <div style={{ fontSize: '14px', opacity: 0.9 }}>Total ore lucrate</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                          {new Set(timeTracking.map(t => t.utilizator_uid)).size}
-                        </div>
-                        <div style={{ fontSize: '14px', opacity: 0.9 }}>Persoane implicate</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                          {new Set(timeTracking.map(t => t.data_lucru)).size}
-                        </div>
-                        <div style={{ fontSize: '14px', opacity: 0.9 }}>Zile de lucru</div>
-                      </div>
-                    </div>
+			<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+			  <div>
+			    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+			      {Number(timeTracking.reduce((sum, t) => sum + (Number(t.ore_lucrate) || 0), 0)).toFixed(1)}h
+			    </div>
+			    <div style={{ fontSize: '14px', opacity: 0.9 }}>Total ore lucrate</div>
+			  </div>
+			  <div>
+			    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+			      {new Set(timeTracking.map(t => t.utilizator_uid)).size}
+			    </div>
+			    <div style={{ fontSize: '14px', opacity: 0.9 }}>Persoane implicate</div>
+			  </div>
+			  <div>
+			    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+			      {new Set(timeTracking.map(t => {
+				const dataLucru = typeof t.data_lucru === 'string' ? t.data_lucru : 
+						 typeof t.data_lucru === 'object' && t.data_lucru?.value ? t.data_lucru.value : 
+						 t.data_lucru?.toString() || '';
+				return dataLucru;
+			      })).size}
+			    </div>
+			    <div style={{ fontSize: '14px', opacity: 0.9 }}>Zile de lucru</div>
+			  </div>
+			</div>
                   </div>
 
                   {/* Lista înregistrări */}
@@ -1261,16 +1266,16 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
                             <strong style={{ color: '#2c3e50' }}>{entry.utilizator_nume}</strong>
-                            <span style={{
-                              padding: '0.25rem 0.5rem',
-                              background: '#f39c12',
-                              color: 'white',
-                              borderRadius: '12px',
-                              fontSize: '12px',
-                              fontWeight: 'bold'
-                            }}>
-                              {entry.ore_lucrate}h
-                            </span>
+				<span style={{
+				  padding: '0.25rem 0.5rem',
+				  background: '#f39c12',
+				  color: 'white',
+				  borderRadius: '12px',
+				  fontSize: '12px',
+				  fontWeight: 'bold'
+				}}>
+				  {Number(entry.ore_lucrate) || 0}h
+				</span>
                             <span style={{ fontSize: '14px', color: '#7f8c8d' }}>
                               {formatDate(entry.data_lucru)}
                             </span>
