@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/sarcini/route.ts
-// DATA: 22.08.2025 22:00 (ora României)
-// MODIFICAT: Corectare procesare data_scadenta pentru BigQuery DATE field
+// DATA: 24.08.2025 16:45 (ora României)
+// MODIFICAT: Corectare data_scadenta cu formatDateLiteral() similar cu TimeTracking
 // PĂSTRATE: Toate funcționalitățile existente + validări timp estimat
 // ==================================================================
 
@@ -16,6 +16,25 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+// Helper function pentru escape SQL - PĂSTRAT
+const escapeString = (value: string): string => {
+  return value.replace(/'/g, "''");
+};
+
+// Helper pentru formatare DATE BigQuery - ADĂUGAT (preluat din TimeTracking)
+const formatDateLiteral = (dateString: string | null): string => {
+  if (!dateString || dateString === 'null' || dateString === '' || dateString.trim() === '') {
+    return 'NULL';
+  }
+  
+  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoDateRegex.test(dateString.trim())) {
+    return `DATE('${dateString.trim()}')`;
+  }
+  
+  return 'NULL';
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -150,6 +169,8 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
+    console.log('POST sarcini - data primită:', JSON.stringify(data, null, 2));
+    
     // Validări de bază
     if (!data.proiect_id || !data.titlu || !data.prioritate || !data.status) {
       return NextResponse.json({ 
@@ -183,87 +204,77 @@ export async function POST(request: NextRequest) {
     // Calculează timpul total în ore
     const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
-    // FIX: Procesare corectă pentru data_scadenta
-    const dataScadentaProcessata = data.data_scadenta && data.data_scadenta.trim() !== '' 
-      ? data.data_scadenta.trim() 
-      : null;
+    // MODIFICAT: Procesare data_scadenta cu formatDateLiteral() ca TimeTracking
+    const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
+    
+    console.log('Data scadenta procesată:', {
+      original: data.data_scadenta,
+      literal: dataScadentaLiteral
+    });
 
-    console.log('Data scadenta procesata:', dataScadentaProcessata, 'Original:', data.data_scadenta);
-
-    // Inserare sarcină cu timp estimat
+    // Inserare sarcină cu timp estimat - MODIFICAT să folosească literal pentru data_scadenta
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
     const insertSarcinaQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
       (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
        created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
-      VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
-          @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
+      VALUES (
+        '${escapeString(sarcinaId)}',
+        '${escapeString(data.proiect_id)}',
+        '${escapeString(data.tip_proiect || 'proiect')}',
+        '${escapeString(data.titlu)}',
+        ${data.descriere ? `'${escapeString(data.descriere)}'` : 'NULL'},
+        '${escapeString(data.prioritate)}',
+        '${escapeString(data.status)}',
+        ${dataScadentaLiteral},
+        ${data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL'},
+        '${escapeString(data.created_by)}',
+        CURRENT_TIMESTAMP(),
+        CURRENT_TIMESTAMP(),
+        ${zileEstimate},
+        ${oreEstimate},
+        ${timpTotalOre}
+      )
     `;
+
+    console.log('Insert sarcină query cu data_scadenta literal:', insertSarcinaQuery);
 
     await bigquery.query({
       query: insertSarcinaQuery,
-      params: {
-        id: sarcinaId,
-        proiect_id: data.proiect_id,
-        tip_proiect: data.tip_proiect || 'proiect',
-        titlu: data.titlu,
-        descriere: data.descriere || null,
-        prioritate: data.prioritate,
-        status: data.status,
-        data_scadenta: dataScadentaProcessata,
-        observatii: data.observatii || null,
-        created_by: data.created_by,
-        timp_estimat_zile: zileEstimate,
-        timp_estimat_ore: oreEstimate,
-        timp_estimat_total_ore: timpTotalOre
-      },
-      types: {
-        id: 'STRING',
-        proiect_id: 'STRING',
-        tip_proiect: 'STRING',
-        titlu: 'STRING',
-        descriere: 'STRING',
-        prioritate: 'STRING',
-        status: 'STRING',
-        data_scadenta: 'DATE',
-        observatii: 'STRING',
-        created_by: 'STRING',
-        timp_estimat_zile: 'INT64',
-        timp_estimat_ore: 'NUMERIC',
-        timp_estimat_total_ore: 'NUMERIC'
-      },
       location: 'EU',
     });
 
-    // Inserare responsabili
+    // Inserare responsabili - PĂSTRAT identic
     for (const responsabil of data.responsabili) {
       const insertResponsabilQuery = `
         INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
         (id, sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_atribuire, atribuit_de)
-        VALUES (@id, @sarcina_id, @responsabil_uid, @responsabil_nume, @rol_in_sarcina, CURRENT_TIMESTAMP(), @atribuit_de)
+        VALUES (
+          '${escapeString(`RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`)}',
+          '${escapeString(sarcinaId)}',
+          '${escapeString(responsabil.uid)}',
+          '${escapeString(responsabil.nume_complet)}',
+          '${escapeString(responsabil.rol)}',
+          CURRENT_TIMESTAMP(),
+          '${escapeString(data.created_by)}'
+        )
       `;
 
       await bigquery.query({
         query: insertResponsabilQuery,
-        params: {
-          id: `RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          sarcina_id: sarcinaId,
-          responsabil_uid: responsabil.uid,
-          responsabil_nume: responsabil.nume_complet,
-          rol_in_sarcina: responsabil.rol,
-          atribuit_de: data.created_by
-        },
         location: 'EU',
       });
     }
+
+    console.log(`Sarcină ${sarcinaId} creată cu succes cu data_scadenta: ${dataScadentaLiteral}`);
 
     return NextResponse.json({
       success: true,
       message: 'Sarcină creată cu succes',
       sarcina_id: sarcinaId,
       timp_total_ore: timpTotalOre,
-      data_scadenta_salvata: dataScadentaProcessata
+      data_scadenta_salvata: dataScadentaLiteral
     });
 
   } catch (error) {
@@ -279,34 +290,31 @@ export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
     
+    console.log('PUT sarcini - data primită:', JSON.stringify(data, null, 2));
+    
     if (!data.id) {
       return NextResponse.json({ 
         error: 'ID-ul sarcinii este obligatoriu pentru actualizare' 
       }, { status: 400 });
     }
 
-    // Construiește query-ul de actualizare dinamic
+    // Construiește query-ul de actualizare dinamic cu literal pentru data_scadenta
     const updateFields: string[] = [];
-    const params: any = { id: data.id };
 
     if (data.titlu !== undefined) {
-      updateFields.push('titlu = @titlu');
-      params.titlu = data.titlu;
+      updateFields.push(`titlu = '${escapeString(data.titlu)}'`);
     }
 
     if (data.descriere !== undefined) {
-      updateFields.push('descriere = @descriere');
-      params.descriere = data.descriere;
+      updateFields.push(`descriere = ${data.descriere ? `'${escapeString(data.descriere)}'` : 'NULL'}`);
     }
 
     if (data.prioritate !== undefined) {
-      updateFields.push('prioritate = @prioritate');
-      params.prioritate = data.prioritate;
+      updateFields.push(`prioritate = '${escapeString(data.prioritate)}'`);
     }
 
     if (data.status !== undefined) {
-      updateFields.push('status = @status');
-      params.status = data.status;
+      updateFields.push(`status = '${escapeString(data.status)}'`);
       
       // Dacă statusul devine "Finalizată", setează data_finalizare
       if (data.status === 'Finalizată') {
@@ -315,18 +323,17 @@ export async function PUT(request: NextRequest) {
     }
 
     if (data.data_scadenta !== undefined) {
-      // FIX: Procesare corectă pentru data_scadenta în update
-      const dataScadentaProcessata = data.data_scadenta && data.data_scadenta.trim() !== '' 
-        ? data.data_scadenta.trim() 
-        : null;
-      updateFields.push('data_scadenta = @data_scadenta');
-      params.data_scadenta = dataScadentaProcessata;
-      console.log('Update data scadenta:', dataScadentaProcessata);
+      // MODIFICAT: Folosește formatDateLiteral() pentru data_scadenta în PUT
+      const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
+      updateFields.push(`data_scadenta = ${dataScadentaLiteral}`);
+      console.log('Update data_scadenta:', {
+        original: data.data_scadenta,
+        literal: dataScadentaLiteral
+      });
     }
 
     if (data.observatii !== undefined) {
-      updateFields.push('observatii = @observatii');
-      params.observatii = data.observatii;
+      updateFields.push(`observatii = ${data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL'}`);
     }
 
     // Actualizare timp estimat
@@ -349,13 +356,9 @@ export async function PUT(request: NextRequest) {
 
       const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
-      updateFields.push('timp_estimat_zile = @timp_estimat_zile');
-      updateFields.push('timp_estimat_ore = @timp_estimat_ore');
-      updateFields.push('timp_estimat_total_ore = @timp_estimat_total_ore');
-      
-      params.timp_estimat_zile = zileEstimate;
-      params.timp_estimat_ore = oreEstimate;
-      params.timp_estimat_total_ore = timpTotalOre;
+      updateFields.push(`timp_estimat_zile = ${zileEstimate}`);
+      updateFields.push(`timp_estimat_ore = ${oreEstimate}`);
+      updateFields.push(`timp_estimat_total_ore = ${timpTotalOre}`);
     }
 
     if (updateFields.length === 0) {
@@ -369,43 +372,26 @@ export async function PUT(request: NextRequest) {
     const query = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
       SET ${updateFields.join(', ')}
-      WHERE id = @id
+      WHERE id = '${escapeString(data.id)}'
     `;
 
-    // Construiește types pentru parametri
-    const types: any = { id: 'STRING' };
-    Object.keys(params).forEach(key => {
-      if (key !== 'id') {
-        if (key === 'data_scadenta') {
-          types[key] = 'DATE';
-        } else if (key === 'timp_estimat_zile') {
-          types[key] = 'INT64';
-        } else if (key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
-          types[key] = 'NUMERIC';
-        } else {
-          types[key] = 'STRING';
-        }
-      }
-    });
+    console.log('Update sarcină query:', query);
 
     await bigquery.query({
       query: query,
-      params: params,
-      types: types,
       location: 'EU',
     });
 
-    // Actualizează responsabilii dacă sunt specificați
+    // Actualizează responsabilii dacă sunt specificați - PĂSTRAT identic
     if (data.responsabili && Array.isArray(data.responsabili)) {
       // Șterge responsabilii existenți
       const deleteResponsabiliQuery = `
         DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
-        WHERE sarcina_id = @sarcina_id
+        WHERE sarcina_id = '${escapeString(data.id)}'
       `;
 
       await bigquery.query({
         query: deleteResponsabiliQuery,
-        params: { sarcina_id: data.id },
         location: 'EU',
       });
 
@@ -414,19 +400,19 @@ export async function PUT(request: NextRequest) {
         const insertResponsabilQuery = `
           INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
           (id, sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_atribuire, atribuit_de)
-          VALUES (@id, @sarcina_id, @responsabil_uid, @responsabil_nume, @rol_in_sarcina, CURRENT_TIMESTAMP(), @atribuit_de)
+          VALUES (
+            '${escapeString(`RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`)}',
+            '${escapeString(data.id)}',
+            '${escapeString(responsabil.uid)}',
+            '${escapeString(responsabil.nume_complet)}',
+            '${escapeString(responsabil.rol)}',
+            CURRENT_TIMESTAMP(),
+            '${escapeString(data.updated_by || 'system')}'
+          )
         `;
 
         await bigquery.query({
           query: insertResponsabilQuery,
-          params: {
-            id: `RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-            sarcina_id: data.id,
-            responsabil_uid: responsabil.uid,
-            responsabil_nume: responsabil.nume_complet,
-            rol_in_sarcina: responsabil.rol,
-            atribuit_de: data.updated_by || 'system'
-          },
           location: 'EU',
         });
       }
@@ -460,36 +446,33 @@ export async function DELETE(request: NextRequest) {
     // Șterge responsabilii sarcinii
     const deleteResponsabiliQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
-      WHERE sarcina_id = @sarcina_id
+      WHERE sarcina_id = '${escapeString(id)}'
     `;
 
     await bigquery.query({
       query: deleteResponsabiliQuery,
-      params: { sarcina_id: id },
       location: 'EU',
     });
 
     // Șterge înregistrările de timp (opțional - în funcție de business logic)
     const deleteTimeTrackingQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
-      WHERE sarcina_id = @sarcina_id
+      WHERE sarcina_id = '${escapeString(id)}'
     `;
 
     await bigquery.query({
       query: deleteTimeTrackingQuery,
-      params: { sarcina_id: id },
       location: 'EU',
     });
 
     // Șterge sarcina
     const deleteSarcinaQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-      WHERE id = @id
+      WHERE id = '${escapeString(id)}'
     `;
 
     await bigquery.query({
       query: deleteSarcinaQuery,
-      params: { id },
       location: 'EU',
     });
 
