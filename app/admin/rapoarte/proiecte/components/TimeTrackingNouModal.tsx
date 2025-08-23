@@ -1,12 +1,14 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/TimeTrackingNouModal.tsx
-// DATA: 21.08.2025 01:50 (ora României)
-// DESCRIERE: Modal pentru înregistrarea manuală a timpului pe sarcini
+// DATA: 24.08.2025 16:30 (ora României)
+// MODIFICAT: Corectare poziționare modal cu createPortal
+// PĂSTRATE: Toate funcționalitățile existente cu validări timp
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TimeTrackingNouModalProps {
   isOpen: boolean;
@@ -28,7 +30,7 @@ interface TimeTrackingNouModalProps {
   } | null;
 }
 
-// Toast system
+// Toast system cu z-index crescut pentru a fi deasupra modalului
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -40,7 +42,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
     border-radius: 16px;
-    z-index: 75000;
+    z-index: 70000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -304,7 +306,7 @@ export default function TimeTrackingNouModal({
 
   if (!isOpen) return null;
 
-  return (
+  return typeof window !== 'undefined' ? createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -597,6 +599,7 @@ export default function TimeTrackingNouModal({
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 }
