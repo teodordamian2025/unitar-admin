@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
-// DATA: 24.08.2025 20:15 (ora României)
+// DATA: 24.08.2025 21:30 (ora României)
 // MODIFICAT: Fixat problema duplicate fields și îmbunătățită logica de actualizare
 // PĂSTRATE: Toate funcționalitățile existente + progres + editare inline
 // ==================================================================
@@ -442,7 +442,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  // ÎMBUNĂTĂȚIRE: Funcții pentru editare inline cu logică inteligentă
+  // FIXAT: Funcții pentru editare inline cu logică inteligentă
   const startEdit = (sarcina: Sarcina) => {
     setEditingSarcina(sarcina.id);
     setEditData({
@@ -658,9 +658,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   if (typeof window === 'undefined') {
     return null;
   }
-  // PARTEA 2 - JSX RENDERING COMPLET
-  // CONTINUARE DIN PARTEA 1
-
   return (
     <>
       {createPortal(
@@ -709,7 +706,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                   )}
                   {loadingUtilizator && (
                     <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
-                      Se încarcă datele utilizatorului...
+                      Se incarca datele utilizatorului...
                     </p>
                   )}
                 </div>
@@ -766,11 +763,11 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
             <div style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
               {loading && (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#7f8c8d' }}>
-                  Se încarcă datele...
+                  Se incarca datele...
                 </div>
               )}
 
-              {/* TAB SARCINI cu progres și editare ÎMBUNĂTĂȚIT */}
+              {/* TAB SARCINI cu progres si editare IMBUNATATIT */}
               {activeTab === 'sarcini' && !loading && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -789,188 +786,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         fontWeight: 'bold'
                       }}
                     >
-                      + Înregistrează Timp
-                    </button>
-                  </div>
-
-                  {timeTracking.length === 0 ? (
-                    <div style={{
-                      textAlign: 'center',
-                      padding: '3rem',
-                      color: '#7f8c8d',
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      border: '2px dashed #dee2e6'
-                    }}>
-                      <div style={{ fontSize: '48px', marginBottom: '1rem' }}>⏱️</div>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu există timp înregistrat</h4>
-                      <p style={{ margin: 0 }}>Înregistrează primul timp lucrat pe acest proiect</p>
-                    </div>
-                  ) : (
-                    <div>
-                      {/* Sumar timp */}
-                      <div style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        padding: '1rem',
-                        borderRadius: '8px',
-                        marginBottom: '1.5rem'
-                      }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                          <div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                              {Number(timeTracking.reduce((sum, t) => sum + (Number(t.ore_lucrate) || 0), 0)).toFixed(1)}h
-                            </div>
-                            <div style={{ fontSize: '14px', opacity: 0.9 }}>Total ore lucrate</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                              {new Set(timeTracking.map(t => t.utilizator_uid)).size}
-                            </div>
-                            <div style={{ fontSize: '14px', opacity: 0.9 }}>Persoane implicate</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                              {new Set(timeTracking.map(t => {
-                                const dataLucru = typeof t.data_lucru === 'string' ? t.data_lucru : 
-                                                 typeof t.data_lucru === 'object' && t.data_lucru?.value ? t.data_lucru.value : 
-                                                 t.data_lucru?.toString() || '';
-                                return dataLucru;
-                              })).size}
-                            </div>
-                            <div style={{ fontSize: '14px', opacity: 0.9 }}>Zile de lucru</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Lista înregistrări */}
-                      <div style={{ display: 'grid', gap: '1rem' }}>
-                        {timeTracking.map(entry => (
-                          <div
-                            key={entry.id}
-                            style={{
-                              border: '1px solid #dee2e6',
-                              borderRadius: '8px',
-                              padding: '1rem',
-                              background: 'white',
-                              display: 'grid',
-                              gridTemplateColumns: '1fr auto',
-                              gap: '1rem',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                                <strong style={{ color: '#2c3e50' }}>{entry.utilizator_nume}</strong>
-                                <span style={{
-                                  padding: '0.25rem 0.5rem',
-                                  background: '#f39c12',
-                                  color: 'white',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                  fontWeight: 'bold'
-                                }}>
-                                  {Number(entry.ore_lucrate) || 0}h
-                                </span>
-                                <span style={{ fontSize: '14px', color: '#7f8c8d' }}>
-                                  {formatDate(entry.data_lucru)}
-                                </span>
-                              </div>
-                              
-                              <div style={{ fontSize: '14px', color: '#3498db', marginBottom: '0.5rem' }}>
-                                Sarcină: {entry.sarcina_titlu}
-                              </div>
-                              
-                              {entry.descriere_lucru && (
-                                <p style={{
-                                  margin: 0,
-                                  fontSize: '14px',
-                                  color: '#7f8c8d',
-                                  fontStyle: 'italic'
-                                }}>
-                                  {entry.descriere_lucru}
-                                </p>
-                              )}
-                            </div>
-                            
-                            <button
-                              style={{
-                                padding: '0.5rem',
-                                background: '#e74c3c',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '12px'
-                              }}
-                              title="Șterge înregistrare"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div style={{
-              padding: '1rem 1.5rem',
-              borderTop: '1px solid #dee2e6',
-              background: '#f8f9fa',
-              borderRadius: '0 0 16px 16px',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                Închide
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-      
-      {/* Modale suplimentare */}
-      {showSarcinaNouaModal && utilizatorCurent && (
-        <SarcinaNouaModal
-          isOpen={showSarcinaNouaModal}
-          onClose={() => setShowSarcinaNouaModal(false)}
-          onSarcinaAdded={handleSarcinaAdded}
-          proiect={proiect}
-          utilizatorCurent={utilizatorCurent}
-        />
-      )}
-
-      {showTimeModal && utilizatorCurent && (
-        <TimeTrackingNouModal
-          isOpen={showTimeModal}
-          onClose={() => setShowTimeModal(false)}
-          onTimeAdded={handleTimeAdded}
-          proiect={proiect}
-          sarcini={sarcini}
-          utilizatorCurent={utilizatorCurent}
-        />
-      )}
-    </>
-  );
-                    >
-                      + Sarcină Nouă
+                      + Sarcina Noua
                     </button>
                   </div>
 
@@ -984,8 +800,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                       border: '2px dashed #dee2e6'
                     }}>
                       <div style={{ fontSize: '48px', marginBottom: '1rem' }}>📋</div>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu există sarcini</h4>
-                      <p style={{ margin: 0 }}>Adaugă prima sarcină pentru acest proiect</p>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu exista sarcini</h4>
+                      <p style={{ margin: 0 }}>Adauga prima sarcina pentru acest proiect</p>
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1001,7 +817,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                           }}
                         >
                           {editingSarcina === sarcina.id ? (
-                            // Form editabil inline cu progres ÎMBUNĂTĂȚIT
+                            // Form editabil inline cu progres IMBUNATATIT
                             <div>
                               {/* Titlu editabil */}
                               <input
@@ -1017,11 +833,11 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                   fontWeight: 'bold',
                                   marginBottom: '0.5rem'
                                 }}
-                                placeholder="Titlu sarcină..."
+                                placeholder="Titlu sarcina..."
                               />
 
-                              {/* ÎMBUNĂTĂȚIRE: Alert pentru auto-completări */}
-                              {(editData.progres_procent == 100 || editData.status === 'Finalizată') && (
+                              {/* IMBUNATATIRE: Alert pentru auto-completari */}
+                              {(editData.progres_procent == 100 || editData.status === 'Finalizata') && (
                                 <div style={{
                                   background: '#fff3cd',
                                   border: '1px solid #ffc107',
@@ -1031,15 +847,15 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                   marginBottom: '1rem',
                                   fontSize: '12px'
                                 }}>
-                                  <strong>Auto-completare activă:</strong> {
+                                  <strong>Auto-completare activa:</strong> {
                                     editData.progres_procent == 100 
-                                      ? 'Progres 100% va seta statusul automat la "Finalizată"' 
-                                      : 'Status "Finalizată" va seta progresul automat la 100%'
+                                      ? 'Progres 100% va seta statusul automat la "Finalizata"' 
+                                      : 'Status "Finalizata" va seta progresul automat la 100%'
                                   }
                                 </div>
                               )}
 
-                              {/* Badges prioritate și status */}
+                              {/* Badges prioritate si status */}
                               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                                 <select
                                   value={editData.prioritate || ''}
@@ -1051,10 +867,10 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                     fontSize: '12px'
                                   }}
                                 >
-                                  <option value="Scăzută">Scăzută</option>
+                                  <option value="Scazuta">Scazuta</option>
                                   <option value="Medie">Medie</option>
-                                  <option value="Înaltă">Înaltă</option>
-                                  <option value="Critică">Critică</option>
+                                  <option value="Inalta">Inalta</option>
+                                  <option value="Critica">Critica</option>
                                 </select>
 
                                 <select
@@ -1067,14 +883,14 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                     fontSize: '12px'
                                   }}
                                 >
-                                  <option value="De făcut">De făcut</option>
-                                  <option value="În lucru">În lucru</option>
-                                  <option value="În verificare">În verificare</option>
-                                  <option value="Finalizată">Finalizată</option>
+                                  <option value="De facut">De facut</option>
+                                  <option value="In lucru">In lucru</option>
+                                  <option value="In verificare">In verificare</option>
+                                  <option value="Finalizata">Finalizata</option>
                                 </select>
                               </div>
 
-                              {/* Descriere editabilă */}
+                              {/* Descriere editabila */}
                               <textarea
                                 value={editData.descriere || ''}
                                 onChange={(e) => setEditData(prev => ({ ...prev, descriere: e.target.value }))}
@@ -1091,7 +907,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 }}
                               />
 
-                              {/* Progres editabil cu logică îmbunătățită */}
+                              {/* Progres editabil cu logica imbunatatita */}
                               <div style={{ marginBottom: '1rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>
                                   Progres
@@ -1123,7 +939,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                   </div>
                                 </div>
                                 
-                                {/* Descriere progres editabilă */}
+                                {/* Descriere progres editabila */}
                                 <textarea
                                   value={editData.progres_descriere || ''}
                                   onChange={(e) => setEditData(prev => ({ ...prev, progres_descriere: e.target.value }))}
@@ -1164,7 +980,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                           e.preventDefault();
                                         }
                                       }}
-                                      placeholder="Zile (întregi)"
+                                      placeholder="Zile (intregi)"
                                       style={{
                                         width: '100%',
                                         padding: '0.5rem',
@@ -1208,11 +1024,11 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 </div>
                               </div>
 
-                              {/* Data scadență și observații */}
+                              {/* Data scadenta si observatii */}
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
                                 <div>
                                   <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold' }}>
-                                    Data Scadență
+                                    Data Scadenta
                                   </label>
                                   <input
                                     type="date"
@@ -1229,13 +1045,13 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 </div>
                                 <div>
                                   <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold' }}>
-                                    Observații
+                                    Observatii
                                   </label>
                                   <input
                                     type="text"
                                     value={editData.observatii || ''}
                                     onChange={(e) => setEditData(prev => ({ ...prev, observatii: e.target.value }))}
-                                    placeholder="Observații suplimentare..."
+                                    placeholder="Observatii suplimentare..."
                                     style={{
                                       width: '100%',
                                       padding: '0.5rem',
@@ -1262,7 +1078,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                     fontSize: '12px'
                                   }}
                                 >
-                                  Anulează
+                                  Anuleaza
                                 </button>
                                 <button
                                   onClick={() => saveEdit(sarcina.id)}
@@ -1277,12 +1093,12 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                     fontSize: '12px'
                                   }}
                                 >
-                                  {savingEdit ? 'Se salvează...' : 'Salvează'}
+                                  {savingEdit ? 'Se salveaza...' : 'Salveaza'}
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            // Afișare normală cu progres vizual
+                            // Afisare normala cu progres vizual
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                                 <h4 style={{ margin: 0, color: '#2c3e50' }}>{sarcina.titlu}</h4>
@@ -1316,7 +1132,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 </p>
                               )}
 
-                              {/* Afișare progres vizual */}
+                              {/* Afisare progres vizual */}
                               <div style={{ 
                                 background: 'rgba(52, 152, 219, 0.1)', 
                                 border: '1px solid rgba(52, 152, 219, 0.3)',
@@ -1377,7 +1193,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                   <span style={{ marginLeft: '1rem' }}>Timp lucrat: {sarcina.total_ore_lucrate}h</span>
                                   {sarcina.data_scadenta && (
                                     <span style={{ marginLeft: '1rem' }}>
-                                      Scadența: {formatDate(sarcina.data_scadenta)}
+                                      Scadenta: {formatDate(sarcina.data_scadenta)}
                                     </span>
                                   )}
                                 </div>
@@ -1396,7 +1212,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                       fontSize: '12px'
                                     }}
                                   >
-                                    Editează
+                                    Editeaza
                                   </button>
                                   <button
                                     onClick={() => setShowTimeModal(true)}
@@ -1410,7 +1226,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                       fontSize: '12px'
                                     }}
                                   >
-                                    Adaugă Timp
+                                    Adauga Timp
                                   </button>
                                 </div>
                               </div>
@@ -1423,11 +1239,11 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 </div>
               )}
 
-              {/* TAB COMENTARII - PĂSTRAT identic */}
+              {/* TAB COMENTARII - PASTRAT identic */}
               {activeTab === 'comentarii' && !loading && (
                 <div>
                   <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Adaugă Comentariu</h3>
+                    <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Adauga Comentariu</h3>
                     
                     <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                       <select
@@ -1478,7 +1294,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         fontWeight: 'bold'
                       }}
                     >
-                      {loading ? 'Se adaugă...' : 'Adaugă Comentariu'}
+                      {loading ? 'Se adauga...' : 'Adauga Comentariu'}
                     </button>
                   </div>
 
@@ -1497,8 +1313,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         border: '2px dashed #dee2e6'
                       }}>
                         <div style={{ fontSize: '48px', marginBottom: '1rem' }}>💬</div>
-                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu există comentarii</h4>
-                        <p style={{ margin: 0 }}>Adaugă primul comentariu pentru acest proiect</p>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu exista comentarii</h4>
+                        <p style={{ margin: 0 }}>Adauga primul comentariu pentru acest proiect</p>
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1550,12 +1366,12 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 </div>
               )}
 
-{/* TAB TIME TRACKING - PĂSTRAT identic */}
+              {/* TAB TIME TRACKING - PASTRAT identic */}
               {activeTab === 'timetracking' && !loading && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h3 style={{ margin: 0, color: '#2c3e50' }}>
-                      Time Tracking ({timeTracking.length} înregistrări)
+                      Time Tracking ({timeTracking.length} inregistrari)
                     </h3>
                     <button
                       onClick={() => setShowTimeModal(true)}
@@ -1571,7 +1387,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         fontWeight: 'bold'
                       }}
                     >
-                      + Înregistrează Timp
+                      + Inregistreaza Timp
                     </button>
                   </div>
 
@@ -1585,8 +1401,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                       border: '2px dashed #dee2e6'
                     }}>
                       <div style={{ fontSize: '48px', marginBottom: '1rem' }}>⏱️</div>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu există timp înregistrat</h4>
-                      <p style={{ margin: 0 }}>Înregistrează primul timp lucrat pe acest proiect</p>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Nu exista timp inregistrat</h4>
+                      <p style={{ margin: 0 }}>Inregistreaza primul timp lucrat pe acest proiect</p>
                     </div>
                   ) : (
                     <div>
@@ -1625,7 +1441,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                         </div>
                       </div>
 
-                      {/* Lista înregistrări */}
+                      {/* Lista inregistrari */}
                       <div style={{ display: 'grid', gap: '1rem' }}>
                         {timeTracking.map(entry => (
                           <div
@@ -1660,7 +1476,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                               </div>
                               
                               <div style={{ fontSize: '14px', color: '#3498db', marginBottom: '0.5rem' }}>
-                                Sarcină: {entry.sarcina_titlu}
+                                Sarcina: {entry.sarcina_titlu}
                               </div>
                               
                               {entry.descriere_lucru && (
@@ -1685,7 +1501,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 cursor: 'pointer',
                                 fontSize: '12px'
                               }}
-                              title="Șterge înregistrare"
+                              title="Sterge inregistrare"
                             >
                               🗑️
                             </button>
@@ -1720,7 +1536,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                   fontWeight: 'bold'
                 }}
               >
-                Închide
+                Inchide
               </button>
             </div>
           </div>

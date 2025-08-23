@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/sarcini/route.ts
-// DATA: 24.08.2025 17:00 (ora României)
-// MODIFICAT: Adăugat funcționalitate progres cu progres_procent și progres_descriere
-// PĂSTRATE: Toate funcționalitățile existente + validări timp estimat + data_scadenta
+// DATA: 24.08.2025 21:45 (ora României)
+// MODIFICAT: FIXAT problema duplicate fields în PUT - deduplicare inteligentă
+// PĂSTRATE: Toate funcționalitățile existente + validări timp estimat + progres
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -315,65 +315,29 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Construiește query-ul de actualizare dinamic
-    const updateFields: string[] = [];
+    // FIXAT: Construiește Map pentru deduplicare câmpuri
+    const updateFieldsMap = new Map<string, string>();
 
+    // Câmpuri de bază - adăugate în Map pentru deduplicare
     if (data.titlu !== undefined) {
-      updateFields.push(`titlu = '${escapeString(data.titlu)}'`);
+      updateFieldsMap.set('titlu', `'${escapeString(data.titlu)}'`);
     }
 
     if (data.descriere !== undefined) {
-      updateFields.push(`descriere = ${data.descriere ? `'${escapeString(data.descriere)}'` : 'NULL'}`);
+      updateFieldsMap.set('descriere', data.descriere ? `'${escapeString(data.descriere)}'` : 'NULL');
     }
 
     if (data.prioritate !== undefined) {
-      updateFields.push(`prioritate = '${escapeString(data.prioritate)}'`);
-    }
-
-    if (data.status !== undefined) {
-      updateFields.push(`status = '${escapeString(data.status)}'`);
-      
-      // Dacă statusul devine "Finalizată", setează progresul la 100% automat
-      if (data.status === 'Finalizată') {
-        updateFields.push('data_finalizare = CURRENT_TIMESTAMP()');
-        updateFields.push('progres_procent = 100');
-        // Dacă nu există descriere progres, adaugă una automată
-        if (data.progres_descriere === undefined || !data.progres_descriere) {
-          updateFields.push(`progres_descriere = 'Sarcină finalizată automat'`);
-        }
-      }
+      updateFieldsMap.set('prioritate', `'${escapeString(data.prioritate)}'`);
     }
 
     if (data.data_scadenta !== undefined) {
       const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
-      updateFields.push(`data_scadenta = ${dataScadentaLiteral}`);
+      updateFieldsMap.set('data_scadenta', dataScadentaLiteral);
     }
 
     if (data.observatii !== undefined) {
-      updateFields.push(`observatii = ${data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL'}`);
-    }
-
-    // Actualizare progres
-    if (data.progres_procent !== undefined) {
-      const progresProcent = parseInt(data.progres_procent);
-      
-      if (isNaN(progresProcent) || progresProcent < 0 || progresProcent > 100) {
-        return NextResponse.json({ 
-          error: 'Progresul trebuie să fie între 0 și 100 procente' 
-        }, { status: 400 });
-      }
-      
-      updateFields.push(`progres_procent = ${progresProcent}`);
-      
-      // Dacă progresul ajunge la 100%, poate actualiza automat statusul
-      if (progresProcent === 100 && data.status !== 'Finalizată') {
-        updateFields.push(`status = 'Finalizată'`);
-        updateFields.push('data_finalizare = CURRENT_TIMESTAMP()');
-      }
-    }
-
-    if (data.progres_descriere !== undefined) {
-      updateFields.push(`progres_descriere = ${data.progres_descriere ? `'${escapeString(data.progres_descriere)}'` : 'NULL'}`);
+      updateFieldsMap.set('observatii', data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL');
     }
 
     // Actualizare timp estimat
@@ -395,10 +359,72 @@ export async function PUT(request: NextRequest) {
 
       const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
-      updateFields.push(`timp_estimat_zile = ${zileEstimate}`);
-      updateFields.push(`timp_estimat_ore = ${oreEstimate}`);
-      updateFields.push(`timp_estimat_total_ore = ${timpTotalOre}`);
+      updateFieldsMap.set('timp_estimat_zile', zileEstimate.toString());
+      updateFieldsMap.set('timp_estimat_ore', oreEstimate.toString());
+      updateFieldsMap.set('timp_estimat_total_ore', timpTotalOre.toString());
     }
+
+    // FIXAT: Logică inteligentă pentru status și progres - FĂRĂ DUPLICATE
+    // Verificăm ce vine în payload și aplicăm logica de prioritate
+    
+    const inputProgres = data.progres_procent !== undefined ? parseInt(data.progres_procent) : null;
+    const inputStatus = data.status !== undefined ? data.status : null;
+
+    console.log('FIXAT - Logică progres/status:', { inputProgres, inputStatus });
+
+    // Validare progres
+    if (inputProgres !== null && (inputProgres < 0 || inputProgres > 100)) {
+      return NextResponse.json({ 
+        error: 'Progresul trebuie să fie între 0 și 100 procente' 
+      }, { status: 400 });
+    }
+
+    // FIXAT: Logică de prioritate - evităm duplicate fields
+    if (inputProgres === 100) {
+      // Progres 100% -> forțăm status finalizat + progres
+      updateFieldsMap.set('progres_procent', '100');
+      updateFieldsMap.set('status', `'Finalizată'`);
+      updateFieldsMap.set('data_finalizare', 'CURRENT_TIMESTAMP()');
+      
+      // Progres descriere
+      const progresDescriere = data.progres_descriere?.trim() || 'Sarcină finalizată automat la 100% progres';
+      updateFieldsMap.set('progres_descriere', `'${escapeString(progresDescriere)}'`);
+      
+      console.log('FIXAT - Aplicată logica: progres 100% -> status finalizat');
+      
+    } else if (inputStatus === 'Finalizată') {
+      // Status finalizat -> forțăm progres 100% + status
+      updateFieldsMap.set('status', `'Finalizată'`);
+      updateFieldsMap.set('progres_procent', '100');
+      updateFieldsMap.set('data_finalizare', 'CURRENT_TIMESTAMP()');
+      
+      // Progres descriere
+      const progresDescriere = data.progres_descriere?.trim() || 'Sarcină finalizată manual - progres setat la 100%';
+      updateFieldsMap.set('progres_descriere', `'${escapeString(progresDescriere)}'`);
+      
+      console.log('FIXAT - Aplicată logica: status finalizat -> progres 100%');
+      
+    } else {
+      // Cazul normal - respectăm valorile individuale
+      if (inputStatus !== null) {
+        updateFieldsMap.set('status', `'${escapeString(inputStatus)}'`);
+      }
+      
+      if (inputProgres !== null) {
+        updateFieldsMap.set('progres_procent', inputProgres.toString());
+      }
+      
+      if (data.progres_descriere !== undefined) {
+        updateFieldsMap.set('progres_descriere', 
+          data.progres_descriere ? `'${escapeString(data.progres_descriere)}'` : 'NULL'
+        );
+      }
+      
+      console.log('FIXAT - Aplicată logica: valori individuale normale');
+    }
+
+    // FIXAT: Convertim Map în array pentru query final
+    const updateFields = Array.from(updateFieldsMap.entries()).map(([field, value]) => `${field} = ${value}`);
 
     if (updateFields.length === 0) {
       return NextResponse.json({ 
@@ -406,6 +432,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Adăugăm updated_at
     updateFields.push('updated_at = CURRENT_TIMESTAMP()');
 
     const query = `
@@ -414,7 +441,7 @@ export async function PUT(request: NextRequest) {
       WHERE id = '${escapeString(data.id)}'
     `;
 
-    console.log('Update sarcină query cu progres:', query);
+    console.log('FIXAT - Update sarcină query FĂRĂ duplicate:', query);
 
     await bigquery.query({
       query: query,
