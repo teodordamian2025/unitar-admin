@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/sarcini/route.ts
-// DATA: 21.08.2025 02:05 (ora României)
-// MODIFICAT: Adăugat timp estimat (zile + ore) cu conversie automată
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 22.08.2025 22:00 (ora României)
+// MODIFICAT: Corectare procesare data_scadenta pentru BigQuery DATE field
+// PĂSTRATE: Toate funcționalitățile existente + validări timp estimat
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -163,71 +163,78 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-	// ADĂUGAT: Validări pentru timp estimat
-	const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
-	const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
+    // Validări pentru timp estimat
+    const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
+    const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-	// Validare că zilele sunt numere întregi
-	if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
-	  return NextResponse.json({ 
-	    error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
-	  }, { status: 400 });
-	}
+    // Validare că zilele sunt numere întregi
+    if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
+      return NextResponse.json({ 
+        error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
+      }, { status: 400 });
+    }
 
-	if (oreEstimate < 0 || oreEstimate >= 8) {
-	  return NextResponse.json({ 
-	    error: 'Orele estimate trebuie să fie între 0 și 7.9' 
-	  }, { status: 400 });
-	}
+    if (oreEstimate < 0 || oreEstimate >= 8) {
+      return NextResponse.json({ 
+        error: 'Orele estimate trebuie să fie între 0 și 7.9' 
+      }, { status: 400 });
+    }
 
-    // ADĂUGAT: Calculează timpul total în ore
+    // Calculează timpul total în ore
     const timpTotalOre = (zileEstimate * 8) + oreEstimate;
+
+    // FIX: Procesare corectă pentru data_scadenta
+    const dataScadentaProcessata = data.data_scadenta && data.data_scadenta.trim() !== '' 
+      ? data.data_scadenta.trim() 
+      : null;
+
+    console.log('Data scadenta procesata:', dataScadentaProcessata, 'Original:', data.data_scadenta);
 
     // Inserare sarcină cu timp estimat
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
-	const insertSarcinaQuery = `
-	  INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-	  (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
-	   created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
-	  VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
-	      @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
-	`;
+    const insertSarcinaQuery = `
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
+       created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
+      VALUES (@id, @proiect_id, @tip_proiect, @titlu, @descriere, @prioritate, @status, @data_scadenta, @observatii, 
+          @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore)
+    `;
 
-	await bigquery.query({
-	  query: insertSarcinaQuery,
-	  params: {
-	    id: sarcinaId,
-	    proiect_id: data.proiect_id,
-	    tip_proiect: data.tip_proiect || 'proiect',
-	    titlu: data.titlu,
-	    descriere: data.descriere || null,
-	    prioritate: data.prioritate,
-	    status: data.status,
-	    data_scadenta: data.data_scadenta || null,
-	    observatii: data.observatii || null,
-	    created_by: data.created_by,
-	    timp_estimat_zile: zileEstimate,
-	    timp_estimat_ore: oreEstimate,
-	    timp_estimat_total_ore: timpTotalOre
-	  },
-	  types: {
-	    id: 'STRING',
-	    proiect_id: 'STRING',
-	    tip_proiect: 'STRING',
-	    titlu: 'STRING',
-	    descriere: 'STRING',
-	    prioritate: 'STRING',
-	    status: 'STRING',
-	    data_scadenta: 'DATE',
-	    observatii: 'STRING',
-	    created_by: 'STRING',
-	    timp_estimat_zile: 'INT64',
-	    timp_estimat_ore: 'NUMERIC',
-	    timp_estimat_total_ore: 'NUMERIC'
-	  },
-	  location: 'EU',
-	});
+    await bigquery.query({
+      query: insertSarcinaQuery,
+      params: {
+        id: sarcinaId,
+        proiect_id: data.proiect_id,
+        tip_proiect: data.tip_proiect || 'proiect',
+        titlu: data.titlu,
+        descriere: data.descriere || null,
+        prioritate: data.prioritate,
+        status: data.status,
+        data_scadenta: dataScadentaProcessata,
+        observatii: data.observatii || null,
+        created_by: data.created_by,
+        timp_estimat_zile: zileEstimate,
+        timp_estimat_ore: oreEstimate,
+        timp_estimat_total_ore: timpTotalOre
+      },
+      types: {
+        id: 'STRING',
+        proiect_id: 'STRING',
+        tip_proiect: 'STRING',
+        titlu: 'STRING',
+        descriere: 'STRING',
+        prioritate: 'STRING',
+        status: 'STRING',
+        data_scadenta: 'DATE',
+        observatii: 'STRING',
+        created_by: 'STRING',
+        timp_estimat_zile: 'INT64',
+        timp_estimat_ore: 'NUMERIC',
+        timp_estimat_total_ore: 'NUMERIC'
+      },
+      location: 'EU',
+    });
 
     // Inserare responsabili
     for (const responsabil of data.responsabili) {
@@ -255,7 +262,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Sarcină creată cu succes',
       sarcina_id: sarcinaId,
-      timp_total_ore: timpTotalOre
+      timp_total_ore: timpTotalOre,
+      data_scadenta_salvata: dataScadentaProcessata
     });
 
   } catch (error) {
@@ -277,7 +285,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-// Construiește query-ul de actualizare dinamic
+    // Construiește query-ul de actualizare dinamic
     const updateFields: string[] = [];
     const params: any = { id: data.id };
 
@@ -307,8 +315,13 @@ export async function PUT(request: NextRequest) {
     }
 
     if (data.data_scadenta !== undefined) {
+      // FIX: Procesare corectă pentru data_scadenta în update
+      const dataScadentaProcessata = data.data_scadenta && data.data_scadenta.trim() !== '' 
+        ? data.data_scadenta.trim() 
+        : null;
       updateFields.push('data_scadenta = @data_scadenta');
-      params.data_scadenta = data.data_scadenta;
+      params.data_scadenta = dataScadentaProcessata;
+      console.log('Update data scadenta:', dataScadentaProcessata);
     }
 
     if (data.observatii !== undefined) {
@@ -316,23 +329,23 @@ export async function PUT(request: NextRequest) {
       params.observatii = data.observatii;
     }
 
-    // ADĂUGAT: Actualizare timp estimat
-	if (data.timp_estimat_zile !== undefined || data.timp_estimat_ore !== undefined) {
-	  const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
-	  const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
+    // Actualizare timp estimat
+    if (data.timp_estimat_zile !== undefined || data.timp_estimat_ore !== undefined) {
+      const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
+      const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-	  // Validare că zilele sunt numere întregi
-	  if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
-	    return NextResponse.json({ 
-	      error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
-	    }, { status: 400 });
-	  }
+      // Validare că zilele sunt numere întregi
+      if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
+        return NextResponse.json({ 
+          error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
+        }, { status: 400 });
+      }
 
-	  if (oreEstimate < 0 || oreEstimate >= 8) {
-	    return NextResponse.json({ 
-	      error: 'Orele estimate trebuie să fie între 0 și 7.9' 
-	    }, { status: 400 });
-	  }
+      if (oreEstimate < 0 || oreEstimate >= 8) {
+        return NextResponse.json({ 
+          error: 'Orele estimate trebuie să fie între 0 și 7.9' 
+        }, { status: 400 });
+      }
 
       const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
@@ -353,34 +366,34 @@ export async function PUT(request: NextRequest) {
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP()');
 
-	const query = `
-	  UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-	  SET ${updateFields.join(', ')}
-	  WHERE id = @id
-	`;
+    const query = `
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      SET ${updateFields.join(', ')}
+      WHERE id = @id
+    `;
 
-	// Construiește types pentru valorile null
-	const types: any = { id: 'STRING' };
-	Object.keys(params).forEach(key => {
-	  if (key !== 'id') {
-	    if (key === 'data_scadenta') {
-	      types[key] = 'DATE';
-	    } else if (key === 'timp_estimat_zile') {
-	      types[key] = 'INT64';
-	    } else if (key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
-	      types[key] = 'NUMERIC';
-	    } else {
-	      types[key] = 'STRING';
-	    }
-	  }
-	});
+    // Construiește types pentru parametri
+    const types: any = { id: 'STRING' };
+    Object.keys(params).forEach(key => {
+      if (key !== 'id') {
+        if (key === 'data_scadenta') {
+          types[key] = 'DATE';
+        } else if (key === 'timp_estimat_zile') {
+          types[key] = 'INT64';
+        } else if (key === 'timp_estimat_ore' || key === 'timp_estimat_total_ore') {
+          types[key] = 'NUMERIC';
+        } else {
+          types[key] = 'STRING';
+        }
+      }
+    });
 
-	await bigquery.query({
-	  query: query,
-	  params: params,
-	  types: types,
-	  location: 'EU',
-	});
+    await bigquery.query({
+      query: query,
+      params: params,
+      types: types,
+      location: 'EU',
+    });
 
     // Actualizează responsabilii dacă sunt specificați
     if (data.responsabili && Array.isArray(data.responsabili)) {
