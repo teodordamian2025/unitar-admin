@@ -657,6 +657,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   // Verificare window pentru SSR
   if (typeof window === 'undefined') {
     return null;
+  }
   // PARTEA 2 - JSX RENDERING COMPLET
   // CONTINUARE DIN PARTEA 1
 
@@ -968,10 +969,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
       )}
     </>
   );
-} : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                      }}
                     >
                       + Sarcină Nouă
                     </button>
