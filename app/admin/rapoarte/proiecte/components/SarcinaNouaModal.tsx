@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarcinaNouaModal.tsx
-// DATA: 22.08.2025 21:50 (ora României)
-// MODIFICAT: Corectare poziționare modal cu createPortal + validări timp estimat
-// PĂSTRATE: Toate funcționalitățile existente cu responsabili multipli
+// DATA: 24.08.2025 17:15 (ora României)
+// MODIFICAT: Adăugat funcționalitate progres cu validări și indicatori vizuali
+// PĂSTRATE: Toate funcționalitățile existente cu responsabili multipli și timp estimat
 // ==================================================================
 
 'use client';
@@ -93,12 +93,15 @@ export default function SarcinaNouaModal({
     status: 'De făcut',
     data_scadenta: '',
     observatii: '',
-    // ADĂUGAT: Câmpuri pentru timp estimat
+    // Timp estimat
     timp_estimat_zile: '',
-    timp_estimat_ore: ''
+    timp_estimat_ore: '',
+    // ADĂUGAT: Progres
+    progres_procent: '0',
+    progres_descriere: ''
   });
 
-  // ADĂUGAT: State pentru calculul timpului total
+  // State pentru calculul timpului total
   const [timpTotalOre, setTimpTotalOre] = useState(0);
 
   const resetForm = () => {
@@ -110,21 +113,21 @@ export default function SarcinaNouaModal({
       data_scadenta: '',
       observatii: '',
       timp_estimat_zile: '',
-      timp_estimat_ore: ''
+      timp_estimat_ore: '',
+      progres_procent: '0',
+      progres_descriere: ''
     });
     setResponsabiliSelectati([]);
     setTimpTotalOre(0);
   };
 
-  // ADĂUGAT: Calculează timpul total când se schimbă zilele sau orele
+  // Calculează timpul total când se schimbă zilele sau orele
   useEffect(() => {
     const zile = parseInt(formData.timp_estimat_zile) || 0;
     const ore = parseFloat(formData.timp_estimat_ore) || 0;
     
-    // Validează că zilele sunt întregi
     const zileInput = formData.timp_estimat_zile;
     if (zileInput && zileInput.includes('.')) {
-      // Nu calculează dacă sunt zecimale la zile
       setTimpTotalOre(0);
     } else {
       setTimpTotalOre((zile * 8) + ore);
@@ -141,7 +144,6 @@ export default function SarcinaNouaModal({
   const handleResponsabilSelected = (responsabil: any) => {
     if (!responsabil) return;
 
-    // Verifică dacă responsabilul este deja adăugat
     const existaResponsabil = responsabiliSelectati.find(r => r.uid === responsabil.uid);
     if (existaResponsabil) {
       showToast('Responsabilul este deja adăugat', 'error');
@@ -169,12 +171,18 @@ export default function SarcinaNouaModal({
     );
   };
 
-  // ADĂUGAT: Validări pentru timp estimat
+  // ADĂUGAT: Funcția pentru culoarea progresului
+  const getProgressColor = (procent: number) => {
+    if (procent < 25) return '#e74c3c'; // Roșu
+    if (procent < 75) return '#f39c12'; // Galben/Portocaliu
+    return '#27ae60'; // Verde
+  };
+
+  // Validări pentru timp estimat
   const validateTimpEstimat = () => {
     const zileString = formData.timp_estimat_zile;
     const oreString = formData.timp_estimat_ore;
     
-    // Validare că zilele sunt numere întregi
     if (zileString && zileString.includes('.')) {
       showToast('Zilele trebuie să fie numere întregi (ex: 1, 2, 3), nu zecimale!', 'error');
       return false;
@@ -206,6 +214,18 @@ export default function SarcinaNouaModal({
     return true;
   };
 
+  // ADĂUGAT: Validări pentru progres
+  const validateProgres = () => {
+    const procent = parseInt(formData.progres_procent) || 0;
+    
+    if (procent < 0 || procent > 100) {
+      showToast('Progresul trebuie să fie între 0 și 100 procente', 'error');
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -225,15 +245,17 @@ export default function SarcinaNouaModal({
       return;
     }
 
-    // Verifică dacă există un responsabil principal
     const responsabilPrincipal = responsabiliSelectati.find(r => r.rol_in_sarcina === 'Principal');
     if (!responsabilPrincipal) {
       showToast('Cel puțin un responsabil trebuie să aibă rolul "Principal"', 'error');
       return;
     }
 
-    // ADĂUGAT: Validări timp estimat
     if (!validateTimpEstimat()) {
+      return;
+    }
+
+    if (!validateProgres()) {
       return;
     }
 
@@ -251,9 +273,12 @@ export default function SarcinaNouaModal({
         data_scadenta: formData.data_scadenta || null,
         observatii: formData.observatii.trim() || null,
         created_by: utilizatorCurent.uid,
-        // ADĂUGAT: Timp estimat
+        // Timp estimat
         timp_estimat_zile: parseInt(formData.timp_estimat_zile) || 0,
         timp_estimat_ore: parseFloat(formData.timp_estimat_ore) || 0,
+        // ADĂUGAT: Progres
+        progres_procent: parseInt(formData.progres_procent) || 0,
+        progres_descriere: formData.progres_descriere.trim() || null,
         responsabili: responsabiliSelectati.map(r => ({
           uid: r.uid,
           nume_complet: r.nume_complet,
@@ -261,7 +286,7 @@ export default function SarcinaNouaModal({
         }))
       };
 
-      console.log('Creez sarcină cu timp estimat:', sarcinaData);
+      console.log('Creez sarcină cu progres:', sarcinaData);
 
       const response = await fetch('/api/rapoarte/sarcini', {
         method: 'POST',
@@ -272,7 +297,7 @@ export default function SarcinaNouaModal({
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Sarcină creată cu succes! Timp estimat: ${timpTotalOre.toFixed(1)}h`, 'success');
+        showToast(`Sarcină creată cu succes! Progres: ${formData.progres_procent}%`, 'success');
         onSarcinaAdded();
         resetForm();
       } else {
@@ -287,6 +312,8 @@ export default function SarcinaNouaModal({
   };
 
   if (!isOpen) return null;
+
+  const progresProcent = parseInt(formData.progres_procent) || 0;
 
   return typeof window !== 'undefined' ? createPortal(
     <div style={{
@@ -470,7 +497,127 @@ export default function SarcinaNouaModal({
             </div>
           </div>
 
-          {/* ADĂUGAT: Secțiune Timp Estimat */}
+          {/* ADĂUGAT: Secțiune Progres */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
+              Progres Sarcină
+            </h3>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '120px 1fr', 
+              gap: '1rem',
+              alignItems: 'end',
+              marginBottom: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Progres (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={formData.progres_procent}
+                  onChange={(e) => handleInputChange('progres_procent', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              {/* Bară de progres vizuală */}
+              <div>
+                <div style={{ 
+                  background: '#f8f9fa', 
+                  height: '24px', 
+                  borderRadius: '12px', 
+                  position: 'relative',
+                  border: '1px solid #dee2e6',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    background: `linear-gradient(90deg, ${getProgressColor(progresProcent)} 0%, ${getProgressColor(progresProcent)} 100%)`,
+                    height: '100%',
+                    width: `${progresProcent}%`,
+                    borderRadius: '12px',
+                    transition: 'all 0.3s ease',
+                    position: 'relative'
+                  }}>
+                    {progresProcent > 15 && (
+                      <span style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                      }}>
+                        {progresProcent}%
+                      </span>
+                    )}
+                  </div>
+                  {progresProcent <= 15 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: progresProcent > 5 ? '50%' : '8px',
+                      transform: progresProcent > 5 ? 'translate(-50%, -50%)' : 'translateY(-50%)',
+                      color: '#7f8c8d',
+                      fontSize: '11px',
+                      fontWeight: 'bold'
+                    }}>
+                      {progresProcent}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Descriere progres */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Descriere Progres
+              </label>
+              <textarea
+                value={formData.progres_descriere}
+                onChange={(e) => handleInputChange('progres_descriere', e.target.value)}
+                disabled={loading}
+                placeholder="Descriere detaliată a progresului sarcinii..."
+                rows={2}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div style={{ 
+              fontSize: '12px', 
+              color: '#7f8c8d',
+              background: '#f8f9fa',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #dee2e6',
+              marginTop: '0.5rem'
+            }}>
+              <strong>Coduri culori:</strong> Roșu (&lt;25%) = Început, Galben (25-74%) = În progres, Verde (75%+) = Aproape finalizat
+            </div>
+          </div>
+
+          {/* Timp Estimat */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
               Timp Estimat *
@@ -494,13 +641,11 @@ export default function SarcinaNouaModal({
                   value={formData.timp_estimat_zile}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Blochează introducerea zecimalelor
                     if (!value.includes('.')) {
                       handleInputChange('timp_estimat_zile', value);
                     }
                   }}
                   onKeyPress={(e) => {
-                    // Blochează introducerea punctului/virgulei
                     if (e.key === '.' || e.key === ',') {
                       e.preventDefault();
                     }
@@ -516,16 +661,6 @@ export default function SarcinaNouaModal({
                     fontSize: '14px'
                   }}
                 />
-                {formData.timp_estimat_zile && formData.timp_estimat_zile.includes('.') && (
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#e74c3c', 
-                    marginTop: '0.25rem',
-                    fontWeight: 'bold'
-                  }}>
-                    ⚠️ Zilele trebuie să fie numere întregi (1, 2, 3...), nu zecimale!
-                  </div>
-                )}
               </div>
 
               <div>
@@ -567,18 +702,6 @@ export default function SarcinaNouaModal({
                 </div>
               </div>
             </div>
-
-            <div style={{ 
-              fontSize: '12px', 
-              color: '#7f8c8d',
-              background: '#f8f9fa',
-              padding: '0.75rem',
-              borderRadius: '6px',
-              border: '1px solid #dee2e6'
-            }}>
-              <strong>Explicație:</strong> 1 zi = 8 ore de lucru. Poți combina zile și ore (ex: 2 zile + 4 ore = 20 ore total).
-              Orele suplimentare trebuie să fie sub 8 pentru a nu forma o zi completă.
-            </div>
           </div>
 
           {/* Observații */}
@@ -603,13 +726,12 @@ export default function SarcinaNouaModal({
             />
           </div>
 
-          {/* Responsabili */}
+          {/* Responsabili - PĂSTRAT identic */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
               Responsabili Sarcină *
             </h3>
 
-            {/* Componenta de căutare */}
             <div style={{
               background: '#f8f9fa',
               padding: '1rem',
@@ -628,7 +750,6 @@ export default function SarcinaNouaModal({
               />
             </div>
 
-            {/* Lista responsabili selectați */}
             {responsabiliSelectati.length > 0 && (
               <div>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
@@ -688,7 +809,6 @@ export default function SarcinaNouaModal({
                             cursor: 'pointer',
                             fontSize: '12px'
                           }}
-                          title="Elimină responsabil"
                         >
                           ×
                         </button>

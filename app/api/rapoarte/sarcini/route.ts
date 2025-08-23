@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/sarcini/route.ts
-// DATA: 24.08.2025 16:45 (ora României)
-// MODIFICAT: Corectare data_scadenta cu formatDateLiteral() similar cu TimeTracking
-// PĂSTRATE: Toate funcționalitățile existente + validări timp estimat
+// DATA: 24.08.2025 17:00 (ora României)
+// MODIFICAT: Adăugat funcționalitate progres cu progres_procent și progres_descriere
+// PĂSTRATE: Toate funcționalitățile existente + validări timp estimat + data_scadenta
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,12 +17,12 @@ const bigquery = new BigQuery({
   },
 });
 
-// Helper function pentru escape SQL - PĂSTRAT
+// Helper function pentru escape SQL
 const escapeString = (value: string): string => {
   return value.replace(/'/g, "''");
 };
 
-// Helper pentru formatare DATE BigQuery - ADĂUGAT (preluat din TimeTracking)
+// Helper pentru formatare DATE BigQuery
 const formatDateLiteral = (dateString: string | null): string => {
   if (!dateString || dateString === 'null' || dateString === '' || dateString.trim() === '') {
     return 'NULL';
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const responsabil_uid = searchParams.get('responsabil_uid');
 
-    // Query principal pentru sarcini cu responsabili și timp lucrat
+    // Query principal pentru sarcini cu progres inclus
     let query = `
       SELECT 
         s.id,
@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
         s.timp_estimat_zile,
         s.timp_estimat_ore,
         s.timp_estimat_total_ore,
+        s.progres_procent,
+        s.progres_descriere,
         COALESCE(SUM(t.ore_lucrate), 0) as total_ore_lucrate
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` t 
@@ -93,7 +95,8 @@ export async function GET(request: NextRequest) {
     query += `
       GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.descriere, s.prioritate, 
                s.status, s.data_creare, s.data_scadenta, s.data_finalizare, s.observatii, 
-               s.created_by, s.updated_at, s.timp_estimat_zile, s.timp_estimat_ore, s.timp_estimat_total_ore
+               s.created_by, s.updated_at, s.timp_estimat_zile, s.timp_estimat_ore, s.timp_estimat_total_ore,
+               s.progres_procent, s.progres_descriere
       ORDER BY s.data_creare DESC
     `;
 
@@ -188,7 +191,6 @@ export async function POST(request: NextRequest) {
     const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
     const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-    // Validare că zilele sunt numere întregi
     if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
       return NextResponse.json({ 
         error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
@@ -201,24 +203,36 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validări pentru progres
+    const progresProcent = parseInt(data.progres_procent) || 0;
+    
+    if (progresProcent < 0 || progresProcent > 100) {
+      return NextResponse.json({ 
+        error: 'Progresul trebuie să fie între 0 și 100 procente' 
+      }, { status: 400 });
+    }
+
     // Calculează timpul total în ore
     const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
-    // MODIFICAT: Procesare data_scadenta cu formatDateLiteral() ca TimeTracking
+    // Procesare data_scadenta
     const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
     
-    console.log('Data scadenta procesată:', {
+    console.log('Data scadenta și progres procesate:', {
       original: data.data_scadenta,
-      literal: dataScadentaLiteral
+      literal: dataScadentaLiteral,
+      progres_procent: progresProcent,
+      progres_descriere: data.progres_descriere
     });
 
-    // Inserare sarcină cu timp estimat - MODIFICAT să folosească literal pentru data_scadenta
+    // Inserare sarcină cu progres
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
     const insertSarcinaQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
       (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
-       created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore)
+       created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore,
+       progres_procent, progres_descriere)
       VALUES (
         '${escapeString(sarcinaId)}',
         '${escapeString(data.proiect_id)}',
@@ -234,18 +248,20 @@ export async function POST(request: NextRequest) {
         CURRENT_TIMESTAMP(),
         ${zileEstimate},
         ${oreEstimate},
-        ${timpTotalOre}
+        ${timpTotalOre},
+        ${progresProcent},
+        ${data.progres_descriere ? `'${escapeString(data.progres_descriere)}'` : 'NULL'}
       )
     `;
 
-    console.log('Insert sarcină query cu data_scadenta literal:', insertSarcinaQuery);
+    console.log('Insert sarcină query cu progres:', insertSarcinaQuery);
 
     await bigquery.query({
       query: insertSarcinaQuery,
       location: 'EU',
     });
 
-    // Inserare responsabili - PĂSTRAT identic
+    // Inserare responsabili
     for (const responsabil of data.responsabili) {
       const insertResponsabilQuery = `
         INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
@@ -267,13 +283,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`Sarcină ${sarcinaId} creată cu succes cu data_scadenta: ${dataScadentaLiteral}`);
+    console.log(`Sarcină ${sarcinaId} creată cu progres ${progresProcent}%`);
 
     return NextResponse.json({
       success: true,
       message: 'Sarcină creată cu succes',
       sarcina_id: sarcinaId,
       timp_total_ore: timpTotalOre,
+      progres_procent: progresProcent,
       data_scadenta_salvata: dataScadentaLiteral
     });
 
@@ -298,7 +315,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Construiește query-ul de actualizare dinamic cu literal pentru data_scadenta
+    // Construiește query-ul de actualizare dinamic
     const updateFields: string[] = [];
 
     if (data.titlu !== undefined) {
@@ -316,24 +333,47 @@ export async function PUT(request: NextRequest) {
     if (data.status !== undefined) {
       updateFields.push(`status = '${escapeString(data.status)}'`);
       
-      // Dacă statusul devine "Finalizată", setează data_finalizare
+      // Dacă statusul devine "Finalizată", setează progresul la 100% automat
       if (data.status === 'Finalizată') {
         updateFields.push('data_finalizare = CURRENT_TIMESTAMP()');
+        updateFields.push('progres_procent = 100');
+        // Dacă nu există descriere progres, adaugă una automată
+        if (data.progres_descriere === undefined || !data.progres_descriere) {
+          updateFields.push(`progres_descriere = 'Sarcină finalizată automat'`);
+        }
       }
     }
 
     if (data.data_scadenta !== undefined) {
-      // MODIFICAT: Folosește formatDateLiteral() pentru data_scadenta în PUT
       const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
       updateFields.push(`data_scadenta = ${dataScadentaLiteral}`);
-      console.log('Update data_scadenta:', {
-        original: data.data_scadenta,
-        literal: dataScadentaLiteral
-      });
     }
 
     if (data.observatii !== undefined) {
       updateFields.push(`observatii = ${data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL'}`);
+    }
+
+    // Actualizare progres
+    if (data.progres_procent !== undefined) {
+      const progresProcent = parseInt(data.progres_procent);
+      
+      if (isNaN(progresProcent) || progresProcent < 0 || progresProcent > 100) {
+        return NextResponse.json({ 
+          error: 'Progresul trebuie să fie între 0 și 100 procente' 
+        }, { status: 400 });
+      }
+      
+      updateFields.push(`progres_procent = ${progresProcent}`);
+      
+      // Dacă progresul ajunge la 100%, poate actualiza automat statusul
+      if (progresProcent === 100 && data.status !== 'Finalizată') {
+        updateFields.push(`status = 'Finalizată'`);
+        updateFields.push('data_finalizare = CURRENT_TIMESTAMP()');
+      }
+    }
+
+    if (data.progres_descriere !== undefined) {
+      updateFields.push(`progres_descriere = ${data.progres_descriere ? `'${escapeString(data.progres_descriere)}'` : 'NULL'}`);
     }
 
     // Actualizare timp estimat
@@ -341,7 +381,6 @@ export async function PUT(request: NextRequest) {
       const zileEstimate = parseInt(data.timp_estimat_zile) || 0;
       const oreEstimate = parseFloat(data.timp_estimat_ore) || 0;
 
-      // Validare că zilele sunt numere întregi
       if (!Number.isInteger(zileEstimate) || zileEstimate < 0) {
         return NextResponse.json({ 
           error: 'Zilele estimate trebuie să fie numere întregi pozitive (0, 1, 2, 3...)' 
@@ -375,16 +414,15 @@ export async function PUT(request: NextRequest) {
       WHERE id = '${escapeString(data.id)}'
     `;
 
-    console.log('Update sarcină query:', query);
+    console.log('Update sarcină query cu progres:', query);
 
     await bigquery.query({
       query: query,
       location: 'EU',
     });
 
-    // Actualizează responsabilii dacă sunt specificați - PĂSTRAT identic
+    // Actualizează responsabilii dacă sunt specificați
     if (data.responsabili && Array.isArray(data.responsabili)) {
-      // Șterge responsabilii existenți
       const deleteResponsabiliQuery = `
         DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
         WHERE sarcina_id = '${escapeString(data.id)}'
@@ -395,7 +433,6 @@ export async function PUT(request: NextRequest) {
         location: 'EU',
       });
 
-      // Inserează responsabilii noi
       for (const responsabil of data.responsabili) {
         const insertResponsabilQuery = `
           INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
@@ -454,7 +491,7 @@ export async function DELETE(request: NextRequest) {
       location: 'EU',
     });
 
-    // Șterge înregistrările de timp (opțional - în funcție de business logic)
+    // Șterge înregistrările de timp
     const deleteTimeTrackingQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
       WHERE sarcina_id = '${escapeString(id)}'
