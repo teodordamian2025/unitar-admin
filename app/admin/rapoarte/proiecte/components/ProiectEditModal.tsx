@@ -1249,7 +1249,9 @@ export default function ProiectEditModal({
   if (!isOpen) return null;
 
   // MODIFICAT: Render cu createPortal pentru centrare
-  const modalContent = (
+  if (typeof window === 'undefined') return null;
+
+  return createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -2592,7 +2594,7 @@ export default function ProiectEditModal({
         />
       )}
     </div>
+    </div>,
+    document.body
   );
-
-  return typeof window !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }
