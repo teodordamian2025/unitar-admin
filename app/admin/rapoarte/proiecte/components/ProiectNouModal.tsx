@@ -381,7 +381,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     );
   };
 
-  // NOU: Funcții pentru managementul responsabililor la subproiecte
+// NOU: Funcții pentru managementul responsabililor la subproiecte
   const handleResponsabilSubproiectSelected = (subproiectId: string, responsabil: any) => {
     if (!responsabil) return;
 
