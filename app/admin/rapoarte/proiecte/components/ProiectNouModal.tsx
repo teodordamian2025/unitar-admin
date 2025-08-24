@@ -214,8 +214,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   
   // NOU: State pentru responsabili multipli
   const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
-  // NOU: State pentru responsabili multipli
-  const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
   
   // NOU: State pentru responsabili per subproiect
   const [responsabiliSubproiecte, setResponsabiliSubproiecte] = useState<{[key: string]: ResponsabilSelectat[]}>({});
