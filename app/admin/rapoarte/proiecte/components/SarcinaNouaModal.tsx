@@ -188,7 +188,7 @@ export default function SarcinaNouaModal({
       uid: responsabil.uid,
       nume_complet: responsabil.nume_complet,
       email: responsabil.email,
-      rol_in_sarcina: responsabiliSelectati.length === 0 ? 'Principal' : 'Colaborator'
+      rol_in_sarcina: responsabiliSelectati.length === 0 ? 'Principal' : 'Normal'
     };
 
     setResponsabiliSelectati(prev => [...prev, nouResponsabil]);
@@ -880,8 +880,8 @@ export default function SarcinaNouaModal({
                           }}
                         >
                           <option value="Principal">Principal</option>
-                          <option value="Colaborator">Colaborator</option>
-                          <option value="Observer">Observer</option>
+                          <option value="Normal">Normal</option>
+                          <option value="Observator">Observator</option>
                         </select>
                         
                         <button
