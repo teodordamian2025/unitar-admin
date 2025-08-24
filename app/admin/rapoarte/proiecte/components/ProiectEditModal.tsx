@@ -1,14 +1,13 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectEditModal.tsx
-// DATA: 24.08.2025 22:30 (ora României)
-// IMPLEMENTARE COMPLETĂ: Toate funcționalitățile din ProiectNouModal + încărcare date existente
-// FUNCȚIONALITĂȚI NOI: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery + createPortal
+// DATA: 24.08.2025 23:45 (ora României)
+// CORECTARE: Sintaxă JSX și structură modal corectată
+// FUNCȚIONALITĂȚI PĂSTRATE: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import ClientNouModal from '../../clienti/components/ClientNouModal';
 import ResponsabilSearch from './ResponsabilSearch';
 import SubcontractantSearch from './SubcontractantSearch';
@@ -797,6 +796,7 @@ export default function ProiectEditModal({
       )
     }));
   };
+  
   // PĂSTRAT: Funcții pentru adăugarea/actualizarea subproiectelor cu cursuri BNR LIVE
   const addSubproiecte = async (proiectId: string, dataStart: string | null, dataFinal: string | null) => {
     console.log(`Începe adăugarea subproiectelor pentru ${proiectId}`);
@@ -1248,102 +1248,130 @@ export default function ProiectEditModal({
 
   if (!isOpen) return null;
 
-  // MODIFICAT: Render fără createPortal pentru a evita problemele de sintaxă
+  // CORECTARE: Render direct fără createPortal pentru a evita problemele de sintaxă
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.8)',
-      zIndex: 65000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
+    <>
       <div style={{
-        background: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        maxWidth: '1100px',
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto'
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.8)',
+        zIndex: 65000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem'
       }}>
-        {/* Header */}
         <div style={{
-          padding: '1.5rem',
-          borderBottom: '1px solid #dee2e6',
-          background: '#f8f9fa',
-          borderRadius: '8px 8px 0 0'
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          maxWidth: '1100px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              Editează Proiect (Extins)
-            </h2>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#6c757d'
-              }}
-            >
-              ×
-            </button>
-          </div>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile cu toate funcționalitățile
-            <br/>
-            <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
-              NOU: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery + Centrat corect
-            </span>
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-          {/* Informații de bază */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-            gap: '1rem',
-            marginBottom: '1rem'
+          {/* Header */}
+          <div style={{
+            padding: '1.5rem',
+            borderBottom: '1px solid #dee2e6',
+            background: '#f8f9fa',
+            borderRadius: '8px 8px 0 0'
           }}>
-            <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, color: '#2c3e50' }}>
+                Editează Proiect (Extins)
+              </h2>
+              <button
+                onClick={onClose}
+                disabled={loading}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6c757d'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
+              ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile cu toate funcționalitățile
+              <br/>
+              <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
+                NOU: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery + Centrat corect
+              </span>
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
+            {/* Informații de bază */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  ID Proiect (Nu se poate modifica)
+                </label>
+                <input
+                  type="text"
+                  value={formData.ID_Proiect}
+                  disabled={true}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    background: '#f8f9fa',
+                    color: '#6c757d'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status General
+                </label>
+                <select
+                  value={formData.Status}
+                  onChange={(e) => handleInputChange('Status', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Activ">Activ</option>
+                  <option value="Planificat">Planificat</option>
+                  <option value="Suspendat">Suspendat</option>
+                  <option value="Finalizat">Finalizat</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Denumire proiect */}
+            <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                ID Proiect (Nu se poate modifica)
+                Denumire Proiect *
               </label>
               <input
                 type="text"
-                value={formData.ID_Proiect}
-                disabled={true}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontFamily: 'monospace',
-                  fontWeight: 'bold',
-                  background: '#f8f9fa',
-                  color: '#6c757d'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Status General
-              </label>
-              <select
-                value={formData.Status}
-                onChange={(e) => handleInputChange('Status', e.target.value)}
+                value={formData.Denumire}
+                onChange={(e) => handleInputChange('Denumire', e.target.value)}
                 disabled={loading}
+                placeholder="Numele proiectului"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -1351,741 +1379,170 @@ export default function ProiectEditModal({
                   borderRadius: '6px',
                   fontSize: '14px'
                 }}
-              >
-                <option value="Activ">Activ</option>
-                <option value="Planificat">Planificat</option>
-                <option value="Suspendat">Suspendat</option>
-                <option value="Finalizat">Finalizat</option>
-              </select>
+              />
             </div>
-          </div>
 
-          {/* Denumire proiect */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Denumire Proiect *
-            </label>
-            <input
-              type="text"
-              value={formData.Denumire}
-              onChange={(e) => handleInputChange('Denumire', e.target.value)}
-              disabled={loading}
-              placeholder="Numele proiectului"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-          </div>
-
-          {/* Client cu căutare */}
-          <div style={{ marginBottom: '1rem', position: 'relative' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Client *
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input
-                  type="text"
-                  value={clientSearch}
-                  onChange={(e) => handleClientSearch(e.target.value)}
-                  disabled={loading}
-                  placeholder="Caută client sau scrie numele..."
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
+            {/* Client cu căutare */}
+            <div style={{ marginBottom: '1rem', position: 'relative' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Client *
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={clientSearch}
+                    onChange={(e) => handleClientSearch(e.target.value)}
+                    disabled={loading}
+                    placeholder="Caută client sau scrie numele..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  
+                  {showClientSuggestions && filteredClients.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'white',
+                      border: '1px solid #dee2e6',
+                      borderTop: 'none',
+                      borderRadius: '0 0 6px 6px',
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                      zIndex: 1000,
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
+                      {filteredClients.map(client => (
+                        <div
+                          key={client.id}
+                          onClick={() => selectClient(client)}
+                          style={{
+                            padding: '0.75rem',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f1f2f6',
+                            fontSize: '14px'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = 'white';
+                          }}
+                        >
+                          <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
+                          {client.cui && (
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              CUI: {client.cui}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 
-                {showClientSuggestions && filteredClients.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    background: 'white',
-                    border: '1px solid #dee2e6',
-                    borderTop: 'none',
-                    borderRadius: '0 0 6px 6px',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                    zIndex: 1000,
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}>
-                    {filteredClients.map(client => (
-                      <div
-                        key={client.id}
-                        onClick={() => selectClient(client)}
-                        style={{
-                          padding: '0.75rem',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f1f2f6',
-                          fontSize: '14px'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'white';
-                        }}
-                      >
-                        <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
-                        {client.cui && (
-                          <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                            CUI: {client.cui}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <button
-                type="button"
-                onClick={() => setShowClientModal(true)}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1rem',
-                  background: '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                + Client Nou
-              </button>
-            </div>
-          </div>
-
-          {/* Adresa */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Adresa Proiect
-            </label>
-            <input
-              type="text"
-              value={formData.Adresa}
-              onChange={(e) => handleInputChange('Adresa', e.target.value)}
-              disabled={loading}
-              placeholder="Adresa unde se desfășoară proiectul"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            />
-          </div>
-
-          {/* SECȚIUNE: Valoare și Monedă */}
-          <div style={{ 
-            background: '#f8f9fa',
-            padding: '1rem',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            border: '1px solid #dee2e6'
-          }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-              Valoare Proiect 
-              <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                Cursuri BNR LIVE (Precizie originală - fără rotunjire)
-              </span>
-            </h4>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '1rem'
-            }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Valoare Estimată *
-                </label>
-                <input
-                  type="number"
-                  value={formData.Valoare_Estimata}
-                  onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
-                  disabled={loading}
-                  placeholder="15000"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Monedă
-                </label>
-                <select
-                  value={formData.moneda}
-                  onChange={(e) => handleInputChange('moneda', e.target.value)}
+                <button
+                  type="button"
+                  onClick={() => setShowClientModal(true)}
                   disabled={loading}
                   style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
+                    padding: '0.75rem 1rem',
+                    background: '#27ae60',
+                    color: 'white',
+                    border: 'none',
                     borderRadius: '6px',
-                    fontSize: '14px'
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <option value="RON">RON</option>
-                  <option value="EUR">EUR</option>
-                  <option value="USD">USD</option>
-                  <option value="GBP">GBP</option>
-                </select>
+                  + Client Nou
+                </button>
               </div>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Data Curs
-                </label>
-                <input
-                  type="date"
-                  value={formData.data_curs_valutar}
-                  onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
-                  disabled={loading || formData.moneda === 'RON'}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Echivalent RON
-                </label>
-                <div style={{
+            {/* Adresa */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Adresa Proiect
+              </label>
+              <input
+                type="text"
+                value={formData.Adresa}
+                onChange={(e) => handleInputChange('Adresa', e.target.value)}
+                disabled={loading}
+                placeholder="Adresa unde se desfășoară proiectul"
+                style={{
+                  width: '100%',
                   padding: '0.75rem',
                   border: '1px solid #dee2e6',
                   borderRadius: '6px',
-                  background: '#fff',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: loadingCurs ? '#6c757d' : '#27ae60'
-                }}>
-                  {loadingCurs ? 'Se calculează...' : 
-                   formData.valoare_ron ? `${ensureNumber(formData.valoare_ron, 0).toLocaleString('ro-RO')} RON` : 
-                   '0.00 RON'}
-                </div>
-                {cursValutar && formData.moneda !== 'RON' && (
-                  <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
-                    Curs: 1 {formData.moneda} = {formatWithOriginalPrecision(cursValutar, precizieOriginala)} RON
-                  </div>
-                )}
-              </div>
+                  fontSize: '14px'
+                }}
+              />
             </div>
-          </div>
 
-          {/* SECȚIUNE: Status-uri Multiple */}
-          <div style={{ 
-            background: '#e8f5e8',
-            padding: '1rem',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            border: '1px solid #c3e6cb'
-          }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Status-uri Proiect</h4>
-            
+            {/* SECȚIUNE: Valoare și Monedă */}
             <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '1rem'
+              background: '#f8f9fa',
+              padding: '1rem',
+              borderRadius: '6px',
+              marginBottom: '1rem',
+              border: '1px solid #dee2e6'
             }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Status Predare
-                </label>
-                <select
-                  value={formData.status_predare}
-                  onChange={(e) => handleInputChange('status_predare', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="Nepredat">Nepredat</option>
-                  <option value="Predat">Predat</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Status Contract
-                </label>
-                <select
-                  value={formData.status_contract}
-                  onChange={(e) => handleInputChange('status_contract', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="Nu e cazul">Nu e cazul</option>
-                  <option value="Nesemnat">Nesemnat</option>
-                  <option value="Semnat">Semnat</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Status Facturare
-                </label>
-                <select
-                  value={formData.status_facturare}
-                  onChange={(e) => handleInputChange('status_facturare', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="Nefacturat">Nefacturat</option>
-                  <option value="Facturat">Facturat</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Status Achitare
-                </label>
-                <select
-                  value={formData.status_achitare}
-                  onChange={(e) => handleInputChange('status_achitare', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="Neachitat">Neachitat</option>
-                  <option value="Achitat">Achitat</option>
-                  <option value="Nu e cazul">Nu e cazul</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* SECȚIUNE: Date și Echipa cu responsabili multipli */}
-          <div style={{ 
-            background: '#f0f8ff',
-            padding: '1rem',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            border: '1px solid #cce7ff'
-          }}>
-            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-              Perioada Proiect și Echipa
-              <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
-                Responsabili multipli cu roluri
-              </span>
-            </h4>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '1rem',
-              marginBottom: '1rem'
-            }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Data Început
-                </label>
-                <input
-                  type="date"
-                  value={formData.Data_Start}
-                  onChange={(e) => handleInputChange('Data_Start', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Data Finalizare (estimată)
-                </label>
-                <input
-                  type="date"
-                  value={formData.Data_Final}
-                  onChange={(e) => handleInputChange('Data_Final', e.target.value)}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Secțiunea pentru responsabili multipli */}
-            <div style={{ marginBottom: '1rem' }}>
               <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-                Responsabili Proiect *
+                Valoare Proiect 
                 <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                  Minimum 1 responsabil Principal
+                  Cursuri BNR LIVE (Precizie originală - fără rotunjire)
                 </span>
               </h4>
-
-              <div style={{
-                background: '#f8f9fa',
-                padding: '1rem',
-                borderRadius: '8px',
-                border: '1px solid #dee2e6',
-                marginBottom: '1rem'
+              
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: '1rem'
               }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Adaugă Responsabil
-                </label>
-                <ResponsabilSearch
-                  onResponsabilSelected={handleResponsabilSelect}
-                  showInModal={true}
-                  disabled={loading}
-                  placeholder="Caută și selectează responsabili..."
-                />
-              </div>
-
-              {responsabiliSelectati.length > 0 && (
                 <div>
-                  <h5 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
-                    Responsabili Selectați ({responsabiliSelectati.length})
-                  </h5>
-                  <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    {responsabiliSelectati.map((responsabil) => (
-                      <div
-                        key={responsabil.uid}
-                        style={{
-                          border: '1px solid #27ae60',
-                          borderRadius: '6px',
-                          padding: '0.75rem',
-                          background: 'rgba(39, 174, 96, 0.05)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
-                            {responsabil.nume_complet}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                            {responsabil.email}
-                          </div>
-                        </div>
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                          <select
-                            value={responsabil.rol_in_proiect}
-                            onChange={(e) => updateRolResponsabil(responsabil.uid, e.target.value)}
-                            disabled={loading}
-                            style={{
-                              padding: '0.5rem',
-                              border: '1px solid #dee2e6',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              minWidth: '120px'
-                            }}
-                          >
-                            <option value="Principal">Principal</option>
-                            <option value="Normal">Normal</option>
-                            <option value="Observator">Observator</option>
-                          </select>
-                          
-                          <button
-                            type="button"
-                            onClick={() => removeResponsabil(responsabil.uid)}
-                            disabled={loading}
-                            style={{
-                              background: '#e74c3c',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.5rem',
-                              cursor: 'pointer',
-                              fontSize: '12px'
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {responsabiliSelectati.length === 0 && (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '2rem',
-                  color: '#7f8c8d',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  border: '2px dashed #dee2e6'
-                }}>
-                  <p style={{ margin: 0, fontSize: '14px' }}>
-                    Nu sunt selectați responsabili. Caută și adaugă cel puțin un responsabil.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Informație despre perioada proiectului */}
-            {formData.Data_Start && formData.Data_Final && (
-              <div style={{
-                marginTop: '1rem',
-                padding: '0.75rem',
-                background: '#d4edda',
-                border: '1px solid #c3e6cb',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: '#155724'
-              }}>
-                <strong>Perioada proiect:</strong> {new Date(formData.Data_Start).toLocaleDateString()} → {new Date(formData.Data_Final).toLocaleDateString()}
-                {(() => {
-                  try {
-                    const start = new Date(formData.Data_Start);
-                    const end = new Date(formData.Data_Final);
-                    const diffTime = Math.abs(end.getTime() - start.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return ` (${diffDays} ${diffDays === 1 ? 'zi' : 'zile'})`;
-                  } catch {
-                    return '';
-                  }
-                })()}
-              </div>
-            )}
-          </div>
-
-          {/* Descriere */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Descriere
-            </label>
-            <textarea
-              value={formData.Descriere}
-              onChange={(e) => handleInputChange('Descriere', e.target.value)}
-              disabled={loading}
-              placeholder="Descrierea detaliată a proiectului..."
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                resize: 'vertical'
-              }}
-            />
-          </div>
-
-          {/* SECȚIUNE cheltuieli cu SubcontractantSearch */}
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                Cheltuieli Proiect
-                <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
-                  SubcontractantSearch în loc de nume+CUI
-                </span>
-              </h4>
-              <button
-                type="button"
-                onClick={addCheltuiala}
-                disabled={loading}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#e67e22',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                + Adaugă Cheltuială
-              </button>
-            </div>
-
-            {formData.cheltuieli.filter(c => !c.isDeleted).map((cheltuiala, index) => (
-              <div
-                key={cheltuiala.id}
-                style={{
-                  border: '1px solid #f39c12',
-                  borderRadius: '6px',
-                  padding: '1rem',
-                  marginBottom: '1rem',
-                  background: '#fef9e7',
-                  position: 'relative'
-                }}
-              >
-                {cheltuiala.isExisting && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '3rem',
-                    background: '#f39c12',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: 'bold'
-                  }}>
-                    EXISTENT
-                  </div>
-                )}
-                
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: '0.5rem'
-                }}>
-                  <h5 style={{ margin: 0, color: '#2c3e50' }}>
-                    Cheltuială #{index + 1}
-                  </h5>
-                  <button
-                    type="button"
-                    onClick={() => removeCheltuiala(cheltuiala.id)}
-                    disabled={loading}
-                    style={{
-                      background: '#e74c3c',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.25rem 0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Șterge
-                  </button>
-                </div>
-
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
-                }}>
-                  <select
-                    value={cheltuiala.tip_cheltuiala}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
-                    disabled={loading}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="subcontractant">Subcontractant</option>
-                    <option value="materiale">Materiale</option>
-                    <option value="transport">Transport</option>
-                    <option value="alte">Alte cheltuieli</option>
-                  </select>
-                  
-                  {/* ÎNLOCUIT: Furnizor cu SubcontractantSearch */}
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50' }}>
-                      Furnizor
-                    </label>
-                    <SubcontractantSearch
-                      onSubcontractantSelected={(subcontractant) => handleSubcontractantSelectForCheltuiala(cheltuiala.id, subcontractant)}
-                      onShowAddModal={handleShowSubcontractantModal}
-                      selectedSubcontractant={cheltuiala.subcontractant_nume}
-                      showInModal={true}
-                      disabled={loading}
-                      placeholder="Caută furnizor/subcontractant sau CUI pentru ANAF..."
-                    />
-                  </div>
-                </div>
-
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem'
-                }}>
-                  <input
-                    type="text"
-                    value={cheltuiala.descriere}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
-                    disabled={loading}
-                    placeholder="Descriere cheltuială"
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      gridColumn: 'span 2'
-                    }}
-                  />
-                  
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Valoare Estimată *
+                  </label>
                   <input
                     type="number"
-                    value={cheltuiala.valoare}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
+                    value={formData.Valoare_Estimata}
+                    onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
                     disabled={loading}
-                    placeholder="Valoare"
+                    placeholder="15000"
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
+                      borderRadius: '6px',
                       fontSize: '14px'
                     }}
                   />
-                  
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Monedă
+                  </label>
                   <select
-                    value={cheltuiala.moneda}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
+                    value={formData.moneda}
+                    onChange={(e) => handleInputChange('moneda', e.target.value)}
                     disabled={loading}
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
+                      borderRadius: '6px',
                       fontSize: '14px'
                     }}
                   >
@@ -2096,67 +1553,144 @@ export default function ProiectEditModal({
                   </select>
                 </div>
 
-                {/* Status-uri pentru cheltuială */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-                  gap: '0.5rem'
-                }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Data Curs
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.data_curs_valutar}
+                    onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
+                    disabled={loading || formData.moneda === 'RON'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Echivalent RON
+                  </label>
+                  <div style={{
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    background: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: loadingCurs ? '#6c757d' : '#27ae60'
+                  }}>
+                    {loadingCurs ? 'Se calculează...' : 
+                     formData.valoare_ron ? `${ensureNumber(formData.valoare_ron, 0).toLocaleString('ro-RO')} RON` : 
+                     '0.00 RON'}
+                  </div>
+                  {cursValutar && formData.moneda !== 'RON' && (
+                    <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                      Curs: 1 {formData.moneda} = {formatWithOriginalPrecision(cursValutar, precizieOriginala)} RON
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SECȚIUNE: Status-uri Multiple */}
+            <div style={{ 
+              background: '#e8f5e8',
+              padding: '1rem',
+              borderRadius: '6px',
+              marginBottom: '1rem',
+              border: '1px solid #c3e6cb'
+            }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Status-uri Proiect</h4>
+              
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: '1rem'
+              }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Status Predare
+                  </label>
                   <select
-                    value={cheltuiala.status_predare}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
+                    value={formData.status_predare}
+                    onChange={(e) => handleInputChange('status_predare', e.target.value)}
                     disabled={loading}
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   >
                     <option value="Nepredat">Nepredat</option>
                     <option value="Predat">Predat</option>
                   </select>
-                  
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Status Contract
+                  </label>
                   <select
-                    value={cheltuiala.status_contract}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
+                    value={formData.status_contract}
+                    onChange={(e) => handleInputChange('status_contract', e.target.value)}
                     disabled={loading}
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   >
                     <option value="Nu e cazul">Nu e cazul</option>
                     <option value="Nesemnat">Nesemnat</option>
                     <option value="Semnat">Semnat</option>
                   </select>
-                  
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Status Facturare
+                  </label>
                   <select
-                    value={cheltuiala.status_facturare}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
+                    value={formData.status_facturare}
+                    onChange={(e) => handleInputChange('status_facturare', e.target.value)}
                     disabled={loading}
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   >
                     <option value="Nefacturat">Nefacturat</option>
                     <option value="Facturat">Facturat</option>
                   </select>
-                  
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Status Achitare
+                  </label>
                   <select
-                    value={cheltuiala.status_achitare}
-                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
+                    value={formData.status_achitare}
+                    onChange={(e) => handleInputChange('status_achitare', e.target.value)}
                     disabled={loading}
                     style={{
-                      padding: '0.5rem',
+                      width: '100%',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      fontSize: '14px'
                     }}
                   >
                     <option value="Neachitat">Neachitat</option>
@@ -2165,202 +1699,395 @@ export default function ProiectEditModal({
                   </select>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* SECȚIUNE: Subproiecte */}
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                Subproiecte
-                <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                  Cursuri BNR LIVE (Precizie originală - fără rotunjire)
-                </span>
-              </h4>
-              <button
-                type="button"
-                onClick={addSubproiect}
-                disabled={loading}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#3498db',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                + Adaugă Subproiect
-              </button>
             </div>
 
-            {formData.subproiecte.filter(s => !s.isDeleted).map((subproiect, index) => (
-              <div
-                key={subproiect.id || subproiect.ID_Subproiect}
-                style={{
-                  border: '1px solid #3498db',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  marginBottom: '1rem',
-                  background: '#f8fbff',
-                  position: 'relative'
-                }}
-              >
-                {subproiect.isExisting && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '0.5rem',
-                    right: '3rem',
-                    background: '#3498db',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: 'bold'
-                  }}>
-                    EXISTENT
-                  </div>
-                )}
-                
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: '1rem'
-                }}>
-                  <h5 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
-                    Subproiect #{index + 1}
-                    {subproiect.ID_Subproiect && (
-                      <span style={{ fontSize: '11px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
-                        ({subproiect.ID_Subproiect})
-                      </span>
-                    )}
-                  </h5>
-                  <button
-                    type="button"
-                    onClick={() => removeSubproiect(subproiect.id || subproiect.ID_Subproiect!)}
-                    disabled={loading}
-                    style={{
-                      background: '#e74c3c',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.25rem 0.5rem',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Sterge
-                  </button>
-                </div>
-                
-                {/* Denumire */}
-                <div style={{ marginBottom: '0.75rem' }}>
+            {/* SECȚIUNE: Date și Echipa cu responsabili multipli */}
+            <div style={{ 
+              background: '#f0f8ff',
+              padding: '1rem',
+              borderRadius: '6px',
+              marginBottom: '1rem',
+              border: '1px solid #cce7ff'
+            }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+                Perioada Proiect și Echipa
+                <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
+                  Responsabili multipli cu roluri
+                </span>
+              </h4>
+              
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Data Început
+                  </label>
                   <input
-                    type="text"
-                    value={subproiect.denumire}
-                    onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'denumire', e.target.value)}
+                    type="date"
+                    value={formData.Data_Start}
+                    onChange={(e) => handleInputChange('Data_Start', e.target.value)}
                     disabled={loading}
-                    placeholder="Denumire subproiect *"
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
+                      padding: '0.75rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
+                      borderRadius: '8px',
+                      fontSize: '14px'
                     }}
                   />
                 </div>
 
-                {/* Date Start/Final */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '1fr 1fr', 
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem'
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Data Finalizare (estimată)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.Data_Final}
+                    onChange={(e) => handleInputChange('Data_Final', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Secțiunea pentru responsabili multipli */}
+              <div style={{ marginBottom: '1rem' }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+                  Responsabili Proiect *
+                  <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
+                    Minimum 1 responsabil Principal
+                  </span>
+                </h4>
+
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #dee2e6',
+                  marginBottom: '1rem'
                 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Data Start
-                    </label>
-                    <input
-                      type="date"
-                      value={subproiect.data_start || formData.Data_Start}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_start', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '13px'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Data Final
-                    </label>
-                    <input
-                      type="date"
-                      value={subproiect.data_final || formData.Data_Final}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_final', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '13px'
-                      }}
-                    />
-                  </div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                    Adaugă Responsabil
+                  </label>
+                  <ResponsabilSearch
+                    onResponsabilSelected={handleResponsabilSelect}
+                    showInModal={true}
+                    disabled={loading}
+                    placeholder="Caută și selectează responsabili..."
+                  />
                 </div>
 
-                {/* Valoare + Monedă + Status */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '120px 80px 1fr', 
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem'
-                }}>
+                {responsabiliSelectati.length > 0 && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Valoare
-                    </label>
-                    <input
-                      type="number"
-                      value={subproiect.valoare}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'valoare', e.target.value)}
+                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
+                      Responsabili Selectați ({responsabiliSelectati.length})
+                    </h5>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {responsabiliSelectati.map((responsabil) => (
+                        <div
+                          key={responsabil.uid}
+                          style={{
+                            border: '1px solid #27ae60',
+                            borderRadius: '6px',
+                            padding: '0.75rem',
+                            background: 'rgba(39, 174, 96, 0.05)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                              {responsabil.nume_complet}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                              {responsabil.email}
+                            </div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <select
+                              value={responsabil.rol_in_proiect}
+                              onChange={(e) => updateRolResponsabil(responsabil.uid, e.target.value)}
+                              disabled={loading}
+                              style={{
+                                padding: '0.5rem',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                minWidth: '120px'
+                              }}
+                            >
+                              <option value="Principal">Principal</option>
+                              <option value="Normal">Normal</option>
+                              <option value="Observator">Observator</option>
+                            </select>
+                            
+                            <button
+                              type="button"
+                              onClick={() => removeResponsabil(responsabil.uid)}
+                              disabled={loading}
+                              style={{
+                                background: '#e74c3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '0.5rem',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {responsabiliSelectati.length === 0 && (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '2rem',
+                    color: '#7f8c8d',
+                    background: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '2px dashed #dee2e6'
+                  }}>
+                    <p style={{ margin: 0, fontSize: '14px' }}>
+                      Nu sunt selectați responsabili. Caută și adaugă cel puțin un responsabil.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Informație despre perioada proiectului */}
+              {formData.Data_Start && formData.Data_Final && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: '#d4edda',
+                  border: '1px solid #c3e6cb',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  color: '#155724'
+                }}>
+                  <strong>Perioada proiect:</strong> {new Date(formData.Data_Start).toLocaleDateString()} → {new Date(formData.Data_Final).toLocaleDateString()}
+                  {(() => {
+                    try {
+                      const start = new Date(formData.Data_Start);
+                      const end = new Date(formData.Data_Final);
+                      const diffTime = Math.abs(end.getTime() - start.getTime());
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      return ` (${diffDays} ${diffDays === 1 ? 'zi' : 'zile'})`;
+                    } catch {
+                      return '';
+                    }
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Descriere */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Descriere
+              </label>
+              <textarea
+                value={formData.Descriere}
+                onChange={(e) => handleInputChange('Descriere', e.target.value)}
+                disabled={loading}
+                placeholder="Descrierea detaliată a proiectului..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            {/* SECȚIUNE cheltuieli cu SubcontractantSearch */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                  Cheltuieli Proiect
+                  <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
+                    SubcontractantSearch în loc de nume+CUI
+                  </span>
+                </h4>
+                <button
+                  type="button"
+                  onClick={addCheltuiala}
+                  disabled={loading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#e67e22',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  + Adaugă Cheltuială
+                </button>
+              </div>
+
+              {formData.cheltuieli.filter(c => !c.isDeleted).map((cheltuiala, index) => (
+                <div
+                  key={cheltuiala.id}
+                  style={{
+                    border: '1px solid #f39c12',
+                    borderRadius: '6px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    background: '#fef9e7',
+                    position: 'relative'
+                  }}
+                >
+                  {cheltuiala.isExisting && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '0.5rem',
+                      right: '3rem',
+                      background: '#f39c12',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 'bold'
+                    }}>
+                      EXISTENT
+                    </div>
+                  )}
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <h5 style={{ margin: 0, color: '#2c3e50' }}>
+                      Cheltuială #{index + 1}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => removeCheltuiala(cheltuiala.id)}
                       disabled={loading}
-                      placeholder="0"
                       style={{
-                        width: '100%',
+                        background: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.5rem',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Șterge
+                    </button>
+                  </div>
+
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <select
+                      value={cheltuiala.tip_cheltuiala}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
+                      disabled={loading}
+                      style={{
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '13px'
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="subcontractant">Subcontractant</option>
+                      <option value="materiale">Materiale</option>
+                      <option value="transport">Transport</option>
+                      <option value="alte">Alte cheltuieli</option>
+                    </select>
+                    
+                    {/* ÎNLOCUIT: Furnizor cu SubcontractantSearch */}
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50' }}>
+                        Furnizor
+                      </label>
+                      <SubcontractantSearch
+                        onSubcontractantSelected={(subcontractant) => handleSubcontractantSelectForCheltuiala(cheltuiala.id, subcontractant)}
+                        onShowAddModal={handleShowSubcontractantModal}
+                        selectedSubcontractant={cheltuiala.subcontractant_nume}
+                        showInModal={true}
+                        disabled={loading}
+                        placeholder="Caută furnizor/subcontractant sau CUI pentru ANAF..."
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <input
+                      type="text"
+                      value={cheltuiala.descriere}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
+                      disabled={loading}
+                      placeholder="Descriere cheltuială"
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        gridColumn: 'span 2'
                       }}
                     />
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Monedă
-                    </label>
-                    <select
-                      value={subproiect.moneda}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'moneda', e.target.value)}
+                    
+                    <input
+                      type="number"
+                      value={cheltuiala.valoare}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
                       disabled={loading}
+                      placeholder="Valoare"
                       style={{
-                        width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '13px'
+                        fontSize: '14px'
+                      }}
+                    />
+                    
+                    <select
+                      value={cheltuiala.moneda}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
+                      disabled={loading}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '14px'
                       }}
                     >
                       <option value="RON">RON</option>
@@ -2369,175 +2096,432 @@ export default function ProiectEditModal({
                       <option value="GBP">GBP</option>
                     </select>
                   </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Status
-                    </label>
+
+                  {/* Status-uri pentru cheltuială */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                    gap: '0.5rem'
+                  }}>
                     <select
-                      value={subproiect.status}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'status', e.target.value)}
+                      value={cheltuiala.status_predare}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
                       disabled={loading}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <option value="Nepredat">Nepredat</option>
+                      <option value="Predat">Predat</option>
+                    </select>
+                    
+                    <select
+                      value={cheltuiala.status_contract}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
+                      disabled={loading}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <option value="Nu e cazul">Nu e cazul</option>
+                      <option value="Nesemnat">Nesemnat</option>
+                      <option value="Semnat">Semnat</option>
+                    </select>
+                    
+                    <select
+                      value={cheltuiala.status_facturare}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
+                      disabled={loading}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <option value="Nefacturat">Nefacturat</option>
+                      <option value="Facturat">Facturat</option>
+                    </select>
+                    
+                    <select
+                      value={cheltuiala.status_achitare}
+                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
+                      disabled={loading}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <option value="Neachitat">Neachitat</option>
+                      <option value="Achitat">Achitat</option>
+                      <option value="Nu e cazul">Nu e cazul</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* SECȚIUNE: Subproiecte */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                  Subproiecte
+                  <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
+                    Cursuri BNR LIVE (Precizie originală - fără rotunjire)
+                  </span>
+                </h4>
+                <button
+                  type="button"
+                  onClick={addSubproiect}
+                  disabled={loading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  + Adaugă Subproiect
+                </button>
+              </div>
+
+              {formData.subproiecte.filter(s => !s.isDeleted).map((subproiect, index) => (
+                <div
+                  key={subproiect.id || subproiect.ID_Subproiect}
+                  style={{
+                    border: '1px solid #3498db',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem',
+                    background: '#f8fbff',
+                    position: 'relative'
+                  }}
+                >
+                  {subproiect.isExisting && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '0.5rem',
+                      right: '3rem',
+                      background: '#3498db',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 'bold'
+                    }}>
+                      EXISTENT
+                    </div>
+                  )}
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '1rem'
+                  }}>
+                    <h5 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
+                      Subproiect #{index + 1}
+                      {subproiect.ID_Subproiect && (
+                        <span style={{ fontSize: '11px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                          ({subproiect.ID_Subproiect})
+                        </span>
+                      )}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => removeSubproiect(subproiect.id || subproiect.ID_Subproiect!)}
+                      disabled={loading}
+                      style={{
+                        background: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.5rem',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Sterge
+                    </button>
+                  </div>
+                  
+                  {/* Denumire */}
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={subproiect.denumire}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'denumire', e.target.value)}
+                      disabled={loading}
+                      placeholder="Denumire subproiect *"
                       style={{
                         width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '13px'
+                        fontSize: '14px',
+                        fontWeight: 'bold'
                       }}
-                    >
-                      <option value="Planificat">Planificat</option>
-                      <option value="Activ">Activ</option>
-                      <option value="Finalizat">Finalizat</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Responsabili - Secțiune compactă */}
-                <div style={{
-                  background: '#f0f8ff',
-                  border: '1px solid #cce7ff',
-                  borderRadius: '6px',
-                  padding: '0.75rem'
-                }}>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                      Responsabili Subproiect
-                    </label>
-                    <ResponsabilSearch
-                      onResponsabilSelected={(responsabil) => handleResponsabilSubproiectSelected(subproiect.id || subproiect.ID_Subproiect!, responsabil)}
-                      showInModal={true}
-                      disabled={loading}
-                      placeholder="Caută responsabili..."
                     />
                   </div>
-                  
-                  {/* Afișare responsabili selectați - Layout compact */}
-                  {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!] && responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length > 0 && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <div style={{ fontSize: '11px', color: '#7f8c8d', marginBottom: '0.25rem' }}>
-                        Responsabili selectați ({responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length}):
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].map((resp) => (
-                          <div
-                            key={resp.uid}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              padding: '0.25rem 0.5rem',
-                              background: 'rgba(39, 174, 96, 0.1)',
-                              border: '1px solid rgba(39, 174, 96, 0.3)',
-                              borderRadius: '12px',
-                              fontSize: '11px'
-                            }}
-                          >
-                            <span style={{ fontWeight: 'bold', color: '#2c3e50', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {resp.nume_complet}
-                            </span>
-                            <select
-                              value={resp.rol_in_subproiect || 'Normal'}
-                              onChange={(e) => updateRolResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid, e.target.value)}
-                              disabled={loading}
+
+                  {/* Date Start/Final */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '1fr 1fr', 
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Data Start
+                      </label>
+                      <input
+                        type="date"
+                        value={subproiect.data_start || formData.Data_Start}
+                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_start', e.target.value)}
+                        disabled={loading}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Data Final
+                      </label>
+                      <input
+                        type="date"
+                        value={subproiect.data_final || formData.Data_Final}
+                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_final', e.target.value)}
+                        disabled={loading}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Valoare + Monedă + Status */}
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: '120px 80px 1fr', 
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Valoare
+                      </label>
+                      <input
+                        type="number"
+                        value={subproiect.valoare}
+                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'valoare', e.target.value)}
+                        disabled={loading}
+                        placeholder="0"
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Monedă
+                      </label>
+                      <select
+                        value={subproiect.moneda}
+                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'moneda', e.target.value)}
+                        disabled={loading}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <option value="RON">RON</option>
+                        <option value="EUR">EUR</option>
+                        <option value="USD">USD</option>
+                        <option value="GBP">GBP</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Status
+                      </label>
+                      <select
+                        value={subproiect.status}
+                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'status', e.target.value)}
+                        disabled={loading}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <option value="Planificat">Planificat</option>
+                        <option value="Activ">Activ</option>
+                        <option value="Finalizat">Finalizat</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Responsabili - Secțiune compactă */}
+                  <div style={{
+                    background: '#f0f8ff',
+                    border: '1px solid #cce7ff',
+                    borderRadius: '6px',
+                    padding: '0.75rem'
+                  }}>
+                    <div style={{ marginBottom: '0.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                        Responsabili Subproiect
+                      </label>
+                      <ResponsabilSearch
+                        onResponsabilSelected={(responsabil) => handleResponsabilSubproiectSelected(subproiect.id || subproiect.ID_Subproiect!, responsabil)}
+                        showInModal={true}
+                        disabled={loading}
+                        placeholder="Caută responsabili..."
+                      />
+                    </div>
+                    
+                    {/* Afișare responsabili selectați - Layout compact */}
+                    {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!] && responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length > 0 && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <div style={{ fontSize: '11px', color: '#7f8c8d', marginBottom: '0.25rem' }}>
+                          Responsabili selectați ({responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length}):
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                          {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].map((resp) => (
+                            <div
+                              key={resp.uid}
                               style={{
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '11px',
-                                borderRadius: '4px',
-                                border: '1px solid #dee2e6',
-                                background: 'white',
-                                minWidth: '85px'
-                              }}
-                            >
-                              <option value="Principal">Principal</option>
-                              <option value="Normal">Normal</option>
-                              <option value="Observator">Observator</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => removeResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid)}
-                              disabled={loading}
-                              style={{
-                                background: '#e74c3c',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '50%',
-                                width: '16px',
-                                height: '16px',
-                                fontSize: '10px',
-                                cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                gap: '0.25rem',
+                                padding: '0.25rem 0.5rem',
+                                background: 'rgba(39, 174, 96, 0.1)',
+                                border: '1px solid rgba(39, 174, 96, 0.3)',
+                                borderRadius: '12px',
+                                fontSize: '11px'
                               }}
                             >
-                              ×
-                            </button>
-                          </div>
-                        ))}
+                              <span style={{ fontWeight: 'bold', color: '#2c3e50', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {resp.nume_complet}
+                              </span>
+                              <select
+                                value={resp.rol_in_subproiect || 'Normal'}
+                                onChange={(e) => updateRolResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid, e.target.value)}
+                                disabled={loading}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '11px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #dee2e6',
+                                  background: 'white',
+                                  minWidth: '85px'
+                                }}
+                              >
+                                <option value="Principal">Principal</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Observator">Observator</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => removeResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid)}
+                                disabled={loading}
+                                style={{
+                                  background: '#e74c3c',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '16px',
+                                  height: '16px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Observații */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Observații
-            </label>
-            <textarea
-              value={formData.Observatii}
-              onChange={(e) => handleInputChange('Observatii', e.target.value)}
-              disabled={loading}
-              placeholder="Observații despre proiect..."
-              rows={2}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px',
-                resize: 'vertical'
-              }}
-            />
-          </div>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            gap: '1rem',
-            paddingTop: '2rem',
-            borderTop: '1px solid #dee2e6',
-            marginTop: '2rem'
-          }}>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: loading ? '#bdc3c7' : '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              {loading ? 'Se șterge...' : 'Șterge Proiect'}
-            </button>
-            
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            {/* Observații */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Observații
+              </label>
+              <textarea
+                value={formData.Observatii}
+                onChange={(e) => handleInputChange('Observatii', e.target.value)}
+                disabled={loading}
+                placeholder="Observații despre proiect..."
+                rows={2}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            {/* Butoanele de acțiune */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              gap: '1rem',
+              paddingTop: '2rem',
+              borderTop: '1px solid #dee2e6',
+              marginTop: '2rem'
+            }}>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleDelete}
                 disabled={loading}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: '#6c757d',
+                  background: loading ? '#bdc3c7' : '#e74c3c',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -2546,28 +2530,47 @@ export default function ProiectEditModal({
                   fontWeight: 'bold'
                 }}
               >
-                Anulează
+                {loading ? 'Se șterge...' : 'Șterge Proiect'}
               </button>
               
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading || responsabiliSelectati.length === 0}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: (loading || responsabiliSelectati.length === 0) ? '#bdc3c7' : '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: (loading || responsabiliSelectati.length === 0) ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                {loading ? 'Se salvează...' : 'Salvează Modificările'}
-              </button>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Anulează
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={loading || responsabiliSelectati.length === 0}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: (loading || responsabiliSelectati.length === 0) ? '#bdc3c7' : '#27ae60',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (loading || responsabiliSelectati.length === 0) ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {loading ? 'Se salvează...' : 'Salvează Modificările'}
+                </button>
+              </div>
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -2591,8 +2594,6 @@ export default function ProiectEditModal({
           onSubcontractantAdded={handleSubcontractantAdded}
         />
       )}
-    </div>
-    </div>,
-    document.body
+    </>
   );
 }
