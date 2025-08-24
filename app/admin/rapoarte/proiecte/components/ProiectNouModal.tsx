@@ -2088,6 +2088,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 </div>
               </div>
             ))}
+          </div>
 
           {/* Observații */}
           <div style={{ marginBottom: '1.5rem' }}>
