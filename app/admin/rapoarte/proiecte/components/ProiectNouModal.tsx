@@ -255,10 +255,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     subproiecte: [] as Array<{
       id: string;
       denumire: string;
-      responsabil: string;
       valoare: string;
       moneda: string;
       status: string;
+      data_start?: string;
+      data_final?: string;
       curs_valutar?: string;
       data_curs_valutar?: string;
       valoare_ron?: string;
