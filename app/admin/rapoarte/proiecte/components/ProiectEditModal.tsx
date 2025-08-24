@@ -1247,10 +1247,9 @@ export default function ProiectEditModal({
   };
 
   if (!isOpen) return null;
-  if (typeof window === 'undefined') return null;
 
-  return createPortal(
-    (
+  // MODIFICAT: Render fără createPortal pentru a evita problemele de sintaxă
+  return (
     <div style={{
       position: 'fixed',
       top: 0,
