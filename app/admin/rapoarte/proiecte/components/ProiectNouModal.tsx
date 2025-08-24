@@ -668,7 +668,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
 // CORECTAT: Calcul conversie valutară pentru cheltuieli
         let cursValutar = 1;
         let valoareRON = ensureNumber(cheltuiala.valoare);
-        const dataCurs = new Date().toISOString().split('T')[0];
+        const dataCurs = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
 
         // Dacă moneda nu este RON, calculează conversia
         if (cheltuiala.moneda !== 'RON') {
@@ -2057,9 +2057,9 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                                 background: 'white'
                               }}
                             >
-                              <option value="Principal">P</option>
-                              <option value="Normal">N</option>
-                              <option value="Observator">O</option>
+                              <option value="Principal">Principal</option>
+                              <option value="Normal">Normal</option>
+                              <option value="Observator">Observator</option>
                             </select>
                             <button
                               type="button"
