@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/sarcini/route.ts
-// DATA: 24.08.2025 21:45 (ora României)
-// MODIFICAT: FIXAT problema duplicate fields în PUT - deduplicare inteligentă
+// DATA: 24.08.2025 22:45 (ora României)
+// MODIFICAT: FIXAT data_finalizare pentru POST + păstrate toate funcționalitățile
 // PĂSTRATE: Toate funcționalitățile existente + validări timp estimat + progres
 // ==================================================================
 
@@ -218,19 +218,24 @@ export async function POST(request: NextRequest) {
     // Procesare data_scadenta
     const dataScadentaLiteral = formatDateLiteral(data.data_scadenta);
     
-    console.log('Data scadenta și progres procesate:', {
-      original: data.data_scadenta,
-      literal: dataScadentaLiteral,
-      progres_procent: progresProcent,
-      progres_descriere: data.progres_descriere
+    // FIXAT: Logică pentru data_finalizare în funcția POST
+    let dataFinalizareLiteral = 'NULL';
+    if (data.status === 'Finalizată' || progresProcent === 100) {
+      dataFinalizareLiteral = 'CURRENT_TIMESTAMP()';
+    }
+    
+    console.log('FIXAT - Data finalizare pentru POST:', {
+      status: data.status,
+      progres: progresProcent,
+      data_finalizare: dataFinalizareLiteral
     });
 
-    // Inserare sarcină cu progres
+    // Inserare sarcină cu progres și data_finalizare FIXAT
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
     const insertSarcinaQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, observatii, 
+      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, data_finalizare, observatii, 
        created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore,
        progres_procent, progres_descriere)
       VALUES (
@@ -242,6 +247,7 @@ export async function POST(request: NextRequest) {
         '${escapeString(data.prioritate)}',
         '${escapeString(data.status)}',
         ${dataScadentaLiteral},
+        ${dataFinalizareLiteral},
         ${data.observatii ? `'${escapeString(data.observatii)}'` : 'NULL'},
         '${escapeString(data.created_by)}',
         CURRENT_TIMESTAMP(),
@@ -254,7 +260,7 @@ export async function POST(request: NextRequest) {
       )
     `;
 
-    console.log('Insert sarcină query cu progres:', insertSarcinaQuery);
+    console.log('FIXAT - Insert sarcină query cu data_finalizare:', insertSarcinaQuery);
 
     await bigquery.query({
       query: insertSarcinaQuery,
@@ -283,7 +289,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`Sarcină ${sarcinaId} creată cu progres ${progresProcent}%`);
+    console.log(`FIXAT - Sarcină ${sarcinaId} creată cu progres ${progresProcent}% și data_finalizare: ${dataFinalizareLiteral}`);
 
     return NextResponse.json({
       success: true,
@@ -291,7 +297,8 @@ export async function POST(request: NextRequest) {
       sarcina_id: sarcinaId,
       timp_total_ore: timpTotalOre,
       progres_procent: progresProcent,
-      data_scadenta_salvata: dataScadentaLiteral
+      data_scadenta_salvata: dataScadentaLiteral,
+      data_finalizare_salvata: dataFinalizareLiteral
     });
 
   } catch (error) {

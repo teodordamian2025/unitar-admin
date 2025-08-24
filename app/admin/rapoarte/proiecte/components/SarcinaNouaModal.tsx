@@ -205,11 +205,41 @@ export default function SarcinaNouaModal({
     );
   };
 
-  // Funcția pentru culoarea progresului
+// FIXAT: Funcția pentru culoarea progresului + formatDate cu timezone România corect
   const getProgressColor = (procent: number) => {
     if (procent < 25) return '#e74c3c'; // Roșu
     if (procent < 75) return '#f39c12'; // Galben/Portocaliu
     return '#27ae60'; // Verde
+  };
+    // FIXAT: Funcție formatDate cu timezone România (dacă este folosită în componentă)
+  const formatDate = (date?: string | { value: string } | any): string => {
+    if (!date) return 'N/A';
+    
+    try {
+      const dateValue = typeof date === 'string' ? date : 
+                      typeof date === 'object' && date.value ? date.value : 
+                      date.toString();
+      
+      const parsedDate = new Date(dateValue);
+      
+      if (isNaN(parsedDate.getTime())) {
+        console.warn('Data invalidă primită:', date);
+        return 'Data invalidă';
+      }
+      
+      // FIXAT: Adăugat timeZone pentru conversie corectă UTC -> România  
+      return parsedDate.toLocaleDateString('ro-RO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Bucharest'  // FIXAT: timezone România (UTC+2/UTC+3)
+      });
+    } catch (error) {
+      console.error('Eroare la formatarea datei:', date, error);
+      return 'Eroare dată';
+    }
   };
   // Validări pentru timp estimat
   const validateTimpEstimat = () => {

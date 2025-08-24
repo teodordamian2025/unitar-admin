@@ -154,7 +154,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const [timeTracking, setTimeTracking] = useState<TimeTracking[]>([]);
   const [showTimeModal, setShowTimeModal] = useState(false);
 
-  // Funcție formatDate compatibilă cu obiectele BigQuery
+// FIXAT: Funcție formatDate compatibilă cu obiectele BigQuery + timezone România corect
   const formatDate = (date?: string | { value: string } | any): string => {
     if (!date) return 'N/A';
     
@@ -170,12 +170,14 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
         return 'Data invalidă';
       }
       
+      // FIXAT: Adăugat timeZone pentru conversie corectă UTC -> România  
       return parsedDate.toLocaleDateString('ro-RO', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        timeZone: 'Europe/Bucharest'  // FIXAT: timezone România (UTC+2/UTC+3)
       });
     } catch (error) {
       console.error('Eroare la formatarea datei:', date, error);
