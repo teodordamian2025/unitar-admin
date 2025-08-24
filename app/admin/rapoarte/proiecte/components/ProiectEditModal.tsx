@@ -1249,7 +1249,7 @@ export default function ProiectEditModal({
   if (!isOpen) return null;
 
   // MODIFICAT: Render cu createPortal pentru centrare
-  return typeof window !== 'undefined' ? createPortal(
+  return typeof window !== 'undefined' ? createPortal((
     <div style={{
       position: 'fixed',
       top: 0,
