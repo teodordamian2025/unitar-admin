@@ -632,7 +632,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           Data_Final: dataFinal,
           moneda: subproiect.moneda || 'RON',
           curs_valutar: cursSubproiect,
-          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar),
+          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar || new Date().toISOString().split('T')[0]),
           valoare_ron: valoareRonSubproiect,
           status_predare: 'Nepredat',
           status_contract: 'Nu e cazul',
@@ -668,7 +668,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
 // CORECTAT: Calcul conversie valutară pentru cheltuieli
         let cursValutar = 1;
         let valoareRON = ensureNumber(cheltuiala.valoare);
-        const dataCurs = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
 
         // Dacă moneda nu este RON, calculează conversia
         if (cheltuiala.moneda !== 'RON') {
@@ -710,7 +709,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           moneda: cheltuiala.moneda,
           // ADĂUGAT: Conversie valutară completă
           curs_valutar: cursValutar,
-          data_curs_valutar: dataCurs,
+          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar || new Date().toISOString().split('T')[0]),
           valoare_ron: valoareRON,
           status_predare: cheltuiala.status_predare,
           status_contract: cheltuiala.status_contract,
@@ -2050,11 +2049,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                               onChange={(e) => updateRolResponsabilSubproiect(subproiect.id, resp.uid, e.target.value)}
                               disabled={loading}
                               style={{
-                                padding: '0.125rem',
-                                fontSize: '10px',
-                                borderRadius: '2px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '11px',
+                                borderRadius: '4px',
                                 border: '1px solid #dee2e6',
-                                background: 'white'
+                                background: 'white',
+                                minWidth: '85px'
                               }}
                             >
                               <option value="Principal">Principal</option>
