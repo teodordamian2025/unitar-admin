@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubcontractantSearch.tsx
-// DATA: 20.08.2025 00:15 (ora României)
-// DESCRIERE: FIX pentru conflictul de nume selectedSubcontractant
+// DATA: 24.08.2025 19:15 (ora României)
+// MODIFICAT: Adăugată salvare automată din ANAF similar cu ANAFClientSearch.tsx
+// PĂSTRATE: Toate funcționalitățile existente de căutare locală și ANAF
 // ==================================================================
 
 'use client';
@@ -39,6 +40,10 @@ interface ANAFResult {
   adresa: string;
   status: string;
   platitorTva: string;
+  judet?: string;
+  oras?: string;
+  codPostal?: string;
+  telefon?: string;
 }
 
 // Toast system cu Z-index compatibil
@@ -102,6 +107,10 @@ export default function SubcontractantSearch({
   const [searchMode, setSearchMode] = useState<'local' | 'anaf'>('local');
   const [loadingAnaf, setLoadingAnaf] = useState(false);
 
+  // NOU: State pentru dialog import automat
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [anafDataForImport, setAnafDataForImport] = useState<ANAFResult | null>(null);
+
   // Încarcă subcontractanți inițiali
   useEffect(() => {
     loadSubcontractanti();
@@ -149,24 +158,45 @@ export default function SubcontractantSearch({
     }
   };
 
+  // MODIFICAT: Căutare în ANAF cu verificare existență în BD
   const searchInANAF = async (cui: string) => {
     if (!cui || cui.trim().length < 6) return;
     
     setLoadingAnaf(true);
     try {
+      // Primul pas: caută în ANAF
       const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cui.trim())}`);
       const result = await response.json();
 
       if (result.success) {
-        setAnafResults([{
+        const anafData: ANAFResult = {
           denumire: result.data.denumire,
           cui: result.data.cui,
           nrRegCom: result.data.nrRegCom,
           adresa: result.data.adresa,
           status: result.data.status,
-          platitorTva: result.data.platitorTva
-        }]);
-        showToast('Găsit în ANAF!', 'success');
+          platitorTva: result.data.platitorTva,
+          judet: result.data.judet,
+          oras: result.data.oras,
+          codPostal: result.data.codPostal,
+          telefon: result.data.telefon
+        };
+
+        // Al doilea pas: verifică dacă există în BD
+        const existingSubcontractant = await checkExistingSubcontractant(anafData.cui);
+        
+        if (existingSubcontractant) {
+          // Există în BD - returnează direct
+          setAnafResults([]);
+          setSubcontractanti([existingSubcontractant]);
+          showToast('Subcontractant găsit în baza de date!', 'success');
+        } else {
+          // Nu există în BD - afișează pentru import
+          setAnafResults([anafData]);
+          setAnafDataForImport(anafData);
+          setShowImportDialog(true);
+          showToast('Găsit în ANAF! Poți să îl imporți automat.', 'info');
+        }
       } else {
         setAnafResults([]);
         showToast('Nu a fost găsit în ANAF', 'info');
@@ -180,10 +210,110 @@ export default function SubcontractantSearch({
     }
   };
 
+  // NOU: Verifică dacă subcontractantul există în BD
+  const checkExistingSubcontractant = async (cui: string): Promise<Subcontractant | null> => {
+    try {
+      const response = await fetch(`/api/rapoarte/subcontractanti?cui=${encodeURIComponent(cui)}&limit=1`);
+      const data = await response.json();
+      
+      if (data.success && data.data && data.data.length > 0) {
+        return data.data[0];
+      }
+      return null;
+    } catch (error) {
+      console.error('Eroare verificare subcontractant existent:', error);
+      return null;
+    }
+  };
+
+  // NOU: Import automat din ANAF în BD
+  const importFromANAF = async (anafData: ANAFResult) => {
+    try {
+      setLoadingAnaf(true);
+      
+      const subcontractantData = {
+        id: `SUB_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        nume: anafData.denumire,
+        tip_client: anafData.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic',
+        cui: anafData.cui,
+        nr_reg_com: anafData.nrRegCom,
+        adresa: anafData.adresa,
+        judet: anafData.judet || '',
+        oras: anafData.oras || '',
+        cod_postal: anafData.codPostal || '',
+        tara: 'Romania',
+        telefon: anafData.telefon || '',
+        email: '',
+        banca: '',
+        iban: '',
+        cnp: null,
+        ci_serie: null,
+        ci_numar: null,
+        ci_eliberata_de: null,
+        ci_eliberata_la: null,
+        data_creare: new Date().toISOString(),
+        data_actualizare: new Date().toISOString(),
+        activ: anafData.status === 'Activ',
+        observatii: `Importat automat din ANAF la ${new Date().toLocaleString('ro-RO')}`,
+        id_factureaza: null,
+        data_ultima_sincronizare: null
+      };
+
+      const response = await fetch('/api/rapoarte/subcontractanti', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subcontractantData)
+      });
+
+      const result = await response.json();
+
+      if (result.success || response.ok) {
+        showToast('Subcontractant importat cu succes din ANAF!', 'success');
+        
+        // Selectează automat subcontractantul importat
+        const newSubcontractant: Subcontractant = {
+          id: subcontractantData.id,
+          nume: subcontractantData.nume,
+          tip_client: subcontractantData.tip_client,
+          cui: subcontractantData.cui,
+          telefon: subcontractantData.telefon,
+          email: subcontractantData.email,
+          activ: true
+        };
+
+        setSelectedItem(newSubcontractant);
+        setSearchTerm(newSubcontractant.nume);
+        setShowImportDialog(false);
+        setAnafResults([]);
+        
+        if (onSubcontractantSelected) {
+          onSubcontractantSelected({
+            id: newSubcontractant.id,
+            nume: newSubcontractant.nume,
+            cui: newSubcontractant.cui,
+            tip_client: newSubcontractant.tip_client,
+            telefon: newSubcontractant.telefon,
+            email: newSubcontractant.email
+          });
+        }
+      } else {
+        console.error('Eroare API:', result);
+        showToast(`Eroare la import: ${result.error || 'Eroare necunoscută'}`, 'error');
+      }
+    } catch (error) {
+      console.error('Eroare la importul din ANAF:', error);
+      showToast('Eroare la importul din ANAF', 'error');
+    } finally {
+      setLoadingAnaf(false);
+    }
+  };
+
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setSelectedItem(null);
     setAnafResults([]);
+    setShowImportDialog(false);
+    setAnafDataForImport(null);
     
     // Detectează dacă este CUI (doar cifre)
     const isCUI = /^\d+$/.test(value.trim()) && value.trim().length >= 6;
@@ -231,22 +361,12 @@ export default function SubcontractantSearch({
     }
   };
 
+  // MODIFICAT: Selectare rezultat ANAF cu opțiune de import automat
   const handleSelectAnafResult = (anafResult: ANAFResult) => {
     setSearchTerm(anafResult.denumire);
     setShowSuggestions(false);
-    
-    if (onSubcontractantSelected) {
-      onSubcontractantSelected({
-        nume: anafResult.denumire,
-        cui: anafResult.cui,
-        nr_reg_com: anafResult.nrRegCom,
-        adresa: anafResult.adresa,
-        tip_client: anafResult.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic',
-        din_anaf: true // Marker pentru a știi că vine din ANAF
-      });
-    }
-    
-    showToast('Date preluate din ANAF. Completează detaliile și salvează.', 'info');
+    setAnafDataForImport(anafResult);
+    setShowImportDialog(true);
   };
 
   const handleFocus = () => {
@@ -257,7 +377,9 @@ export default function SubcontractantSearch({
 
   const handleBlur = () => {
     setTimeout(() => {
-      setShowSuggestions(false);
+      if (!showImportDialog) {
+        setShowSuggestions(false);
+      }
     }, 200);
   };
 
@@ -641,6 +763,115 @@ export default function SubcontractantSearch({
         )}
       </div>
 
+      {/* NOU: Dialog import automat din ANAF */}
+      {showImportDialog && anafDataForImport && (
+        <div style={{
+          marginTop: '0.5rem',
+          background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
+          border: '1px solid rgba(52, 152, 219, 0.3)',
+          borderRadius: '8px',
+          padding: '1rem'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '0.75rem'
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '0.25rem'
+              }}>
+                🏢 {anafDataForImport.denumire}
+              </div>
+              <div style={{
+                fontSize: '12px',
+                color: '#7f8c8d'
+              }}>
+                CUI: {anafDataForImport.cui} • {anafDataForImport.status} • {anafDataForImport.platitorTva === 'Da' ? 'Plătitor TVA' : 'Fără TVA'}
+              </div>
+            </div>
+          </div>
+          
+          <p style={{
+            margin: '0 0 1rem 0',
+            fontSize: '13px',
+            color: '#2c3e50'
+          }}>
+            💡 Subcontractant găsit în ANAF! Vrei să îl imporți automat în baza de date?
+          </p>
+          
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={() => importFromANAF(anafDataForImport)}
+              disabled={loadingAnaf}
+              style={{
+                padding: '0.5rem 1rem',
+                background: loadingAnaf ? '#bdc3c7' : 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: loadingAnaf ? 'not-allowed' : 'pointer',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}
+            >
+              {loadingAnaf ? '⏳ Se importă...' : '✅ Da, importă automat'}
+            </button>
+            
+            <button
+              onClick={() => {
+                setShowImportDialog(false);
+                setAnafDataForImport(null);
+                if (onSubcontractantSelected) {
+                  onSubcontractantSelected({
+                    nume: anafDataForImport.denumire,
+                    cui: anafDataForImport.cui,
+                    tip_client: anafDataForImport.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic',
+                    din_anaf: true
+                  });
+                }
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#f8f9fa',
+                color: '#6c757d',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}
+            >
+              Folosește fără salvare
+            </button>
+            
+            <button
+              onClick={() => {
+                setShowImportDialog(false);
+                setAnafDataForImport(null);
+                setAnafResults([]);
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#f8f9fa',
+                color: '#6c757d',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}
+            >
+              Anulează
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Info despre subcontractantul selectat */}
       {selectedItem && (
         <div style={{
@@ -690,7 +921,7 @@ export default function SubcontractantSearch({
               }}
               title="Șterge selecția"
             >
-              ❌
+              ✖
             </button>
           </div>
         </div>

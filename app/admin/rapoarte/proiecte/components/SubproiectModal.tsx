@@ -1,12 +1,13 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubproiectModal.tsx
-// DATA: 10.08.2025 17:15
-// CORECTAT: TVA implicit 21% în loc de 19% + integrare curs BNR automat
+// DATA: 24.08.2025 21:25 (ora României)
+// MODIFICAT: Responsabili multipli + Opțiuni monedă corectate + Păstrate toate funcționalitățile
 // ==================================================================
 
 'use client';
 
 import React from 'react';
+import ResponsabilSearch from './ResponsabilSearch';
 
 interface SubproiectModalProps {
   proiectParinte: {
@@ -27,6 +28,13 @@ interface SubproiectModalProps {
   onSuccess: () => void;
 }
 
+interface ResponsabilSelectat {
+  uid: string;
+  nume_complet: string;
+  email: string;
+  rol_in_subproiect: string;
+}
+
 // Toast system
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
@@ -39,7 +47,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
     border-radius: 16px;
-    z-index: 60000;
+    z-index: 70000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -72,14 +80,16 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuccess }: SubproiectModalProps) {
+  // State pentru responsabili multipli
+  const [responsabiliSelectati, setResponsabiliSelectati] = React.useState<ResponsabilSelectat[]>([]);
+
   const [formData, setFormData] = React.useState({
     denumire: '',
-    responsabil: '',
     dataStart: new Date().toISOString().split('T')[0],
     dataFinal: '',
     valoareEstimata: '0',
     status: 'Activ',
-    // ✅ NOU: Câmpuri pentru valută
+    // Câmpuri pentru valută - CORECTAT: Opțiuni fără explicații
     moneda: 'RON',
     curs_valutar: 1,
     valoare_ron: 0
@@ -94,7 +104,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     }));
   };
 
-  // ✅ NOU: Funcție pentru preluare curs BNR cu precizie maximă
+  // Funcție pentru preluare curs BNR cu precizie maximă (PĂSTRATĂ identică)
   const getCursBNR = async (moneda: string): Promise<number> => {
     if (moneda === 'RON') return 1;
     
@@ -104,22 +114,21 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       const data = await response.json();
       
       if (data.success) {
-        // ✅ CRUCIAL: Păstrează precizia maximă cu parseFloat
         const cursComplet = typeof data.curs === 'number' ? data.curs : parseFloat(data.curs);
         
-        console.log(`✅ Curs BNR pentru ${moneda} cu precizie maximă:`, {
+        console.log(`Curs BNR pentru ${moneda} cu precizie maximă:`, {
           curs_original: data.curs,
           curs_procesat: cursComplet,
           curs_4_zecimale: cursComplet.toFixed(4),
           sursa: data.source
         });
         
-        showToast(`📊 Curs BNR ${moneda}: ${cursComplet.toFixed(4)} RON (${data.source})`, 'info');
+        showToast(`Curs BNR ${moneda}: ${cursComplet.toFixed(4)} RON (${data.source})`, 'info');
         return cursComplet;
       }
     } catch (error) {
       console.error('Eroare preluare curs BNR:', error);
-      showToast('⚠️ Nu s-a putut prelua cursul BNR. Folosesc curs aproximativ.', 'error');
+      showToast('Nu s-a putut prelua cursul BNR. Folosesc curs aproximativ.', 'error');
     } finally {
       setIsLoadingCurs(false);
     }
@@ -127,14 +136,14 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     // Fallback la cursuri aproximative cu precizie maximă
     const cursuriFallback: { [key: string]: number } = {
       'EUR': 4.9755,
-      'USD': 4.3561, // ✅ Exemplu cu precizie completă
+      'USD': 4.3561,
       'GBP': 5.8585
     };
     
     return cursuriFallback[moneda] || 1;
   };
 
-  // ✅ NOU: Handler pentru schimbare monedă cu precizie maximă
+  // Handler pentru schimbare monedă cu precizie maximă (PĂSTRAT identic)
   const handleMonedaChange = async (moneda: string) => {
     setFormData(prev => ({ ...prev, moneda }));
     
@@ -144,11 +153,11 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       
       setFormData(prev => ({
         ...prev,
-        curs_valutar: cursReal, // ✅ Păstrează precizia completă
+        curs_valutar: cursReal,
         valoare_ron: valoareRON
       }));
       
-      console.log(`💱 Conversie valută ${moneda}:`, {
+      console.log(`Conversie valută ${moneda}:`, {
         valoare_originala: formData.valoareEstimata,
         curs_bnr: cursReal,
         curs_formatat: cursReal.toFixed(4),
@@ -163,7 +172,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     }
   };
 
-  // ✅ NOU: Handler pentru schimbare valoare cu recalculare precisă
+  // Handler pentru schimbare valoare cu recalculare precisă (PĂSTRAT identic)
   const handleValoareChange = async (valoare: string) => {
     setFormData(prev => ({ ...prev, valoareEstimata: valoare }));
     
@@ -175,10 +184,74 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
     }
   };
 
+  // NOU: Handler pentru selectarea responsabilului
+  const handleResponsabilSelected = (responsabil: any) => {
+    if (!responsabil) return;
+
+    const existaResponsabil = responsabiliSelectati.find(r => r.uid === responsabil.uid);
+    if (existaResponsabil) {
+      showToast('Responsabilul este deja adăugat', 'error');
+      return;
+    }
+
+    const nouResponsabil: ResponsabilSelectat = {
+      uid: responsabil.uid,
+      nume_complet: responsabil.nume_complet,
+      email: responsabil.email,
+      rol_in_subproiect: responsabiliSelectati.length === 0 ? 'Principal' : 'Normal'
+    };
+
+    setResponsabiliSelectati(prev => [...prev, nouResponsabil]);
+    showToast(`Responsabil ${responsabil.nume_complet} adăugat`, 'success');
+  };
+
+  // NOU: Funcții pentru managementul responsabililor
+  const removeResponsabil = (uid: string) => {
+    setResponsabiliSelectati(prev => prev.filter(r => r.uid !== uid));
+  };
+
+  const updateRolResponsabil = (uid: string, nouRol: string) => {
+    setResponsabiliSelectati(prev => 
+      prev.map(r => r.uid === uid ? { ...r, rol_in_subproiect: nouRol } : r)
+    );
+  };
+
+  // NOU: Funcție pentru salvarea responsabililor în SubproiecteResponsabili
+  const addResponsabiliSubproiect = async (subproiectId: string) => {
+    if (responsabiliSelectati.length === 0) return;
+
+    try {
+      for (const responsabil of responsabiliSelectati) {
+        const responsabilData = {
+          id: `RESP_SUB_${subproiectId}_${responsabil.uid}_${Date.now()}`,
+          subproiect_id: subproiectId,
+          responsabil_uid: responsabil.uid,
+          responsabil_nume: responsabil.nume_complet,
+          rol_in_subproiect: responsabil.rol_in_subproiect,
+          data_atribuire: new Date().toISOString(),
+          atribuit_de: responsabil.uid // Se poate modifica cu utilizatorul curent
+        };
+
+        const response = await fetch('/api/rapoarte/subproiecte-responsabili', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(responsabilData)
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          console.error(`Eroare la salvarea responsabilului ${responsabil.nume_complet}:`, result.error);
+        }
+      }
+      console.log(`Salvați ${responsabiliSelectati.length} responsabili pentru subproiectul ${subproiectId}`);
+    } catch (error) {
+      console.error('Eroare la salvarea responsabililor subproiect:', error);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       denumire: '',
-      responsabil: '',
       dataStart: new Date().toISOString().split('T')[0],
       dataFinal: '',
       valoareEstimata: '0',
@@ -187,7 +260,8 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       curs_valutar: 1,
       valoare_ron: 0
     });
-    showToast('📋 Formular resetat pentru noul subproiect!', 'info');
+    setResponsabiliSelectati([]); // NOU: Reset responsabili
+    showToast('Formular resetat pentru noul subproiect!', 'info');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -198,42 +272,55 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       return;
     }
 
+    // VALIDARE: Cel puțin un responsabil obligatoriu
+    if (responsabiliSelectati.length === 0) {
+      showToast('Cel puțin un responsabil este obligatoriu', 'error');
+      return;
+    }
+
+    const responsabilPrincipal = responsabiliSelectati.find(r => r.rol_in_subproiect === 'Principal');
+    if (!responsabilPrincipal) {
+      showToast('Cel puțin un responsabil trebuie să aibă rolul "Principal"', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
       const subproiectId = `${proiectParinte.ID_Proiect}_SUB_${Date.now()}`;
       
-      // ✅ Pregătește datele complete cu valută și precizie maximă
+      // Pregătește datele complete cu valută și precizie maximă
       const requestData = {
         ID_Subproiect: subproiectId,
         ID_Proiect: proiectParinte.ID_Proiect,
         Denumire: formData.denumire.trim(),
-        Responsabil: formData.responsabil.trim() || null,
+        // NOU: Responsabil principal pentru compatibilitate
+        Responsabil: responsabilPrincipal.nume_complet,
         Data_Start: formData.dataStart || null,
         Data_Final: formData.dataFinal || null,
         Valoare_Estimata: formData.valoareEstimata ? parseFloat(formData.valoareEstimata) : null,
         Status: formData.status,
         
-        // ✅ Câmpuri multi-valută cu curs real BNR și precizie maximă
+        // Câmpuri multi-valută cu curs real BNR și precizie maximă
         moneda: formData.moneda,
-        curs_valutar: formData.curs_valutar, // ✅ Păstrează precizia completă
+        curs_valutar: formData.curs_valutar,
         data_curs_valutar: new Date().toISOString().split('T')[0],
         valoare_ron: formData.valoare_ron,
         
-        // ✅ CORECTAT: Status-uri multiple cu TVA 21% implicit
+        // Status-uri multiple cu TVA 21% implicit
         status_predare: 'Nepredat',
         status_contract: 'Nu e cazul',
         status_facturare: 'Nefacturat',
         status_achitare: 'Neachitat',
         
-        // ✅ NOU: TVA implicit 21% pentru subproiecte
-        tva_implicit: 21 // ✅ Adăugat pentru consistență
+        // TVA implicit 21% pentru subproiecte
+        tva_implicit: 21
       };
 
-      console.log('📤 Trimitere subproiect cu curs BNR precizie maximă și TVA 21%:', {
+      console.log('Trimitere subproiect cu responsabili multipli:', {
         ...requestData,
-        curs_verificare: formData.curs_valutar.toFixed(4),
-        tva_implicit: 21
+        responsabili_count: responsabiliSelectati.length,
+        responsabil_principal: responsabilPrincipal.nume_complet
       });
 
       const response = await fetch('/api/rapoarte/subproiecte', {
@@ -245,17 +332,26 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       const result = await response.json();
       
       if (result.success) {
+        // SALVARE responsabili în tabela separată
+        if (responsabiliSelectati.length > 0) {
+          await addResponsabiliSubproiect(subproiectId);
+        }
+
         onSuccess();
         resetForm();
-        showToast(`✅ Subproiect adăugat cu succes!${
-          formData.moneda !== 'RON' ? ` (Curs BNR ${formData.moneda}: ${formData.curs_valutar.toFixed(4)})` : ''
-        }\n🎯 TVA implicit: 21%`, 'success');
+        const statusText = formData.moneda !== 'RON' 
+          ? ` (Curs BNR ${formData.moneda}: ${formData.curs_valutar.toFixed(4)})` 
+          : '';
+        showToast(
+          `Subproiect adăugat cu succes cu ${responsabiliSelectati.length} responsabili!${statusText}\nTVA implicit: 21%`, 
+          'success'
+        );
       } else {
-        console.error('❌ Eroare API:', result);
+        console.error('Eroare API:', result);
         showToast(result.error || 'Eroare la adăugarea subproiectului', 'error');
       }
     } catch (error) {
-      console.error('❌ Eroare la adăugarea subproiectului:', error);
+      console.error('Eroare la adăugarea subproiectului:', error);
       showToast('Eroare la adăugarea subproiectului', 'error');
     } finally {
       setIsSubmitting(false);
@@ -279,7 +375,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
       <div style={{
         background: '#ffffff',
         borderRadius: '16px',
-        maxWidth: '700px',
+        maxWidth: '900px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto',
@@ -306,7 +402,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               alignItems: 'center',
               gap: '0.5rem'
             }}>
-              📂 Adaugă Subproiect Nou
+              Adaugă Subproiect Nou
             </h2>
             <p style={{
               fontSize: '14px',
@@ -314,14 +410,14 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               margin: '0.5rem 0 0 0',
               fontWeight: '500'
             }}>
-              🏗️ Proiect părinte: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiectParinte.ID_Proiect}</span>
+              Proiect părinte: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiectParinte.ID_Proiect}</span>
             </p>
             <p style={{
               fontSize: '12px',
               color: '#95a5a6',
               margin: '0.25rem 0 0 0'
             }}>
-              {proiectParinte.Denumire} • 🎯 TVA implicit: 21%
+              {proiectParinte.Denumire} • TVA implicit: 21% • Responsabili multipli
             </p>
           </div>
           <button
@@ -362,7 +458,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               color: '#2c3e50',
               marginBottom: '0.75rem'
             }}>
-              📝 Denumire Subproiect *
+              Denumire Subproiect *
             </label>
             <input
               type="text"
@@ -389,40 +485,6 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
             gap: '1rem'
           }}>
-            {/* Responsabil */}
-            <div style={{
-              background: '#ffffff',
-              padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid #e0e0e0'
-            }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '0.75rem'
-              }}>
-                👤 Responsabil
-              </label>
-              <input
-                type="text"
-                value={formData.responsabil}
-                onChange={(e) => handleInputChange('responsabil', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  background: '#ffffff',
-                  boxSizing: 'border-box'
-                }}
-                placeholder="Numele responsabilului..."
-                disabled={isSubmitting}
-              />
-            </div>
-
             {/* Status */}
             <div style={{
               background: '#ffffff',
@@ -437,7 +499,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 color: '#2c3e50',
                 marginBottom: '0.75rem'
               }}>
-                📊 Status
+                Status
               </label>
               <select
                 value={formData.status}
@@ -453,10 +515,10 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 }}
                 disabled={isSubmitting}
               >
-                <option value="Activ">🟢 Activ</option>
-                <option value="Planificat">📅 Planificat</option>
-                <option value="Suspendat">⏸️ Suspendat</option>
-                <option value="Finalizat">✅ Finalizat</option>
+                <option value="Activ">Activ</option>
+                <option value="Planificat">Planificat</option>
+                <option value="Suspendat">Suspendat</option>
+                <option value="Finalizat">Finalizat</option>
               </select>
             </div>
 
@@ -474,7 +536,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 color: '#2c3e50',
                 marginBottom: '0.75rem'
               }}>
-                📅 Data Început
+                Data Început
               </label>
               <input
                 type="date"
@@ -507,7 +569,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 color: '#2c3e50',
                 marginBottom: '0.75rem'
               }}>
-                🏁 Data Finalizare
+                Data Finalizare
               </label>
               <input
                 type="date"
@@ -527,7 +589,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
             </div>
           </div>
 
-          {/* ✅ NOU: Secțiune Valoare și Valută cu nota TVA 21% */}
+          {/* Secțiune Valoare și Valută cu opțiuni CORECTE */}
           <div style={{
             background: '#e8f8e8',
             padding: '1.5rem',
@@ -540,7 +602,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               color: '#2c3e50',
               marginBottom: '1rem'
             }}>
-              💰 Valoare Estimată și Valută • 🎯 TVA implicit: 21%
+              Valoare Estimată și Valută • TVA implicit: 21%
             </h4>
             
             <div style={{
@@ -580,7 +642,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 />
               </div>
 
-              {/* Moneda */}
+              {/* Moneda - CORECTAT: Opțiuni fără explicații */}
               <div>
                 <label style={{
                   display: 'block',
@@ -648,7 +710,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 fontSize: '13px',
                 color: '#0c5460'
               }}>
-                📊 Curs BNR (precizie maximă): 1 {formData.moneda} = {formData.curs_valutar.toFixed(4)} RON
+                Curs BNR (precizie maximă): 1 {formData.moneda} = {formData.curs_valutar.toFixed(4)} RON
               </div>
             )}
 
@@ -662,11 +724,11 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 fontSize: '13px',
                 color: '#856404'
               }}>
-                ⏳ Se preia cursul BNR cu precizie maximă...
+                Se preia cursul BNR cu precizie maximă...
               </div>
             )}
             
-            {/* ✅ NOU: Notă TVA 21% */}
+            {/* Notă TVA 21% */}
             <div style={{
               marginTop: '1rem',
               padding: '0.75rem',
@@ -676,8 +738,118 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               fontSize: '13px',
               color: '#2d5016'
             }}>
-              🎯 <strong>TVA implicit:</strong> 21% (conform reglementărilor din august 2025)
+              <strong>TVA implicit:</strong> 21% (conform reglementărilor din august 2025)
             </div>
+          </div>
+
+          {/* NOU: Secțiunea pentru responsabili multipli */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
+              Responsabili Subproiect *
+            </h3>
+
+            <div style={{
+              background: '#f8f9fa',
+              padding: '1rem',
+              borderRadius: '8px',
+              border: '1px solid #dee2e6',
+              marginBottom: '1rem'
+            }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Adaugă Responsabil
+              </label>
+              <ResponsabilSearch
+                onResponsabilSelected={handleResponsabilSelected}
+                showInModal={true}
+                disabled={isSubmitting}
+                placeholder="Caută și selectează responsabili..."
+              />
+            </div>
+
+            {responsabiliSelectati.length > 0 && (
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
+                  Responsabili Selectați ({responsabiliSelectati.length})
+                </h4>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  {responsabiliSelectati.map((responsabil) => (
+                    <div
+                      key={responsabil.uid}
+                      style={{
+                        border: '1px solid #27ae60',
+                        borderRadius: '6px',
+                        padding: '0.75rem',
+                        background: 'rgba(39, 174, 96, 0.05)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                          {responsabil.nume_complet}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                          {responsabil.email}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <select
+                          value={responsabil.rol_in_subproiect}
+                          onChange={(e) => updateRolResponsabil(responsabil.uid, e.target.value)}
+                          disabled={isSubmitting}
+                          style={{
+                            padding: '0.5rem',
+                            border: '1px solid #dee2e6',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            minWidth: '120px'
+                          }}
+                        >
+                          <option value="Principal">Principal</option>
+                          <option value="Normal">Normal</option>
+                          <option value="Observator">Observator</option>
+                        </select>
+                        
+                        <button
+                          type="button"
+                          onClick={() => removeResponsabil(responsabil.uid)}
+                          disabled={isSubmitting}
+                          style={{
+                            background: '#e74c3c',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0.5rem',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {responsabiliSelectati.length === 0 && (
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
+                color: '#7f8c8d',
+                background: '#f8f9fa',
+                borderRadius: '8px',
+                border: '2px dashed #dee2e6'
+              }}>
+                <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>👥</div>
+                <p style={{ margin: 0, fontSize: '14px' }}>
+                  Nu sunt selectați responsabili. Caută și adaugă cel puțin un responsabil.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Info despre proiectul părinte */}
@@ -693,7 +865,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
               color: '#2c3e50',
               marginBottom: '1rem'
             }}>
-              🏗️ Informații Proiect Părinte
+              Informații Proiect Părinte
             </h4>
             <div style={{
               display: 'grid',
@@ -762,17 +934,17 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 type="submit"
-                disabled={isSubmitting || !formData.denumire.trim() || isLoadingCurs}
+                disabled={isSubmitting || !formData.denumire.trim() || isLoadingCurs || responsabiliSelectati.length === 0}
                 style={{
-                  background: (isSubmitting || !formData.denumire.trim() || isLoadingCurs) ? 
+                  background: (isSubmitting || !formData.denumire.trim() || isLoadingCurs || responsabiliSelectati.length === 0) ? 
                     '#f8f9fa' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
-                  color: (isSubmitting || !formData.denumire.trim() || isLoadingCurs) ? '#6c757d' : 'white',
+                  color: (isSubmitting || !formData.denumire.trim() || isLoadingCurs || responsabiliSelectati.length === 0) ? '#6c757d' : 'white',
                   border: 'none',
                   borderRadius: '12px',
                   padding: '0.75rem 1.5rem',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: (isSubmitting || !formData.denumire.trim() || isLoadingCurs) ? 'not-allowed' : 'pointer',
+                  cursor: (isSubmitting || !formData.denumire.trim() || isLoadingCurs || responsabiliSelectati.length === 0) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -783,7 +955,7 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
                 ) : isLoadingCurs ? (
                   <>⏳ Se preia cursul...</>
                 ) : (
-                  <>📂 Adaugă Subproiect (TVA 21%)</>
+                  <>📂 Adaugă Subproiect cu Responsabili</>
                 )}
               </button>
               
