@@ -1249,7 +1249,7 @@ export default function ProiectEditModal({
   if (!isOpen) return null;
 
   // MODIFICAT: Render cu createPortal pentru centrare
-  return typeof window !== 'undefined' ? createPortal((
+  const modalContent = (
     <div style={{
       position: 'fixed',
       top: 0,
@@ -2591,7 +2591,8 @@ export default function ProiectEditModal({
           onSubcontractantAdded={handleSubcontractantAdded}
         />
       )}
-    </div>,
-    document.body
-  ) : null;
+    </div>
+  );
+
+  return typeof window !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }
