@@ -374,12 +374,6 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   const removeResponsabil = (uid: string) => {
     setResponsabiliSelectati(prev => prev.filter(r => r.uid !== uid));
   };
-
-  const updateRolResponsabil = (uid: string, nouRol: string) => {
-    setResponsabiliSelectati(prev => 
-      prev.map(r => r.uid === uid ? { ...r, rol_in_proiect: nouRol } : r)
-    );
-  };
   
   const updateRolResponsabil = (uid: string, nouRol: string) => {
     setResponsabiliSelectati(prev => 
