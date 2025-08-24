@@ -214,6 +214,11 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   
   // NOU: State pentru responsabili multipli
   const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
+  // NOU: State pentru responsabili multipli
+  const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
+  
+  // NOU: State pentru responsabili per subproiect
+  const [responsabiliSubproiecte, setResponsabiliSubproiecte] = useState<{[key: string]: ResponsabilSelectat[]}>({});
   
   // State pentru conversii valutare (PĂSTRAT identic)
   const [cursValutar, setCursValutar] = useState<number | null>(null);
@@ -375,6 +380,55 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       prev.map(r => r.uid === uid ? { ...r, rol_in_proiect: nouRol } : r)
     );
   };
+  
+  const updateRolResponsabil = (uid: string, nouRol: string) => {
+    setResponsabiliSelectati(prev => 
+      prev.map(r => r.uid === uid ? { ...r, rol_in_proiect: nouRol } : r)
+    );
+  };
+
+  // NOU: Funcții pentru managementul responsabililor la subproiecte
+  const handleResponsabilSubproiectSelected = (subproiectId: string, responsabil: any) => {
+    if (!responsabil) return;
+
+    const responsabiliActuali = responsabiliSubproiecte[subproiectId] || [];
+    const existaResponsabil = responsabiliActuali.find(r => r.uid === responsabil.uid);
+    
+    if (existaResponsabil) {
+      showToast('Responsabilul este deja adăugat la acest subproiect', 'error');
+      return;
+    }
+
+    const nouResponsabil: ResponsabilSelectat = {
+      uid: responsabil.uid,
+      nume_complet: responsabil.nume_complet,
+      email: responsabil.email,
+      rol_in_proiect: responsabiliActuali.length === 0 ? 'Principal' : 'Normal'
+    };
+
+    setResponsabiliSubproiecte(prev => ({
+      ...prev,
+      [subproiectId]: [...(prev[subproiectId] || []), nouResponsabil]
+    }));
+    
+    showToast(`Responsabil ${responsabil.nume_complet} adăugat la subproiect`, 'success');
+  };
+
+  const removeResponsabilSubproiect = (subproiectId: string, uid: string) => {
+    setResponsabiliSubproiecte(prev => ({
+      ...prev,
+      [subproiectId]: (prev[subproiectId] || []).filter(r => r.uid !== uid)
+    }));
+  };
+
+  const updateRolResponsabilSubproiect = (subproiectId: string, uid: string, nouRol: string) => {
+    setResponsabiliSubproiecte(prev => ({
+      ...prev,
+      [subproiectId]: (prev[subproiectId] || []).map(r => 
+        r.uid === uid ? { ...r, rol_in_proiect: nouRol } : r
+      )
+    }));
+  };
 
   // NOU: Handler pentru selectarea subcontractantului în cheltuieli
   const handleSubcontractantSelectForCheltuiala = (cheltuialaId: string, subcontractant: Subcontractant | null) => {
@@ -444,6 +498,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     });
     setClientSearch('');
     setResponsabiliSelectati([]); // NOU: Reset responsabili
+    setResponsabiliSubproiecte({}); // NOU: Reset responsabili subproiecte
     setCursValutar(null);
     setPrecizieOriginala('');
   };
@@ -568,11 +623,15 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           cursSubproiect = 1;
         }
         
+        // CORECTAT: Responsabil principal din lista de responsabili multipli
+        const responsabiliSubproiect = responsabiliSubproiecte[subproiect.id] || [];
+        const responsabilPrincipal = responsabiliSubproiect.find(r => r.rol_in_proiect === 'Principal');
+        
         const subproiectData = {
           ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
           ID_Proiect: proiectId,
           Denumire: subproiect.denumire,
-          Responsabil: subproiect.responsabil || null,
+          Responsabil: responsabilPrincipal ? responsabilPrincipal.nume_complet : null,
           Status: subproiect.status || 'Planificat',
           Valoare_Estimata: subproiect.valoare ? ensureNumber(subproiect.valoare) : null,
           Data_Start: dataStart,
@@ -608,17 +667,19 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }
   };
 
-  // PĂSTRAT: Funcția pentru adăugarea cheltuielilor
+// CORECTAT: Functia pentru adaugarea cheltuielilor cu mapping corect către API
   const addCheltuieli = async (proiectId: string) => {
     for (const cheltuiala of formData.cheltuieli) {
       try {
+        // CORECTAT: Mapping câmpuri pentru compatibilitate cu API cheltuieli
         const cheltuialaData = {
           id: `${proiectId}_CHE_${cheltuiala.id}`,
           proiect_id: proiectId,
           tip_cheltuiala: cheltuiala.tip_cheltuiala,
-          subcontractant_id: cheltuiala.subcontractant_id,
-          subcontractant_nume: cheltuiala.subcontractant_nume,
-          subcontractant_cui: cheltuiala.subcontractant_cui,
+          // CORECTAT: Mapare subcontractant -> furnizor pentru API
+          furnizor_nume: cheltuiala.subcontractant_nume,
+          furnizor_cui: cheltuiala.subcontractant_cui,
+          furnizor_contact: null, // Nu avem contact în interfață deocamdată
           descriere: cheltuiala.descriere,
           valoare: ensureNumber(cheltuiala.valoare),
           moneda: cheltuiala.moneda,
@@ -636,10 +697,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         
         const result = await response.json();
         if (!result.success) {
-          console.error(`Eroare la adăugarea cheltuielii ${cheltuiala.descriere}:`, result.error);
+          console.error(`Eroare la adÄƒugarea cheltuielii ${cheltuiala.descriere}:`, result.error);
+        } else {
+          console.log(`Cheltuială salvată în ProiecteCheltuieli: ${cheltuiala.descriere}`);
         }
       } catch (error) {
-        console.error(`Eroare la adăugarea cheltuielii ${cheltuiala.descriere}:`, error);
+        console.error(`Eroare la adÄƒugarea cheltuielii ${cheltuiala.descriere}:`, error);
       }
     }
   };
@@ -1792,19 +1855,79 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     }}
                   />
                   
-                  <input
-                    type="text"
-                    value={subproiect.responsabil}
-                    onChange={(e) => updateSubproiect(subproiect.id, 'responsabil', e.target.value)}
-                    disabled={loading}
-                    placeholder="Responsabil"
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      fontSize: '14px'
-                    }}
-                  />
+                  {/* CORECTAT: Responsabili multipli pentru subproiecte */}
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{ marginBottom: '0.5rem' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem', display: 'block' }}>
+                        Responsabili Subproiect
+                      </label>
+                      <ResponsabilSearch
+                        onResponsabilSelected={(responsabil) => handleResponsabilSubproiectSelected(subproiect.id, responsabil)}
+                        showInModal={true}
+                        disabled={loading}
+                        placeholder="Caută responsabili..."
+                      />
+                    </div>
+                    
+                    {/* Afișare responsabili selectați pentru acest subproiect */}
+                    {responsabiliSubproiecte[subproiect.id] && responsabiliSubproiecte[subproiect.id].length > 0 && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        {responsabiliSubproiecte[subproiect.id].map((resp) => (
+                          <div
+                            key={resp.uid}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.25rem 0.5rem',
+                              background: 'rgba(39, 174, 96, 0.1)',
+                              border: '1px solid rgba(39, 174, 96, 0.3)',
+                              borderRadius: '4px',
+                              marginBottom: '0.25rem',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                              {resp.nume_complet}
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              <select
+                                value={resp.rol_in_proiect}
+                                onChange={(e) => updateRolResponsabilSubproiect(subproiect.id, resp.uid, e.target.value)}
+                                disabled={loading}
+                                style={{
+                                  padding: '0.25rem',
+                                  fontSize: '11px',
+                                  borderRadius: '3px',
+                                  border: '1px solid #dee2e6'
+                                }}
+                              >
+                                <option value="Principal">Principal</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Observator">Observator</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => removeResponsabilSubproiect(subproiect.id, resp.uid)}
+                                disabled={loading}
+                                style={{
+                                  background: '#e74c3c',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  padding: '0.25rem',
+                                  fontSize: '10px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   
                   <input
                     type="number"
