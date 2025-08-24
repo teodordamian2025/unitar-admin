@@ -673,7 +673,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         if (cheltuiala.moneda !== 'RON') {
           // Folosește cursul din formData dacă monedele coincid, altfel preiau curs nou
           if (cheltuiala.moneda === formData.moneda && cursValutar && cursValutar > 1) {
-            cursValutar = ensureNumber(cursValutar);
+            cursValutar = ensureNumber(formData.curs_valutar);
           } else {
             // Preluare curs BNR pentru această cheltuială
             try {
@@ -725,12 +725,12 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         
         const result = await response.json();
         if (!result.success) {
-          console.error(`Eroare la adÄƒugarea cheltuielii ${cheltuiala.descriere}:`, result.error);
+          console.error(`Eroare la adaugarea cheltuielii ${cheltuiala.descriere}:`, result.error);
         } else {
           console.log(`Cheltuială salvată în ProiecteCheltuieli: ${cheltuiala.descriere}`);
         }
       } catch (error) {
-        console.error(`Eroare la adÄƒugarea cheltuielii ${cheltuiala.descriere}:`, error);
+        console.error(`Eroare la adaugarea cheltuielii ${cheltuiala.descriere}:`, error);
       }
     }
   };
