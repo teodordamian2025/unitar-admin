@@ -1,6 +1,7 @@
 // ==================================================================
-// CALEA: app/api/rapoarte/subproiecte/route.ts  
-// MODIFICAT: Suport complet pentru multi-valută și status-uri multiple
+// CALEA: app/api/rapoarte/subproiecte/route.ts
+// DATA: 24.08.2025 22:15 (ora României)
+// FIX: data_curs_valutar cu literale SQL ca la Proiecte
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,11 +19,29 @@ const bigquery = new BigQuery({
 const dataset = 'PanouControlUnitar';
 const table = 'Subproiecte';
 
+// ADĂUGAT: Helper functions ca la Proiecte
+const escapeString = (value: string): string => {
+  return value.replace(/'/g, "''");
+};
+
+const formatDateLiteral = (dateString: string | null): string => {
+  if (!dateString || dateString === 'null' || dateString === '') {
+    return 'NULL';
+  }
+  
+  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoDateRegex.test(dateString)) {
+    return `DATE('${dateString}')`;
+  }
+  
+  console.warn('Data nu este în format ISO YYYY-MM-DD:', dateString);
+  return 'NULL';
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // ✅ Query extins cu câmpurile noi
     let query = `
       SELECT 
         s.*,
@@ -38,7 +57,7 @@ export async function GET(request: NextRequest) {
     const params: any = {};
     const types: any = {};
 
-    // Filtre
+    // Filtre existente - PĂSTRATE
     const search = searchParams.get('search');
     if (search) {
       conditions.push(`(
@@ -65,16 +84,13 @@ export async function GET(request: NextRequest) {
       types.proiectId = 'STRING';
     }
 
-    // Adaugă condiții la query
     if (conditions.length > 0) {
       query += ' AND ' + conditions.join(' AND ');
     }
 
-    // Sortare
     query += ' ORDER BY s.ID_Proiect, s.Data_Start DESC';
 
     console.log('Executing subproiecte query:', query);
-    console.log('With params:', params);
 
     const [rows] = await bigquery.query({
       query: query,
@@ -115,7 +131,6 @@ export async function POST(request: NextRequest) {
       Data_Final, 
       Status = 'Activ', 
       Valoare_Estimata,
-      // ✅ NOUĂ: Câmpuri multi-valută și status-uri
       moneda = 'RON',
       curs_valutar,
       data_curs_valutar,
@@ -134,75 +149,61 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ Query complet cu toate câmpurile noi
+    // FIX PRINCIPAL: Debug date primite
+    console.log('=== DEBUG SUBPROIECTE: Date primite ===');
+    console.log('Data_Start primit:', Data_Start);
+    console.log('Data_Final primit:', Data_Final);
+    console.log('data_curs_valutar primit:', data_curs_valutar);
+
+    // FIX PRINCIPAL: Formatare DATE literale ca la Proiecte
+    const dataStartFormatted = formatDateLiteral(Data_Start);
+    const dataFinalFormatted = formatDateLiteral(Data_Final);
+    const dataCursFormatted = formatDateLiteral(data_curs_valutar);
+
+    console.log('=== DEBUG SUBPROIECTE: Date formatate pentru BigQuery ===');
+    console.log('Data_Start formatată:', dataStartFormatted);
+    console.log('Data_Final formatată:', dataFinalFormatted);
+    console.log('data_curs_valutar formatată:', dataCursFormatted);
+
+    // FIX PRINCIPAL: Query cu DATE literale în loc de parameters
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, 
        Status, Valoare_Estimata, activ, data_creare,
        moneda, curs_valutar, data_curs_valutar, valoare_ron,
        status_predare, status_contract, status_facturare, status_achitare)
-      VALUES (@ID_Subproiect, @ID_Proiect, @Denumire, @Responsabil, @Data_Start, 
-              @Data_Final, @Status, @Valoare_Estimata, @activ, @data_creare,
-              @moneda, @curs_valutar, @data_curs_valutar, @valoare_ron,
-              @status_predare, @status_contract, @status_facturare, @status_achitare)
+      VALUES (
+        '${escapeString(ID_Subproiect)}',
+        '${escapeString(ID_Proiect)}',
+        '${escapeString(Denumire)}',
+        ${Responsabil ? `'${escapeString(Responsabil)}'` : 'NULL'},
+        ${dataStartFormatted},
+        ${dataFinalFormatted},
+        '${escapeString(Status)}',
+        ${Valoare_Estimata || 'NULL'},
+        true,
+        CURRENT_TIMESTAMP(),
+        '${escapeString(moneda)}',
+        ${curs_valutar || 'NULL'},
+        ${dataCursFormatted},
+        ${valoare_ron || 'NULL'},
+        '${escapeString(status_predare)}',
+        '${escapeString(status_contract)}',
+        '${escapeString(status_facturare)}',
+        '${escapeString(status_achitare)}'
+      )
     `;
 
-    // ✅ Params cu toate câmpurile
-    const params = {
-      ID_Subproiect: ID_Subproiect,
-      ID_Proiect: ID_Proiect,
-      Denumire: Denumire,
-      Responsabil: Responsabil || null,
-      Data_Start: Data_Start || null,
-      Data_Final: Data_Final || null,
-      Status: Status,
-      Valoare_Estimata: Valoare_Estimata || null,
-      activ: true,
-      data_creare: new Date().toISOString(),
-      // Câmpuri multi-valută
-      moneda: moneda,
-      curs_valutar: curs_valutar || null,
-      data_curs_valutar: data_curs_valutar || null,
-      valoare_ron: valoare_ron || null,
-      // Status-uri multiple
-      status_predare: status_predare,
-      status_contract: status_contract,
-      status_facturare: status_facturare,
-      status_achitare: status_achitare
-    };
+    console.log('=== DEBUG SUBPROIECTE: Query INSERT final ===');
+    console.log(insertQuery);
 
-    // ✅ Types pentru toate câmpurile
-    const types = {
-      ID_Subproiect: 'STRING',
-      ID_Proiect: 'STRING',
-      Denumire: 'STRING',
-      Responsabil: 'STRING',
-      Data_Start: 'DATE',
-      Data_Final: 'DATE',
-      Status: 'STRING',
-      Valoare_Estimata: 'NUMERIC',
-      activ: 'BOOL',
-      data_creare: 'TIMESTAMP',
-      moneda: 'STRING',
-      curs_valutar: 'NUMERIC',
-      data_curs_valutar: 'DATE',
-      valoare_ron: 'NUMERIC',
-      status_predare: 'STRING',
-      status_contract: 'STRING',
-      status_facturare: 'STRING',
-      status_achitare: 'STRING'
-    };
-
-    console.log('Insert subproiect params:', params);
-
+    // Executare query fără parameters pentru DATE fields
     await bigquery.query({
       query: insertQuery,
-      params: params,
-      types: types,
       location: 'EU',
     });
 
-    console.log(`✅ Subproiect ${ID_Subproiect} adăugat cu succes pentru proiectul ${ID_Proiect}`);
+    console.log(`✅ Subproiect ${ID_Subproiect} adăugat cu succes pentru proiectul ${ID_Proiect} cu data_curs_valutar: ${dataCursFormatted}`);
 
     return NextResponse.json({
       success: true,
@@ -211,7 +212,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Eroare la adăugarea subproiectului:', error);
+    console.error('=== EROARE BACKEND la adăugarea subproiectului ===');
+    console.error('Error details:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
     return NextResponse.json({ 
       success: false,
       error: 'Eroare la adăugarea subproiectului',
@@ -232,34 +236,34 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Construire query UPDATE dinamic
-    const updateFields: string[] = [];
-    const params: any = { id };
-    const types: any = { id: 'STRING' };
+    console.log('=== DEBUG PUT SUBPROIECTE: Date primite pentru actualizare ===');
+    console.log('ID:', id);
+    console.log('Update data:', updateData);
 
-    // ✅ ACTUALIZAT: Mapping extins pentru toate câmpurile
-    const fieldTypes: { [key: string]: string } = {
-      'Denumire': 'STRING',
-      'Responsabil': 'STRING',
-      'Data_Start': 'DATE',
-      'Data_Final': 'DATE',
-      'Status': 'STRING',
-      'Valoare_Estimata': 'NUMERIC',
-      'moneda': 'STRING',
-      'curs_valutar': 'NUMERIC',
-      'data_curs_valutar': 'DATE',
-      'valoare_ron': 'NUMERIC',
-      'status_predare': 'STRING',
-      'status_contract': 'STRING',
-      'status_facturare': 'STRING',
-      'status_achitare': 'STRING'
-    };
+    // FIX: Construire query UPDATE cu DATE literale
+    const updateFields: string[] = [];
+
+    const allowedFields = [
+      'Denumire', 'Responsabil', 'Data_Start', 'Data_Final', 'Status', 'Valoare_Estimata',
+      'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
+      'status_predare', 'status_contract', 'status_facturare', 'status_achitare'
+    ];
 
     Object.entries(updateData).forEach(([key, value]) => {
-      if (value !== undefined && key !== 'id' && fieldTypes[key]) {
-        updateFields.push(`${key} = @${key}`);
-        params[key] = value || null;
-        types[key] = fieldTypes[key];
+      if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
+        // FIX: Tratament special pentru câmpurile DATE
+        if (['Data_Start', 'Data_Final', 'data_curs_valutar'].includes(key)) {
+          const formattedDate = formatDateLiteral(value as string);
+          updateFields.push(`${key} = ${formattedDate}`);
+        } else if (value === null || value === '') {
+          updateFields.push(`${key} = NULL`);
+        } else if (typeof value === 'string') {
+          updateFields.push(`${key} = '${escapeString(value)}'`);
+        } else if (typeof value === 'number') {
+          updateFields.push(`${key} = ${value}`);
+        } else {
+          updateFields.push(`${key} = '${escapeString(value.toString())}'`);
+        }
       }
     });
 
@@ -270,25 +274,24 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Adăugat data_actualizare la UPDATE
-    updateFields.push('data_actualizare = @data_actualizare');
-    params.data_actualizare = new Date().toISOString();
-    types.data_actualizare = 'TIMESTAMP';
+    // Adaugă data_actualizare
+    updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(', ')}
-      WHERE ID_Subproiect = @id
+      WHERE ID_Subproiect = '${escapeString(id)}'
     `;
 
-    console.log('Update subproiect query:', updateQuery);
+    console.log('=== DEBUG PUT SUBPROIECTE: Query UPDATE cu DATE literale ===');
+    console.log(updateQuery);
 
     await bigquery.query({
       query: updateQuery,
-      params: params,
-      types: types,
       location: 'EU',
     });
+
+    console.log('=== DEBUG PUT SUBPROIECTE: Update executat cu succes ===');
 
     return NextResponse.json({
       success: true,
@@ -296,7 +299,9 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Eroare la actualizarea subproiectului:', error);
+    console.error('=== EROARE BACKEND la actualizarea subproiectului ===');
+    console.error('Error details:', error);
+    
     return NextResponse.json({ 
       success: false,
       error: 'Eroare la actualizarea subproiectului',
@@ -320,20 +325,12 @@ export async function DELETE(request: NextRequest) {
     // Soft delete cu câmpul activ
     const deleteQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      SET activ = false, data_actualizare = @data_actualizare
-      WHERE ID_Subproiect = @id
+      SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
+      WHERE ID_Subproiect = '${escapeString(id)}'
     `;
 
     await bigquery.query({
       query: deleteQuery,
-      params: { 
-        id,
-        data_actualizare: new Date().toISOString()
-      },
-      types: { 
-        id: 'STRING',
-        data_actualizare: 'TIMESTAMP'
-      },
       location: 'EU',
     });
 

@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/cheltuieli/route.ts
-// DESCRIERE: API pentru managementul cheltuielilor proiectelor (subcontractanți, materiale, etc.)
+// DATA: 24.08.2025 22:18 (ora României)
+// FIX: data_curs_valutar cu literale SQL ca la Proiecte
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,11 +19,30 @@ const bigquery = new BigQuery({
 const dataset = 'PanouControlUnitar';
 const table = 'ProiecteCheltuieli';
 
+// ADĂUGAT: Helper functions ca la Proiecte
+const escapeString = (value: string): string => {
+  return value.replace(/'/g, "''");
+};
+
+const formatDateLiteral = (dateString: string | null): string => {
+  if (!dateString || dateString === 'null' || dateString === '') {
+    return 'NULL';
+  }
+  
+  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoDateRegex.test(dateString)) {
+    return `DATE('${dateString}')`;
+  }
+  
+  console.warn('Data nu este în format ISO YYYY-MM-DD:', dateString);
+  return 'NULL';
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Construire query cu filtre
+    // Construire query cu filtre - PĂSTRAT identic
     let query = `
       SELECT 
         pc.*,
@@ -41,7 +61,7 @@ export async function GET(request: NextRequest) {
     const params: any = {};
     const types: any = {};
 
-    // Filtre
+    // Filtre existente - PĂSTRATE
     const proiectId = searchParams.get('proiectId');
     if (proiectId) {
       conditions.push('pc.proiect_id = @proiectId');
@@ -95,16 +115,13 @@ export async function GET(request: NextRequest) {
       types.statusAchitare = 'STRING';
     }
 
-    // Adaugă condiții la query
     if (conditions.length > 0) {
       query += ' AND ' + conditions.join(' AND ');
     }
 
-    // Sortare
     query += ' ORDER BY pc.data_creare DESC';
 
     console.log('Executing cheltuieli query:', query);
-    console.log('With params:', params);
 
     const [rows] = await bigquery.query({
       query: query,
@@ -167,6 +184,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // FIX PRINCIPAL: Debug date primite
+    console.log('=== DEBUG CHELTUIELI: Date primite ===');
+    console.log('data_curs_valutar primit:', data_curs_valutar);
+    console.log('data_factura_furnizor primit:', data_factura_furnizor);
+    console.log('data_contract_furnizor primit:', data_contract_furnizor);
+
     // Calculează valoarea în RON dacă nu este deja calculată
     let finalValoareRon = valoare_ron;
     if (moneda !== 'RON' && !valoare_ron && curs_valutar) {
@@ -175,6 +198,17 @@ export async function POST(request: NextRequest) {
       finalValoareRon = parseFloat(valoare);
     }
 
+    // FIX PRINCIPAL: Formatare DATE literale ca la Proiecte
+    const dataCursFormatted = formatDateLiteral(data_curs_valutar);
+    const dataFacturaFormatted = formatDateLiteral(data_factura_furnizor);
+    const dataContractFormatted = formatDateLiteral(data_contract_furnizor);
+
+    console.log('=== DEBUG CHELTUIELI: Date formatate pentru BigQuery ===');
+    console.log('data_curs_valutar formatată:', dataCursFormatted);
+    console.log('data_factura_furnizor formatată:', dataFacturaFormatted);
+    console.log('data_contract_furnizor formatată:', dataContractFormatted);
+
+    // FIX PRINCIPAL: Query cu DATE literale în loc de parameters
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       (id, proiect_id, subproiect_id, tip_cheltuiala, furnizor_nume, furnizor_cui, furnizor_contact,
@@ -182,72 +216,45 @@ export async function POST(request: NextRequest) {
        status_predare, status_contract, status_facturare, status_achitare,
        nr_factura_furnizor, data_factura_furnizor, nr_contract_furnizor, data_contract_furnizor,
        observatii, data_creare, data_actualizare, activ)
-      VALUES 
-      (@id, @proiect_id, @subproiect_id, @tip_cheltuiala, @furnizor_nume, @furnizor_cui, @furnizor_contact,
-       @descriere, @valoare, @moneda, @curs_valutar, @data_curs_valutar, @valoare_ron,
-       @status_predare, @status_contract, @status_facturare, @status_achitare,
-       @nr_factura_furnizor, @data_factura_furnizor, @nr_contract_furnizor, @data_contract_furnizor,
-       @observatii, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true)
+      VALUES (
+        '${escapeString(id)}',
+        '${escapeString(proiect_id)}',
+        ${subproiect_id ? `'${escapeString(subproiect_id)}'` : 'NULL'},
+        '${escapeString(tip_cheltuiala)}',
+        '${escapeString(furnizor_nume)}',
+        ${furnizor_cui ? `'${escapeString(furnizor_cui)}'` : 'NULL'},
+        ${furnizor_contact ? `'${escapeString(furnizor_contact)}'` : 'NULL'},
+        '${escapeString(descriere)}',
+        ${parseFloat(valoare)},
+        '${escapeString(moneda)}',
+        ${curs_valutar ? parseFloat(curs_valutar) : 'NULL'},
+        ${dataCursFormatted},
+        ${finalValoareRon ? parseFloat(finalValoareRon.toString()) : 'NULL'},
+        '${escapeString(status_predare)}',
+        '${escapeString(status_contract)}',
+        '${escapeString(status_facturare)}',
+        '${escapeString(status_achitare)}',
+        ${nr_factura_furnizor ? `'${escapeString(nr_factura_furnizor)}'` : 'NULL'},
+        ${dataFacturaFormatted},
+        ${nr_contract_furnizor ? `'${escapeString(nr_contract_furnizor)}'` : 'NULL'},
+        ${dataContractFormatted},
+        ${observatii ? `'${escapeString(observatii)}'` : 'NULL'},
+        CURRENT_TIMESTAMP(),
+        CURRENT_TIMESTAMP(),
+        true
+      )
     `;
 
-    const params = {
-      id: id,
-      proiect_id: proiect_id,
-      subproiect_id: subproiect_id || null,
-      tip_cheltuiala: tip_cheltuiala,
-      furnizor_nume: furnizor_nume,
-      furnizor_cui: furnizor_cui || null,
-      furnizor_contact: furnizor_contact || null,
-      descriere: descriere,
-      valoare: parseFloat(valoare),
-      moneda: moneda,
-      curs_valutar: curs_valutar ? parseFloat(curs_valutar) : null,
-      data_curs_valutar: data_curs_valutar || null,
-      valoare_ron: finalValoareRon ? parseFloat(finalValoareRon.toString()) : null,
-      status_predare: status_predare,
-      status_contract: status_contract,
-      status_facturare: status_facturare,
-      status_achitare: status_achitare,
-      nr_factura_furnizor: nr_factura_furnizor || null,
-      data_factura_furnizor: data_factura_furnizor || null,
-      nr_contract_furnizor: nr_contract_furnizor || null,
-      data_contract_furnizor: data_contract_furnizor || null,
-      observatii: observatii || null
-    };
+    console.log('=== DEBUG CHELTUIELI: Query INSERT final ===');
+    console.log(insertQuery);
 
-    const types = {
-      id: 'STRING',
-      proiect_id: 'STRING',
-      subproiect_id: 'STRING',
-      tip_cheltuiala: 'STRING',
-      furnizor_nume: 'STRING',
-      furnizor_cui: 'STRING',
-      furnizor_contact: 'STRING',
-      descriere: 'STRING',
-      valoare: 'NUMERIC',
-      moneda: 'STRING',
-      curs_valutar: 'NUMERIC',
-      data_curs_valutar: 'DATE',
-      valoare_ron: 'NUMERIC',
-      status_predare: 'STRING',
-      status_contract: 'STRING',
-      status_facturare: 'STRING',
-      status_achitare: 'STRING',
-      nr_factura_furnizor: 'STRING',
-      data_factura_furnizor: 'DATE',
-      nr_contract_furnizor: 'STRING',
-      data_contract_furnizor: 'DATE',
-      observatii: 'STRING'
-    };
-
-    console.log('Insert cheltuiala params:', params);
-
+    // Executare query fără parameters pentru DATE fields
     await bigquery.query({
       query: insertQuery,
-      params: params,
-      types: types,
       location: 'EU',
     });
+
+    console.log(`✅ Cheltuiala ${id} adăugată cu succes pentru proiectul ${proiect_id} cu data_curs_valutar: ${dataCursFormatted}`);
 
     return NextResponse.json({
       success: true,
@@ -255,7 +262,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Eroare la adăugarea cheltuielii:', error);
+    console.error('=== EROARE BACKEND la adăugarea cheltuielii ===');
+    console.error('Error details:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
     return NextResponse.json({ 
       success: false,
       error: 'Eroare la adăugarea cheltuielii',
@@ -276,12 +286,13 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Construire query UPDATE dinamic
-    const updateFields: string[] = [];
-    const params: any = { id };
-    const types: any = { id: 'STRING' };
+    console.log('=== DEBUG PUT CHELTUIELI: Date primite pentru actualizare ===');
+    console.log('ID:', id);
+    console.log('Update data:', updateData);
 
-    // Câmpuri actualizabile
+    // FIX: Construire query UPDATE cu DATE literale
+    const updateFields: string[] = [];
+
     const allowedFields = [
       'tip_cheltuiala', 'furnizor_nume', 'furnizor_cui', 'furnizor_contact',
       'descriere', 'valoare', 'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
@@ -290,39 +301,23 @@ export async function PUT(request: NextRequest) {
       'observatii'
     ];
 
-    const fieldTypes: { [key: string]: string } = {
-      'tip_cheltuiala': 'STRING',
-      'furnizor_nume': 'STRING',
-      'furnizor_cui': 'STRING',
-      'furnizor_contact': 'STRING',
-      'descriere': 'STRING',
-      'valoare': 'NUMERIC',
-      'moneda': 'STRING',
-      'curs_valutar': 'NUMERIC',
-      'data_curs_valutar': 'DATE',
-      'valoare_ron': 'NUMERIC',
-      'status_predare': 'STRING',
-      'status_contract': 'STRING',
-      'status_facturare': 'STRING',
-      'status_achitare': 'STRING',
-      'nr_factura_furnizor': 'STRING',
-      'data_factura_furnizor': 'DATE',
-      'nr_contract_furnizor': 'STRING',
-      'data_contract_furnizor': 'DATE',
-      'observatii': 'STRING'
-    };
-
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && allowedFields.includes(key)) {
-        updateFields.push(`${key} = @${key}`);
-        
-        if (fieldTypes[key] === 'NUMERIC' && value !== null) {
-          params[key] = parseFloat(value as string);
+        // FIX: Tratament special pentru câmpurile DATE
+        if (['data_curs_valutar', 'data_factura_furnizor', 'data_contract_furnizor'].includes(key)) {
+          const formattedDate = formatDateLiteral(value as string);
+          updateFields.push(`${key} = ${formattedDate}`);
+        } else if (value === null || value === '') {
+          updateFields.push(`${key} = NULL`);
+        } else if (typeof value === 'string') {
+          updateFields.push(`${key} = '${escapeString(value)}'`);
+        } else if (typeof value === 'number') {
+          updateFields.push(`${key} = ${value}`);
+        } else if (key === 'valoare' || key === 'curs_valutar' || key === 'valoare_ron') {
+          updateFields.push(`${key} = ${parseFloat(value as string)}`);
         } else {
-          params[key] = value || null;
+          updateFields.push(`${key} = '${escapeString(value.toString())}'`);
         }
-        
-        types[key] = fieldTypes[key];
       }
     });
 
@@ -339,18 +334,18 @@ export async function PUT(request: NextRequest) {
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(', ')}
-      WHERE id = @id
+      WHERE id = '${escapeString(id)}'
     `;
 
-    console.log('Update cheltuiala query:', updateQuery);
-    console.log('Update cheltuiala params:', params);
+    console.log('=== DEBUG PUT CHELTUIELI: Query UPDATE cu DATE literale ===');
+    console.log(updateQuery);
 
     await bigquery.query({
       query: updateQuery,
-      params: params,
-      types: types,
       location: 'EU',
     });
+
+    console.log('=== DEBUG PUT CHELTUIELI: Update executat cu succes ===');
 
     return NextResponse.json({
       success: true,
@@ -358,7 +353,9 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Eroare la actualizarea cheltuielii:', error);
+    console.error('=== EROARE BACKEND la actualizarea cheltuielii ===');
+    console.error('Error details:', error);
+    
     return NextResponse.json({ 
       success: false,
       error: 'Eroare la actualizarea cheltuielii',
@@ -383,15 +380,15 @@ export async function DELETE(request: NextRequest) {
     const deleteQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
-      WHERE id = @id
+      WHERE id = '${escapeString(id)}'
     `;
 
     await bigquery.query({
       query: deleteQuery,
-      params: { id },
-      types: { id: 'STRING' },
       location: 'EU',
     });
+
+    console.log(`✅ Cheltuială ${id} ștearsă (soft delete)`);
 
     return NextResponse.json({
       success: true,
