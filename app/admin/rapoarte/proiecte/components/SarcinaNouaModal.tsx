@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarcinaNouaModal.tsx
-// DATA: 24.08.2025 17:15 (ora României)
-// MODIFICAT: Adăugat funcționalitate progres cu validări și indicatori vizuali
+// DATA: 24.08.2025 22:30 (ora României)
+// MODIFICAT: FIXAT sincronizarea timp real status/progres în frontend + păstrate toate funcționalitățile
 // PĂSTRATE: Toate funcționalitățile existente cu responsabili multipli și timp estimat
 // ==================================================================
 
@@ -96,7 +96,7 @@ export default function SarcinaNouaModal({
     // Timp estimat
     timp_estimat_zile: '',
     timp_estimat_ore: '',
-    // ADĂUGAT: Progres
+    // Progres cu sincronizare
     progres_procent: '0',
     progres_descriere: ''
   });
@@ -141,6 +141,40 @@ export default function SarcinaNouaModal({
     }));
   };
 
+  // FIXAT: Funcție pentru sincronizarea status/progres în timp real - STATUS
+  const handleStatusChangeNou = (newStatus: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, status: newStatus };
+      
+      // FIXAT: Dacă status devine 'Finalizată', forțează progres la 100%
+      if (newStatus === 'Finalizată') {
+        updated.progres_procent = '100';
+        updated.progres_descriere = updated.progres_descriere || 'Sarcină finalizată manual - progres setat la 100%';
+        showToast('Status finalizat - progresul va fi setat automat la 100%', 'info');
+      }
+      
+      return updated;
+    });
+  };
+
+  // FIXAT: Funcție pentru sincronizarea progres/status în timp real - PROGRES  
+  const handleProgresChangeNou = (newProgres: string) => {
+    const progresNumeric = parseInt(newProgres) || 0;
+    
+    setFormData(prev => {
+      const updated = { ...prev, progres_procent: newProgres };
+      
+      // FIXAT: Dacă progres devine 100%, forțează status la 'Finalizată'
+      if (progresNumeric === 100) {
+        updated.status = 'Finalizată';
+        updated.progres_descriere = updated.progres_descriere || 'Sarcină finalizată automat la 100% progres';
+        showToast('Progres 100% - sarcina va fi marcată automat ca finalizată', 'info');
+      }
+      
+      return updated;
+    });
+  };
+
   const handleResponsabilSelected = (responsabil: any) => {
     if (!responsabil) return;
 
@@ -171,13 +205,12 @@ export default function SarcinaNouaModal({
     );
   };
 
-  // ADĂUGAT: Funcția pentru culoarea progresului
+  // Funcția pentru culoarea progresului
   const getProgressColor = (procent: number) => {
     if (procent < 25) return '#e74c3c'; // Roșu
     if (procent < 75) return '#f39c12'; // Galben/Portocaliu
     return '#27ae60'; // Verde
   };
-
   // Validări pentru timp estimat
   const validateTimpEstimat = () => {
     const zileString = formData.timp_estimat_zile;
@@ -214,7 +247,7 @@ export default function SarcinaNouaModal({
     return true;
   };
 
-  // ADĂUGAT: Validări pentru progres
+  // Validări pentru progres
   const validateProgres = () => {
     const procent = parseInt(formData.progres_procent) || 0;
     
@@ -262,6 +295,7 @@ export default function SarcinaNouaModal({
     setLoading(true);
 
     try {
+      // FIXAT: Payload cu sincronizarea aplicată deja în frontend prin handleStatusChangeNou/handleProgresChangeNou
       const sarcinaData = {
         id: `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         proiect_id: proiect.ID_Proiect,
@@ -269,16 +303,16 @@ export default function SarcinaNouaModal({
         titlu: formData.titlu.trim(),
         descriere: formData.descriere.trim() || null,
         prioritate: formData.prioritate,
+        // FIXAT: Folosim valorile deja sincronizate din formData
         status: formData.status,
+        progres_procent: parseInt(formData.progres_procent) || 0,
+        progres_descriere: formData.progres_descriere.trim() || null,
         data_scadenta: formData.data_scadenta || null,
         observatii: formData.observatii.trim() || null,
         created_by: utilizatorCurent.uid,
         // Timp estimat
         timp_estimat_zile: parseInt(formData.timp_estimat_zile) || 0,
         timp_estimat_ore: parseFloat(formData.timp_estimat_ore) || 0,
-        // ADĂUGAT: Progres
-        progres_procent: parseInt(formData.progres_procent) || 0,
-        progres_descriere: formData.progres_descriere.trim() || null,
         responsabili: responsabiliSelectati.map(r => ({
           uid: r.uid,
           nume_complet: r.nume_complet,
@@ -286,7 +320,7 @@ export default function SarcinaNouaModal({
         }))
       };
 
-      console.log('Creez sarcină cu progres:', sarcinaData);
+      console.log('Creez sarcină cu progres sincronizat:', sarcinaData);
 
       const response = await fetch('/api/rapoarte/sarcini', {
         method: 'POST',
@@ -297,7 +331,9 @@ export default function SarcinaNouaModal({
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Sarcină creată cu succes! Progres: ${formData.progres_procent}%`, 'success');
+        const statusText = formData.status === 'Finalizată' ? ' (FINALIZATĂ)' : '';
+        const progresText = formData.progres_procent === '100' ? ' cu progres 100%' : ` cu progres ${formData.progres_procent}%`;
+        showToast(`Sarcină creată cu succes${statusText}${progresText}!`, 'success');
         onSarcinaAdded();
         resetForm();
       } else {
@@ -314,7 +350,6 @@ export default function SarcinaNouaModal({
   if (!isOpen) return null;
 
   const progresProcent = parseInt(formData.progres_procent) || 0;
-
   return typeof window !== 'undefined' ? createPortal(
     <div style={{
       position: 'fixed',
@@ -423,7 +458,7 @@ export default function SarcinaNouaModal({
               />
             </div>
 
-            {/* Grid pentru prioritate, status, data */}
+            {/* Grid pentru prioritate, status, data cu SINCRONIZARE FIXAT */}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
@@ -457,16 +492,18 @@ export default function SarcinaNouaModal({
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Status
                 </label>
+                {/* FIXAT: Select status cu sincronizare prin handleStatusChangeNou */}
                 <select
                   value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  onChange={(e) => handleStatusChangeNou(e.target.value)}
                   disabled={loading}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: '1px solid #dee2e6',
                     borderRadius: '6px',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    background: formData.status === 'Finalizată' ? '#d4edda' : 'white'
                   }}
                 >
                   <option value="De făcut">De făcut</option>
@@ -495,9 +532,28 @@ export default function SarcinaNouaModal({
                 />
               </div>
             </div>
+
+            {/* FIXAT: Alert pentru sincronizarea automată */}
+            {(progresProcent === 100 || formData.status === 'Finalizată') && (
+              <div style={{
+                background: '#d1ecf1',
+                border: '1px solid #bee5eb',
+                color: '#0c5460',
+                padding: '0.75rem',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                fontSize: '13px'
+              }}>
+                <strong>Sincronizare activă:</strong> {
+                  progresProcent === 100 
+                    ? 'Progres 100% va seta statusul automat la "Finalizată"' 
+                    : 'Status "Finalizată" va seta progresul automat la 100%'
+                }
+              </div>
+            )}
           </div>
 
-          {/* ADĂUGAT: Secțiune Progres */}
+          {/* Secțiune Progres cu SINCRONIZARE FIXAT */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
               Progres Sarcină
@@ -514,25 +570,27 @@ export default function SarcinaNouaModal({
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                   Progres (%)
                 </label>
+                {/* FIXAT: Input progres cu sincronizare prin handleProgresChangeNou */}
                 <input
                   type="number"
                   min="0"
                   max="100"
                   step="1"
                   value={formData.progres_procent}
-                  onChange={(e) => handleInputChange('progres_procent', e.target.value)}
+                  onChange={(e) => handleProgresChangeNou(e.target.value)}
                   disabled={loading}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: '1px solid #dee2e6',
                     borderRadius: '6px',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    background: progresProcent === 100 ? '#d4edda' : 'white'
                   }}
                 />
               </div>
 
-              {/* Bară de progres vizuală */}
+              {/* Bară de progres vizuală cu sincronizare */}
               <div>
                 <div style={{ 
                   background: '#f8f9fa', 
@@ -617,7 +675,7 @@ export default function SarcinaNouaModal({
             </div>
           </div>
 
-          {/* Timp Estimat */}
+          {/* Timp Estimat - PĂSTRAT identic */}
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '1.1rem' }}>
               Timp Estimat *
@@ -704,7 +762,7 @@ export default function SarcinaNouaModal({
             </div>
           </div>
 
-          {/* Observații */}
+          {/* Observații - PĂSTRAT identic */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
               Observații

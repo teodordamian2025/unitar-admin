@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SarciniProiectModal.tsx
-// DATA: 24.08.2025 21:30 (ora României)
-// MODIFICAT: Fixat problema duplicate fields și îmbunătățită logica de actualizare
+// DATA: 24.08.2025 22:15 (ora României)
+// MODIFICAT: FIXAT sincronizarea timp real status/progres în frontend
 // PĂSTRATE: Toate funcționalitățile existente + progres + editare inline
 // ==================================================================
 
@@ -254,7 +254,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
       </div>
     );
   };
-
   useEffect(() => {
     if (isOpen) {
       loadData();
@@ -442,7 +441,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
     }
   };
 
-  // FIXAT: Funcții pentru editare inline cu logică inteligentă
+  // FIXAT: Funcții pentru editare inline cu logică inteligentă și sincronizare timp real
   const startEdit = (sarcina: Sarcina) => {
     setEditingSarcina(sarcina.id);
     setEditData({
@@ -464,6 +463,40 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
   const cancelEdit = () => {
     setEditingSarcina(null);
     setEditData({});
+  };
+
+  // FIXAT: Funcție pentru actualizarea sincronizată status/progres în timp real
+  const handleStatusChange = (newStatus: string) => {
+    setEditData(prev => {
+      const updated = { ...prev, status: newStatus };
+      
+      // FIXAT: Dacă status devine 'Finalizată', forțează progres la 100%
+      if (newStatus === 'Finalizată') {
+        updated.progres_procent = 100;
+        updated.progres_descriere = updated.progres_descriere || 'Sarcină finalizată manual - progres setat la 100%';
+        showToast('Status finalizat - progresul va fi setat automat la 100%', 'info');
+      }
+      
+      return updated;
+    });
+  };
+
+  // FIXAT: Funcție pentru actualizarea sincronizată progres/status în timp real
+  const handleProgresChange = (newProgres: string) => {
+    const progresNumeric = parseInt(newProgres) || 0;
+    
+    setEditData(prev => {
+      const updated = { ...prev, progres_procent: progresNumeric };
+      
+      // FIXAT: Dacă progres devine 100%, forțează status la 'Finalizată'
+      if (progresNumeric === 100) {
+        updated.status = 'Finalizată';
+        updated.progres_descriere = updated.progres_descriere || 'Sarcină finalizată automat la 100% progres';
+        showToast('Progres 100% - sarcina va fi marcată automat ca finalizată', 'info');
+      }
+      
+      return updated;
+    });
   };
 
   // FIXAT: Logică inteligentă pentru evitarea duplicate fields
@@ -536,31 +569,13 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
       };
 
       // FIXAT: Logică inteligentă pentru status și progres
-      // Prioritatea este: 
-      // 1. Dacă progres = 100%, forțăm status = 'Finalizată' 
-      // 2. Dacă status = 'Finalizată', forțăm progres = 100%
-      // 3. Altfel, respectăm valorile individuale
-      
-      if (progres === 100) {
-        // Progres 100% -> automat finalizată
-        payload.progres_procent = 100;
-        payload.status = 'Finalizată';
-        payload.progres_descriere = editData.progres_descriere?.trim() || 'Sarcină finalizată automat la 100% progres';
-        showToast('Progres 100% - sarcina va fi marcată automat ca finalizată', 'info');
-      } else if (editData.status === 'Finalizată') {
-        // Status finalizat -> automat progres 100%
-        payload.status = 'Finalizată';
-        payload.progres_procent = 100;
-        payload.progres_descriere = editData.progres_descriere?.trim() || 'Sarcină finalizată manual - progres setat la 100%';
-        showToast('Status finalizat - progresul va fi setat automat la 100%', 'info');
-      } else {
-        // Cazul normal - respectăm valorile individuale
-        payload.status = editData.status;
-        payload.progres_procent = progres;
-        payload.progres_descriere = editData.progres_descriere?.trim() || null;
-      }
+      // Frontend-ul deja are sincronizarea făcută prin handleStatusChange/handleProgresChange
+      // Trimitem valorile finale la backend
+      payload.status = editData.status;
+      payload.progres_procent = progres;
+      payload.progres_descriere = editData.progres_descriere?.trim() || null;
 
-      console.log('Payload pentru actualizare sarcină:', JSON.stringify(payload, null, 2));
+      console.log('Payload pentru actualizare sarcină (cu sincronizare frontend):', JSON.stringify(payload, null, 2));
 
       const response = await fetch('/api/rapoarte/sarcini', {
         method: 'PUT',
@@ -767,7 +782,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                 </div>
               )}
 
-              {/* TAB SARCINI cu progres si editare IMBUNATATIT */}
+              {/* TAB SARCINI cu progres si editare IMBUNATATIT cu sincronizare timp real */}
               {activeTab === 'sarcini' && !loading && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -817,7 +832,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                           }}
                         >
                           {editingSarcina === sarcina.id ? (
-                            // Form editabil inline cu progres IMBUNATATIT
+                            // Form editabil inline cu progres IMBUNATATIT cu sincronizare timp real
                             <div>
                               {/* Titlu editabil */}
                               <input
@@ -836,26 +851,26 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 placeholder="Titlu sarcina..."
                               />
 
-                              {/* IMBUNATATIRE: Alert pentru auto-completari */}
-                              {(editData.progres_procent == 100 || editData.status === 'Finalizata') && (
+                              {/* FIXAT: Alert pentru auto-completari cu sincronizare timp real */}
+                              {(editData.progres_procent == 100 || editData.status === 'Finalizată') && (
                                 <div style={{
-                                  background: '#fff3cd',
-                                  border: '1px solid #ffc107',
-                                  color: '#856404',
+                                  background: '#d1ecf1',
+                                  border: '1px solid #bee5eb',
+                                  color: '#0c5460',
                                   padding: '0.5rem',
                                   borderRadius: '4px',
                                   marginBottom: '1rem',
                                   fontSize: '12px'
                                 }}>
-                                  <strong>Auto-completare activa:</strong> {
+                                  <strong>Sincronizare activă:</strong> {
                                     editData.progres_procent == 100 
-                                      ? 'Progres 100% va seta statusul automat la "Finalizata"' 
-                                      : 'Status "Finalizata" va seta progresul automat la 100%'
+                                      ? 'Progres 100% va seta statusul automat la "Finalizată"' 
+                                      : 'Status "Finalizată" va seta progresul automat la 100%'
                                   }
                                 </div>
                               )}
 
-                              {/* Badges prioritate si status */}
+                              {/* Badges prioritate si status cu sincronizare FIXAT */}
                               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                                 <select
                                   value={editData.prioritate || ''}
@@ -867,26 +882,28 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                     fontSize: '12px'
                                   }}
                                 >
-                                  <option value="Scazuta">Scazuta</option>
+                                  <option value="Scăzută">Scăzută</option>
                                   <option value="Medie">Medie</option>
-                                  <option value="Inalta">Inalta</option>
-                                  <option value="Critica">Critica</option>
+                                  <option value="Înaltă">Înaltă</option>
+                                  <option value="Critică">Critică</option>
                                 </select>
 
+                                {/* FIXAT: Select status cu sincronizare prin handleStatusChange */}
                                 <select
                                   value={editData.status || ''}
-                                  onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value }))}
+                                  onChange={(e) => handleStatusChange(e.target.value)}
                                   style={{
                                     padding: '0.25rem 0.5rem',
                                     border: '1px solid #dee2e6',
                                     borderRadius: '4px',
-                                    fontSize: '12px'
+                                    fontSize: '12px',
+                                    background: editData.status === 'Finalizată' ? '#d4edda' : 'white'
                                   }}
                                 >
-                                  <option value="De facut">De facut</option>
-                                  <option value="In lucru">In lucru</option>
-                                  <option value="In verificare">In verificare</option>
-                                  <option value="Finalizata">Finalizata</option>
+                                  <option value="De făcut">De făcut</option>
+                                  <option value="În lucru">În lucru</option>
+                                  <option value="În verificare">În verificare</option>
+                                  <option value="Finalizată">Finalizată</option>
                                 </select>
                               </div>
 
@@ -907,27 +924,29 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                                 }}
                               />
 
-                              {/* Progres editabil cu logica imbunatatita */}
+                              {/* FIXAT: Progres editabil cu logica imbunatatita si sincronizare timp real */}
                               <div style={{ marginBottom: '1rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', fontSize: '14px' }}>
                                   Progres
                                 </label>
                                 <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
                                   <div>
+                                    {/* FIXAT: Input progres cu sincronizare prin handleProgresChange */}
                                     <input
                                       type="number"
                                       min="0"
                                       max="100"
                                       step="1"
                                       value={editData.progres_procent || 0}
-                                      onChange={(e) => setEditData(prev => ({ ...prev, progres_procent: e.target.value }))}
+                                      onChange={(e) => handleProgresChange(e.target.value)}
                                       placeholder="0-100"
                                       style={{
                                         width: '100%',
                                         padding: '0.5rem',
                                         border: '1px solid #dee2e6',
                                         borderRadius: '4px',
-                                        fontSize: '12px'
+                                        fontSize: '12px',
+                                        background: editData.progres_procent == 100 ? '#d4edda' : 'white'
                                       }}
                                     />
                                   </div>
@@ -1098,7 +1117,7 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                               </div>
                             </div>
                           ) : (
-                            // Afisare normala cu progres vizual
+                            // Afisare normala cu progres vizual - PASTRAT identic
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                                 <h4 style={{ margin: 0, color: '#2c3e50' }}>{sarcina.titlu}</h4>
@@ -1238,7 +1257,6 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                   )}
                 </div>
               )}
-
               {/* TAB COMENTARII - PASTRAT identic */}
               {activeTab === 'comentarii' && !loading && (
                 <div>

@@ -723,7 +723,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                             borderRadius: '8px',
                             fontWeight: 'bold'
                           }}>
-                            {isSubproiect ? 'SUB' : 'NOU'}
+                            {isSubproiect ? 'SUB' }
                           </span>
                         )}
                       </span>
