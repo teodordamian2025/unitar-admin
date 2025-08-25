@@ -191,6 +191,13 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<{ curs: nu
   }
 };
 
+// NOU: Funcție pentru ora României (UTC+3)
+const getRomanianDateTime = (): string => {
+  const now = new Date();
+  const romanianTime = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+  return romanianTime.toISOString();
+};
+
 export default function ProiectEditModal({ 
   proiect, 
   isOpen, 
@@ -853,7 +860,7 @@ export default function ProiectEditModal({
           responsabil_uid: responsabil.uid,
           responsabil_nume: responsabil.nume_complet,
           rol_in_proiect: responsabil.rol_in_proiect,
-          data_atribuire: new Date().toISOString(),
+          data_atribuire: getRomanianDateTime(),
           atribuit_de: responsabil.uid
         };
 
@@ -886,7 +893,7 @@ export default function ProiectEditModal({
           responsabil_uid: responsabil.uid,
           responsabil_nume: responsabil.nume_complet,
           rol_in_subproiect: responsabil.rol_in_proiect, // CORECTAT: Mapare corectă pentru API
-          data_atribuire: new Date().toISOString(),
+          data_atribuire: getRomanianDateTime(),
           atribuit_de: responsabil.uid
         };
 
@@ -978,17 +985,32 @@ export default function ProiectEditModal({
   const updateSubproiecteExistente = async () => {
     for (const subproiect of formData.subproiecte.filter(s => s.isExisting && !s.isDeleted)) {
       try {
+        // ADĂUGAT: Calculează cursul dacă moneda nu e RON
+        let cursSubproiect = 1;
+        let valoareRonSubproiect = parseFloat(subproiect.valoare) || 0;
+        
+        if (subproiect.moneda !== 'RON' && subproiect.valoare) {
+          try {
+            const cursData = await getCursBNRLive(subproiect.moneda, formData.data_curs_valutar);
+            cursSubproiect = cursData.curs;
+            valoareRonSubproiect = parseFloat(subproiect.valoare) * cursSubproiect;
+          } catch (error) {
+            console.error(`Eroare curs pentru ${subproiect.moneda}:`, error);
+          }
+        }
+
         const updateData = {
           id: subproiect.ID_Subproiect,
           Denumire: subproiect.denumire,
           Status: subproiect.status,
           Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
           moneda: subproiect.moneda || 'RON',
-          Data_Start: formatDateForBigQuery(subproiect.data_start || ''),
-          Data_Final: formatDateForBigQuery(subproiect.data_final || ''),
-          curs_valutar: subproiect.curs_valutar ? parseFloat(subproiect.curs_valutar) : null,
-          data_curs_valutar: formatDateForBigQuery(subproiect.data_curs_valutar || ''),
-          valoare_ron: subproiect.valoare_ron ? parseFloat(subproiect.valoare_ron) : null
+          Data_Start: formatDateForBigQuery(subproiect.data_start || formData.Data_Start),
+          Data_Final: formatDateForBigQuery(subproiect.data_final || formData.Data_Final),
+          curs_valutar: cursSubproiect,
+          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar),
+          valoare_ron: valoareRonSubproiect,
+          data_actualizare: getRomanianDateTime()
         };
         
         await fetch('/api/rapoarte/subproiecte', {
@@ -1021,6 +1043,23 @@ export default function ProiectEditModal({
   const updateCheltuieliExistente = async () => {
     for (const cheltuiala of formData.cheltuieli.filter(c => c.isExisting && !c.isDeleted)) {
       try {
+        // ADĂUGAT: Calculează cursul
+        let cursValutar = 1;
+        let valoareRON = parseFloat(cheltuiala.valoare);
+
+        if (cheltuiala.moneda !== 'RON') {
+          try {
+            const response = await fetch(`/api/curs-valutar?moneda=${cheltuiala.moneda}&data=${formData.data_curs_valutar}`);
+            const cursData = await response.json();
+            if (cursData.success) {
+              cursValutar = cursData.curs;
+              valoareRON = parseFloat(cheltuiala.valoare) * cursValutar;
+            }
+          } catch (error) {
+            console.error(`Eroare curs ${cheltuiala.moneda}:`, error);
+          }
+        }
+
         const updateData = {
           id: cheltuiala.id,
           tip_cheltuiala: cheltuiala.tip_cheltuiala,
@@ -1029,10 +1068,14 @@ export default function ProiectEditModal({
           descriere: cheltuiala.descriere,
           valoare: parseFloat(cheltuiala.valoare),
           moneda: cheltuiala.moneda,
+          curs_valutar: cursValutar,
+          data_curs_valutar: formatDateForBigQuery(formData.data_curs_valutar),
+          valoare_ron: valoareRON,
           status_predare: cheltuiala.status_predare,
           status_contract: cheltuiala.status_contract,
           status_facturare: cheltuiala.status_facturare,
-          status_achitare: cheltuiala.status_achitare
+          status_achitare: cheltuiala.status_achitare,
+          data_actualizare: getRomanianDateTime()
         };
         
         await fetch('/api/rapoarte/cheltuieli', {

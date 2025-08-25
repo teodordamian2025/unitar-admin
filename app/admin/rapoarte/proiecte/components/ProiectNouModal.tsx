@@ -204,6 +204,14 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<{ curs: nu
     return fallbackCursuri[moneda] || { curs: 1, precizie: '1' };
   }
 };
+
+// NOU: Funcție pentru ora României (UTC+3)
+const getRomanianDateTime = (): string => {
+  const now = new Date();
+  const romanianTime = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+  return romanianTime.toISOString();
+};
+
 export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: ProiectNouModalProps) {
   const [loading, setLoading] = useState(false);
   const [clienti, setClienti] = useState<Client[]>([]);
@@ -747,7 +755,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
           responsabil_uid: responsabil.uid,
           responsabil_nume: responsabil.nume_complet,
           rol_in_proiect: responsabil.rol_in_proiect,
-          data_atribuire: new Date().toISOString(),
+          data_atribuire: getRomanianDateTime(),
           atribuit_de: responsabil.uid // Se poate modifica cu utilizatorul curent
         };
 
