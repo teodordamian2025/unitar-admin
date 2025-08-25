@@ -1,13 +1,16 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectEditModal.tsx
-// DATA: 24.08.2025 23:45 (ora României)
-// CORECTARE: Sintaxă JSX și structură modal corectată
-// FUNCȚIONALITĂȚI PĂSTRATE: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery
+// DATA: 25.08.2025 08:15 (ora României)
+// CORECTAT: Eroare sintaxă JSX + Uniformizare cu ProiectNouModal + createPortal
+// IMPLEMENTARE COMPLETĂ: Toate funcționalitățile din ProiectNouModal + încărcare date existente
+// FUNCȚIONALITĂȚi CORECTATE: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { toast } from 'react-toastify'; // CORECTAT: Folosește toast din react-toastify ca în ProiectNouModal
 import ClientNouModal from '../../clienti/components/ClientNouModal';
 import ResponsabilSearch from './ResponsabilSearch';
 import SubcontractantSearch from './SubcontractantSearch';
@@ -41,7 +44,7 @@ interface ResponsabilSelectat {
   uid: string;
   nume_complet: string;
   email: string;
-  rol_in_proiect: string;
+  rol_in_proiect: string; // CORECTAT: Consistent cu ProiectNouModal
 }
 
 interface Subcontractant {
@@ -71,48 +74,7 @@ interface CheltuialaProiect {
   isDeleted?: boolean;
 }
 
-// Toast system compatibil cu modalul centrat
-const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-  const toastEl = document.createElement('div');
-  toastEl.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(12px);
-    color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    padding: 16px 20px;
-    border-radius: 16px;
-    z-index: 70000;
-    font-family: 'Inter', Arial, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    max-width: 400px;
-    word-wrap: break-word;
-    transform: translateY(-10px);
-    opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  `;
-  toastEl.textContent = message;
-  document.body.appendChild(toastEl);
-  
-  setTimeout(() => {
-    toastEl.style.transform = 'translateY(0)';
-    toastEl.style.opacity = '1';
-  }, 10);
-  
-  setTimeout(() => {
-    toastEl.style.transform = 'translateY(-10px)';
-    toastEl.style.opacity = '0';
-    setTimeout(() => {
-      if (document.body.contains(toastEl)) {
-        document.body.removeChild(toastEl);
-      }
-    }, 300);
-  }, type === 'success' || type === 'error' ? 4000 : 6000);
-};
+// ELIMINAT: showToast custom - folosim toast din react-toastify pentru consistență
 
 // Funcție helper pentru validări sigure (PĂSTRATĂ identică)
 const ensureNumber = (value: any, defaultValue: number = 0): number => {
@@ -166,7 +128,7 @@ const formatDateForBigQuery = (dateString: string): string | null => {
   }
 };
 
-// FIX PRINCIPAL: Helper simplificat pentru formatarea datei pentru input (FĂRĂ fallback la data curentă)
+// Helper simplificat pentru formatarea datei pentru input
 const formatDateForInput = (dateValue: any): string => {
   if (!dateValue) return '';
   
@@ -243,7 +205,7 @@ export default function ProiectEditModal({
   const [clientSearch, setClientSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   
-  // NOU: State pentru responsabili multipli
+  // State pentru responsabili multipli
   const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
   const [responsabiliSubproiecte, setResponsabiliSubproiecte] = useState<{[key: string]: ResponsabilSelectat[]}>({});
   
@@ -295,7 +257,7 @@ export default function ProiectEditModal({
       isDeleted?: boolean;
     }>,
     
-    // MODIFICAT: Pentru cheltuieli proiect cu subcontractanti
+    // Pentru cheltuieli proiect cu subcontractanti
     cheltuieli: [] as CheltuialaProiect[]
   });
 
@@ -303,7 +265,7 @@ export default function ProiectEditModal({
     if (isOpen && proiect) {
       loadClienti();
       loadProiectData();
-      loadResponsabiliProiect(); // NOU: Încarcă responsabilii existenți
+      loadResponsabiliProiect();
       loadSubproiecte();
       loadCheltuieli();
     }
@@ -333,7 +295,7 @@ export default function ProiectEditModal({
       selectedClientId: '',
       Adresa: proiect.Adresa || '',
       Descriere: proiect.Descriere || '',
-      // FIX PRINCIPAL: Data cursului din BigQuery (fără fallback la data curentă)
+      // Data cursului din BigQuery, nu data curentă
       Data_Start: formatDateForInput(proiect.Data_Start),
       Data_Final: formatDateForInput(proiect.Data_Final),
       Status: proiect.Status || 'Activ',
@@ -341,7 +303,7 @@ export default function ProiectEditModal({
       Valoare_Estimata: proiect.Valoare_Estimata?.toString() || '',
       moneda: proiect.moneda || 'RON',
       curs_valutar: proiect.curs_valutar?.toString() || '',
-      // FIX PRINCIPAL: Data cursului din BigQuery, nu data curentă
+      // Data cursului din BigQuery, nu data curentă
       data_curs_valutar: formatDateForInput(proiect.data_curs_valutar),
       valoare_ron: proiect.valoare_ron?.toString() || '',
       
@@ -355,7 +317,8 @@ export default function ProiectEditModal({
     
     setClientSearch(proiect.Client || '');
   };
-  // NOU: Încarcă responsabilii existenți ai proiectului
+
+  // Încarcă responsabilii existenți ai proiectului
   const loadResponsabiliProiect = async () => {
     if (!proiect.ID_Proiect) return;
     
@@ -379,7 +342,7 @@ export default function ProiectEditModal({
     }
   };
 
-  // NOU: Încarcă responsabilii pentru subproiecte existente
+  // Încarcă responsabilii pentru subproiecte existente
   const loadResponsabiliSubproiecte = async (subproiecteIds: string[]) => {
     if (subproiecteIds.length === 0) return;
     
@@ -395,7 +358,7 @@ export default function ProiectEditModal({
             uid: resp.responsabil_uid,
             nume_complet: resp.responsabil_nume,
             email: resp.email || '',
-            rol_in_subproiect: resp.rol_in_subproiect || 'Normal'
+            rol_in_proiect: resp.rol_in_subproiect || 'Normal' // CORECTAT: Mapare corectă
           }));
         }
       } catch (error) {
@@ -426,7 +389,7 @@ export default function ProiectEditModal({
           data_start: formatDateForInput(sub.Data_Start),
           data_final: formatDateForInput(sub.Data_Final),
           curs_valutar: sub.curs_valutar?.toString() || '',
-          // FIX PRINCIPAL: Data cursului din BigQuery, nu fallback
+          // Data cursului din BigQuery, nu fallback
           data_curs_valutar: formatDateForInput(sub.data_curs_valutar),
           valoare_ron: sub.valoare_ron?.toString() || '',
           isExisting: true,
@@ -438,7 +401,7 @@ export default function ProiectEditModal({
           subproiecte: subproiecteFormatate
         }));
         
-        // NOU: Încarcă responsabilii pentru subproiectele existente
+        // Încarcă responsabilii pentru subproiectele existente
         const subproiecteIds = subproiecteFormatate.map(s => s.ID_Subproiect!);
         await loadResponsabiliSubproiecte(subproiecteIds);
         
@@ -446,7 +409,7 @@ export default function ProiectEditModal({
       }
     } catch (error) {
       console.error('Eroare la încărcarea subproiectelor:', error);
-      showToast('Eroare la încărcarea subproiectelor', 'error');
+      toast.error('Eroare la încărcarea subproiectelor');
     }
   };
 
@@ -468,7 +431,7 @@ export default function ProiectEditModal({
           descriere: ch.descriere || '',
           valoare: ch.valoare?.toString() || '',
           moneda: ch.moneda || 'RON',
-          // FIX PRINCIPAL: Data cursului din BigQuery, nu fallback
+          // Data cursului din BigQuery, nu fallback
           data_curs_valutar: formatDateForInput(ch.data_curs_valutar),
           status_predare: ch.status_predare || 'Nepredat',
           status_contract: ch.status_contract || 'Nu e cazul',
@@ -487,7 +450,7 @@ export default function ProiectEditModal({
       }
     } catch (error) {
       console.error('Eroare la încărcarea cheltuielilor:', error);
-      showToast('Eroare la încărcarea cheltuielilor', 'error');
+      toast.error('Eroare la încărcarea cheltuielilor');
     }
   };
 
@@ -528,25 +491,25 @@ export default function ProiectEditModal({
         }));
         
         if (data.source === 'fallback') {
-          showToast(data.warning || 'Folosind curs aproximativ', 'info');
+          toast.warning(data.warning || 'Folosind curs aproximativ');
         }
       } else {
-        showToast('Nu s-a putut obține cursul valutar', 'error');
+        toast.error('Nu s-a putut obține cursul valutar');
       }
     } catch (error) {
       console.error('Eroare la obținerea cursului:', error);
-      showToast('Eroare la obținerea cursului valutar', 'error');
+      toast.error('Eroare la obținerea cursului valutar');
     } finally {
       setLoadingCurs(false);
     }
   };
 
-  // NOU: Handler pentru selectarea responsabilului
+  // Handler pentru selectarea responsabilului
   const handleResponsabilSelect = (responsabil: Responsabil | null) => {
     if (responsabil) {
       const existaResponsabil = responsabiliSelectati.find(r => r.uid === responsabil.uid);
       if (existaResponsabil) {
-        showToast('Responsabilul este deja adăugat', 'error');
+        toast.error('Responsabilul este deja adăugat');
         return;
       }
 
@@ -558,11 +521,11 @@ export default function ProiectEditModal({
       };
 
       setResponsabiliSelectati(prev => [...prev, nouResponsabil]);
-      showToast(`Responsabil ${responsabil.nume_complet} adăugat`, 'success');
+      toast.success(`Responsabil ${responsabil.nume_complet} adăugat`);
     }
   };
 
-  // NOU: Funcții pentru managementul responsabililor
+  // Funcții pentru managementul responsabililor
   const removeResponsabil = (uid: string) => {
     setResponsabiliSelectati(prev => prev.filter(r => r.uid !== uid));
   };
@@ -573,7 +536,7 @@ export default function ProiectEditModal({
     );
   };
 
-  // NOU: Funcții pentru managementul responsabililor la subproiecte
+  // Funcții pentru managementul responsabililor la subproiecte
   const handleResponsabilSubproiectSelected = (subproiectId: string, responsabil: any) => {
     if (!responsabil) return;
 
@@ -581,7 +544,7 @@ export default function ProiectEditModal({
     const existaResponsabil = responsabiliActuali.find(r => r.uid === responsabil.uid);
     
     if (existaResponsabil) {
-      showToast('Responsabilul este deja adăugat la acest subproiect', 'error');
+      toast.error('Responsabilul este deja adăugat la acest subproiect');
       return;
     }
 
@@ -589,7 +552,7 @@ export default function ProiectEditModal({
       uid: responsabil.uid,
       nume_complet: responsabil.nume_complet,
       email: responsabil.email,
-      rol_in_subproiect: responsabiliActuali.length === 0 ? 'Principal' : 'Normal'
+      rol_in_proiect: responsabiliActuali.length === 0 ? 'Principal' : 'Normal' // CORECTAT: Folosește rol_in_proiect
     };
 
     setResponsabiliSubproiecte(prev => ({
@@ -597,7 +560,7 @@ export default function ProiectEditModal({
       [subproiectId]: [...(prev[subproiectId] || []), nouResponsabil]
     }));
     
-    showToast(`Responsabil ${responsabil.nume_complet} adăugat la subproiect`, 'success');
+    toast.success(`Responsabil ${responsabil.nume_complet} adăugat la subproiect`);
   };
 
   const removeResponsabilSubproiect = (subproiectId: string, uid: string) => {
@@ -611,12 +574,12 @@ export default function ProiectEditModal({
     setResponsabiliSubproiecte(prev => ({
       ...prev,
       [subproiectId]: (prev[subproiectId] || []).map(r => 
-        r.uid === uid ? { ...r, rol_in_subproiect: nouRol } : r
+        r.uid === uid ? { ...r, rol_in_proiect: nouRol } : r // CORECTAT: Folosește rol_in_proiect
       )
     }));
   };
 
-  // NOU: Handler pentru selectarea subcontractantului în cheltuieli
+  // Handler pentru selectarea subcontractantului în cheltuieli
   const handleSubcontractantSelectForCheltuiala = (cheltuialaId: string, subcontractant: Subcontractant | null) => {
     if (subcontractant) {
       setFormData(prev => ({
@@ -645,15 +608,15 @@ export default function ProiectEditModal({
     }
   };
 
-  // PĂSTRAT: Handler pentru afișarea modalului de subcontractant nou
+  // Handler pentru afișarea modalului de subcontractant nou
   const handleShowSubcontractantModal = () => {
     setShowSubcontractantModal(true);
   };
 
-  // PĂSTRAT: Handler pentru când subcontractantul a fost adăugat
+  // Handler pentru când subcontractantul a fost adăugat
   const handleSubcontractantAdded = () => {
     setShowSubcontractantModal(false);
-    showToast('Subcontractant adăugat cu succes!', 'success');
+    toast.success('Subcontractant adăugat cu succes!');
   };
 
   const resetForm = () => {
@@ -681,8 +644,8 @@ export default function ProiectEditModal({
       cheltuieli: []
     });
     setClientSearch('');
-    setResponsabiliSelectati([]); // NOU: Reset responsabili
-    setResponsabiliSubproiecte({}); // NOU: Reset responsabili subproiecte
+    setResponsabiliSelectati([]);
+    setResponsabiliSubproiecte({});
     setCursValutar(null);
     setPrecizieOriginala('');
   };
@@ -714,7 +677,7 @@ export default function ProiectEditModal({
     client.nume.toLowerCase().includes(clientSearch.toLowerCase())
   ).slice(0, 5);
 
-  // PĂSTRAT: Funcții pentru managementul subproiectelor
+  // Funcții pentru managementul subproiectelor
   const addSubproiect = () => {
     const newSubproiect = {
       id: Date.now().toString(),
@@ -753,7 +716,7 @@ export default function ProiectEditModal({
     }));
   };
 
-  // MODIFICAT: Funcții pentru managementul cheltuielilor cu subcontractant
+  // Funcții pentru managementul cheltuielilor cu subcontractant
   const addCheltuiala = () => {
     const newCheltuiala: CheltuialaProiect = {
       id: Date.now().toString(),
@@ -796,8 +759,8 @@ export default function ProiectEditModal({
       )
     }));
   };
-  
-  // PĂSTRAT: Funcții pentru adăugarea/actualizarea subproiectelor cu cursuri BNR LIVE
+
+  // Funcții pentru adăugarea/actualizarea subproiectelor cu cursuri BNR LIVE
   const addSubproiecte = async (proiectId: string, dataStart: string | null, dataFinal: string | null) => {
     console.log(`Începe adăugarea subproiectelor pentru ${proiectId}`);
     
@@ -821,9 +784,9 @@ export default function ProiectEditModal({
           cursSubproiect = 1;
         }
         
-        // NOU: Responsabil principal din lista de responsabili multipli pentru subproiect
+        // Responsabil principal din lista de responsabili multipli pentru subproiect
         const responsabiliSubproiect = responsabiliSubproiecte[subproiect.id] || [];
-        const responsabilPrincipal = responsabiliSubproiect.find(r => r.rol_in_subproiect === 'Principal');
+        const responsabilPrincipal = responsabiliSubproiect.find(r => r.rol_in_proiect === 'Principal');
         
         const subproiectData = {
           ID_Subproiect: `${proiectId}_SUB_${subproiect.id}`,
@@ -853,22 +816,21 @@ export default function ProiectEditModal({
         const result = await response.json();
         
         if (result.success) {
-          // NOU: Adaugă responsabilii pentru subproiectul nou creat
+          // Adaugă responsabilii pentru subproiectul nou creat
           if (responsabiliSubproiect.length > 0) {
             await addResponsabiliSubproiect(subproiectData.ID_Subproiect, responsabiliSubproiect);
           }
           console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes`);
         } else {
           console.error(`Eroare la subproiect ${subproiect.denumire}:`, result);
-          showToast(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`, 'error');
+          toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
         }
       } catch (error) {
         console.error(`Eroare la adăugarea subproiectului ${subproiect.denumire}:`, error);
-        showToast(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`, 'error');
+        toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}"`);
       }
     }
   };
-
   // NOU: Funcție pentru salvarea responsabililor în tabela ProiecteResponsabili
   const addResponsabiliProiect = async (proiectId: string) => {
     if (responsabiliSelectati.length === 0) return;
@@ -923,7 +885,7 @@ export default function ProiectEditModal({
           subproiect_id: subproiectId,
           responsabil_uid: responsabil.uid,
           responsabil_nume: responsabil.nume_complet,
-          rol_in_subproiect: responsabil.rol_in_subproiect,
+          rol_in_subproiect: responsabil.rol_in_proiect, // CORECTAT: Mapare corectă pentru API
           data_atribuire: new Date().toISOString(),
           atribuit_de: responsabil.uid
         };
@@ -945,7 +907,7 @@ export default function ProiectEditModal({
     }
   };
 
-  // PĂSTRAT: Funcția pentru adăugarea cheltuielilor
+  // Funcția pentru adăugarea cheltuielilor
   const addCheltuieli = async (proiectId: string) => {
     for (const cheltuiala of formData.cheltuieli.filter(c => !c.isExisting && !c.isDeleted)) {
       try {
@@ -1106,27 +1068,27 @@ export default function ProiectEditModal({
     try {
       // Validări
       if (!formData.Denumire.trim()) {
-        showToast('Denumirea proiectului este obligatorie', 'error');
+        toast.error('Denumirea proiectului este obligatorie');
         setLoading(false);
         return;
       }
 
       if (!formData.Client.trim()) {
-        showToast('Clientul este obligatoriu', 'error');
+        toast.error('Clientul este obligatoriu');
         setLoading(false);
         return;
       }
 
       // Validare pentru cel puțin un responsabil principal
       if (responsabiliSelectati.length === 0) {
-        showToast('Cel puțin un responsabil este obligatoriu', 'error');
+        toast.error('Cel puțin un responsabil este obligatoriu');
         setLoading(false);
         return;
       }
 
       const responsabilPrincipal = responsabiliSelectati.find(r => r.rol_in_proiect === 'Principal');
       if (!responsabilPrincipal) {
-        showToast('Cel puțin un responsabil trebuie să aibă rolul "Principal"', 'error');
+        toast.error('Cel puțin un responsabil trebuie să aibă rolul "Principal"');
         setLoading(false);
         return;
       }
@@ -1137,13 +1099,13 @@ export default function ProiectEditModal({
         const dataFinal = new Date(formData.Data_Final);
         
         if (dataFinal <= dataStart) {
-          showToast('Data de finalizare trebuie să fie după data de început', 'error');
+          toast.error('Data de finalizare trebuie să fie după data de început');
           setLoading(false);
           return;
         }
       }
 
-      showToast('Se actualizează proiectul...', 'info');
+      toast.info('Se actualizează proiectul...');
 
       // Pregătește datele pentru actualizare
       const updateData = {
@@ -1180,7 +1142,7 @@ export default function ProiectEditModal({
       const result = await response.json();
 
       if (result.success || response.ok) {
-        // NOU: Actualizează responsabilii
+        // Actualizează responsabilii
         await addResponsabiliProiect(formData.ID_Proiect);
         
         // Actualizează subproiectele
@@ -1193,16 +1155,16 @@ export default function ProiectEditModal({
         await deleteCheltuieli();
         await addCheltuieli(formData.ID_Proiect);
         
-        showToast('Proiect actualizat cu succes cu toate componentele!', 'success');
+        toast.success('Proiect actualizat cu succes cu toate componentele!');
         onProiectUpdated();
         onClose();
       } else {
         console.error('Eroare API:', result);
-        showToast(`Eroare: ${result.error || 'Eroare necunoscută'}`, 'error');
+        toast.error(`Eroare: ${result.error || 'Eroare necunoscută'}`);
       }
     } catch (error) {
       console.error('Eroare la actualizarea proiectului:', error);
-      showToast('Eroare la actualizarea proiectului', 'error');
+      toast.error('Eroare la actualizarea proiectului');
     } finally {
       setLoading(false);
     }
@@ -1232,15 +1194,15 @@ export default function ProiectEditModal({
       const result = await response.json();
 
       if (result.success) {
-        showToast('Proiect șters cu succes!', 'success');
+        toast.success('Proiect șters cu succes!');
         onProiectDeleted();
         onClose();
       } else {
-        showToast(result.error || 'Eroare la ștergerea proiectului', 'error');
+        toast.error(result.error || 'Eroare la ștergerea proiectului');
       }
     } catch (error) {
       console.error('Eroare la ștergere:', error);
-      showToast('Eroare la ștergerea proiectului', 'error');
+      toast.error('Eroare la ștergerea proiectului');
     } finally {
       setLoading(false);
     }
@@ -1248,102 +1210,294 @@ export default function ProiectEditModal({
 
   if (!isOpen) return null;
 
-  // CORECTARE: Render direct fără createPortal pentru a evita problemele de sintaxă
-  return (
-    <>
+  // CORECTAT: Render cu createPortal pentru centrare corectă (ca în ProiectNouModal)
+  return typeof window !== 'undefined' ? createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.8)',
+      zIndex: 65000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }}>
       <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.8)',
-        zIndex: 65000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem'
+        background: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        maxWidth: '1100px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto'
       }}>
+        {/* Header */}
         <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          maxWidth: '1100px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto'
+          padding: '1.5rem',
+          borderBottom: '1px solid #dee2e6',
+          background: '#f8f9fa',
+          borderRadius: '8px 8px 0 0'
         }}>
-          {/* Header */}
-          <div style={{
-            padding: '1.5rem',
-            borderBottom: '1px solid #dee2e6',
-            background: '#f8f9fa',
-            borderRadius: '8px 8px 0 0'
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, color: '#2c3e50' }}>
+              Editează Proiect (Extins)
+            </h2>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#6c757d'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
+            ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile cu toate funcționalitățile
+            <br/>
+            <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
+              CORECTAT: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery + createPortal
+            </span>
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
+          {/* Informații de bază */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+            gap: '1rem',
+            marginBottom: '1rem'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, color: '#2c3e50' }}>
-                Editează Proiect (Extins)
-              </h2>
-              <button
-                onClick={onClose}
-                disabled={loading}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                ID Proiect (Nu se poate modifica)
+              </label>
+              <input
+                type="text"
+                value={formData.ID_Proiect}
+                disabled={true}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  background: '#f8f9fa',
                   color: '#6c757d'
                 }}
-              >
-                ×
-              </button>
+              />
             </div>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-              ID: <strong>{formData.ID_Proiect}</strong> | Modifică informațiile cu toate funcționalitățile
-              <br/>
-              <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
-                NOU: Responsabili multipli + SubcontractantSearch + Data cursului din BigQuery + Centrat corect
-              </span>
-            </p>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Status General
+              </label>
+              <select
+                value={formData.Status}
+                onChange={(e) => handleInputChange('Status', e.target.value)}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="Activ">Activ</option>
+                <option value="Planificat">Planificat</option>
+                <option value="Suspendat">Suspendat</option>
+                <option value="Finalizat">Finalizat</option>
+              </select>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
-            {/* Informații de bază */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-              gap: '1rem',
-              marginBottom: '1rem'
-            }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  ID Proiect (Nu se poate modifica)
-                </label>
+          {/* Denumire proiect */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Denumire Proiect *
+            </label>
+            <input
+              type="text"
+              value={formData.Denumire}
+              onChange={(e) => handleInputChange('Denumire', e.target.value)}
+              disabled={loading}
+              placeholder="Numele proiectului"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+
+          {/* Client cu căutare */}
+          <div style={{ marginBottom: '1rem', position: 'relative' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Client *
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
                 <input
                   type="text"
-                  value={formData.ID_Proiect}
-                  disabled={true}
+                  value={clientSearch}
+                  onChange={(e) => handleClientSearch(e.target.value)}
+                  disabled={loading}
+                  placeholder="Caută client sau scrie numele..."
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: '1px solid #dee2e6',
                     borderRadius: '6px',
-                    fontSize: '14px',
-                    fontFamily: 'monospace',
-                    fontWeight: 'bold',
-                    background: '#f8f9fa',
-                    color: '#6c757d'
+                    fontSize: '14px'
+                  }}
+                />
+                
+                {showClientSuggestions && filteredClients.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid #dee2e6',
+                    borderTop: 'none',
+                    borderRadius: '0 0 6px 6px',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                    zIndex: 1000,
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {filteredClients.map(client => (
+                      <div
+                        key={client.id}
+                        onClick={() => selectClient(client)}
+                        style={{
+                          padding: '0.75rem',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f1f2f6',
+                          fontSize: '14px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = 'white';
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
+                        {client.cui && (
+                          <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                            CUI: {client.cui}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setShowClientModal(true)}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                + Client Nou
+              </button>
+            </div>
+          </div>
+
+          {/* Adresa */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Adresa Proiect
+            </label>
+            <input
+              type="text"
+              value={formData.Adresa}
+              onChange={(e) => handleInputChange('Adresa', e.target.value)}
+              disabled={loading}
+              placeholder="Adresa unde se desfășoară proiectul"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+
+          {/* SECȚIUNE: Valoare și Monedă */}
+          <div style={{ 
+            background: '#f8f9fa',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #dee2e6'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+              Valoare Proiect 
+              <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
+                Cursuri BNR LIVE (Precizie originală - fără rotunjire)
+              </span>
+            </h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Valoare Estimată *
+                </label>
+                <input
+                  type="number"
+                  value={formData.Valoare_Estimata}
+                  onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
+                  disabled={loading}
+                  placeholder="15000"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
                   }}
                 />
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                  Status General
+                  Monedă
                 </label>
                 <select
-                  value={formData.Status}
-                  onChange={(e) => handleInputChange('Status', e.target.value)}
+                  value={formData.moneda}
+                  onChange={(e) => handleInputChange('moneda', e.target.value)}
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -1353,196 +1507,546 @@ export default function ProiectEditModal({
                     fontSize: '14px'
                   }}
                 >
-                  <option value="Activ">Activ</option>
-                  <option value="Planificat">Planificat</option>
-                  <option value="Suspendat">Suspendat</option>
-                  <option value="Finalizat">Finalizat</option>
+                  <option value="RON">RON</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                  <option value="GBP">GBP</option>
                 </select>
               </div>
-            </div>
 
-            {/* Denumire proiect */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Denumire Proiect *
-              </label>
-              <input
-                type="text"
-                value={formData.Denumire}
-                onChange={(e) => handleInputChange('Denumire', e.target.value)}
-                disabled={loading}
-                placeholder="Numele proiectului"
-                style={{
-                  width: '100%',
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Curs
+                </label>
+                <input
+                  type="date"
+                  value={formData.data_curs_valutar}
+                  onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
+                  disabled={loading || formData.moneda === 'RON'}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Echivalent RON
+                </label>
+                <div style={{
                   padding: '0.75rem',
                   border: '1px solid #dee2e6',
                   borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
+                  background: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: loadingCurs ? '#6c757d' : '#27ae60'
+                }}>
+                  {loadingCurs ? 'Se calculează...' : 
+                   formData.valoare_ron ? `${ensureNumber(formData.valoare_ron, 0).toLocaleString('ro-RO')} RON` : 
+                   '0.00 RON'}
+                </div>
+                {cursValutar && formData.moneda !== 'RON' && (
+                  <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                    Curs: 1 {formData.moneda} = {formatWithOriginalPrecision(cursValutar, precizieOriginala)} RON
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECȚIUNE: Status-uri Multiple */}
+          <div style={{ 
+            background: '#e8f5e8',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #c3e6cb'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Status-uri Proiect</h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Predare
+                </label>
+                <select
+                  value={formData.status_predare}
+                  onChange={(e) => handleInputChange('status_predare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nepredat">Nepredat</option>
+                  <option value="Predat">Predat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Contract
+                </label>
+                <select
+                  value={formData.status_contract}
+                  onChange={(e) => handleInputChange('status_contract', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nu e cazul">Nu e cazul</option>
+                  <option value="Nesemnat">Nesemnat</option>
+                  <option value="Semnat">Semnat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Facturare
+                </label>
+                <select
+                  value={formData.status_facturare}
+                  onChange={(e) => handleInputChange('status_facturare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Nefacturat">Nefacturat</option>
+                  <option value="Facturat">Facturat</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Status Achitare
+                </label>
+                <select
+                  value={formData.status_achitare}
+                  onChange={(e) => handleInputChange('status_achitare', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="Neachitat">Neachitat</option>
+                  <option value="Achitat">Achitat</option>
+                  <option value="Nu e cazul">Nu e cazul</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          {/* SECȚIUNE: Date și Echipa cu responsabili multipli */}
+          <div style={{ 
+            background: '#f0f8ff',
+            padding: '1rem',
+            borderRadius: '6px',
+            marginBottom: '1rem',
+            border: '1px solid #cce7ff'
+          }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+              Perioada Proiect și Echipa
+              <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
+                Responsabili multipli cu roluri
+              </span>
+            </h4>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Început
+                </label>
+                <input
+                  type="date"
+                  value={formData.Data_Start}
+                  onChange={(e) => handleInputChange('Data_Start', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Data Finalizare (estimată)
+                </label>
+                <input
+                  type="date"
+                  value={formData.Data_Final}
+                  onChange={(e) => handleInputChange('Data_Final', e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Client cu căutare */}
-            <div style={{ marginBottom: '1rem', position: 'relative' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Client *
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
+            {/* Secțiunea pentru responsabili multipli */}
+            <div style={{ marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+                Responsabili Proiect *
+                <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
+                  Minimum 1 responsabil Principal
+                </span>
+              </h4>
+
+              <div style={{
+                background: '#f8f9fa',
+                padding: '1rem',
+                borderRadius: '8px',
+                border: '1px solid #dee2e6',
+                marginBottom: '1rem'
+              }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Adaugă Responsabil
+                </label>
+                <ResponsabilSearch
+                  onResponsabilSelected={handleResponsabilSelect}
+                  showInModal={true}
+                  disabled={loading}
+                  placeholder="Caută și selectează responsabili..."
+                />
+              </div>
+
+              {responsabiliSelectati.length > 0 && (
+                <div>
+                  <h5 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
+                    Responsabili Selectați ({responsabiliSelectati.length})
+                  </h5>
+                  <div style={{ display: 'grid', gap: '0.5rem' }}>
+                    {responsabiliSelectati.map((responsabil) => (
+                      <div
+                        key={responsabil.uid}
+                        style={{
+                          border: '1px solid #27ae60',
+                          borderRadius: '6px',
+                          padding: '0.75rem',
+                          background: 'rgba(39, 174, 96, 0.05)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                            {responsabil.nume_complet}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                            {responsabil.email}
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <select
+                            value={responsabil.rol_in_proiect}
+                            onChange={(e) => updateRolResponsabil(responsabil.uid, e.target.value)}
+                            disabled={loading}
+                            style={{
+                              padding: '0.5rem',
+                              border: '1px solid #dee2e6',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              minWidth: '120px'
+                            }}
+                          >
+                            <option value="Principal">Principal</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Observator">Observator</option>
+                          </select>
+                          
+                          <button
+                            type="button"
+                            onClick={() => removeResponsabil(responsabil.uid)}
+                            disabled={loading}
+                            style={{
+                              background: '#e74c3c',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.5rem',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {responsabiliSelectati.length === 0 && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#7f8c8d',
+                  background: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '2px dashed #dee2e6'
+                }}>
+                  <p style={{ margin: 0, fontSize: '14px' }}>
+                    Nu sunt selectați responsabili. Caută și adaugă cel puțin un responsabil.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Informație despre perioada proiectului */}
+            {formData.Data_Start && formData.Data_Final && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: '#d4edda',
+                border: '1px solid #c3e6cb',
+                borderRadius: '6px',
+                fontSize: '14px',
+                color: '#155724'
+              }}>
+                <strong>Perioada proiect:</strong> {new Date(formData.Data_Start).toLocaleDateString()} → {new Date(formData.Data_Final).toLocaleDateString()}
+                {(() => {
+                  try {
+                    const start = new Date(formData.Data_Start);
+                    const end = new Date(formData.Data_Final);
+                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return ` (${diffDays} ${diffDays === 1 ? 'zi' : 'zile'})`;
+                  } catch {
+                    return '';
+                  }
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Descriere */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Descriere
+            </label>
+            <textarea
+              value={formData.Descriere}
+              onChange={(e) => handleInputChange('Descriere', e.target.value)}
+              disabled={loading}
+              placeholder="Descrierea detaliată a proiectului..."
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          {/* SECȚIUNE cheltuieli cu SubcontractantSearch */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                Cheltuieli Proiect
+                <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
+                  SubcontractantSearch în loc de nume+CUI
+                </span>
+              </h4>
+              <button
+                type="button"
+                onClick={addCheltuiala}
+                disabled={loading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#e67e22',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Adaugă Cheltuială
+              </button>
+            </div>
+
+            {formData.cheltuieli.filter(c => !c.isDeleted).map((cheltuiala, index) => (
+              <div
+                key={cheltuiala.id}
+                style={{
+                  border: '1px solid #f39c12',
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  background: '#fef9e7',
+                  position: 'relative'
+                }}
+              >
+                {cheltuiala.isExisting && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '3rem',
+                    background: '#f39c12',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 'bold'
+                  }}>
+                    EXISTENT
+                  </div>
+                )}
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '0.5rem'
+                }}>
+                  <h5 style={{ margin: 0, color: '#2c3e50' }}>
+                    Cheltuială #{index + 1}
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => removeCheltuiala(cheltuiala.id)}
+                    disabled={loading}
+                    style={{
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Șterge
+                  </button>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <select
+                    value={cheltuiala.tip_cheltuiala}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
+                    disabled={loading}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="subcontractant">Subcontractant</option>
+                    <option value="materiale">Materiale</option>
+                    <option value="transport">Transport</option>
+                    <option value="alte">Alte cheltuieli</option>
+                  </select>
+                  
+                  {/* ÎNLOCUIT: Furnizor cu SubcontractantSearch */}
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50' }}>
+                      Furnizor
+                    </label>
+                    <SubcontractantSearch
+                      onSubcontractantSelected={(subcontractant) => handleSubcontractantSelectForCheltuiala(cheltuiala.id, subcontractant)}
+                      onShowAddModal={handleShowSubcontractantModal}
+                      selectedSubcontractant={cheltuiala.subcontractant_nume}
+                      showInModal={true}
+                      disabled={loading}
+                      placeholder="Caută furnizor/subcontractant sau CUI pentru ANAF..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem'
+                }}>
                   <input
                     type="text"
-                    value={clientSearch}
-                    onChange={(e) => handleClientSearch(e.target.value)}
+                    value={cheltuiala.descriere}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
                     disabled={loading}
-                    placeholder="Caută client sau scrie numele..."
+                    placeholder="Descriere cheltuială"
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      gridColumn: 'span 2'
+                    }}
+                  />
+                  
+                  <input
+                    type="number"
+                    value={cheltuiala.valoare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
+                    disabled={loading}
+                    placeholder="Valoare"
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
                       fontSize: '14px'
                     }}
                   />
                   
-                  {showClientSuggestions && filteredClients.length > 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: 'white',
-                      border: '1px solid #dee2e6',
-                      borderTop: 'none',
-                      borderRadius: '0 0 6px 6px',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                      zIndex: 1000,
-                      maxHeight: '200px',
-                      overflowY: 'auto'
-                    }}>
-                      {filteredClients.map(client => (
-                        <div
-                          key={client.id}
-                          onClick={() => selectClient(client)}
-                          style={{
-                            padding: '0.75rem',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid #f1f2f6',
-                            fontSize: '14px'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#f8f9fa';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = 'white';
-                          }}
-                        >
-                          <div style={{ fontWeight: 'bold' }}>{client.nume}</div>
-                          {client.cui && (
-                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                              CUI: {client.cui}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={() => setShowClientModal(true)}
-                  disabled={loading}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    background: '#27ae60',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  + Client Nou
-                </button>
-              </div>
-            </div>
-
-            {/* Adresa */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Adresa Proiect
-              </label>
-              <input
-                type="text"
-                value={formData.Adresa}
-                onChange={(e) => handleInputChange('Adresa', e.target.value)}
-                disabled={loading}
-                placeholder="Adresa unde se desfășoară proiectul"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-
-            {/* SECȚIUNE: Valoare și Monedă */}
-            <div style={{ 
-              background: '#f8f9fa',
-              padding: '1rem',
-              borderRadius: '6px',
-              marginBottom: '1rem',
-              border: '1px solid #dee2e6'
-            }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-                Valoare Proiect 
-                <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                  Cursuri BNR LIVE (Precizie originală - fără rotunjire)
-                </span>
-              </h4>
-              
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '1rem'
-              }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Valoare Estimată *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.Valoare_Estimata}
-                    onChange={(e) => handleInputChange('Valoare_Estimata', e.target.value)}
-                    disabled={loading}
-                    placeholder="15000"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Monedă
-                  </label>
                   <select
-                    value={formData.moneda}
-                    onChange={(e) => handleInputChange('moneda', e.target.value)}
+                    value={cheltuiala.moneda}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
                     disabled={loading}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
+                      borderRadius: '4px',
                       fontSize: '14px'
                     }}
                   >
@@ -1553,144 +2057,67 @@ export default function ProiectEditModal({
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Data Curs
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.data_curs_valutar}
-                    onChange={(e) => handleInputChange('data_curs_valutar', e.target.value)}
-                    disabled={loading || formData.moneda === 'RON'}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Echivalent RON
-                  </label>
-                  <div style={{
-                    padding: '0.75rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '6px',
-                    background: '#fff',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    color: loadingCurs ? '#6c757d' : '#27ae60'
-                  }}>
-                    {loadingCurs ? 'Se calculează...' : 
-                     formData.valoare_ron ? `${ensureNumber(formData.valoare_ron, 0).toLocaleString('ro-RO')} RON` : 
-                     '0.00 RON'}
-                  </div>
-                  {cursValutar && formData.moneda !== 'RON' && (
-                    <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
-                      Curs: 1 {formData.moneda} = {formatWithOriginalPrecision(cursValutar, precizieOriginala)} RON
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* SECȚIUNE: Status-uri Multiple */}
-            <div style={{ 
-              background: '#e8f5e8',
-              padding: '1rem',
-              borderRadius: '6px',
-              marginBottom: '1rem',
-              border: '1px solid #c3e6cb'
-            }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Status-uri Proiect</h4>
-              
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '1rem'
-              }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Status Predare
-                  </label>
+                {/* Status-uri pentru cheltuială */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                  gap: '0.5rem'
+                }}>
                   <select
-                    value={formData.status_predare}
-                    onChange={(e) => handleInputChange('status_predare', e.target.value)}
+                    value={cheltuiala.status_predare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
                     disabled={loading}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
+                      borderRadius: '4px',
+                      fontSize: '12px'
                     }}
                   >
                     <option value="Nepredat">Nepredat</option>
                     <option value="Predat">Predat</option>
                   </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Status Contract
-                  </label>
+                  
                   <select
-                    value={formData.status_contract}
-                    onChange={(e) => handleInputChange('status_contract', e.target.value)}
+                    value={cheltuiala.status_contract}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
                     disabled={loading}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
+                      borderRadius: '4px',
+                      fontSize: '12px'
                     }}
                   >
                     <option value="Nu e cazul">Nu e cazul</option>
                     <option value="Nesemnat">Nesemnat</option>
                     <option value="Semnat">Semnat</option>
                   </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Status Facturare
-                  </label>
+                  
                   <select
-                    value={formData.status_facturare}
-                    onChange={(e) => handleInputChange('status_facturare', e.target.value)}
+                    value={cheltuiala.status_facturare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
                     disabled={loading}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
+                      borderRadius: '4px',
+                      fontSize: '12px'
                     }}
                   >
                     <option value="Nefacturat">Nefacturat</option>
                     <option value="Facturat">Facturat</option>
                   </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Status Achitare
-                  </label>
+                  
                   <select
-                    value={formData.status_achitare}
-                    onChange={(e) => handleInputChange('status_achitare', e.target.value)}
+                    value={cheltuiala.status_achitare}
+                    onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
                     disabled={loading}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      fontSize: '14px'
+                      borderRadius: '4px',
+                      fontSize: '12px'
                     }}
                   >
                     <option value="Neachitat">Neachitat</option>
@@ -1699,395 +2126,202 @@ export default function ProiectEditModal({
                   </select>
                 </div>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* SECȚIUNE: Date și Echipa cu responsabili multipli */}
-            <div style={{ 
-              background: '#f0f8ff',
-              padding: '1rem',
-              borderRadius: '6px',
-              marginBottom: '1rem',
-              border: '1px solid #cce7ff'
-            }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-                Perioada Proiect și Echipa
-                <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
-                  Responsabili multipli cu roluri
+          {/* SECȚIUNE: Subproiecte */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#2c3e50' }}>
+                Subproiecte
+                <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
+                  Cursuri BNR LIVE (Precizie originală - fără rotunjire)
                 </span>
               </h4>
-              
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '1rem',
-                marginBottom: '1rem'
-              }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Data Început
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.Data_Start}
-                    onChange={(e) => handleInputChange('Data_Start', e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={addSubproiect}
+                disabled={loading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#3498db',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                + Adaugă Subproiect
+              </button>
+            </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Data Finalizare (estimată)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.Data_Final}
-                    onChange={(e) => handleInputChange('Data_Final', e.target.value)}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Secțiunea pentru responsabili multipli */}
-              <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
-                  Responsabili Proiect *
-                  <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                    Minimum 1 responsabil Principal
-                  </span>
-                </h4>
-
-                <div style={{
-                  background: '#f8f9fa',
-                  padding: '1rem',
+            {formData.subproiecte.filter(s => !s.isDeleted).map((subproiect, index) => (
+              <div
+                key={subproiect.id || subproiect.ID_Subproiect}
+                style={{
+                  border: '1px solid #3498db',
                   borderRadius: '8px',
-                  border: '1px solid #dee2e6',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  background: '#f8fbff',
+                  position: 'relative'
+                }}
+              >
+                {subproiect.isExisting && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0.5rem',
+                    right: '3rem',
+                    background: '#3498db',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 'bold'
+                  }}>
+                    EXISTENT
+                  </div>
+                )}
+                
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
                   marginBottom: '1rem'
                 }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    Adaugă Responsabil
-                  </label>
-                  <ResponsabilSearch
-                    onResponsabilSelected={handleResponsabilSelect}
-                    showInModal={true}
+                  <h5 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
+                    Subproiect #{index + 1}
+                    {subproiect.ID_Subproiect && (
+                      <span style={{ fontSize: '11px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
+                        ({subproiect.ID_Subproiect})
+                      </span>
+                    )}
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => removeSubproiect(subproiect.id || subproiect.ID_Subproiect!)}
                     disabled={loading}
-                    placeholder="Caută și selectează responsabili..."
+                    style={{
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Sterge
+                  </button>
+                </div>
+                
+                {/* Denumire */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <input
+                    type="text"
+                    value={subproiect.denumire}
+                    onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'denumire', e.target.value)}
+                    disabled={loading}
+                    placeholder="Denumire subproiect *"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
                   />
                 </div>
 
-                {responsabiliSelectati.length > 0 && (
-                  <div>
-                    <h5 style={{ margin: '0 0 0.5rem 0', color: '#2c3e50' }}>
-                      Responsabili Selectați ({responsabiliSelectati.length})
-                    </h5>
-                    <div style={{ display: 'grid', gap: '0.5rem' }}>
-                      {responsabiliSelectati.map((responsabil) => (
-                        <div
-                          key={responsabil.uid}
-                          style={{
-                            border: '1px solid #27ae60',
-                            borderRadius: '6px',
-                            padding: '0.75rem',
-                            background: 'rgba(39, 174, 96, 0.05)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
-                              {responsabil.nume_complet}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                              {responsabil.email}
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <select
-                              value={responsabil.rol_in_proiect}
-                              onChange={(e) => updateRolResponsabil(responsabil.uid, e.target.value)}
-                              disabled={loading}
-                              style={{
-                                padding: '0.5rem',
-                                border: '1px solid #dee2e6',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                minWidth: '120px'
-                              }}
-                            >
-                              <option value="Principal">Principal</option>
-                              <option value="Normal">Normal</option>
-                              <option value="Observator">Observator</option>
-                            </select>
-                            
-                            <button
-                              type="button"
-                              onClick={() => removeResponsabil(responsabil.uid)}
-                              disabled={loading}
-                              style={{
-                                background: '#e74c3c',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '0.5rem',
-                                cursor: 'pointer',
-                                fontSize: '12px'
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {responsabiliSelectati.length === 0 && (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '2rem',
-                    color: '#7f8c8d',
-                    background: '#f8f9fa',
-                    borderRadius: '8px',
-                    border: '2px dashed #dee2e6'
-                  }}>
-                    <p style={{ margin: 0, fontSize: '14px' }}>
-                      Nu sunt selectați responsabili. Caută și adaugă cel puțin un responsabil.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Informație despre perioada proiectului */}
-              {formData.Data_Start && formData.Data_Final && (
-                <div style={{
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  background: '#d4edda',
-                  border: '1px solid #c3e6cb',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  color: '#155724'
+                {/* Date Start/Final */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: '0.5rem',
+                  marginBottom: '0.75rem'
                 }}>
-                  <strong>Perioada proiect:</strong> {new Date(formData.Data_Start).toLocaleDateString()} → {new Date(formData.Data_Final).toLocaleDateString()}
-                  {(() => {
-                    try {
-                      const start = new Date(formData.Data_Start);
-                      const end = new Date(formData.Data_Final);
-                      const diffTime = Math.abs(end.getTime() - start.getTime());
-                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                      return ` (${diffDays} ${diffDays === 1 ? 'zi' : 'zile'})`;
-                    } catch {
-                      return '';
-                    }
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* Descriere */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Descriere
-              </label>
-              <textarea
-                value={formData.Descriere}
-                onChange={(e) => handleInputChange('Descriere', e.target.value)}
-                disabled={loading}
-                placeholder="Descrierea detaliată a proiectului..."
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            {/* SECȚIUNE cheltuieli cu SubcontractantSearch */}
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                  Cheltuieli Proiect
-                  <span style={{ fontSize: '12px', color: '#3498db', marginLeft: '1rem' }}>
-                    SubcontractantSearch în loc de nume+CUI
-                  </span>
-                </h4>
-                <button
-                  type="button"
-                  onClick={addCheltuiala}
-                  disabled={loading}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#e67e22',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  + Adaugă Cheltuială
-                </button>
-              </div>
-
-              {formData.cheltuieli.filter(c => !c.isDeleted).map((cheltuiala, index) => (
-                <div
-                  key={cheltuiala.id}
-                  style={{
-                    border: '1px solid #f39c12',
-                    borderRadius: '6px',
-                    padding: '1rem',
-                    marginBottom: '1rem',
-                    background: '#fef9e7',
-                    position: 'relative'
-                  }}
-                >
-                  {cheltuiala.isExisting && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '0.5rem',
-                      right: '3rem',
-                      background: '#f39c12',
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: 'bold'
-                    }}>
-                      EXISTENT
-                    </div>
-                  )}
-                  
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <h5 style={{ margin: 0, color: '#2c3e50' }}>
-                      Cheltuială #{index + 1}
-                    </h5>
-                    <button
-                      type="button"
-                      onClick={() => removeCheltuiala(cheltuiala.id)}
-                      disabled={loading}
-                      style={{
-                        background: '#e74c3c',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.25rem 0.5rem',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      Șterge
-                    </button>
-                  </div>
-
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                    gap: '0.5rem',
-                    marginBottom: '0.5rem'
-                  }}>
-                    <select
-                      value={cheltuiala.tip_cheltuiala}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'tip_cheltuiala', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      <option value="subcontractant">Subcontractant</option>
-                      <option value="materiale">Materiale</option>
-                      <option value="transport">Transport</option>
-                      <option value="alte">Alte cheltuieli</option>
-                    </select>
-                    
-                    {/* ÎNLOCUIT: Furnizor cu SubcontractantSearch */}
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50' }}>
-                        Furnizor
-                      </label>
-                      <SubcontractantSearch
-                        onSubcontractantSelected={(subcontractant) => handleSubcontractantSelectForCheltuiala(cheltuiala.id, subcontractant)}
-                        onShowAddModal={handleShowSubcontractantModal}
-                        selectedSubcontractant={cheltuiala.subcontractant_nume}
-                        showInModal={true}
-                        disabled={loading}
-                        placeholder="Caută furnizor/subcontractant sau CUI pentru ANAF..."
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                    gap: '0.5rem',
-                    marginBottom: '0.5rem'
-                  }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Data Start
+                    </label>
                     <input
-                      type="text"
-                      value={cheltuiala.descriere}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'descriere', e.target.value)}
+                      type="date"
+                      value={subproiect.data_start || formData.Data_Start}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_start', e.target.value)}
                       disabled={loading}
-                      placeholder="Descriere cheltuială"
                       style={{
+                        width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '14px',
-                        gridColumn: 'span 2'
+                        fontSize: '13px'
                       }}
                     />
-                    
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Data Final
+                    </label>
+                    <input
+                      type="date"
+                      value={subproiect.data_final || formData.Data_Final}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_final', e.target.value)}
+                      disabled={loading}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        fontSize: '13px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Valoare + Monedă + Status */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '120px 80px 1fr', 
+                  gap: '0.5rem',
+                  marginBottom: '0.75rem'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Valoare
+                    </label>
                     <input
                       type="number"
-                      value={cheltuiala.valoare}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'valoare', e.target.value)}
+                      value={subproiect.valoare}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'valoare', e.target.value)}
                       disabled={loading}
-                      placeholder="Valoare"
+                      placeholder="0"
                       style={{
+                        width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '14px'
+                        fontSize: '13px'
                       }}
                     />
-                    
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Monedă
+                    </label>
                     <select
-                      value={cheltuiala.moneda}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'moneda', e.target.value)}
+                      value={subproiect.moneda}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'moneda', e.target.value)}
                       disabled={loading}
                       style={{
+                        width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '14px'
+                        fontSize: '13px'
                       }}
                     >
                       <option value="RON">RON</option>
@@ -2096,432 +2330,177 @@ export default function ProiectEditModal({
                       <option value="GBP">GBP</option>
                     </select>
                   </div>
-
-                  {/* Status-uri pentru cheltuială */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-                    gap: '0.5rem'
-                  }}>
-                    <select
-                      value={cheltuiala.status_predare}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_predare', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      <option value="Nepredat">Nepredat</option>
-                      <option value="Predat">Predat</option>
-                    </select>
-                    
-                    <select
-                      value={cheltuiala.status_contract}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_contract', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      <option value="Nu e cazul">Nu e cazul</option>
-                      <option value="Nesemnat">Nesemnat</option>
-                      <option value="Semnat">Semnat</option>
-                    </select>
-                    
-                    <select
-                      value={cheltuiala.status_facturare}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_facturare', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      <option value="Nefacturat">Nefacturat</option>
-                      <option value="Facturat">Facturat</option>
-                    </select>
-                    
-                    <select
-                      value={cheltuiala.status_achitare}
-                      onChange={(e) => updateCheltuiala(cheltuiala.id, 'status_achitare', e.target.value)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    >
-                      <option value="Neachitat">Neachitat</option>
-                      <option value="Achitat">Achitat</option>
-                      <option value="Nu e cazul">Nu e cazul</option>
-                    </select>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* SECȚIUNE: Subproiecte */}
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                  Subproiecte
-                  <span style={{ fontSize: '12px', color: '#27ae60', marginLeft: '1rem' }}>
-                    Cursuri BNR LIVE (Precizie originală - fără rotunjire)
-                  </span>
-                </h4>
-                <button
-                  type="button"
-                  onClick={addSubproiect}
-                  disabled={loading}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#3498db',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  + Adaugă Subproiect
-                </button>
-              </div>
-
-              {formData.subproiecte.filter(s => !s.isDeleted).map((subproiect, index) => (
-                <div
-                  key={subproiect.id || subproiect.ID_Subproiect}
-                  style={{
-                    border: '1px solid #3498db',
-                    borderRadius: '8px',
-                    padding: '1rem',
-                    marginBottom: '1rem',
-                    background: '#f8fbff',
-                    position: 'relative'
-                  }}
-                >
-                  {subproiect.isExisting && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '0.5rem',
-                      right: '3rem',
-                      background: '#3498db',
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: 'bold'
-                    }}>
-                      EXISTENT
-                    </div>
-                  )}
                   
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '1rem'
-                  }}>
-                    <h5 style={{ margin: 0, color: '#2c3e50', fontSize: '14px', fontWeight: 'bold' }}>
-                      Subproiect #{index + 1}
-                      {subproiect.ID_Subproiect && (
-                        <span style={{ fontSize: '11px', color: '#7f8c8d', marginLeft: '0.5rem' }}>
-                          ({subproiect.ID_Subproiect})
-                        </span>
-                      )}
-                    </h5>
-                    <button
-                      type="button"
-                      onClick={() => removeSubproiect(subproiect.id || subproiect.ID_Subproiect!)}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Status
+                    </label>
+                    <select
+                      value={subproiect.status}
+                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'status', e.target.value)}
                       disabled={loading}
-                      style={{
-                        background: '#e74c3c',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.25rem 0.5rem',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      Sterge
-                    </button>
-                  </div>
-                  
-                  {/* Denumire */}
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <input
-                      type="text"
-                      value={subproiect.denumire}
-                      onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'denumire', e.target.value)}
-                      disabled={loading}
-                      placeholder="Denumire subproiect *"
                       style={{
                         width: '100%',
                         padding: '0.5rem',
                         border: '1px solid #dee2e6',
                         borderRadius: '4px',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
+                        fontSize: '13px'
                       }}
-                    />
-                  </div>
-
-                  {/* Date Start/Final */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr 1fr', 
-                    gap: '0.5rem',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Data Start
-                      </label>
-                      <input
-                        type="date"
-                        value={subproiect.data_start || formData.Data_Start}
-                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_start', e.target.value)}
-                        disabled={loading}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Data Final
-                      </label>
-                      <input
-                        type="date"
-                        value={subproiect.data_final || formData.Data_Final}
-                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'data_final', e.target.value)}
-                        disabled={loading}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Valoare + Monedă + Status */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '120px 80px 1fr', 
-                    gap: '0.5rem',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Valoare
-                      </label>
-                      <input
-                        type="number"
-                        value={subproiect.valoare}
-                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'valoare', e.target.value)}
-                        disabled={loading}
-                        placeholder="0"
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Monedă
-                      </label>
-                      <select
-                        value={subproiect.moneda}
-                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'moneda', e.target.value)}
-                        disabled={loading}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      >
-                        <option value="RON">RON</option>
-                        <option value="EUR">EUR</option>
-                        <option value="USD">USD</option>
-                        <option value="GBP">GBP</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Status
-                      </label>
-                      <select
-                        value={subproiect.status}
-                        onChange={(e) => updateSubproiect(subproiect.id || subproiect.ID_Subproiect!, 'status', e.target.value)}
-                        disabled={loading}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '13px'
-                        }}
-                      >
-                        <option value="Planificat">Planificat</option>
-                        <option value="Activ">Activ</option>
-                        <option value="Finalizat">Finalizat</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Responsabili - Secțiune compactă */}
-                  <div style={{
-                    background: '#f0f8ff',
-                    border: '1px solid #cce7ff',
-                    borderRadius: '6px',
-                    padding: '0.75rem'
-                  }}>
-                    <div style={{ marginBottom: '0.5rem' }}>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
-                        Responsabili Subproiect
-                      </label>
-                      <ResponsabilSearch
-                        onResponsabilSelected={(responsabil) => handleResponsabilSubproiectSelected(subproiect.id || subproiect.ID_Subproiect!, responsabil)}
-                        showInModal={true}
-                        disabled={loading}
-                        placeholder="Caută responsabili..."
-                      />
-                    </div>
-                    
-                    {/* Afișare responsabili selectați - Layout compact */}
-                    {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!] && responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length > 0 && (
-                      <div style={{ marginTop: '0.5rem' }}>
-                        <div style={{ fontSize: '11px', color: '#7f8c8d', marginBottom: '0.25rem' }}>
-                          Responsabili selectați ({responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length}):
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                          {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].map((resp) => (
-                            <div
-                              key={resp.uid}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.25rem 0.5rem',
-                                background: 'rgba(39, 174, 96, 0.1)',
-                                border: '1px solid rgba(39, 174, 96, 0.3)',
-                                borderRadius: '12px',
-                                fontSize: '11px'
-                              }}
-                            >
-                              <span style={{ fontWeight: 'bold', color: '#2c3e50', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {resp.nume_complet}
-                              </span>
-                              <select
-                                value={resp.rol_in_subproiect || 'Normal'}
-                                onChange={(e) => updateRolResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid, e.target.value)}
-                                disabled={loading}
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  fontSize: '11px',
-                                  borderRadius: '4px',
-                                  border: '1px solid #dee2e6',
-                                  background: 'white',
-                                  minWidth: '85px'
-                                }}
-                              >
-                                <option value="Principal">Principal</option>
-                                <option value="Normal">Normal</option>
-                                <option value="Observator">Observator</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => removeResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid)}
-                                disabled={loading}
-                                style={{
-                                  background: '#e74c3c',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '50%',
-                                  width: '16px',
-                                  height: '16px',
-                                  fontSize: '10px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    >
+                      <option value="Planificat">Planificat</option>
+                      <option value="Activ">Activ</option>
+                      <option value="Finalizat">Finalizat</option>
+                    </select>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Observații */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                Observații
-              </label>
-              <textarea
-                value={formData.Observatii}
-                onChange={(e) => handleInputChange('Observatii', e.target.value)}
-                disabled={loading}
-                placeholder="Observații despre proiect..."
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #dee2e6',
+                {/* Responsabili - Secțiune compactă */}
+                <div style={{
+                  background: '#f0f8ff',
+                  border: '1px solid #cce7ff',
                   borderRadius: '6px',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
+                  padding: '0.75rem'
+                }}>
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '0.25rem' }}>
+                      Responsabili Subproiect
+                    </label>
+                    <ResponsabilSearch
+                      onResponsabilSelected={(responsabil) => handleResponsabilSubproiectSelected(subproiect.id || subproiect.ID_Subproiect!, responsabil)}
+                      showInModal={true}
+                      disabled={loading}
+                      placeholder="Caută responsabili..."
+                    />
+                  </div>
+                  
+                  {/* Afișare responsabili selectați - Layout compact */}
+                  {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!] && responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length > 0 && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <div style={{ fontSize: '11px', color: '#7f8c8d', marginBottom: '0.25rem' }}>
+                        Responsabili selectați ({responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].length}):
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                        {responsabiliSubproiecte[subproiect.id || subproiect.ID_Subproiect!].map((resp) => (
+                          <div
+                            key={resp.uid}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.25rem 0.5rem',
+                              background: 'rgba(39, 174, 96, 0.1)',
+                              border: '1px solid rgba(39, 174, 96, 0.3)',
+                              borderRadius: '12px',
+                              fontSize: '11px'
+                            }}
+                          >
+                            <span style={{ fontWeight: 'bold', color: '#2c3e50', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {resp.nume_complet}
+                            </span>
+                            <select
+                              value={resp.rol_in_proiect}
+                              onChange={(e) => updateRolResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid, e.target.value)}
+                              disabled={loading}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '11px',
+                                borderRadius: '4px',
+                                border: '1px solid #dee2e6',
+                                background: 'white',
+                                minWidth: '85px'
+                              }}
+                            >
+                              <option value="Principal">Principal</option>
+                              <option value="Normal">Normal</option>
+                              <option value="Observator">Observator</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeResponsabilSubproiect(subproiect.id || subproiect.ID_Subproiect!, resp.uid)}
+                              disabled={loading}
+                              style={{
+                                background: '#e74c3c',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '16px',
+                                height: '16px',
+                                fontSize: '10px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
 
-            {/* Butoanele de acțiune */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              gap: '1rem',
-              paddingTop: '2rem',
-              borderTop: '1px solid #dee2e6',
-              marginTop: '2rem'
-            }}>
+          {/* Observații */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+              Observații
+            </label>
+            <textarea
+              value={formData.Observatii}
+              onChange={(e) => handleInputChange('Observatii', e.target.value)}
+              disabled={loading}
+              placeholder="Observații despre proiect..."
+              rows={2}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                fontSize: '14px',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          {/* Butoane finale */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            gap: '1rem',
+            paddingTop: '2rem',
+            borderTop: '1px solid #dee2e6',
+            marginTop: '2rem'
+          }}>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: loading ? '#bdc3c7' : '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              {loading ? 'Se șterge...' : 'Șterge Proiect'}
+            </button>
+            
+            <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={onClose}
                 disabled={loading}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: loading ? '#bdc3c7' : '#e74c3c',
+                  background: '#6c757d',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -2530,51 +2509,32 @@ export default function ProiectEditModal({
                   fontWeight: 'bold'
                 }}
               >
-                {loading ? 'Se șterge...' : 'Șterge Proiect'}
+                Anulează
               </button>
               
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={loading}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Anulează
-                </button>
-                
-                <button
-                  type="submit"
-                  disabled={loading || responsabiliSelectati.length === 0}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: (loading || responsabiliSelectati.length === 0) ? '#bdc3c7' : '#27ae60',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: (loading || responsabiliSelectati.length === 0) ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {loading ? 'Se salvează...' : 'Salvează Modificările'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || responsabiliSelectati.length === 0}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: (loading || responsabiliSelectati.length === 0) ? '#bdc3c7' : '#27ae60',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: (loading || responsabiliSelectati.length === 0) ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {loading ? 'Se salvează...' : 'Salvează Modificările'}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
 
-      {/* PĂSTRAT: Modal Client Nou */}
+      {/* Modal Client Nou */}
       {showClientModal && (
         <ClientNouModal
           isOpen={showClientModal}
@@ -2586,7 +2546,7 @@ export default function ProiectEditModal({
         />
       )}
 
-      {/* PĂSTRAT: Modal Subcontractant Nou */}
+      {/* Modal Subcontractant Nou */}
       {showSubcontractantModal && (
         <SubcontractantNouModal
           isOpen={showSubcontractantModal}
@@ -2594,6 +2554,7 @@ export default function ProiectEditModal({
           onSubcontractantAdded={handleSubcontractantAdded}
         />
       )}
-    </>
-  );
+    </div>,
+    document.body
+  ) : null;
 }
