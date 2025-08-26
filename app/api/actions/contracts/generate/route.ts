@@ -1,5 +1,15 @@
+// ==================================================================
+// CALEA: app/api/actions/contracts/generate/route.ts
+// DATA: 26.08.2025 23:00 (ora României)
+// CORECȚII: Project ID + Helper functions + Pattern DOCX existent + Z-index + Error handling
+// ==================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
+import JSZip from 'jszip';
+import { getNextContractNumber } from '../../../setari/contracte/route';
+
+const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -10,9 +20,73 @@ const bigquery = new BigQuery({
   },
 });
 
+// Helper pentru conversie BigQuery NUMERIC (reutilizat din pattern-ul existent)
+const convertBigQueryNumeric = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  
+  if (typeof value === 'object' && value.value !== undefined) {
+    return parseFloat(value.value.toString()) || 0;
+  }
+  
+  if (typeof value === 'string') {
+    return parseFloat(value) || 0;
+  }
+  
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  return 0;
+};
+
+// Helper pentru formatarea datelor BigQuery
+const formatDate = (date?: string | { value: string }): string => {
+  if (!date) return '';
+  const dateValue = typeof date === 'string' ? date : date.value;
+  try {
+    return new Date(dateValue).toLocaleDateString('ro-RO');
+  } catch {
+    return '';
+  }
+};
+
+// Helper pentru formatarea datelor pentru BigQuery
+const formatDateForBigQuery = (dateString: string): string | null => {
+  if (!dateString || dateString.trim() === '') {
+    return null;
+  }
+  
+  try {
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (isoDateRegex.test(dateString)) {
+      const date = new Date(dateString + 'T00:00:00');
+      if (!isNaN(date.getTime())) {
+        return dateString;
+      }
+    }
+    
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Eroare la formatarea datei pentru BigQuery:', dateString, error);
+    return null;
+  }
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const { proiectId } = await request.json();
+    const {
+      proiectId,
+      tipDocument = 'contract',
+      sablonId,
+      termenePersonalizate = [],
+      articoleSuplimentare = [],
+      observatii
+    } = await request.json();
 
     if (!proiectId) {
       return NextResponse.json({ 
@@ -20,10 +94,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 1. Obține datele proiectului din BigQuery
+    console.log(`Generare contract pentru proiect: ${proiectId}, tip: ${tipDocument}`);
+
+    // 1. Preia datele proiectului cu JOIN către client (PROJECT ID CORECT)
     const projectQuery = `
-      SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
-      WHERE ID_Proiect = @proiectId
+      SELECT 
+        p.*,
+        c.id as client_id,
+        c.nume as client_nume,
+        c.cui as client_cui,
+        c.nr_reg_com as client_reg_com,
+        c.adresa as client_adresa,
+        c.judet as client_judet,
+        c.oras as client_oras,
+        c.telefon as client_telefon,
+        c.email as client_email
+      FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\` p
+      LEFT JOIN \`${PROJECT_ID}.PanouControlUnitar.Clienti\` c
+        ON p.Client = c.nume
+      WHERE p.ID_Proiect = @proiectId
     `;
 
     const [projectRows] = await bigquery.query({
@@ -40,50 +129,64 @@ export async function POST(request: NextRequest) {
 
     const proiect = projectRows[0];
 
-    // 2. Verifică dacă există template de contract
-    const templateQuery = `
-      SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ContractTemplates\`
-      WHERE tip = 'standard' AND activ = true
-      ORDER BY data_creare DESC
-      LIMIT 1
+    // 2. Preia subproiectele (PROJECT ID CORECT)
+    const subproiecteQuery = `
+      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      WHERE ID_Proiect = @proiectId
+      ORDER BY Denumire ASC
     `;
 
-    let templateRows;
-    try {
-      [templateRows] = await bigquery.query({
-        query: templateQuery,
-        location: 'EU',
-      });
-    } catch (error) {
-      // Dacă tabela nu există, creează un contract simplu
-      console.log('Tabela ContractTemplates nu există, generez contract simplu');
-      templateRows = [];
-    }
+    const [subproiecteRows] = await bigquery.query({
+      query: subproiecteQuery,
+      params: { proiectId },
+      location: 'EU',
+    });
 
-    let contractContent;
+    // 3. Calculează suma totală contractului (cu helper functions corecte)
+    const { sumaFinala, monedaFinala, cursuriUtilizate } = calculeazaSumaContract(
+      proiect, 
+      subproiecteRows, 
+      articoleSuplimentare
+    );
 
-    if (templateRows && templateRows.length > 0) {
-      // Folosește template-ul existent
-      const template = templateRows[0];
-      contractContent = await processContractTemplate(template.continut, proiect);
-    } else {
-      // Generează contract simplu cu template default
-      contractContent = generateDefaultContract(proiect);
-    }
+    // 4. Generează numărul contractului
+    const contractData = await getNextContractNumber(tipDocument, proiectId);
 
-    // 3. Salvează contractul generat în BigQuery (audit trail)
-    await saveGeneratedContract(proiectId, contractContent);
+    // 5. Pregătește datele pentru înlocuire placeholder-uri
+    const placeholderData = prepareazaPlaceholderData(
+      proiect, 
+      subproiecteRows, 
+      sumaFinala,
+      monedaFinala,
+      contractData,
+      termenePersonalizate,
+      articoleSuplimentare
+    );
 
-    // 4. Pentru moment, returnează link de download ca HTML
-    // TODO: Implementare generare .docx reală
-    const htmlContent = generateContractHTML(contractContent);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Contract generat cu succes',
-      contractData: contractContent,
-      downloadUrl: null, // TODO: Implementare download real
-      htmlPreview: htmlContent
+    // 6. Generează DOCX (folosind pattern-ul existent din /api/genereaza/docx)
+    const docxBuffer = await genereazaDOCXContract(placeholderData, sablonId);
+
+    // 7. Salvează în BigQuery (PROJECT ID CORECT)
+    const contractId = await salveazaContract({
+      proiectId,
+      tipDocument,
+      contractData,
+      placeholderData,
+      sumaFinala,
+      monedaFinala,
+      cursuriUtilizate,
+      observatii
+    });
+
+    // 8. Returnează rezultatul
+    return new NextResponse(docxBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${contractData.numar_contract}.docx"`,
+        'X-Contract-Id': contractId,
+        'X-Contract-Number': contractData.numar_contract
+      }
     });
 
   } catch (error) {
@@ -95,196 +198,316 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processContractTemplate(template: string, proiect: any): Promise<any> {
-  // Înlocuiește placeholder-urile din template cu datele reale
-  const placeholders = {
-    '{{client.nume}}': proiect.Client || '',
-    '{{proiect.denumire}}': proiect.Denumire || '',
-    '{{proiect.id}}': proiect.ID_Proiect || '',
-    '{{proiect.valoare}}': proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON` : 'Nu este specificată',
-    '{{proiect.data_start}}': proiect.Data_Start ? formatDate(proiect.Data_Start) : '',
-    '{{proiect.data_final}}': proiect.Data_Final ? formatDate(proiect.Data_Final) : '',
-    '{{firma.nume}}': 'UNITAR PROIECT TDA',
-    '{{firma.adresa}}': 'Adresa firmei UNITAR', // TODO: Din configurare
-    '{{data_contract}}': formatDate(new Date()),
-    '{{numar_contract}}': `CONTR-${proiect.ID_Proiect}-${new Date().getFullYear()}`
-  };
+// Calculează suma finală a contractului (cu helper functions corecte)
+function calculeazaSumaContract(proiect: any, subproiecte: any[], articoleSuplimentare: any[]) {
+  let sumaFinala = 0;
+  let monedaFinala = 'RON';
+  const cursuriUtilizate: { [moneda: string]: number } = {};
 
-  let processedTemplate = template;
-  Object.entries(placeholders).forEach(([placeholder, value]) => {
-    processedTemplate = processedTemplate.replace(new RegExp(placeholder, 'g'), value);
+  // LOGICA CRITICĂ: Pentru proiecte cu subproiecte, suma = DOAR subproiecte + articole
+  if (subproiecte.length > 0) {
+    // Suma doar din subproiecte (NU din proiectul principal)
+    subproiecte.forEach(sub => {
+      const valoare = convertBigQueryNumeric(sub.valoare_ron) || convertBigQueryNumeric(sub.Valoare_Estimata);
+      sumaFinala += valoare;
+      
+      if (sub.moneda && sub.moneda !== 'RON') {
+        cursuriUtilizate[sub.moneda] = convertBigQueryNumeric(sub.curs_valutar) || 1;
+      }
+    });
+    
+    console.log(`Proiect cu ${subproiecte.length} subproiecte - suma calculată FĂRĂ proiectul principal: ${sumaFinala} RON`);
+  } else {
+    // Pentru proiecte fără subproiecte, suma = valoarea proiectului
+    sumaFinala = convertBigQueryNumeric(proiect.valoare_ron) || convertBigQueryNumeric(proiect.Valoare_Estimata);
+    monedaFinala = proiect.moneda || 'RON';
+    
+    if (proiect.moneda && proiect.moneda !== 'RON') {
+      cursuriUtilizate[proiect.moneda] = convertBigQueryNumeric(proiect.curs_valutar) || 1;
+    }
+    
+    console.log(`Proiect fără subproiecte - suma din proiect: ${sumaFinala} ${monedaFinala}`);
+  }
+
+  // Adaugă articolele suplimentare
+  articoleSuplimentare.forEach(articol => {
+    let valoareRON = convertBigQueryNumeric(articol.valoare);
+    
+    if (articol.moneda && articol.moneda !== 'RON') {
+      valoareRON = valoareRON * (cursuriUtilizate[articol.moneda] || 1);
+      cursuriUtilizate[articol.moneda] = cursuriUtilizate[articol.moneda] || 1;
+    }
+    
+    sumaFinala += valoareRON;
   });
 
-  return {
-    id: proiect.ID_Proiect,
-    numarContract: placeholders['{{numar_contract}}'],
-    client: proiect.Client,
-    proiect: proiect.Denumire,
-    valoare: proiect.Valoare_Estimata,
-    dataStart: proiect.Data_Start,
-    dataFinal: proiect.Data_Final,
-    continut: processedTemplate
-  };
+  return { sumaFinala, monedaFinala, cursuriUtilizate };
 }
 
-function generateDefaultContract(proiect: any): any {
-  const numarContract = `CONTR-${proiect.ID_Proiect}-${new Date().getFullYear()}`;
+// Pregătește datele pentru placeholder-uri
+function prepareazaPlaceholderData(
+  proiect: any, 
+  subproiecte: any[], 
+  sumaFinala: number,
+  monedaFinala: string,
+  contractData: any,
+  termene: any[],
+  articole: any[]
+) {
+  const dataContract = new Date().toLocaleDateString('ro-RO');
   
   return {
-    id: proiect.ID_Proiect,
-    numarContract,
-    client: proiect.Client,
-    proiect: proiect.Denumire,
-    valoare: proiect.Valoare_Estimata,
-    dataStart: proiect.Data_Start,
-    dataFinal: proiect.Data_Final,
-    continut: `
-CONTRACT DE PRESTĂRI SERVICII
-
-Numărul: ${numarContract}
-Data: ${formatDate(new Date())}
-
-PĂRȚILE CONTRACTANTE:
-
-1. PRESTATOR: UNITAR PROIECT TDA
-   Adresa: [Adresa completă]
-   CUI: [CUI firmă]
-   
-2. BENEFICIAR: ${proiect.Client}
-   Adresa: [Adresa client]
-
-OBIECTUL CONTRACTULUI:
-Prestarea serviciilor de inginerie structurală pentru proiectul "${proiect.Denumire}".
-
-VALOAREA CONTRACTULUI:
-${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata} RON + TVA` : 'Se va stabili ulterior'}
-
-TERMENE DE EXECUȚIE:
-Data început: ${proiect.Data_Start ? formatDate(proiect.Data_Start) : 'Se va stabili'}
-Data finalizare: ${proiect.Data_Final ? formatDate(proiect.Data_Final) : 'Se va stabili'}
-
-CLAUZE SPECIALE:
-- Serviciile se vor presta conform normelor în vigoare
-- Plata se va efectua conform acordului părților
-- Contractul poate fi modificat doar prin act adițional
-
-Prestator,                    Beneficiar,
-UNITAR PROIECT TDA           ${proiect.Client}
-    `
+    // Date contract
+    contract: {
+      numar: contractData.numar_contract,
+      data: dataContract,
+      tip: contractData.setari?.tip_document || 'contract'
+    },
+    
+    // Date client (cu fallback pentru valori lipsă)
+    client: {
+      nume: proiect.client_nume || proiect.Client || 'Client necunoscut',
+      cui: proiect.client_cui || 'CUI necunoscut',
+      nr_reg_com: proiect.client_reg_com || 'Nr. reg. com. necunoscut',
+      adresa: proiect.client_adresa || 'Adresa necunoscută',
+      judet: proiect.client_judet || '',
+      oras: proiect.client_oras || '',
+      telefon: proiect.client_telefon || '',
+      email: proiect.client_email || '',
+      reprezentant: 'Administrator' // Default
+    },
+    
+    // Date proiect (cu conversii BigQuery corecte)
+    proiect: {
+      id: proiect.ID_Proiect,
+      denumire: proiect.Denumire,
+      descriere: proiect.Descriere || '',
+      adresa: proiect.Adresa || '',
+      valoare: sumaFinala,
+      moneda: monedaFinala,
+      data_start: formatDate(proiect.Data_Start),
+      data_final: formatDate(proiect.Data_Final),
+      responsabil: proiect.Responsabil || ''
+    },
+    
+    // Date firmă UNITAR (actualizate conform README)
+    firma: {
+      nume: 'UNITAR PROIECT TDA SRL',
+      cui: 'RO35639210',
+      nr_reg_com: 'J2016002024405',
+      adresa: 'Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01, mun. Bucuresti, sector 4',
+      telefon: '0765486044',
+      email: 'contact@unitarproiect.eu',
+      cont_ing: 'RO82INGB0000999905667533',
+      cont_trezorerie: 'RO29TREZ7035069XXX018857'
+    },
+    
+    // Subproiecte și articole (cu conversii corecte)
+    subproiecte: subproiecte.map(sub => ({
+      denumire: sub.Denumire,
+      valoare: convertBigQueryNumeric(sub.valoare_ron) || convertBigQueryNumeric(sub.Valoare_Estimata),
+      moneda: sub.moneda || 'RON',
+      status: sub.Status
+    })),
+    
+    articole_suplimentare: articole,
+    termene_personalizate: termene,
+    
+    // Metadate
+    data_generare: new Date().toISOString(),
+    suma_totala_ron: sumaFinala.toFixed(2)
   };
 }
 
-function generateContractHTML(contractData: any): string {
+// Generează DOCX cu template (folosind pattern-ul existent)
+async function genereazaDOCXContract(placeholderData: any, sablonId?: string): Promise<Buffer> {
+  
+  const continutHTML = genereazaContractHTML(placeholderData);
+  
+  // Convertește HTML în structura DOCX (pattern existent din /api/genereaza/docx)
+  const wordXml = convertHTMLToWordXML(continutHTML);
+  
+  // Creează ZIP-ul DOCX (pattern identic cu cel existent)
+  const zip = new JSZip();
+  
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+  
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+  
+  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`);
+  
+  zip.file('word/document.xml', wordXml);
+  
+  return await zip.generateAsync({ type: 'nodebuffer' });
+}
+
+// Generează HTML pentru contract (template profesional)
+function genereazaContractHTML(data: any): string {
   return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Contract ${contractData.numarContract}</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .section { margin-bottom: 20px; }
-        .parties { display: flex; justify-content: space-between; margin: 20px 0; }
-        .party { width: 45%; }
-        .signature-area { display: flex; justify-content: space-between; margin-top: 50px; }
-        .signature { text-align: center; width: 40%; }
-        @media print { body { margin: 20px; } }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>CONTRACT DE PRESTĂRI SERVICII</h1>
-        <p><strong>Numărul:</strong> ${contractData.numarContract}</p>
-        <p><strong>Data:</strong> ${formatDate(new Date())}</p>
+<div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+  <h1 style="text-align: center;">CONTRACT DE SERVICII</h1>
+  <p style="text-align: center;"><strong>Nr. ${data.contract.numar} din ${data.contract.data}</strong></p>
+  
+  <h2>PĂRȚILE CONTRACTANTE:</h2>
+  
+  <div style="margin: 20px 0;">
+    <strong>1. BENEFICIAR:</strong> ${data.client.nume}<br>
+    CUI: ${data.client.cui}<br>
+    Nr. Reg. Com.: ${data.client.nr_reg_com}<br>
+    Adresa: ${data.client.adresa}<br>
+    ${data.client.telefon ? `Telefon: ${data.client.telefon}<br>` : ''}
+    ${data.client.email ? `Email: ${data.client.email}<br>` : ''}
+  </div>
+  
+  <div style="margin: 20px 0;">
+    <strong>2. PRESTATOR:</strong> ${data.firma.nume}<br>
+    CUI: ${data.firma.cui}<br>
+    Nr. Reg. Com.: ${data.firma.nr_reg_com}<br>
+    Adresa: ${data.firma.adresa}<br>
+    Telefon: ${data.firma.telefon}<br>
+    Email: ${data.firma.email}<br>
+    Cont ING: ${data.firma.cont_ing}<br>
+    Cont Trezorerie: ${data.firma.cont_trezorerie}
+  </div>
+  
+  <h2>OBIECTUL CONTRACTULUI:</h2>
+  <p>Prestarea serviciilor de inginerie structurală pentru proiectul <strong>"${data.proiect.denumire}"</strong>.</p>
+  ${data.proiect.descriere ? `<p>Descriere: ${data.proiect.descriere}</p>` : ''}
+  ${data.proiect.adresa ? `<p>Adresa execuție: ${data.proiect.adresa}</p>` : ''}
+  
+  <h2>VALOAREA CONTRACTULUI:</h2>
+  <p><strong>${data.suma_totala_ron} RON + TVA</strong></p>
+  
+  ${data.subproiecte.length > 0 ? `
+  <h3>Detaliere pe subproiecte:</h3>
+  <ul>
+    ${data.subproiecte.map(sub => `
+      <li>${sub.denumire}: ${sub.valoare.toFixed(2)} ${sub.moneda}</li>
+    `).join('')}
+  </ul>
+  ` : ''}
+  
+  ${data.articole_suplimentare.length > 0 ? `
+  <h3>Articole suplimentare:</h3>
+  <ul>
+    ${data.articole_suplimentare.map(art => `
+      <li>${art.descriere}: ${art.valoare} ${art.moneda}</li>
+    `).join('')}
+  </ul>
+  ` : ''}
+  
+  <h2>TERMENE DE EXECUȚIE:</h2>
+  <p>Data început: ${data.proiect.data_start || 'Se va stabili'}</p>
+  <p>Data finalizare: ${data.proiect.data_final || 'Se va stabili'}</p>
+  
+  ${data.termene_personalizate.length > 0 ? `
+  <h3>Termene personalizate:</h3>
+  <ul>
+    ${data.termene_personalizate.map(termen => `
+      <li>${termen.denumire}: ${termen.termen_zile} zile (${termen.procent_plata}% din valoare)</li>
+    `).join('')}
+  </ul>
+  ` : ''}
+  
+  <h2>CONDIȚII DE PLATĂ:</h2>
+  <p>Plata se va efectua în lei conform cursului BNR din ziua facturării.</p>
+  
+  <div style="margin-top: 50px; display: flex; justify-content: space-between;">
+    <div style="text-align: center;">
+      <strong>PRESTATOR</strong><br>
+      ${data.firma.nume}<br>
+      <br><br>
+      _______________________
     </div>
-    
-    <div class="section">
-        <h3>PĂRȚILE CONTRACTANTE:</h3>
-        <div class="parties">
-            <div class="party">
-                <strong>1. PRESTATOR:</strong><br>
-                UNITAR PROIECT TDA<br>
-                Adresa: [Adresa completă]<br>
-                CUI: [CUI firmă]
-            </div>
-            <div class="party">
-                <strong>2. BENEFICIAR:</strong><br>
-                ${contractData.client}<br>
-                Adresa: [Adresa client]
-            </div>
-        </div>
+    <div style="text-align: center;">
+      <strong>BENEFICIAR</strong><br>
+      ${data.client.nume}<br>
+      <br><br>
+      _______________________
     </div>
-    
-    <div class="section">
-        <h3>OBIECTUL CONTRACTULUI:</h3>
-        <p>Prestarea serviciilor de inginerie structurală pentru proiectul <strong>"${contractData.proiect}"</strong>.</p>
-    </div>
-    
-    <div class="section">
-        <h3>VALOAREA CONTRACTULUI:</h3>
-        <p>${contractData.valoare ? `${contractData.valoare} RON + TVA` : 'Se va stabili ulterior'}</p>
-    </div>
-    
-    <div class="section">
-        <h3>TERMENE DE EXECUȚIE:</h3>
-        <p><strong>Data început:</strong> ${contractData.dataStart ? formatDate(contractData.dataStart) : 'Se va stabili'}</p>
-        <p><strong>Data finalizare:</strong> ${contractData.dataFinal ? formatDate(contractData.dataFinal) : 'Se va stabili'}</p>
-    </div>
-    
-    <div class="signature-area">
-        <div class="signature">
-            <p><strong>Prestator,</strong></p>
-            <p>UNITAR PROIECT TDA</p>
-            <p style="margin-top: 40px;">_________________</p>
-        </div>
-        <div class="signature">
-            <p><strong>Beneficiar,</strong></p>
-            <p>${contractData.client}</p>
-            <p style="margin-top: 40px;">_________________</p>
-        </div>
-    </div>
-</body>
-</html>
+  </div>
+</div>
   `;
 }
 
-async function saveGeneratedContract(proiectId: string, contractData: any): Promise<void> {
+// Convertește HTML în XML Word (pattern existent)
+function convertHTMLToWordXML(html: string): string {
+  const cleanText = html
+    .replace(/<h1[^>]*>(.*?)<\/h1>/g, '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>$1</w:t></w:r></w:p>')
+    .replace(/<h2[^>]*>(.*?)<\/h2>/g, '<w:p><w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>$1</w:t></w:r></w:p>')
+    .replace(/<h3[^>]*>(.*?)<\/h3>/g, '<w:p><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>$1</w:t></w:r></w:p>')
+    .replace(/<p[^>]*>(.*?)<\/p>/g, '<w:p><w:r><w:t>$1</w:t></w:r></w:p>')
+    .replace(/<strong>(.*?)<\/strong>/g, '<w:r><w:rPr><w:b/></w:rPr><w:t>$1</w:t></w:r>')
+    .replace(/<br\s*\/?>/g, '</w:t></w:r></w:p><w:p><w:r><w:t>')
+    .replace(/<ul[^>]*>/g, '')
+    .replace(/<\/ul>/g, '')
+    .replace(/<li[^>]*>(.*?)<\/li>/g, '<w:p><w:r><w:t>• $1</w:t></w:r></w:p>')
+    .replace(/<div[^>]*>/g, '')
+    .replace(/<\/div>/g, '')
+    .replace(/<[^>]+>/g, ''); // Remove any remaining HTML tags
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${cleanText}
+  </w:body>
+</w:document>`;
+}
+
+// Salvează contractul în BigQuery (PROJECT ID CORECT)
+async function salveazaContract(contractInfo: any): Promise<string> {
+  const contractId = `CONTR_${contractInfo.proiectId}_${Date.now()}`;
+  
   try {
-    // Încearcă să salveze contractul generat pentru audit
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ContracteGenerate\`
-      (id, proiect_id, numar_contract, data_generare, continut_json, status)
-      VALUES (@id, @proiectId, @numarContract, @dataGenerare, @continut, 'generat')
+      INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+      (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, client_id, client_nume, 
+       Denumire_Contract, Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
+       continut_json, data_creare, data_actualizare, Observatii)
+      VALUES 
+      (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId, @clientId, @clientNume,
+       @denumireContract, @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
+       @continutJson, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @observatii)
     `;
 
     await bigquery.query({
       query: insertQuery,
       params: {
-        id: `contract_${proiectId}_${Date.now()}`,
-        proiectId,
-        numarContract: contractData.numarContract,
-        dataGenerare: new Date().toISOString(),
-        continut: JSON.stringify(contractData)
+        contractId,
+        numarContract: contractInfo.contractData.numar_contract,
+        serieContract: contractInfo.contractData.serie,
+        tipDocument: contractInfo.tipDocument,
+        proiectId: contractInfo.proiectId,
+        clientId: contractInfo.placeholderData.client.id || null,
+        clientNume: contractInfo.placeholderData.client.nume,
+        denumireContract: `Contract ${contractInfo.placeholderData.proiect.denumire}`,
+        status: 'Generat',
+        valoare: contractInfo.sumaFinala,
+        moneda: contractInfo.monedaFinala,
+        cursValutar: null,
+        dataCurs: null,
+        valoareRon: contractInfo.sumaFinala,
+        continutJson: JSON.stringify(contractInfo.placeholderData),
+        observatii: contractInfo.observatii || null
       },
       location: 'EU',
     });
-  } catch (error) {
-    // Dacă tabela nu există, nu oprește procesul
-    console.log('Nu s-a putut salva contractul în audit trail:', error);
-  }
-}
 
-function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  
-  if (isNaN(d.getTime())) {
-    return '';
+    console.log(`Contract salvat în BigQuery: ${contractId}`);
+    return contractId;
+    
+  } catch (error) {
+    console.error('Eroare la salvarea contractului în BigQuery:', error);
+    throw error;
   }
-  
-  return d.toLocaleDateString('ro-RO', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
 }

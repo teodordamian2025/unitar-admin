@@ -1,3 +1,5 @@
+//app/api/genereaza/docx/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import JSZip from 'jszip';
 

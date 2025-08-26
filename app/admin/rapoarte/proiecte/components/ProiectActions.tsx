@@ -49,6 +49,7 @@ interface ProiectActionsProps {
   onShowFacturaModal?: (proiect: any) => void;
   onShowSubproiectModal?: (proiect: any) => void;
   onShowEditModal?: (proiect: any) => void;
+  onShowContractModal?: (proiect: any) => void;
 }
 
 // System global pentru management dropdown-uri multiple
@@ -187,6 +188,13 @@ export default function ProiectActions({
         disabled: proiect.Status === 'Anulat'
       },
       {
+          key: 'generate_contract',
+          label: 'Genereaza Contract',
+          icon: '📄',
+          color: 'primary',
+          disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
+        },
+      {
         key: 'divider2',
         label: '',
         icon: '',
@@ -242,6 +250,9 @@ export default function ProiectActions({
           handleCreateInvoiceHibrid();
           break;
         case 'mark_completed':
+        case 'generate_contract':
+          handleGenerateContract();
+          break;
           await handleUpdateStatus('Finalizat');
           break;
         case 'suspend':
@@ -281,6 +292,16 @@ export default function ProiectActions({
     } else {
       console.warn('onShowFacturaModal callback not provided');
       showToast('Funcția de generare factură nu este disponibilă', 'error');
+    }
+  };
+  
+  const handleGenerateContract = () => {
+    if (onShowContractModal) {
+      onShowContractModal(proiect);
+    } else {
+      // Fallback dacă modalul nu e implementat încă
+      showToast('Sistemul de contracte va fi disponibil în curând!', 'info');
+      console.log('Contract pentru proiect:', proiect.ID_Proiect);
     }
   };
 
