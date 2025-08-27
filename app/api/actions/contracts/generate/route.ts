@@ -553,11 +553,11 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       dataSemnare: formatDateForBigQuery(new Date().toISOString().split('T')[0]),
       dataExpirare: null,
       status: 'Generat',
-      valoare: String(contractInfo.sumaFinala),
+      valoare: contractInfo.sumaFinala,
       moneda: contractInfo.monedaFinala,
       cursValutar: null,
       dataCurs: null,
-      valoareRon: String(contractInfo.sumaFinala),
+      valoareRon: contractInfo.sumaFinala,
       etape: JSON.stringify(contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
         ? contractInfo.termenePersonalizate 
         : [{ id: "default", denumire: "La semnare", termen_zile: 0, procent_plata: 100 }]),
@@ -577,13 +577,15 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       contractParinte: sanitizeStringForBigQuery(null)
     };
 
-    // FIX CRITIC: Tipurile explicite pentru valorile NULL (fără JSON ca arrays sunt acum strings)
+    // FIX CRITIC: Tipurile explicite pentru valorile NULL + NUMERIC strings
     const tipuriParametri = {
       clientId: 'STRING',
       dataSemnare: 'DATE',
       dataExpirare: 'DATE',
+      valoare: 'NUMERIC',      // Forțează conversie string -> NUMERIC
       cursValutar: 'NUMERIC',
       dataCurs: 'DATE',
+      valoareRon: 'NUMERIC',   // Forțează conversie string -> NUMERIC
       sablonId: 'STRING',
       sablonNume: 'STRING',
       creatDe: 'STRING',
