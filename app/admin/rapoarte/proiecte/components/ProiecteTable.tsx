@@ -13,6 +13,7 @@ import ProiectNouModal from './ProiectNouModal';
 import FacturaHibridModal from './FacturaHibridModal';
 import SubproiectModal from './SubproiectModal';
 import ProiectEditModal from './ProiectEditModal';
+import ContractModal from './ContractModal';  // ✅ ADĂUGAT: Import ContractModal
 
 // Interfețe PĂSTRATE identic
 interface Proiect {
@@ -191,6 +192,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [showSubproiectModal, setShowSubproiectModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProiect, setSelectedProiect] = useState<any>(null);
+  const [showContractModal, setShowContractModal] = useState(false);
   
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
@@ -424,6 +426,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     setSelectedProiect(proiect);
     setShowEditModal(true);
   };
+  
+  const handleShowContractModal = (proiect: any) => {
+    setSelectedProiect(proiect);
+    setShowContractModal(true);
+  };
 
   const handleFacturaSuccess = (invoiceId: string, downloadUrl?: string) => {
     setShowFacturaModal(false);
@@ -452,6 +459,13 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     showToast('Proiect șters cu succes!', 'success');
     handleRefresh();
   };
+  
+  const handleContractSuccess = () => {
+    setShowContractModal(false);
+    setSelectedProiect(null);
+    showToast('Contract generat cu succes!', 'success');
+    handleRefresh();
+  };
 
   const handleCloseFacturaModal = () => {
     setShowFacturaModal(false);
@@ -465,6 +479,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
+    setSelectedProiect(null);
+  };
+  
+  const handleCloseContractModal = () => {
+    setShowContractModal(false);
     setSelectedProiect(null);
   };
 
@@ -1204,6 +1223,7 @@ const formatDate = (dateString?: string | null) => {
                             onShowFacturaModal={handleShowFacturaModal}
                             onShowSubproiectModal={handleShowSubproiectModal}
                             onShowEditModal={handleShowEditModal}
+                            onShowContractModal={handleShowContractModal}
                           />
                         </td>
                       </tr>
@@ -1333,6 +1353,7 @@ const formatDate = (dateString?: string | null) => {
                               onShowFacturaModal={handleShowFacturaModal}
                               onShowSubproiectModal={handleShowSubproiectModal}
                               onShowEditModal={handleShowEditModal}
+                              onShowContractModal={handleShowContractModal}
                             />
                           </td>
                         </tr>
@@ -1463,6 +1484,16 @@ const formatDate = (dateString?: string | null) => {
             onClose={handleCloseEditModal}
             onProiectUpdated={handleEditSuccess}
             onProiectDeleted={handleEditDelete}
+          />
+        </div>
+      )}
+      {showContractModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <ContractModal
+            proiect={selectedProiect}
+            isOpen={showContractModal}
+            onClose={handleCloseContractModal}
+            onSuccess={handleContractSuccess}
           />
         </div>
       )}
