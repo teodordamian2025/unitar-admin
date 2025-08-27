@@ -21,22 +21,29 @@ const bigquery = new BigQuery({
   },
 });
 
-// Helper pentru conversie BigQuery NUMERIC (reutilizat din pattern-ul existent)
+// Helper pentru conversie BigQuery NUMERIC (FIX pentru obiecte BigQuery)
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
-  if (typeof value === 'object' && value.value !== undefined) {
-    return parseFloat(value.value.toString()) || 0;
+  // FIX CRITIC: BigQuery NUMERIC vine ca obiect {value: "number"}
+  if (typeof value === 'object' && value !== null && value.value !== undefined) {
+    const numericValue = parseFloat(value.value.toString()) || 0;
+    console.log(`BigQuery NUMERIC conversion: ${JSON.stringify(value)} -> ${numericValue}`);
+    return numericValue;
   }
   
   if (typeof value === 'string') {
-    return parseFloat(value) || 0;
+    const parsed = parseFloat(value) || 0;
+    console.log(`String to number: ${value} -> ${parsed}`);
+    return parsed;
   }
   
   if (typeof value === 'number') {
+    console.log(`Already number: ${value}`);
     return value;
   }
   
+  console.log(`Cannot convert to number: ${JSON.stringify(value)} (type: ${typeof value})`);
   return 0;
 };
 
@@ -535,8 +542,12 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       cursValutar: null,
       dataCurs: null,
       valoareRon: contractInfo.sumaFinala,
-      etape: contractInfo.termenePersonalizate || [],
-      articoleSuplimentare: contractInfo.articoleSuplimentare || [],
+      etape: contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
+        ? contractInfo.termenePersonalizate 
+        : [{ id: "default", denumire: "La semnare", termen_zile: 0, procent_plata: 100 }],
+      articoleSuplimentare: contractInfo.articoleSuplimentare && contractInfo.articoleSuplimentare.length > 0
+        ? contractInfo.articoleSuplimentare
+        : [],
       sablonId: sanitizeStringForBigQuery(null),
       sablonNume: sanitizeStringForBigQuery(null),
       creatDe: sanitizeStringForBigQuery('SISTEM'),
@@ -550,13 +561,14 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       contractParinte: sanitizeStringForBigQuery(null)
     };
 
-    // FIX CRITIC: Tipurile explicite pentru valorile NULL (fără JSON fields)
+    // FIX CRITIC: Tipurile explicite pentru valorile NULL + empty arrays
     const tipuriParametri = {
       clientId: 'STRING',
       dataSemnare: 'DATE',
       dataExpirare: 'DATE',
       cursValutar: 'NUMERIC',
       dataCurs: 'DATE',
+      articoleSuplimentare: 'JSON',  // Tip pentru array gol
       sablonId: 'STRING',
       sablonNume: 'STRING',
       creatDe: 'STRING',
