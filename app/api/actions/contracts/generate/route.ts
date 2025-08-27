@@ -520,7 +520,7 @@ async function salveazaContract(contractInfo: any): Promise<string> {
   const contractId = `CONTR_${contractInfo.proiectId}_${Date.now()}`;
   
   try {
-    // FIX CRITIC: Query corect cu toate câmpurile din schema BigQuery
+    // FIX CRITIC: Query corect cu PARSE_JSON pentru câmpurile JSON
     const insertQuery = `
       INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
       (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
@@ -534,9 +534,9 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
        @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
        @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
-       @etape, @articoleSuplimentare, @sablonId, @sablonNume,
+       PARSE_JSON(@etape), PARSE_JSON(@articoleSuplimentare), @sablonId, @sablonNume,
        CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @creatDe, @actualizatDe,
-       @continutJson, @pathFisier, @hashContinut, @observatii, @noteInterne,
+       PARSE_JSON(@continutJson), @pathFisier, @hashContinut, @observatii, @noteInterne,
        @versiune, @contractParinte)
     `;
 
