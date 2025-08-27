@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts
-// DATA: 26.08.2025 23:00 (ora României)
-// CORECȚII: Project ID + Helper functions + Pattern DOCX existent + Z-index + Error handling
+// DATA: 27.08.2025 02:45 (ora României)
+// CORECȚII: BigQuery NULL types + câmpuri lipsă + mapping corect
+// PĂSTRATE: Toate funcționalitățile existente + pattern DOCX
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,10 +10,10 @@ import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
 import { getNextContractNumber } from '../../../setari/contracte/route';
 
-const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
+const PROJECT_ID = 'hale-mode-464009-i6';
 
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -39,7 +40,7 @@ const convertBigQueryNumeric = (value: any): number => {
   return 0;
 };
 
-// Helper pentru formatarea datelor BigQuery
+// Helper pentru formatarea datelor BigQuery (pattern din EditFacturaModal)
 const formatDate = (date?: string | { value: string }): string => {
   if (!date) return '';
   const dateValue = typeof date === 'string' ? date : date.value;
@@ -50,8 +51,8 @@ const formatDate = (date?: string | { value: string }): string => {
   }
 };
 
-// Helper pentru formatarea datelor pentru BigQuery
-const formatDateForBigQuery = (dateString: string): string | null => {
+// Helper pentru formatarea datelor pentru BigQuery (pattern din EditFacturaModal)
+const formatDateForBigQuery = (dateString?: string): string | null => {
   if (!dateString || dateString.trim() === '') {
     return null;
   }
@@ -77,6 +78,20 @@ const formatDateForBigQuery = (dateString: string): string | null => {
   }
 };
 
+// Helper pentru validarea și sanitizarea string-urilor pentru BigQuery
+const sanitizeStringForBigQuery = (value: any): string | null => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  }
+  
+  return String(value).trim() || null;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -96,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Generare contract pentru proiect: ${proiectId}, tip: ${tipDocument}`);
 
-    // 1. Preia datele proiectului cu JOIN către client (PROJECT ID CORECT)
+    // 1. Preia datele proiectului cu JOIN către client
     const projectQuery = `
       SELECT 
         p.*,
@@ -129,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     const proiect = projectRows[0];
 
-    // 2. Preia subproiectele (PROJECT ID CORECT)
+    // 2. Preia subproiectele
     const subproiecteQuery = `
       SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
       WHERE ID_Proiect = @proiectId
@@ -142,7 +157,7 @@ export async function POST(request: NextRequest) {
       location: 'EU',
     });
 
-    // 3. Calculează suma totală contractului (cu helper functions corecte)
+    // 3. Calculează suma totală contractului
     const { sumaFinala, monedaFinala, cursuriUtilizate } = calculeazaSumaContract(
       proiect, 
       subproiecteRows, 
@@ -163,10 +178,10 @@ export async function POST(request: NextRequest) {
       articoleSuplimentare
     );
 
-    // 6. Generează DOCX (folosind pattern-ul existent din /api/genereaza/docx)
+    // 6. Generează DOCX
     const docxBuffer = await genereazaDOCXContract(placeholderData, sablonId);
 
-    // 7. Salvează în BigQuery (PROJECT ID CORECT)
+    // 7. Salvează în BigQuery (FIX COMPLET)
     const contractId = await salveazaContract({
       proiectId,
       tipDocument,
@@ -175,7 +190,9 @@ export async function POST(request: NextRequest) {
       sumaFinala,
       monedaFinala,
       cursuriUtilizate,
-      observatii
+      observatii,
+      termenePersonalizate,
+      articoleSuplimentare
     });
 
     // 8. Returnează rezultatul
@@ -198,7 +215,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Calculează suma finală a contractului (cu helper functions corecte)
+// Calculează suma finală a contractului
 function calculeazaSumaContract(proiect: any, subproiecte: any[], articoleSuplimentare: any[]) {
   let sumaFinala = 0;
   let monedaFinala = 'RON';
@@ -206,7 +223,6 @@ function calculeazaSumaContract(proiect: any, subproiecte: any[], articoleSuplim
 
   // LOGICA CRITICĂ: Pentru proiecte cu subproiecte, suma = DOAR subproiecte + articole
   if (subproiecte.length > 0) {
-    // Suma doar din subproiecte (NU din proiectul principal)
     subproiecte.forEach(sub => {
       const valoare = convertBigQueryNumeric(sub.valoare_ron) || convertBigQueryNumeric(sub.Valoare_Estimata);
       sumaFinala += valoare;
@@ -218,7 +234,6 @@ function calculeazaSumaContract(proiect: any, subproiecte: any[], articoleSuplim
     
     console.log(`Proiect cu ${subproiecte.length} subproiecte - suma calculată FĂRĂ proiectul principal: ${sumaFinala} RON`);
   } else {
-    // Pentru proiecte fără subproiecte, suma = valoarea proiectului
     sumaFinala = convertBigQueryNumeric(proiect.valoare_ron) || convertBigQueryNumeric(proiect.Valoare_Estimata);
     monedaFinala = proiect.moneda || 'RON';
     
@@ -274,7 +289,7 @@ function prepareazaPlaceholderData(
       oras: proiect.client_oras || '',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: 'Administrator' // Default
+      reprezentant: 'Administrator'
     },
     
     // Date proiect (cu conversii BigQuery corecte)
@@ -319,15 +334,12 @@ function prepareazaPlaceholderData(
   };
 }
 
-// Generează DOCX cu template (folosind pattern-ul existent)
+// Generează DOCX cu template
 async function genereazaDOCXContract(placeholderData: any, sablonId?: string): Promise<Buffer> {
-  
   const continutHTML = genereazaContractHTML(placeholderData);
-  
-  // Convertește HTML în structura DOCX (pattern existent din /api/genereaza/docx)
   const wordXml = convertHTMLToWordXML(continutHTML);
   
-  // Creează ZIP-ul DOCX (pattern identic cu cel existent)
+  // Crează ZIP-ul DOCX
   const zip = new JSZip();
   
   zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -351,7 +363,7 @@ async function genereazaDOCXContract(placeholderData: any, sablonId?: string): P
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
-// Generează HTML pentru contract (template profesional)
+// Generează HTML pentru contract
 function genereazaContractHTML(data: any): string {
   return `
 <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
@@ -440,7 +452,7 @@ function genereazaContractHTML(data: any): string {
   `;
 }
 
-// Convertește HTML în XML Word (pattern existent)
+// Convertește HTML în XML Word
 function convertHTMLToWordXML(html: string): string {
   const cleanText = html
     .replace(/<h1[^>]*>(.*?)<\/h1>/g, '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>$1</w:t></w:r></w:p>')
@@ -454,7 +466,7 @@ function convertHTMLToWordXML(html: string): string {
     .replace(/<li[^>]*>(.*?)<\/li>/g, '<w:p><w:r><w:t>• $1</w:t></w:r></w:p>')
     .replace(/<div[^>]*>/g, '')
     .replace(/<\/div>/g, '')
-    .replace(/<[^>]+>/g, ''); // Remove any remaining HTML tags
+    .replace(/<[^>]+>/g, '');
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -464,50 +476,107 @@ function convertHTMLToWordXML(html: string): string {
 </w:document>`;
 }
 
-// Salvează contractul în BigQuery (PROJECT ID CORECT)
+// FIX COMPLET: Salvează contractul în BigQuery cu tipuri corecte pentru NULL
 async function salveazaContract(contractInfo: any): Promise<string> {
   const contractId = `CONTR_${contractInfo.proiectId}_${Date.now()}`;
   
   try {
+    // FIX CRITIC: Query corect cu toate câmpurile din schema BigQuery
     const insertQuery = `
       INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
-      (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, client_id, client_nume, 
-       Denumire_Contract, Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
-       continut_json, data_creare, data_actualizare, Observatii)
+      (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
+       client_id, client_nume, Denumire_Contract, Data_Semnare, Data_Expirare,
+       Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
+       etape, articole_suplimentare, sablon_id, sablon_nume,
+       data_creare, data_actualizare, creat_de, actualizat_de,
+       continut_json, path_fisier, hash_continut, Observatii, note_interne,
+       versiune, contract_parinte)
       VALUES 
-      (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId, @clientId, @clientNume,
-       @denumireContract, @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
-       @continutJson, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @observatii)
+      (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
+       @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
+       @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
+       @etape, @articoleSuplimentare, @sablonId, @sablonNume,
+       CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @creatDe, @actualizatDe,
+       @continutJson, @pathFisier, @hashContinut, @observatii, @noteInterne,
+       @versiune, @contractParinte)
     `;
+
+    // FIX CRITIC: Parametrii cu gestionare corectă NULL + tipuri explicite
+    const parametrii = {
+      contractId,
+      numarContract: contractInfo.contractData.numar_contract,
+      serieContract: sanitizeStringForBigQuery(contractInfo.contractData.serie),
+      tipDocument: contractInfo.tipDocument,
+      proiectId: contractInfo.proiectId,
+      clientId: sanitizeStringForBigQuery(contractInfo.placeholderData.client.id),
+      clientNume: contractInfo.placeholderData.client.nume,
+      denumireContract: `Contract ${contractInfo.placeholderData.proiect.denumire}`,
+      dataSemnare: formatDateForBigQuery(new Date().toISOString().split('T')[0]),
+      dataExpirare: null,
+      status: 'Generat',
+      valoare: contractInfo.sumaFinala,
+      moneda: contractInfo.monedaFinala,
+      cursValutar: null,
+      dataCurs: null,
+      valoareRon: contractInfo.sumaFinala,
+      etape: JSON.stringify(contractInfo.termenePersonalizate || []),
+      articoleSuplimentare: JSON.stringify(contractInfo.articoleSuplimentare || []),
+      sablonId: sanitizeStringForBigQuery(null),
+      sablonNume: sanitizeStringForBigQuery(null),
+      creatDe: sanitizeStringForBigQuery('SISTEM'),
+      actualizatDe: sanitizeStringForBigQuery('SISTEM'),
+      continutJson: JSON.stringify(contractInfo.placeholderData),
+      pathFisier: sanitizeStringForBigQuery(null),
+      hashContinut: sanitizeStringForBigQuery(null),
+      observatii: sanitizeStringForBigQuery(contractInfo.observatii),
+      noteInterne: sanitizeStringForBigQuery(null),
+      versiune: 1,
+      contractParinte: sanitizeStringForBigQuery(null)
+    };
+
+    // FIX CRITIC: Tipurile explicite pentru valorile NULL
+    const tipuriParametri = {
+      clientId: 'STRING',
+      dataSemnare: 'DATE',
+      dataExpirare: 'DATE',
+      cursValutar: 'NUMERIC',
+      dataCurs: 'DATE',
+      sablonId: 'STRING',
+      sablonNume: 'STRING',
+      creatDe: 'STRING',
+      actualizatDe: 'STRING',
+      pathFisier: 'STRING',
+      hashContinut: 'STRING',
+      observatii: 'STRING',
+      noteInterne: 'STRING',
+      contractParinte: 'STRING'
+    };
+
+    console.log('Salvare contract în BigQuery cu parametrii:', {
+      contractId,
+      proiectId: contractInfo.proiectId,
+      clientNume: contractInfo.placeholderData.client.nume,
+      valoare: contractInfo.sumaFinala,
+      tipDocument: contractInfo.tipDocument
+    });
 
     await bigquery.query({
       query: insertQuery,
-      params: {
-        contractId,
-        numarContract: contractInfo.contractData.numar_contract,
-        serieContract: contractInfo.contractData.serie,
-        tipDocument: contractInfo.tipDocument,
-        proiectId: contractInfo.proiectId,
-        clientId: contractInfo.placeholderData.client.id || null,
-        clientNume: contractInfo.placeholderData.client.nume,
-        denumireContract: `Contract ${contractInfo.placeholderData.proiect.denumire}`,
-        status: 'Generat',
-        valoare: contractInfo.sumaFinala,
-        moneda: contractInfo.monedaFinala,
-        cursValutar: null,
-        dataCurs: null,
-        valoareRon: contractInfo.sumaFinala,
-        continutJson: JSON.stringify(contractInfo.placeholderData),
-        observatii: contractInfo.observatii || null
-      },
+      params: parametrii,
+      types: tipuriParametri, // FIX PRINCIPAL: Tipurile pentru NULL
       location: 'EU',
     });
 
-    console.log(`Contract salvat în BigQuery: ${contractId}`);
+    console.log(`Contract salvat cu succes în BigQuery: ${contractId}`);
     return contractId;
     
   } catch (error) {
     console.error('Eroare la salvarea contractului în BigQuery:', error);
+    console.error('Detalii eroare:', {
+      contractId,
+      proiectId: contractInfo.proiectId,
+      error: error instanceof Error ? error.message : 'Eroare necunoscută'
+    });
     throw error;
   }
 }
