@@ -21,26 +21,42 @@ const bigquery = new BigQuery({
   },
 });
 
-// Helper pentru conversie BigQuery NUMERIC (FIX pentru obiecte BigQuery)
+// Helper pentru conversie BigQuery NUMERIC (FIX complet pentru toate cazurile)
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
-  // FIX CRITIC: BigQuery NUMERIC vine ca obiect {value: "number"}
-  if (typeof value === 'object' && value !== null && value.value !== undefined) {
-    const numericValue = parseFloat(value.value.toString()) || 0;
-    console.log(`BigQuery NUMERIC conversion: ${JSON.stringify(value)} -> ${numericValue}`);
+  console.log(`Converting value:`, value, `type:`, typeof value);
+  
+  // Cazul 1: BigQuery NUMERIC ca obiect {value: "number"}
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    const numericValue = parseFloat(String(value.value)) || 0;
+    console.log(`BigQuery NUMERIC object: ${JSON.stringify(value)} -> ${numericValue}`);
     return numericValue;
   }
   
+  // Cazul 2: String direct
   if (typeof value === 'string') {
     const parsed = parseFloat(value) || 0;
-    console.log(`String to number: ${value} -> ${parsed}`);
+    console.log(`String to number: "${value}" -> ${parsed}`);
     return parsed;
   }
   
+  // Cazul 3: Number direct
   if (typeof value === 'number') {
     console.log(`Already number: ${value}`);
     return value;
+  }
+  
+  // Cazul 4: Obiect fără proprietatea 'value' dar care conține string numeric
+  if (typeof value === 'object' && value !== null) {
+    // Încearcă să găsească o valoare numerică în obiect
+    const stringified = JSON.stringify(value);
+    const numericMatch = stringified.match(/["']?(\d+\.?\d*)["']?/);
+    if (numericMatch) {
+      const extracted = parseFloat(numericMatch[1]) || 0;
+      console.log(`Extracted from object: ${stringified} -> ${extracted}`);
+      return extracted;
+    }
   }
   
   console.log(`Cannot convert to number: ${JSON.stringify(value)} (type: ${typeof value})`);
@@ -542,12 +558,12 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       cursValutar: null,
       dataCurs: null,
       valoareRon: contractInfo.sumaFinala,
-      etape: contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
+      etape: JSON.stringify(contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
         ? contractInfo.termenePersonalizate 
-        : [{ id: "default", denumire: "La semnare", termen_zile: 0, procent_plata: 100 }],
-      articoleSuplimentare: contractInfo.articoleSuplimentare && contractInfo.articoleSuplimentare.length > 0
+        : [{ id: "default", denumire: "La semnare", termen_zile: 0, procent_plata: 100 }]),
+      articoleSuplimentare: JSON.stringify(contractInfo.articoleSuplimentare && contractInfo.articoleSuplimentare.length > 0
         ? contractInfo.articoleSuplimentare
-        : [],
+        : []),
       sablonId: sanitizeStringForBigQuery(null),
       sablonNume: sanitizeStringForBigQuery(null),
       creatDe: sanitizeStringForBigQuery('SISTEM'),
@@ -561,14 +577,13 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       contractParinte: sanitizeStringForBigQuery(null)
     };
 
-    // FIX CRITIC: Tipurile explicite pentru valorile NULL + empty arrays
+    // FIX CRITIC: Tipurile explicite pentru valorile NULL (fără JSON ca arrays sunt acum strings)
     const tipuriParametri = {
       clientId: 'STRING',
       dataSemnare: 'DATE',
       dataExpirare: 'DATE',
       cursValutar: 'NUMERIC',
       dataCurs: 'DATE',
-      articoleSuplimentare: 'JSON',  // Tip pentru array gol
       sablonId: 'STRING',
       sablonNume: 'STRING',
       creatDe: 'STRING',
