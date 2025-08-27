@@ -224,15 +224,31 @@ function calculeazaSumaContract(proiect: any, subproiecte: any[], articoleSuplim
   // LOGICA CRITICĂ: Pentru proiecte cu subproiecte, suma = DOAR subproiecte + articole
   if (subproiecte.length > 0) {
     subproiecte.forEach(sub => {
-      const valoare = convertBigQueryNumeric(sub.valoare_ron) || convertBigQueryNumeric(sub.Valoare_Estimata);
+      // FIX: Verifică mai multe surse pentru valoare
+      const valoare = convertBigQueryNumeric(sub.valoare_ron) || 
+                     convertBigQueryNumeric(sub.Valoare_Estimata) ||
+                     0;
       sumaFinala += valoare;
+      
+      console.log(`Subproiect ${sub.ID_Subproiect || sub.Denumire}: ${valoare} RON (din valoare_ron=${sub.valoare_ron}, Valoare_Estimata=${sub.Valoare_Estimata})`);
       
       if (sub.moneda && sub.moneda !== 'RON') {
         cursuriUtilizate[sub.moneda] = convertBigQueryNumeric(sub.curs_valutar) || 1;
       }
     });
     
-    console.log(`Proiect cu ${subproiecte.length} subproiecte - suma calculată FĂRĂ proiectul principal: ${sumaFinala} RON`);
+    console.log(`Proiect cu ${subproiecte.length} subproiecte - suma calculată din subproiecte: ${sumaFinala} RON`);
+    
+    // Dacă suma din subproiecte este 0, folosește valoarea proiectului principal ca fallback
+    if (sumaFinala === 0) {
+      console.log('ATENȚIE: Suma din subproiecte este 0, folosesc valoarea proiectului principal ca fallback');
+      sumaFinala = convertBigQueryNumeric(proiect.valoare_ron) || convertBigQueryNumeric(proiect.Valoare_Estimata) || 0;
+      monedaFinala = proiect.moneda || 'RON';
+      
+      if (proiect.moneda && proiect.moneda !== 'RON') {
+        cursuriUtilizate[proiect.moneda] = convertBigQueryNumeric(proiect.curs_valutar) || 1;
+      }
+    }
   } else {
     sumaFinala = convertBigQueryNumeric(proiect.valoare_ron) || convertBigQueryNumeric(proiect.Valoare_Estimata);
     monedaFinala = proiect.moneda || 'RON';
@@ -519,8 +535,8 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       cursValutar: null,
       dataCurs: null,
       valoareRon: contractInfo.sumaFinala,
-      etape: JSON.stringify(contractInfo.termenePersonalizate || []),
-      articoleSuplimentare: JSON.stringify(contractInfo.articoleSuplimentare || []),
+      etape: contractInfo.termenePersonalizate || [],
+      articoleSuplimentare: contractInfo.articoleSuplimentare || [],
       sablonId: sanitizeStringForBigQuery(null),
       sablonNume: sanitizeStringForBigQuery(null),
       creatDe: sanitizeStringForBigQuery('SISTEM'),
@@ -534,7 +550,7 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       contractParinte: sanitizeStringForBigQuery(null)
     };
 
-    // FIX CRITIC: Tipurile explicite pentru valorile NULL
+    // FIX CRITIC: Tipurile explicite pentru valorile NULL (fără JSON fields)
     const tipuriParametri = {
       clientId: 'STRING',
       dataSemnare: 'DATE',
