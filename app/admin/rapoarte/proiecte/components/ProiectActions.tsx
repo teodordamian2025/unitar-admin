@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// DATA: 21.08.2025 01:35 (ora României)
-// MODIFICAT: Acțiuni diferențiate - subproiecte active au doar "Sarcini"
-// PĂSTRATE: Toate funcționalitățile existente pentru proiecte
+// DATA: 27.08.2025 02:30 (ora României)
+// MODIFICAT: Adăugat buton Contract doar pentru proiecte principale
+// PĂSTRATE: Toate funcționalitățile existente + buton Contract corect
 // ==================================================================
 
 'use client';
@@ -105,7 +105,8 @@ export default function ProiectActions({
   onRefresh, 
   onShowFacturaModal, 
   onShowSubproiectModal,
-  onShowEditModal
+  onShowEditModal,
+  onShowContractModal
 }: ProiectActionsProps) {
   
   // State pentru modalul de sarcini
@@ -187,13 +188,14 @@ export default function ProiectActions({
         color: 'warning',
         disabled: proiect.Status === 'Anulat'
       },
+      // BUTON CONTRACT - doar pentru proiecte principale
       {
-          key: 'generate_contract',
-          label: 'Genereaza Contract',
-          icon: '📄',
-          color: 'primary',
-          disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
-        },
+        key: 'generate_contract',
+        label: 'Generează Contract',
+        icon: '📄',
+        color: 'primary',
+        disabled: proiect.Status === 'Anulat'
+      },
       {
         key: 'divider2',
         label: '',
@@ -249,10 +251,10 @@ export default function ProiectActions({
         case 'generate_invoice':
           handleCreateInvoiceHibrid();
           break;
-        case 'mark_completed':
         case 'generate_contract':
           handleGenerateContract();
           break;
+        case 'mark_completed':
           await handleUpdateStatus('Finalizat');
           break;
         case 'suspend':
@@ -294,14 +296,14 @@ export default function ProiectActions({
       showToast('Funcția de generare factură nu este disponibilă', 'error');
     }
   };
-  
+
+  // Handler pentru Contract (NOU)
   const handleGenerateContract = () => {
     if (onShowContractModal) {
       onShowContractModal(proiect);
     } else {
-      // Fallback dacă modalul nu e implementat încă
-      showToast('Sistemul de contracte va fi disponibil în curând!', 'info');
-      console.log('Contract pentru proiect:', proiect.ID_Proiect);
+      console.warn('onShowContractModal callback not provided');
+      showToast('Funcția de generare contract nu este disponibilă', 'error');
     }
   };
 
@@ -317,7 +319,7 @@ export default function ProiectActions({
 
     const detalii = `📋 ${tipText}: ${proiect.ID_Proiect}
 
-📝 Denumire: ${proiect.Denumire}
+🏷️ Denumire: ${proiect.Denumire}
 👤 Client: ${proiect.Client}
 📊 Status: ${proiect.Status}${isActiv ? ' ✅' : ''}
 💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}${monedaInfo}
@@ -745,6 +747,19 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                             fontWeight: 'bold'
                           }}>
                             {isSubproiect ? 'SUB' : 'NOU'}
+                          </span>
+                        )}
+                        {action.key === 'generate_contract' && (
+                          <span style={{
+                            marginLeft: '0.5rem',
+                            fontSize: '10px',
+                            background: '#3498db',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '8px',
+                            fontWeight: 'bold'
+                          }}>
+                            NOU
                           </span>
                         )}
                       </span>
