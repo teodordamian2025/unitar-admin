@@ -553,11 +553,11 @@ async function salveazaContract(contractInfo: any): Promise<string> {
       dataSemnare: formatDateForBigQuery(new Date().toISOString().split('T')[0]),
       dataExpirare: null,
       status: 'Generat',
-      valoare: contractInfo.sumaFinala,
+      valoare: String(contractInfo.sumaFinala),
       moneda: contractInfo.monedaFinala,
       cursValutar: null,
       dataCurs: null,
-      valoareRon: contractInfo.sumaFinala,
+      valoareRon: String(contractInfo.sumaFinala),
       etape: JSON.stringify(contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
         ? contractInfo.termenePersonalizate 
         : [{ id: "default", denumire: "La semnare", termen_zile: 0, procent_plata: 100 }]),
