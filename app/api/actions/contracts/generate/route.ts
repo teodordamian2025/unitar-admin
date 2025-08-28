@@ -11,6 +11,7 @@ import JSZip from 'jszip';
 import { readFile, readdir } from 'fs/promises';
 import path from 'path';
 import { getNextContractNumber } from '../../../setari/contracte/route';
+import { findBestTemplate } from '../../../../../lib/templates-helpers';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
@@ -112,36 +113,6 @@ const sanitizeStringForBigQuery = (value: any): string | null => {
   
   return String(value).trim() || null;
 };
-
-// FUNCTIE NOUA: Gaseste template-ul pentru tipul de document
-async function findTemplate(tipDocument: string): Promise<string | null> {
-  try {
-    const files = await readdir(TEMPLATES_DIR);
-    
-    // Cauta template specific pentru tipul de document
-    const specificTemplate = files.find(f => 
-      f.includes(tipDocument) && (f.endsWith('.docx') || f.endsWith('.txt'))
-    );
-    
-    if (specificTemplate) {
-      return path.join(TEMPLATES_DIR, specificTemplate);
-    }
-    
-    // Fallback: cauta orice template DOCX/TXT
-    const genericTemplate = files.find(f => 
-      f.endsWith('.docx') || f.endsWith('.txt')
-    );
-    
-    if (genericTemplate) {
-      return path.join(TEMPLATES_DIR, genericTemplate);
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Eroare la cautarea template-ului:', error);
-    return null;
-  }
-}
 
 // FUNCTIE NOUA: Proceseaza placeholder-urile in text
 function processPlaceholders(text: string, data: any): string {
@@ -483,7 +454,7 @@ export async function POST(request: NextRequest) {
     let templateUsed = 'fallback';
 
     try {
-      const templatePath = await findTemplate(tipDocument);
+      const templatePath = await findBestTemplate(tipDocument);
       
       if (templatePath) {
         console.log(`Template gasit: ${templatePath}`);
