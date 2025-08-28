@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "node ./scripts/setup-uploads.js"
+    "postinstall": "node ./scripts/setup-uploads.js",
     "setup-templates": "node ./scripts/setup-contract-templates.js",
     "postinstall": "node ./scripts/setup-uploads.js && node ./scripts/setup-contract-templates.js"
   },
