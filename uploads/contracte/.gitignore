@@ -1,0 +1,6 @@
+# Exclude all files
+*
+# But include directories and templates
+!*/
+!templates/*.txt
+!.gitignore

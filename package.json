@@ -6,6 +6,8 @@
     "build": "next build",
     "start": "next start",
     "postinstall": "node ./scripts/setup-uploads.js"
+    "setup-templates": "node ./scripts/setup-contract-templates.js",
+    "postinstall": "node ./scripts/setup-uploads.js && node ./scripts/setup-contract-templates.js"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^8.1.1",
