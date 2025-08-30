@@ -1,12 +1,14 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 26.08.2025 21:35 (ora României)
-// DESCRIERE: Modal complet pentru configurarea și generarea contractelor
+// DATA: 31.08.2025 12:15 (ora României)
+// MODIFICAT: Centrare cu createPortal + logică contract existent + eliminare PV/Anexe
+// PĂSTRATE: Toate funcționalitățile bune + descrieri coloane termene
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ProiectData {
   ID_Proiect: string;
@@ -19,6 +21,15 @@ interface ProiectData {
   moneda?: string;
   valoare_ron?: number;
   curs_valutar?: number;
+}
+
+interface ContractExistent {
+  ID_Contract: string;
+  numar_contract: string;
+  Status: string;
+  data_creare: string;
+  Valoare: number;
+  Moneda: string;
 }
 
 interface ContractModalProps {
@@ -96,11 +107,12 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 
 export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: ContractModalProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingCheck, setLoadingCheck] = useState(true);
   const [subproiecte, setSubproiecte] = useState<SubproiectInfo[]>([]);
-  const [loadingSubproiecte, setLoadingSubproiecte] = useState(false);
+  const [contractExistent, setContractExistent] = useState<ContractExistent | null>(null);
   
   // State pentru configurarea contractului
-  const [tipDocument, setTipDocument] = useState<'contract' | 'pv' | 'anexa'>('contract');
+  const [isEditMode, setIsEditMode] = useState(false);
   const [observatii, setObservatii] = useState('');
   
   // State pentru termene personalizate
@@ -114,12 +126,17 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
 
   useEffect(() => {
     if (isOpen) {
-      loadSubproiecte();
+      setLoadingCheck(true);
+      Promise.all([
+        loadSubproiecte(),
+        checkContractExistent()
+      ]).finally(() => {
+        setLoadingCheck(false);
+      });
     }
   }, [isOpen, proiect.ID_Proiect]);
 
   const loadSubproiecte = async () => {
-    setLoadingSubproiecte(true);
     try {
       const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
       const result = await response.json();
@@ -131,8 +148,53 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     } catch (error) {
       console.error('Eroare la încărcarea subproiectelor pentru contract:', error);
       showToast('Nu s-au putut încărca subproiectele', 'error');
-    } finally {
-      setLoadingSubproiecte(false);
+    }
+  };
+
+  // FUNCȚIE NOUĂ: Verifică dacă există deja contract pentru acest proiect
+  const checkContractExistent = async () => {
+    try {
+      const response = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.length > 0) {
+        const contract = result.data[0]; // Primul contract pentru proiect
+        setContractExistent(contract);
+        setIsEditMode(true);
+        
+        // Precompletează datele din contractul existent
+        if (contract.etape) {
+          try {
+            const etapeParsate = typeof contract.etape === 'string' 
+              ? JSON.parse(contract.etape) 
+              : contract.etape;
+            setTermenePersonalizate(etapeParsate);
+          } catch (e) {
+            console.error('Eroare parsare etape:', e);
+          }
+        }
+        
+        if (contract.articole_suplimentare) {
+          try {
+            const articoleParsate = typeof contract.articole_suplimentare === 'string'
+              ? JSON.parse(contract.articole_suplimentare)
+              : contract.articole_suplimentare;
+            setArticoleSuplimentare(articoleParsate);
+          } catch (e) {
+            console.error('Eroare parsare articole:', e);
+          }
+        }
+        
+        setObservatii(contract.Observatii || '');
+        
+        console.log(`Contract existent găsit: ${contract.numar_contract}`);
+      } else {
+        setContractExistent(null);
+        setIsEditMode(false);
+      }
+    } catch (error) {
+      console.error('Eroare la verificarea contractului existent:', error);
+      // Nu afișăm toast pentru această eroare, e doar verificare
     }
   };
 
@@ -217,6 +279,19 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     );
   };
 
+  // FUNCȚIE NOUĂ: Forțare contract nou (resetează contractul existent)
+  const handleForceNewContract = () => {
+    setContractExistent(null);
+    setIsEditMode(false);
+    setTermenePersonalizate([
+      { id: '1', denumire: 'La semnare', termen_zile: 0, procent_plata: 30 },
+      { id: '2', denumire: 'La predarea proiectului', termen_zile: 60, procent_plata: 70 }
+    ]);
+    setArticoleSuplimentare([]);
+    setObservatii('');
+    showToast('Mod contract nou activat', 'info');
+  };
+
   const handleGenerateContract = async () => {
     setLoading(true);
     
@@ -242,17 +317,20 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         return;
       }
 
-      showToast(`Se generează ${tipDocument === 'contract' ? 'contractul' : tipDocument === 'pv' ? 'PV-ul' : 'anexa'}...`, 'info');
+      const actionText = isEditMode ? 'actualizează contractul' : 'generează contractul';
+      showToast(`Se ${actionText}...`, 'info');
 
       const response = await fetch('/api/actions/contracts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           proiectId: proiect.ID_Proiect,
-          tipDocument,
+          tipDocument: 'contract', // Doar contract, PV și Anexe eliminate
           termenePersonalizate,
           articoleSuplimentare,
-          observatii: observatii.trim()
+          observatii: observatii.trim(),
+          isEdit: isEditMode,
+          contractExistentId: contractExistent?.ID_Contract || null
         })
       });
 
@@ -262,10 +340,12 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         const url = window.URL.createObjectURL(blob);
         
         // Extrage numele fișierului din header-uri
-        const contractNumber = response.headers.get('X-Contract-Number') || 'contract';
+        const contractNumber = response.headers.get('X-Contract-Number') || 
+                              contractExistent?.numar_contract ||
+                              'contract';
         const fileName = `${contractNumber}.docx`;
         
-        // Crează link pentru download
+        // Creează link pentru download
         const link = document.createElement('a');
         link.href = url;
         link.download = fileName;
@@ -276,7 +356,11 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         // Cleanup
         window.URL.revokeObjectURL(url);
         
-        showToast(`${tipDocument.charAt(0).toUpperCase() + tipDocument.slice(1)} generat cu succes!`, 'success');
+        const successMessage = isEditMode ? 
+          `Contract ${contractNumber} actualizat cu succes!` :
+          `Contract ${contractNumber} generat cu succes!`;
+        
+        showToast(successMessage, 'success');
         
         if (onSuccess) {
           onSuccess();
@@ -285,11 +369,11 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         onClose();
       } else {
         const errorResult = await response.json();
-        throw new Error(errorResult.error || 'Eroare la generarea contractului');
+        throw new Error(errorResult.error || 'Eroare la procesarea contractului');
       }
     } catch (error) {
-      console.error('Eroare la generarea contractului:', error);
-      showToast(`Eroare la generarea contractului: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
+      console.error('Eroare la generarea/actualizarea contractului:', error);
+      showToast(`Eroare la procesarea contractului: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -297,17 +381,61 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
 
   if (!isOpen) return null;
 
+  // Loading inițial pentru verificare contract existent
+  if (loadingCheck) {
+    return typeof window !== 'undefined' ? createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.8)',
+        zIndex: 65000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'white',
+          padding: '2rem',
+          borderRadius: '12px',
+          textAlign: 'center',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            border: '3px solid #3498db',
+            borderTop: '3px solid transparent',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem'
+          }}>
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>
+            Verificare contract existent...
+          </div>
+          <style>
+            {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+          </style>
+        </div>
+      </div>,
+      document.body
+    ) : null;
+  }
+
   const sumaTotala = calculeazaSumaTotala();
 
-  return (
+  return typeof window !== 'undefined' ? createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.7)',
-      zIndex: 99999,
+      background: 'rgba(0,0,0,0.8)',
+      zIndex: 65000,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -315,8 +443,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
         maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
@@ -326,30 +454,42 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
-          background: '#f8f9fa',
-          borderRadius: '8px 8px 0 0'
+          background: contractExistent ? 
+            'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)' :
+            'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+          borderRadius: '16px 16px 0 0'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, color: '#2c3e50' }}>
-              📄 Generare Contract
-            </h2>
+            <div>
+              <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: '700' }}>
+                {contractExistent ? '✏️ Editare Contract' : '📄 Generare Contract Nou'}
+              </h2>
+              <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
+                Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{proiect.ID_Proiect}</span> - {proiect.Denumire}
+              </p>
+              {contractExistent && (
+                <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                  Contract existent: {contractExistent.numar_contract} • Status: {contractExistent.Status}
+                </p>
+              )}
+            </div>
             <button
               onClick={onClose}
               disabled={loading}
               style={{
-                background: 'transparent',
+                background: 'rgba(255, 255, 255, 0.2)',
                 border: 'none',
-                fontSize: '24px',
+                borderRadius: '12px',
+                width: '40px',
+                height: '40px',
+                fontSize: '20px',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                color: '#6c757d'
+                color: 'white'
               }}
             >
               ×
             </button>
           </div>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span> - {proiect.Denumire}
-          </p>
         </div>
 
         <div style={{ padding: '1.5rem' }}>
@@ -391,52 +531,58 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     animation: 'spin 1s linear infinite'
                   }}>
                   </div>
-                  <span>Se generează contractul...</span>
+                  <span>{isEditMode ? 'Se actualizează contractul...' : 'Se generează contractul...'}</span>
                 </div>
                 <style>
-                  {`
-                    @keyframes spin {
-                      0% { transform: rotate(0deg); }
-                      100% { transform: rotate(360deg); }
-                    }
-                  `}
+                  {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
                 </style>
               </div>
             </div>
           )}
 
-          {/* Tip document */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Tip Document</h3>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              {(['contract', 'pv', 'anexa'] as const).map(tip => (
-                <label key={tip} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  border: `2px solid ${tipDocument === tip ? '#3498db' : '#dee2e6'}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  background: tipDocument === tip ? '#f0f8ff' : 'white'
-                }}>
-                  <input
-                    type="radio"
-                    name="tipDocument"
-                    value={tip}
-                    checked={tipDocument === tip}
-                    onChange={(e) => setTipDocument(e.target.value as any)}
-                    disabled={loading}
-                  />
-                  <span style={{ fontWeight: '500' }}>
-                    {tip === 'contract' ? 'Contract de servicii' :
-                     tip === 'pv' ? 'Proces Verbal Predare' :
-                     'Anexă contract'}
-                  </span>
-                </label>
-              ))}
+          {/* Informații contract existent + buton contract nou */}
+          {contractExistent && (
+            <div style={{
+              background: '#fff3cd',
+              border: '1px solid #ffeaa7',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#856404', marginBottom: '0.5rem' }}>
+                    📄 Contract existent pentru acest proiect
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#856404' }}>
+                    <strong>Nr. Contract:</strong> {contractExistent.numar_contract} •{' '}
+                    <strong>Status:</strong> {contractExistent.Status} •{' '}
+                    <strong>Valoare:</strong> {contractExistent.Valoare?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {contractExistent.Moneda}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#856404', marginTop: '0.25rem' }}>
+                    Creat: {contractExistent.data_creare && new Date(contractExistent.data_creare).toLocaleDateString('ro-RO')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleForceNewContract}
+                  disabled={loading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🔄 Contract cu Număr Nou
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Informații proiect și suma */}
           <div style={{
@@ -505,10 +651,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             )}
           </div>
 
-          {/* Termene personalizate */}
+          {/* Termene personalizate CU DESCRIERI COLOANE */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#2c3e50' }}>Termene și Etape de Plată</h3>
+              <div>
+                <h3 style={{ margin: 0, color: '#2c3e50' }}>Etape și Termene de Plată</h3>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#7f8c8d' }}>
+                  Configurează etapele de plată cu termenele și procentele corespunzătoare
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={addTermen}
@@ -526,6 +677,24 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               >
                 + Adaugă Termen
               </button>
+            </div>
+
+            {/* HEADERS DESCRIPTIVE PENTRU COLOANE */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '2fr 1fr 1fr',
+              gap: '0.5rem',
+              marginBottom: '0.5rem',
+              padding: '0.5rem',
+              background: '#e3f2fd',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#1976d2'
+            }}>
+              <div>Descriere Etapă</div>
+              <div style={{ textAlign: 'center' }}>Termen (zile)</div>
+              <div style={{ textAlign: 'center' }}>Procent (%)</div>
             </div>
 
             {termenePersonalizate.map((termen, index) => (
@@ -811,12 +980,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             border: '1px solid #c3e6cb',
             marginBottom: '1.5rem'
           }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>Sumar Contract</h3>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+              {isEditMode ? 'Sumar Actualizare Contract' : 'Sumar Contract Nou'}
+            </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
-                <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>TIP DOCUMENT</div>
-                <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold', textTransform: 'capitalize' }}>
-                  {tipDocument}
+                <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ACȚIUNE</div>
+                <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
+                  {isEditMode ? 'Actualizare' : 'Generare Nouă'}
                 </div>
               </div>
               <div>
@@ -853,7 +1024,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               color: '#7f8c8d',
               fontWeight: '500'
             }}>
-              Contractul va fi generat ca fișier DOCX cu toate datele configurate
+              Contractul va fi {isEditMode ? 'actualizat și regenerat' : 'generat'} ca fișier DOCX
             </div>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -879,7 +1050,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 disabled={loading || termenePersonalizate.some(t => !t.denumire.trim())}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: (loading || termenePersonalizate.some(t => !t.denumire.trim())) ? '#bdc3c7' : '#27ae60',
+                  background: (loading || termenePersonalizate.some(t => !t.denumire.trim())) ? '#bdc3c7' : 
+                    isEditMode ? '#f39c12' : '#27ae60',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
@@ -888,12 +1060,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   fontWeight: 'bold'
                 }}
               >
-                {loading ? 'Se generează...' : `📄 Generează ${tipDocument.charAt(0).toUpperCase() + tipDocument.slice(1)}`}
+                {loading ? 'Se procesează...' : 
+                 isEditMode ? '📝 Actualizează Contract' : '📄 Generează Contract'}
               </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 }

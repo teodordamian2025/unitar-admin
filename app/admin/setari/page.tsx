@@ -1,6 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/setari/page.tsx
-// DESCRIERE: Dashboard principal pentru zona de setări
+// DATA: 31.08.2025 12:30 (ora României)
+// MODIFICAT: Adăugat buton pentru setări contracte
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 'use client';
@@ -221,6 +223,68 @@ export default function SetariDashboard() {
                 className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 font-medium"
               >
                 🏢 Editează Date Firmă
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECȚIUNE NOUĂ: Setări Contracte */}
+      <div className="mb-8">
+        <div className="bg-white rounded-lg shadow border">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              📄 Setări Contracte
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Configurare numerotare și format pentru contracte, PV-uri și anexe
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+                <div>
+                  <div className="font-medium text-gray-900">Contracte</div>
+                  <div className="text-sm text-gray-600">Serie: CONTR</div>
+                </div>
+                <div className="text-blue-600 text-2xl">📄</div>
+              </div>
+              
+              <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
+                <div>
+                  <div className="font-medium text-gray-900">Procese Verbale</div>
+                  <div className="text-sm text-gray-600">Serie: PV</div>
+                </div>
+                <div className="text-green-600 text-2xl">📋</div>
+              </div>
+              
+              <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
+                <div>
+                  <div className="font-medium text-gray-900">Anexe</div>
+                  <div className="text-sm text-gray-600">Serie: ANX</div>
+                </div>
+                <div className="text-purple-600 text-2xl">📎</div>
+              </div>
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">⚙️</div>
+                <div>
+                  <div className="font-medium text-amber-900">Configurare Numerotare</div>
+                  <div className="text-sm text-amber-700">
+                    Setează formatul și seriile pentru toate tipurile de contracte
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <Link
+                href="/admin/setari/contracte"
+                className="w-full bg-amber-600 text-white px-4 py-3 rounded-lg hover:bg-amber-700 flex items-center justify-center gap-2 font-medium"
+              >
+                📄 Configurează Contracte
               </Link>
             </div>
           </div>

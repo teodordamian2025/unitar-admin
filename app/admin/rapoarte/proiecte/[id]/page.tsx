@@ -1,6 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/[id]/page.tsx
-// 
+// DATA: 31.08.2025 13:00 (ora României)
+// MODIFICAT: Integrat ContractModal funcțional
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 'use client';
@@ -9,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-toastify';
+import ContractModal from '../components/ContractModal';
 
 interface ProiectDetails {
   ID_Proiect: string;
@@ -18,30 +21,37 @@ interface ProiectDetails {
   Data_Start: any;
   Data_Final: any;
   Valoare_Estimata: number;
-  // Adaugă alte câmpuri după necesitate
+  moneda?: string;
+  valoare_ron?: number;
+  curs_valutar?: number;
+  Adresa?: string;
+  Descriere?: string;
+  Responsabil?: string;
 }
 
 export default function ProiectDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const proiectId = params?.id as string; // Adăugat optional chaining
+  const proiectId = params?.id as string;
   
   const [proiect, setProiect] = useState<ProiectDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  
+  // State pentru ContractModal
+  const [showContractModal, setShowContractModal] = useState(false);
 
   useEffect(() => {
     if (proiectId) {
       fetchProiectDetails();
     } else {
-      // Dacă nu avem ID, redirectionează înapoi
       router.push('/admin/rapoarte/proiecte');
     }
   }, [proiectId, router]);
 
   const fetchProiectDetails = async () => {
-    if (!proiectId) return; // Verificare suplimentară
+    if (!proiectId) return;
     
     try {
       const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`);
@@ -88,7 +98,6 @@ export default function ProiectDetailsPage() {
       if (result.success) {
         toast.success('Factură PDF generată cu succes!');
         
-        // Download automat
         if (result.downloadUrl) {
           window.open(result.downloadUrl, '_blank');
         }
@@ -102,6 +111,14 @@ export default function ProiectDetailsPage() {
     } finally {
       setIsGeneratingInvoice(false);
     }
+  };
+
+  // Handler pentru succesul contractului
+  const handleContractSuccess = () => {
+    toast.success('Contract procesat cu succes!');
+    setShowContractModal(false);
+    // Opțional: refresh datele proiectului dacă e nevoie
+    // fetchProiectDetails();
   };
 
   const renderStatus = (status: string) => {
@@ -141,9 +158,14 @@ export default function ProiectDetailsPage() {
     return new Date(data).toLocaleDateString('ro-RO');
   };
 
-  const renderValoare = (valoare: any) => {
+  const renderValoare = (valoare: any, moneda?: string) => {
     if (!valoare) return '-';
     const amount = typeof valoare === 'string' ? parseFloat(valoare) : valoare;
+    
+    if (moneda && moneda !== 'RON') {
+      return `${amount.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} ${moneda}`;
+    }
+    
     return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
       currency: 'RON'
@@ -262,7 +284,7 @@ export default function ProiectDetailsPage() {
           </button>
           
           <button
-            onClick={() => alert('Generare contract în dezvoltare')}
+            onClick={() => setShowContractModal(true)}
             style={{
               padding: '0.75rem 1.5rem',
               background: '#28a745',
@@ -323,9 +345,32 @@ export default function ProiectDetailsPage() {
                 Valoare Estimată
               </label>
               <div style={{ color: '#6c757d', fontSize: '1.1rem', fontWeight: 500 }}>
-                {renderValoare(proiect.Valoare_Estimata)}
+                {renderValoare(proiect.Valoare_Estimata, proiect.moneda)}
+                {proiect.moneda && proiect.moneda !== 'RON' && proiect.valoare_ron && (
+                  <div style={{ fontSize: '0.9rem', color: '#8e8e93', marginTop: '0.25rem' }}>
+                    ({renderValoare(proiect.valoare_ron, 'RON')})
+                  </div>
+                )}
               </div>
             </div>
+
+            {proiect.Responsabil && (
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
+                  Responsabil
+                </label>
+                <div style={{ color: '#6c757d' }}>{proiect.Responsabil}</div>
+              </div>
+            )}
+
+            {proiect.Adresa && (
+              <div>
+                <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
+                  Adresă
+                </label>
+                <div style={{ color: '#6c757d' }}>{proiect.Adresa}</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -342,7 +387,7 @@ export default function ProiectDetailsPage() {
           
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <button
-              onClick={() => alert('Generare contract în dezvoltare')}
+              onClick={() => setShowContractModal(true)}
               style={{
                 padding: '0.75rem',
                 background: '#28a745',
@@ -408,6 +453,29 @@ export default function ProiectDetailsPage() {
           </div>
         </div>
 
+        {/* Descriere proiect */}
+        {proiect.Descriere && (
+          <div style={{
+            background: 'white',
+            borderRadius: '8px',
+            padding: '1.5rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            gridColumn: 'span 2'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+              📝 Descriere Proiect
+            </h3>
+            
+            <div style={{ 
+              color: '#6c757d', 
+              lineHeight: '1.6',
+              whiteSpace: 'pre-wrap' 
+            }}>
+              {proiect.Descriere}
+            </div>
+          </div>
+        )}
+
         {/* Timeline / Istoric */}
         <div style={{
           background: 'white',
@@ -425,6 +493,27 @@ export default function ProiectDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* CONTRACT MODAL */}
+      {showContractModal && proiect && (
+        <ContractModal
+          proiect={{
+            ID_Proiect: proiect.ID_Proiect,
+            Denumire: proiect.Denumire,
+            Client: proiect.Client,
+            Status: proiect.Status,
+            Valoare_Estimata: proiect.Valoare_Estimata,
+            Data_Start: proiect.Data_Start,
+            Data_Final: proiect.Data_Final,
+            moneda: proiect.moneda,
+            valoare_ron: proiect.valoare_ron,
+            curs_valutar: proiect.curs_valutar
+          }}
+          isOpen={showContractModal}
+          onClose={() => setShowContractModal(false)}
+          onSuccess={handleContractSuccess}
+        />
+      )}
     </div>
   );
 }
