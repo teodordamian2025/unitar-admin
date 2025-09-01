@@ -138,16 +138,27 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
-// FUNCTIE NOUA: Proceseaza placeholder-urile in text
+// FIX CRITIC: Funcția pentru procesarea placeholder-urilor cu debugging
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // Inlocuire placeholder-uri simple
+  // DEBUG: Log pentru a vedea ce date primește template processing
+  console.log('🔍 TEMPLATE PROCESSING DEBUG:', {
+    has_client_data: !!data.client,
+    client_nume: data.client?.nume,
+    client_cui: data.client?.cui,
+    client_adresa: data.client?.adresa,
+    contract_numar: data.contract?.numar,
+    proiect_denumire: data.proiect?.denumire
+  });
+  
+  // FIX CRITIC: Inlocuire placeholder-uri cu verificare existenta date
   const simpleReplacements: { [key: string]: string } = {
+    // Contract info
     '{{contract.numar}}': data.contract?.numar || 'Contract-NR-TBD',
     '{{contract.data}}': data.contract?.data || new Date().toLocaleDateString('ro-RO'),
     
-    // FIX: Client info complet din JOIN
+    // FIX CRITICAL: Client info cu fallback-uri multiple
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -156,7 +167,7 @@ function processPlaceholders(text: string, data: any): string {
     '{{client.email}}': data.client?.email || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
     
-    // FIX: Proiect cu valorile estimate originale, NU RON
+    // Proiect info cu valorile estimate originale
     '{{proiect.denumire}}': data.proiect?.denumire || 'PROIECT NECUNOSCUT',
     '{{proiect.descriere}}': data.proiect?.descriere || '',
     '{{proiect.adresa}}': data.proiect?.adresa || '',
@@ -167,6 +178,7 @@ function processPlaceholders(text: string, data: any): string {
     '{{proiect.responsabil}}': data.proiect?.responsabil || '',
     '{{proiect.durata_zile}}': data.proiect?.durata_zile || 'TBD',
     
+    // Firma info
     '{{firma.nume}}': data.firma?.nume || 'UNITAR PROIECT TDA SRL',
     '{{firma.cui}}': data.firma?.cui || 'RO35639210',
     '{{firma.nr_reg_com}}': data.firma?.nr_reg_com || 'J2016002024405',
@@ -176,14 +188,30 @@ function processPlaceholders(text: string, data: any): string {
     '{{firma.cont_ing}}': data.firma?.cont_ing || 'RO82INGB0000999905667533',
     '{{firma.cont_trezorerie}}': data.firma?.cont_trezorerie || 'RO29TREZ7035069XXX018857',
     
-    // FIX: Suma cu valorile estimate originale
+    // Suma totala
     '{{suma_totala_ron}}': data.suma_totala_originala || data.suma_totala_ron || '0.00',
     '{{observatii}}': data.observatii || ''
   };
   
+  // Log pentru debugging replacements
+  console.log('🔧 REPLACEMENTS DEBUG:', {
+    client_nume_replacement: simpleReplacements['{{client.nume}}'],
+    client_cui_replacement: simpleReplacements['{{client.cui}}'],
+    client_adresa_replacement: simpleReplacements['{{client.adresa}}'],
+    contract_numar_replacement: simpleReplacements['{{contract.numar}}']
+  });
+  
   // Aplica inlocuirile simple
   for (const [placeholder, value] of Object.entries(simpleReplacements)) {
-    processed = processed.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+    const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
+    const beforeCount = (processed.match(regex) || []).length;
+    processed = processed.replace(regex, value);
+    const afterCount = (processed.match(regex) || []).length;
+    
+    // Debug logging pentru fiecare replacement
+    if (beforeCount > 0) {
+      console.log(`🔄 REPLACED: ${placeholder} -> "${value}" (${beforeCount} occurrences)`);
+    }
   }
   
   // Proceseaza liste complexe (subproiecte, termene, articole)
@@ -195,15 +223,25 @@ function processPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// FUNCTIE NOUA: Proceseaza placeholder-uri pentru liste
+// FIX: Proceseaza placeholder-uri pentru liste cu debugging
 function processListPlaceholders(text: string, data: any): string {
   let processed = text;
   
+  console.log('📋 LIST PROCESSING DEBUG:', {
+    subproiecte_count: data.subproiecte?.length || 0,
+    articole_count: data.articole_suplimentare?.length || 0,
+    termene_count: data.termene_personalizate?.length || 0
+  });
+  
   // Proceseaza subproiecte cu valorile estimate originale
   if (data.subproiecte && Array.isArray(data.subproiecte) && data.subproiecte.length > 0) {
-    const subproiecteList = data.subproiecte.map((sub: any, index: number) => 
-      `- ${sub.denumire}: ${sub.valoare_originala?.toFixed(2) || sub.valoare?.toFixed(2) || '0.00'} ${sub.moneda || 'RON'}`
-    ).join('\n');
+    const subproiecteList = data.subproiecte.map((sub: any, index: number) => {
+      const valoare = sub.valoare_originala || sub.valoare || 0;
+      const moneda = sub.moneda || 'RON';
+      return `- ${sub.denumire}: ${valoare.toFixed(2)} ${moneda}`;
+    }).join('\n');
+    
+    console.log('📝 Subproiecte list generated:', subproiecteList);
     
     processed = processed.replace(/{{#subproiecte}}[\s\S]*?{{\/subproiecte}}/g, 
       `**Componente proiect:**\n${subproiecteList}`);
@@ -217,6 +255,8 @@ function processListPlaceholders(text: string, data: any): string {
     const articoleList = data.articole_suplimentare.map((art: any, index: number) => 
       `- ${art.descriere}: ${art.valoare?.toFixed(2) || '0.00'} ${art.moneda || 'RON'}`
     ).join('\n');
+    
+    console.log('🛒 Articole list generated:', articoleList);
     
     processed = processed.replace(/{{#articole_suplimentare}}[\s\S]*?{{\/articole_suplimentare}}/g, 
       `**Servicii suplimentare:**\n${articoleList}`);
@@ -236,6 +276,8 @@ function processListPlaceholders(text: string, data: any): string {
       return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${monedaBaza}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
     }).join('\n');
     
+    console.log('💰 Termene list generated:', termeneList);
+    
     processed = processed.replace(/{{#termene_personalizate}}[\s\S]*?{{\/termene_personalizate}}/g, termeneList);
     processed = processed.replace(/{{#termene_personalizate\.lista}}[\s\S]*?{{\/termene_personalizate\.lista}}/g, termeneList);
   } else {
@@ -244,6 +286,8 @@ function processListPlaceholders(text: string, data: any): string {
     const monedaBaza = data.proiect?.moneda || 'RON';
     const defaultTermene = `**Etapa 1**: 100% (${valoareBaza.toFixed(2)} ${monedaBaza}) - La predarea proiectului (termen: 60 zile)`;
     
+    console.log('💰 Default termene generated:', defaultTermene);
+    
     processed = processed.replace(/{{#termene_personalizate}}[\s\S]*?{{\/termene_personalizate}}/g, defaultTermene);
     processed = processed.replace(/{{#termene_personalizate\.lista}}[\s\S]*?{{\/termene_personalizate\.lista}}/g, defaultTermene);
   }
@@ -251,7 +295,7 @@ function processListPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// FUNCTIE NOUA: Proceseaza sectiuni conditionale
+// PĂSTRAT: Funcția pentru secțiuni condiționale (neschimbată)
 function processConditionalSections(text: string, data: any): string {
   let processed = text;
   
@@ -755,7 +799,7 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
   };
 }
 
-// FIX: Pregătește datele cu valorile estimate originale
+// FIX CRITIC: Pregătește datele cu valorile estimate originale ȘI client info corect
 function prepareazaPlaceholderDataCuValoriEstimate(
   proiect: any, 
   subproiecte: any[], 
@@ -773,6 +817,18 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   const cursProiect = convertBigQueryNumeric(proiect.curs_valutar) || 1;
   const sumaRON = monedaOriginala !== 'RON' ? (sumaOriginala * cursProiect).toFixed(2) : sumaOriginala.toFixed(2);
   
+  // FIX CRITIC: Debug logging pentru client data
+  console.log('🔍 CLIENT DATA DEBUG:', {
+    proiect_client_original: proiect.Client,
+    proiect_client_id: proiect.client_id,
+    proiect_client_nume: proiect.client_nume,
+    proiect_client_cui: proiect.client_cui,
+    proiect_client_adresa: proiect.client_adresa,
+    proiect_client_telefon: proiect.client_telefon,
+    proiect_client_email: proiect.client_email,
+    toate_keys: Object.keys(proiect).filter(k => k.includes('client'))
+  });
+  
   return {
     // Date contract
     contract: {
@@ -781,9 +837,10 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       tip: contractData.setari?.tip_document || 'contract'
     },
     
-    // FIX: Date client complete din JOIN
+    // FIX CRITIC: Date client complete din JOIN BigQuery cu debugging
     client: {
       nume: proiect.client_nume || proiect.Client || 'Client necunoscut',
+      denumire: proiect.client_nume || proiect.Client || 'Client necunoscut', // Pentru backwards compatibility
       cui: proiect.client_cui || 'CUI necunoscut',
       nr_reg_com: proiect.client_reg_com || 'Nr. reg. com. necunoscut',
       adresa: proiect.client_adresa || 'Adresa necunoscuta',
@@ -791,7 +848,8 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       oras: proiect.client_oras || '',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: 'Administrator'
+      reprezentant: 'Administrator', // Default pentru toate contractele
+      id: proiect.client_id || null
     },
     
     // FIX: Date proiect cu valorile estimate originale și durata calculată
