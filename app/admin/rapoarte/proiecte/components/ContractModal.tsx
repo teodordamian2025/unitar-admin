@@ -1383,3 +1383,4 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     </div>,
     document.body
   ) : null;
+}
