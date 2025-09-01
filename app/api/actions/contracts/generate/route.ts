@@ -688,7 +688,7 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
     );
 
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      // UPDATE pentru contractul existent (PĂSTRAT)
+      // UPDATE pentru contractul existent cu types complete
       const updateQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         SET 
@@ -721,16 +721,31 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         observatii: sanitizeStringForBigQuery(contractInfo.observatii)
       };
 
+      // FIX CRITIC: Tipuri complete pentru UPDATE
+      const tipuriUpdate = {
+        contractId: 'STRING',
+        valoare: 'NUMERIC',
+        moneda: 'STRING',
+        cursValutar: 'NUMERIC',
+        dataCurs: 'DATE',
+        valoareRon: 'NUMERIC',
+        etape: 'STRING',
+        articoleSuplimentare: 'STRING',
+        continutJson: 'STRING',
+        observatii: 'STRING'
+      };
+
       await bigquery.query({
         query: updateQuery,
         params: parametriiUpdate,
+        types: tipuriUpdate, // FIX: Adăugat types
         location: 'EU',
       });
 
       console.log(`Contract actualizat în BigQuery: ${contractInfo.contractExistentId}`);
       
     } else {
-      // INSERT pentru contract nou cu toate datele corecte (PĂSTRAT)
+      // INSERT pentru contract nou cu types complete
       const insertQuery = `
         INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
@@ -773,9 +788,44 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         versiune: 1
       };
 
+      // FIX CRITIC: Tipuri complete pentru INSERT - aceasta era problema principală
+      const tipuriInsert = {
+        contractId: 'STRING',
+        numarContract: 'STRING',
+        serieContract: 'STRING',
+        tipDocument: 'STRING',
+        proiectId: 'STRING',
+        clientId: 'STRING',
+        clientNume: 'STRING',
+        denumireContract: 'STRING',
+        dataSemnare: 'DATE',
+        dataExpirare: 'DATE',
+        status: 'STRING',
+        valoare: 'NUMERIC',
+        moneda: 'STRING',
+        cursValutar: 'NUMERIC',
+        dataCurs: 'DATE',
+        valoareRon: 'NUMERIC',
+        etape: 'STRING',
+        articoleSuplimentare: 'STRING',
+        continutJson: 'STRING',
+        observatii: 'STRING',
+        versiune: 'INT64'
+      };
+
+      console.log('🔍 DEBUG INSERT PARAMS:', {
+        has_client_id: !!parametriiInsert.clientId,
+        client_id_value: parametriiInsert.clientId,
+        cursValutar_value: parametriiInsert.cursValutar,
+        dataCurs_value: parametriiInsert.dataCurs,
+        dataExpirare_value: parametriiInsert.dataExpirare,
+        observatii_value: parametriiInsert.observatii
+      });
+
       await bigquery.query({
         query: insertQuery,
         params: parametriiInsert,
+        types: tipuriInsert, // FIX PRINCIPAL: Aceasta linia lipsea și cauza eroarea
         location: 'EU',
       });
 
@@ -786,6 +836,12 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
     
   } catch (error) {
     console.error('Eroare la salvarea contractului în BigQuery:', error);
+    console.error('Detalii parametri:', {
+      contractId,
+      proiectId: contractInfo.proiectId,
+      isEdit: contractInfo.isEdit,
+      error: error instanceof Error ? error.message : 'Eroare necunoscuta'
+    });
     throw error;
   }
 }
