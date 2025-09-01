@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts
-// DATA: 01.09.2025 19:00 (ora României)
-// OPTIMIZĂRI: Suport pentru contractPreview personalizat + fix calculele valutare consistente
+// DATA: 01.09.2025 20:00 (ora României)
+// FIX PRINCIPAL: Suport pentru noua structură de termeni cu valorile valutare + preview personalizat
 // PĂSTRATE: Toate funcționalitățile existente + JOIN corect cu Clienti
 // ==================================================================
 
@@ -120,11 +120,11 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
-// FUNCȚIE OPTIMIZATĂ: Procesarea placeholder-urilor cu debugging și fix valori consistente
+// OPTIMIZAT: Procesarea placeholder-urilor cu suport pentru noua structură de termeni
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  console.log('🔍 TEMPLATE PROCESSING DEBUG:', {
+  console.log('🔄 TEMPLATE PROCESSING DEBUG:', {
     has_client_data: !!data.client,
     client_nume: data.client?.nume,
     client_cui: data.client?.cui,
@@ -135,7 +135,7 @@ function processPlaceholders(text: string, data: any): string {
     moneda_originala: data.moneda_originala
   });
   
-  // OPTIMIZARE: Înlocuiri simple cu valorile estimate consistente
+  // Înlocuiri simple cu valorile estimate consistente (PĂSTRAT)
   const simpleReplacements: { [key: string]: string } = {
     // Contract info
     '{{contract.numar}}': data.contract?.numar || 'Contract-NR-TBD',
@@ -150,11 +150,10 @@ function processPlaceholders(text: string, data: any): string {
     '{{client.email}}': data.client?.email || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
     
-    // OPTIMIZARE: Proiect info cu valorile estimate originale CONSISTENTE
+    // Proiect info cu valorile estimate originale CONSISTENTE
     '{{proiect.denumire}}': data.proiect?.denumire || 'PROIECT NECUNOSCUT',
     '{{proiect.descriere}}': data.proiect?.descriere || '',
     '{{proiect.adresa}}': data.proiect?.adresa || '',
-    // FIX CRITIC: Folosește valorile estimate originale, nu RON
     '{{proiect.valoare}}': data.suma_totala_originala || data.proiect?.valoare_originala?.toFixed(2) || '0.00',
     '{{proiect.moneda}}': data.moneda_originala || data.proiect?.moneda || 'RON',
     '{{proiect.data_start}}': data.proiect?.data_start || 'TBD',
@@ -162,7 +161,7 @@ function processPlaceholders(text: string, data: any): string {
     '{{proiect.responsabil}}': data.proiect?.responsabil || '',
     '{{proiect.durata_zile}}': data.proiect?.durata_zile || 'TBD',
     
-    // Firma info
+    // Firma info (PĂSTRAT)
     '{{firma.nume}}': data.firma?.nume || 'UNITAR PROIECT TDA SRL',
     '{{firma.cui}}': data.firma?.cui || 'RO35639210',
     '{{firma.nr_reg_com}}': data.firma?.nr_reg_com || 'J2016002024405',
@@ -172,20 +171,12 @@ function processPlaceholders(text: string, data: any): string {
     '{{firma.cont_ing}}': data.firma?.cont_ing || 'RO82INGB0000999905667533',
     '{{firma.cont_trezorerie}}': data.firma?.cont_trezorerie || 'RO29TREZ7035069XXX018857',
     
-    // OPTIMIZARE: Suma totală cu valorile estimate consistente
+    // OPTIMIZAT: Suma totală cu valorile estimate consistente
     '{{suma_totala_ron}}': data.suma_totala_ron || '0.00',
     '{{suma_totala_originala}}': data.suma_totala_originala || '0.00',
     '{{moneda_originala}}': data.moneda_originala || 'RON',
     '{{observatii}}': data.observatii || ''
   };
-  
-  // Log pentru debugging replacements
-  console.log('🔧 REPLACEMENTS DEBUG:', {
-    client_nume_replacement: simpleReplacements['{{client.nume}}'],
-    proiect_valoare_replacement: simpleReplacements['{{proiect.valoare}}'],
-    proiect_moneda_replacement: simpleReplacements['{{proiect.moneda}}'],
-    suma_originala_replacement: simpleReplacements['{{suma_totala_originala}}']
-  });
   
   // Aplică înlocuirile simple
   for (const [placeholder, value] of Object.entries(simpleReplacements)) {
@@ -207,7 +198,7 @@ function processPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// FUNCȚIE OPTIMIZATĂ: Procesează placeholder-uri pentru liste cu valorile estimate consistente
+// OPTIMIZAT: Procesează placeholder-uri pentru liste cu noua structură de termeni
 function processListPlaceholders(text: string, data: any): string {
   let processed = text;
   
@@ -217,16 +208,15 @@ function processListPlaceholders(text: string, data: any): string {
     termene_count: data.termene_personalizate?.length || 0
   });
   
-  // Procesează subproiecte cu valorile estimate originale
+  // Procesează subproiecte cu valorile estimate originale (PĂSTRAT)
   if (data.subproiecte && Array.isArray(data.subproiecte) && data.subproiecte.length > 0) {
     const subproiecteList = data.subproiecte.map((sub: any, index: number) => {
-      // OPTIMIZARE: Folosește valorile estimate originale
       const valoare = sub.valoare_originala || sub.valoare || 0;
       const moneda = sub.moneda || 'RON';
       return `- ${sub.denumire}: ${valoare.toFixed(2)} ${moneda}`;
     }).join('\n');
     
-    console.log('🔍 Subproiecte list generated:', subproiecteList);
+    console.log('🔄 Subproiecte list generated:', subproiecteList);
     
     processed = processed.replace(/{{#subproiecte}}[\s\S]*?{{\/subproiecte}}/g, 
       `**Componente proiect:**\n${subproiecteList}`);
@@ -235,7 +225,7 @@ function processListPlaceholders(text: string, data: any): string {
     processed = processed.replace(/{{#subproiecte}}[\s\S]*?{{\/subproiecte}}/g, '');
   }
   
-  // Procesează articole suplimentare cu monedele originale
+  // Procesează articole suplimentare cu monedele originale (PĂSTRAT)
   if (data.articole_suplimentare && Array.isArray(data.articole_suplimentare) && data.articole_suplimentare.length > 0) {
     const articoleList = data.articole_suplimentare.map((art: any, index: number) => 
       `- ${art.descriere}: ${art.valoare?.toFixed(2) || '0.00'} ${art.moneda || 'RON'}`
@@ -250,23 +240,27 @@ function processListPlaceholders(text: string, data: any): string {
     processed = processed.replace(/{{#articole_suplimentare}}[\s\S]*?{{\/articole_suplimentare}}/g, '');
   }
   
-  // OPTIMIZARE: Procesează termene personalizate cu calculele estimate consistente
+  // OPTIMIZAT: Procesează termene personalizate cu noua structură (valorile valutare)
   if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
     const termeneList = data.termene_personalizate.map((termen: any, index: number) => {
-      // FIX CRITIC: Folosește valorile estimate originale pentru calcule
-      const valoareBaza = parseFloat(data.suma_totala_originala) || data.proiect?.valoare_originala || 0;
-      const valoareEtapa = (valoareBaza * (termen.procent_plata || 0) / 100).toFixed(2);
-      const monedaBaza = data.moneda_originala || 'RON';
+      // FIX PRINCIPAL: Folosește valorile din structura nouă (valoare + moneda) în loc de procent_plata
+      const valoareTermen = termen.valoare || 0;
+      const valoareRON = termen.valoare_ron || 0;
+      const monedaTermen = termen.moneda || 'RON';
       
-      return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${monedaBaza}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
+      // Calculează procentul din suma totală pentru afișare
+      const sumaTotal = parseFloat(data.suma_totala_ron) || 0;
+      const procentCalculat = sumaTotal > 0 ? Math.round((valoareRON / sumaTotal) * 100) : 0;
+      
+      return `**Etapa ${index + 1}**: ${procentCalculat}% (${valoareTermen.toFixed(2)} ${monedaTermen}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
     }).join('\n');
     
-    console.log('💰 Termene list generated:', termeneList);
+    console.log('💰 Termene list generated cu noua structură:', termeneList);
     
     processed = processed.replace(/{{#termene_personalizate}}[\s\S]*?{{\/termene_personalizate}}/g, termeneList);
     processed = processed.replace(/{{#termene_personalizate\.lista}}[\s\S]*?{{\/termene_personalizate\.lista}}/g, termeneList);
   } else {
-    // Template default cu valorile estimate
+    // Template default cu valorile estimate (PĂSTRAT)
     const valoareBaza = parseFloat(data.suma_totala_originala) || data.proiect?.valoare_originala || 0;
     const monedaBaza = data.moneda_originala || 'RON';
     const defaultTermene = `**Etapa 1**: 100% (${valoareBaza.toFixed(2)} ${monedaBaza}) - La predarea proiectului (termen: 60 zile)`;
@@ -396,23 +390,50 @@ function convertTextToWordXml(text: string): string {
 </w:document>`;
 }
 
-// FUNCȚIE OPTIMIZATĂ: Calculează suma cu valorile estimate originale consistente
-function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], articoleSuplimentare: any[]) {
+// OPTIMIZAT: Calculează suma cu noua structură de termeni (valorile valutare)
+function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], articoleSuplimentare: any[], termenePersonalizate: any[]) {
   let sumaOriginala = 0;
   let monedaOriginala = proiect.moneda || 'RON';
   let sumaFinalaRON = 0;
   const cursuriUtilizate: { [moneda: string]: number } = {};
 
-  console.log('💰 CALCUL SUMA CONTRACT:', {
+  console.log('💰 CALCUL SUMA CONTRACT cu noua structură:', {
     proiect_valoare: proiect.Valoare_Estimata,
     proiect_moneda: proiect.moneda,
     subproiecte_count: subproiecte.length,
-    articole_count: articoleSuplimentare.length
+    articole_count: articoleSuplimentare.length,
+    termene_count: termenePersonalizate.length
   });
 
-  // LOGICA CRITICĂ: Pentru proiecte cu subproiecte, suma = DOAR subproiecte + articole
-  if (subproiecte.length > 0) {
-    // Calculează în moneda originală predominantă
+  // FIX PRINCIPAL: Pentru proiecte cu subproiecte convertite în termeni, calculează din termeni
+  if (termenePersonalizate.length > 0 && termenePersonalizate.some((t: any) => t.este_subproiect)) {
+    console.log('Calculez suma din termeni (subproiecte convertite)...');
+    
+    termenePersonalizate.forEach(termen => {
+      const valoareOriginala = termen.valoare || 0;
+      const valoareRON = termen.valoare_ron || valoareOriginala;
+      const monedaTermen = termen.moneda || 'RON';
+      
+      sumaOriginala += valoareOriginala;
+      sumaFinalaRON += valoareRON;
+      
+      console.log(`Termen ${termen.denumire}: ${valoareOriginala} ${monedaTermen} = ${valoareRON} RON`);
+      
+      if (monedaTermen && monedaTermen !== 'RON') {
+        cursuriUtilizate[monedaTermen] = termen.curs_valutar || 1;
+        // Setează moneda originală la prima monedă non-RON găsită
+        if (monedaOriginala === 'RON') {
+          monedaOriginala = monedaTermen;
+        }
+      }
+    });
+    
+    console.log(`Proiect cu ${termenePersonalizate.length} termeni - suma originală: ${sumaOriginala} ${monedaOriginala}, suma RON: ${sumaFinalaRON}`);
+  } 
+  // Fallback: calculează din subproiecte dacă nu există termeni
+  else if (subproiecte.length > 0) {
+    console.log('Calculez suma din subproiecte (fallback)...');
+    
     subproiecte.forEach(sub => {
       const valoareOriginala = convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
       const valoareRON = convertBigQueryNumeric(sub.valoare_ron) || valoareOriginala;
@@ -425,26 +446,11 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
       
       if (monedaSub && monedaSub !== 'RON') {
         cursuriUtilizate[monedaSub] = convertBigQueryNumeric(sub.curs_valutar) || 1;
-        // Setează moneda originală la prima monedă non-RON găsită
         if (monedaOriginala === 'RON') {
           monedaOriginala = monedaSub;
         }
       }
     });
-    
-    console.log(`Proiect cu ${subproiecte.length} subproiecte - suma originală: ${sumaOriginala} ${monedaOriginala}, suma RON: ${sumaFinalaRON}`);
-    
-    // Fallback dacă suma din subproiecte este 0
-    if (sumaOriginala === 0) {
-      console.log('ATENTIE: Suma din subproiecte este 0, folosesc valoarea proiectului principal');
-      sumaOriginala = convertBigQueryNumeric(proiect.Valoare_Estimata) || 0;
-      sumaFinalaRON = convertBigQueryNumeric(proiect.valoare_ron) || sumaOriginala;
-      monedaOriginala = proiect.moneda || 'RON';
-      
-      if (proiect.moneda && proiect.moneda !== 'RON') {
-        cursuriUtilizate[proiect.moneda] = convertBigQueryNumeric(proiect.curs_valutar) || 1;
-      }
-    }
   } else {
     // Pentru proiecte fără subproiecte
     sumaOriginala = convertBigQueryNumeric(proiect.Valoare_Estimata) || 0;
@@ -458,13 +464,12 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     console.log(`Proiect fără subproiecte - suma originală: ${sumaOriginala} ${monedaOriginala} = ${sumaFinalaRON} RON`);
   }
 
-  // Adaugă articolele suplimentare (în monedele lor originale)
+  // Adaugă articolele suplimentare (PĂSTRAT)
   articoleSuplimentare.forEach(articol => {
     const valoareArticol = convertBigQueryNumeric(articol.valoare);
     let valoareRON = valoareArticol;
     
     if (articol.moneda && articol.moneda !== 'RON') {
-      // Folosește cursul din cursuriUtilizate sau unul aproximativ
       const cursArticol = cursuriUtilizate[articol.moneda] || 
                           (articol.moneda === 'EUR' ? 5.0683 : 
                            articol.moneda === 'USD' ? 4.3688 : 
@@ -474,7 +479,6 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
       cursuriUtilizate[articol.moneda] = cursArticol;
     }
     
-    // Pentru simplitate, adaugă la suma în moneda predominantă
     if (articol.moneda === monedaOriginala) {
       sumaOriginala += valoareArticol;
     }
@@ -498,7 +502,7 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
   };
 }
 
-// FUNCȚIE OPTIMIZATĂ: Pregătește datele cu valorile estimate originale și client info corect
+// OPTIMIZAT: Pregătește datele cu noua structură de termeni
 function prepareazaPlaceholderDataCuValoriEstimate(
   proiect: any, 
   subproiecte: any[], 
@@ -512,11 +516,10 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   const dataContract = new Date().toLocaleDateString('ro-RO');
   const durataZile = calculateDurationInDays(proiect.Data_Start, proiect.Data_Final);
   
-  // Calculează și suma în RON pentru referință
   const cursProiect = convertBigQueryNumeric(proiect.curs_valutar) || 1;
   const sumaRON = monedaOriginala !== 'RON' ? (sumaOriginala * cursProiect).toFixed(2) : sumaOriginala.toFixed(2);
   
-  // Debug logging pentru client data
+  // Debug logging pentru client data (PĂSTRAT)
   console.log('🔍 CLIENT DATA DEBUG:', {
     proiect_client_original: proiect.Client,
     proiect_client_id: proiect.client_id,
@@ -534,7 +537,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       tip: contractData.setari?.tip_document || 'contract'
     },
     
-    // Date client complete din JOIN BigQuery
+    // Date client complete din JOIN BigQuery (PĂSTRAT)
     client: {
       nume: proiect.client_nume || proiect.Client || 'Client necunoscut',
       denumire: proiect.client_nume || proiect.Client || 'Client necunoscut',
@@ -549,7 +552,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       id: proiect.client_id || null
     },
     
-    // Date proiect cu valorile estimate originale și durata calculată
+    // Date proiect cu valorile estimate originale și durata calculată (PĂSTRAT)
     proiect: {
       id: proiect.ID_Proiect,
       denumire: proiect.Denumire,
@@ -564,7 +567,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       responsabil: proiect.Responsabil || ''
     },
     
-    // Date firma UNITAR (actualizate conform README)
+    // Date firma UNITAR (PĂSTRAT)
     firma: {
       nume: 'UNITAR PROIECT TDA SRL',
       cui: 'RO35639210',
@@ -576,7 +579,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       cont_trezorerie: 'RO29TREZ7035069XXX018857'
     },
     
-    // Subproiecte cu valorile estimate originale
+    // OPTIMIZAT: Subproiecte cu valorile estimate originale
     subproiecte: subproiecte.map(sub => ({
       denumire: sub.Denumire,
       valoare: convertBigQueryNumeric(sub.Valoare_Estimata) || 0,
@@ -586,6 +589,8 @@ function prepareazaPlaceholderDataCuValoriEstimate(
     })),
     
     articole_suplimentare: articole,
+    
+    // FIX PRINCIPAL: Termene cu noua structură (valorile valutare)
     termene_personalizate: termene,
     
     // Observații și metadate cu valorile estimate și RON
@@ -646,8 +651,16 @@ Platile vor fi realizate in modul urmator:
 
 ${data.termene_personalizate && data.termene_personalizate.length > 0 ? 
   data.termene_personalizate.map((termen: any, index: number) => {
-    const valoareEtapa = ((parseFloat(data.suma_totala_originala) || 0) * (termen.procent_plata || 0) / 100).toFixed(2);
-    return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${data.moneda_originala || 'RON'}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
+    // FIX PRINCIPAL: Folosește valorile din noua structură
+    const valoareTermen = termen.valoare || 0;
+    const monedaTermen = termen.moneda || 'RON';
+    const valoareRON = termen.valoare_ron || valoareTermen;
+    
+    // Calculează procentul
+    const sumaTotal = parseFloat(data.suma_totala_ron) || 0;
+    const procentCalculat = sumaTotal > 0 ? Math.round((valoareRON / sumaTotal) * 100) : 0;
+    
+    return `**Etapa ${index + 1}**: ${procentCalculat}% (${valoareTermen.toFixed(2)} ${monedaTermen}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
   }).join('\n') : 
   `**Etapa 1**: 100% (${data.suma_totala_originala} ${data.moneda_originala || 'RON'}) - La predarea proiectului (termen: 60 zile)`
 }
@@ -662,20 +675,21 @@ ${data.termene_personalizate && data.termene_personalizate.length > 0 ?
 `;
 }
 
-// Funcția pentru salvarea contractului (PĂSTRATĂ cu mici optimizări)
+// Funcția pentru salvarea contractului (OPTIMIZATĂ pentru noua structură)
 async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string> {
   const contractId = contractInfo.isEdit && contractInfo.contractExistentId 
     ? contractInfo.contractExistentId 
     : `CONTR_${contractInfo.proiectId}_${Date.now()}`;
   
   try {
-    console.log('Salvare contract cu date corecte:', {
+    console.log('Salvare contract cu date corecte și noua structură:', {
       contractId,
       isEdit: contractInfo.isEdit,
       client_id: contractInfo.proiect.client_id,
       client_nume: contractInfo.placeholderData.client.nume,
       valoare_originala: contractInfo.sumaOriginala,
-      moneda_originala: contractInfo.monedaOriginala
+      moneda_originala: contractInfo.monedaOriginala,
+      termene_count: contractInfo.termenePersonalizate?.length || 0
     });
 
     const dataStart = contractInfo.proiect.Data_Start;
@@ -688,7 +702,7 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
     );
 
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      // UPDATE pentru contractul existent cu types complete
+      // UPDATE pentru contractul existent cu noua structură
       const updateQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         SET 
@@ -721,7 +735,6 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         observatii: sanitizeStringForBigQuery(contractInfo.observatii)
       };
 
-      // FIX CRITIC: Tipuri complete pentru UPDATE
       const tipuriUpdate = {
         contractId: 'STRING',
         valoare: 'NUMERIC',
@@ -738,14 +751,14 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
       await bigquery.query({
         query: updateQuery,
         params: parametriiUpdate,
-        types: tipuriUpdate, // FIX: Adăugat types
+        types: tipuriUpdate,
         location: 'EU',
       });
 
       console.log(`Contract actualizat în BigQuery: ${contractInfo.contractExistentId}`);
       
     } else {
-      // INSERT pentru contract nou cu types complete
+      // INSERT pentru contract nou cu noua structură
       const insertQuery = `
         INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
@@ -788,7 +801,6 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         versiune: 1
       };
 
-      // FIX CRITIC: Tipuri complete pentru INSERT - aceasta era problema principală
       const tipuriInsert = {
         contractId: 'STRING',
         numarContract: 'STRING',
@@ -813,19 +825,10 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         versiune: 'INT64'
       };
 
-      console.log('🔍 DEBUG INSERT PARAMS:', {
-        has_client_id: !!parametriiInsert.clientId,
-        client_id_value: parametriiInsert.clientId,
-        cursValutar_value: parametriiInsert.cursValutar,
-        dataCurs_value: parametriiInsert.dataCurs,
-        dataExpirare_value: parametriiInsert.dataExpirare,
-        observatii_value: parametriiInsert.observatii
-      });
-
       await bigquery.query({
         query: insertQuery,
         params: parametriiInsert,
-        types: tipuriInsert, // FIX PRINCIPAL: Aceasta linia lipsea și cauza eroarea
+        types: tipuriInsert,
         location: 'EU',
       });
 
@@ -857,7 +860,6 @@ export async function POST(request: NextRequest) {
       observatii,
       isEdit = false,
       contractExistentId = null,
-      // NOU: Suport pentru preview contract personalizat
       contractPreview,
       contractPrefix
     } = await request.json();
@@ -870,6 +872,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`${isEdit ? 'Actualizare' : 'Generare'} contract pentru proiect: ${proiectId}`);
     console.log('Contract preview primit:', contractPreview);
+    console.log('FIX PRINCIPAL: Termene cu noua structură:', termenePersonalizate.length);
 
     // Query cu JOIN corect pentru client_id și date complete (PĂSTRAT)
     const projectQuery = `
@@ -923,14 +926,13 @@ export async function POST(request: NextRequest) {
       location: 'EU',
     });
 
-    // OPTIMIZARE: Calculează suma cu valorile estimate originale
+    // OPTIMIZAT: Calculează suma cu noua structură de termeni
     const { sumaFinala, monedaFinala, cursuriUtilizate, sumaOriginala, monedaOriginala } = 
-      calculeazaSumaContractCuValoriEstimate(proiect, subproiecteRows, articoleSuplimentare);
+      calculeazaSumaContractCuValoriEstimate(proiect, subproiecteRows, articoleSuplimentare, termenePersonalizate);
 
-    // OPTIMIZARE: Generează numărul contractului cu suport pentru preview personalizat
+    // OPTIMIZAT: Generează numărul contractului cu suport pentru preview personalizat
     let contractData;
     if (isEdit && contractExistentId) {
-      // Pentru editare, păstrează numărul existent sau folosește preview-ul
       if (contractPreview) {
         contractData = {
           numar_contract: contractPreview,
@@ -961,7 +963,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      // Pentru contract nou, folosește preview-ul dacă este furnizat
       if (contractPreview) {
         contractData = {
           numar_contract: contractPreview,
@@ -973,7 +974,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // OPTIMIZARE: Pregătește datele cu valorile estimate originale
+    // OPTIMIZAT: Pregătește datele cu noua structură de termeni
     const placeholderData = prepareazaPlaceholderDataCuValoriEstimate(
       proiect, 
       subproiecteRows, 
@@ -1018,7 +1019,7 @@ export async function POST(request: NextRequest) {
       templateUsed = 'fallback-error';
     }
 
-    // Salvează în BigQuery cu toate datele corecte (PĂSTRAT)
+    // Salvează în BigQuery cu toate datele corecte (OPTIMIZAT)
     const contractId = await salveazaContractCuDateCorecte({
       proiectId,
       tipDocument,

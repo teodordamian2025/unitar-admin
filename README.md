@@ -391,6 +391,7 @@ Tabele Bigquery: Sarcini, SarciniResponsabili, ProiectComentarii, TimeTracking
 
 Coduri pentru contracte:
 app/api/setari/contracte/route.ts
+app/api/setari/contracte/next-number/route.ts
 app/api/actions/contracts/generate/route.ts
 app/admin/rapoarte/proiecte/components/ContractModal.tsx
 app/admin/setari/contracte/page.tsx
