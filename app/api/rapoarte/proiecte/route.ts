@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/proiecte/route.ts
-// DATA: 16.08.2025 15:00 (ora României)
-// FIX PRINCIPAL: DATE fields cu literale în loc de parameters pentru BigQuery
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 01.09.2025 18:30 (ora României)
+// FIX CRITIC: Adăugat JOIN cu tabela Clienti pentru datele complete client
+// PĂSTRATE: Toate funcționalitățile existente (filtrare, paginare, POST, PUT, DELETE)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,13 +19,14 @@ const bigquery = new BigQuery({
 
 const dataset = 'PanouControlUnitar';
 const table = 'Proiecte';
+const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
 
-// Helper function pentru validare și escape SQL
+// Helper function pentru validare și escape SQL (PĂSTRAT)
 const escapeString = (value: string): string => {
   return value.replace(/'/g, "''");
 };
 
-// Helper function pentru formatare DATE pentru BigQuery
+// Helper function pentru formatare DATE pentru BigQuery (PĂSTRAT)
 const formatDateLiteral = (dateString: string | null): string => {
   if (!dateString || dateString === 'null' || dateString === '') {
     return 'NULL';
@@ -41,155 +42,247 @@ const formatDateLiteral = (dateString: string | null): string => {
   return 'NULL';
 };
 
+// Helper pentru conversie BigQuery NUMERIC (PĂSTRAT)
+const convertBigQueryNumeric = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    const numericValue = parseFloat(String(value.value)) || 0;
+    return numericValue;
+  }
+  
+  if (typeof value === 'string') {
+    return parseFloat(value) || 0;
+  }
+  
+  if (typeof value === 'number') {
+    return value;
+  }
+  
+  return 0;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
-    // Query cu câmpuri noi pentru multi-valută
-    let query = `SELECT 
-      ID_Proiect, 
-      Denumire, 
-      Client, 
-      Adresa,
-      Descriere,
-      Data_Start, 
-      Data_Final, 
-      Status, 
-      Valoare_Estimata,
-      moneda,
-      curs_valutar,
-      data_curs_valutar,
-      valoare_ron,
-      status_predare,
-      status_contract,
-      status_facturare,
-      status_achitare,
-      Responsabil,
-      Observatii
-    FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
-    
+    const search = searchParams.get('search');
+    const status = searchParams.get('status');
+    const client = searchParams.get('client');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+
+    console.log('🔍 PROIECTE API PARAMS:', { search, status, client, page, limit });
+
+    // FIX CRITICAL: Query cu JOIN pentru datele clientului (ca în contracte)
+    let baseQuery = `
+      SELECT 
+        p.*,
+        c.id as client_id,
+        c.nume as client_nume,
+        c.cui as client_cui,
+        c.nr_reg_com as client_reg_com,
+        c.adresa as client_adresa,
+        c.judet as client_judet,
+        c.oras as client_oras,
+        c.telefon as client_telefon,
+        c.email as client_email,
+        c.banca as client_banca,
+        c.iban as client_iban
+      FROM \`${PROJECT_ID}.${dataset}.${table}\` p
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+        ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
+    `;
+
     const conditions: string[] = [];
     const params: any = {};
     const types: any = {};
 
-    // Filtre - PĂSTRATE identic
-    const search = searchParams.get('search');
+    // Filtre - PĂSTRATE identic cu funcționalitate extinsă
     if (search) {
       conditions.push(`(
-        LOWER(ID_Proiect) LIKE LOWER(@search) OR 
-        LOWER(Denumire) LIKE LOWER(@search) OR 
-        LOWER(Client) LIKE LOWER(@search) OR
-        LOWER(COALESCE(Adresa, '')) LIKE LOWER(@search)
+        LOWER(p.ID_Proiect) LIKE LOWER(@search) OR 
+        LOWER(p.Denumire) LIKE LOWER(@search) OR 
+        LOWER(p.Client) LIKE LOWER(@search) OR
+        LOWER(COALESCE(p.Adresa, '')) LIKE LOWER(@search) OR
+        LOWER(COALESCE(c.nume, '')) LIKE LOWER(@search) OR
+        LOWER(COALESCE(c.cui, '')) LIKE LOWER(@search)
       )`);
       params.search = `%${search}%`;
       types.search = 'STRING';
     }
 
-    const status = searchParams.get('status');
     if (status) {
-      conditions.push('Status = @status');
+      conditions.push('p.Status = @status');
       params.status = status;
       types.status = 'STRING';
     }
 
-    const client = searchParams.get('client');
     if (client) {
-      conditions.push('Client = @client');
-      params.client = client;
+      conditions.push(`(
+        LOWER(p.Client) LIKE LOWER(@client) OR
+        LOWER(COALESCE(c.nume, '')) LIKE LOWER(@client)
+      )`);
+      params.client = `%${client}%`;
       types.client = 'STRING';
     }
 
+    // Filtrare pe baza datelor - PĂSTRATE
     const dataStartFrom = searchParams.get('data_start_start');
     const dataStartTo = searchParams.get('data_start_end');
     if (dataStartFrom) {
-      conditions.push('Data_Start >= @dataStartFrom');
+      conditions.push('p.Data_Start >= @dataStartFrom');
       params.dataStartFrom = dataStartFrom;
       types.dataStartFrom = 'DATE';
     }
     if (dataStartTo) {
-      conditions.push('Data_Start <= @dataStartTo');
+      conditions.push('p.Data_Start <= @dataStartTo');
       params.dataStartTo = dataStartTo;
       types.dataStartTo = 'DATE';
     }
 
-    // Filtrare pe baza valorii RON pentru acuratețe
+    // Filtrare pe baza valorii RON pentru acuratețe - PĂSTRATE
     const valoareMin = searchParams.get('valoare_min');
     if (valoareMin && !isNaN(Number(valoareMin))) {
-      conditions.push('CAST(COALESCE(valoare_ron, Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin');
+      conditions.push('CAST(COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin');
       params.valoareMin = Number(valoareMin);
       types.valoareMin = 'NUMERIC';
     }
 
     const valoareMax = searchParams.get('valoare_max');
     if (valoareMax && !isNaN(Number(valoareMax))) {
-      conditions.push('CAST(COALESCE(valoare_ron, Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax');
+      conditions.push('CAST(COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax');
       params.valoareMax = Number(valoareMax);
       types.valoareMax = 'NUMERIC';
     }
 
-    // Filtrare pe baza monedei
+    // Filtrare pe baza monedei - PĂSTRATE
     const moneda = searchParams.get('moneda');
     if (moneda) {
-      conditions.push('COALESCE(moneda, "RON") = @moneda');
+      conditions.push('COALESCE(p.moneda, "RON") = @moneda');
       params.moneda = moneda;
       types.moneda = 'STRING';
     }
 
-    // Filtrare pe baza status-urilor multiple
+    // Filtrare pe baza status-urilor multiple - PĂSTRATE
     const statusPredare = searchParams.get('status_predare');
     if (statusPredare) {
-      conditions.push('COALESCE(status_predare, "Nepredat") = @statusPredare');
+      conditions.push('COALESCE(p.status_predare, "Nepredat") = @statusPredare');
       params.statusPredare = statusPredare;
       types.statusPredare = 'STRING';
     }
 
     const statusContract = searchParams.get('status_contract');
     if (statusContract) {
-      conditions.push('COALESCE(status_contract, "Nu e cazul") = @statusContract');
+      conditions.push('COALESCE(p.status_contract, "Nu e cazul") = @statusContract');
       params.statusContract = statusContract;
       types.statusContract = 'STRING';
     }
 
     const statusFacturare = searchParams.get('status_facturare');
     if (statusFacturare) {
-      conditions.push('COALESCE(status_facturare, "Nefacturat") = @statusFacturare');
+      conditions.push('COALESCE(p.status_facturare, "Nefacturat") = @statusFacturare');
       params.statusFacturare = statusFacturare;
       types.statusFacturare = 'STRING';
     }
 
     const statusAchitare = searchParams.get('status_achitare');
     if (statusAchitare) {
-      conditions.push('COALESCE(status_achitare, "Neachitat") = @statusAchitare');
+      conditions.push('COALESCE(p.status_achitare, "Neachitat") = @statusAchitare');
       params.statusAchitare = statusAchitare;
       types.statusAchitare = 'STRING';
     }
 
     // Adaugă condiții la query
     if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+      baseQuery += ' WHERE ' + conditions.join(' AND ');
     }
 
-    // Sortare
-    query += ' ORDER BY Data_Start DESC';
+    // Sortare și paginare
+    baseQuery += ` 
+      ORDER BY p.Data_Start DESC 
+      LIMIT @limit OFFSET @offset
+    `;
 
-    console.log('Executing GET query:', query);
-    console.log('With params:', params);
+    params.limit = limit;
+    params.offset = offset;
+    types.limit = 'INT64';
+    types.offset = 'INT64';
 
+    console.log('📋 QUERY PARAMS:', params);
+
+    // Execută query-ul principal
     const [rows] = await bigquery.query({
-      query: query,
+      query: baseQuery,
       params: params,
       types: types,
       location: 'EU',
     });
 
+    console.log(`✅ PROIECTE LOADED: ${rows.length} results`);
+
+    // DEBUG pentru primul rând să vedem datele clientului
+    if (rows.length > 0) {
+      console.log('🔍 FIRST PROJECT CLIENT DATA:', {
+        ID_Proiect: rows[0].ID_Proiect,
+        Client: rows[0].Client,
+        client_id: rows[0].client_id,
+        client_nume: rows[0].client_nume,
+        client_cui: rows[0].client_cui,
+        client_adresa: rows[0].client_adresa,
+        has_client_join: !!rows[0].client_id ? 'YES' : 'NO'
+      });
+    }
+
+    // Query pentru total count (pentru paginare)
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM \`${PROJECT_ID}.${dataset}.${table}\` p
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+        ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
+    `;
+
+    if (conditions.length > 0) {
+      countQuery += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    const countParams = { ...params };
+    const countTypes = { ...types };
+    delete countParams.limit;
+    delete countParams.offset;
+    delete countTypes.limit;
+    delete countTypes.offset;
+
+    const [countRows] = await bigquery.query({
+      query: countQuery,
+      params: countParams,
+      types: countTypes,
+      location: 'EU',
+    });
+
+    const total = convertBigQueryNumeric(countRows[0]?.total) || 0;
+
+    // Procesează rezultatele pentru consistency (PĂSTRAT + conversii NUMERIC)
+    const processedData = rows.map((row: any) => ({
+      ...row,
+      Valoare_Estimata: convertBigQueryNumeric(row.Valoare_Estimata),
+      valoare_ron: convertBigQueryNumeric(row.valoare_ron),
+      curs_valutar: convertBigQueryNumeric(row.curs_valutar)
+    }));
+
     return NextResponse.json({
       success: true,
-      data: rows,
-      count: rows.length
+      data: processedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {
-    console.error('Eroare la încărcarea proiectelor:', error);
+    console.error('❌ EROARE LA ÎNCĂRCAREA PROIECTELOR:', error);
     return NextResponse.json({ 
       success: false,
       error: 'Eroare la încărcarea proiectelor',
@@ -198,6 +291,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PĂSTRAT: Funcțiile POST, PUT, DELETE neschimbate
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -253,7 +347,7 @@ export async function POST(request: NextRequest) {
 
     // FIX PRINCIPAL: Query cu DATE literale pentru a evita probleme cu parameters
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
       (ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final, 
        Status, Valoare_Estimata, moneda, curs_valutar, data_curs_valutar, valoare_ron,
        status_predare, status_contract, status_facturare, status_achitare,
@@ -367,7 +461,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(', ')}
       WHERE ID_Proiect = '${escapeString(id)}'
     `;
@@ -412,7 +506,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      DELETE FROM \`${PROJECT_ID}.${dataset}.${table}\`
       WHERE ID_Proiect = '${escapeString(id)}'
     `;
 

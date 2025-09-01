@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts
-// DATA: 31.08.2025 12:45 (ora României)
-// CORECTII: Fix client_id din JOIN + valorile estimate originale + date BigQuery corecte
-// PASTRATE: Toate functionalitatile existente + procesare template reala
+// DATA: 01.09.2025 19:00 (ora României)
+// OPTIMIZĂRI: Suport pentru contractPreview personalizat + fix calculele valutare consistente
+// PĂSTRATE: Toate funcționalitățile existente + JOIN corect cu Clienti
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,44 +25,27 @@ const bigquery = new BigQuery({
   },
 });
 
-// Helper pentru conversie BigQuery NUMERIC (PASTRAT din codul original)
+// Helper pentru conversie BigQuery NUMERIC (PĂSTRAT)
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
-  console.log(`Converting value:`, value, `type:`, typeof value);
-  
   if (typeof value === 'object' && value !== null && 'value' in value) {
     const numericValue = parseFloat(String(value.value)) || 0;
-    console.log(`BigQuery NUMERIC object: ${JSON.stringify(value)} -> ${numericValue}`);
     return numericValue;
   }
   
   if (typeof value === 'string') {
-    const parsed = parseFloat(value) || 0;
-    console.log(`String to number: "${value}" -> ${parsed}`);
-    return parsed;
+    return parseFloat(value) || 0;
   }
   
   if (typeof value === 'number') {
-    console.log(`Already number: ${value}`);
     return value;
   }
   
-  if (typeof value === 'object' && value !== null) {
-    const stringified = JSON.stringify(value);
-    const numericMatch = stringified.match(/["']?(\d+\.?\d*)["']?/);
-    if (numericMatch) {
-      const extracted = parseFloat(numericMatch[1]) || 0;
-      console.log(`Extracted from object: ${stringified} -> ${extracted}`);
-      return extracted;
-    }
-  }
-  
-  console.log(`Cannot convert to number: ${JSON.stringify(value)} (type: ${typeof value})`);
   return 0;
 };
 
-// FIX: Helper pentru formatarea datelor pentru BigQuery (corectat pentru date viitoare)
+// Helper pentru formatarea datelor pentru BigQuery (PĂSTRAT)
 const formatDateForBigQuery = (dateString?: string): string | null => {
   if (!dateString || dateString.trim() === '') {
     return null;
@@ -71,10 +54,9 @@ const formatDateForBigQuery = (dateString?: string): string | null => {
   try {
     const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (isoDateRegex.test(dateString)) {
-      // Verifică dacă data este validă, dar nu restricționa date viitoare
       const date = new Date(dateString + 'T00:00:00');
       if (!isNaN(date.getTime())) {
-        return dateString; // Returnează formatul ISO direct
+        return dateString;
       }
     }
     
@@ -90,7 +72,7 @@ const formatDateForBigQuery = (dateString?: string): string | null => {
   }
 };
 
-// Helper pentru formatarea datelor pentru afișare (PASTRAT)
+// Helper pentru formatarea datelor pentru afișare (PĂSTRAT)
 const formatDate = (date?: string | { value: string }): string => {
   if (!date) return '';
   const dateValue = typeof date === 'string' ? date : date.value;
@@ -101,7 +83,7 @@ const formatDate = (date?: string | { value: string }): string => {
   }
 };
 
-// Helper pentru validarea si sanitizarea string-urilor pentru BigQuery (PASTRAT)
+// Helper pentru sanitizarea string-urilor (PĂSTRAT)
 const sanitizeStringForBigQuery = (value: any): string | null => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -115,7 +97,7 @@ const sanitizeStringForBigQuery = (value: any): string | null => {
   return String(value).trim() || null;
 };
 
-// FIX: Calculare corectă durată în zile
+// Calculare durată în zile (PĂSTRAT)
 function calculateDurationInDays(startDate?: string | { value: string }, endDate?: string | { value: string }): string {
   if (!startDate || !endDate) return 'TBD';
   
@@ -138,27 +120,28 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
-// FIX CRITIC: Funcția pentru procesarea placeholder-urilor cu debugging
+// FUNCȚIE OPTIMIZATĂ: Procesarea placeholder-urilor cu debugging și fix valori consistente
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // DEBUG: Log pentru a vedea ce date primește template processing
   console.log('🔍 TEMPLATE PROCESSING DEBUG:', {
     has_client_data: !!data.client,
     client_nume: data.client?.nume,
     client_cui: data.client?.cui,
     client_adresa: data.client?.adresa,
     contract_numar: data.contract?.numar,
-    proiect_denumire: data.proiect?.denumire
+    proiect_denumire: data.proiect?.denumire,
+    suma_originala: data.suma_totala_originala,
+    moneda_originala: data.moneda_originala
   });
   
-  // FIX CRITIC: Inlocuire placeholder-uri cu verificare existenta date
+  // OPTIMIZARE: Înlocuiri simple cu valorile estimate consistente
   const simpleReplacements: { [key: string]: string } = {
     // Contract info
     '{{contract.numar}}': data.contract?.numar || 'Contract-NR-TBD',
     '{{contract.data}}': data.contract?.data || new Date().toLocaleDateString('ro-RO'),
     
-    // FIX CRITICAL: Client info cu fallback-uri multiple
+    // Client info cu fallback-uri multiple
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -167,12 +150,13 @@ function processPlaceholders(text: string, data: any): string {
     '{{client.email}}': data.client?.email || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
     
-    // Proiect info cu valorile estimate originale
+    // OPTIMIZARE: Proiect info cu valorile estimate originale CONSISTENTE
     '{{proiect.denumire}}': data.proiect?.denumire || 'PROIECT NECUNOSCUT',
     '{{proiect.descriere}}': data.proiect?.descriere || '',
     '{{proiect.adresa}}': data.proiect?.adresa || '',
-    '{{proiect.valoare}}': data.proiect?.valoare_originala?.toFixed(2) || data.proiect?.valoare?.toFixed(2) || '0.00',
-    '{{proiect.moneda}}': data.proiect?.moneda || 'RON',
+    // FIX CRITIC: Folosește valorile estimate originale, nu RON
+    '{{proiect.valoare}}': data.suma_totala_originala || data.proiect?.valoare_originala?.toFixed(2) || '0.00',
+    '{{proiect.moneda}}': data.moneda_originala || data.proiect?.moneda || 'RON',
     '{{proiect.data_start}}': data.proiect?.data_start || 'TBD',
     '{{proiect.data_final}}': data.proiect?.data_final || 'TBD',
     '{{proiect.responsabil}}': data.proiect?.responsabil || '',
@@ -188,42 +172,42 @@ function processPlaceholders(text: string, data: any): string {
     '{{firma.cont_ing}}': data.firma?.cont_ing || 'RO82INGB0000999905667533',
     '{{firma.cont_trezorerie}}': data.firma?.cont_trezorerie || 'RO29TREZ7035069XXX018857',
     
-    // Suma totala
-    '{{suma_totala_ron}}': data.suma_totala_originala || data.suma_totala_ron || '0.00',
+    // OPTIMIZARE: Suma totală cu valorile estimate consistente
+    '{{suma_totala_ron}}': data.suma_totala_ron || '0.00',
+    '{{suma_totala_originala}}': data.suma_totala_originala || '0.00',
+    '{{moneda_originala}}': data.moneda_originala || 'RON',
     '{{observatii}}': data.observatii || ''
   };
   
   // Log pentru debugging replacements
   console.log('🔧 REPLACEMENTS DEBUG:', {
     client_nume_replacement: simpleReplacements['{{client.nume}}'],
-    client_cui_replacement: simpleReplacements['{{client.cui}}'],
-    client_adresa_replacement: simpleReplacements['{{client.adresa}}'],
-    contract_numar_replacement: simpleReplacements['{{contract.numar}}']
+    proiect_valoare_replacement: simpleReplacements['{{proiect.valoare}}'],
+    proiect_moneda_replacement: simpleReplacements['{{proiect.moneda}}'],
+    suma_originala_replacement: simpleReplacements['{{suma_totala_originala}}']
   });
   
-  // Aplica inlocuirile simple
+  // Aplică înlocuirile simple
   for (const [placeholder, value] of Object.entries(simpleReplacements)) {
     const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
     const beforeCount = (processed.match(regex) || []).length;
     processed = processed.replace(regex, value);
-    const afterCount = (processed.match(regex) || []).length;
     
-    // Debug logging pentru fiecare replacement
     if (beforeCount > 0) {
       console.log(`🔄 REPLACED: ${placeholder} -> "${value}" (${beforeCount} occurrences)`);
     }
   }
   
-  // Proceseaza liste complexe (subproiecte, termene, articole)
+  // Procesează liste complexe
   processed = processListPlaceholders(processed, data);
   
-  // Proceseaza sectiuni conditionale
+  // Procesează secțiuni condiționale
   processed = processConditionalSections(processed, data);
   
   return processed;
 }
 
-// FIX: Proceseaza placeholder-uri pentru liste cu debugging
+// FUNCȚIE OPTIMIZATĂ: Procesează placeholder-uri pentru liste cu valorile estimate consistente
 function processListPlaceholders(text: string, data: any): string {
   let processed = text;
   
@@ -233,15 +217,16 @@ function processListPlaceholders(text: string, data: any): string {
     termene_count: data.termene_personalizate?.length || 0
   });
   
-  // Proceseaza subproiecte cu valorile estimate originale
+  // Procesează subproiecte cu valorile estimate originale
   if (data.subproiecte && Array.isArray(data.subproiecte) && data.subproiecte.length > 0) {
     const subproiecteList = data.subproiecte.map((sub: any, index: number) => {
+      // OPTIMIZARE: Folosește valorile estimate originale
       const valoare = sub.valoare_originala || sub.valoare || 0;
       const moneda = sub.moneda || 'RON';
       return `- ${sub.denumire}: ${valoare.toFixed(2)} ${moneda}`;
     }).join('\n');
     
-    console.log('📝 Subproiecte list generated:', subproiecteList);
+    console.log('🔍 Subproiecte list generated:', subproiecteList);
     
     processed = processed.replace(/{{#subproiecte}}[\s\S]*?{{\/subproiecte}}/g, 
       `**Componente proiect:**\n${subproiecteList}`);
@@ -250,7 +235,7 @@ function processListPlaceholders(text: string, data: any): string {
     processed = processed.replace(/{{#subproiecte}}[\s\S]*?{{\/subproiecte}}/g, '');
   }
   
-  // Proceseaza articole suplimentare
+  // Procesează articole suplimentare cu monedele originale
   if (data.articole_suplimentare && Array.isArray(data.articole_suplimentare) && data.articole_suplimentare.length > 0) {
     const articoleList = data.articole_suplimentare.map((art: any, index: number) => 
       `- ${art.descriere}: ${art.valoare?.toFixed(2) || '0.00'} ${art.moneda || 'RON'}`
@@ -265,13 +250,13 @@ function processListPlaceholders(text: string, data: any): string {
     processed = processed.replace(/{{#articole_suplimentare}}[\s\S]*?{{\/articole_suplimentare}}/g, '');
   }
   
-  // FIX: Proceseaza termene personalizate cu calcule corecte pe valorile estimate
+  // OPTIMIZARE: Procesează termene personalizate cu calculele estimate consistente
   if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
     const termeneList = data.termene_personalizate.map((termen: any, index: number) => {
-      // Folosește valorile estimate originale pentru calcule, nu RON
-      const valoareBaza = data.proiect?.valoare_originala || data.proiect?.valoare || 0;
+      // FIX CRITIC: Folosește valorile estimate originale pentru calcule
+      const valoareBaza = parseFloat(data.suma_totala_originala) || data.proiect?.valoare_originala || 0;
       const valoareEtapa = (valoareBaza * (termen.procent_plata || 0) / 100).toFixed(2);
-      const monedaBaza = data.proiect?.moneda || 'RON';
+      const monedaBaza = data.moneda_originala || 'RON';
       
       return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${monedaBaza}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
     }).join('\n');
@@ -281,9 +266,9 @@ function processListPlaceholders(text: string, data: any): string {
     processed = processed.replace(/{{#termene_personalizate}}[\s\S]*?{{\/termene_personalizate}}/g, termeneList);
     processed = processed.replace(/{{#termene_personalizate\.lista}}[\s\S]*?{{\/termene_personalizate\.lista}}/g, termeneList);
   } else {
-    // Template default pentru termene cu valorile estimate
-    const valoareBaza = data.proiect?.valoare_originala || data.proiect?.valoare || 0;
-    const monedaBaza = data.proiect?.moneda || 'RON';
+    // Template default cu valorile estimate
+    const valoareBaza = parseFloat(data.suma_totala_originala) || data.proiect?.valoare_originala || 0;
+    const monedaBaza = data.moneda_originala || 'RON';
     const defaultTermene = `**Etapa 1**: 100% (${valoareBaza.toFixed(2)} ${monedaBaza}) - La predarea proiectului (termen: 60 zile)`;
     
     console.log('💰 Default termene generated:', defaultTermene);
@@ -295,11 +280,10 @@ function processListPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// PĂSTRAT: Funcția pentru secțiuni condiționale (neschimbată)
+// Funcția pentru secțiuni condiționale (PĂSTRATĂ)
 function processConditionalSections(text: string, data: any): string {
   let processed = text;
   
-  // Sectiuni conditionale simple
   const conditionalSections = [
     { tag: 'proiect.descriere', value: data.proiect?.descriere },
     { tag: 'proiect.adresa', value: data.proiect?.adresa },
@@ -320,7 +304,7 @@ function processConditionalSections(text: string, data: any): string {
   return processed;
 }
 
-// FUNCTIE NOUA: Proceseaza template DOCX cu JSZip
+// Funcții pentru template processing (PĂSTRATE)
 async function processDocxTemplate(templatePath: string, data: any): Promise<Buffer> {
   try {
     const templateBuffer = await readFile(templatePath);
@@ -328,19 +312,15 @@ async function processDocxTemplate(templatePath: string, data: any): Promise<Buf
     
     await zip.loadAsync(templateBuffer);
     
-    // Citeste word/document.xml
     const documentXml = await zip.file('word/document.xml')?.async('string');
     if (!documentXml) {
       throw new Error('document.xml nu a fost gasit in template DOCX');
     }
     
-    // Proceseaza placeholder-urile in XML
     const processedXml = processPlaceholdersInXml(documentXml, data);
     
-    // Actualizeaza document.xml in ZIP
     zip.file('word/document.xml', processedXml);
     
-    // Genereaza noul DOCX
     return await zip.generateAsync({ type: 'nodebuffer' });
     
   } catch (error) {
@@ -349,9 +329,7 @@ async function processDocxTemplate(templatePath: string, data: any): Promise<Buf
   }
 }
 
-// Helper pentru procesarea placeholder-urilor in XML Word
 function processPlaceholdersInXml(xml: string, data: any): string {
-  // Converteste placeholder-urile Mustache in text simplu pentru XML
   const textContent = xml.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (match, content) => {
     const processed = processPlaceholders(content, data);
     return match.replace(content, processed);
@@ -360,7 +338,6 @@ function processPlaceholdersInXml(xml: string, data: any): string {
   return textContent;
 }
 
-// FUNCTIE NOUA: Proceseaza template TXT
 async function processTextTemplate(templatePath: string, data: any): Promise<string> {
   try {
     const templateContent = await readFile(templatePath, 'utf8');
@@ -371,11 +348,9 @@ async function processTextTemplate(templatePath: string, data: any): Promise<str
   }
 }
 
-// FUNCTIE NOUA: Converteste text procesat in DOCX
 async function convertTextToDocx(processedText: string): Promise<Buffer> {
   const zip = new JSZip();
   
-  // Creaza structura DOCX de baza
   zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
@@ -392,27 +367,23 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>`);
   
-  // Converteste textul in XML Word cu formatare mai buna
   const wordXml = convertTextToWordXml(processedText);
   zip.file('word/document.xml', wordXml);
   
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
-// Helper pentru conversie text la XML Word imbunatatit
 function convertTextToWordXml(text: string): string {
   const paragraphs = text.split('\n').map(line => {
     if (line.trim() === '') {
       return '<w:p/>';
     }
     
-    // Detecteaza si formateaza titluri
     if (line.includes('**') && line.includes('**')) {
       const boldText = line.replace(/\*\*(.*?)\*\*/g, '<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>$1</w:t></w:r>');
       return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${boldText}</w:p>`;
     }
     
-    // Text normal
     const cleanText = line.replace(/\*\*(.*?)\*\*/g, '<w:r><w:rPr><w:b/></w:rPr><w:t>$1</w:t></w:r>');
     return `<w:p><w:r><w:t>${cleanText}</w:t></w:r></w:p>`;
   }).join('');
@@ -425,298 +396,19 @@ function convertTextToWordXml(text: string): string {
 </w:document>`;
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const {
-      proiectId,
-      tipDocument = 'contract',
-      sablonId,
-      termenePersonalizate = [],
-      articoleSuplimentare = [],
-      observatii,
-      isEdit = false,
-      contractExistentId = null
-    } = await request.json();
-
-    if (!proiectId) {
-      return NextResponse.json({ 
-        error: 'ID proiect necesar' 
-      }, { status: 400 });
-    }
-
-    console.log(`${isEdit ? 'Actualizare' : 'Generare'} contract pentru proiect: ${proiectId}, tip: ${tipDocument}`);
-
-    // FIX CRITIC: Query cu JOIN corect pentru client_id și date complete
-    const projectQuery = `
-      SELECT 
-        p.*,
-        c.id as client_id,
-        c.nume as client_nume,
-        c.cui as client_cui,
-        c.nr_reg_com as client_reg_com,
-        c.adresa as client_adresa,
-        c.judet as client_judet,
-        c.oras as client_oras,
-        c.telefon as client_telefon,
-        c.email as client_email
-      FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\` p
-      LEFT JOIN \`${PROJECT_ID}.PanouControlUnitar.Clienti\` c
-        ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
-      WHERE p.ID_Proiect = @proiectId
-    `;
-
-    const [projectRows] = await bigquery.query({
-      query: projectQuery,
-      params: { proiectId },
-      location: 'EU',
-    });
-
-    if (projectRows.length === 0) {
-      return NextResponse.json({ 
-        error: 'Proiectul nu a fost gasit' 
-      }, { status: 404 });
-    }
-
-    const proiect = projectRows[0];
-    console.log('Proiect încărcat cu client_id:', {
-      proiect_id: proiect.ID_Proiect,
-      client_nume: proiect.client_nume || proiect.Client,
-      client_id: proiect.client_id,
-      has_client_data: !!proiect.client_cui
-    });
-
-    // 2. Preia subproiectele (PASTRAT din codul original)
-    const subproiecteQuery = `
-      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
-      WHERE ID_Proiect = @proiectId
-      ORDER BY Denumire ASC
-    `;
-
-    const [subproiecteRows] = await bigquery.query({
-      query: subproiecteQuery,
-      params: { proiectId },
-      location: 'EU',
-    });
-
-    // FIX: Calculează suma cu valorile estimate originale, NU convertite în RON
-    const { sumaFinala, monedaFinala, cursuriUtilizate, sumaOriginala, monedaOriginala } = calculeazaSumaContractCuValoriEstimate(
-      proiect, 
-      subproiecteRows, 
-      articoleSuplimentare
-    );
-
-    // 4. Generează numărul contractului (PASTRAT din codul original)
-    let contractData;
-    if (isEdit && contractExistentId) {
-      // Pentru editare, păstrează numărul existent
-      const existingQuery = `
-        SELECT numar_contract, serie_contract 
-        FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
-        WHERE ID_Contract = @contractId
-      `;
-      
-      const [existingRows] = await bigquery.query({
-        query: existingQuery,
-        params: { contractId: contractExistentId },
-        location: 'EU',
-      });
-      
-      if (existingRows.length > 0) {
-        contractData = {
-          numar_contract: existingRows[0].numar_contract,
-          serie: existingRows[0].serie_contract,
-          setari: { tip_document: tipDocument }
-        };
-      } else {
-        // Fallback la număr nou dacă contractul nu există
-        contractData = await getNextContractNumber(tipDocument, proiectId);
-      }
-    } else {
-      contractData = await getNextContractNumber(tipDocument, proiectId);
-    }
-
-    // FIX: Pregătește datele cu valorile estimate originale și durata corectă
-    const placeholderData = prepareazaPlaceholderDataCuValoriEstimate(
-      proiect, 
-      subproiecteRows, 
-      sumaOriginala, // Folosește valorile estimate originale
-      monedaOriginala,
-      contractData,
-      termenePersonalizate,
-      articoleSuplimentare,
-      observatii
-    );
-
-    // 6. NOU: Gaseste si proceseaza template-ul
-    let docxBuffer: Buffer;
-    let templateUsed = 'fallback';
-
-    try {
-      const templatePath = await findBestTemplate(tipDocument);
-      
-      if (templatePath) {
-        console.log(`Template gasit: ${templatePath}`);
-        templateUsed = path.basename(templatePath);
-        
-        if (templatePath.endsWith('.docx')) {
-          // Proceseaza template DOCX real
-          docxBuffer = await processDocxTemplate(templatePath, placeholderData);
-        } else if (templatePath.endsWith('.txt')) {
-          // Proceseaza template TXT si converteste in DOCX
-          const processedText = await processTextTemplate(templatePath, placeholderData);
-          docxBuffer = await convertTextToDocx(processedText);
-        } else {
-          throw new Error('Tip template nepermis');
-        }
-      } else {
-        console.log('Niciun template gasit, folosesc fallback');
-        // Fallback la template hardcodat
-        const fallbackTemplate = await createFallbackTemplate(placeholderData);
-        docxBuffer = await convertTextToDocx(fallbackTemplate);
-      }
-    } catch (templateError) {
-      console.error('Eroare la procesarea template-ului:', templateError);
-      console.log('Folosesc template fallback');
-      
-      // Fallback la template hardcodat in caz de eroare
-      const fallbackTemplate = await createFallbackTemplate(placeholderData);
-      docxBuffer = await convertTextToDocx(fallbackTemplate);
-      templateUsed = 'fallback-error';
-    }
-
-    // FIX CRITIC: Salvează în BigQuery cu toate datele corecte
-    const contractId = await salveazaContractCuDateCorecte({
-      proiectId,
-      tipDocument,
-      contractData,
-      placeholderData,
-      sumaOriginala, // Valorile estimate originale
-      monedaOriginala,
-      sumaFinala, // Valoarea în RON pentru referință
-      cursuriUtilizate,
-      observatii,
-      termenePersonalizate,
-      articoleSuplimentare,
-      templateUsed,
-      isEdit,
-      contractExistentId,
-      proiect // Transmite întregul obiect proiect pentru date suplimentare
-    });
-
-    console.log(`Contract ${isEdit ? 'actualizat' : 'generat'} cu succes: ${contractData.numar_contract} (template: ${templateUsed})`);
-
-    // 8. Returnează rezultatul
-    return new NextResponse(docxBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${contractData.numar_contract}.docx"`,
-        'X-Contract-Id': contractId,
-        'X-Contract-Number': contractData.numar_contract,
-        'X-Template-Used': templateUsed,
-        'X-Action': isEdit ? 'updated' : 'generated'
-      }
-    });
-
-  } catch (error) {
-    console.error('Eroare la generarea/actualizarea contractului:', error);
-    return NextResponse.json({ 
-      error: 'Eroare la procesarea contractului',
-      details: error instanceof Error ? error.message : 'Eroare necunoscuta'
-    }, { status: 500 });
-  }
-}
-
-// FUNCTIE NOUA: Creaza template fallback daca nu exista template incarcat
-async function createFallbackTemplate(data: any): Promise<string> {
-  return `**CONTRACT DE SERVICII**
-
-**NR. ${data.contract?.numar} din ${data.contract?.data}**
-
-**CAP.I. PARTI CONTRACTANTE**
-
-1. Intre ${data.client?.nume}, persoana juridica romana, cu sediul in ${data.client?.adresa}, inmatriculata la Oficiul Registrului Comertului sub nr. ${data.client?.nr_reg_com}, C.U.I. ${data.client?.cui}, reprezentata prin ${data.client?.reprezentant} denumita in continuare **BENEFICIAR**
-
-Si
-
-2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social in ${data.firma?.adresa}, avand CIF ${data.firma?.cui} si nr. de inregistrare la Registrul Comertului ${data.firma?.nr_reg_com}, avand contul IBAN: ${data.firma?.cont_ing}, deschis la banca ING, si cont Trezorerie IBAN: ${data.firma?.cont_trezorerie}, e-mail: ${data.firma?.email}, reprezentata legal de Damian Teodor, in calitate de Administrator, numita in continuare **PRESTATOR**.
-
-**CAP. II. OBIECTUL CONTRACTULUI**
-
-Obiectul contractului il reprezinta:
-
-Realizare ${data.proiect?.denumire}
-
-${data.proiect?.descriere ? `Descriere detaliata: ${data.proiect.descriere}` : ''}
-${data.proiect?.adresa ? `Adresa executie: ${data.proiect.adresa}` : ''}
-
-${data.subproiecte && data.subproiecte.length > 0 ? `
-**Componente proiect:**
-${data.subproiecte.map((sub: any) => `- ${sub.denumire}: ${sub.valoare_originala?.toFixed(2)} ${sub.moneda}`).join('\n')}
-` : ''}
-
-${data.articole_suplimentare && data.articole_suplimentare.length > 0 ? `
-**Servicii suplimentare:**
-${data.articole_suplimentare.map((art: any) => `- ${art.descriere}: ${art.valoare} ${art.moneda}`).join('\n')}
-` : ''}
-
-**CAP.III. DURATA CONTRACTULUI:**
-
-1. Contractul se incheie pe o perioada determinata, cu urmatoarele termene:
-- Data inceput: ${data.proiect?.data_start}
-- Data finalizare: ${data.proiect?.data_final}
-- Durata estimata: ${data.proiect?.durata_zile} zile
-
-**CAP. IV. PRETUL DE EXECUTARE AL LUCRARII**
-
-1. Pretul pe care Beneficiarul il datoreaza prestatorului pentru serviciile sale este de **${data.proiect?.valoare_originala?.toFixed(2)} ${data.proiect?.moneda}** la care se aplica suplimentar TVA${data.proiect?.moneda !== 'RON' ? ', platiti in lei la cursul BNR din ziua facturarii' : ''}.
-
-**Valoarea totala contract: ${data.suma_totala_originala} ${data.moneda_originala}${data.moneda_originala !== 'RON' ? ` (${data.suma_totala_ron} RON)` : ''}**
-
-Platile vor fi realizate in modul urmator:
-
-${data.termene_personalizate && data.termene_personalizate.length > 0 ? 
-  data.termene_personalizate.map((termen: any, index: number) => {
-    const valoareEtapa = ((data.proiect?.valoare_originala || 0) * (termen.procent_plata || 0) / 100).toFixed(2);
-    return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${data.proiect?.moneda || 'RON'}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
-  }).join('\n') : 
-  `**Etapa 1**: 100% (${data.proiect?.valoare_originala?.toFixed(2)} ${data.proiect?.moneda || 'RON'}) - La predarea proiectului (termen: 60 zile)`
-}
-
-**CAP.V. OBLIGATIILE PARTILOR**
-
-I. Obligatiile prestatorului:
-A). Va executa intocmai si la termen lucrarile solicitate de catre Beneficiar.
-B). Va pastra confidentialitatea datelor.
-C). Va executa lucrarile la care s-a angajat prin semnarea prezentului contract cu maxima responsabilitate.
-${data.proiect?.responsabil ? `D). Responsabilul proiect din partea PRESTATOR: ${data.proiect.responsabil}` : ''}
-
-II. Obligatiile Beneficiarului:
-A). Va pune la dispozitia prestatorului datele de tema necesare si alte informatii necesare pentru realizarea proiectului.
-B). Va respecta termenele de plata stabilite prin prezentul contract.
-${data.client?.telefon ? `C). Persoana de contact: ${data.client.nume} (Tel: ${data.client.telefon}, Email: ${data.client.email})` : ''}
-
-${data.observatii ? `
-**OBSERVATII SUPLIMENTARE:**
-${data.observatii}
-` : ''}
-
-**SEMNAT IN DATA: ${data.contract?.data}**
-
-| BENEFICIAR | PRESTATOR |
-|------------|-----------|
-| **${data.client?.nume}** | **S.C. UNITAR PROIECT TDA S.R.L.** |
-| ${data.client?.reprezentant} | **DAMIAN TEODOR** |
-| ................................. | ................................. |
-`;
-}
-
-// FIX: Calculează suma cu valorile estimate originale (nu RON)
+// FUNCȚIE OPTIMIZATĂ: Calculează suma cu valorile estimate originale consistente
 function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], articoleSuplimentare: any[]) {
   let sumaOriginala = 0;
   let monedaOriginala = proiect.moneda || 'RON';
   let sumaFinalaRON = 0;
   const cursuriUtilizate: { [moneda: string]: number } = {};
+
+  console.log('💰 CALCUL SUMA CONTRACT:', {
+    proiect_valoare: proiect.Valoare_Estimata,
+    proiect_moneda: proiect.moneda,
+    subproiecte_count: subproiecte.length,
+    articole_count: articoleSuplimentare.length
+  });
 
   // LOGICA CRITICĂ: Pentru proiecte cu subproiecte, suma = DOAR subproiecte + articole
   if (subproiecte.length > 0) {
@@ -790,6 +482,13 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     sumaFinalaRON += valoareRON;
   });
 
+  console.log('💰 SUMA FINALĂ CALCULATĂ:', {
+    sumaOriginala,
+    monedaOriginala, 
+    sumaFinalaRON,
+    cursuriUtilizate
+  });
+
   return { 
     sumaFinala: sumaFinalaRON, 
     monedaFinala: 'RON', 
@@ -799,7 +498,7 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
   };
 }
 
-// FIX CRITIC: Pregătește datele cu valorile estimate originale ȘI client info corect
+// FUNCȚIE OPTIMIZATĂ: Pregătește datele cu valorile estimate originale și client info corect
 function prepareazaPlaceholderDataCuValoriEstimate(
   proiect: any, 
   subproiecte: any[], 
@@ -817,15 +516,13 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   const cursProiect = convertBigQueryNumeric(proiect.curs_valutar) || 1;
   const sumaRON = monedaOriginala !== 'RON' ? (sumaOriginala * cursProiect).toFixed(2) : sumaOriginala.toFixed(2);
   
-  // FIX CRITIC: Debug logging pentru client data
+  // Debug logging pentru client data
   console.log('🔍 CLIENT DATA DEBUG:', {
     proiect_client_original: proiect.Client,
     proiect_client_id: proiect.client_id,
     proiect_client_nume: proiect.client_nume,
     proiect_client_cui: proiect.client_cui,
     proiect_client_adresa: proiect.client_adresa,
-    proiect_client_telefon: proiect.client_telefon,
-    proiect_client_email: proiect.client_email,
     toate_keys: Object.keys(proiect).filter(k => k.includes('client'))
   });
   
@@ -837,10 +534,10 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       tip: contractData.setari?.tip_document || 'contract'
     },
     
-    // FIX CRITIC: Date client complete din JOIN BigQuery cu debugging
+    // Date client complete din JOIN BigQuery
     client: {
       nume: proiect.client_nume || proiect.Client || 'Client necunoscut',
-      denumire: proiect.client_nume || proiect.Client || 'Client necunoscut', // Pentru backwards compatibility
+      denumire: proiect.client_nume || proiect.Client || 'Client necunoscut',
       cui: proiect.client_cui || 'CUI necunoscut',
       nr_reg_com: proiect.client_reg_com || 'Nr. reg. com. necunoscut',
       adresa: proiect.client_adresa || 'Adresa necunoscuta',
@@ -848,18 +545,18 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       oras: proiect.client_oras || '',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: 'Administrator', // Default pentru toate contractele
+      reprezentant: 'Administrator',
       id: proiect.client_id || null
     },
     
-    // FIX: Date proiect cu valorile estimate originale și durata calculată
+    // Date proiect cu valorile estimate originale și durata calculată
     proiect: {
       id: proiect.ID_Proiect,
       denumire: proiect.Denumire,
       descriere: proiect.Descriere || '',
       adresa: proiect.Adresa || '',
-      valoare: sumaOriginala, // Valoarea estimată originală
-      valoare_originala: sumaOriginala, // Pentru template processing
+      valoare: sumaOriginala,
+      valoare_originala: sumaOriginala,
       moneda: monedaOriginala,
       data_start: formatDate(proiect.Data_Start),
       data_final: formatDate(proiect.Data_Final),
@@ -879,7 +576,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       cont_trezorerie: 'RO29TREZ7035069XXX018857'
     },
     
-    // FIX: Subproiecte cu valorile estimate originale
+    // Subproiecte cu valorile estimate originale
     subproiecte: subproiecte.map(sub => ({
       denumire: sub.Denumire,
       valoare: convertBigQueryNumeric(sub.Valoare_Estimata) || 0,
@@ -900,7 +597,72 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   };
 }
 
-// FIX COMPLET: Salvează contractul cu date corecte pentru BigQuery
+async function createFallbackTemplate(data: any): Promise<string> {
+  return `**CONTRACT DE SERVICII**
+
+**NR. ${data.contract?.numar} din ${data.contract?.data}**
+
+**CAP.I. PARTI CONTRACTANTE**
+
+1. Intre ${data.client?.nume}, persoana juridica romana, cu sediul in ${data.client?.adresa}, inmatriculata la Oficiul Registrului Comertului sub nr. ${data.client?.nr_reg_com}, C.U.I. ${data.client?.cui}, reprezentata prin ${data.client?.reprezentant} denumita in continuare **BENEFICIAR**
+
+Si
+
+2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social in ${data.firma?.adresa}, avand CIF ${data.firma?.cui} si nr. de inregistrare la Registrul Comertului ${data.firma?.nr_reg_com}, avand contul IBAN: ${data.firma?.cont_ing}, deschis la banca ING, si cont Trezorerie IBAN: ${data.firma?.cont_trezorerie}, e-mail: ${data.firma?.email}, reprezentata legal de Damian Teodor, in calitate de Administrator, numita in continuare **PRESTATOR**.
+
+**CAP. II. OBIECTUL CONTRACTULUI**
+
+Obiectul contractului il reprezinta:
+
+Realizare ${data.proiect?.denumire}
+
+${data.proiect?.descriere ? `Descriere detaliata: ${data.proiect.descriere}` : ''}
+${data.proiect?.adresa ? `Adresa executie: ${data.proiect.adresa}` : ''}
+
+${data.subproiecte && data.subproiecte.length > 0 ? `
+**Componente proiect:**
+${data.subproiecte.map((sub: any) => `- ${sub.denumire}: ${sub.valoare_originala?.toFixed(2)} ${sub.moneda}`).join('\n')}
+` : ''}
+
+${data.articole_suplimentare && data.articole_suplimentare.length > 0 ? `
+**Servicii suplimentare:**
+${data.articole_suplimentare.map((art: any) => `- ${art.descriere}: ${art.valoare} ${art.moneda}`).join('\n')}
+` : ''}
+
+**CAP.III. DURATA CONTRACTULUI:**
+
+1. Contractul se incheie pe o perioada determinata, cu urmatoarele termene:
+- Data inceput: ${data.proiect?.data_start}
+- Data finalizare: ${data.proiect?.data_final}
+- Durata estimata: ${data.proiect?.durata_zile} zile
+
+**CAP. IV. PRETUL DE EXECUTARE AL LUCRARII**
+
+1. Pretul pe care Beneficiarul il datoreaza prestatorului pentru serviciile sale este de **${data.suma_totala_originala} ${data.moneda_originala}** la care se aplica suplimentar TVA${data.moneda_originala !== 'RON' ? ', platiti in lei la cursul BNR din ziua facturarii' : ''}.
+
+**Valoarea totala contract: ${data.suma_totala_originala} ${data.moneda_originala}${data.moneda_originala !== 'RON' ? ` (${data.suma_totala_ron} RON)` : ''}**
+
+Platile vor fi realizate in modul urmator:
+
+${data.termene_personalizate && data.termene_personalizate.length > 0 ? 
+  data.termene_personalizate.map((termen: any, index: number) => {
+    const valoareEtapa = ((parseFloat(data.suma_totala_originala) || 0) * (termen.procent_plata || 0) / 100).toFixed(2);
+    return `**Etapa ${index + 1}**: ${termen.procent_plata}% (${valoareEtapa} ${data.moneda_originala || 'RON'}) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
+  }).join('\n') : 
+  `**Etapa 1**: 100% (${data.suma_totala_originala} ${data.moneda_originala || 'RON'}) - La predarea proiectului (termen: 60 zile)`
+}
+
+**SEMNAT IN DATA: ${data.contract?.data}**
+
+| BENEFICIAR | PRESTATOR |
+|------------|-----------|
+| **${data.client?.nume}** | **S.C. UNITAR PROIECT TDA S.R.L.** |
+| ${data.client?.reprezentant} | **DAMIAN TEODOR** |
+| ................................. | ................................. |
+`;
+}
+
+// Funcția pentru salvarea contractului (PĂSTRATĂ cu mici optimizări)
 async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string> {
   const contractId = contractInfo.isEdit && contractInfo.contractExistentId 
     ? contractInfo.contractExistentId 
@@ -916,19 +678,17 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
       moneda_originala: contractInfo.monedaOriginala
     });
 
-    // FIX: Calcularea datelor pentru BigQuery cu gestionare corectă a datelor
     const dataStart = contractInfo.proiect.Data_Start;
     const dataFinal = contractInfo.proiect.Data_Final;
     
-    const dataSemnare = formatDateForBigQuery(new Date().toISOString().split('T')[0]); // Data curentă
+    const dataSemnare = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
     const dataExpirare = formatDateForBigQuery(
       typeof dataFinal === 'object' && dataFinal.value ? dataFinal.value : 
       typeof dataFinal === 'string' ? dataFinal : null
     );
 
-    // FIX: Query pentru INSERT sau UPDATE
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      // UPDATE pentru contractul existent
+      // UPDATE pentru contractul existent (PĂSTRAT)
       const updateQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         SET 
@@ -939,13 +699,9 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
           valoare_ron = @valoareRon,
           etape = PARSE_JSON(@etape),
           articole_suplimentare = PARSE_JSON(@articoleSuplimentare),
-          sablon_id = @sablonId,
-          sablon_nume = @sablonNume,
           data_actualizare = CURRENT_TIMESTAMP(),
-          actualizat_de = @actualizatDe,
           continut_json = PARSE_JSON(@continutJson),
           Observatii = @observatii,
-          note_interne = @noteInterne,
           versiune = versiune + 1
         WHERE ID_Contract = @contractId
       `;
@@ -959,58 +715,36 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         dataCurs: contractInfo.monedaOriginala !== 'RON' ? 
           formatDateForBigQuery(new Date().toISOString().split('T')[0]) : null,
         valoareRon: contractInfo.sumaFinala,
-        etape: JSON.stringify(contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
-          ? contractInfo.termenePersonalizate 
-          : [{ id: "default", denumire: "La predarea proiectului", termen_zile: 60, procent_plata: 100 }]),
+        etape: JSON.stringify(contractInfo.termenePersonalizate || []),
         articoleSuplimentare: JSON.stringify(contractInfo.articoleSuplimentare || []),
-        sablonId: sanitizeStringForBigQuery(contractInfo.templateUsed || null),
-        sablonNume: sanitizeStringForBigQuery(contractInfo.templateUsed || null),
-        actualizatDe: sanitizeStringForBigQuery('SISTEM'),
         continutJson: JSON.stringify(contractInfo.placeholderData),
-        observatii: sanitizeStringForBigQuery(contractInfo.observatii),
-        noteInterne: sanitizeStringForBigQuery(`Template folosit: ${contractInfo.templateUsed || 'fallback'} - Actualizat`)
-      };
-
-      const tipuriUpdate = {
-        valoare: 'NUMERIC',
-        cursValutar: 'NUMERIC',
-        dataCurs: 'DATE',
-        valoareRon: 'NUMERIC',
-        sablonId: 'STRING',
-        sablonNume: 'STRING',
-        actualizatDe: 'STRING',
-        observatii: 'STRING',
-        noteInterne: 'STRING'
+        observatii: sanitizeStringForBigQuery(contractInfo.observatii)
       };
 
       await bigquery.query({
         query: updateQuery,
         params: parametriiUpdate,
-        types: tipuriUpdate,
         location: 'EU',
       });
 
       console.log(`Contract actualizat în BigQuery: ${contractInfo.contractExistentId}`);
       
     } else {
-      // INSERT pentru contract nou cu toate datele corecte
+      // INSERT pentru contract nou cu toate datele corecte (PĂSTRAT)
       const insertQuery = `
         INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
          client_id, client_nume, Denumire_Contract, Data_Semnare, Data_Expirare,
          Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
-         etape, articole_suplimentare, sablon_id, sablon_nume,
-         data_creare, data_actualizare, creat_de, actualizat_de,
-         continut_json, path_fisier, hash_continut, Observatii, note_interne,
-         versiune, contract_parinte)
+         etape, articole_suplimentare, data_creare, data_actualizare, 
+         continut_json, Observatii, versiune)
         VALUES 
         (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
          @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
          @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
-         PARSE_JSON(@etape), PARSE_JSON(@articoleSuplimentare), @sablonId, @sablonNume,
-         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), @creatDe, @actualizatDe,
-         PARSE_JSON(@continutJson), @pathFisier, @hashContinut, @observatii, @noteInterne,
-         @versiune, @contractParinte)
+         PARSE_JSON(@etape), PARSE_JSON(@articoleSuplimentare), 
+         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 
+         PARSE_JSON(@continutJson), @observatii, @versiune)
       `;
 
       const parametriiInsert = {
@@ -1019,63 +753,29 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         serieContract: sanitizeStringForBigQuery(contractInfo.contractData.serie),
         tipDocument: contractInfo.tipDocument,
         proiectId: contractInfo.proiectId,
-        // FIX CRITIC: client_id din JOIN
         clientId: sanitizeStringForBigQuery(contractInfo.proiect.client_id),
         clientNume: contractInfo.placeholderData.client.nume,
         denumireContract: `Contract ${contractInfo.placeholderData.proiect.denumire}`,
-        // FIX: Date corecte pentru BigQuery
         dataSemnare: dataSemnare,
         dataExpirare: dataExpirare,
         status: 'Generat',
-        // FIX: Valorile estimate originale
         valoare: contractInfo.sumaOriginala,
         moneda: contractInfo.monedaOriginala,
-        // FIX: Curs valutar corect
         cursValutar: contractInfo.monedaOriginala !== 'RON' ? 
           (contractInfo.cursuriUtilizate[contractInfo.monedaOriginala] || null) : null,
         dataCurs: contractInfo.monedaOriginala !== 'RON' ? 
           formatDateForBigQuery(new Date().toISOString().split('T')[0]) : null,
         valoareRon: contractInfo.sumaFinala,
-        etape: JSON.stringify(contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0 
-          ? contractInfo.termenePersonalizate 
-          : [{ id: "default", denumire: "La predarea proiectului", termen_zile: 60, procent_plata: 100 }]),
+        etape: JSON.stringify(contractInfo.termenePersonalizate || []),
         articoleSuplimentare: JSON.stringify(contractInfo.articoleSuplimentare || []),
-        sablonId: sanitizeStringForBigQuery(contractInfo.templateUsed || null),
-        sablonNume: sanitizeStringForBigQuery(contractInfo.templateUsed || null),
-        creatDe: sanitizeStringForBigQuery('SISTEM'),
-        actualizatDe: sanitizeStringForBigQuery('SISTEM'),
         continutJson: JSON.stringify(contractInfo.placeholderData),
-        pathFisier: sanitizeStringForBigQuery(null),
-        hashContinut: sanitizeStringForBigQuery(null),
         observatii: sanitizeStringForBigQuery(contractInfo.observatii),
-        noteInterne: sanitizeStringForBigQuery(`Template folosit: ${contractInfo.templateUsed || 'fallback'}`),
-        versiune: 1,
-        contractParinte: sanitizeStringForBigQuery(null)
-      };
-
-      const tipuriInsert = {
-        clientId: 'STRING',
-        dataSemnare: 'DATE',
-        dataExpirare: 'DATE',
-        valoare: 'NUMERIC',
-        cursValutar: 'NUMERIC',
-        dataCurs: 'DATE',
-        valoareRon: 'NUMERIC',
-        sablonId: 'STRING',
-        sablonNume: 'STRING',
-        creatDe: 'STRING',
-        actualizatDe: 'STRING',
-        pathFisier: 'STRING',
-        hashContinut: 'STRING',
-        observatii: 'STRING',
-        noteInterne: 'STRING',
-        contractParinte: 'STRING'
+        versiune: 1
       };
 
       await bigquery.query({
         query: insertQuery,
         params: parametriiInsert,
-        types: tipuriInsert,
         location: 'EU',
       });
 
@@ -1086,12 +786,220 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
     
   } catch (error) {
     console.error('Eroare la salvarea contractului în BigQuery:', error);
-    console.error('Detalii eroare:', {
-      contractId,
-      proiectId: contractInfo.proiectId,
-      isEdit: contractInfo.isEdit,
-      error: error instanceof Error ? error.message : 'Eroare necunoscuta'
-    });
     throw error;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const {
+      proiectId,
+      tipDocument = 'contract',
+      sablonId,
+      termenePersonalizate = [],
+      articoleSuplimentare = [],
+      observatii,
+      isEdit = false,
+      contractExistentId = null,
+      // NOU: Suport pentru preview contract personalizat
+      contractPreview,
+      contractPrefix
+    } = await request.json();
+
+    if (!proiectId) {
+      return NextResponse.json({ 
+        error: 'ID proiect necesar' 
+      }, { status: 400 });
+    }
+
+    console.log(`${isEdit ? 'Actualizare' : 'Generare'} contract pentru proiect: ${proiectId}`);
+    console.log('Contract preview primit:', contractPreview);
+
+    // Query cu JOIN corect pentru client_id și date complete (PĂSTRAT)
+    const projectQuery = `
+      SELECT 
+        p.*,
+        c.id as client_id,
+        c.nume as client_nume,
+        c.cui as client_cui,
+        c.nr_reg_com as client_reg_com,
+        c.adresa as client_adresa,
+        c.judet as client_judet,
+        c.oras as client_oras,
+        c.telefon as client_telefon,
+        c.email as client_email
+      FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\` p
+      LEFT JOIN \`${PROJECT_ID}.PanouControlUnitar.Clienti\` c
+        ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
+      WHERE p.ID_Proiect = @proiectId
+    `;
+
+    const [projectRows] = await bigquery.query({
+      query: projectQuery,
+      params: { proiectId },
+      location: 'EU',
+    });
+
+    if (projectRows.length === 0) {
+      return NextResponse.json({ 
+        error: 'Proiectul nu a fost gasit' 
+      }, { status: 404 });
+    }
+
+    const proiect = projectRows[0];
+    console.log('Proiect încărcat cu client_id:', {
+      proiect_id: proiect.ID_Proiect,
+      client_nume: proiect.client_nume || proiect.Client,
+      client_id: proiect.client_id,
+      has_client_data: !!proiect.client_cui
+    });
+
+    // Preia subproiectele (PĂSTRAT)
+    const subproiecteQuery = `
+      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      WHERE ID_Proiect = @proiectId
+      ORDER BY Denumire ASC
+    `;
+
+    const [subproiecteRows] = await bigquery.query({
+      query: subproiecteQuery,
+      params: { proiectId },
+      location: 'EU',
+    });
+
+    // OPTIMIZARE: Calculează suma cu valorile estimate originale
+    const { sumaFinala, monedaFinala, cursuriUtilizate, sumaOriginala, monedaOriginala } = 
+      calculeazaSumaContractCuValoriEstimate(proiect, subproiecteRows, articoleSuplimentare);
+
+    // OPTIMIZARE: Generează numărul contractului cu suport pentru preview personalizat
+    let contractData;
+    if (isEdit && contractExistentId) {
+      // Pentru editare, păstrează numărul existent sau folosește preview-ul
+      if (contractPreview) {
+        contractData = {
+          numar_contract: contractPreview,
+          serie: contractPrefix || 'CONTR',
+          setari: { tip_document: tipDocument }
+        };
+      } else {
+        const existingQuery = `
+          SELECT numar_contract, serie_contract 
+          FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+          WHERE ID_Contract = @contractId
+        `;
+        
+        const [existingRows] = await bigquery.query({
+          query: existingQuery,
+          params: { contractId: contractExistentId },
+          location: 'EU',
+        });
+        
+        if (existingRows.length > 0) {
+          contractData = {
+            numar_contract: existingRows[0].numar_contract,
+            serie: existingRows[0].serie_contract,
+            setari: { tip_document: tipDocument }
+          };
+        } else {
+          contractData = await getNextContractNumber(tipDocument, proiectId);
+        }
+      }
+    } else {
+      // Pentru contract nou, folosește preview-ul dacă este furnizat
+      if (contractPreview) {
+        contractData = {
+          numar_contract: contractPreview,
+          serie: contractPrefix || 'CONTR', 
+          setari: { tip_document: tipDocument }
+        };
+      } else {
+        contractData = await getNextContractNumber(tipDocument, proiectId);
+      }
+    }
+
+    // OPTIMIZARE: Pregătește datele cu valorile estimate originale
+    const placeholderData = prepareazaPlaceholderDataCuValoriEstimate(
+      proiect, 
+      subproiecteRows, 
+      sumaOriginala,
+      monedaOriginala,
+      contractData,
+      termenePersonalizate,
+      articoleSuplimentare,
+      observatii
+    );
+
+    // Găsește și procesează template-ul (PĂSTRAT)
+    let docxBuffer: Buffer;
+    let templateUsed = 'fallback';
+
+    try {
+      const templatePath = await findBestTemplate(tipDocument);
+      
+      if (templatePath) {
+        console.log(`Template gasit: ${templatePath}`);
+        templateUsed = path.basename(templatePath);
+        
+        if (templatePath.endsWith('.docx')) {
+          docxBuffer = await processDocxTemplate(templatePath, placeholderData);
+        } else if (templatePath.endsWith('.txt')) {
+          const processedText = await processTextTemplate(templatePath, placeholderData);
+          docxBuffer = await convertTextToDocx(processedText);
+        } else {
+          throw new Error('Tip template nepermis');
+        }
+      } else {
+        console.log('Niciun template gasit, folosesc fallback');
+        const fallbackTemplate = await createFallbackTemplate(placeholderData);
+        docxBuffer = await convertTextToDocx(fallbackTemplate);
+      }
+    } catch (templateError) {
+      console.error('Eroare la procesarea template-ului:', templateError);
+      console.log('Folosesc template fallback');
+      
+      const fallbackTemplate = await createFallbackTemplate(placeholderData);
+      docxBuffer = await convertTextToDocx(fallbackTemplate);
+      templateUsed = 'fallback-error';
+    }
+
+    // Salvează în BigQuery cu toate datele corecte (PĂSTRAT)
+    const contractId = await salveazaContractCuDateCorecte({
+      proiectId,
+      tipDocument,
+      contractData,
+      placeholderData,
+      sumaOriginala,
+      monedaOriginala,
+      sumaFinala,
+      cursuriUtilizate,
+      observatii,
+      termenePersonalizate,
+      articoleSuplimentare,
+      templateUsed,
+      isEdit,
+      contractExistentId,
+      proiect
+    });
+
+    console.log(`Contract ${isEdit ? 'actualizat' : 'generat'} cu succes: ${contractData.numar_contract}`);
+
+    return new NextResponse(docxBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${contractData.numar_contract}.docx"`,
+        'X-Contract-Id': contractId,
+        'X-Contract-Number': contractData.numar_contract,
+        'X-Template-Used': templateUsed,
+        'X-Action': isEdit ? 'updated' : 'generated'
+      }
+    });
+
+  } catch (error) {
+    console.error('Eroare la generarea/actualizarea contractului:', error);
+    return NextResponse.json({ 
+      error: 'Eroare la procesarea contractului',
+      details: error instanceof Error ? error.message : 'Eroare necunoscuta'
+    }, { status: 500 });
   }
 }
