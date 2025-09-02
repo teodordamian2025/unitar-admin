@@ -1407,6 +1407,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
-    return new NextResponse(docxBuffer, {
-      status: 200,
-      headers: {
