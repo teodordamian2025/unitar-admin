@@ -608,21 +608,22 @@ ${data.termene_personalizate && data.termene_personalizate.length > 0 ?
 `;
 }
 
-// OPTIMIZAT: Funcția pentru salvarea contractului (FĂRĂ articole suplimentare)
+// OPTIMIZAT: Funcția pentru salvarea contractului (FĂRĂ articole suplimentare + cursuri corecte)
 async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string> {
   const contractId = contractInfo.isEdit && contractInfo.contractExistentId 
     ? contractInfo.contractExistentId 
     : `CONTR_${contractInfo.proiectId}_${Date.now()}`;
   
   try {
-    console.log('Salvare contract simplificat (fără articole suplimentare):', {
+    console.log('Salvare contract cu cursuri valutare corecte:', {
       contractId,
       isEdit: contractInfo.isEdit,
       client_id: contractInfo.proiect.client_id,
       client_nume: contractInfo.placeholderData.client.nume,
       valoare_originala: contractInfo.sumaOriginala,
       moneda_originala: contractInfo.monedaOriginala,
-      termene_count: contractInfo.termenePersonalizate?.length || 0
+      termene_count: contractInfo.termenePersonalizate?.length || 0,
+      cursuri_utilizate: Object.keys(contractInfo.cursuriUtilizate || {})
     });
 
     const dataStart = contractInfo.proiect.Data_Start;
@@ -634,8 +635,24 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
       typeof dataFinal === 'string' ? dataFinal : null
     );
 
+    // FIX PRINCIPAL: Determină cursul valutar pentru salvare în câmpul dedicat
+    const cursValutarPrincipal = contractInfo.monedaOriginala !== 'RON' ? 
+      (contractInfo.cursuriUtilizate[contractInfo.monedaOriginala] || CURSURI_VALUTAR[contractInfo.monedaOriginala] || null) : 
+      null;
+    
+    const dataCursValutar = cursValutarPrincipal ? 
+      formatDateForBigQuery(new Date().toISOString().split('T')[0]) : 
+      null;
+
+    console.log('Cursuri pentru salvare BigQuery:', {
+      moneda_principala: contractInfo.monedaOriginala,
+      curs_principal: cursValutarPrincipal,
+      data_curs: dataCursValutar,
+      toate_cursurile: contractInfo.cursuriUtilizate
+    });
+
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      // UPDATE pentru contractul existent - fără articole suplimentare
+      // UPDATE pentru contractul existent - cu cursuri corecte
       const updateQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         SET 
@@ -657,10 +674,8 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         contractId: contractInfo.contractExistentId,
         valoare: contractInfo.sumaOriginala,
         moneda: contractInfo.monedaOriginala,
-        cursValutar: contractInfo.monedaOriginala !== 'RON' ? 
-          (contractInfo.cursuriUtilizate[contractInfo.monedaOriginala] || null) : null,
-        dataCurs: contractInfo.monedaOriginala !== 'RON' ? 
-          formatDateForBigQuery(new Date().toISOString().split('T')[0]) : null,
+        cursValutar: cursValutarPrincipal,
+        dataCurs: dataCursValutar,
         valoareRon: contractInfo.sumaFinala,
         etape: JSON.stringify(contractInfo.termenePersonalizate || []),
         articoleSuplimentare: JSON.stringify([]), // Array gol pentru backward compatibility
@@ -688,10 +703,13 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         location: 'EU',
       });
 
-      console.log(`Contract actualizat în BigQuery: ${contractInfo.contractExistentId}`);
+      console.log(`Contract actualizat în BigQuery cu cursuri: ${contractInfo.contractExistentId}`, {
+        curs_salvat: cursValutarPrincipal,
+        data_curs: dataCursValutar
+      });
       
     } else {
-      // INSERT pentru contract nou - fără articole suplimentare
+      // INSERT pentru contract nou - cu cursuri corecte
       const insertQuery = `
         INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
@@ -722,10 +740,8 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         status: 'Generat',
         valoare: contractInfo.sumaOriginala,
         moneda: contractInfo.monedaOriginala,
-        cursValutar: contractInfo.monedaOriginala !== 'RON' ? 
-          (contractInfo.cursuriUtilizate[contractInfo.monedaOriginala] || null) : null,
-        dataCurs: contractInfo.monedaOriginala !== 'RON' ? 
-          formatDateForBigQuery(new Date().toISOString().split('T')[0]) : null,
+        cursValutar: cursValutarPrincipal,
+        dataCurs: dataCursValutar,
         valoareRon: contractInfo.sumaFinala,
         etape: JSON.stringify(contractInfo.termenePersonalizate || []),
         articoleSuplimentare: JSON.stringify([]), // Array gol pentru backward compatibility
@@ -765,7 +781,10 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
         location: 'EU',
       });
 
-      console.log(`Contract nou salvat în BigQuery: ${contractId}`);
+      console.log(`Contract nou salvat în BigQuery cu cursuri: ${contractId}`, {
+        curs_salvat: cursValutarPrincipal,
+        data_curs: dataCursValutar
+      });
     }
 
     return contractId;

@@ -393,6 +393,7 @@ Coduri pentru contracte:
 app/api/setari/contracte/route.ts
 app/api/setari/contracte/next-number/route.ts
 app/api/actions/contracts/generate/route.ts
+app/api/rapoarte/contracte/route.ts
 app/admin/rapoarte/proiecte/components/ContractModal.tsx
 app/admin/setari/contracte/page.tsx
 uploads/contracte/templates/contract-template.txt  = sablon contract cu placeholdere
