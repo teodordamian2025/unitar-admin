@@ -327,8 +327,8 @@ export async function PUT(request: NextRequest) {
 
     console.log('PUT actualizare contract:', ID_Contract);
 
-    // Construiește query-ul de update dinamic
-    let updateFields = [];
+    // Construiește query-ul de update dinamic cu tipizare explicită
+    const updateFields: string[] = [];
     const params: any = { ID_Contract };
     const types: any = { ID_Contract: 'STRING' };
 
