@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/contracte/route.ts
-// DATA: 02.09.2025 20:30 (ora României)
-// DESCRIERE: CRUD complet pentru contracte - verificare existentă, listare, căutare
+// DATA: 02.09.2025 22:15 (ora României)
+// FIX PRINCIPAL: Rezolvare eroare parsare date UTC - "Invalid time value"
 // PĂSTRATE: Toate funcționalitățile + pattern-uri consistente cu alte API-uri
 // ==================================================================
 
@@ -41,12 +41,49 @@ const convertBigQueryNumeric = (value: any): number => {
   return 0;
 };
 
-// Helper pentru formatarea datei
+// FIX PRINCIPAL: Helper pentru parsarea sigură a datelor BigQuery cu format UTC
+const parseDate = (dateValue: any): string | null => {
+  if (!dateValue) return null;
+  
+  try {
+    let dateString = dateValue;
+    
+    // Dacă este obiect BigQuery cu proprietatea value
+    if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
+      dateString = dateValue.value;
+    }
+    
+    if (!dateString) return null;
+    
+    // Convertește la string și elimină UTC-ul de la sfârșit care cauzează probleme
+    const cleanDateString = dateString.toString().replace(/\s+UTC\s*$/, '').trim();
+    
+    console.log(`Parsare dată: "${dateString}" -> "${cleanDateString}"`);
+    
+    // Încearcă să parseze data
+    const parsedDate = new Date(cleanDateString);
+    
+    // Verifică dacă data este validă
+    if (isNaN(parsedDate.getTime())) {
+      console.warn(`Data invalidă după parsare: "${cleanDateString}"`);
+      return null;
+    }
+    
+    return parsedDate.toISOString();
+  } catch (error) {
+    console.error('Eroare la parsarea datei:', dateValue, error);
+    return null;
+  }
+};
+
+// Helper pentru formatarea datei pentru afișare
 const formatDate = (date?: string | { value: string }): string => {
   if (!date) return '';
   const dateValue = typeof date === 'string' ? date : date.value;
   try {
-    return new Date(dateValue).toLocaleDateString('ro-RO');
+    // Folosește aceeași logică de sanitizare
+    const cleanDate = dateValue.toString().replace(/\s+UTC\s*$/, '').trim();
+    return new Date(cleanDate).toLocaleDateString('ro-RO');
   } catch {
     return '';
   }
@@ -153,11 +190,16 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     });
 
-    // Procesează rezultatele
+    // FIX PRINCIPAL: Procesează rezultatele cu parsare sigură a datelor
     const contracteProcesate = rows.map((contract: any) => {
       // Parsează JSON-urile
       const etape = parseJsonField(contract.etape);
       const continutJson = parseJsonField(contract.continut_json);
+
+      console.log(`Procesare contract ${contract.numar_contract}:`, {
+        data_creare_raw: contract.data_creare,
+        data_actualizare_raw: contract.data_actualizare
+      });
 
       return {
         ID_Contract: contract.ID_Contract,
@@ -184,8 +226,9 @@ export async function GET(request: NextRequest) {
         etape_count: etape ? (Array.isArray(etape) ? etape.length : 0) : 0,
         articole_suplimentare: parseJsonField(contract.articole_suplimentare),
         continut_json: continutJson,
-        data_creare: contract.data_creare ? new Date(contract.data_creare).toISOString() : null,
-        data_actualizare: contract.data_actualizare ? new Date(contract.data_actualizare).toISOString() : null,
+        // FIX PRINCIPAL: Folosește parseDate pentru data_creare și data_actualizare
+        data_creare: parseDate(contract.data_creare),
+        data_actualizare: parseDate(contract.data_actualizare),
         Observatii: contract.Observatii,
         versiune: contract.versiune || 1
       };
