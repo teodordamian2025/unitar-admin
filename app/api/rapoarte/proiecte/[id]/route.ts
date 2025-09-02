@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/proiecte/[id]/route.ts
-// DATA: 01.09.2025 18:35 (ora României)
-// FIX CRITIC: Adăugat JOIN cu tabela Clienti în GET method
-// PĂSTRATE: Toate funcționalitățile existente + statistici și subproiecte
+// DATA: 02.09.2025 23:15 (ora României)
+// FIX CRITIC: Îmbunătățire convertBigQueryNumeric pentru valorile NUMERIC din BigQuery
+// PĂSTRATE: Toate funcționalitățile existente + JOIN cu Clienti
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,24 +20,72 @@ const bigquery = new BigQuery({
 const dataset = 'PanouControlUnitar';
 const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
 
-// Helper pentru conversie BigQuery NUMERIC (PĂSTRAT)
+// FIX PRINCIPAL: Helper pentru conversie BigQuery NUMERIC îmbunătățit
 const convertBigQueryNumeric = (value: any): number => {
+  // Console log pentru debugging valorilor primite
+  if (value !== null && value !== undefined && value !== 0) {
+    console.log(`convertBigQueryNumeric - input:`, {
+      value,
+      type: typeof value,
+      isObject: typeof value === 'object',
+      hasValue: value?.hasOwnProperty?.('value'),
+      stringified: JSON.stringify(value)
+    });
+  }
+
   if (value === null || value === undefined) return 0;
   
+  // Cazul 1: Obiect BigQuery cu proprietatea 'value'
   if (typeof value === 'object' && value !== null && 'value' in value) {
-    const numericValue = parseFloat(String(value.value)) || 0;
+    const extractedValue = value.value;
+    console.log(`BigQuery object detected - extracted value:`, extractedValue, `type:`, typeof extractedValue);
+    
+    // Recursiv pentru cazuri aninate
+    if (typeof extractedValue === 'object' && extractedValue !== null) {
+      return convertBigQueryNumeric(extractedValue);
+    }
+    
+    const numericValue = parseFloat(String(extractedValue)) || 0;
+    console.log(`Converted to numeric:`, numericValue);
     return numericValue;
   }
   
+  // Cazul 2: String cu valoare numerică
   if (typeof value === 'string') {
-    return parseFloat(value) || 0;
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return 0;
+    
+    const parsed = parseFloat(trimmed);
+    const result = isNaN(parsed) ? 0 : parsed;
+    console.log(`String converted:`, value, `->`, result);
+    return result;
   }
   
+  // Cazul 3: Număr direct
   if (typeof value === 'number') {
-    return value;
+    const result = isNaN(value) || !isFinite(value) ? 0 : value;
+    console.log(`Number processed:`, value, `->`, result);
+    return result;
   }
   
-  return 0;
+  // Cazul 4: BigInt (posibil pentru NUMERIC mari)
+  if (typeof value === 'bigint') {
+    const result = Number(value);
+    console.log(`BigInt converted:`, value, `->`, result);
+    return result;
+  }
+  
+  // Cazul 5: Alte tipuri - încearcă conversie
+  try {
+    const stringValue = String(value);
+    const parsed = parseFloat(stringValue);
+    const result = isNaN(parsed) ? 0 : parsed;
+    console.log(`Other type converted:`, value, `(${typeof value}) ->`, result);
+    return result;
+  } catch (error) {
+    console.warn(`Cannot convert value:`, value, error);
+    return 0;
+  }
 };
 
 // Helper function pentru validare și escape SQL (PĂSTRAT)
@@ -69,7 +117,7 @@ export async function GET(
 
     console.log('🔍 GET PROIECT BY ID:', proiectId);
 
-    // FIX CRITICAL: Query cu JOIN pentru client_id și date complete
+    // Query cu JOIN pentru client_id și date complete (PĂSTRAT)
     const proiectQuery = `
       SELECT 
         p.*,
@@ -141,7 +189,13 @@ export async function GET(
 
     const proiect = proiectRows[0];
 
-    // DEBUG pentru a vedea datele clientului
+    // DEBUG pentru valorile NUMERIC înainte de conversie
+    console.log('🔍 RAW BigQuery values pentru:', proiectId);
+    console.log('Valoare_Estimata RAW:', proiect.Valoare_Estimata);
+    console.log('valoare_ron RAW:', proiect.valoare_ron);
+    console.log('curs_valutar RAW:', proiect.curs_valutar);
+
+    // DEBUG pentru a vedea datele clientului (PĂSTRAT)
     console.log('🔍 PROIECT CLIENT DATA:', {
       ID_Proiect: proiect.ID_Proiect,
       Client: proiect.Client,
@@ -152,20 +206,42 @@ export async function GET(
       has_client_join: !!proiect.client_id ? 'YES' : 'NO'
     });
 
-    // Procesează datele pentru consistency
+    // FIX PRINCIPAL: Procesează datele cu funcția îmbunătățită
+    const valoare_estimata_converted = convertBigQueryNumeric(proiect.Valoare_Estimata);
+    const valoare_ron_converted = convertBigQueryNumeric(proiect.valoare_ron);
+    const curs_valutar_converted = convertBigQueryNumeric(proiect.curs_valutar);
+
+    console.log('✅ CONVERTED VALUES:', {
+      Valoare_Estimata: valoare_estimata_converted,
+      valoare_ron: valoare_ron_converted,
+      curs_valutar: curs_valutar_converted
+    });
+
     const processedProiect = {
       ...proiect,
-      Valoare_Estimata: convertBigQueryNumeric(proiect.Valoare_Estimata),
-      valoare_ron: convertBigQueryNumeric(proiect.valoare_ron),
-      curs_valutar: convertBigQueryNumeric(proiect.curs_valutar)
+      Valoare_Estimata: valoare_estimata_converted,
+      valoare_ron: valoare_ron_converted,
+      curs_valutar: curs_valutar_converted
     };
 
-    const processedSubproiecte = subproiecteRows.map((sub: any) => ({
-      ...sub,
-      Valoare_Estimata: convertBigQueryNumeric(sub.Valoare_Estimata),
-      valoare_ron: convertBigQueryNumeric(sub.valoare_ron),
-      curs_valutar: convertBigQueryNumeric(sub.curs_valutar)
-    }));
+    const processedSubproiecte = subproiecteRows.map((sub: any) => {
+      const subValoare = convertBigQueryNumeric(sub.Valoare_Estimata);
+      const subValoareRon = convertBigQueryNumeric(sub.valoare_ron);
+      const subCurs = convertBigQueryNumeric(sub.curs_valutar);
+      
+      console.log(`Subproiect ${sub.ID_Subproiect || sub.Denumire} converted:`, {
+        Valoare_Estimata: subValoare,
+        valoare_ron: subValoareRon,
+        curs_valutar: subCurs
+      });
+
+      return {
+        ...sub,
+        Valoare_Estimata: subValoare,
+        valoare_ron: subValoareRon,
+        curs_valutar: subCurs
+      };
+    });
 
     // Calculează statistici din sesiuni (PĂSTRAT)
     const totalOre = sesiuniRows.reduce((sum: number, sesiune: any) => {
@@ -173,6 +249,7 @@ export async function GET(
     }, 0);
 
     console.log(`✅ PROIECT LOADED: ${proiect.ID_Proiect} cu ${subproiecteRows.length} subproiecte și ${sesiuniRows.length} sesiuni`);
+    console.log(`💰 Valoare finală returnată: ${valoare_estimata_converted} ${proiect.moneda || 'RON'}`);
 
     return NextResponse.json({
       success: true,
@@ -209,7 +286,7 @@ export async function PUT(
     console.log('Proiect ID:', proiectId);
     console.log('Update data:', updateData);
 
-    // Construire query UPDATE dinamic cu DATE literale (ca în route.ts principal)
+    // Construire query UPDATE dinamic cu DATE literale (PĂSTRAT)
     const updateFields: string[] = [];
 
     // Lista câmpurilor permise pentru actualizare (PĂSTRAT + EXTINS)
@@ -223,7 +300,7 @@ export async function PUT(
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && allowedFields.includes(key)) {
-        // FIX: Tratament special pentru câmpurile DATE
+        // Tratament special pentru câmpurile DATE (PĂSTRAT)
         if (['Data_Start', 'Data_Final', 'data_curs_valutar'].includes(key)) {
           const formattedDate = formatDateLiteral(value as string);
           updateFields.push(`${key} = ${formattedDate}`);
