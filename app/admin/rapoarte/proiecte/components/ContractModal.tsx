@@ -1365,3 +1365,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     document.body
   ) : null;
 }
+                }}
+              >
+                {loading ? 'Se procesează...' : 
+                 isEditMode ? 'Actualizează Contract' : 'Generează Contract'}
