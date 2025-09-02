@@ -31,8 +31,19 @@ interface ContractExistent {
   Valoare: number;
   Moneda: string;
   etape?: any[];
+  etape_count?: number;  // Proprietate adăugată
   continut_json?: any;
   Observatii?: string;
+  // Proprietăți adiționale returnate de noul API
+  client_nume?: string;
+  client_nume_complet?: string;
+  client_adresa?: string;
+  client_telefon?: string;
+  client_email?: string;
+  curs_valutar?: number;
+  data_curs_valutar?: string;
+  valoare_ron?: number;
+  versiune?: number;
 }
 
 interface ContractModalProps {
