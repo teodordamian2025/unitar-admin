@@ -701,6 +701,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       </div>,
       document.body
     ) : null;
+}
   }
 
   const sumaTotala = calculeazaSumaTotala();
@@ -1363,3 +1364,4 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     </div>,
     document.body
   ) : null;
+}
