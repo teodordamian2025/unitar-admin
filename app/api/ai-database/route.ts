@@ -1,3 +1,5 @@
+// app/api/ai-database/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // Stocare temporară pentru query-urile pending

@@ -1,3 +1,5 @@
+// pages/api/queryBigQuery.ts
+
 import { BigQuery } from '@google-cloud/bigquery';
 
 export default async function handler(req, res) {

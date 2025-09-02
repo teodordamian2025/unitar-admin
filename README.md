@@ -401,6 +401,16 @@ scripts/setup-contract-templates.js
 lib/templates-helpers.ts
 Tabel Bigquery Contracte
 
+Coduri legate de chatbot si Bigquery:
+app/api/gueryOpenAI/route.ts
+app/api/bigquery/route.ts
+pages/api/queryBigQuery.ts
+app/api/ai-database/route.ts
+pages/api/chat.ts
+app/components/UserChatbot.tsx
+components/Chatbot.tsx
+
+
 ### 📋 Descriere Componente Cheie
 
 #### 🎯 **FacturaHibridModal.tsx**

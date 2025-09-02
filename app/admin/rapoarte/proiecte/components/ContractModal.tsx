@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 01.09.2025 19:45 (ora României)
-// FIX PRINCIPAL: Numerotare consecutivă + Coloane restructurate pentru Etape de Plată
-// PĂSTRATE: Toate funcționalitățile existente + logica contract existent/nou
+// DATA: 01.09.2025 21:30 (ora României)
+// VERSIUNE FINALĂ: Procente informative + reordonare + eliminare articole suplimentare + workflow editare
+// PĂSTRATE: Toate funcționalitățile de bază + logica contract existent/nou
 // ==================================================================
 
 'use client';
@@ -39,26 +39,17 @@ interface ContractModalProps {
   onSuccess?: () => void;
 }
 
-// OPTIMIZAT: Interfață nouă pentru termeni cu valorile valutare (identic cu Articole Suplimentare)
+// OPTIMIZAT: Interfață pentru termeni cu procent informativ
 interface TermenPersonalizat {
   id: string;
   denumire: string;
-  valoare: number;           // NOUĂ - valoarea în moneda originală
-  moneda: string;           // NOUĂ - moneda (RON, EUR, USD, GBP)
-  valoare_ron: number;      // NOUĂ - valoarea convertită în RON
+  valoare: number;           
+  moneda: string;           
+  valoare_ron: number;      
   termen_zile: number;
-  // ELIMINAT: procent_plata (calculat automat din valoare)
+  procent_calculat: number; // NOU: Procent informativ (read-only)
   este_subproiect?: boolean;
   subproiect_id?: string;
-}
-
-interface ArticolSuplimentar {
-  id: string;
-  descriere: string;
-  valoare: number;
-  moneda: string;
-  termen_zile: number;
-  valoare_ron?: number;
 }
 
 interface SubproiectInfo {
@@ -72,7 +63,7 @@ interface SubproiectInfo {
   Data_Final?: string | { value: string };
 }
 
-// Cursuri valutare pentru conversii (identic cu sistemul existent)
+// Cursuri valutare pentru conversii (PĂSTRAT)
 const CURSURI_VALUTAR: { [key: string]: number } = {
   'EUR': 5.0683,
   'USD': 4.3688,
@@ -132,16 +123,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [isEditMode, setIsEditMode] = useState(false);
   const [observatii, setObservatii] = useState('');
   
-  // FIX PRINCIPAL: State pentru preview număr contract cu API real
+  // State pentru preview număr contract (păstrat pentru editare)
   const [contractPrefix, setContractPrefix] = useState('CONTR');
   const [contractNumber, setContractNumber] = useState<number | null>(null);
   const [contractPreview, setContractPreview] = useState('');
   
-  // OPTIMIZAT: State pentru termene cu structura nouă (valorile valutare)
+  // OPTIMIZAT: State pentru termene cu procente calculate
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
-  
-  // State pentru articole suplimentare (PĂSTRAT)
-  const [articoleSuplimentare, setArticoleSuplimentare] = useState<ArticolSuplimentar[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -149,17 +137,17 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       Promise.all([
         loadSubproiecte(),
         checkContractExistent(),
-        previewContractNumberReal() // FIX: Folosește API-ul real
+        previewContractNumberReal()
       ]).finally(() => {
         setLoadingCheck(false);
       });
     }
   }, [isOpen, proiect.ID_Proiect]);
 
-  // FIX PRINCIPAL: Funcție pentru preview numărul contractului cu API real
+  // Funcție pentru preview numărul contractului cu API real (PĂSTRAT)
   const previewContractNumberReal = async () => {
     try {
-      console.log('🔢 Apelez API-ul real pentru numerotare consecutivă...');
+      console.log('Apelez API-ul real pentru numerotare consecutivă...');
       
       const response = await fetch(`/api/setari/contracte/next-number?tipDocument=contract&proiectId=${encodeURIComponent(proiect.ID_Proiect)}`);
       const result = await response.json();
@@ -169,7 +157,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         setContractPrefix(result.serie);
         setContractPreview(result.contract_preview);
         
-        console.log('✅ Număr consecutiv primit:', {
+        console.log('Număr consecutiv primit:', {
           preview: result.contract_preview,
           numar: result.numar_secvential,
           serie: result.serie
@@ -178,46 +166,18 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         throw new Error(result.error || 'Eroare la obținerea numărului contract');
       }
     } catch (error) {
-      console.error('❌ Eroare la preview numărul contractului:', error);
+      console.error('Eroare la preview numărul contractului:', error);
       showToast('Nu s-a putut obține următorul număr de contract', 'error');
       
-      // Fallback cu format similar cu cel din setari/contracte/page.tsx
+      // Fallback
       const currentYear = new Date().getFullYear();
-      const fallbackNumber = 1001; // Următor număr aproximativ
+      const fallbackNumber = 1001;
       setContractNumber(fallbackNumber);
       setContractPreview(`${contractPrefix}-${fallbackNumber}-${currentYear}`);
     }
   };
 
-  // PĂSTRAT: Actualizează preview-ul contractului
-  const updateContractPreview = (prefix: string, number: number | null, year?: number) => {
-    const currentYear = year || new Date().getFullYear();
-    if (number) {
-      setContractPreview(`${prefix}-${number}-${currentYear}`);
-    } else {
-      setContractPreview(`${prefix}-???-${currentYear}`);
-    }
-  };
-
-  // OPTIMIZAT: Handler pentru schimbarea prefix-ului (regenerează cu API real)
-  const handlePrefixChange = async (newPrefix: string) => {
-    setContractPrefix(newPrefix);
-    
-    // Re-apelează API-ul pentru noua numerotare
-    try {
-      const response = await fetch(`/api/setari/contracte/next-number?tipDocument=contract&proiectId=${encodeURIComponent(proiect.ID_Proiect)}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        setContractNumber(result.numar_secvential);
-        updateContractPreview(newPrefix, result.numar_secvential);
-      }
-    } catch (error) {
-      console.error('Eroare la actualizarea prefix-ului:', error);
-      updateContractPreview(newPrefix, contractNumber);
-    }
-  };
-
+  // FIX PRINCIPAL: Încărcarea cu valoarea proiectului pentru cazurile fără subproiecte
   const loadSubproiecte = async () => {
     try {
       const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
@@ -226,47 +186,77 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       if (result.success && result.data) {
         setSubproiecte(result.data);
         
-        // OPTIMIZAT: Convertește subproiectele în termeni cu valorile valutare complete
-        const termeniDinSubproiecte = result.data.map((sub: SubproiectInfo) => {
-          const valoareOriginala = parseFloat(sub.Valoare_Estimata?.toString() || '') || 0;
-          const valoareRON = parseFloat(sub.valoare_ron?.toString() || '') || valoareOriginala;
-          const monedaOriginala = sub.moneda || 'RON';
-          
-          // Calculează termenul în zile din Data_Final
-          let terminZile = 30; // default
-          if (sub.Data_Final) {
-            const dataFinal = typeof sub.Data_Final === 'string' ? sub.Data_Final : sub.Data_Final.value;
-            const dataStart = typeof proiect.Data_Start === 'string' ? proiect.Data_Start : proiect.Data_Start?.value;
-            if (dataStart && dataFinal) {
-              const diffTime = Math.abs(new Date(dataFinal).getTime() - new Date(dataStart).getTime());
-              terminZile = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (result.data.length > 0) {
+          // Convertește subproiectele în termeni cu valorile valutare complete
+          const termeniDinSubproiecte = result.data.map((sub: SubproiectInfo) => {
+            const valoareOriginala = parseFloat(sub.Valoare_Estimata?.toString() || '') || 0;
+            const valoareRON = parseFloat(sub.valoare_ron?.toString() || '') || valoareOriginala;
+            const monedaOriginala = sub.moneda || 'RON';
+            
+            // Calculează termenul în zile din Data_Final
+            let terminZile = 30;
+            if (sub.Data_Final) {
+              const dataFinal = typeof sub.Data_Final === 'string' ? sub.Data_Final : sub.Data_Final.value;
+              const dataStart = typeof proiect.Data_Start === 'string' ? proiect.Data_Start : proiect.Data_Start?.value;
+              if (dataStart && dataFinal) {
+                const diffTime = Math.abs(new Date(dataFinal).getTime() - new Date(dataStart).getTime());
+                terminZile = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              }
             }
-          }
+            
+            return {
+              id: `sub_${sub.ID_Subproiect}`,
+              denumire: sub.Denumire,
+              valoare: valoareOriginala,
+              moneda: monedaOriginala,
+              valoare_ron: valoareRON,
+              termen_zile: terminZile,
+              procent_calculat: 0, // Va fi calculat după
+              este_subproiect: true,
+              subproiect_id: sub.ID_Subproiect
+            };
+          });
           
-          return {
-            id: `sub_${sub.ID_Subproiect}`,
-            denumire: sub.Denumire,
-            valoare: valoareOriginala,        // NOUĂ: valoarea în moneda originală
-            moneda: monedaOriginala,          // NOUĂ: moneda originală
-            valoare_ron: valoareRON,          // NOUĂ: valoarea convertită
-            termen_zile: terminZile,
-            este_subproiect: true,
-            subproiect_id: sub.ID_Subproiect
-          };
-        });
+          setTermenePersonalizate(termeniDinSubproiecte);
+        } else {
+          // FIX CRITIC: Pentru proiecte fără subproiecte, folosește valoarea proiectului
+          const valoareProiect = parseFloat(proiect.valoare_ron?.toString() || '') || 
+                                parseFloat(proiect.Valoare_Estimata?.toString() || '') || 0;
+          const monedaProiect = proiect.moneda || 'RON';
+          
+          console.log('Proiect fără subproiecte - setez valoarea:', valoareProiect, monedaProiect);
+          
+          setTermenePersonalizate([
+            { 
+              id: '1', 
+              denumire: 'La predarea proiectului', 
+              valoare: valoareProiect,
+              moneda: monedaProiect,
+              valoare_ron: valoareProiect,
+              termen_zile: 60,
+              procent_calculat: 100,
+              este_subproiect: false
+            }
+          ]);
+        }
         
-        setTermenePersonalizate(termeniDinSubproiecte.length > 0 ? termeniDinSubproiecte : [
+        console.log(`Încărcate ${result.data.length} subproiecte pentru contract`);
+      } else {
+        // Fallback dacă API-ul nu returnează date
+        const valoareProiect = parseFloat(proiect.valoare_ron?.toString() || '') || 
+                              parseFloat(proiect.Valoare_Estimata?.toString() || '') || 0;
+        setTermenePersonalizate([
           { 
             id: '1', 
-            denumire: 'La semnare', 
-            valoare: parseFloat(proiect.valoare_ron?.toString() || '') || parseFloat(proiect.Valoare_Estimata?.toString() || '') || 0,
+            denumire: 'La predarea proiectului', 
+            valoare: valoareProiect,
             moneda: proiect.moneda || 'RON',
-            valoare_ron: parseFloat(proiect.valoare_ron?.toString() || '') || parseFloat(proiect.Valoare_Estimata?.toString() || '') || 0,
-            termen_zile: 0 
+            valoare_ron: valoareProiect,
+            termen_zile: 60,
+            procent_calculat: 100,
+            este_subproiect: false
           }
         ]);
-        
-        console.log(`Încărcate ${result.data.length} subproiecte, convertite în ${termeniDinSubproiecte.length} termeni cu valorile valutare`);
       }
     } catch (error) {
       console.error('Eroare la încărcarea subproiectelor pentru contract:', error);
@@ -274,7 +264,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // PĂSTRAT: Funcție existentă pentru verificarea contractului existent
+  // PĂSTRAT: Funcție pentru verificarea contractului existent
   const checkContractExistent = async () => {
     try {
       const response = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
@@ -293,7 +283,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           setContractPreview(contract.numar_contract);
         }
         
-        // PĂSTRAT: Precompleteaza datele din contractul existent
+        // Precompleteaza datele din contractul existent
         if (contract.etape) {
           try {
             const etapeParsate = typeof contract.etape === 'string' 
@@ -302,24 +292,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             setTermenePersonalizate(etapeParsate);
           } catch (e) {
             console.error('Eroare parsare etape:', e);
-          }
-        }
-        
-        if (contract.articole_suplimentare) {
-          try {
-            const articoleParsate = typeof contract.articole_suplimentare === 'string'
-              ? JSON.parse(contract.articole_suplimentare)
-              : contract.articole_suplimentare;
-            
-            const articoleCuConversii = articoleParsate.map((art: ArticolSuplimentar) => ({
-              ...art,
-              valoare_ron: art.moneda !== 'RON' ? 
-                (art.valoare * (CURSURI_VALUTAR[art.moneda] || 1)) : art.valoare
-            }));
-            
-            setArticoleSuplimentare(articoleCuConversii);
-          } catch (e) {
-            console.error('Eroare parsare articole:', e);
           }
         }
         
@@ -334,24 +306,43 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // OPTIMIZAT: Calculează suma totală cu noua logică
-  const calculeazaSumaTotala = () => {
-    let suma = 0;
+  // NOU: Calculează și actualizează procentele pentru toate termenele
+  const calculeazaProcenteInformative = (termeni: TermenPersonalizat[]) => {
+    const sumaTotal = termeni.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
     
-    // Suma din termeni (inclusiv subproiecte convertite)
-    termenePersonalizate.forEach(termen => {
-      suma += termen.valoare_ron || 0;
-    });
-    
-    // Adaugă articolele suplimentare
-    articoleSuplimentare.forEach(articol => {
-      suma += articol.valoare_ron || articol.valoare;
-    });
-    
-    return suma;
+    return termeni.map(termen => ({
+      ...termen,
+      procent_calculat: sumaTotal > 0 ? Math.round((termen.valoare_ron / sumaTotal) * 100 * 100) / 100 : 0
+    }));
   };
 
-  // OPTIMIZAT: Funcții pentru managementul termenelor cu noua structură
+  // Calculează suma totală (OPTIMIZAT)
+  const calculeazaSumaTotala = () => {
+    return termenePersonalizate.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
+  };
+
+  // NOU: Funcții pentru reordonarea etapelor (sus/jos)
+  const moveTermenUp = (index: number) => {
+    if (index > 0) {
+      const newTermene = [...termenePersonalizate];
+      [newTermene[index], newTermene[index - 1]] = [newTermene[index - 1], newTermene[index]];
+      const termeneWithPercents = calculeazaProcenteInformative(newTermene);
+      setTermenePersonalizate(termeneWithPercents);
+      showToast('Etapa mutată în sus', 'info');
+    }
+  };
+
+  const moveTermenDown = (index: number) => {
+    if (index < termenePersonalizate.length - 1) {
+      const newTermene = [...termenePersonalizate];
+      [newTermene[index], newTermene[index + 1]] = [newTermene[index + 1], newTermene[index]];
+      const termeneWithPercents = calculeazaProcenteInformative(newTermene);
+      setTermenePersonalizate(termeneWithPercents);
+      showToast('Etapa mutată în jos', 'info');
+    }
+  };
+
+  // OPTIMIZAT: Funcții pentru managementul termenelor
   const addTermen = () => {
     const newTermen: TermenPersonalizat = {
       id: Date.now().toString(),
@@ -360,71 +351,42 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       moneda: 'RON',
       valoare_ron: 0,
       termen_zile: 30,
+      procent_calculat: 0,
       este_subproiect: false
     };
-    setTermenePersonalizate([...termenePersonalizate, newTermen]);
+    
+    const newTermene = [...termenePersonalizate, newTermen];
+    const termeneWithPercents = calculeazaProcenteInformative(newTermene);
+    setTermenePersonalizate(termeneWithPercents);
   };
 
   const removeTermen = (id: string) => {
-    setTermenePersonalizate(termenePersonalizate.filter(t => t.id !== id));
+    const newTermene = termenePersonalizate.filter(t => t.id !== id);
+    const termeneWithPercents = calculeazaProcenteInformative(newTermene);
+    setTermenePersonalizate(termeneWithPercents);
   };
 
   const updateTermen = (id: string, field: keyof TermenPersonalizat, value: string | number) => {
-    setTermenePersonalizate(prev => 
-      prev.map(t => {
-        if (t.id === id) {
-          const updated = { ...t, [field]: value };
-          
-          // OPTIMIZAT: Recalculează valoarea în RON când se schimbă valoarea sau moneda
-          if (field === 'valoare' || field === 'moneda') {
-            const valoare = field === 'valoare' ? value as number : t.valoare;
-            const moneda = field === 'moneda' ? value as string : t.moneda;
-            updated.valoare_ron = moneda !== 'RON' ? 
-              (valoare * (CURSURI_VALUTAR[moneda] || 1)) : valoare;
-          }
-          
-          return updated;
+    const newTermene = termenePersonalizate.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, [field]: value };
+        
+        // Recalculează valoarea în RON când se schimbă valoarea sau moneda
+        if (field === 'valoare' || field === 'moneda') {
+          const valoare = field === 'valoare' ? value as number : t.valoare;
+          const moneda = field === 'moneda' ? value as string : t.moneda;
+          updated.valoare_ron = moneda !== 'RON' ? 
+            (valoare * (CURSURI_VALUTAR[moneda] || 1)) : valoare;
         }
-        return t;
-      })
-    );
-  };
-
-  // PĂSTRAT: Funcții pentru managementul articolelor suplimentare
-  const addArticol = () => {
-    const newArticol: ArticolSuplimentar = {
-      id: Date.now().toString(),
-      descriere: '',
-      valoare: 0,
-      moneda: 'RON',
-      termen_zile: 30,
-      valoare_ron: 0
-    };
-    setArticoleSuplimentare([...articoleSuplimentare, newArticol]);
-  };
-
-  const removeArticol = (id: string) => {
-    setArticoleSuplimentare(articoleSuplimentare.filter(a => a.id !== id));
-  };
-
-  const updateArticol = (id: string, field: keyof ArticolSuplimentar, value: string | number) => {
-    setArticoleSuplimentare(prev => 
-      prev.map(a => {
-        if (a.id === id) {
-          const updated = { ...a, [field]: value };
-          
-          if (field === 'valoare' || field === 'moneda') {
-            const valoare = field === 'valoare' ? value as number : a.valoare;
-            const moneda = field === 'moneda' ? value as string : a.moneda;
-            updated.valoare_ron = moneda !== 'RON' ? 
-              (valoare * (CURSURI_VALUTAR[moneda] || 1)) : valoare;
-          }
-          
-          return updated;
-        }
-        return a;
-      })
-    );
+        
+        return updated;
+      }
+      return t;
+    });
+    
+    // Recalculează procentele pentru toți termenii
+    const termeneWithPercents = calculeazaProcenteInformative(newTermene);
+    setTermenePersonalizate(termeneWithPercents);
   };
 
   // PĂSTRAT: Funcție pentru forțarea contractului nou
@@ -432,43 +394,28 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setContractExistent(null);
     setIsEditMode(false);
     setContractPrefix('CONTR');
-    previewContractNumberReal(); // FIX: Folosește API-ul real
+    previewContractNumberReal();
     
     // Resetează la termenii din subproiecte sau default
-    if (subproiecte.length > 0) {
-      loadSubproiecte();
-    } else {
-      setTermenePersonalizate([
-        { 
-          id: '1', 
-          denumire: 'La semnare', 
-          valoare: parseFloat(proiect.valoare_ron?.toString() || '') || 0,
-          moneda: proiect.moneda || 'RON',
-          valoare_ron: parseFloat(proiect.valoare_ron?.toString() || '') || 0,
-          termen_zile: 0 
-        }
-      ]);
-    }
-    
-    setArticoleSuplimentare([]);
+    loadSubproiecte();
     setObservatii('');
     showToast('Mod contract nou activat', 'info');
   };
 
-  // PĂSTRAT: Funcția pentru generarea contractului
+  // OPTIMIZAT: Funcția pentru generarea contractului (eliminată logica pentru articole suplimentare)
   const handleGenerateContract = async () => {
     setLoading(true);
     
     try {
-      // Validări (PĂSTRATE + OPTIMIZATE)
+      // Validări
       if (termenePersonalizate.some(t => !t.denumire.trim())) {
         showToast('Toate etapele trebuie să aibă o denumire', 'error');
         setLoading(false);
         return;
       }
 
-      if (articoleSuplimentare.some(a => !a.descriere.trim() || a.valoare <= 0)) {
-        showToast('Toate articolele suplimentare trebuie să aibă descriere și valoare validă', 'error');
+      if (termenePersonalizate.length === 0) {
+        showToast('Contractul trebuie să aibă cel puțin o etapă', 'error');
         setLoading(false);
         return;
       }
@@ -483,7 +430,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           proiectId: proiect.ID_Proiect,
           tipDocument: 'contract',
           termenePersonalizate,
-          articoleSuplimentare,
+          articoleSuplimentare: [], // ELIMINAT: Nu mai trimitem articole suplimentare
           observatii: observatii.trim(),
           isEdit: isEditMode,
           contractExistentId: contractExistent?.ID_Contract || null,
@@ -533,9 +480,20 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // Actualizează procentele când se schimbă termenii
+  useEffect(() => {
+    if (termenePersonalizate.length > 0) {
+      const termeneWithPercents = calculeazaProcenteInformative(termenePersonalizate);
+      // Evită loop-ul de actualizări
+      if (JSON.stringify(termeneWithPercents) !== JSON.stringify(termenePersonalizate)) {
+        setTermenePersonalizate(termeneWithPercents);
+      }
+    }
+  }, [termenePersonalizate.map(t => t.valoare_ron).join(',')]); // Doar când se schimbă valorile RON
+
   if (!isOpen) return null;
 
-  // PĂSTRAT: Loading initial
+  // PĂSTRAT: Loading inicial
   if (loadingCheck) {
     return typeof window !== 'undefined' ? createPortal(
       <div style={{
@@ -694,96 +652,33 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           )}
 
-          {/* FIX PRINCIPAL: Preview Număr Contract cu numerotare consecutivă */}
-          <div style={{
-            background: '#e8f5e8',
-            border: '1px solid #c3e6cb',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '16px' }}>
-              Preview Număr Contract (Numerotare Consecutivă)
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: '0 0 auto' }}>
-                <label style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                  PREFIX
-                </label>
-                <input
-                  type="text"
-                  value={contractPrefix}
-                  onChange={(e) => handlePrefixChange(e.target.value.toUpperCase())}
-                  disabled={loading || isEditMode}
-                  style={{
-                    padding: '0.5rem',
-                    border: '1px solid #c3e6cb',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    width: '80px',
-                    fontFamily: 'monospace',
-                    fontWeight: 'bold'
-                  }}
-                />
-              </div>
-              
-              <div style={{ flex: '1', minWidth: '200px' }}>
-                <label style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold', display: 'block', marginBottom: '0.25rem' }}>
-                  NUMĂR CONTRACT CONSECUTIV
-                </label>
-                <div style={{
-                  padding: '0.5rem 1rem',
-                  background: '#fff',
-                  border: '2px solid #27ae60',
-                  borderRadius: '8px',
-                  fontSize: '18px',
-                  fontFamily: 'monospace',
-                  fontWeight: 'bold',
-                  color: '#27ae60',
-                  textAlign: 'center'
-                }}>
-                  {contractPreview}
-                </div>
-              </div>
-              
-              {!isEditMode && (
-                <div style={{ flex: '0 0 auto' }}>
-                  <button
-                    type="button"
-                    onClick={previewContractNumberReal}
-                    disabled={loading}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: '#3498db',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      marginTop: '1.5rem'
-                    }}
-                  >
-                    Regenerează Nr.
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            {isEditMode && (
+          {/* ELIMINAT: Butonul "Regenerează Nr." conform cerințelor */}
+          {!isEditMode && (
+            <div style={{
+              background: '#e8f5e8',
+              border: '1px solid #c3e6cb',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '16px' }}>
+                Număr Contract Consecutiv
+              </h3>
               <div style={{
-                marginTop: '0.5rem',
-                padding: '0.5rem',
-                background: '#fff3cd',
-                border: '1px solid #ffeaa7',
-                borderRadius: '4px',
-                fontSize: '12px',
-                color: '#856404'
+                padding: '0.5rem 1rem',
+                background: '#fff',
+                border: '2px solid #27ae60',
+                borderRadius: '8px',
+                fontSize: '18px',
+                fontFamily: 'monospace',
+                fontWeight: 'bold',
+                color: '#27ae60',
+                textAlign: 'center'
               }}>
-                Mod editare: se păstrează numărul contractului existent. Pentru număr nou, apasă "Contract cu Număr Nou".
+                {contractPreview}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* PĂSTRAT: Informații contract existent + buton contract nou */}
           {contractExistent && (
@@ -858,7 +753,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 </div>
                 {subproiecte.length > 0 && (
                   <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>
-                    Calculat din {subproiecte.length} subproiecte + {articoleSuplimentare.length} articole
+                    Calculat din {subproiecte.length} subproiecte
                   </div>
                 )}
               </div>
@@ -896,18 +791,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             )}
           </div>
 
-          {/* OPTIMIZAT: Etape și Termene de Plată cu structura nouă identică cu Articole Suplimentare */}
+          {/* OPTIMIZAT: Etape și Termene cu noua structură și procente informative */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#2c3e50' }}>
-                  {subproiecte.length > 0 ? 'Etape de Plată (din Subproiecte)' : 'Etape și Termene de Plată'}
+                  Etape și Termene de Plată
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#7f8c8d' }}>
-                  {subproiecte.length > 0 ? 
-                    `Subproiectele au fost convertite automat în etape cu valorile și monedele originale.` :
-                    `Configurează etapele de plată cu valorile și termenele corespunzătoare`
-                  }
+                  Etapele sunt preluate din proiect. Poți modifica doar termenele și ordinea de afișare.
                 </p>
               </div>
               <button
@@ -929,10 +821,10 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </button>
             </div>
 
-            {/* OPTIMIZAT: HEADERS IDENTIC CU ARTICOLE SUPLIMENTARE */}
+            {/* NOU: HEADERS CU COLOANA PROCENT */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
+              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr auto',
               gap: '0.5rem',
               marginBottom: '0.5rem',
               padding: '0.5rem',
@@ -946,8 +838,9 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <div style={{ textAlign: 'center' }}>Valoare</div>
               <div style={{ textAlign: 'center' }}>Monedă</div>
               <div style={{ textAlign: 'center' }}>Val. RON</div>
+              <div style={{ textAlign: 'center' }}>Procent (%)</div>
               <div style={{ textAlign: 'center' }}>Termen</div>
-              <div style={{ textAlign: 'center' }}>Act.</div>
+              <div style={{ textAlign: 'center' }}>Acțiuni</div>
             </div>
 
             {termenePersonalizate.map((termen, index) => (
@@ -975,32 +868,75 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                         borderRadius: '8px',
                         fontWeight: 'bold'
                       }}>
-                        AUTO
+                        DIN PROIECT
                       </span>
                     )}
                   </h5>
-                  <button
-                    type="button"
-                    onClick={() => removeTermen(termen.id)}
-                    disabled={loading || termenePersonalizate.length === 1}
-                    style={{
-                      background: '#e74c3c',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '0.25rem 0.5rem',
-                      cursor: (loading || termenePersonalizate.length === 1) ? 'not-allowed' : 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    ×
-                  </button>
+                  
+                  {/* NOU: Butoane de mutare sus/jos și ștergere */}
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => moveTermenUp(index)}
+                      disabled={loading || index === 0}
+                      title="Mută în sus"
+                      style={{
+                        background: index === 0 ? '#bdc3c7' : '#3498db',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.4rem',
+                        cursor: (loading || index === 0) ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      ↑
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => moveTermenDown(index)}
+                      disabled={loading || index === termenePersonalizate.length - 1}
+                      title="Mută în jos"
+                      style={{
+                        background: index === termenePersonalizate.length - 1 ? '#bdc3c7' : '#3498db',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.4rem',
+                        cursor: (loading || index === termenePersonalizate.length - 1) ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      ↓
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => removeTermen(termen.id)}
+                      disabled={loading || termenePersonalizate.length === 1}
+                      title="Șterge etapa"
+                      style={{
+                        background: (loading || termenePersonalizate.length === 1) ? '#bdc3c7' : '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.25rem 0.5rem',
+                        cursor: (loading || termenePersonalizate.length === 1) ? 'not-allowed' : 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 
-                {/* OPTIMIZAT: GRID IDENTIC CU ARTICOLE SUPLIMENTARE */}
+                {/* NOU: GRID CU COLOANA PROCENT */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
+                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
                   gap: '0.5rem',
                   alignItems: 'end'
                 }}>
@@ -1036,7 +972,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     }}
                   />
                   
-                  {/* OPTIMIZAT: Dropdown pentru monede (identic cu articole) */}
                   <select
                     value={termen.moneda}
                     onChange={(e) => updateTermen(termen.id, 'moneda', e.target.value)}
@@ -1055,7 +990,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     <option value="GBP">GBP</option>
                   </select>
                   
-                  {/* OPTIMIZAT: Afișaj valoare în RON calculată automat (identic cu articole) */}
+                  {/* Afișaj valoare în RON calculată automat */}
                   <div style={{
                     padding: '0.5rem',
                     border: '1px solid #27ae60',
@@ -1067,6 +1002,20 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     fontWeight: 'bold'
                   }}>
                     {(termen.valoare_ron || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2 })}
+                  </div>
+                  
+                  {/* NOU: Coloana procent informativă */}
+                  <div style={{
+                    padding: '0.5rem',
+                    border: '1px solid #f39c12',
+                    borderRadius: '4px',
+                    background: '#fff8e1',
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    color: '#f39c12',
+                    fontWeight: 'bold'
+                  }}>
+                    {termen.procent_calculat?.toFixed(1) || '0.0'}%
                   </div>
                   
                   <input
@@ -1085,7 +1034,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   />
                 </div>
                 
-                {/* OPTIMIZAT: Afișare info conversie pentru subproiecte */}
+                {/* Afișare info conversie pentru subproiecte */}
                 {(termen.este_subproiect || termen.moneda !== 'RON') && termen.valoare > 0 && (
                   <div style={{
                     marginTop: '0.5rem',
@@ -1094,208 +1043,27 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     fontStyle: 'italic'
                   }}>
                     {termen.este_subproiect ? 
-                      `Generat automat din subproiectul: ${termen.subproiect_id}` :
+                      `Preluat din subproiectul: ${termen.subproiect_id}` :
                       `Conversie: ${termen.valoare} ${termen.moneda} × ${CURSURI_VALUTAR[termen.moneda]} = ${(termen.valoare_ron || 0).toFixed(2)} RON`
                     }
                   </div>
                 )}
               </div>
             ))}
-          </div>
-
-          {/* PĂSTRAT: Articole suplimentare (neschimbat) */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ margin: 0, color: '#2c3e50' }}>Articole Suplimentare</h3>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#7f8c8d' }}>
-                  Servicii sau produse suplimentare cu conversie automată în RON
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={addArticol}
-                disabled={loading}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                + Adaugă Articol
-              </button>
+            
+            {/* Verificare total procente */}
+            <div style={{
+              marginTop: '0.5rem',
+              padding: '0.5rem',
+              background: '#e3f2fd',
+              border: '1px solid #2196f3',
+              borderRadius: '4px',
+              fontSize: '12px',
+              color: '#1976d2'
+            }}>
+              Total procente: {termenePersonalizate.reduce((sum, t) => sum + (t.procent_calculat || 0), 0).toFixed(1)}% 
+              (calculat automat din valorile în RON)
             </div>
-
-            {articoleSuplimentare.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '2rem',
-                color: '#7f8c8d',
-                background: '#f8f9fa',
-                borderRadius: '6px',
-                border: '2px dashed #dee2e6'
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: '0.5rem' }}>📋</div>
-                <p style={{ margin: 0, fontSize: '14px' }}>
-                  Nu sunt articole suplimentare. Adaugă servicii sau produse suplimentare.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
-                  gap: '0.5rem',
-                  marginBottom: '0.5rem',
-                  padding: '0.5rem',
-                  background: '#e8f5e8',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#27ae60'
-                }}>
-                  <div>Descriere</div>
-                  <div style={{ textAlign: 'center' }}>Valoare</div>
-                  <div style={{ textAlign: 'center' }}>Moneda</div>
-                  <div style={{ textAlign: 'center' }}>Val. RON</div>
-                  <div style={{ textAlign: 'center' }}>Termen</div>
-                  <div style={{ textAlign: 'center' }}>Act.</div>
-                </div>
-
-                {articoleSuplimentare.map((articol, index) => (
-                  <div key={articol.id} style={{
-                    border: '1px solid #27ae60',
-                    borderRadius: '6px',
-                    padding: '1rem',
-                    marginBottom: '0.5rem',
-                    background: '#f8fff8'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <h5 style={{ margin: 0, color: '#2c3e50' }}>Articol {index + 1}</h5>
-                      <button
-                        type="button"
-                        onClick={() => removeArticol(articol.id)}
-                        disabled={loading}
-                        style={{
-                          background: '#e74c3c',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          padding: '0.25rem 0.5rem',
-                          cursor: loading ? 'not-allowed' : 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
-                      gap: '0.5rem',
-                      alignItems: 'end'
-                    }}>
-                      <input
-                        type="text"
-                        value={articol.descriere}
-                        onChange={(e) => updateArticol(articol.id, 'descriere', e.target.value)}
-                        disabled={loading}
-                        placeholder="Descriere serviciu/produs"
-                        style={{
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '14px'
-                        }}
-                      />
-                      
-                      <input
-                        type="number"
-                        value={articol.valoare}
-                        onChange={(e) => updateArticol(articol.id, 'valoare', parseFloat(e.target.value) || 0)}
-                        disabled={loading}
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                        style={{
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '14px'
-                        }}
-                      />
-                      
-                      <select
-                        value={articol.moneda}
-                        onChange={(e) => updateArticol(articol.id, 'moneda', e.target.value)}
-                        disabled={loading}
-                        style={{
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '14px'
-                        }}
-                      >
-                        <option value="RON">RON</option>
-                        <option value="EUR">EUR</option>
-                        <option value="USD">USD</option>
-                        <option value="GBP">GBP</option>
-                      </select>
-                      
-                      <div style={{
-                        padding: '0.5rem',
-                        border: '1px solid #27ae60',
-                        borderRadius: '4px',
-                        background: '#f0f9ff',
-                        fontSize: '14px',
-                        textAlign: 'center',
-                        color: '#27ae60',
-                        fontWeight: 'bold'
-                      }}>
-                        {(articol.valoare_ron || articol.valoare).toLocaleString('ro-RO', { minimumFractionDigits: 2 })}
-                      </div>
-                      
-                      <input
-                        type="number"
-                        value={articol.termen_zile}
-                        onChange={(e) => updateArticol(articol.id, 'termen_zile', parseInt(e.target.value) || 0)}
-                        disabled={loading}
-                        placeholder="Zile"
-                        min="0"
-                        style={{
-                          padding: '0.5rem',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '4px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    
-                    {articol.moneda !== 'RON' && articol.valoare > 0 && (
-                      <div style={{
-                        marginTop: '0.5rem',
-                        fontSize: '11px',
-                        color: '#7f8c8d',
-                        fontStyle: 'italic'
-                      }}>
-                        Conversie: {articol.valoare} {articol.moneda} × {CURSURI_VALUTAR[articol.moneda]} = {(articol.valoare_ron || 0).toFixed(2)} RON
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            )}
           </div>
 
           {/* PĂSTRAT: Observații */}
@@ -1320,7 +1088,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             />
           </div>
 
-          {/* OPTIMIZAT: Sumar final cu valorile calculate */}
+          {/* OPTIMIZAT: Sumar final (eliminat referința la articole suplimentare) */}
           <div style={{
             background: '#e8f5e8',
             padding: '1.5rem',
@@ -1354,19 +1122,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ETAPE PLATĂ</div>
                 <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
                   {termenePersonalizate.length} etape
-                  {subproiecte.length > 0 && ` (${termenePersonalizate.filter(t => t.este_subproiect).length} auto)`}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ARTICOLE EXTRA</div>
-                <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
-                  {articoleSuplimentare.length} articole
+                  {subproiecte.length > 0 && ` (${termenePersonalizate.filter(t => t.este_subproiect).length} din proiect)`}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Butoane finale (PĂSTRAT) */}
+          {/* PĂSTRAT: Butoane finale */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
