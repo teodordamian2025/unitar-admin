@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 03.09.2025 00:45 (ora României)
-// FIX COMPLET: Implementare completă cu păstrare număr contract în editare + încărcare valoare proiect
+// DATA: 03.09.2025 02:30 (ora României)
+// FIX COMPLET: Corectare eroare sintaxă JSX + păstrare număr contract în editare + încărcare valoare proiect
 // PĂSTRATE: Toate funcționalitățile + procente informative + reordonare + observații + sumar complet
 // ==================================================================
 
@@ -701,7 +701,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       </div>,
       document.body
     ) : null;
-}
   }
 
   const sumaTotala = calculeazaSumaTotala();
