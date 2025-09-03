@@ -409,7 +409,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     subproiecte.length
   ]);
 
-  // FIX PRINCIPAL: Verificarea contractului existent cu logică îmbunătățită
+  // FIX PRINCIPAL: Verificarea contractului existent cu încărcare corectă a etapelor din JSON
   const checkContractExistent = async () => {
     try {
       console.log('Verific contract existent pentru proiectul:', proiect.ID_Proiect);
@@ -434,7 +434,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           valoare: contract.Valoare,
           moneda: contract.Moneda,
           etape_count: contract.etape_count,
-          data_creare: contract.data_creare
+          data_creare: contract.data_creare,
+          etape_raw: contract.etape
         });
         
         setContractExistent(contract);
@@ -454,21 +455,45 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         
         console.log(`✅ PĂSTRARE NUMĂR EXISTENT: ${contract.numar_contract} (nu se generează unul nou)`);
         
+        // FIX CRITIC: Procesează etapele din JSON fără convertBigQueryNumeric
         if (contract.etape && Array.isArray(contract.etape)) {
-          const etapeConvertite = contract.etape.map((etapa: any, index: number) => ({
-            id: etapa.id || `etapa_${index}`,
-            denumire: etapa.denumire || `Etapa ${index + 1}`,
-            valoare: convertBigQueryNumeric(etapa.valoare) || 0,
-            moneda: etapa.moneda || 'RON',
-            valoare_ron: convertBigQueryNumeric(etapa.valoare_ron) || 0,
-            termen_zile: parseInt(etapa.termen_zile) || 30,
-            procent_calculat: parseFloat(etapa.procent_calculat) || 0,
-            este_subproiect: etapa.este_subproiect || false,
-            subproiect_id: etapa.subproiect_id || null
-          }));
+          console.log('🔍 Procesez etape din contract existent - date raw:', contract.etape);
+          
+          const etapeConvertite = contract.etape.map((etapa: any, index: number) => {
+            // FIX: JSON-ul din BigQuery conține deja valorile numerice, nu obiecte Big
+            const valoare = typeof etapa.valoare === 'number' ? etapa.valoare : parseFloat(etapa.valoare) || 0;
+            const valoare_ron = typeof etapa.valoare_ron === 'number' ? etapa.valoare_ron : parseFloat(etapa.valoare_ron) || 0;
+            const procent_calculat = typeof etapa.procent_calculat === 'number' ? etapa.procent_calculat : parseFloat(etapa.procent_calculat) || 0;
+            const termen_zile = typeof etapa.termen_zile === 'number' ? etapa.termen_zile : parseInt(etapa.termen_zile) || 30;
+            
+            console.log(`Etapa ${index + 1} procesată:`, {
+              denumire: etapa.denumire,
+              valoare_raw: etapa.valoare,
+              valoare_processed: valoare,
+              valoare_ron_raw: etapa.valoare_ron,
+              valoare_ron_processed: valoare_ron,
+              moneda: etapa.moneda,
+              procent: procent_calculat
+            });
+            
+            return {
+              id: etapa.id || `etapa_${index}`,
+              denumire: etapa.denumire || `Etapa ${index + 1}`,
+              valoare: valoare,
+              moneda: etapa.moneda || 'RON',
+              valoare_ron: valoare_ron,
+              termen_zile: termen_zile,
+              procent_calculat: procent_calculat,
+              este_subproiect: etapa.este_subproiect || false,
+              subproiect_id: etapa.subproiect_id || null
+            };
+          });
           
           setTermenePersonalizate(etapeConvertite);
-          console.log(`Precompletate ${etapeConvertite.length} etape din contractul existent`);
+          console.log(`✅ Precompletate ${etapeConvertite.length} etape din contractul existent cu valorile corecte`);
+        } else {
+          console.warn('⚠️ Contract fără etape sau format etape invalid');
+          setTermenePersonalizate([]);
         }
         
         setObservatii(contract.Observatii || '');
