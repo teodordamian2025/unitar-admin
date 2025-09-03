@@ -384,7 +384,7 @@ function convertTextToWordXml(text: string): string {
 
 // FIX PRINCIPAL: Calculează suma FĂRĂ dublarea valorilor
 function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], termenePersonalizate: any[]) {
-  console.log('💰 CALCUL SUMA CONTRACT - versiune corectată (fără dublare):', {
+  console.log('💰 CALCUL SUMA CONTRACT - versiunea finală corectă (multi-valută):', {
     proiect_id: proiect.ID_Proiect,
     proiect_valoare: proiect.Valoare_Estimata,
     proiect_moneda: proiect.moneda,
@@ -392,35 +392,37 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     termene_count: termenePersonalizate.length
   });
 
-  // LOGICA CORECTATĂ: Pentru contracte, suma se calculează DOAR din termenii setați
-  // Nu se mai adaugă separat valoarea proiectului principal
-  
   let sumaOriginala = 0;
   let monedaOriginala = 'RON';
   let sumaFinalaRON = 0;
   const cursuriUtilizate: { [moneda: string]: number } = {};
   
-  // IMPORTANT: Determinăm moneda principală din proiect pentru consecvență
+  // Moneda contractului = moneda proiectului pentru consecvență
   monedaOriginala = proiect.moneda || 'RON';
-  console.log(`🏷️ Moneda contractului setată conform proiectului: ${monedaOriginala}`);
+  console.log(`🏷️ Moneda contractului: ${monedaOriginala}`);
 
   if (termenePersonalizate.length > 0) {
-    console.log('📋 Calculez suma DOAR din termenii contractului...');
+    console.log('📋 Calculez suma din TOȚI termenii contractului...');
     
-    // Grupăm termenii pe monede pentru a calcula corect
-    const termeniPeMonede: { [moneda: string]: number } = {};
-    let totalRONCalculat = 0;
+    // Calculez totalul în RON din toți termenii
+    let totalRONDinTermeni = 0;
+    const detaliiTermeni: any[] = [];
     
     termenePersonalizate.forEach((termen, index) => {
       const valoareOriginala = termen.valoare || 0;
       const valoareRON = termen.valoare_ron || valoareOriginala;
       const monedaTermen = termen.moneda || 'RON';
       
-      // Adaugă la grupul de monede
-      termeniPeMonede[monedaTermen] = (termeniPeMonede[monedaTermen] || 0) + valoareOriginala;
-      totalRONCalculat += valoareRON;
+      totalRONDinTermeni += valoareRON;
       
-      console.log(`  Termen ${index + 1} (${termen.denumire}): ${valoareOriginala} ${monedaTermen} = ${valoareRON} RON`);
+      detaliiTermeni.push({
+        index: index + 1,
+        denumire: termen.denumire,
+        valoare: valoareOriginala,
+        moneda: monedaTermen,
+        valoare_ron: valoareRON,
+        este_subproiect: termen.este_subproiect || false
+      });
       
       // Stochează cursul pentru această monedă
       if (monedaTermen !== 'RON') {
@@ -428,33 +430,38 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
       }
     });
     
-    // FIX PRINCIPAL: Suma originală este în moneda proiectului, nu suma tuturor monedelor
+    console.log('📊 Detalii termeni procesați:', detaliiTermeni);
+    
+    // FIX PRINCIPAL: Convertesc totalul RON la moneda proiectului
     if (monedaOriginala === 'RON') {
-      sumaOriginala = termeniPeMonede['RON'] || 0;
+      sumaOriginala = totalRONDinTermeni;
+      sumaFinalaRON = totalRONDinTermeni;
     } else {
-      // Pentru proiecte în valută străină, suma originală este în acea valută
-      sumaOriginala = termeniPeMonede[monedaOriginala] || 0;
+      // Pentru proiecte în valută străină, convertesc totalul la acea valută
+      const cursProiect = cursuriUtilizate[monedaOriginala] || 
+                         convertBigQueryNumeric(proiect.curs_valutar) || 
+                         CURSURI_VALUTAR[monedaOriginala] || 1;
       
-      // Dacă nu avem termeni în moneda proiectului, convertim total RON la moneda proiectului
-      if (sumaOriginala === 0 && totalRONCalculat > 0) {
-        const cursProiect = cursuriUtilizate[monedaOriginala] || CURSURI_VALUTAR[monedaOriginala] || 1;
-        sumaOriginala = totalRONCalculat / cursProiect;
-        console.log(`🔄 Conversia inversă: ${totalRONCalculat} RON / ${cursProiect} = ${sumaOriginala} ${monedaOriginala}`);
-      }
+      sumaOriginala = totalRONDinTermeni / cursProiect;
+      sumaFinalaRON = totalRONDinTermeni;
+      
+      // Adaugă cursul proiectului la cursurile utilizate
+      cursuriUtilizate[monedaOriginala] = cursProiect;
+      
+      console.log(`🔄 Conversie totală: ${totalRONDinTermeni} RON / ${cursProiect} = ${sumaOriginala.toFixed(2)} ${monedaOriginala}`);
     }
     
-    sumaFinalaRON = totalRONCalculat;
-    
-    console.log('📊 REZULTAT CALCUL CORECT:', {
-      termeni_pe_monede: termeniPeMonede,
-      suma_originala: sumaOriginala,
+    console.log('✅ REZULTAT CALCUL FINAL CORECT:', {
+      total_ron_din_termeni: totalRONDinTermeni,
+      suma_originala_in_moneda_proiect: sumaOriginala,
       moneda_originala: monedaOriginala,
       suma_finala_ron: sumaFinalaRON,
-      cursuri_utilizate: cursuriUtilizate
+      cursuri_utilizate: cursuriUtilizate,
+      numar_termeni_procesati: termenePersonalizate.length
     });
     
   } else {
-    // Fallback: dacă nu sunt termeni setați, folosim valoarea proiectului
+    // Fallback: dacă nu sunt termeni setați, folosește valoarea proiectului
     console.log('⚠️ Nu sunt termeni setați, folosesc valoarea proiectului ca fallback');
     
     sumaOriginala = convertBigQueryNumeric(proiect.Valoare_Estimata) || 0;
@@ -465,22 +472,27 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
       cursuriUtilizate[proiect.moneda] = convertBigQueryNumeric(proiect.curs_valutar) || CURSURI_VALUTAR[proiect.moneda] || 1;
     }
     
-    console.log(`📋 Proiect fără termeni - suma: ${sumaOriginala} ${monedaOriginala} = ${sumaFinalaRON} RON`);
+    console.log(`📋 Fallback - suma: ${sumaOriginala} ${monedaOriginala} = ${sumaFinalaRON} RON`);
   }
 
-  console.log('✅ SUMA FINALĂ CALCULATĂ CORECT:', {
-    sumaOriginala,
-    monedaOriginala, 
-    sumaFinalaRON,
-    cursuriUtilizate,
-    diferenta_fata_de_valoarea_proiect: Math.abs(sumaFinalaRON - (convertBigQueryNumeric(proiect.valoare_ron) || 0))
+  // Verificare finală cu proiectul
+  const valoareProiectRON = convertBigQueryNumeric(proiect.valoare_ron) || 0;
+  const diferentaFataDeProiect = Math.abs(sumaFinalaRON - valoareProiectRON);
+  const procentDiferenta = valoareProiectRON > 0 ? (diferentaFataDeProiect / valoareProiectRON) * 100 : 0;
+  
+  console.log('🔍 VERIFICARE FINALĂ:', {
+    suma_calculata_ron: sumaFinalaRON,
+    valoare_proiect_ron: valoareProiectRON,
+    diferenta_absoluta: diferentaFataDeProiect,
+    procent_diferenta: procentDiferenta.toFixed(2) + '%',
+    in_limita_3_procent: procentDiferenta <= 3
   });
 
   return { 
     sumaFinala: sumaFinalaRON, 
-    monedaFinala: monedaOriginala, // FIX: Moneda contractului = moneda proiectului
+    monedaFinala: monedaOriginala,
     cursuriUtilizate,
-    sumaOriginala,
+    sumaOriginala: Math.round(sumaOriginala * 100) / 100, // Rotunjire pentru afișare
     monedaOriginala
   };
 }
@@ -498,8 +510,18 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   const dataContract = new Date().toLocaleDateString('ro-RO');
   const durataZile = calculateDurationInDays(proiect.Data_Start, proiect.Data_Final);
   
-  const cursProiect = convertBigQueryNumeric(proiect.curs_valutar) || 1;
-  const sumaRON = monedaOriginala !== 'RON' ? (sumaOriginala * cursProiect).toFixed(2) : sumaOriginala.toFixed(2);
+  // FIX: Folosește cursul corect pentru conversia afișată
+  const cursProiect = convertBigQueryNumeric(proiect.curs_valutar) || CURSURI_VALUTAR[monedaOriginala] || 1;
+  const sumaRONPentruAfisare = monedaOriginala !== 'RON' ? 
+    (sumaOriginala * cursProiect).toFixed(2) : 
+    sumaOriginala.toFixed(2);
+  
+  console.log('📋 PREGĂTIRE PLACEHOLDER DATA cu valori corecte:', {
+    suma_originala_corecta: sumaOriginala,
+    moneda_originala: monedaOriginala,
+    suma_ron_pentru_afisare: sumaRONPentruAfisare,
+    curs_utilizat: cursProiect
+  });
   
   // Debug logging pentru client data (PĂSTRAT)
   console.log('🔍 CLIENT DATA DEBUG:', {
@@ -512,7 +534,7 @@ function prepareazaPlaceholderDataCuValoriEstimate(
   });
   
   return {
-    // Date contract
+    // Date contract (PĂSTRAT)
     contract: {
       numar: contractData.numar_contract,
       data: dataContract,
@@ -534,14 +556,14 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       id: proiect.client_id || null
     },
     
-    // Date proiect cu valorile estimate originale și durata calculată (PĂSTRAT)
+    // Date proiect cu valorile estimate CORECTE (FIX APLICAT)
     proiect: {
       id: proiect.ID_Proiect,
       denumire: proiect.Denumire,
       descriere: proiect.Descriere || '',
       adresa: proiect.Adresa || '',
-      valoare: sumaOriginala,
-      valoare_originala: sumaOriginala,
+      valoare: sumaOriginala, // FIX: Valoarea corectă calculată
+      valoare_originala: sumaOriginala, // FIX: Valoarea corectă calculată
       moneda: monedaOriginala,
       data_start: formatDate(proiect.Data_Start),
       data_final: formatDate(proiect.Data_Final),
@@ -570,14 +592,14 @@ function prepareazaPlaceholderDataCuValoriEstimate(
       status: sub.Status
     })),
     
-    // Termene cu noua structură (valorile valutare și procente)
+    // Termene cu structura completă (PĂSTRAT)
     termene_personalizate: termene,
     
-    // Observații și metadate cu valorile estimate și RON
+    // Observații și metadate cu valorile CORECTE (FIX APLICAT)
     observatii: observatii || '',
     data_generare: new Date().toISOString(),
-    suma_totala_originala: sumaOriginala.toFixed(2),
-    suma_totala_ron: sumaRON,
+    suma_totala_originala: sumaOriginala.toFixed(2), // FIX: Suma corectă
+    suma_totala_ron: sumaRONPentruAfisare, // FIX: RON corect
     moneda_originala: monedaOriginala
   };
 }
