@@ -337,48 +337,77 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // FIX CRITIC: useEffect separat pentru setarea termenilor cu verificări complete
   useEffect(() => {
-    // FIX CRITIC: Setează termenii doar pentru proiecte fără subproiecte și când proiectComplet este disponibil
+    console.log('🔧 useEffect termeni - checking conditions:', {
+      hasProiectComplet: !!proiectComplet,
+      subproiecte_length: subproiecte.length,
+      termene_length: termenePersonalizate.length,
+      proiect_valoare: proiectComplet?.Valoare_Estimata,
+      proiect_moneda: proiectComplet?.moneda
+    });
+    
+    // Setează termenii doar pentru proiecte fără subproiecte
     if (proiectComplet && subproiecte.length === 0) {
-      // Verifică dacă termenii nu sunt deja setați cu valori din proiect
-      const hasValidTermeni = termenePersonalizate.some(t => t.valoare > 0 || t.este_subproiect);
+      // Verifică dacă avem valori valide în proiectComplet
+      const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
+        ? proiectComplet.Valoare_Estimata 
+        : (proiectComplet.Valoare_Estimata as any)?.value || 0;
+      const valoareRON = typeof proiectComplet.valoare_ron === 'number'
+        ? proiectComplet.valoare_ron
+        : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
+      const monedaProiect = proiectComplet.moneda || 'RON';
       
-      if (!hasValidTermeni) {
-        // FIX: Folosește valorile direct din răspunsul API cu type safety
-        const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
-          ? proiectComplet.Valoare_Estimata 
-          : (proiectComplet.Valoare_Estimata as any)?.value || 0;
-        const valoareRON = typeof proiectComplet.valoare_ron === 'number'
-          ? proiectComplet.valoare_ron
-          : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
-        const monedaProiect = proiectComplet.moneda || 'RON';
+      console.log('🔧 Valori extrase din proiectComplet:', {
+        valoareProiect,
+        valoareRON,
+        monedaProiect,
+        hasValidValue: valoareProiect > 0
+      });
+      
+      // Setează termenii doar dacă avem o valoare validă și nu sunt deja setați corect
+      if (valoareProiect > 0) {
+        const currentTermenValue = termenePersonalizate.length > 0 ? termenePersonalizate[0].valoare : 0;
         
-        console.log('🔧 FIX: Setare valoare proiect cu date convertite din API:', {
-          valoare_estimata_raw: proiectComplet.Valoare_Estimata,
-          valoare_processata: valoareProiect,
-          valoare_ron: valoareRON,
-          moneda: monedaProiect
-        });
-        
-        setTermenePersonalizate([
-          { 
-            id: '1', 
-            denumire: 'La predarea proiectului', 
+        if (currentTermenValue !== valoareProiect) {
+          console.log('🔄 Setez termenii cu valorile corecte din proiect');
+          
+          setTermenePersonalizate([
+            { 
+              id: '1', 
+              denumire: 'La predarea proiectului', 
+              valoare: valoareProiect,
+              moneda: monedaProiect,
+              valoare_ron: valoareRON,
+              termen_zile: 60,
+              procent_calculat: 100,
+              este_subproiect: false
+            }
+          ]);
+          
+          console.log('✅ Termeni setați cu succes:', {
             valoare: valoareProiect,
             moneda: monedaProiect,
-            valoare_ron: valoareRON,
-            termen_zile: 60,
-            procent_calculat: 100,
-            este_subproiect: false
-          }
-        ]);
-        
-        console.log('✅ Termeni setați cu succes pentru proiect fără subproiecte');
+            valoare_ron: valoareRON
+          });
+        } else {
+          console.log('📋 Termenii sunt deja setați cu valoarea corectă:', currentTermenValue);
+        }
       } else {
-        console.log('📋 Termenii sunt deja setați cu valori valide, se păstrează');
+        console.warn('⚠️ Valoarea proiectului este 0 sau invalidă, nu setez termenii');
       }
+    } else if (subproiecte.length > 0) {
+      console.log('📂 Proiect cu subproiecte - termenii vor fi setați din loadSubproiecte()');
+    } else if (!proiectComplet) {
+      console.log('⏳ proiectComplet încă nu este încărcat');
     }
-  }, [proiectComplet, subproiecte.length, termenePersonalizate.length]);
+  }, [
+    proiectComplet?.ID_Proiect,
+    proiectComplet?.Valoare_Estimata, 
+    proiectComplet?.valoare_ron,
+    proiectComplet?.moneda,
+    subproiecte.length
+  ]);
 
   // FIX PRINCIPAL: Verificarea contractului existent cu logică îmbunătățită
   const checkContractExistent = async () => {
