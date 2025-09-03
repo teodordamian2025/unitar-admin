@@ -344,9 +344,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       const hasValidTermeni = termenePersonalizate.some(t => t.valoare > 0 || t.este_subproiect);
       
       if (!hasValidTermeni) {
-        // FIX: Folosește valorile direct din răspunsul API (deja convertite)
-        const valoareProiect = proiectComplet.Valoare_Estimata || 0;
-        const valoareRON = proiectComplet.valoare_ron || valoareProiect;
+        // FIX: Folosește valorile direct din răspunsul API cu type safety
+        const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
+          ? proiectComplet.Valoare_Estimata 
+          : (proiectComplet.Valoare_Estimata as any)?.value || 0;
+        const valoareRON = typeof proiectComplet.valoare_ron === 'number'
+          ? proiectComplet.valoare_ron
+          : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
         const monedaProiect = proiectComplet.moneda || 'RON';
         
         console.log('🔧 FIX: Setare valoare proiect cu date convertite din API:', {
