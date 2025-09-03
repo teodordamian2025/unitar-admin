@@ -338,32 +338,43 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   };
 
   useEffect(() => {
-    if (proiectComplet && subproiecte.length === 0 && termenePersonalizate.length === 0) {
-      const valoareProiect = convertBigQueryNumeric(proiectComplet.Valoare_Estimata) || 0;
-      const valoareRON = convertBigQueryNumeric(proiectComplet.valoare_ron) || valoareProiect;
-      const monedaProiect = proiectComplet.moneda || 'RON';
+    // FIX CRITIC: Setează termenii doar pentru proiecte fără subproiecte și când proiectComplet este disponibil
+    if (proiectComplet && subproiecte.length === 0) {
+      // Verifică dacă termenii nu sunt deja setați cu valori din proiect
+      const hasValidTermeni = termenePersonalizate.some(t => t.valoare > 0 || t.este_subproiect);
       
-      console.log('Setare valoare proiect din BigQuery complet cu îmbunătățiri:', {
-        valoare_estimata_raw: proiectComplet.Valoare_Estimata,
-        valoare_processata: valoareProiect,
-        valoare_ron: valoareRON,
-        moneda: monedaProiect
-      });
-      
-      setTermenePersonalizate([
-        { 
-          id: '1', 
-          denumire: 'La predarea proiectului', 
-          valoare: valoareProiect,
-          moneda: monedaProiect,
+      if (!hasValidTermeni) {
+        // FIX: Folosește valorile direct din răspunsul API (deja convertite)
+        const valoareProiect = proiectComplet.Valoare_Estimata || 0;
+        const valoareRON = proiectComplet.valoare_ron || valoareProiect;
+        const monedaProiect = proiectComplet.moneda || 'RON';
+        
+        console.log('🔧 FIX: Setare valoare proiect cu date convertite din API:', {
+          valoare_estimata_raw: proiectComplet.Valoare_Estimata,
+          valoare_processata: valoareProiect,
           valoare_ron: valoareRON,
-          termen_zile: 60,
-          procent_calculat: 100,
-          este_subproiect: false
-        }
-      ]);
+          moneda: monedaProiect
+        });
+        
+        setTermenePersonalizate([
+          { 
+            id: '1', 
+            denumire: 'La predarea proiectului', 
+            valoare: valoareProiect,
+            moneda: monedaProiect,
+            valoare_ron: valoareRON,
+            termen_zile: 60,
+            procent_calculat: 100,
+            este_subproiect: false
+          }
+        ]);
+        
+        console.log('✅ Termeni setați cu succes pentru proiect fără subproiecte');
+      } else {
+        console.log('📋 Termenii sunt deja setați cu valori valide, se păstrează');
+      }
     }
-  }, [proiectComplet, subproiecte.length]);
+  }, [proiectComplet, subproiecte.length, termenePersonalizate.length]);
 
   // FIX PRINCIPAL: Verificarea contractului existent cu logică îmbunătățită
   const checkContractExistent = async () => {
