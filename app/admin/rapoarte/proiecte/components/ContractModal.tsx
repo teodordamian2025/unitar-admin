@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 03.09.2025 02:30 (ora României)
-// FIX COMPLET: Corectare eroare sintaxă JSX + păstrare număr contract în editare + încărcare valoare proiect
-// PĂSTRATE: Toate funcționalitățile + procente informative + reordonare + observații + sumar complet
+// DATA: 03.09.2025 22:45 (ora României)
+// MODIFICAT: Eliminare rubrica "Subproiecte incluse" + Header cu valoare proiect + Sumar pe valute + Limitare 3% + Buton ștergere
+// PĂSTRATE: Toate funcționalitățile existente + logica completă
 // ==================================================================
 
 'use client';
@@ -104,11 +104,9 @@ const CURSURI_VALUTAR: { [key: string]: number } = {
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
-  // Cazul 1: Obiect BigQuery cu proprietatea 'value'
   if (typeof value === 'object' && value !== null && 'value' in value) {
     const extractedValue = value.value;
     
-    // Recursiv pentru cazuri anidite
     if (typeof extractedValue === 'object' && extractedValue !== null) {
       return convertBigQueryNumeric(extractedValue);
     }
@@ -117,7 +115,6 @@ const convertBigQueryNumeric = (value: any): number => {
     return numericValue;
   }
   
-  // Cazul 2: String cu valoare numerică
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return 0;
@@ -126,17 +123,14 @@ const convertBigQueryNumeric = (value: any): number => {
     return isNaN(parsed) ? 0 : parsed;
   }
   
-  // Cazul 3: Număr direct
   if (typeof value === 'number') {
     return isNaN(value) || !isFinite(value) ? 0 : value;
   }
   
-  // Cazul 4: BigInt
   if (typeof value === 'bigint') {
     return Number(value);
   }
   
-  // Cazul 5: Alte tipuri
   try {
     const stringValue = String(value);
     const parsed = parseFloat(stringValue);
@@ -191,6 +185,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: ContractModalProps) {
   const [loading, setLoading] = useState(false);
   const [loadingCheck, setLoadingCheck] = useState(true);
+  const [loadingDelete, setLoadingDelete] = useState(false);
   const [subproiecte, setSubproiecte] = useState<SubproiectInfo[]>([]);
   const [contractExistent, setContractExistent] = useState<ContractExistent | null>(null);
   
@@ -199,11 +194,10 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [isEditMode, setIsEditMode] = useState(false);
   const [observatii, setObservatii] = useState('');
   
-  // FIX PRINCIPAL: State separat pentru păstrarea numărului contractului existent
   const [contractPrefix, setContractPrefix] = useState('CONTR');
   const [contractNumber, setContractNumber] = useState<number | null>(null);
   const [contractPreview, setContractPreview] = useState('');
-  const [contractPreviewForGeneration, setContractPreviewForGeneration] = useState(''); // Pentru generare
+  const [contractPreviewForGeneration, setContractPreviewForGeneration] = useState('');
   
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
 
@@ -214,8 +208,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         loadProiectComplet(),
         loadSubproiecte(),
         checkContractExistent(),
-        // FIX PRINCIPAL: Nu apelează previewContractNumberReal() automat
-        // Se va apela doar dacă nu există contract existent
       ]).finally(() => {
         setLoadingCheck(false);
       });
@@ -250,7 +242,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // FIX PRINCIPAL: Funcție pentru preview numărul contractului DOAR pentru contracte noi
   const previewContractNumberForNewContract = async () => {
     try {
       console.log('Apelez API-ul pentru numerotare consecutivă (contract nou)...');
@@ -263,7 +254,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         setContractPrefix(result.serie);
         const newPreview = result.contract_preview;
         setContractPreview(newPreview);
-        setContractPreviewForGeneration(newPreview); // Pentru generare
+        setContractPreviewForGeneration(newPreview);
         
         console.log('Număr consecutiv pentru contract nou:', {
           preview: newPreview,
@@ -277,7 +268,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       console.error('Eroare la preview numărul contractului nou:', error);
       showToast('Nu s-a putut obține următorul număr de contract', 'error');
       
-      // Fallback
       const currentYear = new Date().getFullYear();
       const fallbackNumber = 1001;
       setContractNumber(fallbackNumber);
@@ -337,9 +327,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // FIX CRITIC: useEffect separat pentru setarea termenilor cu verificări complete
   useEffect(() => {
-    console.log('🔧 useEffect termeni - checking conditions:', {
+    console.log('📧 useEffect termeni - checking conditions:', {
       hasProiectComplet: !!proiectComplet,
       subproiecte_length: subproiecte.length,
       termene_length: termenePersonalizate.length,
@@ -347,9 +336,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       proiect_moneda: proiectComplet?.moneda
     });
     
-    // Setează termenii doar pentru proiecte fără subproiecte
     if (proiectComplet && subproiecte.length === 0) {
-      // Verifică dacă avem valori valide în proiectComplet
       const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
         ? proiectComplet.Valoare_Estimata 
         : (proiectComplet.Valoare_Estimata as any)?.value || 0;
@@ -358,14 +345,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
       const monedaProiect = proiectComplet.moneda || 'RON';
       
-      console.log('🔧 Valori extrase din proiectComplet:', {
+      console.log('📧 Valori extrase din proiectComplet:', {
         valoareProiect,
         valoareRON,
         monedaProiect,
         hasValidValue: valoareProiect > 0
       });
       
-      // Setează termenii doar dacă avem o valoare validă și nu sunt deja setați corect
       if (valoareProiect > 0) {
         const currentTermenValue = termenePersonalizate.length > 0 ? termenePersonalizate[0].valoare : 0;
         
@@ -409,7 +395,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     subproiecte.length
   ]);
 
-  // FIX PRINCIPAL: Verificarea contractului existent cu încărcare corectă a etapelor din JSON
   const checkContractExistent = async () => {
     try {
       console.log('Verific contract existent pentru proiectul:', proiect.ID_Proiect);
@@ -441,26 +426,21 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         setContractExistent(contract);
         setIsEditMode(true);
         
-        // FIX PRINCIPAL: Păstrează numărul contractului existent pentru afișare
         const parts = contract.numar_contract.split('-');
         if (parts.length >= 3) {
           setContractPrefix(parts[0]);
           setContractNumber(parseInt(parts[1]) || 0);
         }
         
-        // IMPORTANT: Pentru afișare folosește numărul existent
         setContractPreview(contract.numar_contract);
-        // IMPORTANT: Pentru generare păstrează același număr (nu generează unul nou)
         setContractPreviewForGeneration(contract.numar_contract);
         
         console.log(`✅ PĂSTRARE NUMĂR EXISTENT: ${contract.numar_contract} (nu se generează unul nou)`);
         
-        // FIX CRITIC: Procesează etapele din JSON fără convertBigQueryNumeric
         if (contract.etape && Array.isArray(contract.etape)) {
           console.log('🔍 Procesez etape din contract existent - date raw:', contract.etape);
           
           const etapeConvertite = contract.etape.map((etapa: any, index: number) => {
-            // FIX: JSON-ul din BigQuery conține deja valorile numerice, nu obiecte Big
             const valoare = typeof etapa.valoare === 'number' ? etapa.valoare : parseFloat(etapa.valoare) || 0;
             const valoare_ron = typeof etapa.valoare_ron === 'number' ? etapa.valoare_ron : parseFloat(etapa.valoare_ron) || 0;
             const procent_calculat = typeof etapa.procent_calculat === 'number' ? etapa.procent_calculat : parseFloat(etapa.procent_calculat) || 0;
@@ -504,7 +484,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         setContractExistent(null);
         setIsEditMode(false);
         
-        // FIX PRINCIPAL: DOAR acum generează numărul pentru contract nou
         await previewContractNumberForNewContract();
       }
     } catch (error) {
@@ -525,7 +504,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       setContractExistent(null);
       setIsEditMode(false);
       
-      // Generează numărul pentru contract nou în caz de eroare
       await previewContractNumberForNewContract();
     }
   };
@@ -542,6 +520,62 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
 
   const calculeazaSumaTotala = () => {
     return termenePersonalizate.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
+  };
+
+  // MODIFICAT: Calculare sumar pe valute separate
+  const calculeazaSumarValute = () => {
+    const valuteSumar: { [moneda: string]: number } = {};
+    let totalRON = 0;
+    
+    termenePersonalizate.forEach(termen => {
+      if (termen.moneda === 'RON') {
+        valuteSumar['RON'] = (valuteSumar['RON'] || 0) + termen.valoare;
+      } else {
+        valuteSumar[termen.moneda] = (valuteSumar[termen.moneda] || 0) + termen.valoare;
+      }
+      totalRON += termen.valoare_ron;
+    });
+    
+    return { valuteSumar, totalRON };
+  };
+
+  // MODIFICAT: Calculare valoare proiect în RON pentru comparația de 3%
+  const calculeazaValoareProiectRON = (): number => {
+    if (!proiectComplet) return 0;
+    
+    const valoareProiect = convertBigQueryNumeric(proiectComplet.Valoare_Estimata) || 0;
+    const monedaProiect = proiectComplet.moneda || 'RON';
+    
+    if (monedaProiect === 'RON') {
+      return valoareProiect;
+    } else {
+      const valoareRONDinBD = convertBigQueryNumeric(proiectComplet.valoare_ron);
+      if (valoareRONDinBD > 0) {
+        return valoareRONDinBD;
+      }
+      
+      const cursProiect = convertBigQueryNumeric(proiectComplet.curs_valutar) || CURSURI_VALUTAR[monedaProiect] || 1;
+      return valoareProiect * cursProiect;
+    }
+  };
+
+  // MODIFICAT: Verificare limită 3%
+  const verificaLimita3Procent = (): { valid: boolean; diferentaProcentuala: number; mesaj: string } => {
+    const valoareProiectRON = calculeazaValoareProiectRON();
+    const sumaTotalaContractRON = calculeazaSumaTotala();
+    
+    if (valoareProiectRON === 0) {
+      return { valid: true, diferentaProcentuala: 0, mesaj: 'Nu se poate verifica (valoare proiect 0)' };
+    }
+    
+    const diferentaProcentuala = Math.abs((sumaTotalaContractRON - valoareProiectRON) / valoareProiectRON) * 100;
+    const valid = diferentaProcentuala <= 3;
+    
+    const mesaj = valid 
+      ? `Diferență: ${diferentaProcentuala.toFixed(2)}% (în limita de 3%)`
+      : `Diferență: ${diferentaProcentuala.toFixed(2)}% (depășește limita de 3%)`;
+    
+    return { valid, diferentaProcentuala, mesaj };
   };
 
   const moveTermenUp = (index: number) => {
@@ -608,16 +642,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setTermenePersonalizate(termeneWithPercents);
   };
 
-  // FIX PRINCIPAL: Funcție pentru forțarea contractului nou cu preview nou
   const handleForceNewContract = async () => {
     setContractExistent(null);
     setIsEditMode(false);
     setContractPrefix('CONTR');
     
-    // Generează numărul pentru contract nou
     await previewContractNumberForNewContract();
     
-    // Resetează la termenii din subproiecte sau default
     if (subproiecte.length > 0) {
       loadSubproiecte();
     } else if (proiectComplet) {
@@ -643,6 +674,41 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     showToast('Mod contract nou activat cu număr nou', 'info');
   };
 
+  // ADĂUGAT: Handler pentru ștergerea contractului
+  const handleDeleteContract = async () => {
+    if (!contractExistent) return;
+    
+    const confirmed = confirm(`Sigur vrei să ștergi contractul ${contractExistent.numar_contract}?\n\nContractul va fi marcat ca "Anulat".`);
+    if (!confirmed) return;
+    
+    setLoadingDelete(true);
+    
+    try {
+      const response = await fetch(`/api/rapoarte/contracte?id=${encodeURIComponent(contractExistent.ID_Contract)}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast(`Contract ${contractExistent.numar_contract} șters cu succes!`, 'success');
+        
+        if (onSuccess) {
+          onSuccess();
+        }
+        
+        onClose();
+      } else {
+        throw new Error(result.error || 'Eroare la ștergerea contractului');
+      }
+    } catch (error) {
+      console.error('Eroare la ștergerea contractului:', error);
+      showToast(`Eroare la ștergerea contractului: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
+    } finally {
+      setLoadingDelete(false);
+    }
+  };
+
   const handleGenerateContract = async () => {
     setLoading(true);
     
@@ -659,10 +725,17 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         return;
       }
 
+      // ADĂUGAT: Verificare limită 3%
+      const validareProcentuala = verificaLimita3Procent();
+      if (!validareProcentuala.valid) {
+        showToast(`Nu se poate genera contractul: ${validareProcentuala.mesaj}`, 'error');
+        setLoading(false);
+        return;
+      }
+
       const actionText = isEditMode ? 'actualizează contractul' : 'generează contractul';
       showToast(`Se ${actionText}...`, 'info');
 
-      // FIX PRINCIPAL: Folosește contractPreviewForGeneration pentru generare
       const response = await fetch('/api/actions/contracts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -673,7 +746,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           observatii: observatii.trim(),
           isEdit: isEditMode,
           contractExistentId: contractExistent?.ID_Contract || null,
-          contractPreview: contractPreviewForGeneration, // Folosește numărul corect
+          contractPreview: contractPreviewForGeneration,
           contractPrefix: contractPrefix
         })
       });
@@ -773,6 +846,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   }
 
   const sumaTotala = calculeazaSumaTotala();
+  const { valuteSumar, totalRON } = calculeazaSumarValute();
+  const validareProcentuala = verificaLimita3Procent();
 
   return typeof window !== 'undefined' ? createPortal(
     <div style={{
@@ -814,16 +889,23 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
                 Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{proiect.ID_Proiect}</span> - {proiect.Denumire}
               </p>
-              {contractExistent && (
+              {contractExistent && proiectComplet && (
                 <div style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
+                  {/* MODIFICAT: Header cu valoarea din proiect + echivalent RON */}
                   <div>Contract: {contractExistent.numar_contract} • Status: {contractExistent.Status}</div>
-                  <div>Valoare: {contractExistent.Valoare?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {contractExistent.Moneda} • Etape: {contractExistent.etape_count || 0}</div>
+                  <div>
+                    Valoare proiect: {convertBigQueryNumeric(proiectComplet.Valoare_Estimata)?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {proiectComplet.moneda || 'RON'}
+                    {proiectComplet.moneda && proiectComplet.moneda !== 'RON' && (
+                      <span> (≈ {calculeazaValoareProiectRON().toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON)</span>
+                    )}
+                     • Etape: {contractExistent.etape_count || 0}
+                  </div>
                 </div>
               )}
             </div>
             <button
               onClick={onClose}
-              disabled={loading}
+              disabled={loading || loadingDelete}
               style={{
                 background: 'rgba(255, 255, 255, 0.2)',
                 border: 'none',
@@ -831,7 +913,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 width: '40px',
                 height: '40px',
                 fontSize: '20px',
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
                 color: 'white'
               }}
             >
@@ -841,7 +923,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         </div>
 
         <div style={{ padding: '1.5rem' }}>
-          {loading && (
+          {(loading || loadingDelete) && (
             <div style={{
               position: 'fixed',
               top: 0,
@@ -878,7 +960,10 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     animation: 'spin 1s linear infinite'
                   }}>
                   </div>
-                  <span>{isEditMode ? 'Se actualizează contractul...' : 'Se generează contractul...'}</span>
+                  <span>
+                    {loadingDelete ? 'Se șterge contractul...' : 
+                     isEditMode ? 'Se actualizează contractul...' : 'Se generează contractul...'}
+                  </span>
                 </div>
                 <style>
                   {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
@@ -932,34 +1017,60 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   <div style={{ fontSize: '13px', color: '#856404' }}>
                     <strong>Nr. Contract:</strong> {contractExistent.numar_contract} •{' '}
                     <strong>Status:</strong> {contractExistent.Status} •{' '}
-                    <strong>Valoare:</strong> {contractExistent.Valoare?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {contractExistent.Moneda}
+                    <strong>Valoare proiect:</strong> {proiectComplet ? 
+                      `${convertBigQueryNumeric(proiectComplet.Valoare_Estimata)?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} ${proiectComplet.moneda || 'RON'}` : 
+                      'Se încarcă...'
+                    }
+                    {proiectComplet?.moneda && proiectComplet.moneda !== 'RON' && (
+                      <span> (≈ {calculeazaValoareProiectRON().toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON)</span>
+                    )}
                   </div>
                   <div style={{ fontSize: '12px', color: '#856404', marginTop: '0.25rem' }}>
                     ✅ Numărul contractului se păstrează: <strong>{contractPreview}</strong>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleForceNewContract}
-                  disabled={loading}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#e74c3c',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Contract cu Număr Nou
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {/* ADĂUGAT: Buton ștergere contract */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteContract}
+                    disabled={loading || loadingDelete}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {loadingDelete ? '⏳ Șterge...' : '🗑️ Șterge Contract'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleForceNewContract}
+                    disabled={loading || loadingDelete}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Contract cu Număr Nou
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Informații proiect și suma */}
+          {/* Informații proiect */}
           <div style={{
             background: '#f8f9fa',
             padding: '1rem',
@@ -1000,36 +1111,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 )}
               </div>
             </div>
-            
-            {subproiecte.length > 0 && (
-              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #dee2e6' }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '14px', color: '#2c3e50' }}>
-                  Subproiecte incluse ({subproiecte.length}):
-                </h4>
-                <div style={{ display: 'grid', gap: '0.5rem', maxHeight: '150px', overflowY: 'auto' }}>
-                  {subproiecte.map((sub, index) => {
-                    const valoare = convertBigQueryNumeric(sub.valoare_ron) || 
-                                   convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
-                    return (
-                      <div key={sub.ID_Subproiect} style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.5rem',
-                        background: 'rgba(52, 152, 219, 0.1)',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}>
-                        <span style={{ fontWeight: '500' }}>{sub.Denumire}</span>
-                        <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
-                          {valoare.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {sub.moneda || 'RON'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Etape și Termene cu implementarea completă */}
@@ -1049,14 +1130,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <button
                 type="button"
                 onClick={addTermen}
-                disabled={loading}
+                disabled={loading || loadingDelete}
                 style={{
                   padding: '0.5rem 1rem',
                   background: '#3498db',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
                   fontSize: '12px',
                   fontWeight: 'bold'
                 }}
@@ -1123,7 +1204,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     <button
                       type="button"
                       onClick={() => moveTermenUp(index)}
-                      disabled={loading || index === 0}
+                      disabled={loading || loadingDelete || index === 0}
                       title="Mută în sus"
                       style={{
                         background: index === 0 ? '#bdc3c7' : '#3498db',
@@ -1131,7 +1212,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                         border: 'none',
                         borderRadius: '4px',
                         padding: '0.25rem 0.4rem',
-                        cursor: (loading || index === 0) ? 'not-allowed' : 'pointer',
+                        cursor: (loading || loadingDelete || index === 0) ? 'not-allowed' : 'pointer',
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}
@@ -1142,7 +1223,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     <button
                       type="button"
                       onClick={() => moveTermenDown(index)}
-                      disabled={loading || index === termenePersonalizate.length - 1}
+                      disabled={loading || loadingDelete || index === termenePersonalizate.length - 1}
                       title="Mută în jos"
                       style={{
                         background: index === termenePersonalizate.length - 1 ? '#bdc3c7' : '#3498db',
@@ -1150,7 +1231,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                         border: 'none',
                         borderRadius: '4px',
                         padding: '0.25rem 0.4rem',
-                        cursor: (loading || index === termenePersonalizate.length - 1) ? 'not-allowed' : 'pointer',
+                        cursor: (loading || loadingDelete || index === termenePersonalizate.length - 1) ? 'not-allowed' : 'pointer',
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}
@@ -1161,15 +1242,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     <button
                       type="button"
                       onClick={() => removeTermen(termen.id)}
-                      disabled={loading || termenePersonalizate.length === 1}
+                      disabled={loading || loadingDelete || termenePersonalizate.length === 1}
                       title="Șterge etapa"
                       style={{
-                        background: (loading || termenePersonalizate.length === 1) ? '#bdc3c7' : '#e74c3c',
+                        background: (loading || loadingDelete || termenePersonalizate.length === 1) ? '#bdc3c7' : '#e74c3c',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
                         padding: '0.25rem 0.5rem',
-                        cursor: (loading || termenePersonalizate.length === 1) ? 'not-allowed' : 'pointer',
+                        cursor: (loading || loadingDelete || termenePersonalizate.length === 1) ? 'not-allowed' : 'pointer',
                         fontSize: '12px'
                       }}
                     >
@@ -1189,7 +1270,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     type="text"
                     value={termen.denumire}
                     onChange={(e) => updateTermen(termen.id, 'denumire', e.target.value)}
-                    disabled={loading || termen.este_subproiect}
+                    disabled={loading || loadingDelete || termen.este_subproiect}
                     placeholder="Denumire etapă (ex: La semnare)"
                     style={{
                       padding: '0.5rem',
@@ -1204,7 +1285,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     type="number"
                     value={termen.valoare}
                     onChange={(e) => updateTermen(termen.id, 'valoare', parseFloat(e.target.value) || 0)}
-                    disabled={loading || termen.este_subproiect}
+                    disabled={loading || loadingDelete || termen.este_subproiect}
                     placeholder="0.00"
                     min="0"
                     step="0.01"
@@ -1220,7 +1301,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   <select
                     value={termen.moneda}
                     onChange={(e) => updateTermen(termen.id, 'moneda', e.target.value)}
-                    disabled={loading || termen.este_subproiect}
+                    disabled={loading || loadingDelete || termen.este_subproiect}
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #dee2e6',
@@ -1267,7 +1348,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     type="number"
                     value={termen.termen_zile}
                     onChange={(e) => updateTermen(termen.id, 'termen_zile', parseInt(e.target.value) || 0)}
-                    disabled={loading}
+                    disabled={loading || loadingDelete}
                     placeholder="Zile"
                     min="0"
                     style={{
@@ -1309,6 +1390,24 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               Total procente: {termenePersonalizate.reduce((sum, t) => sum + (t.procent_calculat || 0), 0).toFixed(1)}% 
               (calculat automat din valorile în RON)
             </div>
+
+            {/* ADĂUGAT: Verificare limită 3% */}
+            <div style={{
+              marginTop: '0.5rem',
+              padding: '0.5rem',
+              background: validareProcentuala.valid ? '#d4edda' : '#f8d7da',
+              border: `1px solid ${validareProcentuala.valid ? '#c3e6cb' : '#f5c6cb'}`,
+              borderRadius: '4px',
+              fontSize: '12px',
+              color: validareProcentuala.valid ? '#155724' : '#721c24'
+            }}>
+              <strong>Validare diferență față de proiect:</strong> {validareProcentuala.mesaj}
+              {!validareProcentuala.valid && (
+                <div style={{ marginTop: '4px', fontSize: '11px' }}>
+                  Contractul nu poate fi generat dacă diferența depășește 3%.
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Observații COMPLETE */}
@@ -1319,7 +1418,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             <textarea
               value={observatii}
               onChange={(e) => setObservatii(e.target.value)}
-              disabled={loading}
+              disabled={loading || loadingDelete}
               placeholder="Observații speciale pentru contract, clauze suplimentare, etc."
               rows={3}
               style={{
@@ -1333,7 +1432,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             />
           </div>
 
-          {/* Sumar final COMPLET */}
+          {/* MODIFICAT: Sumar final cu valute separate */}
           <div style={{
             background: '#e8f5e8',
             padding: '1.5rem',
@@ -1358,17 +1457,33 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>VALOARE TOTALĂ</div>
-                <div style={{ fontSize: '18px', color: '#27ae60', fontWeight: 'bold' }}>
-                  {sumaTotala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
-                </div>
-              </div>
-              <div>
                 <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ETAPE PLATĂ</div>
                 <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
                   {termenePersonalizate.length} etape
                   {subproiecte.length > 0 && ` (${termenePersonalizate.filter(t => t.este_subproiect).length} din proiect)`}
                 </div>
+              </div>
+              
+              {/* MODIFICAT: Afișare valoare totală pe valute separate */}
+              <div style={{ gridColumn: 'span 1' }}>
+                <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>VALOARE TOTALĂ</div>
+                {Object.entries(valuteSumar).map(([moneda, valoare]) => (
+                  <div key={moneda} style={{ fontSize: '16px', color: '#27ae60', fontWeight: 'bold' }}>
+                    {valoare.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {moneda}
+                  </div>
+                ))}
+                {Object.keys(valuteSumar).length > 1 && (
+                  <div style={{ 
+                    fontSize: '14px', 
+                    color: '#6c757d', 
+                    fontWeight: '500',
+                    marginTop: '0.25rem',
+                    borderTop: '1px solid #dee2e6',
+                    paddingTop: '0.25rem'
+                  }}>
+                    Echivalent: {totalRON.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1392,14 +1507,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
                 onClick={onClose}
-                disabled={loading}
+                disabled={loading || loadingDelete}
                 style={{
                   padding: '0.75rem 1.5rem',
                   background: '#6c757d',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold'
                 }}
@@ -1409,15 +1524,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               
               <button
                 onClick={handleGenerateContract}
-                disabled={loading || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0}
+                disabled={loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: (loading || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0) ? '#bdc3c7' : 
+                  background: (loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid) ? '#bdc3c7' : 
                     isEditMode ? '#f39c12' : '#27ae60',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: (loading || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0) ? 'not-allowed' : 'pointer',
+                  cursor: (loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid) ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold'
                 }}
