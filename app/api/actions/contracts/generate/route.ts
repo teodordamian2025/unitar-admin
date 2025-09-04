@@ -417,7 +417,7 @@ async function loadProiectDataSimple(proiectId: string) {
       
       if (clientRows.length > 0) {
         clientData = clientRows[0];
-        console.log('👤 CLIENT GĂSIT:', clientData.nume, clientData.cui);
+        console.log('👤 CLIENT GĂSIT:', clientData?.nume, clientData?.cui);
       } else {
         console.log('⚠️ Client nu găsit în BD, folosesc doar numele din proiect');
       }
