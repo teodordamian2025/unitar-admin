@@ -406,10 +406,11 @@ Coduri legate de chatbot si Bigquery:
 app/api/gueryOpenAI/route.ts
 app/api/bigquery/route.ts
 pages/api/queryBigQuery.ts
+app/components/UserChatbot.tsx
+Codurile unde se gaseste o metoda simplificata de extragere date din Bigquery:
+components/Chatbot.tsx
 app/api/ai-database/route.ts
 pages/api/chat.ts
-app/components/UserChatbot.tsx
-components/Chatbot.tsx
 
 
 ### 📋 Descriere Componente Cheie

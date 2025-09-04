@@ -16,27 +16,11 @@ Obiectul contractului îl reprezintă:
 
 Realizare {{proiect.denumire}}
 
-{{#proiect.descriere}}
-Descriere detaliată: {{proiect.descriere}}
-{{/proiect.descriere}}
+{{proiect.descriere}}
 
-{{#proiect.adresa}}
-Adresa execuție: {{proiect.adresa}}
-{{/proiect.adresa}}
+{{proiect.adresa}}
 
-{{#subproiecte}}
-**Componente proiect:**
-{{#subproiecte.lista}}
-- {{denumire}}: {{valoare}} {{moneda}}
-{{/subproiecte.lista}}
-{{/subproiecte}}
-
-{{#articole_suplimentare}}
-**Servicii suplimentare:**
-{{#articole_suplimentare.lista}}
-- {{descriere}}: {{valoare}} {{moneda}}
-{{/articole_suplimentare.lista}}
-{{/articole_suplimentare}}
+{{subproiecte_lista}}
 
 **CAP.III. DURATA CONTRACTULUI:**
 
@@ -47,17 +31,13 @@ Adresa execuție: {{proiect.adresa}}
 
 **CAP. IV. PREȚUL DE EXECUTARE AL LUCRĂRII**
 
-1. Prețul pe care Beneficiarul îl datorează prestatorului pentru serviciile sale este de **{{proiect.valoare}} {{proiect.moneda}}** la care se aplică suplimentar TVA, plătiți în lei la cursul BNR din ziua facturării.
+1. Prețul pe care Beneficiarul îl datorează prestatorului pentru serviciile sale este de **{{suma_totala_originala}} {{moneda_originala}}** la care se aplică suplimentar TVA{{valuta_clause}}.
 
 **Valoarea totală contract: {{suma_totala_ron}} RON + TVA**
 
 Plățile vor fi realizate în modul următor:
 
-{{#termene_personalizate}}
-{{#termene_personalizate.lista}}
-**Etapa {{index}}**: {{procent_plata}}% ({{valoare_etapa}} RON) - {{denumire}} (termen: {{termen_zile}} zile)
-{{/termene_personalizate.lista}}
-{{/termene_personalizate}}
+{{termene_personalizate}}
 
 2. Nerespectarea de către Beneficiar a termenelor de plată stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere, în cuantum de 0.1% din contravaloarea proiectului pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
 
@@ -75,9 +55,7 @@ C). Va executa lucrările la care s-a angajat prin semnarea prezentului contract
 
 D). Va realiza modificările necesare, în cazul în care i se solicită acest lucru.
 
-{{#proiect.responsabil}}
-E). Responsabilul proiect din partea PRESTATOR: {{proiect.responsabil}}
-{{/proiect.responsabil}}
+{{responsabil_clause}}
 
 II. Obligațiile Beneficiarului:
 
@@ -85,9 +63,7 @@ A). Va pune la dispoziția prestatorului datele de temă necesare și alte infor
 
 B). Va respecta termenele de plată stabilite prin prezentul contract;
 
-{{#client.telefon}}
-C). Persoană de contact: {{client.nume}} (Tel: {{client.telefon}}, Email: {{client.email}})
-{{/client.telefon}}
+{{contact_clause}}
 
 **CAP. VI. ÎNCETAREA CONTRACTULUI**
 
@@ -119,7 +95,7 @@ C). Persoană de contact: {{client.nume}} (Tel: {{client.telefon}}, Email: {{cli
 
 1. În accepțiunea părților contractante, orice notificare adresată de una dintre acestea celeilalte este valabil îndeplinită dacă va fi transmisă prin e-mail.
 
-2. În cazul în care notificarea se face pe cale poștală, ea va fi transmisă, prin scrisoare recomandată, cu confirmare de primire și se consideră primită de destinatar la data menționată de oficiul poștal primitor pe această confirmare.
+2. In cazul în care notificarea se face pe cale poștală, ea va fi transmisă, prin scrisoare recomandată, cu confirmare de primire și se consideră primită de destinatar la data menționată de oficiul poștal primitor pe această confirmare.
 
 3. Dacă notificarea se trimite prin fax sau e-mail, ea se consideră primită în prima zi lucrătoare după cea în care a fost expediată.
 
@@ -141,12 +117,7 @@ C). Persoană de contact: {{client.nume}} (Tel: {{client.telefon}}, Email: {{cli
 
 4. Prezentul contract a fost încheiat, în 2 exemplare, câte unul pentru fiecare parte.
 
-{{#observatii}}
-
-**OBSERVAȚII SUPLIMENTARE:**
-
-{{observatii}}
-{{/observatii}}
+{{observatii_clause}}
 
 ---
 
