@@ -409,7 +409,7 @@ async function loadProiectDataSimple(proiectId: string) {
         LIMIT 1
       `;
       
-      const [clientRows]: [any[]] = await bigquery.query({
+      const [clientRows] = await bigquery.query({
         query: clientQuery,
         params: { clientNume: proiectRaw.Client },
         location: 'EU',
