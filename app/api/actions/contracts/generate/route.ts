@@ -400,7 +400,7 @@ async function loadProiectDataSimple(proiectId: string) {
     });
     
     // 2. Query separat pentru client - mai sigur
-    let clientData = null;
+    let clientData: any = null;
     if (proiectRaw.Client) {
       const clientQuery = `
         SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Clienti\`
@@ -409,7 +409,7 @@ async function loadProiectDataSimple(proiectId: string) {
         LIMIT 1
       `;
       
-      const [clientRows] = await bigquery.query({
+      const [clientRows]: [any[]] = await bigquery.query({
         query: clientQuery,
         params: { clientNume: proiectRaw.Client },
         location: 'EU',
@@ -417,7 +417,7 @@ async function loadProiectDataSimple(proiectId: string) {
       
       if (clientRows.length > 0) {
         clientData = clientRows[0];
-        console.log('👤 CLIENT GĂSIT:', clientData?.nume, clientData?.cui);
+        console.log('👤 CLIENT GĂSIT:', clientData.nume, clientData.cui);
       } else {
         console.log('⚠️ Client nu găsit în BD, folosesc doar numele din proiect');
       }
