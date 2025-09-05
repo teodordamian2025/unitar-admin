@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts  
-// DATA: 05.09.2025 22:30 (ora României)
-// VERSIUNEA FINALĂ: Eliminat debugging + Fix spațiere text + Funcționalități păstrate
+// DATA: 05.09.2025 23:00 (ora României)
+// VERSIUNEA FINALĂ: Multi-valută corectă + Fix spațiere text + Funcționalități păstrate
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -229,8 +229,7 @@ function processPlaceholders(text: string, data: any): string {
     
     // Sume monetare
     '{{suma_totala_originala}}': data.suma_totala_originala || '0.00',
-    '{{moneda_originala}}': data.moneda_originala || 'RON',
-    '{{suma_totala_ron}}': data.suma_totala_ron || '0.00'
+    '{{moneda_originala}}': data.moneda_originala || 'RON'
   };
   
   // Aplică înlocuirile simple
@@ -342,7 +341,7 @@ function convertTextToWordXml(text: string): string {
 </w:document>`;
 }
 
-// Restul funcțiilor rămân la fel...
+// Extragere proiect simplificată
 async function loadProiectDataSimple(proiectId: string) {
   try {
     const proiectQuery = `
@@ -443,6 +442,85 @@ async function loadProiectDataSimple(proiectId: string) {
   }
 }
 
+// Funcția de calcul cu logica multi-valută corectă
+function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], termenePersonalizate: any[]) {
+  if (termenePersonalizate.length > 0) {
+    // Grupez termenii pe valute pentru a calcula suma corectă
+    const valuteBuckets: { [moneda: string]: number } = {};
+    
+    termenePersonalizate.forEach((termen) => {
+      const monedaTermen = termen.moneda || 'RON';
+      const valoareOriginala = termen.valoare || 0;
+      
+      if (!valuteBuckets[monedaTermen]) {
+        valuteBuckets[monedaTermen] = 0;
+      }
+      valuteBuckets[monedaTermen] += valoareOriginala;
+    });
+    
+    // Calculez suma RON pentru BigQuery (păstrez logica existentă pentru BD)
+    let sumaFinalaRON = 0;
+    const cursuriUtilizate: { [moneda: string]: number } = {};
+    
+    Object.entries(valuteBuckets).forEach(([moneda, suma]) => {
+      if (moneda === 'RON') {
+        sumaFinalaRON += suma;
+      } else {
+        const curs = CURSURI_VALUTAR[moneda] || 1;
+        sumaFinalaRON += suma * curs;
+        cursuriUtilizate[moneda] = curs;
+      }
+    });
+    
+    // Generez string-ul pentru afișare în contract
+    let sumaOriginalaString: string;
+    let monedaOriginalaString: string;
+    
+    if (Object.keys(valuteBuckets).length === 1) {
+      // O singură valută - afișez suma simplă
+      const [moneda, suma] = Object.entries(valuteBuckets)[0];
+      sumaOriginalaString = suma.toFixed(2);
+      monedaOriginalaString = moneda;
+    } else {
+      // Multe valute - afișez enumerarea
+      const enumerareValute = Object.entries(valuteBuckets)
+        .map(([moneda, suma]) => `${suma.toFixed(2)} ${moneda}`)
+        .join(' + ');
+      
+      sumaOriginalaString = enumerareValute;
+      monedaOriginalaString = ''; // Nu afișez moneda separată pentru enumerare
+    }
+    
+    return { 
+      sumaFinala: sumaFinalaRON, 
+      monedaFinala: Object.keys(valuteBuckets).length === 1 ? Object.keys(valuteBuckets)[0] : 'MULTIPLE',
+      cursuriUtilizate,
+      sumaOriginala: sumaOriginalaString, // String pentru afișare
+      monedaOriginala: monedaOriginalaString
+    };
+    
+  } else {
+    // Fallback: dacă nu sunt termeni setați, folosesc valoarea proiectului
+    const sumaOriginala = proiect.Valoare_Estimata || 0;
+    const sumaFinalaRON = proiect.valoare_ron || sumaOriginala;
+    const monedaOriginala = proiect.moneda || 'RON';
+    const cursuriUtilizate: { [moneda: string]: number } = {};
+    
+    if (proiect.moneda && proiect.moneda !== 'RON') {
+      cursuriUtilizate[proiect.moneda] = proiect.curs_valutar || CURSURI_VALUTAR[proiect.moneda] || 1;
+    }
+    
+    return { 
+      sumaFinala: sumaFinalaRON, 
+      monedaFinala: monedaOriginala,
+      cursuriUtilizate,
+      sumaOriginala: sumaOriginala.toFixed(2),
+      monedaOriginala
+    };
+  }
+}
+
+// Preparare date template cu noua logică
 function prepareSimpleTemplateData(
   proiect: any, 
   subproiecte: any[], 
@@ -450,24 +528,8 @@ function prepareSimpleTemplateData(
   termene: any[],
   observatii?: string
 ) {
-  let sumaOriginalaCalculata = 0;
-  let sumaRONCalculata = 0;
-  let monedaContract = proiect.moneda || 'RON';
-  
-  if (termene.length > 0) {
-    sumaRONCalculata = termene.reduce((sum, t) => sum + (t.valoare_ron || 0), 0);
-    
-    if (monedaContract === 'RON') {
-      sumaOriginalaCalculata = sumaRONCalculata;
-    } else {
-      const cursProiect = proiect.curs_valutar || CURSURI_VALUTAR[monedaContract] || 1;
-      sumaOriginalaCalculata = sumaRONCalculata / cursProiect;
-    }
-  } else {
-    sumaOriginalaCalculata = proiect.Valoare_Estimata || 0;
-    sumaRONCalculata = proiect.valoare_ron || sumaOriginalaCalculata;
-    monedaContract = proiect.moneda || 'RON';
-  }
+  // Utilizez noua logică de calcul
+  const { sumaOriginala, monedaOriginala } = calculeazaSumaContractCuValoriEstimate(proiect, subproiecte, termene);
   
   const dataContract = new Date().toLocaleDateString('ro-RO');
   const durataZile = calculateDurationInDays(proiect.Data_Start, proiect.Data_Final);
@@ -518,69 +580,15 @@ function prepareSimpleTemplateData(
     
     termene_personalizate: termene,
     
-    suma_totala_originala: sumaOriginalaCalculata.toFixed(2),
-    moneda_originala: monedaContract,
+    // Pentru afișare în contract - string complet gata formatat
+    suma_totala_originala: sumaOriginala, // Poate fi "10000.00" sau "1000.00 GBP + 1000.00 USD + 5000.00 EUR"
+    moneda_originala: monedaOriginala, // Fie "EUR", fie "" pentru multe valute
     
     observatii: observatii || '',
     data_generare: new Date().toISOString()
   };
   
   return templateData;
-}
-
-function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], termenePersonalizate: any[]) {
-  let sumaOriginala = 0;
-  let monedaOriginala = 'RON';
-  let sumaFinalaRON = 0;
-  const cursuriUtilizate: { [moneda: string]: number } = {};
-  
-  monedaOriginala = proiect.moneda || 'RON';
-
-  if (termenePersonalizate.length > 0) {
-    let totalRONDinTermeni = 0;
-    
-    termenePersonalizate.forEach((termen) => {
-      const valoareOriginala = termen.valoare || 0;
-      const valoareRON = termen.valoare_ron || valoareOriginala;
-      const monedaTermen = termen.moneda || 'RON';
-      
-      totalRONDinTermeni += valoareRON;
-      
-      if (monedaTermen !== 'RON') {
-        cursuriUtilizate[monedaTermen] = termen.curs_valutar || CURSURI_VALUTAR[monedaTermen] || 1;
-      }
-    });
-    
-    if (monedaOriginala === 'RON') {
-      sumaOriginala = totalRONDinTermeni;
-      sumaFinalaRON = totalRONDinTermeni;
-    } else {
-      const cursProiect = cursuriUtilizate[monedaOriginala] || 
-                         proiect.curs_valutar || 
-                         CURSURI_VALUTAR[monedaOriginala] || 1;
-      
-      sumaOriginala = totalRONDinTermeni / cursProiect;
-      sumaFinalaRON = totalRONDinTermeni;
-      
-      cursuriUtilizate[monedaOriginala] = cursProiect;
-    }
-  } else {
-    sumaOriginala = proiect.Valoare_Estimata || 0;
-    sumaFinalaRON = proiect.valoare_ron || sumaOriginala;
-    monedaOriginala = proiect.moneda || 'RON';
-    
-    if (proiect.moneda && proiect.moneda !== 'RON') {
-      cursuriUtilizate[proiect.moneda] = proiect.curs_valutar || CURSURI_VALUTAR[proiect.moneda] || 1;
-    }
-  }
-
-  return { 
-    sumaFinala: sumaFinalaRON, 
-    monedaFinala: monedaOriginala,
-    cursuriUtilizate,
-    sumaOriginala: Math.round(sumaOriginala * 100) / 100,
-    monedaOriginala
-  };
 }
 
 async function processDocxTemplate(templatePath: string, data: any): Promise<Buffer> {
@@ -675,8 +683,6 @@ Realizare {{proiect.denumire}}
 **CAP. IV. PREȚUL DE EXECUTARE AL LUCRĂRII**
 
 1. Prețul pe care Beneficiarul îl datorează prestatorului pentru serviciile sale este de **{{suma_totala_originala}} {{moneda_originala}}** la care se aplică suplimentar TVA{{valuta_clause}}.
-
-**Valoarea totală contract: {{suma_totala_ron}} RON + TVA**
 
 Plățile vor fi realizate în modul următor:
 
@@ -867,7 +873,7 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
   }
 }
 
-// FUNCȚIA PRINCIPALĂ POST - VERSIUNEA FINALĂ CURĂȚATĂ
+// FUNCȚIA PRINCIPALĂ POST - VERSIUNEA FINALĂ
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -890,8 +896,15 @@ export async function POST(request: NextRequest) {
 
     const { proiect, subproiecte } = await loadProiectDataSimple(proiectId);
 
-    const { sumaFinala, monedaFinala, cursuriUtilizate, sumaOriginala, monedaOriginala } = 
-      calculeazaSumaContractCuValoriEstimate(proiect, subproiecte, termenePersonalizate);
+    const rezultatCalcul = calculeazaSumaContractCuValoriEstimate(proiect, subproiecte, termenePersonalizate);
+
+    // Pentru BigQuery - convertesc string la numeric dacă e nevoie
+    let valoareNumericaPentruBD = 0;
+    if (typeof rezultatCalcul.sumaOriginala === 'string' && !rezultatCalcul.sumaOriginala.includes('+')) {
+      valoareNumericaPentruBD = parseFloat(rezultatCalcul.sumaOriginala);
+    } else {
+      valoareNumericaPentruBD = rezultatCalcul.sumaFinala; // Folosesc RON pentru multe valute
+    }
 
     let contractData;
     if (isEdit && contractExistentId) {
@@ -980,10 +993,10 @@ export async function POST(request: NextRequest) {
       tipDocument,
       contractData,
       placeholderData,
-      sumaOriginala: sumaNumericaPentruBD,
-      monedaOriginala: monedaFinala === 'MULTIPLE' ? 'MULTIPLE' : monedaOriginala,
-      sumaFinala,
-      cursuriUtilizate,
+      sumaOriginala: valoareNumericaPentruBD,
+      monedaOriginala: rezultatCalcul.monedaOriginala || 'MULTIPLE',
+      sumaFinala: rezultatCalcul.sumaFinala,
+      cursuriUtilizate: rezultatCalcul.cursuriUtilizate,
       observatii,
       termenePersonalizate,
       templateUsed,
