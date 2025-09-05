@@ -215,6 +215,23 @@ function processPlaceholders(text: string, data: any): string {
     suma_ron: data.suma_totala_ron
   });
   
+  
+  // PROCESARE {{termene_personalizate}} ÎNAINTE DE TOATE CELELALTE
+	console.log('🔥 PROCESARE TERMENE ÎNAINTE DE SIMPLE REPLACEMENTS');
+	let termeneText = '';
+	if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
+	  termeneText = data.termene_personalizate.map((termen, index) => {
+	    const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'} = ${(termen.valoare_ron || 0).toFixed(2)} RON) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
+	    return etapaString;
+	  }).join('\n\n');
+	} else {
+	  termeneText = `**Etapa 1**: 100.0% (${data.suma_totala_originala || '0.00'} ${data.moneda_originala || 'RON'} = ${data.suma_totala_ron || '0.00'} RON) - La predarea proiectului (termen: 60 zile)`;
+	}
+
+	processed = processed.replace('{{termene_personalizate}}', termeneText);
+	console.log('🔥 TERMENE ÎNLOCUITE ÎNAINTE:', termeneText.substring(0, 100) + '...');
+  
+  
   // 1. ÎNLOCUIRI SIMPLE DIRECTE - acestea funcționează sigur
   const simpleReplacements: { [key: string]: string } = {
     // Contract info
@@ -296,32 +313,7 @@ function processPlaceholders(text: string, data: any): string {
   // Clauză valută pentru contracte în valută străină
   const valutaClause = data.moneda_originala !== 'RON' ? ', plătiți în lei la cursul BNR din ziua facturării' : '';
   processed = processed.replace('{{valuta_clause}}', valutaClause);
-  
-// 3. TERMENE PERSONALIZATE - FIX DIRECT FĂRĂ DEBUGGING COMPLEX
-	console.log('🔥 START TERMENE DIRECT FIX');
-	console.log('📊 Termene array:', data.termene_personalizate?.length || 0);
-
-	let termeneText = '';
-	if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
-	  console.log('✅ Array termene valid, generez string...');
-	  
-	  termeneText = data.termene_personalizate.map((termen, index) => {
-	    const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'} = ${(termen.valoare_ron || 0).toFixed(2)} RON) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
-	    console.log(`📋 Generat etapa ${index + 1}:`, etapaString);
-	    return etapaString;
-	  }).join('\n\n');
-	  
-	  console.log('🔥 TERMENE TEXT FINAL:', termeneText.length, 'caractere');
-	} else {
-	  console.log('⚠️ Nu sunt termeni - folosesc fallback');
-	  termeneText = `**Etapa 1**: 100.0% (${data.suma_totala_originala || '0.00'} ${data.moneda_originala || 'RON'} = ${data.suma_totala_ron || '0.00'} RON) - La predarea proiectului (termen: 60 zile)`;
-	}
-
-	// ÎNLOCUIRE DIRECTĂ FĂRĂ VERIFICĂRI COMPLEXE
-	processed = processed.replace('{{termene_personalizate}}', termeneText);
-	console.log('🔥 ÎNLOCUIT {{termene_personalizate}} cu:', termeneText.substring(0, 100) + '...');
-
-  
+    
   // DEBUGGING SPECIFIC pentru placeholder
   console.log('🔍 DEBUGGING PLACEHOLDER {{termene_personalizate}}');
   console.log('📄 Verificare template conține placeholder:', processed.includes('{{termene_personalizate}}'));
