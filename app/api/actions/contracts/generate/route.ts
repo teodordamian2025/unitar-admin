@@ -299,7 +299,7 @@ function processPlaceholders(text: string, data: any): string {
   
 // 3. TERMENE PERSONALIZATE - FIX DIRECT FĂRĂ DEBUGGING COMPLEX
 	console.log('🔥 START TERMENE DIRECT FIX');
-	console.log('📊 Termene array:', termenePersonalizate?.length || 0);
+	console.log('📊 Termene array:', data.termene_personalizate?.length || 0);
 
 	let termeneText = '';
 	if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
