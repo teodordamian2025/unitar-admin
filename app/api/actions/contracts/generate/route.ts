@@ -1215,39 +1215,74 @@ export async function POST(request: NextRequest) {
       observatii
     );
 
-    // ✅ PROCESARE TEMPLATE cu funcțiile reparate
+    // ✅ PROCESARE TEMPLATE cu logging detaliat pentru debugging
     let docxBuffer: Buffer;
     let templateUsed = 'fallback';
 
+    console.log('🔍 DEBUT PROCESARE TEMPLATE');
+    console.log(`📋 Tip document: ${tipDocument}`);
+    console.log(`📊 Placeholder data pregătită: ${Object.keys(placeholderData).length} secțiuni`);
+
     try {
+      console.log('🔎 Încercare găsire template...');
       const templatePath = await findBestTemplate(tipDocument);
       
+      console.log(`📁 Rezultat findBestTemplate: ${templatePath || 'NULL'}`);
+      
       if (templatePath) {
-        console.log(`Template găsit: ${templatePath}`);
+        console.log(`✅ Template găsit: ${templatePath}`);
         templateUsed = path.basename(templatePath);
         
+        // Verifică existența fizică a fișierului
+        try {
+          const { access } = await import('fs/promises');
+          await access(templatePath);
+          console.log(`✅ Template accesibil fizic: ${templatePath}`);
+        } catch (accessError) {
+          console.error(`❌ Template nu poate fi accesat: ${accessError}`);
+          throw new Error(`Template inaccesibil: ${accessError}`);
+        }
+        
         if (templatePath.endsWith('.docx')) {
+          console.log('📖 Procesare template DOCX...');
           // ✅ FOLOSEȘTE processDocxTemplate cu XML processing reparat
           docxBuffer = await processDocxTemplate(templatePath, placeholderData);
+          console.log('✅ Template DOCX procesat cu succes');
         } else if (templatePath.endsWith('.txt')) {
+          console.log('📖 Procesare template TXT...');
           // ✅ FOLOSEȘTE processTextTemplate cu placeholder processing reparat
           const processedText = await processTextTemplate(templatePath, placeholderData);
+          console.log(`✅ Template TXT procesat: ${processedText.length} caractere`);
+          console.log('🔄 Conversie la DOCX...');
           docxBuffer = await convertTextToDocx(processedText);
+          console.log('✅ Conversie DOCX completă');
         } else {
-          throw new Error('Tip template nepermis');
+          console.error(`❌ Tip template nepermis: ${templatePath}`);
+          throw new Error(`Tip template nepermis: ${path.extname(templatePath)}`);
         }
+        
+        console.log(`✅ TEMPLATE REAL FOLOSIT: ${templateUsed}`);
+        
       } else {
-        console.log('Niciun template găsit, folosesc fallback cu template-ul reparat');
+        console.log('⚠️ findBestTemplate a returnat NULL - folosesc fallback');
         const fallbackTemplate = await createFallbackTemplate(placeholderData);
         docxBuffer = await convertTextToDocx(fallbackTemplate);
+        templateUsed = 'fallback-no-template-found';
+        console.log('✅ Fallback template folosit (nu s-a găsit template real)');
       }
     } catch (templateError) {
-      console.error('Eroare la procesarea template-ului:', templateError);
-      console.log('Folosesc template fallback cu structura reparată');
+      console.error('❌ EROARE LA PROCESAREA TEMPLATE-ULUI:', templateError);
+      console.error('📊 Detalii eroare:', {
+        message: templateError instanceof Error ? templateError.message : 'Eroare necunoscută',
+        stack: templateError instanceof Error ? templateError.stack : 'Nu există stack trace',
+        templateUsed: templateUsed
+      });
+      console.log('🔄 Folosesc template fallback din cauza erorii');
       
       const fallbackTemplate = await createFallbackTemplate(placeholderData);
       docxBuffer = await convertTextToDocx(fallbackTemplate);
-      templateUsed = 'fallback-error';
+      templateUsed = `fallback-error-${templateError instanceof Error ? templateError.message.substring(0, 20) : 'unknown'}`;
+      console.log(`✅ Fallback template folosit din cauza erorii: ${templateUsed}`);
     }
 
     // Salvare în BigQuery (păstrat ca înainte)
@@ -1291,3 +1326,8 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+  } catch (error) {
+    console.error('Eroare la generarea/actualizarea contractului cu FIX aplicat:', error);
+    return NextResponse.json({ 
+      error: 'Eroare la procesarea contractului',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
