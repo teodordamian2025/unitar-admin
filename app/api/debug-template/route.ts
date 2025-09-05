@@ -203,7 +203,27 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[DEBUG] Starting template debugging...');
     
-    const debugResults = {
+    const debugResults: {
+      timestamp: string;
+      template_loading: any;
+      placeholder_processing: any;
+      environment: {
+        cwd: string;
+        node_env: string | undefined;
+        platform: string;
+        uploads_dir?: {
+          exists: boolean;
+          contents?: string[];
+          error?: string;
+        };
+        contracte_dir?: {
+          exists: boolean;
+          contents?: string[];
+          error?: string;
+        };
+        error?: string;
+      };
+    } = {
       timestamp: new Date().toISOString(),
       template_loading: {},
       placeholder_processing: {},

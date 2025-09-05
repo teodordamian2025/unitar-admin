@@ -398,7 +398,7 @@ app/admin/rapoarte/proiecte/components/ContractModal.tsx
 app/admin/setari/contracte/page.tsx
 uploads/contracte/templates/contract-template.txt  = sablon contract cu placeholdere
 app/api/setari/contracte/templates/route.ts
-scripts/setup-contract-templates.js
+scripts/setup-contract-templates.js = sters, pentru ca incurca la folosirea template
 lib/templates-helpers.ts
 Tabel Bigquery Contracte
 
