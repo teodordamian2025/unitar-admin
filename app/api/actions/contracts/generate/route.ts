@@ -1326,8 +1326,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
-  } catch (error) {
-    console.error('Eroare la generarea/actualizarea contractului cu FIX aplicat:', error);
-    return NextResponse.json({ 
-      error: 'Eroare la procesarea contractului',
-      details: error instanceof Error ? error.message : 'Eroare necunoscută'
