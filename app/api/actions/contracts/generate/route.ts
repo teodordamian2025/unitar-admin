@@ -297,25 +297,86 @@ function processPlaceholders(text: string, data: any): string {
   const valutaClause = data.moneda_originala !== 'RON' ? ', plătiți în lei la cursul BNR din ziua facturării' : '';
   processed = processed.replace('{{valuta_clause}}', valutaClause);
   
-  // 3. TERMENE PERSONALIZATE - string pre-generat din date corecte
+  // 3. TERMENE PERSONALIZATE - string pre-generat din date corecte cu debugging
+  console.log('🔍 DEBUG TERMENE PERSONALIZATE - Start procesare');
+  console.log('📊 Data termene disponibilă:', {
+    has_termene: !!data.termene_personalizate,
+    is_array: Array.isArray(data.termene_personalizate),
+    length: data.termene_personalizate?.length || 0,
+    first_termen: data.termene_personalizate?.[0] || 'N/A'
+  });
+  
   let termeneText = '';
   if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
+    console.log('✅ Generez string termene din array-ul de termeni...');
+    
     termeneText = data.termene_personalizate.map((termen: any, index: number) => {
       const valoareTermen = termen.valoare || 0;
       const valoareRON = termen.valoare_ron || 0;
       const monedaTermen = termen.moneda || 'RON';
       const procentInformativ = termen.procent_calculat || 0;
       
-      return `**Etapa ${index + 1}**: ${procentInformativ.toFixed(1)}% (${valoareTermen.toFixed(2)} ${monedaTermen} = ${valoareRON.toFixed(2)} RON) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
+      const etapaString = `**Etapa ${index + 1}**: ${procentInformativ.toFixed(1)}% (${valoareTermen.toFixed(2)} ${monedaTermen} = ${valoareRON.toFixed(2)} RON) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
+      
+      console.log(`📋 Etapa ${index + 1} generată:`, etapaString.substring(0, 100) + '...');
+      return etapaString;
     }).join('\n\n');
+    
+    console.log('📝 String final termene generat:', {
+      length: termeneText.length,
+      preview: termeneText.substring(0, 200) + '...',
+      contains_etapa: termeneText.includes('Etapa'),
+      line_breaks: (termeneText.match(/\n/g) || []).length
+    });
   } else {
+    console.log('⚠️ Nu sunt termeni disponibili, folosesc fallback...');
     // Fallback cu valorile din data
     const valoareBaza = parseFloat(data.suma_totala_originala) || 0;
     const monedaBaza = data.moneda_originala || 'RON';
     const valoareRON = parseFloat(data.suma_totala_ron) || valoareBaza;
     termeneText = `**Etapa 1**: 100.0% (${valoareBaza.toFixed(2)} ${monedaBaza} = ${valoareRON.toFixed(2)} RON) - La predarea proiectului (termen: 60 zile)`;
+    
+    console.log('📝 Fallback termene generat:', termeneText);
   }
+  
+  // DEBUGGING SPECIFIC pentru placeholder
+  console.log('🔍 DEBUGGING PLACEHOLDER {{termene_personalizate}}');
+  console.log('📄 Verificare template conține placeholder:', processed.includes('{{termene_personalizate}}'));
+  console.log('📊 Lungime template înainte de înlocuire:', processed.length);
+  
+  const beforeReplace = processed;
   processed = processed.replace('{{termene_personalizate}}', termeneText);
+  
+  const wasReplaced = beforeReplace !== processed;
+  console.log('🔄 Înlocuire efectuată:', wasReplaced);
+  console.log('📊 Lungime template după înlocuire:', processed.length);
+  console.log('📝 Diferența de lungime:', processed.length - beforeReplace.length);
+  
+  if (wasReplaced) {
+    console.log('✅ PLACEHOLDER {{termene_personalizate}} ÎNLOCUIT CU SUCCES');
+  } else {
+    console.log('❌ PLACEHOLDER {{termene_personalizate}} NU S-A ÎNLOCUIT!');
+    console.log('🔍 Verificare posibile cauze:');
+    
+    // Caută variații ale placeholder-ului
+    const variations = [
+      '{{termene_personalizate}}',
+      '{{ termene_personalizate }}',
+      '{{termene_personalizate }}',
+      '{{ termene_personalizate}}',
+      '{{termene personalizate}}',
+      '{{termene_personalizate}}'
+    ];
+    
+    variations.forEach(variation => {
+      const found = processed.includes(variation);
+      console.log(`🔍 Variația "${variation}": ${found ? 'GĂSITĂ' : 'Nu există'}`);
+    });
+    
+    // Caută în jurul zonei unde ar trebui să fie
+    const searchArea = processed.substring(processed.indexOf('Plățile vor fi realizate') - 50, processed.indexOf('Plățile vor fi realizate') + 200);
+    console.log('📄 Zona din jurul "Plățile vor fi realizate":', searchArea);
+  }
   
   // 4. CLAUZE CONDIȚIONALE
   
