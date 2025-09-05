@@ -4,7 +4,7 @@
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între {{client.nume}}, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}} denumită în continuare **BENEFICIAR**
+1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
 
 Și
 
@@ -14,7 +14,7 @@
 
 Obiectul contractului îl reprezintă:
 
-Realizare {{proiect.denumire}}
+**{{proiect.denumire}}**
 
 {{proiect.descriere}}
 
@@ -35,35 +35,31 @@ Realizare {{proiect.denumire}}
 
 **Valoarea totală contract: {{suma_totala_ron}} RON + TVA**
 
-Plățile vor fi realizate în modul următor:
+2. Plățile vor fi realizate în modul următor:
 
 {{termene_personalizate}}
 
-2. Nerespectarea de către Beneficiar a termenelor de plată stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere, în cuantum de 0.1% din contravaloarea proiectului pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
+3. Nerespectarea de către Beneficiar a termenelor de plată stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere, în cuantum de 0.1% din contravaloarea proiectului pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
 
-3. Nerespectarea de către Prestator a termenelor de predare a documentațiilor stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere în cuantum de 0.1% din contravaloarea proiectului, pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
+4. Nerespectarea de către Prestator a termenelor de predare a documentațiilor stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere în cuantum de 0.1% din contravaloarea proiectului, pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
 
 **CAP.V. OBLIGAȚIILE PĂRȚILOR**
 
-I. Obligațiile prestatorului:
+**I. Obligațiile prestatorului:**
 
 A). Va executa întocmai și la termen lucrările solicitate de către Beneficiar.
 
 B). Va păstra confidențialitatea datelor.
 
-C). Va executa lucrările la care s-a angajat prin semnarea prezentului contract cu maxima responsabilitate;
+C). Va executa lucrările la care s-a angajat prin semnarea prezentului contract cu maxima responsabilitate.
 
 D). Va realiza modificările necesare, în cazul în care i se solicită acest lucru.
 
-{{responsabil_clause}}
+**II. Obligațiile Beneficiarului:**
 
-II. Obligațiile Beneficiarului:
+A). Va pune la dispoziția prestatorului datele de temă necesare și alte informații necesare pentru realizarea proiectului.
 
-A). Va pune la dispoziția prestatorului datele de temă necesare și alte informații necesare pentru realizarea proiectului;
-
-B). Va respecta termenele de plată stabilite prin prezentul contract;
-
-{{contact_clause}}
+B). Va respecta termenele de plată stabilite prin prezentul contract.
 
 **CAP. VI. ÎNCETAREA CONTRACTULUI**
 
@@ -95,7 +91,7 @@ B). Va respecta termenele de plată stabilite prin prezentul contract;
 
 1. În accepțiunea părților contractante, orice notificare adresată de una dintre acestea celeilalte este valabil îndeplinită dacă va fi transmisă prin e-mail.
 
-2. In cazul în care notificarea se face pe cale poștală, ea va fi transmisă, prin scrisoare recomandată, cu confirmare de primire și se consideră primită de destinatar la data menționată de oficiul poștal primitor pe această confirmare.
+2. În cazul în care notificarea se face pe cale poștală, ea va fi transmisă, prin scrisoare recomandată, cu confirmare de primire și se consideră primită de destinatar la data menționată de oficiul poștal primitor pe această confirmare.
 
 3. Dacă notificarea se trimite prin fax sau e-mail, ea se consideră primită în prima zi lucrătoare după cea în care a fost expediată.
 
@@ -123,8 +119,9 @@ B). Va respecta termenele de plată stabilite prin prezentul contract;
 
 **SEMNAT ÎN DATA: {{contract.data}}**
 
-| BENEFICIAR | PRESTATOR |
-|------------|-----------|
+| **BENEFICIAR** | **PRESTATOR** |
+|----------------|---------------|
 | **{{client.nume}}** | **S.C. UNITAR PROIECT TDA S.R.L.** |
 | {{client.reprezentant}} | **DAMIAN TEODOR** |
+| | Administrator |
 | ................................. | ................................. |
