@@ -519,7 +519,6 @@ function prepareSimpleTemplateData(
     termene_personalizate: termene,
     
     suma_totala_originala: sumaOriginalaCalculata.toFixed(2),
-    suma_totala_ron: sumaRONCalculata.toFixed(2),
     moneda_originala: monedaContract,
     
     observatii: observatii || '',

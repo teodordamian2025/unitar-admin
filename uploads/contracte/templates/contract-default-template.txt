@@ -31,8 +31,6 @@ Obiectul contractului îl reprezintă:
 
 1. Prețul pe care Beneficiarul îl datorează prestatorului pentru serviciile sale este de **{{suma_totala_originala}} {{moneda_originala}}** la care se aplică suplimentar TVA{{valuta_clause}}.
 
-**Valoarea totală contract: {{suma_totala_ron}} RON + TVA**
-
 2. Plățile vor fi realizate în modul următor:
 
 {{termene_personalizate}}
