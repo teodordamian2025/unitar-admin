@@ -4,19 +4,17 @@
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare ** BENEFICIAR**
+1. Între ** ** **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare ** ** **BENEFICIAR**
 
 Și
 
-2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare ** PRESTATOR**.
+2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare ** ** **PRESTATOR**.
 
 **CAP. II. OBIECTUL CONTRACTULUI**
 
 Obiectul contractului îl reprezintă:
 
 **{{proiect.denumire}}**
-
-{{proiect.descriere}}
 
 {{proiect.adresa}}
 
@@ -38,6 +36,14 @@ Obiectul contractului îl reprezintă:
 2. Plățile vor fi realizate în modul următor:
 
 {{termene_personalizate}}
+
+Notă:
+a) Pentru cazul în care **Beneficiarul** nu este Beneficiarul final:
+**Beneficiarul** se obligă să achite in termen de 180 zile 50% din valoarea totală, de la data
+semnării contractului;
+• diferența de 50% se va achita la maxim 30 de zile de la data incasării respectivelor servicii de la beneficiarul final (când este cazul).
+• Daca se incaseaza de la beneficiarul final in termen de 180 zile,sau mai devreme, valoarea totală se va achita integral in termen de 30 de zile de la data incasarii respectivelor servicii de la beneficiarul final (când este cazul).
+b) Pentru cazul în care **Beneficiarul** este Beneficiarul final, plățile vor trebui realizate în termenul facturilor emise.
 
 3. Nerespectarea de către Beneficiar a termenelor de plată stabilite potrivit contractului și anexelor acestuia, poate atrage obligarea acestuia la plata de penalități de întârziere, în cuantum de 0.1% din contravaloarea proiectului pentru fiecare zi de întârziere, cuantumul penalităților putând depăși valoarea sumelor asupra cărora sunt calculate.
 
