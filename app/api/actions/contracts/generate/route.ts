@@ -1012,3 +1012,7 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+  } catch (error) {
+    console.error('Eroare la generarea/actualizarea contractului:', error);
+    return NextResponse.json(
