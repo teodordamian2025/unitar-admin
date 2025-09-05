@@ -4,11 +4,11 @@
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
+1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare ** BENEFICIAR**
 
 Și
 
-2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare **PRESTATOR**.
+2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare ** PRESTATOR**.
 
 **CAP. II. OBIECTUL CONTRACTULUI**
 
@@ -119,9 +119,18 @@ B). Va respecta termenele de plată stabilite prin prezentul contract.
 
 **SEMNAT ÎN DATA: {{contract.data}}**
 
-| **BENEFICIAR** | **PRESTATOR** |
-|----------------|---------------|
-| **{{client.nume}}** | **S.C. UNITAR PROIECT TDA S.R.L.** |
-| {{client.reprezentant}} | **DAMIAN TEODOR** |
-| | Administrator |
-| ................................. | ................................. |
+**BENEFICIAR:**
+
+**{{client.nume}}**
+{{client.reprezentant}}
+
+.................................
+
+
+**PRESTATOR:**
+
+**S.C. UNITAR PROIECT TDA S.R.L.**
+**DAMIAN TEODOR**
+Administrator
+
+.................................
