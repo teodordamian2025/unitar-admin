@@ -17,7 +17,15 @@ async function debugFindBestTemplate(tipDocument: string = 'contract') {
   console.log('[DEBUG] Templates dir:', TEMPLATES_DIR);
   console.log('[DEBUG] Tip document:', tipDocument);
   
-  const debugInfo = {
+  const debugInfo: {
+    templates_dir: string;
+    tip_document: string;
+    dir_exists: boolean;
+    dir_contents: string[];
+    template_files: string[];
+    selected_template: any;
+    errors: string[];
+  } = {
     templates_dir: TEMPLATES_DIR,
     tip_document: tipDocument,
     dir_exists: false,
