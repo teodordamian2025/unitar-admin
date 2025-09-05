@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts  
-// DATA: 05.09.2025 11:30 (ora României)
-// FIX COMPLET: Template processing reparat + extragere BigQuery simplificată
+// DATA: 05.09.2025 21:45 (ora României)
+// FIX COMPLET: Convertor reparat + calculul sumei + template processing
 // PĂSTRATE: Toate funcționalitățile + logica de calcule + numerotare contracte
 // ==================================================================
 
@@ -33,7 +33,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// FIX PRINCIPAL: Helper simplu pentru conversie valori BigQuery
+// FIX PRINCIPAL 1: Helper corect pentru conversie valori BigQuery (inspirat din test)
 const extractSimpleValue = (value: any): any => {
   if (value === null || value === undefined) return null;
   
@@ -42,8 +42,27 @@ const extractSimpleValue = (value: any): any => {
     return extractSimpleValue(value.value);
   }
   
-  // Pentru numere și string-uri
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  // Pentru string-uri - PĂSTREAZĂ ca string dacă nu e pure numeric
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return null;
+    
+    // FIX CRITIC: Nu converti la număr dacă string-ul conține caractere non-numerice
+    if (/^-?\d+\.?\d*$/.test(trimmed)) {
+      const numericValue = parseFloat(trimmed);
+      if (!isNaN(numericValue)) {
+        console.log(`[FIX] Pure numeric string converted: "${trimmed}" → ${numericValue}`);
+        return numericValue;
+      }
+    }
+    
+    // Returnează string-ul original pentru ID-uri, nume etc.
+    console.log(`[FIX] String preserved: "${trimmed}"`);
+    return trimmed;
+  }
+  
+  // Pentru numere și boolean-uri
+  if (typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
   
@@ -52,20 +71,54 @@ const extractSimpleValue = (value: any): any => {
     return value.toISOString().split('T')[0];
   }
   
-  // Pentru alte tipuri, încearcă să convertească la string
+  // Pentru obiectele Big din BigQuery (cei cu proprietatea 'c')
+  if (typeof value === 'object' && value !== null && 'c' in value && Array.isArray(value.c)) {
+    console.log(`[FIX] BigQuery Big object detected:`, value);
+    
+    try {
+      const stringValue = value.toString();
+      console.log(`[FIX] Big object toString(): "${stringValue}"`);
+      
+      const numericValue = parseFloat(stringValue);
+      if (!isNaN(numericValue)) {
+        console.log(`[FIX] Big object converted to: ${numericValue}`);
+        return numericValue;
+      }
+    } catch (error) {
+      console.error(`[FIX] Error converting Big object:`, error);
+      return 0;
+    }
+  }
+  
+  // Pentru BigInt
+  if (typeof value === 'bigint') {
+    const result = Number(value);
+    console.log(`[FIX] BigInt converted: ${value} → ${result}`);
+    return result;
+  }
+  
+  // Pentru alte tipuri, încearcă să convertești la string
   return String(value);
 };
 
-// Conversie sigură pentru numere
+// Conversie sigură pentru numere (folosește extractSimpleValue)
 const extractNumericValue = (value: any): number => {
   const simple = extractSimpleValue(value);
   if (simple === null || simple === undefined) return 0;
   
-  const parsed = parseFloat(String(simple));
-  return isNaN(parsed) ? 0 : parsed;
+  // Dacă e deja număr, returnează-l
+  if (typeof simple === 'number') return simple;
+  
+  // Dacă e string, încearcă conversie
+  if (typeof simple === 'string') {
+    const parsed = parseFloat(simple);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  
+  return 0;
 };
 
-// Helper pentru conversie BigQuery NUMERIC (păstrat pentru compatibilitate)
+// Helper pentru conversie BigQuery NUMERIC (folosește noul convertor)
 const convertBigQueryNumeric = (value: any): number => {
   return extractNumericValue(value);
 };
@@ -147,7 +200,7 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
-// FIX PRINCIPAL: Procesarea placeholder-urilor simplificată și funcțională
+// FIX PRINCIPAL 2: Procesarea placeholder-urilor reparată și funcțională
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
   
@@ -168,7 +221,7 @@ function processPlaceholders(text: string, data: any): string {
     '{{contract.numar}}': data.contract?.numar || 'Contract-NR-TBD',
     '{{contract.data}}': data.contract?.data || new Date().toLocaleDateString('ro-RO'),
     
-    // Client info - exact din structura BigQuery
+    // Client info - cu fallback la date minime
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -207,7 +260,7 @@ function processPlaceholders(text: string, data: any): string {
     processed = processed.replace(regex, value);
     
     if (beforeCount > 0) {
-      console.log(`🔄 REPLACED: ${placeholder} -> "${value}" (${beforeCount} occurrences)`);
+      console.log(`🔄 REPLACED: ${placeholder} → "${value}" (${beforeCount} occurrences)`);
     }
   }
   
@@ -296,72 +349,67 @@ function processPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// FIX CRITIC: Procesarea placeholder-urilor fragmentate în XML DOCX
+// FIX CRITIC 3: Procesarea placeholder-urilor fragmentate în XML DOCX - REPARATĂ
 function processPlaceholdersInXml(xml: string, data: any): string {
   console.log('🔧 PROCESARE XML DOCX - început');
   
-  // 1. DEFRAGMENTARE PLACEHOLDER-URI
-  // Microsoft Word fragmentează adesea placeholder-urile între multiple tag-uri <w:t>
+  // 1. DEFRAGMENTARE PLACEHOLDER-URI îmbunătățită
   let defragmentedXml = xml;
   
-  // Regex pentru găsirea și defragmentarea placeholder-urilor fragmentate
-  const fragmentPattern = /(<w:t[^>]*>)(.*?)(<\/w:t>(?:\s*<w:[^>]*>)*\s*<w:t[^>]*>)(.*?)(<\/w:t>)/g;
-  
-  defragmentedXml = defragmentedXml.replace(fragmentPattern, (match, openTag1, content1, middlePart, content2, closeTag2) => {
-    const combinedContent = content1 + content2;
+  // Regex pentru găsirea și defragmentarea placeholder-urilor fragmentate pe 2-5 tag-uri
+  for (let pass = 0; pass < 3; pass++) {
+    console.log(`[XML] Defragmentation pass ${pass + 1}`);
     
-    // Verifică dacă conținutul combinat formează un placeholder valid
-    if (combinedContent.includes('{{') && combinedContent.includes('}}')) {
-      console.log('🔧 Defragmentare placeholder găsit:', combinedContent);
-      return `${openTag1}${combinedContent}${closeTag2}`;
-    }
+    // Pattern pentru găsirea secvențelor de tag-uri <w:t> consecutive
+    const consecutiveTagsPattern = /(<w:t[^>]*>)(.*?)(<\/w:t>)(\s*<w:[^>]*>)*(\s*<w:t[^>]*>)(.*?)(<\/w:t>)/g;
     
-    return match; // Returnează originalul dacă nu e placeholder
-  });
-  
-  // 2. DEFRAGMENTARE AVANSATĂ pentru placeholder-uri pe mai multe tag-uri
-  const multiTagPattern = /(<w:t[^>]*>.*?<\/w:t>)/g;
-  const tags = defragmentedXml.match(multiTagPattern) || [];
-  
-  for (let i = 0; i < tags.length - 2; i++) {
-    const currentTag = tags[i];
-    const nextTag = tags[i + 1];
-    const thirdTag = tags[i + 2];
-    
-    // Extrage conținutul din tag-uri
-    const content1 = currentTag.replace(/<w:t[^>]*>(.*?)<\/w:t>/, '$1');
-    const content2 = nextTag.replace(/<w:t[^>]*>(.*?)<\/w:t>/, '$1');
-    const content3 = thirdTag ? thirdTag.replace(/<w:t[^>]*>(.*?)<\/w:t>/, '$1') : '';
-    
-    const combinedContent = content1 + content2 + content3;
-    
-    // Verifică dacă formează un placeholder complet
-    if (combinedContent.match(/\{\{[\w\.\_\-]+\}\}/)) {
-      console.log('🔧 Multi-tag placeholder găsit:', combinedContent);
+    defragmentedXml = defragmentedXml.replace(consecutiveTagsPattern, (match, openTag1, content1, closeTag1, middlePart, openTag2, content2, closeTag2) => {
+      const combinedContent = content1 + content2;
       
-      // Înlocuiește cele 3 tag-uri cu unul singur care conține placeholder-ul complet
-      const openTag = currentTag.match(/<w:t[^>]*>/)?.[0] || '<w:t>';
-      const closeTag = '</w:t>';
-      const newTag = `${openTag}${combinedContent}${closeTag}`;
+      // Verifică dacă conținutul combinat formează un placeholder valid sau parțial
+      if (combinedContent.includes('{{') || combinedContent.includes('}}') || 
+          (content1.includes('{') && content2.includes('}'))) {
+        console.log(`[XML] Defragmented: "${content1}" + "${content2}" → "${combinedContent}"`);
+        return `${openTag1}${combinedContent}${closeTag2}`;
+      }
       
-      defragmentedXml = defragmentedXml.replace(currentTag + nextTag + (thirdTag || ''), newTag);
-    }
+      return match; // Returnează originalul dacă nu e placeholder
+    });
   }
+  
+  // 2. PATTERN PENTRU PLACEHOLDER-URI COMPLETE ȘI PARȚIALE
+  const placeholderPatterns = [
+    // Placeholder-uri complete: {{ceva.altceva}}
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*\.?[a-zA-Z0-9_]*)\}\}/g,
+    // Placeholder-uri parțiale: {{ceva (fără închidere)
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*\.?[a-zA-Z0-9_]*)/g,
+    // Închideri parțiale: altceva}}
+    /([a-zA-Z_][a-zA-Z0-9_]*\.?[a-zA-Z0-9_]*)\}\}/g
+  ];
   
   // 3. PROCESARE NORMALĂ cu placeholder-uri defragmentate
   const processedXml = defragmentedXml.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, (match, content) => {
-    // Verifică dacă conținutul e un placeholder
-    if (content.includes('{{') && content.includes('}}')) {
-      console.log('🔄 Procesare placeholder în XML:', content);
-      
-      // Aplică procesarea placeholder-urilor
-      const processed = processPlaceholders(content, data);
-      
-      // Returnează tag-ul cu conținutul procesat
-      return match.replace(content, processed);
-    }
+    // Verifică dacă conținutul conține placeholder-uri
+    let processedContent = content;
     
-    return match; // Returnează originalul dacă nu e placeholder
+    // Aplică toate pattern-urile de placeholder-uri
+    placeholderPatterns.forEach(pattern => {
+      if (pattern.test(processedContent)) {
+        console.log(`[XML] Processing placeholder pattern in: "${processedContent}"`);
+        
+        // Aplică procesarea placeholder-urilor
+        const tempProcessed = processPlaceholders(processedContent, data);
+        
+        // Doar dacă s-a schimbat ceva, înlocuiește
+        if (tempProcessed !== processedContent) {
+          console.log(`[XML] Placeholder processed: "${processedContent}" → "${tempProcessed}"`);
+          processedContent = tempProcessed;
+        }
+      }
+    });
+    
+    // Returnează tag-ul cu conținutul procesat
+    return match.replace(content, processedContent);
   });
   
   console.log('✅ PROCESARE XML DOCX - terminată cu succes');
@@ -369,7 +417,7 @@ function processPlaceholdersInXml(xml: string, data: any): string {
   return processedXml;
 }
 
-// FIX PRINCIPAL: EXTRAGERE PROIECT SIMPLIFICATĂ - fără JOIN complicat
+// FIX PRINCIPAL 4: EXTRAGERE PROIECT SIMPLIFICATĂ cu convertorul reparat
 async function loadProiectDataSimple(proiectId: string) {
   console.log(`📥 EXTRAGERE SIMPLĂ pentru proiect: ${proiectId}`);
   
@@ -439,7 +487,7 @@ async function loadProiectDataSimple(proiectId: string) {
     
     console.log(`📂 SUBPROIECTE GĂSITE: ${subproiecteRows.length}`);
     
-    // 4. PROCESARE SIMPLĂ - direct din valori
+    // 4. PROCESARE CU CONVERTORUL REPARAT
     const proiectProcessed = {
       ID_Proiect: extractSimpleValue(proiectRaw.ID_Proiect),
       Denumire: extractSimpleValue(proiectRaw.Denumire),
@@ -497,7 +545,7 @@ async function loadProiectDataSimple(proiectId: string) {
   }
 }
 
-// PREGĂTIRE DATE PENTRU TEMPLATE - versiune simplificată
+// FIX PRINCIPAL 5: PREGĂTIRE DATE PENTRU TEMPLATE cu calculul sumei reparat
 function prepareSimpleTemplateData(
   proiect: any, 
   subproiecte: any[], 
@@ -505,19 +553,46 @@ function prepareSimpleTemplateData(
   termene: any[],
   observatii?: string
 ) {
-  console.log('🛠️ PREGĂTIRE DATE TEMPLATE - versiunea simplificată');
+  console.log('🛠️ PREGĂTIRE DATE TEMPLATE - versiunea reparată');
   
-  // Calculare sume direct din termene
+  // FIX CRITIC: Calculare sume CORECTE din termene
   let sumaOriginalaCalculata = 0;
   let sumaRONCalculata = 0;
-  const monedaPrimaTermen = termene.length > 0 ? termene[0].moneda : proiect.moneda;
+  let monedaContract = proiect.moneda || 'RON'; // MONEDA CONTRACTULUI = MONEDA PROIECTULUI
   
   if (termene.length > 0) {
-    sumaOriginalaCalculata = termene.reduce((sum, t) => sum + (t.valoare || 0), 0);
+    console.log('📋 Calculez suma din toți termenii contractului...');
+    
+    // Calculez totalul în RON din toți termenii
     sumaRONCalculata = termene.reduce((sum, t) => sum + (t.valoare_ron || 0), 0);
+    
+    // FIX PRINCIPAL: Convertesc totalul RON la moneda proiectului
+    if (monedaContract === 'RON') {
+      sumaOriginalaCalculata = sumaRONCalculata;
+    } else {
+      // Pentru proiecte în valută străină, convertesc totalul la acea valută
+      const cursProiect = proiect.curs_valutar || CURSURI_VALUTAR[monedaContract] || 1;
+      sumaOriginalaCalculata = sumaRONCalculata / cursProiect;
+      
+      console.log(`🔄 Conversie totală: ${sumaRONCalculata} RON / ${cursProiect} = ${sumaOriginalaCalculata.toFixed(2)} ${monedaContract}`);
+    }
+    
+    console.log('📊 Calculul CORECT din termeni:', {
+      termeni_count: termene.length,
+      suma_ron_din_termeni: sumaRONCalculata,
+      moneda_contract: monedaContract,
+      suma_in_moneda_contract: sumaOriginalaCalculata
+    });
+    
   } else {
+    // Fallback: dacă nu sunt termeni setați, folosește valoarea proiectului
+    console.log('⚠️ Nu sunt termeni setați, folosesc valoarea proiectului ca fallback');
+    
     sumaOriginalaCalculata = proiect.Valoare_Estimata || 0;
-    sumaRONCalculata = proiect.valoare_ron || proiect.Valoare_Estimata || 0;
+    sumaRONCalculata = proiect.valoare_ron || sumaOriginalaCalculata;
+    monedaContract = proiect.moneda || 'RON';
+    
+    console.log(`📋 Fallback - suma: ${sumaOriginalaCalculata} ${monedaContract} = ${sumaRONCalculata} RON`);
   }
   
   const dataContract = new Date().toLocaleDateString('ro-RO');
@@ -577,17 +652,17 @@ function prepareSimpleTemplateData(
     // Termene
     termene_personalizate: termene,
     
-    // Sume finale
+    // FIX PRINCIPAL: Sume finale CORECTE
     suma_totala_originala: sumaOriginalaCalculata.toFixed(2),
     suma_totala_ron: sumaRONCalculata.toFixed(2),
-    moneda_originala: monedaPrimaTermen || proiect.moneda || 'RON',
+    moneda_originala: monedaContract,
     
     // Observații
     observatii: observatii || '',
     data_generare: new Date().toISOString()
   };
   
-  console.log('✅ DATE TEMPLATE PREGĂTITE:', {
+  console.log('✅ DATE TEMPLATE PREGĂTITE CORECT:', {
     client: templateData.client.nume,
     suma_originala: templateData.suma_totala_originala,
     moneda: templateData.moneda_originala,
@@ -598,7 +673,7 @@ function prepareSimpleTemplateData(
   return templateData;
 }
 
-// Calculare suma contract cu valorile estimate (păstrat din logica existentă)
+// Calculare suma contract cu valorile estimate (păstrat din logica existentă, dar folosește convertorul reparat)
 function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[], termenePersonalizate: any[]) {
   console.log('💰 CALCUL SUMA CONTRACT - versiunea finală corectă (multi-valută):', {
     proiect_id: proiect.ID_Proiect,
@@ -655,7 +730,7 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     } else {
       // Pentru proiecte în valută străină, convertesc totalul la acea valută
       const cursProiect = cursuriUtilizate[monedaOriginala] || 
-                         convertBigQueryNumeric(proiect.curs_valutar) || 
+                         proiect.curs_valutar || 
                          CURSURI_VALUTAR[monedaOriginala] || 1;
       
       sumaOriginala = totalRONDinTermeni / cursProiect;
@@ -680,19 +755,19 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     // Fallback: dacă nu sunt termeni setați, folosește valoarea proiectului
     console.log('⚠️ Nu sunt termeni setați, folosesc valoarea proiectului ca fallback');
     
-    sumaOriginala = convertBigQueryNumeric(proiect.Valoare_Estimata) || 0;
-    sumaFinalaRON = convertBigQueryNumeric(proiect.valoare_ron) || sumaOriginala;
+    sumaOriginala = proiect.Valoare_Estimata || 0;
+    sumaFinalaRON = proiect.valoare_ron || sumaOriginala;
     monedaOriginala = proiect.moneda || 'RON';
     
     if (proiect.moneda && proiect.moneda !== 'RON') {
-      cursuriUtilizate[proiect.moneda] = convertBigQueryNumeric(proiect.curs_valutar) || CURSURI_VALUTAR[proiect.moneda] || 1;
+      cursuriUtilizate[proiect.moneda] = proiect.curs_valutar || CURSURI_VALUTAR[proiect.moneda] || 1;
     }
     
     console.log(`📋 Fallback - suma: ${sumaOriginala} ${monedaOriginala} = ${sumaFinalaRON} RON`);
   }
 
   // Verificare finală cu proiectul
-  const valoareProiectRON = convertBigQueryNumeric(proiect.valoare_ron) || 0;
+  const valoareProiectRON = proiect.valoare_ron || 0;
   const diferentaFataDeProiect = Math.abs(sumaFinalaRON - valoareProiectRON);
   const procentDiferenta = valoareProiectRON > 0 ? (diferentaFataDeProiect / valoareProiectRON) * 100 : 0;
   
@@ -1045,7 +1120,7 @@ async function salveazaContractCuDateCorecte(contractInfo: any): Promise<string>
     return contractId;
     
   } catch (error) {
-    console.error('⌐ Eroare la salvarea contractului în BigQuery:', error);
+    console.error('❌ Eroare la salvarea contractului în BigQuery:', error);
     console.error('Detalii parametri:', {
       contractId,
       proiectId: contractInfo.proiectId,
@@ -1078,12 +1153,12 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`${isEdit ? 'Actualizare' : 'Generare'} contract pentru proiect: ${proiectId}`);
-    console.log('FIX APLICAT: Folosim extragerea simplificată și template-ul reparat');
+    console.log('FIX APLICAT: Folosim convertorul reparat și calculul sumei corect');
 
-    // ✅ FOLOSEȘTE EXTRAGEREA SIMPLIFICATĂ în loc de query-ul complex
+    // ✅ FOLOSEȘTE EXTRAGEREA SIMPLIFICATĂ cu convertorul reparat
     const { proiect, subproiecte } = await loadProiectDataSimple(proiectId);
 
-    // ✅ CALCULARE SUME cu logica existentă (păstrată)
+    // ✅ CALCULARE SUME cu logica reparată
     const { sumaFinala, monedaFinala, cursuriUtilizate, sumaOriginala, monedaOriginala } = 
       calculeazaSumaContractCuValoriEstimate(proiect, subproiecte, termenePersonalizate);
 
@@ -1131,7 +1206,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ FOLOSEȘTE PREGĂTIREA SIMPLIFICATĂ A DATELOR
+    // ✅ FOLOSEȘTE PREGĂTIREA REPARATĂ A DATELOR
     const placeholderData = prepareSimpleTemplateData(
       proiect, 
       subproiecte, 
@@ -1204,7 +1279,7 @@ export async function POST(request: NextRequest) {
         'X-Contract-Number': contractData.numar_contract,
         'X-Template-Used': templateUsed,
         'X-Action': isEdit ? 'updated' : 'generated',
-        'X-Fix-Applied': 'simplified-processing-v1.0'
+        'X-Fix-Applied': 'complete-converter-and-calculation-fix-v2.0'
       }
     });
 
