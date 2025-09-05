@@ -887,16 +887,33 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
 function convertTextToWordXml(text: string): string {
   const paragraphs = text.split('\n').map(line => {
     if (line.trim() === '') {
-      return '<w:p/>';
+      return '<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
     }
     
-    if (line.includes('**') && line.includes('**')) {
-      const boldText = line.replace(/\*\*(.*?)\*\*/g, '<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>$1</w:t></w:r>');
-      return `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${boldText}</w:p>`;
+    // Procesare specială pentru linii cu **text**
+    if (line.includes('**')) {
+      let processedLine = line;
+      
+      // Înlocuiește **text** cu formatare bold XML
+      processedLine = processedLine.replace(/\*\*(.*?)\*\*/g, '<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t>$1</w:t></w:r>');
+      
+      // Text normal între bold-uri
+      const parts = processedLine.split(/(<w:r><w:rPr><w:b\/><w:sz w:val="24"\/><\/w:rPr><w:t>.*?<\/w:t><\/w:r>)/);
+      
+      const xmlParts = parts.map(part => {
+        if (part.startsWith('<w:r>')) {
+          return part; // Deja formatat
+        } else if (part.trim()) {
+          return `<w:r><w:t>${part}</w:t></w:r>`;
+        }
+        return '';
+      }).filter(p => p);
+      
+      return `<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr>${xmlParts.join('')}</w:p>`;
     }
     
-    const cleanText = line.replace(/\*\*(.*?)\*\*/g, '<w:r><w:rPr><w:b/></w:rPr><w:t>$1</w:t></w:r>');
-    return `<w:p><w:r><w:t>${cleanText}</w:t></w:r></w:p>`;
+    // Pentru linii normale
+    return `<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t>${line}</w:t></w:r></w:p>`;
   }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
