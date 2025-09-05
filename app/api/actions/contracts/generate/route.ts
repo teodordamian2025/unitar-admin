@@ -297,47 +297,30 @@ function processPlaceholders(text: string, data: any): string {
   const valutaClause = data.moneda_originala !== 'RON' ? ', plătiți în lei la cursul BNR din ziua facturării' : '';
   processed = processed.replace('{{valuta_clause}}', valutaClause);
   
-  // 3. TERMENE PERSONALIZATE - string pre-generat din date corecte cu debugging
-  console.log('🔍 DEBUG TERMENE PERSONALIZATE - Start procesare');
-  console.log('📊 Data termene disponibilă:', {
-    has_termene: !!data.termene_personalizate,
-    is_array: Array.isArray(data.termene_personalizate),
-    length: data.termene_personalizate?.length || 0,
-    first_termen: data.termene_personalizate?.[0] || 'N/A'
-  });
-  
-  let termeneText = '';
-  if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
-    console.log('✅ Generez string termene din array-ul de termeni...');
-    
-    termeneText = data.termene_personalizate.map((termen: any, index: number) => {
-      const valoareTermen = termen.valoare || 0;
-      const valoareRON = termen.valoare_ron || 0;
-      const monedaTermen = termen.moneda || 'RON';
-      const procentInformativ = termen.procent_calculat || 0;
-      
-      const etapaString = `**Etapa ${index + 1}**: ${procentInformativ.toFixed(1)}% (${valoareTermen.toFixed(2)} ${monedaTermen} = ${valoareRON.toFixed(2)} RON) - ${termen.denumire} (termen: ${termen.termen_zile} zile)`;
-      
-      console.log(`📋 Etapa ${index + 1} generată:`, etapaString.substring(0, 100) + '...');
-      return etapaString;
-    }).join('\n\n');
-    
-    console.log('📝 String final termene generat:', {
-      length: termeneText.length,
-      preview: termeneText.substring(0, 200) + '...',
-      contains_etapa: termeneText.includes('Etapa'),
-      line_breaks: (termeneText.match(/\n/g) || []).length
-    });
-  } else {
-    console.log('⚠️ Nu sunt termeni disponibili, folosesc fallback...');
-    // Fallback cu valorile din data
-    const valoareBaza = parseFloat(data.suma_totala_originala) || 0;
-    const monedaBaza = data.moneda_originala || 'RON';
-    const valoareRON = parseFloat(data.suma_totala_ron) || valoareBaza;
-    termeneText = `**Etapa 1**: 100.0% (${valoareBaza.toFixed(2)} ${monedaBaza} = ${valoareRON.toFixed(2)} RON) - La predarea proiectului (termen: 60 zile)`;
-    
-    console.log('📝 Fallback termene generat:', termeneText);
-  }
+// 3. TERMENE PERSONALIZATE - FIX DIRECT FĂRĂ DEBUGGING COMPLEX
+	console.log('🔥 START TERMENE DIRECT FIX');
+	console.log('📊 Termene array:', termenePersonalizate?.length || 0);
+
+	let termeneText = '';
+	if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
+	  console.log('✅ Array termene valid, generez string...');
+	  
+	  termeneText = data.termene_personalizate.map((termen, index) => {
+	    const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'} = ${(termen.valoare_ron || 0).toFixed(2)} RON) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
+	    console.log(`📋 Generat etapa ${index + 1}:`, etapaString);
+	    return etapaString;
+	  }).join('\n\n');
+	  
+	  console.log('🔥 TERMENE TEXT FINAL:', termeneText.length, 'caractere');
+	} else {
+	  console.log('⚠️ Nu sunt termeni - folosesc fallback');
+	  termeneText = `**Etapa 1**: 100.0% (${data.suma_totala_originala || '0.00'} ${data.moneda_originala || 'RON'} = ${data.suma_totala_ron || '0.00'} RON) - La predarea proiectului (termen: 60 zile)`;
+	}
+
+	// ÎNLOCUIRE DIRECTĂ FĂRĂ VERIFICĂRI COMPLEXE
+	processed = processed.replace('{{termene_personalizate}}', termeneText);
+	console.log('🔥 ÎNLOCUIT {{termene_personalizate}} cu:', termeneText.substring(0, 100) + '...');
+
   
   // DEBUGGING SPECIFIC pentru placeholder
   console.log('🔍 DEBUGGING PLACEHOLDER {{termene_personalizate}}');
