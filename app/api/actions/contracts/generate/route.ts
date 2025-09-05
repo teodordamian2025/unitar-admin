@@ -186,11 +186,11 @@ function processPlaceholders(text: string, data: any): string {
   let termeneText = '';
   if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
     termeneText = data.termene_personalizate.map((termen: any, index: number) => {
-      const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'} = ${(termen.valoare_ron || 0).toFixed(2)} RON) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
+      const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'}) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
       return etapaString;
     }).join('\n\n');
   } else {
-    termeneText = `**Etapa 1**: 100.0% (${data.suma_totala_originala || '0.00'} ${data.moneda_originala || 'RON'} = ${data.suma_totala_ron || '0.00'} RON) - La predarea proiectului (termen: 60 zile)`;
+    termeneText = `**Etapa 1**: 100.0% (${data.suma_totala_originala || '0.00'} ${data.moneda_originala || 'RON'}) - La predarea proiectului (termen: 60 zile)`;
   }
 
   processed = processed.replace('{{termene_personalizate}}', termeneText);
