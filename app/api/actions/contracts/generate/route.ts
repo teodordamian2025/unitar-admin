@@ -748,7 +748,7 @@ Administrator
   return processPlaceholders(templateContent, data);
 }
 
-// FUNCȚIE NOUĂ: Salvare contract cu EtapeContract
+// FUNCȚIE MODIFICATĂ: Salvare contract cu logică inteligentă de merge pentru EtapeContract
 async function salveazaContractCuEtapeContract(contractInfo: any): Promise<string> {
   const contractId = contractInfo.isEdit && contractInfo.contractExistentId 
     ? contractInfo.contractExistentId 
@@ -772,8 +772,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       formatDateForBigQuery(new Date().toISOString().split('T')[0]) : 
       null;
 
+    // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      // MODIFICAT: Update fără câmpul etape JSON
       const updateQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         SET 
@@ -828,7 +828,6 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       });
       
     } else {
-      // MODIFICAT: Insert fără câmpul etape JSON
       const insertQuery = `
         INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
@@ -905,44 +904,233 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       });
     }
 
-    // NOUĂ FUNCȚIONALITATE: Salvare etape în EtapeContract prin API
+    // 2. LOGICĂ INTELIGENTĂ DE MERGE PENTRU ETAPECONTRACT
     if (contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0) {
-      console.log(`[CONTRACT-GENERATE] Salvez ${contractInfo.termenePersonalizate.length} etape în EtapeContract pentru contractul ${contractId}`);
+      console.log(`[CONTRACT-GENERATE] Începe merge inteligent pentru ${contractInfo.termenePersonalizate.length} etape în contractul ${contractId}`);
       
-      // Apelează API-ul pentru salvarea etapelor
-      const etapeResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/rapoarte/etape-contract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contract_id: contractId,
-          etape: contractInfo.termenePersonalizate.map((termen: any, index: number) => ({
-            denumire: termen.denumire,
-            valoare: termen.valoare,
-            moneda: termen.moneda,
-            valoare_ron: termen.valoare_ron,
-            termen_zile: termen.termen_zile,
-            subproiect_id: termen.subproiect_id || null,
-            procent_calculat: termen.procent_calculat || 0,
-            curs_valutar: termen.moneda !== 'RON' ? (CURSURI_VALUTAR[termen.moneda] || 1) : null,
-            data_curs_valutar: termen.moneda !== 'RON' ? new Date().toISOString().split('T')[0] : null,
-            observatii: termen.observatii || null
-          }))
-        })
+      // 2.1 Încarcă etapele existente din EtapeContract
+      const etapeExistenteQuery = `
+        SELECT ID_Etapa, subproiect_id, etapa_index, denumire, 
+               status_facturare, status_incasare, factura_id, 
+               data_facturare, data_incasare, data_scadenta
+        FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+        WHERE contract_id = '${contractId}' AND activ = true
+        ORDER BY etapa_index ASC
+      `;
+
+      const [etapeExistente] = await bigquery.query({
+        query: etapeExistenteQuery,
+        location: 'EU',
       });
 
-      if (!etapeResponse.ok) {
-        console.error('Eroare la salvarea etapelor în EtapeContract:', await etapeResponse.text());
-        throw new Error('Nu s-au putut salva etapele contractului');
-      } else {
-        const etapeResult = await etapeResponse.json();
-        console.log(`✅ Salvate cu succes ${etapeResult.data?.etape_count || contractInfo.termenePersonalizate.length} etape în EtapeContract`);
-      }
+      console.log(`[CONTRACT-GENERATE] Găsite ${etapeExistente.length} etape existente în EtapeContract`);
+
+      // 2.2 Construiește map-uri pentru matching
+      const etapeExistenteMap = new Map();
+      const etapeExistenteManuale = [];
+
+      etapeExistente.forEach((etapa: any) => {
+        if (etapa.subproiect_id) {
+          // Etape din subproiecte - matching prin subproiect_id
+          etapeExistenteMap.set(etapa.subproiect_id, etapa);
+        } else {
+          // Etape manuale - matching prin poziție/denumire
+          etapeExistenteManuale.push(etapa);
+        }
+      });
+
+      // 2.3 Procesează fiecare etapă nouă
+      const etapeProcessate = new Set();
+      const queryPromises = [];
+
+      contractInfo.termenePersonalizate.forEach((termen: any, index: number) => {
+        const etapaIndex = index + 1;
+        const cursValutarEtapa = termen.moneda !== 'RON' ? (CURSURI_VALUTAR[termen.moneda] || 1) : null;
+        const dataCursEtapa = termen.moneda !== 'RON' ? new Date().toISOString().split('T')[0] : null;
+
+        if (termen.subproiect_id) {
+          // ETAPĂ DIN SUBPROIECT - matching prin subproiect_id
+          const etapaExistenta = etapeExistenteMap.get(termen.subproiect_id);
+          
+          if (etapaExistenta) {
+            // UPDATE etapă existentă - păstrează datele business
+            console.log(`[CONTRACT-GENERATE] UPDATE etapă existentă: ${etapaExistenta.ID_Etapa} pentru subproiect ${termen.subproiect_id}`);
+            
+            const updateEtapaQuery = `
+              UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              SET 
+                etapa_index = ${etapaIndex},
+                denumire = '${termen.denumire.replace(/'/g, "''")}',
+                valoare = ${termen.valoare},
+                moneda = '${termen.moneda}',
+                valoare_ron = ${termen.valoare_ron},
+                termen_zile = ${termen.termen_zile},
+                curs_valutar = ${cursValutarEtapa || 'NULL'},
+                data_curs_valutar = ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
+                procent_din_total = ${termen.procent_calculat || 0},
+                data_actualizare = CURRENT_TIMESTAMP()
+              WHERE ID_Etapa = '${etapaExistenta.ID_Etapa}'
+            `;
+            
+            queryPromises.push(bigquery.query({ query: updateEtapaQuery, location: 'EU' }));
+            etapeProcessate.add(etapaExistenta.ID_Etapa);
+            
+          } else {
+            // INSERT etapă nouă din subproiect
+            const etapaId = `ETAPA_${contractId}_${etapaIndex}_${Date.now()}`;
+            console.log(`[CONTRACT-GENERATE] INSERT etapă nouă din subproiect: ${etapaId}`);
+            
+            const insertEtapaQuery = `
+              INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              (ID_Etapa, contract_id, etapa_index, denumire, valoare, moneda, 
+               valoare_ron, termen_zile, subproiect_id, status_facturare, status_incasare,
+               curs_valutar, data_curs_valutar, procent_din_total, 
+               activ, data_creare)
+              VALUES (
+                '${etapaId}',
+                '${contractId}',
+                ${etapaIndex},
+                '${termen.denumire.replace(/'/g, "''")}',
+                ${termen.valoare},
+                '${termen.moneda}',
+                ${termen.valoare_ron},
+                ${termen.termen_zile},
+                '${termen.subproiect_id}',
+                'Nefacturat',
+                'Neîncasat',
+                ${cursValutarEtapa || 'NULL'},
+                ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
+                ${termen.procent_calculat || 0},
+                true,
+                CURRENT_TIMESTAMP()
+              )
+            `;
+            
+            queryPromises.push(bigquery.query({ query: insertEtapaQuery, location: 'EU' }));
+          }
+          
+        } else {
+          // ETAPĂ MANUALĂ - matching prin poziție sau denumire
+          let etapaExistentaManuala = null;
+          
+          // Încearcă să găsească prin denumire
+          etapaExistentaManuala = etapeExistenteManuale.find(e => 
+            e.denumire && e.denumire.trim() === termen.denumire.trim()
+          );
+          
+          // Dacă nu găsește prin denumire, încearcă prin poziție relativă
+          if (!etapaExistentaManuala && etapeExistenteManuale.length > 0) {
+            const pozitieRelativa = index - contractInfo.termenePersonalizate.filter((t: any, i: number) => 
+              i < index && t.subproiect_id
+            ).length;
+            
+            if (pozitieRelativa >= 0 && pozitieRelativa < etapeExistenteManuale.length) {
+              etapaExistentaManuala = etapeExistenteManuale[pozitieRelativa];
+            }
+          }
+          
+          if (etapaExistentaManuala) {
+            // UPDATE etapă manuală existentă - păstrează datele business
+            console.log(`[CONTRACT-GENERATE] UPDATE etapă manuală existentă: ${etapaExistentaManuala.ID_Etapa}`);
+            
+            const updateEtapaManualaQuery = `
+              UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              SET 
+                etapa_index = ${etapaIndex},
+                denumire = '${termen.denumire.replace(/'/g, "''")}',
+                valoare = ${termen.valoare},
+                moneda = '${termen.moneda}',
+                valoare_ron = ${termen.valoare_ron},
+                termen_zile = ${termen.termen_zile},
+                curs_valutar = ${cursValutarEtapa || 'NULL'},
+                data_curs_valutar = ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
+                procent_din_total = ${termen.procent_calculat || 0},
+                data_actualizare = CURRENT_TIMESTAMP()
+              WHERE ID_Etapa = '${etapaExistentaManuala.ID_Etapa}'
+            `;
+            
+            queryPromises.push(bigquery.query({ query: updateEtapaManualaQuery, location: 'EU' }));
+            etapeProcessate.add(etapaExistentaManuala.ID_Etapa);
+            
+          } else {
+            // INSERT etapă manuală nouă
+            const etapaId = `ETAPA_${contractId}_${etapaIndex}_${Date.now()}`;
+            console.log(`[CONTRACT-GENERATE] INSERT etapă manuală nouă: ${etapaId}`);
+            
+            const insertEtapaManualaQuery = `
+              INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              (ID_Etapa, contract_id, etapa_index, denumire, valoare, moneda, 
+               valoare_ron, termen_zile, subproiect_id, status_facturare, status_incasare,
+               curs_valutar, data_curs_valutar, procent_din_total, 
+               activ, data_creare)
+              VALUES (
+                '${etapaId}',
+                '${contractId}',
+                ${etapaIndex},
+                '${termen.denumire.replace(/'/g, "''")}',
+                ${termen.valoare},
+                '${termen.moneda}',
+                ${termen.valoare_ron},
+                ${termen.termen_zile},
+                NULL,
+                'Nefacturat',
+                'Neîncasat',
+                ${cursValutarEtapa || 'NULL'},
+                ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
+                ${termen.procent_calculat || 0},
+                true,
+                CURRENT_TIMESTAMP()
+              )
+            `;
+            
+            queryPromises.push(bigquery.query({ query: insertEtapaManualaQuery, location: 'EU' }));
+          }
+        }
+      });
+
+      // 2.4 Gestionează etapele care nu mai există în noua versiune
+      const etapeDeEliminat = etapeExistente.filter((etapa: any) => 
+        !etapeProcessate.has(etapa.ID_Etapa)
+      );
+
+      etapeDeEliminat.forEach((etapa: any) => {
+        if (etapa.status_facturare === 'Facturat' || etapa.factura_id) {
+          // Dacă etapa e facturată, o păstrează dar o marchează ca inactivă
+          console.log(`[CONTRACT-GENERATE] Marchează ca inactivă etapa facturată: ${etapa.ID_Etapa}`);
+          
+          const deactivateQuery = `
+            UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+            SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
+            WHERE ID_Etapa = '${etapa.ID_Etapa}'
+          `;
+          
+          queryPromises.push(bigquery.query({ query: deactivateQuery, location: 'EU' }));
+          
+        } else {
+          // Dacă etapa nu e facturată, o șterge fizic
+          console.log(`[CONTRACT-GENERATE] Șterge fizic etapa nefacturată: ${etapa.ID_Etapa}`);
+          
+          const deleteQuery = `
+            DELETE FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+            WHERE ID_Etapa = '${etapa.ID_Etapa}'
+          `;
+          
+          queryPromises.push(bigquery.query({ query: deleteQuery, location: 'EU' }));
+        }
+      });
+
+      // 2.5 Execută toate query-urile
+      await Promise.all(queryPromises);
+      
+      console.log(`[CONTRACT-GENERATE] ✅ Merge inteligent finalizat pentru contractul ${contractId}:`);
+      console.log(`   - ${contractInfo.termenePersonalizate.length} etape procesate`);
+      console.log(`   - ${etapeDeEliminat.length} etape eliminate/dezactivate`);
     }
 
     return contractId;
     
   } catch (error) {
-    console.error('Eroare la salvarea contractului în BigQuery:', error);
+    console.error('[CONTRACT-GENERATE] Eroare la salvarea contractului în BigQuery:', error);
     throw error;
   }
 }
