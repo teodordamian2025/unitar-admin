@@ -757,13 +757,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     console.log('🔄 Actualizare parțială - doar subproiecte noi');
     
     // Păstrează etapele existente și adaugă doar subproiectele noi
-    const etapeExistente = termenePersonalizate.map(t => ({
-      ...t,
-      tip_modificare: t.subproiect_id ? 
-        (modificariDetectate.subproiecte_sterse.some(s => s.subproiect_id === t.subproiect_id) ? 'sters' : 
-         modificariDetectate.valori_modificate.some(v => v.etapa.subproiect_id === t.subproiect_id) ? 'modificat' : 'normal') :
-        'manual'
-    }));
+	const etapeExistente = termenePersonalizate.map(t => ({
+	  ...t,
+	  tip_modificare: t.subproiect_id ? 
+	    (modificariDetectate.subproiecte_sterse.some(s => s.subproiect_id === t.subproiect_id) ? 'sters' as const : 
+	     modificariDetectate.valori_modificate.some(v => v.etapa.subproiect_id === t.subproiect_id) ? 'modificat' as const : 'normal' as const) :
+	    'manual' as const
+	}));
     
     // Adaugă subproiectele noi
     const etapeNoi = modificariDetectate.subproiecte_noi.map((sub: SubproiectInfo) => {
