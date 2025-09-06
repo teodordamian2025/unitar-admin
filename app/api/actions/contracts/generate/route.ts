@@ -941,7 +941,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
       // 2.3 Procesează fiecare etapă nouă
       const etapeProcessate = new Set();
-      const queryPromises = [];
+      const queryPromises: Promise<any>[] = [];
 
       contractInfo.termenePersonalizate.forEach((termen: any, index: number) => {
         const etapaIndex = index + 1;
