@@ -1011,7 +1011,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           
         } else {
           // ETAPĂ MANUALĂ - matching prin poziție sau denumire
-          let etapaExistentaManuala = null;
+          let etapaExistentaManuala: any = null;
           
           // Încearcă să găsească prin denumire
           etapaExistentaManuala = etapeExistenteManuale.find(e => 
