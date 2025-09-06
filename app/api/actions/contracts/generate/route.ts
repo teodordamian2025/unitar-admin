@@ -926,8 +926,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       console.log(`[CONTRACT-GENERATE] Găsite ${etapeExistente.length} etape existente în EtapeContract`);
 
       // 2.2 Construiește map-uri pentru matching
-      const etapeExistenteMap = new Map();
-      const etapeExistenteManuale = [];
+	const etapeExistenteMap = new Map();
+	const etapeExistenteManuale: any[] = [];
 
       etapeExistente.forEach((etapa: any) => {
         if (etapa.subproiect_id) {
