@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 03.09.2025 22:45 (ora României)
-// MODIFICAT: Eliminare rubrica "Subproiecte incluse" + Header cu valoare proiect + Sumar pe valute + Limitare 3% + Buton ștergere
-// PĂSTRATE: Toate funcționalitățile existente + logica completă
+// DATA: 06.09.2025 18:30 (ora României)
+// MODIFICAT: Integrare EtapeContract + Detectare modificări + Afișare diferențe vizuale
+// PĂSTRATE: Toate funcționalitățile existente + buton Anexă pentru dezvoltare viitoare
 // ==================================================================
 
 'use client';
@@ -30,7 +30,7 @@ interface ContractExistent {
   data_creare: string;
   Valoare: number;
   Moneda: string;
-  etape?: any[];
+  etape?: any[]; // Acum din EtapeContract
   etape_count?: number;
   continut_json?: any;
   Observatii?: string;
@@ -60,8 +60,9 @@ interface TermenPersonalizat {
   valoare_ron: number;      
   termen_zile: number;
   procent_calculat: number;
+  subproiect_id?: string | null; // MODIFICAT: Pentru identificarea din subproiect
   este_subproiect?: boolean;
-  subproiect_id?: string;
+  tip_modificare?: 'nou' | 'sters' | 'modificat' | 'manual' | 'normal'; // NOUĂ: Pentru afișarea diferențelor
 }
 
 interface SubproiectInfo {
@@ -90,6 +91,15 @@ interface ProiectComplet {
   Adresa?: string;
   Descriere?: string;
   Observatii?: string;
+}
+
+// NOUĂ: Interfață pentru detectarea modificărilor
+interface ModificariDetectate {
+  detected: boolean;
+  subproiecte_noi: SubproiectInfo[];
+  subproiecte_sterse: TermenPersonalizat[];
+  valori_modificate: {etapa: TermenPersonalizat, valoare_noua: number, moneda_noua: string}[];
+  etape_manuale: TermenPersonalizat[];
 }
 
 // Cursuri valutare pentru conversii
@@ -201,6 +211,17 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
 
+  // NOUĂ: State pentru detectarea modificărilor
+  const [modificariDetectate, setModificariDetectate] = useState<ModificariDetectate>({
+    detected: false,
+    subproiecte_noi: [],
+    subproiecte_sterse: [],
+    valori_modificate: [],
+    etape_manuale: []
+  });
+  const [showModificariAlert, setShowModificariAlert] = useState(false);
+  const [alertPosition, setAlertPosition] = useState({ x: 100, y: 100 });
+
   useEffect(() => {
     if (isOpen) {
       setLoadingCheck(true);
@@ -285,40 +306,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       if (result.success && result.data) {
         setSubproiecte(result.data);
         
-        if (result.data.length > 0) {
-          const termeniDinSubproiecte = result.data.map((sub: SubproiectInfo) => {
-            const valoareOriginala = convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
-            const valoareRON = convertBigQueryNumeric(sub.valoare_ron) || valoareOriginala;
-            const monedaOriginala = sub.moneda || 'RON';
-            
-            let terminZile = 30;
-            if (sub.Data_Final) {
-              const dataFinal = typeof sub.Data_Final === 'string' ? sub.Data_Final : sub.Data_Final.value;
-              const dataStart = typeof proiect.Data_Start === 'string' ? proiect.Data_Start : proiect.Data_Start?.value;
-              if (dataStart && dataFinal) {
-                const diffTime = Math.abs(new Date(dataFinal).getTime() - new Date(dataStart).getTime());
-                terminZile = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              }
-            }
-            
-            return {
-              id: `sub_${sub.ID_Subproiect}`,
-              denumire: sub.Denumire,
-              valoare: valoareOriginala,
-              moneda: monedaOriginala,
-              valoare_ron: valoareRON,
-              termen_zile: terminZile,
-              procent_calculat: 0,
-              este_subproiect: true,
-              subproiect_id: sub.ID_Subproiect
-            };
-          });
-          
-          setTermenePersonalizate(termeniDinSubproiecte);
-        } else {
-          console.log('Proiect fără subproiecte - se va încărca valoarea după proiect complet');
-        }
-        
         console.log(`Încărcate ${result.data.length} subproiecte pentru contract`);
       }
     } catch (error) {
@@ -327,73 +314,116 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  useEffect(() => {
-    console.log('📧 useEffect termeni - checking conditions:', {
-      hasProiectComplet: !!proiectComplet,
-      subproiecte_length: subproiecte.length,
-      termene_length: termenePersonalizate.length,
-      proiect_valoare: proiectComplet?.Valoare_Estimata,
-      proiect_moneda: proiectComplet?.moneda
-    });
-    
-    if (proiectComplet && subproiecte.length === 0) {
-      const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
-        ? proiectComplet.Valoare_Estimata 
-        : (proiectComplet.Valoare_Estimata as any)?.value || 0;
-      const valoareRON = typeof proiectComplet.valoare_ron === 'number'
-        ? proiectComplet.valoare_ron
-        : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
-      const monedaProiect = proiectComplet.moneda || 'RON';
+  // NOUĂ FUNCȚIE: Încărcarea etapelor din EtapeContract
+  const loadEtapeFromEtapeContract = async (contractId: string): Promise<TermenPersonalizat[]> => {
+    try {
+      const response = await fetch(`/api/rapoarte/etape-contract?contract_id=${encodeURIComponent(contractId)}`);
+      const result = await response.json();
       
-      console.log('📧 Valori extrase din proiectComplet:', {
-        valoareProiect,
-        valoareRON,
-        monedaProiect,
-        hasValidValue: valoareProiect > 0
-      });
-      
-      if (valoareProiect > 0) {
-        const currentTermenValue = termenePersonalizate.length > 0 ? termenePersonalizate[0].valoare : 0;
+      if (result.success && result.data) {
+        console.log(`📋 Încărcate ${result.data.length} etape din EtapeContract pentru contractul ${contractId}`);
         
-        if (currentTermenValue !== valoareProiect) {
-          console.log('🔄 Setez termenii cu valorile corecte din proiect');
-          
-          setTermenePersonalizate([
-            { 
-              id: '1', 
-              denumire: 'La predarea proiectului', 
-              valoare: valoareProiect,
-              moneda: monedaProiect,
-              valoare_ron: valoareRON,
-              termen_zile: 60,
-              procent_calculat: 100,
-              este_subproiect: false
-            }
-          ]);
-          
-          console.log('✅ Termeni setați cu succes:', {
-            valoare: valoareProiect,
-            moneda: monedaProiect,
-            valoare_ron: valoareRON
-          });
-        } else {
-          console.log('📋 Termenii sunt deja setați cu valoarea corectă:', currentTermenValue);
-        }
-      } else {
-        console.warn('⚠️ Valoarea proiectului este 0 sau invalidă, nu setez termenii');
+        return result.data.map((etapa: any) => ({
+          id: etapa.ID_Etapa,
+          denumire: etapa.denumire,
+          valoare: etapa.valoare,
+          moneda: etapa.moneda,
+          valoare_ron: etapa.valoare_ron,
+          termen_zile: etapa.termen_zile,
+          procent_calculat: etapa.procent_din_total || 0,
+          subproiect_id: etapa.subproiect_id,
+          este_subproiect: !!etapa.subproiect_id,
+          tip_modificare: 'normal' as const
+        }));
       }
-    } else if (subproiecte.length > 0) {
-      console.log('📂 Proiect cu subproiecte - termenii vor fi setați din loadSubproiecte()');
-    } else if (!proiectComplet) {
-      console.log('⏳ proiectComplet încă nu este încărcat');
+      
+      return [];
+    } catch (error) {
+      console.error('Eroare la încărcarea etapelor din EtapeContract:', error);
+      return [];
     }
-  }, [
-    proiectComplet?.ID_Proiect,
-    proiectComplet?.Valoare_Estimata, 
-    proiectComplet?.valoare_ron,
-    proiectComplet?.moneda,
-    subproiecte.length
-  ]);
+  };
+
+  // NOUĂ FUNCȚIE: Detectarea modificărilor
+  const detecteazaModificari = (
+    subproiecteActuale: SubproiectInfo[], 
+    etapeContract: TermenPersonalizat[]
+  ): ModificariDetectate => {
+    console.log('🔍 Detectez modificări...', {
+      subproiecte_actuale_count: subproiecteActuale.length,
+      etape_contract_count: etapeContract.length
+    });
+
+    const subproiecteNoi: SubproiectInfo[] = [];
+    const subproiecteSterse: TermenPersonalizat[] = [];
+    const valoriModificate: {etapa: TermenPersonalizat, valoare_noua: number, moneda_noua: string}[] = [];
+    const etapeManuale: TermenPersonalizat[] = [];
+
+    // Identifică etapele manuale (fără subproiect_id)
+    etapeContract.forEach(etapa => {
+      if (!etapa.subproiect_id) {
+        etapeManuale.push({...etapa, tip_modificare: 'manual'});
+      }
+    });
+
+    // Identifică subproiecte noi (în BD dar nu în contract)
+    subproiecteActuale.forEach(subproiect => {
+      const existaInContract = etapeContract.some(etapa => 
+        etapa.subproiect_id === subproiect.ID_Subproiect
+      );
+      
+      if (!existaInContract) {
+        subproiecteNoi.push(subproiect);
+      }
+    });
+
+    // Identifică subproiecte șterse (în contract dar nu în BD)
+    etapeContract.forEach(etapa => {
+      if (etapa.subproiect_id) {
+        const existaInBD = subproiecteActuale.some(sub => 
+          sub.ID_Subproiect === etapa.subproiect_id
+        );
+        
+        if (!existaInBD) {
+          subproiecteSterse.push({...etapa, tip_modificare: 'sters'});
+        }
+      }
+    });
+
+    // Identifică valori modificate (același subproiect, valori diferite)
+    etapeContract.forEach(etapa => {
+      if (etapa.subproiect_id) {
+        const subproiectActual = subproiecteActuale.find(sub => 
+          sub.ID_Subproiect === etapa.subproiect_id
+        );
+        
+        if (subproiectActual) {
+          const valoareActuala = convertBigQueryNumeric(subproiectActual.Valoare_Estimata) || 0;
+          const monedaActuala = subproiectActual.moneda || 'RON';
+          
+          if (Math.abs(valoareActuala - etapa.valoare) > 0.01 || monedaActuala !== etapa.moneda) {
+            valoriModificate.push({
+              etapa: {...etapa, tip_modificare: 'modificat'},
+              valoare_noua: valoareActuala,
+              moneda_noua: monedaActuala
+            });
+          }
+        }
+      }
+    });
+
+    const modificariDetectate = {
+      detected: subproiecteNoi.length > 0 || subproiecteSterse.length > 0 || valoriModificate.length > 0,
+      subproiecte_noi: subproiecteNoi,
+      subproiecte_sterse: subproiecteSterse,
+      valori_modificate: valoriModificate,
+      etape_manuale: etapeManuale
+    };
+
+    console.log('🔍 Rezultat detectare modificări:', modificariDetectate);
+
+    return modificariDetectate;
+  };
 
   const checkContractExistent = async () => {
     try {
@@ -419,8 +449,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           valoare: contract.Valoare,
           moneda: contract.Moneda,
           etape_count: contract.etape_count,
-          data_creare: contract.data_creare,
-          etape_raw: contract.etape
+          data_creare: contract.data_creare
         });
         
         setContractExistent(contract);
@@ -437,40 +466,37 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         
         console.log(`✅ PĂSTRARE NUMĂR EXISTENT: ${contract.numar_contract} (nu se generează unul nou)`);
         
+        // MODIFICAT: Încarcă etapele din EtapeContract în loc de JSON
         if (contract.etape && Array.isArray(contract.etape)) {
-          console.log('🔍 Procesez etape din contract existent - date raw:', contract.etape);
+          console.log('📋 Procesez etape din EtapeContract - date:', contract.etape);
           
-          const etapeConvertite = contract.etape.map((etapa: any, index: number) => {
-            const valoare = typeof etapa.valoare === 'number' ? etapa.valoare : parseFloat(etapa.valoare) || 0;
-            const valoare_ron = typeof etapa.valoare_ron === 'number' ? etapa.valoare_ron : parseFloat(etapa.valoare_ron) || 0;
-            const procent_calculat = typeof etapa.procent_calculat === 'number' ? etapa.procent_calculat : parseFloat(etapa.procent_calculat) || 0;
-            const termen_zile = typeof etapa.termen_zile === 'number' ? etapa.termen_zile : parseInt(etapa.termen_zile) || 30;
-            
-            console.log(`Etapa ${index + 1} procesată:`, {
-              denumire: etapa.denumire,
-              valoare_raw: etapa.valoare,
-              valoare_processed: valoare,
-              valoare_ron_raw: etapa.valoare_ron,
-              valoare_ron_processed: valoare_ron,
-              moneda: etapa.moneda,
-              procent: procent_calculat
-            });
-            
-            return {
-              id: etapa.id || `etapa_${index}`,
-              denumire: etapa.denumire || `Etapa ${index + 1}`,
-              valoare: valoare,
-              moneda: etapa.moneda || 'RON',
-              valoare_ron: valoare_ron,
-              termen_zile: termen_zile,
-              procent_calculat: procent_calculat,
-              este_subproiect: etapa.este_subproiect || false,
-              subproiect_id: etapa.subproiect_id || null
-            };
-          });
+          const etapeContract = contract.etape.map((etapa: any) => ({
+            id: etapa.ID_Etapa || `etapa_${Date.now()}_${Math.random()}`,
+            denumire: etapa.denumire || 'Etapă fără denumire',
+            valoare: etapa.valoare || 0,
+            moneda: etapa.moneda || 'RON',
+            valoare_ron: etapa.valoare_ron || 0,
+            termen_zile: etapa.termen_zile || 30,
+            procent_calculat: etapa.procent_din_total || 0,
+            subproiect_id: etapa.subproiect_id,
+            este_subproiect: !!etapa.subproiect_id,
+            tip_modificare: 'normal' as const
+          }));
           
-          setTermenePersonalizate(etapeConvertite);
-          console.log(`✅ Precompletate ${etapeConvertite.length} etape din contractul existent cu valorile corecte`);
+          setTermenePersonalizate(etapeContract);
+          
+          // NOUĂ: Detectează modificările după încărcarea datelor
+          setTimeout(() => {
+            const modificari = detecteazaModificari(subproiecte, etapeContract);
+            setModificariDetectate(modificari);
+            
+            if (modificari.detected) {
+              setShowModificariAlert(true);
+              console.log('⚠️ Modificări detectate - afișez alerta');
+            }
+          }, 500); // Delay pentru a permite încărcarea subproiectelor
+          
+          console.log(`✅ Precompletate ${etapeContract.length} etape din contractul existent cu valorile corecte`);
         } else {
           console.warn('⚠️ Contract fără etape sau format etape invalid');
           setTermenePersonalizate([]);
@@ -508,6 +534,124 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // NOUĂ: Detectarea modificărilor după încărcarea subproiectelor
+  useEffect(() => {
+    if (subproiecte.length > 0 && termenePersonalizate.length > 0 && isEditMode) {
+      const modificari = detecteazaModificari(subproiecte, termenePersonalizate);
+      setModificariDetectate(modificari);
+      
+      if (modificari.detected && !showModificariAlert) {
+        setShowModificariAlert(true);
+        console.log('⚠️ Modificări detectate după încărcarea subproiectelor');
+      }
+    }
+  }, [subproiecte, termenePersonalizate, isEditMode]);
+
+  // PĂSTRAT: Logic pentru proiecte fără subproiecte
+  useEffect(() => {
+    console.log('🔧 useEffect termeni - checking conditions:', {
+      hasProiectComplet: !!proiectComplet,
+      subproiecte_length: subproiecte.length,
+      termene_length: termenePersonalizate.length,
+      proiect_valoare: proiectComplet?.Valoare_Estimata,
+      proiect_moneda: proiectComplet?.moneda,
+      isEditMode
+    });
+    
+    if (proiectComplet && subproiecte.length === 0 && !isEditMode) {
+      const valoareProiect = typeof proiectComplet.Valoare_Estimata === 'number' 
+        ? proiectComplet.Valoare_Estimata 
+        : (proiectComplet.Valoare_Estimata as any)?.value || 0;
+      const valoareRON = typeof proiectComplet.valoare_ron === 'number'
+        ? proiectComplet.valoare_ron
+        : (proiectComplet.valoare_ron as any)?.value || valoareProiect;
+      const monedaProiect = proiectComplet.moneda || 'RON';
+      
+      console.log('🔧 Valori extrase din proiectComplet:', {
+        valoareProiect,
+        valoareRON,
+        monedaProiect,
+        hasValidValue: valoareProiect > 0
+      });
+      
+      if (valoareProiect > 0) {
+        const currentTermenValue = termenePersonalizate.length > 0 ? termenePersonalizate[0].valoare : 0;
+        
+        if (currentTermenValue !== valoareProiect) {
+          console.log('🔄 Setez termenii cu valorile corecte din proiect');
+          
+          setTermenePersonalizate([
+            { 
+              id: '1', 
+              denumire: 'La predarea proiectului', 
+              valoare: valoareProiect,
+              moneda: monedaProiect,
+              valoare_ron: valoareRON,
+              termen_zile: 60,
+              procent_calculat: 100,
+              este_subproiect: false,
+              subproiect_id: null,
+              tip_modificare: 'normal'
+            }
+          ]);
+          
+          console.log('✅ Termeni setați cu succes:', {
+            valoare: valoareProiect,
+            moneda: monedaProiect,
+            valoare_ron: valoareRON
+          });
+        } else {
+          console.log('📋 Termenii sunt deja setați cu valoarea corectă:', currentTermenValue);
+        }
+      } else {
+        console.warn('⚠️ Valoarea proiectului este 0 sau invalidă, nu setez termenii');
+      }
+    } else if (subproiecte.length > 0 && !isEditMode) {
+      console.log('📂 Proiect cu subproiecte - termenii vor fi setați din loadSubproiecte()');
+      
+      // Pentru proiecte noi cu subproiecte
+      const termeniDinSubproiecte = subproiecte.map((sub: SubproiectInfo) => {
+        const valoareOriginala = convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
+        const valoareRON = convertBigQueryNumeric(sub.valoare_ron) || valoareOriginala;
+        const monedaOriginala = sub.moneda || 'RON';
+        
+        let terminZile = 30;
+        if (sub.Data_Final) {
+          const dataFinal = typeof sub.Data_Final === 'string' ? sub.Data_Final : sub.Data_Final.value;
+          const dataStart = typeof proiect.Data_Start === 'string' ? proiect.Data_Start : proiect.Data_Start?.value;
+          if (dataStart && dataFinal) {
+            const diffTime = Math.abs(new Date(dataFinal).getTime() - new Date(dataStart).getTime());
+            terminZile = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          }
+        }
+        
+        return {
+          id: `sub_${sub.ID_Subproiect}`,
+          denumire: sub.Denumire,
+          valoare: valoareOriginala,
+          moneda: monedaOriginala,
+          valoare_ron: valoareRON,
+          termen_zile: terminZile,
+          procent_calculat: 0,
+          este_subproiect: true,
+          subproiect_id: sub.ID_Subproiect,
+          tip_modificare: 'normal' as const
+        };
+      });
+      
+      setTermenePersonalizate(termeniDinSubproiecte);
+    } else if (!proiectComplet) {
+      console.log('⏳ proiectComplet încă nu este încărcat');
+    }
+  }, [
+    proiectComplet?.ID_Proiect,
+    proiectComplet?.Valoare_Estimata, 
+    proiectComplet?.valoare_ron,
+    proiectComplet?.moneda,
+    subproiecte.length,
+    isEditMode
+  ]);
+
   // Calculează și actualizează procentele pentru toate termenele
   const calculeazaProcenteInformative = (termeni: TermenPersonalizat[]) => {
     const sumaTotal = termeni.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
@@ -522,7 +666,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     return termenePersonalizate.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
   };
 
-  // MODIFICAT: Calculare sumar pe valute separate
+  // Calculare sumar pe valute separate
   const calculeazaSumarValute = () => {
     const valuteSumar: { [moneda: string]: number } = {};
     let totalRON = 0;
@@ -539,7 +683,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     return { valuteSumar, totalRON };
   };
 
-  // MODIFICAT: Calculare valoare proiect în RON pentru comparația de 3%
+  // Calculare valoare proiect în RON pentru comparația de 3%
   const calculeazaValoareProiectRON = (): number => {
     if (!proiectComplet) return 0;
     
@@ -559,7 +703,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // MODIFICAT: Verificare limită 3%
+  // Verificare limită 3%
   const verificaLimita3Procent = (): { valid: boolean; diferentaProcentuala: number; mesaj: string } => {
     const valoareProiectRON = calculeazaValoareProiectRON();
     const sumaTotalaContractRON = calculeazaSumaTotala();
@@ -578,6 +722,105 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     return { valid, diferentaProcentuala, mesaj };
   };
 
+  // NOUĂ FUNCȚIE: Funcțiile pentru aplicarea opțiunilor de modificare
+  const handleActualizeazaDinProiect = () => {
+    console.log('🔄 Actualizare completă din proiect');
+    
+    // Regenerează complet etapele din subproiectele actuale
+    const termeniNoi = subproiecte.map((sub: SubproiectInfo) => {
+      const valoareOriginala = convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
+      const valoareRON = convertBigQueryNumeric(sub.valoare_ron) || valoareOriginala;
+      const monedaOriginala = sub.moneda || 'RON';
+      
+      return {
+        id: `sub_${sub.ID_Subproiect}_${Date.now()}`,
+        denumire: sub.Denumire,
+        valoare: valoareOriginala,
+        moneda: monedaOriginala,
+        valoare_ron: valoareRON,
+        termen_zile: 30,
+        procent_calculat: 0,
+        este_subproiect: true,
+        subproiect_id: sub.ID_Subproiect,
+        tip_modificare: 'normal' as const
+      };
+    });
+    
+    const termeneWithPercents = calculeazaProcenteInformative(termeniNoi);
+    setTermenePersonalizate(termeneWithPercents);
+    setShowModificariAlert(false);
+    setModificariDetectate({ detected: false, subproiecte_noi: [], subproiecte_sterse: [], valori_modificate: [], etape_manuale: [] });
+    showToast('Contract actualizat complet din subproiectele actuale', 'success');
+  };
+
+  const handleActualizeazaPartial = () => {
+    console.log('🔄 Actualizare parțială - doar subproiecte noi');
+    
+    // Păstrează etapele existente și adaugă doar subproiectele noi
+    const etapeExistente = termenePersonalizate.map(t => ({
+      ...t,
+      tip_modificare: t.subproiect_id ? 
+        (modificariDetectate.subproiecte_sterse.some(s => s.subproiect_id === t.subproiect_id) ? 'sters' : 
+         modificariDetectate.valori_modificate.some(v => v.etapa.subproiect_id === t.subproiect_id) ? 'modificat' : 'normal') :
+        'manual'
+    }));
+    
+    // Adaugă subproiectele noi
+    const etapeNoi = modificariDetectate.subproiecte_noi.map((sub: SubproiectInfo) => {
+      const valoareOriginala = convertBigQueryNumeric(sub.Valoare_Estimata) || 0;
+      const valoareRON = convertBigQueryNumeric(sub.valoare_ron) || valoareOriginala;
+      const monedaOriginala = sub.moneda || 'RON';
+      
+      return {
+        id: `sub_nou_${sub.ID_Subproiect}_${Date.now()}`,
+        denumire: sub.Denumire,
+        valoare: valoareOriginala,
+        moneda: monedaOriginala,
+        valoare_ron: valoareRON,
+        termen_zile: 30,
+        procent_calculat: 0,
+        este_subproiect: true,
+        subproiect_id: sub.ID_Subproiect,
+        tip_modificare: 'nou' as const
+      };
+    });
+    
+    const termeniActualizati = [...etapeExistente, ...etapeNoi];
+    const termeneWithPercents = calculeazaProcenteInformative(termeniActualizati);
+    setTermenePersonalizate(termeneWithPercents);
+    setShowModificariAlert(false);
+    showToast(`Adăugate ${etapeNoi.length} etape noi. Etapele existente au fost păstrate.`, 'success');
+  };
+
+  const handlePastreazaActual = () => {
+    console.log('📋 Păstrează contractul actual');
+    setShowModificariAlert(false);
+    showToast('Contractul a fost păstrat în forma actuală', 'info');
+  };
+
+  // NOUĂ FUNCȚIE: Obține culoarea pentru tipul de modificare
+  const getRowColor = (tipModificare?: string): string => {
+    switch (tipModificare) {
+      case 'nou': return '#27ae60'; // Verde
+      case 'sters': return '#e74c3c'; // Roșu
+      case 'modificat': return '#f39c12'; // Portocaliu
+      case 'manual': return '#95a5a6'; // Gri
+      default: return '#3498db'; // Albastru normal
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Obține eticheta pentru tipul de modificare
+  const getRowLabel = (tipModificare?: string): string => {
+    switch (tipModificare) {
+      case 'nou': return 'NOU';
+      case 'sters': return 'ȘTERS';
+      case 'modificat': return 'MODIFICAT';
+      case 'manual': return 'MANUAL';
+      default: return '';
+    }
+  };
+
+  // TOATE FUNCȚIILE PĂSTRATE IDENTIC
   const moveTermenUp = (index: number) => {
     if (index > 0) {
       const newTermene = [...termenePersonalizate];
@@ -607,7 +850,9 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       valoare_ron: 0,
       termen_zile: 30,
       procent_calculat: 0,
-      este_subproiect: false
+      este_subproiect: false,
+      subproiect_id: null,
+      tip_modificare: 'manual'
     };
     
     const newTermene = [...termenePersonalizate, newTermen];
@@ -646,6 +891,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setContractExistent(null);
     setIsEditMode(false);
     setContractPrefix('CONTR');
+    setModificariDetectate({ detected: false, subproiecte_noi: [], subproiecte_sterse: [], valori_modificate: [], etape_manuale: [] });
+    setShowModificariAlert(false);
     
     await previewContractNumberForNewContract();
     
@@ -665,7 +912,9 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           valoare_ron: valoareRON,
           termen_zile: 60,
           procent_calculat: 100,
-          este_subproiect: false
+          este_subproiect: false,
+          subproiect_id: null,
+          tip_modificare: 'normal'
         }
       ]);
     }
@@ -674,7 +923,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     showToast('Mod contract nou activat cu număr nou', 'info');
   };
 
-  // ADĂUGAT: Handler pentru ștergerea contractului
   const handleDeleteContract = async () => {
     if (!contractExistent) return;
     
@@ -725,7 +973,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         return;
       }
 
-      // ADĂUGAT: Verificare limită 3%
       const validareProcentuala = verificaLimita3Procent();
       if (!validareProcentuala.valid) {
         showToast(`Nu se poate genera contractul: ${validareProcentuala.mesaj}`, 'error');
@@ -891,7 +1138,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </p>
               {contractExistent && proiectComplet && (
                 <div style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
-                  {/* MODIFICAT: Header cu valoarea din proiect + echivalent RON */}
                   <div>Contract: {contractExistent.numar_contract} • Status: {contractExistent.Status}</div>
                   <div>
                     Valoare proiect: {convertBigQueryNumeric(proiectComplet.Valoare_Estimata)?.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {proiectComplet.moneda || 'RON'}
@@ -972,7 +1218,146 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           )}
 
-          {/* Număr contract - doar pentru contract nou */}
+          {/* NOUĂ: Alertă mobilă pentru modificări detectate */}
+          {showModificariAlert && modificariDetectate.detected && (
+            <div
+              style={{
+                position: 'fixed',
+                left: alertPosition.x,
+                top: alertPosition.y,
+                width: '400px',
+                background: '#fff3cd',
+                border: '2px solid #ffc107',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                zIndex: 70000,
+                cursor: 'move'
+              }}
+              onMouseDown={(e) => {
+                const startX = e.clientX - alertPosition.x;
+                const startY = e.clientY - alertPosition.y;
+                
+                const handleMouseMove = (e: MouseEvent) => {
+                  setAlertPosition({
+                    x: e.clientX - startX,
+                    y: e.clientY - startY
+                  });
+                };
+                
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                };
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, color: '#856404', fontSize: '16px', fontWeight: '700' }}>
+                  ⚠️ Modificări Detectate
+                </h4>
+                <button
+                  onClick={() => setShowModificariAlert(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '18px',
+                    cursor: 'pointer',
+                    color: '#856404'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div style={{ marginBottom: '1rem', fontSize: '13px', color: '#856404' }}>
+                {modificariDetectate.subproiecte_noi.length > 0 && (
+                  <div>🟢 {modificariDetectate.subproiecte_noi.length} subproiecte noi</div>
+                )}
+                {modificariDetectate.subproiecte_sterse.length > 0 && (
+                  <div>🔴 {modificariDetectate.subproiecte_sterse.length} subproiecte șterse</div>
+                )}
+                {modificariDetectate.valori_modificate.length > 0 && (
+                  <div>🟡 {modificariDetectate.valori_modificate.length} valori modificate</div>
+                )}
+                {modificariDetectate.etape_manuale.length > 0 && (
+                  <div>⚪ {modificariDetectate.etape_manuale.length} etape manuale</div>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <button
+                  onClick={handleActualizeazaDinProiect}
+                  style={{
+                    padding: '0.75rem',
+                    background: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  🔄 Actualizează din proiect (sincronizare completă)
+                </button>
+                <button
+                  onClick={handleActualizeazaPartial}
+                  style={{
+                    padding: '0.75rem',
+                    background: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  ➕ Actualizează parțial (doar subproiecte noi)
+                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={handlePastreazaActual}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    📋 Păstrează actual
+                  </button>
+                  <button
+                    disabled={true}
+                    title="În dezvoltare"
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: '#e9ecef',
+                      color: '#6c757d',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'not-allowed',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    📄 + Anexă
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Numărul contractului - doar pentru contract nou */}
           {!isEditMode && (
             <div style={{
               background: '#e8f5e8',
@@ -1030,7 +1415,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {/* ADĂUGAT: Buton ștergere contract */}
                   <button
                     type="button"
                     onClick={handleDeleteContract}
@@ -1113,7 +1497,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           </div>
 
-          {/* Etape și Termene cu implementarea completă */}
+          {/* Etape și Termene cu afișarea diferențelor vizuale */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div>
@@ -1122,7 +1506,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#7f8c8d' }}>
                   {contractExistent ? 
-                    'Etapele sunt precompletate din contractul existent. Poți modifica valorile și ordinea.' :
+                    'Etapele sunt precompletate din contractul existent. Modificările sunt marcate vizual.' :
                     'Etapele sunt preluate din proiect. Poți modifica doar termenele și ordinea de afișare.'
                   }
                 </p>
@@ -1168,14 +1552,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <div style={{ textAlign: 'center' }}>Acțiuni</div>
             </div>
 
-            {/* RENDER COMPLET AL TUTUROR ETAPELOR */}
+            {/* RENDER COMPLET AL TUTUROR ETAPELOR CU DIFERENȚE VIZUALE */}
             {termenePersonalizate.map((termen, index) => (
               <div key={termen.id} style={{
-                border: termen.este_subproiect ? '1px solid #27ae60' : '1px solid #3498db',
+                border: `1px solid ${getRowColor(termen.tip_modificare)}`,
                 borderRadius: '6px',
                 padding: '1rem',
                 marginBottom: '0.5rem',
-                background: termen.este_subproiect ? '#f8fff8' : '#f8fbff'
+                background: `${getRowColor(termen.tip_modificare)}10`,
+                borderLeft: `4px solid ${getRowColor(termen.tip_modificare)}`
               }}>
                 <div style={{
                   display: 'flex',
@@ -1185,16 +1570,16 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 }}>
                   <h5 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {termen.este_subproiect ? 'Subproiect' : 'Etapa'} {index + 1}
-                    {termen.este_subproiect && (
+                    {termen.tip_modificare && termen.tip_modificare !== 'normal' && (
                       <span style={{
                         fontSize: '10px',
-                        background: '#27ae60',
+                        background: getRowColor(termen.tip_modificare),
                         color: 'white',
                         padding: '2px 6px',
                         borderRadius: '8px',
                         fontWeight: 'bold'
                       }}>
-                        DIN PROIECT
+                        {getRowLabel(termen.tip_modificare)}
                       </span>
                     )}
                   </h5>
@@ -1270,14 +1655,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     type="text"
                     value={termen.denumire}
                     onChange={(e) => updateTermen(termen.id, 'denumire', e.target.value)}
-                    disabled={loading || loadingDelete || termen.este_subproiect}
+                    disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
                     placeholder="Denumire etapă (ex: La semnare)"
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #dee2e6',
                       borderRadius: '4px',
                       fontSize: '14px',
-                      background: termen.este_subproiect ? '#f8f9fa' : 'white'
+                      background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#f8f9fa' : 'white'
                     }}
                   />
                   
@@ -1285,7 +1670,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     type="number"
                     value={termen.valoare}
                     onChange={(e) => updateTermen(termen.id, 'valoare', parseFloat(e.target.value) || 0)}
-                    disabled={loading || loadingDelete || termen.este_subproiect}
+                    disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
                     placeholder="0.00"
                     min="0"
                     step="0.01"
@@ -1294,20 +1679,20 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       border: '1px solid #dee2e6',
                       borderRadius: '4px',
                       fontSize: '14px',
-                      background: termen.este_subproiect ? '#f8f9fa' : 'white'
+                      background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#f8f9fa' : 'white'
                     }}
                   />
                   
                   <select
                     value={termen.moneda}
                     onChange={(e) => updateTermen(termen.id, 'moneda', e.target.value)}
-                    disabled={loading || loadingDelete || termen.este_subproiect}
+                    disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #dee2e6',
                       borderRadius: '4px',
                       fontSize: '14px',
-                      background: termen.este_subproiect ? '#f8f9fa' : 'white'
+                      background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#f8f9fa' : 'white'
                     }}
                   >
                     <option value="RON">RON</option>
@@ -1360,18 +1745,26 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   />
                 </div>
                 
-                {/* Afișare info conversie pentru subproiecte */}
-                {(termen.este_subproiect || termen.moneda !== 'RON') && termen.valoare > 0 && (
+                {/* Afișare info conversie și modificări */}
+                {((termen.este_subproiect && termen.tip_modificare !== 'manual') || termen.moneda !== 'RON') && termen.valoare > 0 && (
                   <div style={{
                     marginTop: '0.5rem',
                     fontSize: '11px',
-                    color: termen.este_subproiect ? '#27ae60' : '#7f8c8d',
+                    color: termen.tip_modificare === 'nou' ? '#27ae60' : 
+                           termen.tip_modificare === 'sters' ? '#e74c3c' :
+                           termen.tip_modificare === 'modificat' ? '#f39c12' :
+                           termen.tip_modificare === 'manual' ? '#95a5a6' : '#7f8c8d',
                     fontStyle: 'italic'
                   }}>
-                    {termen.este_subproiect ? 
+                    {termen.este_subproiect && termen.tip_modificare !== 'manual' ? 
                       `Preluat din subproiectul: ${termen.subproiect_id}` :
                       `Conversie: ${termen.valoare} ${termen.moneda} × ${CURSURI_VALUTAR[termen.moneda]} = ${(termen.valoare_ron || 0).toFixed(2)} RON`
                     }
+                    {termen.tip_modificare && termen.tip_modificare !== 'normal' && (
+                      <span style={{ marginLeft: '10px', fontWeight: 'bold' }}>
+                        [{getRowLabel(termen.tip_modificare)}]
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1391,7 +1784,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               (calculat automat din valorile în RON)
             </div>
 
-            {/* ADĂUGAT: Verificare limită 3% */}
+            {/* Verificare limită 3% */}
             <div style={{
               marginTop: '0.5rem',
               padding: '0.5rem',
@@ -1432,7 +1825,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             />
           </div>
 
-          {/* MODIFICAT: Sumar final cu valute separate */}
+          {/* Sumar final cu valute separate */}
           <div style={{
             background: '#e8f5e8',
             padding: '1.5rem',
@@ -1464,7 +1857,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 </div>
               </div>
               
-              {/* MODIFICAT: Afișare valoare totală pe valute separate */}
+              {/* Afișare valoare totală pe valute separate */}
               <div style={{ gridColumn: 'span 1' }}>
                 <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>VALOARE TOTALĂ</div>
                 {Object.entries(valuteSumar).map(([moneda, valoare]) => (
@@ -1520,6 +1913,24 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 }}
               >
                 Anulează
+              </button>
+              
+              {/* NOUĂ: Buton Anexă pentru dezvoltare viitoare */}
+              <button
+                disabled={true}
+                title="În dezvoltare"
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#e9ecef',
+                  color: '#6c757d',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: 'bold'
+                }}
+              >
+                📄 Generează Anexă
               </button>
               
               <button

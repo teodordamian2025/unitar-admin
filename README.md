@@ -400,7 +400,8 @@ uploads/contracte/templates/contract-template.txt  = sablon contract cu placehol
 app/api/setari/contracte/templates/route.ts
 scripts/setup-contract-templates.js = sters, pentru ca incurca la folosirea template
 lib/templates-helpers.ts
-Tabel Bigquery Contracte
+app/api/rapoarte/etape-contract/route.ts
+Tabel Bigquery Contracte si EtapeContract
 
 Coduri legate de chatbot si Bigquery:
 app/api/gueryOpenAI/route.ts
