@@ -1060,7 +1060,7 @@ export async function POST(request: NextRequest) {
         path.join(TEMPLATES_DIR, 'contract-template.txt')
       ];
 
-      let templatePath = null;
+      let templatePath: string | null = null;
       for (const templateOption of templateOptions) {
         try {
           const { access } = await import('fs/promises');
