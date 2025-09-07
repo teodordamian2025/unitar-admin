@@ -1124,56 +1124,66 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
     // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-	const updateQuery = `
-	  UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
-	  SET 
-	    Valoare = @valoare,
-	    Moneda = @moneda,
-	    curs_valutar = @cursValutar,
-	    data_curs_valutar = @dataCurs,
-	    valoare_ron = @valoareRon,
-	    articole_suplimentare = PARSE_JSON(@articoleSuplimentare),
-	    data_actualizare = CURRENT_TIMESTAMP(),
-	    continut_json = PARSE_JSON(@continutJson),
-	    Observatii = @observatii,
-	    versiune = versiune + 1
-	  WHERE ID_Contract = @contractId
-	`;
+	  const updateQuery = `
+	    UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+	    SET 
+	      Valoare = CAST(@valoare AS NUMERIC),
+	      Moneda = @moneda,
+	      curs_valutar = @cursValutar,
+	      data_curs_valutar = @dataCurs,
+	      valoare_ron = CAST(@valoareRon AS NUMERIC),
+	      articole_suplimentare = PARSE_JSON(@articoleSuplimentare),
+	      data_actualizare = CURRENT_TIMESTAMP(),
+	      continut_json = PARSE_JSON(@continutJson),
+	      Observatii = @observatii,
+	      versiune = versiune + 1
+	    WHERE ID_Contract = @contractId
+	  `;
 
-	const parametriiUpdate = {
-	  contractId: contractInfo.contractExistentId,
-	  valoare: contractInfo.sumaOriginalaNumeric || contractInfo.sumaFinala,
-	  moneda: contractInfo.monedaOriginalaForDB || 'RON',
-	  cursValutar: cursValutarPrincipal,
-	  dataCurs: dataCursValutar,
-	  valoareRon: contractInfo.sumaFinala,
-	  articoleSuplimentare: JSON.stringify([]),
-	  continutJson: JSON.stringify({
-	    snapshot_original: {
-	      subproiecte_originale: contractInfo.subproiecte || [],
-	      data_snapshot: new Date().toISOString()
+	  // Forțează conversie la numeric pentru valori multiple
+	  let valoarePentruDB = contractInfo.sumaFinala; // fallback la suma în RON
+	  if (contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0) {
+	    // Folosește prima valoare din prima etapă sau suma totală
+	    const primeaEtapa = contractInfo.termenePersonalizate[0];
+	    if (primeaEtapa && primeaEtapa.moneda === 'RON') {
+	      valoarePentruDB = primeaEtapa.valoare || contractInfo.sumaFinala;
+	    }
+	  }
+
+	  const parametriiUpdate = {
+	    contractId: contractInfo.contractExistentId,
+	    valoare: valoarePentruDB.toString(),
+	    moneda: contractInfo.monedaOriginalaForDB || 'RON',
+	    cursValutar: cursValutarPrincipal,
+	    dataCurs: dataCursValutar,
+	    valoareRon: contractInfo.sumaFinala.toString(),
+	    articoleSuplimentare: JSON.stringify([]),
+	    continutJson: JSON.stringify({
+	      snapshot_original: {
+		subproiecte_originale: contractInfo.subproiecte || [],
+		data_snapshot: new Date().toISOString()
+	      },
+	      placeholderData: contractInfo.placeholderData
+	    }),
+	    observatii: sanitizeStringForBigQuery(contractInfo.observatii)
+	  };
+
+	  await bigquery.query({
+	    query: updateQuery,
+	    params: parametriiUpdate,
+	    types: {
+	      contractId: 'STRING',
+	      valoare: 'STRING',
+	      moneda: 'STRING',
+	      cursValutar: 'NUMERIC',
+	      dataCurs: 'DATE',
+	      valoareRon: 'STRING',
+	      articoleSuplimentare: 'STRING',
+	      continutJson: 'STRING',
+	      observatii: 'STRING'
 	    },
-	    placeholderData: contractInfo.placeholderData
-	  }),
-	  observatii: sanitizeStringForBigQuery(contractInfo.observatii)
-	};
-
-	await bigquery.query({
-	  query: updateQuery,
-	  params: parametriiUpdate,
-	  types: {
-	    contractId: 'STRING',
-	    valoare: 'STRING',
-	    moneda: 'STRING',
-	    cursValutar: 'NUMERIC',
-	    dataCurs: 'DATE',
-	    valoareRon: 'NUMERIC',
-	    articoleSuplimentare: 'STRING',
-	    continutJson: 'STRING',
-	    observatii: 'STRING'
-	  },
-	  location: 'EU',
-	});
+	    location: 'EU',
+	  });
       
     } else {
       const insertQuery = `
@@ -1186,7 +1196,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         VALUES 
         (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
          @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
-         @status, @valoare, @moneda, @cursValutar, @dataCurs, @valoareRon,
+         @status, CAST(@valoare AS NUMERIC), @moneda, @cursValutar, @dataCurs, CAST(@valoareRon AS NUMERIC),
          PARSE_JSON(@articoleSuplimentare), 
          CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 
          PARSE_JSON(@continutJson), @observatii, @versiune)
@@ -1204,7 +1214,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         dataSemnare: dataSemnare,
         dataExpirare: dataExpirare,
         status: 'Generat',
-        valoare: contractInfo.sumaOriginalaNumeric || contractInfo.sumaFinala,
+        valoare: valoarePentruDB.toString(),
         moneda: contractInfo.monedaOriginalaForDB || 'RON',
         cursValutar: cursValutarPrincipal,
         dataCurs: dataCursValutar,
