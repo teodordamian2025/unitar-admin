@@ -170,7 +170,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
   try {
     console.log('[PV-CONTRACT] Căutare contract/anexe pentru:', { proiectId, subproiecteIds });
 
-    let contractData = null;
+    let contractData: any = null;
     let anexeData: any[] = [];
 
     // 1. CĂUTARE CONTRACT PRINCIPAL
