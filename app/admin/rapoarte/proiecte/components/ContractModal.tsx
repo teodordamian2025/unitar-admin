@@ -2793,7 +2793,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     anexaEtape.some(t => !t.denumire.trim()) || 
                     anexaEtape.length === 0 ||
                     !anexaDataStart ||
-                    !anexaDataFinal
+                    !anexaDataFinal ||
                     !anexaDescrierelucrari.trim()
                   ))
                 }
@@ -2809,7 +2809,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       anexaEtape.some(t => !t.denumire.trim()) || 
                       anexaEtape.length === 0 ||
                       !anexaDataStart ||
-                      !anexaDataFinal
+                      !anexaDataFinal ||
                       !anexaDescrierelucrari.trim()
                     ))
                   ) ? '#bdc3c7' : 
@@ -2828,7 +2828,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       anexaEtape.some(t => !t.denumire.trim()) || 
                       anexaEtape.length === 0 ||
                       !anexaDataStart ||
-                      !anexaDataFinal
+                      !anexaDataFinal ||
                       !anexaDescrierelucrari.trim()
                     ))
                   ) ? 'not-allowed' : 'pointer',
