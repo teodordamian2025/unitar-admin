@@ -16,6 +16,7 @@ Prezenta anexă are ca obiect completarea și/sau modificarea contractului princ
 
 **{{proiect.denumire}}**
 
+**Descriere lucrări anexă:**
 {{anexa.descriere_lucrari}}
 
 {{proiect.adresa}}

@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectActions.tsx
-// DATA: 27.08.2025 02:30 (ora României)
-// MODIFICAT: Adăugat buton Contract doar pentru proiecte principale
-// PĂSTRATE: Toate funcționalitățile existente + buton Contract corect
+// DATA: 07.09.2025 21:00 (ora României)
+// MODIFICAT: Adăugat buton Proces Verbal în dropdown pentru proiecte principale
+// PĂSTRATE: Toate funcționalitățile existente + logica Contract
 // ==================================================================
 
 'use client';
@@ -50,6 +50,7 @@ interface ProiectActionsProps {
   onShowSubproiectModal?: (proiect: any) => void;
   onShowEditModal?: (proiect: any) => void;
   onShowContractModal?: (proiect: any) => void;
+  onShowPVModal?: (proiect: any) => void;  // ✅ NOU: Callback pentru PV
 }
 
 // System global pentru management dropdown-uri multiple
@@ -106,7 +107,8 @@ export default function ProiectActions({
   onShowFacturaModal, 
   onShowSubproiectModal,
   onShowEditModal,
-  onShowContractModal
+  onShowContractModal,
+  onShowPVModal  // ✅ NOU: Callback PV
 }: ProiectActionsProps) {
   
   // State pentru modalul de sarcini
@@ -170,7 +172,7 @@ export default function ProiectActions({
       {
         key: 'add_subproiect',
         label: 'Adaugă Subproiect',
-        icon: '📁',
+        icon: '📄',
         color: 'primary' as const,
         disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
       },
@@ -194,6 +196,14 @@ export default function ProiectActions({
         label: 'Generează Contract',
         icon: '📄',
         color: 'primary',
+        disabled: proiect.Status === 'Anulat'
+      },
+      // ✅ NOU: BUTON PROCES VERBAL - doar pentru proiecte principale
+      {
+        key: 'generate_pv',
+        label: 'Generează Proces Verbal',
+        icon: '📋',
+        color: 'success',
         disabled: proiect.Status === 'Anulat'
       },
       {
@@ -254,6 +264,9 @@ export default function ProiectActions({
         case 'generate_contract':
           handleGenerateContract();
           break;
+        case 'generate_pv':  // ✅ NOU: Handler pentru PV
+          handleGeneratePV();
+          break;
         case 'mark_completed':
           await handleUpdateStatus('Finalizat');
           break;
@@ -297,13 +310,23 @@ export default function ProiectActions({
     }
   };
 
-  // Handler pentru Contract (NOU)
+  // Handler pentru Contract
   const handleGenerateContract = () => {
     if (onShowContractModal) {
       onShowContractModal(proiect);
     } else {
       console.warn('onShowContractModal callback not provided');
       showToast('Funcția de generare contract nu este disponibilă', 'error');
+    }
+  };
+
+  // ✅ NOU: Handler pentru Proces Verbal
+  const handleGeneratePV = () => {
+    if (onShowPVModal) {
+      onShowPVModal(proiect);
+    } else {
+      console.warn('onShowPVModal callback not provided');
+      showToast('Funcția de generare proces verbal nu este disponibilă', 'error');
     }
   };
 
@@ -653,7 +676,7 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                   marginBottom: '0.5rem',
                   fontFamily: 'monospace'
                 }}>
-                  {proiect.tip === 'subproiect' ? '📁' : '🗃️'} {proiect.ID_Proiect}
+                  {proiect.tip === 'subproiect' ? '📄' : '🗃️'} {proiect.ID_Proiect}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                   Status: <span style={{ 
@@ -754,6 +777,20 @@ function EnhancedActionDropdown({ actions, onAction, proiect }: EnhancedActionDr
                             marginLeft: '0.5rem',
                             fontSize: '10px',
                             background: '#3498db',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '8px',
+                            fontWeight: 'bold'
+                          }}>
+                            NOU
+                          </span>
+                        )}
+                        {/* ✅ NOU: Badge pentru PV */}
+                        {action.key === 'generate_pv' && (
+                          <span style={{
+                            marginLeft: '0.5rem',
+                            fontSize: '10px',
+                            background: '#27ae60',
                             color: 'white',
                             padding: '2px 6px',
                             borderRadius: '8px',

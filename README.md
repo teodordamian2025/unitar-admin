@@ -392,12 +392,12 @@ Tabele Bigquery: Sarcini, SarciniResponsabili, ProiectComentarii, TimeTracking
 Coduri pentru contracte:
 app/api/setari/contracte/route.ts
 app/api/setari/contracte/next-number/route.ts
+app/admin/setari/contracte/page.tsx
+app/api/setari/contracte/templates/route.ts
 app/api/actions/contracts/generate/route.ts
 app/api/rapoarte/contracte/route.ts
 app/admin/rapoarte/proiecte/components/ContractModal.tsx
-app/admin/setari/contracte/page.tsx
 uploads/contracte/templates/contract-template.txt  = sablon contract cu placeholdere
-app/api/setari/contracte/templates/route.ts
 scripts/setup-contract-templates.js = sters, pentru ca incurca la folosirea template
 lib/templates-helpers.ts
 app/api/rapoarte/etape-contract/route.ts
@@ -405,6 +405,11 @@ Tabel Bigquery Contracte si EtapeContract
 
 Coduri pentru anexe contract:
 app/api/rapoarte/anexe-contract/route.ts
+
+Coduri pentru PV procese verbale predare:
+app/admin/rapoarte/proiecte/components/ProcesVerbalModal.tsx
+app/api/actions/pv/generate/route.ts
+app/api/rapoarte/procese-verbale/route.ts
 
 Coduri legate de chatbot si Bigquery:
 app/api/gueryOpenAI/route.ts

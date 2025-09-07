@@ -1,88 +1,33 @@
-**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{anexa.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**
+[CENTER]**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**[/CENTER]
 
-Prin prezen
+Încheiat azi {{pv.data}} între:
 
-**CAP.I. PĂRȚI CONTRACTANTE**
-
-1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
+**S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare **PRESTATOR**.
 
 Și
 
-2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare **PRESTATOR**.
+**{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
 
-au convenit să încheie prezenta anexă la contractul de servicii nr. {{contract.numar}} din {{contract.data}} cu următoarele:
-
-**CAP. II. OBIECTUL ANEXEI**
-
-Prezenta anexă are ca obiect completarea și/sau modificarea contractului principal cu următoarele servicii și/sau modificări:
-
-**{{proiect.denumire}}**
-
-{{proiect.adresa}}
-
-**Servicii suplimentare, modificări și/sau completări:**
-- Servicii adiționale necesare pentru finalizarea proiectului
-- Modificări la cerințele inițiale
-- Completări generate de evoluția proiectului
-- Adaptări la specificațiile tehnice actualizate
-
-**CAP. III. DURATA ANEXEI**
-
-1. Anexa se execută în perioada:
-   - **Data început:** {{anexa.data_start}}
-   - **Data finalizare:** {{anexa.data_final}}
-   - **Durata estimată:** {{anexa.durata_zile}} zile
-
-2. Termenele de execuție se adaugă la termenele contractului principal sau se execută în paralel, conform programului de lucru convenit.
-
-**CAP. IV. PREȚUL DE EXECUTARE PENTRU ANEXĂ**
-
-1. Prețul pe care **BENEFICIARUL** îl datorează **PRESTATORULUI** pentru serviciile din prezenta anexă este de **{{suma_totala_originala}} {{moneda_originala}}** la care se aplică suplimentar TVA în vigoare{{valuta_clause}}.
-
-2. **Programul de plăți pentru anexă:**
-
-{{termene_personalizate}}
-
-3. Plățile se vor efectua prin transfer bancar în conturile:
-   - **Cont principal:** {{firma.cont_ing}} (ING Bank)
-   - **Cont trezorerie:** {{firma.cont_trezorerie}} (Trezoreria Sectorului 3 București)
-
-**CAP. V. CLAUZE SPECIALE PENTRU ANEXĂ**
-
-1. **Relația cu contractul principal:** Prezenta anexă constituie parte integrantă din contractul principal nr. {{contract.numar}} și completează obiectul acestuia.
-
-2. **Aplicabilitatea clauzelor:** Pentru toate aspectele nereglementate în prezenta anexă, se aplică prevederile contractului principal.
-
-3. **Responsabilități:** Părțile își mențin responsabilitățile și obligațiile din contractul principal, la care se adaugă cele stipulate în prezenta anexă.
-
-4. **Modificări:** Orice modificare a prezentei anexe se poate face doar prin acord scris între părți, prin anexe ulterioare.
-
-**CAP. VI. DISPOZIȚII FINALE**
-
-1. Prezenta anexă intră în vigoare la data semnării și rămâne valabilă pe toată durata de execuție.
-
-2. Anexa a fost încheiată în 2 (două) exemplare originale, câte unul pentru fiecare parte contractantă.
-
-3. **Forța majoră, litigiile și legislația aplicabilă** sunt cele stipulate în contractul principal.
+Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} exemplare din **{{proiect.denumire}}** {{proiect.adresa}} {{subproiecte_lista}}.
 
 {{observatii_clause}}
 
 ---
 
-**SEMNAT ÎN DATA: {{anexa.data}}**
+[CENTER]**SEMNAT ÎN DATA: {{pv.data}}**[/CENTER]
 
-**BENEFICIAR:**
+[CENTER]**BENEFICIAR:**[/CENTER]
 
-**{{client.nume}}**
-{{client.reprezentant}}
+[CENTER]**{{client.nume}}**[/CENTER]
+[CENTER]{{client.reprezentant}}[/CENTER]
 
-.................................
+[CENTER].................................[/CENTER]
 
 
-**PRESTATOR:**
+[CENTER]**PRESTATOR:**[/CENTER]
 
-**S.C. UNITAR PROIECT TDA S.R.L.**
-**DAMIAN TEODOR**
-Administrator
+[CENTER]**S.C. UNITAR PROIECT TDA S.R.L.**[/CENTER]
+[CENTER]**DAMIAN TEODOR**[/CENTER]
+[CENTER]Administrator[/CENTER]
 
-.................................
+[CENTER].................................[/CENTER]

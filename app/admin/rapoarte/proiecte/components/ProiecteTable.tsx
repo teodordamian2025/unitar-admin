@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiecteTable.tsx
-// DATA: 16.08.2025 12:30 (ora RomÃ¢niei)
-// FIX PRINCIPAL: Eliminare fortare 4 zecimale + validari sigure pentru .toFixed()
-// PĂSTRATE: Toate funcționalitățile existente + precizie originala cursuri
+// DATA: 07.09.2025 21:15 (ora României)
+// MODIFICAT: Adăugat integrare ProcesVerbalModal pentru generarea PV-urilor
+// PĂSTRATE: Toate funcționalitățile existente + pattern identic cu ContractModal
 // ==================================================================
 
 'use client';
@@ -13,7 +13,8 @@ import ProiectNouModal from './ProiectNouModal';
 import FacturaHibridModal from './FacturaHibridModal';
 import SubproiectModal from './SubproiectModal';
 import ProiectEditModal from './ProiectEditModal';
-import ContractModal from './ContractModal';  // ✅ ADĂUGAT: Import ContractModal
+import ContractModal from './ContractModal';
+import ProcesVerbalModal from './ProcesVerbalModal';  // ✅ NOU: Import ProcesVerbalModal
 
 // Interfețe PĂSTRATE identic
 interface Proiect {
@@ -178,7 +179,7 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
-  // State variables - PĂSTRATE identic
+  // State variables - PĂSTRATE identic + ADĂUGAT state pentru PV
   const [proiecte, setProiecte] = useState<Proiect[]>([]);
   const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,6 +194,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProiect, setSelectedProiect] = useState<any>(null);
   const [showContractModal, setShowContractModal] = useState(false);
+  const [showPVModal, setShowPVModal] = useState(false);  // ✅ NOU: State pentru PV Modal
   
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
@@ -314,99 +316,99 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [searchParams]);
 
-	// Toate funcțiile de încărcare date - PĂSTRATE identic
-	const loadData = async () => {
-	  try {
-	    setLoading(true);
-	    await Promise.all([loadProiecte(), loadSubproiecte()]);
-	  } catch (error) {
-	    console.error('Eroare la încărcarea datelor:', error);
-	    showToast('Eroare de conectare la baza de date', 'error');
-	  } finally {
-	    setLoading(false);
-	  }
-	};
+  // Toate funcțiile de încărcare date - PĂSTRATE identic
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([loadProiecte(), loadSubproiecte()]);
+    } catch (error) {
+      console.error('Eroare la încărcarea datelor:', error);
+      showToast('Eroare de conectare la baza de date', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	const loadProiecte = async () => {
-	  try {
-	    const queryParams = new URLSearchParams();
-	    if (searchParams) {
-	      Object.entries(searchParams).forEach(([key, value]) => {
-		if (value && key !== 'invoice_status' && key !== 'project_id') {
-		  queryParams.append(key, value);
-		}
-	      });
-	    }
+  const loadProiecte = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+          if (value && key !== 'invoice_status' && key !== 'project_id') {
+            queryParams.append(key, value);
+          }
+        });
+      }
 
-	    const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
-	    if (!response.ok) {
-	      throw new Error(`HTTP ${response.status}`);
-	    }
-	    
-	    const data = await response.json();
-	    
-	    console.log('=== DEBUG: Date RAW din BigQuery ===');
-	    console.log('Sample proiect din API:', data.data[0]);
-	    console.log('Data_Start raw:', data.data[0]?.Data_Start);
-	    console.log('Data_Final raw:', data.data[0]?.Data_Final);
-	    console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
-	    
-	    if (data.success) {
-	      // FIX: Procesează obiectele DATE de la BigQuery
-	      const proiecteFormatate = (data.data || []).map((p: any) => ({
-		...p,
-		Data_Start: p.Data_Start?.value || p.Data_Start,
-		Data_Final: p.Data_Final?.value || p.Data_Final,
-		data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
-		tip: 'proiect' as const
-	      }));
-	      setProiecte(proiecteFormatate);
-	    } else {
-	      throw new Error(data.error || 'Eroare la încărcarea proiectelor');
-	    }
-	  } catch (error) {
-	    console.error('Eroare la încărcarea proiectelor:', error);
-	    setProiecte([]);
-	  }
-	};
+      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      console.log('=== DEBUG: Date RAW din BigQuery ===');
+      console.log('Sample proiect din API:', data.data[0]);
+      console.log('Data_Start raw:', data.data[0]?.Data_Start);
+      console.log('Data_Final raw:', data.data[0]?.Data_Final);
+      console.log('Tipul Data_Start:', typeof data.data[0]?.Data_Start);
+      
+      if (data.success) {
+        // FIX: Procesează obiectele DATE de la BigQuery
+        const proiecteFormatate = (data.data || []).map((p: any) => ({
+          ...p,
+          Data_Start: p.Data_Start?.value || p.Data_Start,
+          Data_Final: p.Data_Final?.value || p.Data_Final,
+          data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
+          tip: 'proiect' as const
+        }));
+        setProiecte(proiecteFormatate);
+      } else {
+        throw new Error(data.error || 'Eroare la încărcarea proiectelor');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea proiectelor:', error);
+      setProiecte([]);
+    }
+  };
 
-	const loadSubproiecte = async () => {
-	  try {
-	    const queryParams = new URLSearchParams();
-	    if (searchParams) {
-	      Object.entries(searchParams).forEach(([key, value]) => {
-		if (value && key !== 'invoice_status' && key !== 'project_id') {
-		  queryParams.append(key, value);
-		}
-	      });
-	    }
+  const loadSubproiecte = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+          if (value && key !== 'invoice_status' && key !== 'project_id') {
+            queryParams.append(key, value);
+          }
+        });
+      }
 
-	    const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
-	    if (!response.ok) {
-	      throw new Error(`HTTP ${response.status}`);
-	    }
-	    
-	    const data = await response.json();
-	    
-	    if (data.success) {
-	      // FIX: Procesează obiectele DATE de la BigQuery pentru subproiecte
-	      const subproiecteFormatate = (data.data || []).map((s: any) => ({
-		...s,
-		Data_Start: s.Data_Start?.value || s.Data_Start,
-		Data_Final: s.Data_Final?.value || s.Data_Final,
-		data_curs_valutar: s.data_curs_valutar?.value || s.data_curs_valutar
-	      }));
-	      setSubproiecte(subproiecteFormatate);
-	    } else {
-	      setSubproiecte([]);
-	    }
-	  } catch (error) {
-	    console.error('Eroare la încărcarea subproiectelor:', error);
-	    setSubproiecte([]);
-	  }
-	};
+      const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // FIX: Procesează obiectele DATE de la BigQuery pentru subproiecte
+        const subproiecteFormatate = (data.data || []).map((s: any) => ({
+          ...s,
+          Data_Start: s.Data_Start?.value || s.Data_Start,
+          Data_Final: s.Data_Final?.value || s.Data_Final,
+          data_curs_valutar: s.data_curs_valutar?.value || s.data_curs_valutar
+        }));
+        setSubproiecte(subproiecteFormatate);
+      } else {
+        setSubproiecte([]);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea subproiectelor:', error);
+      setSubproiecte([]);
+    }
+  };
 
-  // Toate handler-ele - PĂSTRATE identic
+  // Toate handler-ele - PĂSTRATE identic + ADĂUGAT handler pentru PV
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     showToast('Date actualizate!', 'success');
@@ -430,6 +432,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const handleShowContractModal = (proiect: any) => {
     setSelectedProiect(proiect);
     setShowContractModal(true);
+  };
+
+  // ✅ NOU: Handler pentru PV Modal
+  const handleShowPVModal = (proiect: any) => {
+    setSelectedProiect(proiect);
+    setShowPVModal(true);
   };
 
   const handleFacturaSuccess = (invoiceId: string, downloadUrl?: string) => {
@@ -467,6 +475,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     handleRefresh();
   };
 
+  // ✅ NOU: Handler pentru PV Success
+  const handlePVSuccess = () => {
+    setShowPVModal(false);
+    setSelectedProiect(null);
+    showToast('Proces Verbal generat cu succes!', 'success');
+    handleRefresh();
+  };
+
   const handleCloseFacturaModal = () => {
     setShowFacturaModal(false);
     setSelectedProiect(null);
@@ -484,6 +500,12 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   
   const handleCloseContractModal = () => {
     setShowContractModal(false);
+    setSelectedProiect(null);
+  };
+
+  // ✅ NOU: Handler pentru PV Close
+  const handleClosePVModal = () => {
+    setShowPVModal(false);
     setSelectedProiect(null);
   };
 
@@ -544,22 +566,32 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-// FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ
-const formatDate = (dateString?: string | null) => {
-  console.log('formatDate primește:', dateString, 'tip:', typeof dateString);
-  if (!dateString || dateString === 'null' || dateString === 'undefined') {
-    return (
-      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-        Data lipsă
-      </span>
-    );
-  }
-  
-  try {
-    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (isoDateRegex.test(dateString)) {
-      const date = new Date(dateString + 'T00:00:00');
+  // FIX PRINCIPAL: Funcție formatDate SIMPLIFICATĂ
+  const formatDate = (dateString?: string | null) => {
+    console.log('formatDate primește:', dateString, 'tip:', typeof dateString);
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Data lipsă
+        </span>
+      );
+    }
+    
+    try {
+      const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (isoDateRegex.test(dateString)) {
+        const date = new Date(dateString + 'T00:00:00');
+        
+        if (!isNaN(date.getTime())) {
+          return (
+            <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+              {date.toLocaleDateString()}
+            </span>
+          );
+        }
+      }
       
+      const date = new Date(dateString);
       if (!isNaN(date.getTime())) {
         return (
           <span style={{ color: '#2c3e50', fontWeight: '500' }}>
@@ -567,31 +599,21 @@ const formatDate = (dateString?: string | null) => {
           </span>
         );
       }
-    }
-    
-    const date = new Date(dateString);
-    if (!isNaN(date.getTime())) {
+      
       return (
-        <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-          {date.toLocaleDateString()}
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Data invalidă
+        </span>
+      );
+    } catch (error) {
+      console.warn('Eroare formatare dată:', dateString, error);
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Eroare formatare
         </span>
       );
     }
-    
-    return (
-      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-        Data invalidă
-      </span>
-    );
-  } catch (error) {
-    console.warn('Eroare formatare dată:', dateString, error);
-    return (
-      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-        Eroare formatare
-      </span>
-    );
-  }
-};
+  };
 
   // FIX PRINCIPAL: Funcții pentru currency cu validări sigure și precizie originală
   const recalculeazaValoareaCuCursBNRLive = (
@@ -699,7 +721,7 @@ const formatDate = (dateString?: string | null) => {
               borderRadius: '3px', 
               fontSize: '9px'
             }}>
-              ⳼
+              ⏼
             </span>
           )}
         </div>
@@ -833,7 +855,7 @@ const formatDate = (dateString?: string | null) => {
         border: '1px solid rgba(255, 255, 255, 0.3)',
         zIndex: 1
       }}>
-        ⳼ Se încarcă proiectele...
+        ⏼ Se încarcă proiectele...
       </div>
     );
   }
@@ -888,7 +910,7 @@ const formatDate = (dateString?: string | null) => {
                 fontSize: '11px',
                 fontWeight: 'bold'
               }}>
-                {loadingCursuri ? '⳼ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
+                {loadingCursuri ? '⏼ Se actualizează cursuri BNR...' : `💱 ${Object.keys(cursuriLive).length} cursuri BNR LIVE`}
               </span>
             )}
             <br/>
@@ -1224,6 +1246,7 @@ const formatDate = (dateString?: string | null) => {
                             onShowSubproiectModal={handleShowSubproiectModal}
                             onShowEditModal={handleShowEditModal}
                             onShowContractModal={handleShowContractModal}
+                            onShowPVModal={handleShowPVModal}  // ✅ NOU: Callback pentru PV
                           />
                         </td>
                       </tr>
@@ -1354,6 +1377,7 @@ const formatDate = (dateString?: string | null) => {
                               onShowSubproiectModal={handleShowSubproiectModal}
                               onShowEditModal={handleShowEditModal}
                               onShowContractModal={handleShowContractModal}
+                              onShowPVModal={handleShowPVModal}  // ✅ NOU: Callback pentru PV și pentru subproiecte
                             />
                           </td>
                         </tr>
@@ -1444,7 +1468,7 @@ const formatDate = (dateString?: string | null) => {
         </div>
       )}
 
-      {/* Toate modalele - PĂSTRATE identic */}
+      {/* Toate modalele - PĂSTRATE identic + ADĂUGAT ProcesVerbalModal */}
       {showProiectModal && (
         <div style={{ zIndex: 50000 }}>
           <ProiectNouModal
@@ -1487,6 +1511,7 @@ const formatDate = (dateString?: string | null) => {
           />
         </div>
       )}
+
       {showContractModal && selectedProiect && (
         <div style={{ zIndex: 50000 }}>
           <ContractModal
@@ -1494,6 +1519,18 @@ const formatDate = (dateString?: string | null) => {
             isOpen={showContractModal}
             onClose={handleCloseContractModal}
             onSuccess={handleContractSuccess}
+          />
+        </div>
+      )}
+
+      {/* ✅ NOU: Modal pentru Proces Verbal */}
+      {showPVModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <ProcesVerbalModal
+            proiect={selectedProiect}
+            isOpen={showPVModal}
+            onClose={handleClosePVModal}
+            onSuccess={handlePVSuccess}
           />
         </div>
       )}
