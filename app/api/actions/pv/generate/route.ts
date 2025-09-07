@@ -274,11 +274,12 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
 
       // Subproiectele în anexe sunt cele găsite mai sus
       anexeData.forEach(anexa => {
-        subproiecteInAnexe.push(...anexa.subproiecte_ids.filter((id: string) => subproiecteIds.includes(id)));
+        anexa.subproiecte_ids.forEach((id: string) => {
+          if (subproiecteIds.includes(id) && subproiecteInAnexe.indexOf(id) === -1) {
+            subproiecteInAnexe.push(id);
+          }
+        });
       });
-
-      // Elimină duplicatele
-      subproiecteInAnexe = [...new Set(subproiecteInAnexe)];
     }
 
     return {
