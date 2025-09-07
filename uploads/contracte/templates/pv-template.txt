@@ -1,4 +1,4 @@
-[CENTER]**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**[/CENTER]
+[CENTER]**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} {{contract_sau_anexa_text}}**[/CENTER]
 
 Încheiat azi {{pv.data}} între:
 

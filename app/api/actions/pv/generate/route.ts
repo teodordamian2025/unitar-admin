@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/pv/generate/route.ts
-// DATA: 07.09.2025 20:30 (ora României)
-// DESCRIERE: API pentru generarea Proceselor Verbale de Predare-Primire
-// PĂSTRATE: Toate pattern-urile din contracte + logica template processing
+// DATA: 07.09.2025 22:15 (ora României)
+// MODIFICAT: Adăugată logica inteligentă pentru căutarea contract/anexe
+// PĂSTRATE: Toate funcționalitățile existente + corectare [CENTER] markers
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,7 +14,7 @@ import path from 'path';
 const PROJECT_ID = 'hale-mode-464009-i6';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
 
-// Cursuri valutare pentru conversii - PĂSTRAT din contracte
+// Cursuri valutare pentru conversii - PĂSTRAT identic
 const CURSURI_VALUTAR: { [key: string]: number } = {
   'EUR': 5.0683,
   'USD': 4.3688,
@@ -31,7 +31,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// TOATE HELPER-urile PĂSTRATE din contracte pentru consistență
+// TOATE HELPER-urile PĂSTRATE identic din original
 const extractSimpleValue = (value: any): any => {
   if (value === null || value === undefined) return null;
   
@@ -129,7 +129,7 @@ const sanitizeStringForBigQuery = (value: any): string | null => {
   return String(value).trim() || null;
 };
 
-// Funcție pentru obținerea următorului număr PV din SetariContracte
+// PĂSTRAT identic - Funcție pentru obținerea următorului număr PV
 async function getNextPVNumber(proiectId?: string): Promise<any> {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/setari/contracte/next-number?tipDocument=pv&proiectId=${proiectId || ''}`);
@@ -143,7 +143,6 @@ async function getNextPVNumber(proiectId?: string): Promise<any> {
         setari: result
       };
     } else {
-      // Fallback dacă nu găsește setări
       const currentYear = new Date().getFullYear();
       const fallbackNumber = Math.floor(Math.random() * 1000) + 100;
       return {
@@ -166,9 +165,146 @@ async function getNextPVNumber(proiectId?: string): Promise<any> {
   }
 }
 
-// Funcție pentru încărcarea datelor proiect (PĂSTRATĂ din contracte)
-async function loadProiectDataForPV(proiectId: string) {
+// NOUĂ FUNCȚIE: Căutare contract și anexe pentru subproiectele selectate
+async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecteIds: string[]) {
   try {
+    console.log('[PV-CONTRACT] Căutare contract/anexe pentru:', { proiectId, subproiecteIds });
+
+    let contractData = null;
+    let anexeData: any[] = [];
+
+    // 1. CĂUTARE CONTRACT PRINCIPAL
+    const contractQuery = `
+      SELECT numar_contract, Data_Semnare, Status, ID_Contract
+      FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+      WHERE proiect_id = @proiectId 
+        AND Status != 'Anulat'
+      ORDER BY data_creare DESC 
+      LIMIT 1
+    `;
+
+    const [contractRows] = await bigquery.query({
+      query: contractQuery,
+      params: { proiectId },
+      location: 'EU',
+    });
+
+    if (contractRows.length > 0) {
+      const contract = contractRows[0];
+      contractData = {
+        numar_contract: contract.numar_contract,
+        data_semnare: formatDate(contract.Data_Semnare),
+        status: contract.Status,
+        id_contract: contract.ID_Contract
+      };
+      
+      console.log('[PV-CONTRACT] Contract principal găsit:', contractData.numar_contract);
+    } else {
+      console.log('[PV-CONTRACT] Nu s-a găsit contract pentru proiectul:', proiectId);
+    }
+
+    // 2. CĂUTARE ANEXE pentru subproiectele selectate (doar dacă sunt subproiecte)
+    if (subproiecteIds.length > 0) {
+      const subproiecteList = subproiecteIds.map(id => `'${id}'`).join(',');
+      
+      const anexeQuery = `
+        SELECT DISTINCT 
+          anexa_numar, 
+          contract_id, 
+          subproiect_id,
+          data_start,
+          data_final
+        FROM \`${PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+        WHERE subproiect_id IN (${subproiecteList})
+          AND activ = true
+        ORDER BY anexa_numar DESC
+      `;
+
+      const [anexeRows] = await bigquery.query({
+        query: anexeQuery,
+        location: 'EU',
+      });
+
+      if (anexeRows.length > 0) {
+        // Grupează anexele după numărul anexei (prioritizează cel mai mare)
+        const anexeMap = new Map();
+        
+        anexeRows.forEach((anexa: any) => {
+          const anexaNum = anexa.anexa_numar;
+          if (!anexeMap.has(anexaNum) || anexeMap.get(anexaNum).anexa_numar < anexaNum) {
+            anexeMap.set(anexaNum, {
+              anexa_numar: anexaNum,
+              contract_id: anexa.contract_id,
+              data_start: formatDate(anexa.data_start),
+              data_final: formatDate(anexa.data_final),
+              subproiecte_ids: []
+            });
+          }
+          anexeMap.get(anexaNum).subproiecte_ids.push(anexa.subproiect_id);
+        });
+
+        anexeData = Array.from(anexeMap.values());
+        
+        console.log('[PV-CONTRACT] Anexe găsite:', anexeData.map(a => `Anexa ${a.anexa_numar}`));
+      }
+    }
+
+    // 3. VERIFICARE ce subproiecte sunt în contract vs anexe
+    let subproiecteInContract: string[] = [];
+    let subproiecteInAnexe: string[] = [];
+
+    if (subproiecteIds.length > 0 && contractData) {
+      // Verifică ce subproiecte sunt în EtapeContract (contractul principal)
+      const etapeContractQuery = `
+        SELECT DISTINCT subproiect_id
+        FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+        WHERE contract_id = '${contractData.id_contract}'
+          AND subproiect_id IS NOT NULL
+          AND activ = true
+      `;
+
+      const [etapeContractRows] = await bigquery.query({
+        query: etapeContractQuery,
+        location: 'EU',
+      });
+
+      subproiecteInContract = etapeContractRows
+        .map((row: any) => row.subproiect_id)
+        .filter((id: string) => subproiecteIds.includes(id));
+
+      // Subproiectele în anexe sunt cele găsite mai sus
+      anexeData.forEach(anexa => {
+        subproiecteInAnexe.push(...anexa.subproiecte_ids.filter((id: string) => subproiecteIds.includes(id)));
+      });
+
+      // Elimină duplicatele
+      subproiecteInAnexe = [...new Set(subproiecteInAnexe)];
+    }
+
+    return {
+      contract: contractData,
+      anexe: anexeData,
+      subproiecte_in_contract: subproiecteInContract,
+      subproiecte_in_anexe: subproiecteInAnexe,
+      has_mix: subproiecteInContract.length > 0 && subproiecteInAnexe.length > 0
+    };
+
+  } catch (error) {
+    console.error('[PV-CONTRACT] Eroare la căutarea contract/anexe:', error);
+    return {
+      contract: null,
+      anexe: [],
+      subproiecte_in_contract: [],
+      subproiecte_in_anexe: [],
+      has_mix: false
+    };
+  }
+}
+
+// MODIFICAT: Funcție pentru încărcarea datelor proiect cu contract/anexe
+async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] = []) {
+  try {
+    // PĂSTRAT: Încărcarea proiectului
     const proiectQuery = `
       SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\`
       WHERE ID_Proiect = @proiectId
@@ -187,7 +323,7 @@ async function loadProiectDataForPV(proiectId: string) {
     
     const proiectRaw = proiectRows[0];
     
-    // Încarcă date client (ca în contracte)
+    // PĂSTRAT: Încarcă date client
     let clientData: any = null;
     if (proiectRaw.Client) {
       const clientQuery = `
@@ -208,7 +344,7 @@ async function loadProiectDataForPV(proiectId: string) {
       }
     }
     
-    // Încarcă subproiecte
+    // PĂSTRAT: Încarcă subproiecte
     const subproiecteQuery = `
       SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
       WHERE ID_Proiect = @proiectId
@@ -221,6 +357,9 @@ async function loadProiectDataForPV(proiectId: string) {
       params: { proiectId },
       location: 'EU',
     });
+
+    // NOU: Căutare contract și anexe
+    const contractInfo = await findContractAndAnexeForSubproiecte(proiectId, subproiecteIds);
     
     const proiectProcessed = {
       ID_Proiect: extractSimpleValue(proiectRaw.ID_Proiect),
@@ -261,7 +400,8 @@ async function loadProiectDataForPV(proiectId: string) {
     
     return {
       proiect: proiectProcessed,
-      subproiecte: subproiecteProcessed
+      subproiecte: subproiecteProcessed,
+      contractInfo: contractInfo  // NOU: Informații contract/anexe
     };
     
   } catch (error) {
@@ -270,11 +410,46 @@ async function loadProiectDataForPV(proiectId: string) {
   }
 }
 
-// Procesarea placeholder-urilor pentru PV (adaptat din contracte)
+// NOUĂ FUNCȚIE: Determină textul pentru contract/anexă în template
+function determineContractText(contractInfo: any, subproiecteIds: string[]): string {
+  const { contract, anexe, subproiecte_in_contract, subproiecte_in_anexe, has_mix } = contractInfo;
+
+  console.log('[PV-CONTRACT] Determinare text pentru template:', {
+    hasContract: !!contract,
+    anexeCount: anexe.length,
+    subproiecteInContract: subproiecte_in_contract.length,
+    subproiecteInAnexe: subproiecte_in_anexe.length,
+    hasMix: has_mix
+  });
+
+  // Cazul 1: Nu există contract
+  if (!contract) {
+    return 'LA CONTRACTUL [LIPSĂ CONTRACT - Proiectul nu are încă contract]';
+  }
+
+  // Cazul 2: Mix de subproiecte (unele în contract, altele în anexe)
+  if (has_mix && anexe.length > 0) {
+    const anexaNumar = Math.max(...anexe.map(a => a.anexa_numar));
+    return `LA CONTRACTUL NR. ${contract.numar_contract} din ${contract.data_semnare} ȘI ANEXA NR. ${anexaNumar}`;
+  }
+
+  // Cazul 3: Doar anexe (subproiectele sunt doar în anexe)
+  if (anexe.length > 0 && subproiecte_in_contract.length === 0 && subproiecte_in_anexe.length > 0) {
+    const anexaNumar = Math.max(...anexe.map(a => a.anexa_numar));
+    const anexaData = anexe.find(a => a.anexa_numar === anexaNumar);
+    const dataAnexa = anexaData?.data_start || contract.data_semnare;
+    return `LA CONTRACTUL NR. ${contract.numar_contract} - ANEXA NR. ${anexaNumar} din ${dataAnexa}`;
+  }
+
+  // Cazul 4: Doar contract (clasic)
+  return `LA CONTRACTUL NR. ${contract.numar_contract} din ${contract.data_semnare}`;
+}
+
+// MODIFICAT: Procesarea placeholder-urilor pentru PV cu logica dinamică
 function processPVPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // ÎNLOCUIRI SIMPLE DIRECTE
+  // ÎNLOCUIRI SIMPLE DIRECTE - PĂSTRATE din original
   const simpleReplacements: { [key: string]: string } = {
     // PV info
     '{{pv.numar}}': data.pv?.numar || 'PV-NR-TBD',
@@ -296,7 +471,7 @@ function processPVPlaceholders(text: string, data: any): string {
     '{{proiect.data_final}}': data.proiect?.data_final || 'TBD',
     '{{proiect.responsabil}}': data.proiect?.responsabil || '',
     
-    // Firma info (identic cu contractele)
+    // Firma info - PĂSTRAT identic
     '{{firma.nume}}': 'UNITAR PROIECT TDA SRL',
     '{{firma.cui}}': 'RO35639210',
     '{{firma.nr_reg_com}}': 'J2016002024405',
@@ -304,7 +479,14 @@ function processPVPlaceholders(text: string, data: any): string {
     '{{firma.telefon}}': '0765486044',
     '{{firma.email}}': 'contact@unitarproiect.eu',
     '{{firma.cont_ing}}': 'RO82INGB0000999905667533',
-    '{{firma.cont_trezorerie}}': 'RO29TREZ7035069XXX018857'
+    '{{firma.cont_trezorerie}}': 'RO29TREZ7035069XXX018857',
+    
+    // NOU: Placeholder dinamic pentru contract/anexă
+    '{{contract_sau_anexa_text}}': data.contract_sau_anexa_text || 'LA CONTRACTUL [NEDETERMINAT]',
+    
+    // COMPATIBILITATE RETROACTIVĂ: Păstrează placeholder-urile vechi
+    '{{contract.numar}}': data.contract?.numar || '[VEZI contract_sau_anexa_text]',
+    '{{contract.data}}': data.contract?.data || new Date().toLocaleDateString('ro-RO')
   };
   
   // Aplică înlocuirile simple
@@ -313,7 +495,7 @@ function processPVPlaceholders(text: string, data: any): string {
     processed = processed.replace(regex, value);
   }
   
-  // PROCESARE COMPLEXĂ pentru secțiuni condiționale
+  // PROCESARE COMPLEXĂ pentru secțiuni condiționale - PĂSTRAT din original
   
   // Adresa execuție
   if (data.proiect?.adresa && data.proiect.adresa.trim()) {
@@ -342,21 +524,22 @@ function processPVPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// Conversie TXT la DOCX (PĂSTRATĂ din contracte)
+// MODIFICAT: Conversie TXT la DOCX cu CORECTAREA [CENTER] markers
 function convertTextToWordXml(text: string): string {
   const paragraphs = text.split('\n').map(line => {
     if (line.trim() === '') {
       return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
     }
+    
     // Detectează și procesează markerele de centrare
-  const shouldCenter = line.includes('[CENTER]');
-  const cleanLine = line.replace(/\[CENTER\]|\[\/CENTER\]/g, '');
-  const alignment = shouldCenter ? '<w:jc w:val="center"/>' : '';
-  
-  // Folosește cleanLine în loc de line pentru restul procesării
-  if (cleanLine.trim() === '') {
-    return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
-  }
+    const shouldCenter = line.includes('[CENTER]');
+    const cleanLine = line.replace(/\[CENTER\]|\[\/CENTER\]/g, '');  // CURĂȚĂ markerele
+    const alignment = shouldCenter ? '<w:jc w:val="center"/>' : '';
+    
+    // CORECTARE: Folosește cleanLine în loc de line pentru restul procesării
+    if (cleanLine.trim() === '') {
+      return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
+    }
     
     if (cleanLine.includes('**')) {
       let processedLine = cleanLine;
@@ -382,7 +565,8 @@ function convertTextToWordXml(text: string): string {
       return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr>${result}</w:p>`;
     }
     
-    return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${line}</w:t></w:r></w:p>`;
+    // CORECTARE PRINCIPALĂ: Folosește cleanLine în loc de line
+    return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${cleanLine}</w:t></w:r></w:p>`;
   }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -393,6 +577,7 @@ function convertTextToWordXml(text: string): string {
 </w:document>`;
 }
 
+// PĂSTRATE identic - toate funcțiile pentru template processing
 async function convertTextToDocx(processedText: string): Promise<Buffer> {
   const zip = new JSZip();
   
@@ -418,7 +603,7 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
-// Procesare template DOCX pentru PV
+// PĂSTRATE identic - funcțiile pentru procesarea template-urilor DOCX și TXT
 async function processPVDocxTemplate(templatePath: string, data: any): Promise<Buffer> {
   try {
     const templateBuffer = await readFile(templatePath);
@@ -443,7 +628,6 @@ async function processPVDocxTemplate(templatePath: string, data: any): Promise<B
   }
 }
 
-// Procesare template TXT pentru PV
 async function processPVTextTemplate(templatePath: string, data: any): Promise<string> {
   try {
     const templateContent = await readFile(templatePath, 'utf8');
@@ -454,9 +638,9 @@ async function processPVTextTemplate(templatePath: string, data: any): Promise<s
   }
 }
 
-// Template fallback pentru PV
+// MODIFICAT: Template fallback cu placeholder dinamic pentru contract
 async function createPVFallbackTemplate(data: any): Promise<string> {
-  const templateContent = `**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**
+  const templateContent = `[CENTER]**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} {{contract_sau_anexa_text}}**[/CENTER]
 
 Încheiat azi {{pv.data}} între:
 
@@ -466,53 +650,62 @@ async function createPVFallbackTemplate(data: any): Promise<string> {
 
 **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
 
-Prin prezenta se confirmă că am predat / am primit în .....număr..... exemplare din **{{proiect.denumire}}** {{proiect.adresa}} {{subproiecte_lista}}.
+Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} exemplare din **{{proiect.denumire}}** {{proiect.adresa}} {{subproiecte_lista}}.
 
 {{observatii_clause}}
 
 ---
 
-**SEMNAT ÎN DATA: {{pv.data}}**
+[CENTER]**SEMNAT ÎN DATA: {{pv.data}}**[/CENTER]
 
-**BENEFICIAR:**
+[CENTER]**BENEFICIAR:**[/CENTER]
 
-**{{client.nume}}**
-{{client.reprezentant}}
+[CENTER]**{{client.nume}}**[/CENTER]
+[CENTER]{{client.reprezentant}}[/CENTER]
 
-.................................
+[CENTER].................................[/CENTER]
 
 
-**PRESTATOR:**
+[CENTER]**PRESTATOR:**[/CENTER]
 
-**S.C. UNITAR PROIECT TDA S.R.L.**
-**DAMIAN TEODOR**
-Administrator
+[CENTER]**S.C. UNITAR PROIECT TDA S.R.L.**[/CENTER]
+[CENTER]**DAMIAN TEODOR**[/CENTER]
+[CENTER]Administrator[/CENTER]
 
-.................................`;
+[CENTER].................................[/CENTER]`;
 
   return processPVPlaceholders(templateContent, data);
 }
 
-// Preparare date template pentru PV
+// MODIFICAT: Preparare date template cu informații contract/anexă
 function preparePVTemplateData(
   proiect: any, 
   subproiectePredate: any[],
   pvData: any,
+  contractInfo: any,
+  subproiecteIds: string[],
   observatii?: string
 ) {
   const dataPV = new Date().toLocaleDateString('ro-RO');
   
+  // NOU: Determină textul pentru contract/anexă
+  const contractText = determineContractText(contractInfo, subproiecteIds);
+  
   const templateData = {
     pv: {
-	  numar: pvData.numar_pv,
-	  data: dataPV,
-	  numar_exemplare: '3'
-	},
-    
-    contract: {
-      numar: 'Se va completa manual', // PV poate fi independent de contract
-      data: dataPV
+      numar: pvData.numar_pv,
+      data: dataPV,
+      numar_exemplare: '3'
     },
+    
+    // NOU: Contract dinamic determinat din căutare
+    contract: {
+      numar: contractInfo.contract?.numar_contract || '[LIPSĂ CONTRACT]',
+      data: contractInfo.contract?.data_semnare || dataPV
+    },
+    
+    // NOU: Textul dinamic pentru template
+    contract_sau_anexa_text: contractText,
     
     client: {
       nume: proiect.client_nume || 'Client necunoscut',
@@ -558,14 +751,13 @@ function preparePVTemplateData(
   return templateData;
 }
 
-// Salvare PV în BigQuery
+// PĂSTRATE identic - toate funcțiile pentru salvare și actualizare status
 async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
   try {
     const pvId = `PV_${pvInfo.proiectId}_${Date.now()}`;
     
     const dataPredare = `DATE('${new Date().toISOString().split('T')[0]}')`;
     
-    // Calculează valoarea totală a subproiectelor predate
     let valoareTotala = 0;
     let valoareRON = 0;
     let monedaPrincipala = 'RON';
@@ -576,7 +768,6 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
       valoareRON = pvInfo.subproiectePredate.reduce((sum: number, sub: any) => 
         sum + (sub.valoare_ron || sub.Valoare_Estimata || 0), 0);
       
-      // Determină moneda principală
       const monede = pvInfo.subproiectePredate.map((sub: any) => sub.moneda || 'RON');
       const monedeCounts = monede.reduce((acc: any, moneda: string) => {
         acc[moneda] = (acc[moneda] || 0) + 1;
@@ -586,7 +777,6 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
       monedaPrincipala = Object.entries(monedeCounts)
         .sort(([,a], [,b]) => (b as number) - (a as number))[0][0] as string;
     } else {
-      // Pentru proiecte fără subproiecte
       valoareTotala = pvInfo.proiect.Valoare_Estimata || 0;
       valoareRON = pvInfo.proiect.valoare_ron || valoareTotala;
       monedaPrincipala = pvInfo.proiect.moneda || 'RON';
@@ -636,13 +826,11 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
   }
 }
 
-// Actualizare status predare pentru subproiecte/proiect
 async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: string[]) {
   try {
     const queryPromises: Promise<any>[] = [];
 
     if (subproiecteIds.length > 0) {
-      // Actualizează status_predare pentru subproiectele selectate
       subproiecteIds.forEach(subId => {
         const updateSubQuery = `
           UPDATE \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
@@ -652,7 +840,6 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
         queryPromises.push(bigquery.query({ query: updateSubQuery, location: 'EU' }));
       });
     } else {
-      // Pentru proiecte fără subproiecte, actualizează proiectul principal
       const updateProiectQuery = `
         UPDATE \`${PROJECT_ID}.PanouControlUnitar.Proiecte\`
         SET status_predare = 'Predat'
@@ -661,7 +848,6 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
       queryPromises.push(bigquery.query({ query: updateProiectQuery, location: 'EU' }));
     }
 
-    // Execută toate actualizările
     await Promise.all(queryPromises);
     
     console.log(`✅ Status predare actualizat pentru proiectul ${proiectId}`);
@@ -672,7 +858,7 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
   }
 }
 
-// FUNCȚIA POST PRINCIPALĂ
+// MODIFICAT: FUNCȚIA POST PRINCIPALĂ cu integrarea contract/anexe
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -691,19 +877,20 @@ export async function POST(request: NextRequest) {
       denumirePV
     });
 
-    // 1. ÎNCĂRCAREA DATELOR PROIECT
-    const { proiect, subproiecte } = await loadProiectDataForPV(proiectId);
+    // 1. ÎNCĂRCAREA DATELOR PROIECT CU CONTRACT/ANEXE
+    const { proiect, subproiecte, contractInfo } = await loadProiectDataForPV(proiectId, subproiecteIds);
     
     console.log('[PV-GENERATE] Date proiect încărcate:', {
       proiect_id: proiect.ID_Proiect,
       client: proiect.Client,
       subproiecte_total: subproiecte.length,
-      subproiecte_selectate: subproiecteIds.length
+      subproiecte_selectate: subproiecteIds.length,
+      contract_gasit: !!contractInfo.contract,
+      anexe_gasite: contractInfo.anexe.length
     });
 
     // 2. GENERAREA NUMĂRULUI PV
     const pvData = await getNextPVNumber(proiectId);
-    
     console.log('[PV-GENERATE] Număr PV generat:', pvData.numar_pv);
 
     // 3. IDENTIFICAREA SUBPROIECTELOR PREDATE
@@ -714,22 +901,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. PREGĂTIREA DATELOR TEMPLATE
+    // 4. PREGĂTIREA DATELOR TEMPLATE cu informații contract/anexă
     const templateData = preparePVTemplateData(
       proiect,
       subproiectePredate,
       pvData,
+      contractInfo,
+      subproiecteIds,
       observatii
     );
 
-    console.log('[PV-GENERATE] Template data pregătit pentru:', pvData.numar_pv);
+    console.log('[PV-GENERATE] Template data pregătit cu contract/anexă:', {
+      pv_numar: pvData.numar_pv,
+      contract_text: templateData.contract_sau_anexa_text,
+      contract_gasit: !!contractInfo.contract,
+      anexe_count: contractInfo.anexe.length
+    });
 
-    // 5. GENERAREA DOCUMENTULUI PV
+    // 5. GENERAREA DOCUMENTULUI PV - PĂSTRAT identic
     let pvBuffer: Buffer;
     let templateUsed = 'fallback';
 
     try {
-      // Caută template-uri disponibile pentru PV
       const templateOptions = [
         path.join(TEMPLATES_DIR, 'pv-template.docx'),
         path.join(TEMPLATES_DIR, 'pv-template.txt'),
@@ -761,14 +954,12 @@ export async function POST(request: NextRequest) {
           throw new Error(`Tip template nepermis: ${path.extname(templatePath)}`);
         }
       } else {
-        // Fallback la template hardcodat
         const fallbackTemplate = await createPVFallbackTemplate(templateData);
         pvBuffer = await convertTextToDocx(fallbackTemplate);
         templateUsed = 'fallback-no-template-found';
       }
     } catch (templateError) {
       console.error('[PV-GENERATE] Eroare template PV:', templateError);
-      // Fallback la template hardcodat
       const fallbackTemplate = await createPVFallbackTemplate(templateData);
       pvBuffer = await convertTextToDocx(fallbackTemplate);
       templateUsed = `fallback-error: ${templateError instanceof Error ? templateError.message : 'unknown'}`;
@@ -776,7 +967,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[PV-GENERATE] PV DOCX generat, template folosit:', templateUsed);
 
-    // 6. SALVAREA ÎN BIGQUERY
+    // 6. SALVAREA ÎN BIGQUERY - PĂSTRAT identic
     const pvInfo = {
       proiectId,
       subproiecteIds,
@@ -788,12 +979,10 @@ export async function POST(request: NextRequest) {
     };
 
     const pvId = await salveazaPVInBigQuery(pvInfo);
-    
     console.log('[PV-GENERATE] ✅ PV salvat în BigQuery cu ID:', pvId);
 
-    // 7. ACTUALIZAREA STATUS PREDARE
+    // 7. ACTUALIZAREA STATUS PREDARE - PĂSTRAT identic
     await actualizeazaStatusPredare(proiectId, subproiecteIds);
-    
     console.log('[PV-GENERATE] ✅ Status predare actualizat');
 
     // 8. RĂSPUNSUL FINAL
@@ -806,12 +995,13 @@ export async function POST(request: NextRequest) {
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'Content-Length': pvBuffer.length.toString(),
         
-        // Headere informative pentru frontend
         'X-PV-Number': pvData.numar_pv,
         'X-PV-ID': pvId,
         'X-Template-Used': templateUsed,
         'X-Subproiecte-Count': subproiecteIds.length.toString(),
-        'X-Proiect-ID': proiectId
+        'X-Proiect-ID': proiectId,
+        'X-Contract-Found': contractInfo.contract ? 'true' : 'false',
+        'X-Anexe-Count': contractInfo.anexe.length.toString()
       }
     });
 
@@ -822,7 +1012,9 @@ export async function POST(request: NextRequest) {
       file_name: fileName,
       file_size: `${(pvBuffer.length / 1024).toFixed(2)} KB`,
       subproiecte_predate: subproiecteIds.length,
-      template_used: templateUsed
+      template_used: templateUsed,
+      contract_found: !!contractInfo.contract,
+      anexe_found: contractInfo.anexe.length
     });
     console.log('[PV-GENERATE] ================================');
 
@@ -855,7 +1047,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET pentru testare
+// PĂSTRAT identic - GET pentru testare
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -865,17 +1057,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'proiect_id este necesar' }, { status: 400 });
     }
 
-    const { proiect, subproiecte } = await loadProiectDataForPV(proiectId);
+    const { proiect, subproiecte, contractInfo } = await loadProiectDataForPV(proiectId);
     
     return NextResponse.json({
       success: true,
-      message: 'API PV funcțional',
+      message: 'API PV funcțional cu logica contract/anexe',
       proiect_test: {
         id: proiect.ID_Proiect,
         denumire: proiect.Denumire,
         client: proiect.Client,
         subproiecte_count: subproiecte.length,
-        subproiecte_disponibile: subproiecte.filter(sub => sub.status_predare !== 'Predat').length
+        subproiecte_disponibile: subproiecte.filter(sub => sub.status_predare !== 'Predat').length,
+        contract_gasit: !!contractInfo.contract,
+        contract_numar: contractInfo.contract?.numar_contract || null,
+        anexe_count: contractInfo.anexe.length
       }
     });
     
