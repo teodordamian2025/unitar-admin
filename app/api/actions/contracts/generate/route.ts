@@ -1561,20 +1561,22 @@ async function generateAnexaDocument(
   anexaDataStart: string,
   anexaDataFinal: string,
   anexaEtape: any[],
-  anexaObservatii: string
+  anexaObservatii: string,
+  anexaDescrierelucrari: string
 ): Promise<Buffer> {
   
   // Pregătește datele pentru anexă folosind aceleași surse ca contractul
-  const anexaTemplateData = prepareAnexaTemplateData(
-    proiectComplet,
-    subproiecte,
-    contractData,
-    anexaEtape,
-    anexaNumar,
-    anexaDataStart,
-    anexaDataFinal,
-    anexaObservatii
-  );
+	const anexaTemplateData = prepareAnexaTemplateData(
+	  proiectComplet,
+	  subproiecte,
+	  contractData,
+	  anexaEtape,
+	  anexaNumar,
+	  anexaDataStart,
+	  anexaDataFinal,
+	  anexaObservatii,
+	  anexaDescrierelucrari
+	);
   
   let anexaBuffer: Buffer;
   let templateUsed = 'fallback-anexa';
@@ -1802,7 +1804,8 @@ export async function POST(request: NextRequest) {
 	  anexaDataStart,
 	  anexaDataFinal,
 	  anexaEtape,
-	  anexaObservatii
+	  anexaObservatii,
+	  anexaDescrierelucrari
 	);
         anexaGenerated = true;
         
