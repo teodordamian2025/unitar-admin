@@ -175,7 +175,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
 
     // 1. CĂUTARE CONTRACT PRINCIPAL
     const contractQuery = `
-      SELECT numar_contract, Data_Semnare, Status, ID_Contract
+      SELECT numar_contract, Data_Semnare, Status, ID_Contract, continut_json
       FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
       WHERE proiect_id = @proiectId 
         AND Status != 'Anulat'
@@ -196,12 +196,43 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
         numar_contract: contract.numar_contract,
         Data_Semnare_raw: contract.Data_Semnare,
         Data_Semnare_type: typeof contract.Data_Semnare,
-        Status: contract.Status
+        Status: contract.Status,
+        has_continut_json: !!contract.continut_json
       });
+      
+      // Determină data contractului cu fallback la continut_json
+      let dataContract = formatDate(contract.Data_Semnare);
+      
+      if (!dataContract || dataContract === '') {
+        // Încearcă să extragi data din continut_json
+        try {
+          if (contract.continut_json) {
+            const continutJson = typeof contract.continut_json === 'string' 
+              ? JSON.parse(contract.continut_json) 
+              : contract.continut_json;
+            
+            if (continutJson?.placeholderData?.contract?.data) {
+              dataContract = continutJson.placeholderData.contract.data;
+              console.log('[PV-CONTRACT] Data extrasă din continut_json:', dataContract);
+            } else if (continutJson?.contract?.data) {
+              dataContract = continutJson.contract.data;
+              console.log('[PV-CONTRACT] Data extrasă din continut_json (format alternativ):', dataContract);
+            }
+          }
+        } catch (jsonError) {
+          console.error('[PV-CONTRACT] Eroare parsare continut_json:', jsonError);
+        }
+        
+        // Ultimul fallback - data curentă
+        if (!dataContract || dataContract === '') {
+          dataContract = new Date().toLocaleDateString('ro-RO');
+          console.log('[PV-CONTRACT] Folosesc data curentă ca ultimul fallback:', dataContract);
+        }
+      }
       
       contractData = {
         numar_contract: contract.numar_contract,
-        data_semnare: formatDate(contract.Data_Semnare),
+        data_semnare: dataContract,
         status: contract.Status,
         id_contract: contract.ID_Contract
       };
