@@ -563,7 +563,7 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
   try {
     const pvId = `PV_${pvInfo.proiectId}_${Date.now()}`;
     
-    const dataPredare = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
+    const dataPredare = `DATE('${new Date().toISOString().split('T')[0]}')`;
     
     // Calculează valoarea totală a subproiectelor predate
     let valoareTotala = 0;
