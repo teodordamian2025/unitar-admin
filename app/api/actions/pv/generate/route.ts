@@ -191,6 +191,14 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
 
     if (contractRows.length > 0) {
       const contract = contractRows[0];
+      
+      console.log('[PV-CONTRACT] Date contract raw din BigQuery:', {
+        numar_contract: contract.numar_contract,
+        Data_Semnare_raw: contract.Data_Semnare,
+        Data_Semnare_type: typeof contract.Data_Semnare,
+        Status: contract.Status
+      });
+      
       contractData = {
         numar_contract: contract.numar_contract,
         data_semnare: formatDate(contract.Data_Semnare),
@@ -198,7 +206,11 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
         id_contract: contract.ID_Contract
       };
       
-      console.log('[PV-CONTRACT] Contract principal găsit:', contractData.numar_contract);
+      console.log('[PV-CONTRACT] Contract principal găsit:', {
+        numar: contractData.numar_contract,
+        data_formatata: contractData.data_semnare,
+        status: contractData.status
+      });
     } else {
       console.log('[PV-CONTRACT] Nu s-a găsit contract pentru proiectul:', proiectId);
     }
