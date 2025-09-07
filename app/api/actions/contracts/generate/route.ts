@@ -356,6 +356,7 @@ function processAnexaPlaceholders(text: string, data: any): string {
     '{{firma.email}}': 'contact@unitarproiect.eu',
     '{{firma.cont_ing}}': 'RO82INGB0000999905667533',
     '{{firma.cont_trezorerie}}': 'RO29TREZ7035069XXX018857'
+    '{{anexa.descriere_lucrari}}': data.anexa_descriere_lucrari || '',
   };
   
   // Aplică înlocuirile anexă
