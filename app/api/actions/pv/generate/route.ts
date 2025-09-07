@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/pv/generate/route.ts
-// DATA: 07.09.2025 23:35 (ora României)
-// MODIFICAT: Eliminare calcule financiare din generarea PV
+// DATA: 07.09.2025 23:45 (ora României)
+// MODIFICAT: Eliminare calcule financiare din generarea PV - CORECTAT sintaxa
 // PĂSTRATE: Toate funcționalitățile contract/anexe + logica de business
 // ==================================================================
 
@@ -13,8 +13,6 @@ import path from 'path';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
-
-// ELIMINAT: Cursuri valutare pentru conversii (nu mai sunt necesare)
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -409,7 +407,6 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
       Data_Final: extractSimpleValue(proiectRaw.Data_Final),
       Adresa: extractSimpleValue(proiectRaw.Adresa),
       Responsabil: extractSimpleValue(proiectRaw.Responsabil),
-      // ELIMINAT: Valoare_Estimata, moneda, curs_valutar, valoare_ron
       
       client_id: clientData ? extractSimpleValue(clientData.id) : null,
       client_nume: clientData ? extractSimpleValue(clientData.nume) : extractSimpleValue(proiectRaw.Client),
@@ -429,13 +426,12 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
       status_predare: extractSimpleValue(sub.status_predare) || 'Nepredat',
       Data_Final: extractSimpleValue(sub.Data_Final),
       Responsabil: extractSimpleValue(sub.Responsabil)
-      // ELIMINAT: Valoare_Estimata, moneda, curs_valutar, valoare_ron
     }));
     
     return {
       proiect: proiectProcessed,
       subproiecte: subproiecteProcessed,
-      contractInfo: contractInfo  // PĂSTRAT: Informații contract/anexe
+      contractInfo: contractInfo
     };
     
   } catch (error) {
@@ -483,7 +479,7 @@ function determineContractText(contractInfo: any, subproiecteIds: string[]): str
 function processPVPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // ÎNLOCUIRI SIMPLE DIRECTE - PĂSTRATE din original
+  // ÎNLOCUIRI SIMPLE DIRECTE - CORECTAT sintaxa
   const simpleReplacements: { [key: string]: string } = {
     // PV info
     '{{pv.numar}}': data.pv?.numar || 'PV-NR-TBD',
@@ -525,7 +521,7 @@ function processPVPlaceholders(text: string, data: any): string {
   
   // Aplică înlocuirile simple
   for (const [placeholder, value] of Object.entries(simpleReplacements)) {
-    const regex = new RegExp(placeholder.replace(/[{}]/g, '\\    '{{firma.adresa}}': 'Bd. Gheorghe Sincai, nr. 15, bl. 5A, sc. 1, ap. 1, interfon 01, mun. Bucuresti,'), 'g');
+    const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
     processed = processed.replace(regex, value);
   }
   
@@ -567,10 +563,9 @@ function convertTextToWordXml(text: string): string {
     
     // Detectează și procesează markerele de centrare
     const shouldCenter = line.includes('[CENTER]');
-    const cleanLine = line.replace(/\[CENTER\]|\[\/CENTER\]/g, '');  // CURĂȚĂ markerele
+    const cleanLine = line.replace(/\[CENTER\]|\[\/CENTER\]/g, '');
     const alignment = shouldCenter ? '<w:jc w:val="center"/>' : '';
     
-    // CORECTARE: Folosește cleanLine în loc de line pentru restul procesării
     if (cleanLine.trim() === '') {
       return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
     }
@@ -599,7 +594,6 @@ function convertTextToWordXml(text: string): string {
       return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr>${result}</w:p>`;
     }
     
-    // CORECTARE PRINCIPALĂ: Folosește cleanLine în loc de line
     return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${cleanLine}</w:t></w:r></w:p>`;
   }).join('');
 
@@ -637,7 +631,6 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
-// PĂSTRATE identic - funcțiile pentru procesarea template-urilor DOCX și TXT
 async function processPVDocxTemplate(templatePath: string, data: any): Promise<Buffer> {
   try {
     const templateBuffer = await readFile(templatePath);
@@ -722,7 +715,6 @@ function preparePVTemplateData(
 ) {
   const dataPV = new Date().toLocaleDateString('ro-RO');
   
-  // PĂSTRAT: Determină textul pentru contract/anexă
   const contractText = determineContractText(contractInfo, subproiecteIds);
   
   const templateData = {
@@ -732,13 +724,11 @@ function preparePVTemplateData(
       numar_exemplare: '3'
     },
     
-    // PĂSTRAT: Contract dinamic determinat din căutare
     contract: {
       numar: contractInfo.contract?.numar_contract || '[LIPSĂ CONTRACT]',
       data: contractInfo.contract?.data_semnare || dataPV
     },
     
-    // PĂSTRAT: Textul dinamic pentru template
     contract_sau_anexa_text: contractText,
     
     client: {
@@ -770,12 +760,10 @@ function preparePVTemplateData(
       cont_trezorerie: 'RO29TREZ7035069XXX018857'
     },
     
-    // MODIFICAT: Subproiecte predate FĂRĂ informații financiare
     subproiecte_predate: subproiectePredate.map(sub => ({
       id: sub.ID_Subproiect,
       denumire: sub.Denumire,
       status: sub.Status
-      // ELIMINAT: valoare, moneda
     })),
     
     observatii: observatii || '',
@@ -792,7 +780,6 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
     
     const dataPredare = `DATE('${new Date().toISOString().split('T')[0]}')`;
     
-    // MODIFICAT: Eliminare calcule financiare - setează toate la NULL
     const insertQuery = `
       INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.ProcesVerbale\`
       (ID_PV, numar_pv, serie_pv, tip_document, proiect_id, subproiecte_ids, 
@@ -837,7 +824,6 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
   }
 }
 
-// PĂSTRAT identic - actualizează status predare
 async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: string[]) {
   try {
     const queryPromises: Promise<any>[] = [];
@@ -889,7 +875,6 @@ export async function POST(request: NextRequest) {
       denumirePV
     });
 
-    // 1. ÎNCĂRCAREA DATELOR PROIECT CU CONTRACT/ANEXE
     const { proiect, subproiecte, contractInfo } = await loadProiectDataForPV(proiectId, subproiecteIds);
     
     console.log('[PV-GENERATE] Date proiect încărcate:', {
@@ -901,11 +886,9 @@ export async function POST(request: NextRequest) {
       anexe_gasite: contractInfo.anexe.length
     });
 
-    // 2. GENERAREA NUMĂRULUI PV
     const pvData = await getNextPVNumber(proiectId);
     console.log('[PV-GENERATE] Număr PV generat:', pvData.numar_pv);
 
-    // 3. IDENTIFICAREA SUBPROIECTELOR PREDATE
     let subproiectePredate: any[] = [];
     if (subproiecteIds.length > 0) {
       subproiectePredate = subproiecte.filter(sub => 
@@ -913,7 +896,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. PREGĂTIREA DATELOR TEMPLATE cu informații contract/anexă FĂRĂ date financiare
     const templateData = preparePVTemplateData(
       proiect,
       subproiectePredate,
@@ -930,7 +912,6 @@ export async function POST(request: NextRequest) {
       anexe_count: contractInfo.anexe.length
     });
 
-    // 5. GENERAREA DOCUMENTULUI PV - PĂSTRAT identic
     let pvBuffer: Buffer;
     let templateUsed = 'fallback';
 
@@ -979,7 +960,6 @@ export async function POST(request: NextRequest) {
 
     console.log('[PV-GENERATE] PV DOCX generat, template folosit:', templateUsed);
 
-    // 6. SALVAREA ÎN BIGQUERY - MODIFICAT fără calcule financiare
     const pvInfo = {
       proiectId,
       subproiecteIds,
@@ -993,11 +973,9 @@ export async function POST(request: NextRequest) {
     const pvId = await salveazaPVInBigQuery(pvInfo);
     console.log('[PV-GENERATE] ✅ PV salvat în BigQuery cu ID:', pvId);
 
-    // 7. ACTUALIZAREA STATUS PREDARE - PĂSTRAT identic
     await actualizeazaStatusPredare(proiectId, subproiecteIds);
     console.log('[PV-GENERATE] ✅ Status predare actualizat');
 
-    // 8. RĂSPUNSUL FINAL
     const fileName = `${pvData.numar_pv}.docx`;
 
     const response = new NextResponse(pvBuffer, {
@@ -1059,7 +1037,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PĂSTRAT identic - GET pentru testare
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
