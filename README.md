@@ -403,6 +403,9 @@ lib/templates-helpers.ts
 app/api/rapoarte/etape-contract/route.ts
 Tabel Bigquery Contracte si EtapeContract
 
+Coduri pentru anexe contract:
+app/api/rapoarte/anexe-contract/route.ts
+
 Coduri legate de chatbot si Bigquery:
 app/api/gueryOpenAI/route.ts
 app/api/bigquery/route.ts

@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 06.09.2025 18:30 (ora României)
-// MODIFICAT: Integrare EtapeContract + Detectare modificări + Afișare diferențe vizuale
-// PĂSTRATE: Toate funcționalitățile existente + buton Anexă pentru dezvoltare viitoare
+// DATA: 07.09.2025 17:30 (ora României)
+// COMPLETAT: Integrare COMPLETĂ sistem anexă + detectare modificări + UI dual
+// PĂSTRATE: TOATE funcționalitățile existente + logica EtapeContract
 // ==================================================================
 
 'use client';
@@ -30,7 +30,7 @@ interface ContractExistent {
   data_creare: string;
   Valoare: number;
   Moneda: string;
-  etape?: any[]; // Acum din EtapeContract
+  etape?: any[];
   etape_count?: number;
   continut_json?: any;
   Observatii?: string;
@@ -60,9 +60,9 @@ interface TermenPersonalizat {
   valoare_ron: number;      
   termen_zile: number;
   procent_calculat: number;
-  subproiect_id?: string | null; // MODIFICAT: Pentru identificarea din subproiect
+  subproiect_id?: string | null;
   este_subproiect?: boolean;
-  tip_modificare?: 'nou' | 'sters' | 'modificat' | 'manual' | 'normal'; // NOUĂ: Pentru afișarea diferențelor
+  tip_modificare?: 'nou' | 'sters' | 'modificat' | 'manual' | 'normal';
 }
 
 interface SubproiectInfo {
@@ -102,7 +102,15 @@ interface ModificariDetectate {
   etape_manuale: TermenPersonalizat[];
 }
 
-// Cursuri valutare pentru conversii
+// NOUĂ: Interfață pentru anexă existentă
+interface AnexaExistenta {
+  anexa_numar: number;
+  etape: TermenPersonalizat[];
+  valoare_totala: number;
+  moneda_principala: string;
+}
+
+// Cursuri valutare pentru conversii - PĂSTRAT identic
 const CURSURI_VALUTAR: { [key: string]: number } = {
   'EUR': 5.0683,
   'USD': 4.3688,
@@ -110,7 +118,7 @@ const CURSURI_VALUTAR: { [key: string]: number } = {
   'RON': 1
 };
 
-// Helper pentru conversie BigQuery NUMERIC îmbunătățit
+// Helper pentru conversie BigQuery NUMERIC - PĂSTRAT identic
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
@@ -209,9 +217,19 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [contractPreview, setContractPreview] = useState('');
   const [contractPreviewForGeneration, setContractPreviewForGeneration] = useState('');
   
+  // PĂSTRAT: Termene contract
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
 
-  // NOUĂ: State pentru detectarea modificărilor
+  // NOUĂ: State pentru anexă
+  const [anexaActiva, setAnexaActiva] = useState(false);
+  const [anexaEtape, setAnexaEtape] = useState<TermenPersonalizat[]>([]);
+  const [anexaNumar, setAnexaNumar] = useState(1);
+  const [anexeExistente, setAnexeExistente] = useState<AnexaExistenta[]>([]);
+  const [anexaDataStart, setAnexaDataStart] = useState('');
+  const [anexaDataFinal, setAnexaDataFinal] = useState('');
+  const [anexaObservatii, setAnexaObservatii] = useState('');
+
+  // PĂSTRAT: State pentru detectarea modificărilor
   const [modificariDetectate, setModificariDetectate] = useState<ModificariDetectate>({
     detected: false,
     subproiecte_noi: [],
@@ -235,6 +253,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   }, [isOpen, proiect.ID_Proiect]);
 
+  // PĂSTRAT identic
   const loadProiectComplet = async () => {
     try {
       console.log(`Încărcare proiect complet din BigQuery: ${proiect.ID_Proiect}`);
@@ -263,6 +282,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // PĂSTRAT identic
   const previewContractNumberForNewContract = async () => {
     try {
       console.log('Apelez API-ul pentru numerotare consecutivă (contract nou)...');
@@ -298,6 +318,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // PĂSTRAT identic
   const loadSubproiecte = async () => {
     try {
       const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
@@ -314,7 +335,64 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // NOUĂ FUNCȚIE: Încărcarea etapelor din EtapeContract
+  // NOUĂ FUNCȚIE: Încărcarea anexelor existente
+  const loadAnexeExistente = async (contractId: string) => {
+    try {
+      const response = await fetch(`/api/rapoarte/anexe-contract?contract_id=${encodeURIComponent(contractId)}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Grupează etapele pe anexe
+        const anexeMap = new Map<number, TermenPersonalizat[]>();
+        
+        result.data.forEach((etapa: any) => {
+          const anexaNum = etapa.anexa_numar;
+          if (!anexeMap.has(anexaNum)) {
+            anexeMap.set(anexaNum, []);
+          }
+          
+          anexeMap.get(anexaNum)?.push({
+            id: etapa.ID_Anexa,
+            denumire: etapa.denumire,
+            valoare: etapa.valoare,
+            moneda: etapa.moneda,
+            valoare_ron: etapa.valoare_ron,
+            termen_zile: etapa.termen_zile,
+            procent_calculat: etapa.procent_din_total || 0,
+            subproiect_id: etapa.subproiect_id,
+            este_subproiect: !!etapa.subproiect_id,
+            tip_modificare: 'normal'
+          });
+        });
+        
+        // Convertește în array de anexe
+        const anexe: AnexaExistenta[] = Array.from(anexeMap.entries()).map(([numar, etape]) => {
+          const valoareTotala = etape.reduce((sum, etapa) => sum + etapa.valoare_ron, 0);
+          const monede = [...new Set(etape.map(e => e.moneda))];
+          
+          return {
+            anexa_numar: numar,
+            etape,
+            valoare_totala: valoareTotala,
+            moneda_principala: monede.length === 1 ? monede[0] : 'MULTIPLE'
+          };
+        });
+        
+        setAnexeExistente(anexe);
+        
+        // Dacă există anexe, setează următorul număr
+        if (anexe.length > 0) {
+          const maxAnexaNumar = Math.max(...anexe.map(a => a.anexa_numar));
+          setAnexaNumar(maxAnexaNumar + 1);
+        }
+        
+        console.log(`🔎 Încărcate ${anexe.length} anexe existente pentru contractul ${contractId}`);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea anexelor existente:', error);
+    }
+  };
+  // MODIFICAT: Funcția de încărcare etape din EtapeContract + anexe
   const loadEtapeFromEtapeContract = async (contractId: string): Promise<TermenPersonalizat[]> => {
     try {
       const response = await fetch(`/api/rapoarte/etape-contract?contract_id=${encodeURIComponent(contractId)}`);
@@ -322,6 +400,9 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       
       if (result.success && result.data) {
         console.log(`📋 Încărcate ${result.data.length} etape din EtapeContract pentru contractul ${contractId}`);
+        
+        // Încarcă și anexele
+        await loadAnexeExistente(contractId);
         
         return result.data.map((etapa: any) => ({
           id: etapa.ID_Etapa,
@@ -341,6 +422,188 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     } catch (error) {
       console.error('Eroare la încărcarea etapelor din EtapeContract:', error);
       return [];
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Calculează diferențele pentru anexă
+  const calculeazaDiferenteSubproiecte = (): TermenPersonalizat[] => {
+    const diferente: TermenPersonalizat[] = [];
+    
+    // Subproiecte complet noi (nu sunt în contract)
+    subproiecte.forEach(subproiect => {
+      const existaInContract = termenePersonalizate.some(etapa => 
+        etapa.subproiect_id === subproiect.ID_Subproiect
+      );
+      
+      if (!existaInContract) {
+        const valoare = convertBigQueryNumeric(subproiect.Valoare_Estimata) || 0;
+        const moneda = subproiect.moneda || 'RON';
+        const valoareRON = convertBigQueryNumeric(subproiect.valoare_ron) || valoare;
+        
+        diferente.push({
+          id: `diff_${subproiect.ID_Subproiect}_${Date.now()}`,
+          denumire: `${subproiect.Denumire} (subproiect nou)`,
+          valoare,
+          moneda,
+          valoare_ron: valoareRON,
+          termen_zile: 30,
+          procent_calculat: 0,
+          subproiect_id: subproiect.ID_Subproiect,
+          este_subproiect: true,
+          tip_modificare: 'nou'
+        });
+      }
+    });
+    
+    // Diferențe de valori pentru subproiecte existente
+    termenePersonalizate.forEach(etapa => {
+      if (etapa.subproiect_id) {
+        const subproiectActual = subproiecte.find(sub => 
+          sub.ID_Subproiect === etapa.subproiect_id
+        );
+        
+        if (subproiectActual) {
+          const valoareActuala = convertBigQueryNumeric(subproiectActual.Valoare_Estimata) || 0;
+          const diferentaValoare = valoareActuala - etapa.valoare;
+          
+          if (Math.abs(diferentaValoare) > 0.01) {
+            const moneda = subproiectActual.moneda || 'RON';
+            const valoareRON = diferentaValoare * (moneda !== 'RON' ? CURSURI_VALUTAR[moneda] || 1 : 1);
+            
+            diferente.push({
+              id: `diff_val_${etapa.subproiect_id}_${Date.now()}`,
+              denumire: `${subproiectActual.Denumire} (diferență valoare)`,
+              valoare: diferentaValoare,
+              moneda,
+              valoare_ron: valoareRON,
+              termen_zile: 30,
+              procent_calculat: 0,
+              subproiect_id: etapa.subproiect_id,
+              este_subproiect: true,
+              tip_modificare: 'modificat'
+            });
+          }
+        }
+      }
+    });
+    
+    return diferente;
+  };
+
+  // NOUĂ FUNCȚIE: Detectează când să activeze anexa
+  const detecteazaNecesitateAnexa = () => {
+    const valoareTotalaContract = termenePersonalizate.reduce((sum, t) => sum + t.valoare_ron, 0);
+    const valoareProiectRON = calculeazaValoareProiectRON();
+    
+    if (valoareProiectRON === 0) return false;
+    
+    const diferentaProcentuala = Math.abs((valoareTotalaContract - valoareProiectRON) / valoareProiectRON) * 100;
+    
+    // Activează anexa dacă diferența > 1% SAU dacă există subproiecte noi
+    const diferenteSubproiecte = calculeazaDiferenteSubproiecte();
+    
+    return diferentaProcentuala > 1 || diferenteSubproiecte.length > 0;
+  };
+
+  // NOUĂ FUNCȚIE: Activează/dezactivează anexa manual
+  const toggleAnexa = () => {
+    if (!anexaActiva) {
+      // Activează anexa și calculează diferențele
+      const diferenteCalculate = calculeazaDiferenteSubproiecte();
+      setAnexaEtape(calculeazaProcenteInformative(diferenteCalculate));
+      setAnexaActiva(true);
+      
+      // Setează date default pentru anexă
+      const today = new Date().toISOString().split('T')[0];
+      setAnexaDataStart(today);
+      
+      // Data finală cu 30 zile în plus
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 30);
+      setAnexaDataFinal(futureDate.toISOString().split('T')[0]);
+      
+      console.log('📄 Anexă activată manual cu diferențe calculate');
+      showToast('Anexă activată - diferențele au fost calculate automat', 'info');
+    } else {
+      // Dezactivează anexa
+      setAnexaActiva(false);
+      setAnexaEtape([]);
+      setAnexaDataStart('');
+      setAnexaDataFinal('');
+      setAnexaObservatii('');
+      console.log('📄 Anexă dezactivată');
+      showToast('Anexă dezactivată', 'info');
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Adaugă etapă la anexă
+  const addAnexaEtapa = () => {
+    const newTermen: TermenPersonalizat = {
+      id: `anexa_${Date.now()}`,
+      denumire: '',
+      valoare: 0,
+      moneda: 'RON',
+      valoare_ron: 0,
+      termen_zile: 30,
+      procent_calculat: 0,
+      este_subproiect: false,
+      subproiect_id: null,
+      tip_modificare: 'manual'
+    };
+    
+    const newEtape = [...anexaEtape, newTermen];
+    const etapeWithPercents = calculeazaProcenteInformative(newEtape);
+    setAnexaEtape(etapeWithPercents);
+  };
+
+  // NOUĂ FUNCȚIE: Șterge etapă din anexă
+  const removeAnexaEtapa = (id: string) => {
+    const newEtape = anexaEtape.filter(t => t.id !== id);
+    const etapeWithPercents = calculeazaProcenteInformative(newEtape);
+    setAnexaEtape(etapeWithPercents);
+  };
+
+  // NOUĂ FUNCȚIE: Actualizează etapă anexă
+  const updateAnexaEtapa = (id: string, field: keyof TermenPersonalizat, value: string | number) => {
+    const newEtape = anexaEtape.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, [field]: value };
+        
+        if (field === 'valoare' || field === 'moneda') {
+          const valoare = field === 'valoare' ? value as number : t.valoare;
+          const moneda = field === 'moneda' ? value as string : t.moneda;
+          updated.valoare_ron = moneda !== 'RON' ? 
+            (valoare * (CURSURI_VALUTAR[moneda] || 1)) : valoare;
+        }
+        
+        return updated;
+      }
+      return t;
+    });
+    
+    const etapeWithPercents = calculeazaProcenteInformative(newEtape);
+    setAnexaEtape(etapeWithPercents);
+  };
+
+  // NOUĂ FUNCȚIE: Mută etapă anexă sus
+  const moveAnexaEtapaUp = (index: number) => {
+    if (index > 0) {
+      const newEtape = [...anexaEtape];
+      [newEtape[index], newEtape[index - 1]] = [newEtape[index - 1], newEtape[index]];
+      const etapeWithPercents = calculeazaProcenteInformative(newEtape);
+      setAnexaEtape(etapeWithPercents);
+      showToast('Etapa anexă mutată în sus', 'info');
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Mută etapă anexă jos
+  const moveAnexaEtapaDown = (index: number) => {
+    if (index < anexaEtape.length - 1) {
+      const newEtape = [...anexaEtape];
+      [newEtape[index], newEtape[index + 1]] = [newEtape[index + 1], newEtape[index]];
+      const etapeWithPercents = calculeazaProcenteInformative(newEtape);
+      setAnexaEtape(etapeWithPercents);
+      showToast('Etapa anexă mutată în jos', 'info');
     }
   };
 
@@ -425,6 +688,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     return modificariDetectate;
   };
 
+  // MODIFICAT: Funcția checkContractExistent cu logica anexă
   const checkContractExistent = async () => {
     try {
       console.log('Verific contract existent pentru proiectul:', proiect.ID_Proiect);
@@ -466,41 +730,20 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         
         console.log(`✅ PĂSTRARE NUMĂR EXISTENT: ${contract.numar_contract} (nu se generează unul nou)`);
         
-        // MODIFICAT: Încarcă etapele din EtapeContract în loc de JSON
-        if (contract.etape && Array.isArray(contract.etape)) {
-          console.log('📋 Procesez etape din EtapeContract - date:', contract.etape);
-          
-          const etapeContract = contract.etape.map((etapa: any) => ({
-            id: etapa.ID_Etapa || `etapa_${Date.now()}_${Math.random()}`,
-            denumire: etapa.denumire || 'Etapă fără denumire',
-            valoare: etapa.valoare || 0,
-            moneda: etapa.moneda || 'RON',
-            valoare_ron: etapa.valoare_ron || 0,
-            termen_zile: etapa.termen_zile || 30,
-            procent_calculat: etapa.procent_din_total || 0,
-            subproiect_id: etapa.subproiect_id,
-            este_subproiect: !!etapa.subproiect_id,
-            tip_modificare: 'normal' as const
-          }));
-          
-          setTermenePersonalizate(etapeContract);
-          
-          // NOUĂ: Detectează modificările după încărcarea datelor
-          setTimeout(() => {
-            const modificari = detecteazaModificari(subproiecte, etapeContract);
-            setModificariDetectate(modificari);
-            
-            if (modificari.detected) {
-              setShowModificariAlert(true);
-              console.log('⚠️ Modificări detectate - afișez alerta');
-            }
-          }, 500); // Delay pentru a permite încărcarea subproiectelor
-          
-          console.log(`✅ Precompletate ${etapeContract.length} etape din contractul existent cu valorile corecte`);
-        } else {
-          console.warn('⚠️ Contract fără etape sau format etape invalid');
-          setTermenePersonalizate([]);
-        }
+        // Încarcă etapele din EtapeContract + anexele
+        const etapeContract = await loadEtapeFromEtapeContract(contract.ID_Contract);
+        setTermenePersonalizate(etapeContract);
+        
+        // NOUĂ LOGICĂ: Detectează necesitatea anexei
+        setTimeout(() => {
+          const necesitaAnexa = detecteazaNecesitateAnexa();
+          if (necesitaAnexa) {
+            setAnexaActiva(true);
+            const diferenteCalculate = calculeazaDiferenteSubproiecte();
+            setAnexaEtape(calculeazaProcenteInformative(diferenteCalculate));
+            console.log('🔎 Anexă activată automat - diferențe detectate');
+          }
+        }, 1000);
         
         setObservatii(contract.Observatii || '');
         showToast(`Contract existent găsit: ${contract.numar_contract}`, 'info');
@@ -534,7 +777,22 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // NOUĂ: Detectarea modificărilor după încărcarea subproiectelor
+  // NOUĂ LOGICĂ: Detectează automat când să activeze anexa
+  useEffect(() => {
+    if (isEditMode && termenePersonalizate.length > 0 && subproiecte.length > 0) {
+      setTimeout(() => {
+        const necesitaAnexa = detecteazaNecesitateAnexa();
+        if (necesitaAnexa && !anexaActiva) {
+          setAnexaActiva(true);
+          const diferenteCalculate = calculeazaDiferenteSubproiecte();
+          setAnexaEtape(calculeazaProcenteInformative(diferenteCalculate));
+          console.log('🔎 Anexă activată automat - diferențe detectate');
+        }
+      }, 500);
+    }
+  }, [termenePersonalizate, subproiecte, isEditMode]);
+
+  // Detectarea modificărilor după încărcarea subproiectelor
   useEffect(() => {
     if (subproiecte.length > 0 && termenePersonalizate.length > 0 && isEditMode) {
       const modificari = detecteazaModificari(subproiecte, termenePersonalizate);
@@ -546,8 +804,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       }
     }
   }, [subproiecte, termenePersonalizate, isEditMode]);
-
-  // PĂSTRAT: Logic pentru proiecte fără subproiecte
+  // PĂSTRAT: Logic pentru proiecte fără subproiecte  
   useEffect(() => {
     console.log('🔧 useEffect termeni - checking conditions:', {
       hasProiectComplet: !!proiectComplet,
@@ -652,7 +909,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     isEditMode
   ]);
 
-  // Calculează și actualizează procentele pentru toate termenele
+  // Calculează și actualizează procentele pentru toate termenele - PĂSTRAT identic
   const calculeazaProcenteInformative = (termeni: TermenPersonalizat[]) => {
     const sumaTotal = termeni.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
     
@@ -662,15 +919,22 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }));
   };
 
+  // PĂSTRAT identic
   const calculeazaSumaTotala = () => {
     return termenePersonalizate.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
   };
 
-  // Calculare sumar pe valute separate
+  // NOUĂ FUNCȚIE: Calculează suma anexă
+  const calculeazaSumaAnexa = () => {
+    return anexaEtape.reduce((suma, termen) => suma + (termen.valoare_ron || 0), 0);
+  };
+
+  // MODIFICAT: Calculare sumar pe valute separate incluind anexa
   const calculeazaSumarValute = () => {
     const valuteSumar: { [moneda: string]: number } = {};
     let totalRON = 0;
     
+    // Contract
     termenePersonalizate.forEach(termen => {
       if (termen.moneda === 'RON') {
         valuteSumar['RON'] = (valuteSumar['RON'] || 0) + termen.valoare;
@@ -680,10 +944,22 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       totalRON += termen.valoare_ron;
     });
     
+    // Anexă
+    if (anexaActiva) {
+      anexaEtape.forEach(termen => {
+        if (termen.moneda === 'RON') {
+          valuteSumar['RON'] = (valuteSumar['RON'] || 0) + termen.valoare;
+        } else {
+          valuteSumar[termen.moneda] = (valuteSumar[termen.moneda] || 0) + termen.valoare;
+        }
+        totalRON += termen.valoare_ron;
+      });
+    }
+    
     return { valuteSumar, totalRON };
   };
 
-  // Calculare valoare proiect în RON pentru comparația de 3%
+  // PĂSTRAT identic
   const calculeazaValoareProiectRON = (): number => {
     if (!proiectComplet) return 0;
     
@@ -703,16 +979,18 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // Verificare limită 3%
+  // MODIFICAT: Verificare limită 3% pentru contract + anexă
   const verificaLimita3Procent = (): { valid: boolean; diferentaProcentuala: number; mesaj: string } => {
     const valoareProiectRON = calculeazaValoareProiectRON();
     const sumaTotalaContractRON = calculeazaSumaTotala();
+    const sumaTotalaAnexaRON = anexaActiva ? calculeazaSumaAnexa() : 0;
+    const sumaTotalaRON = sumaTotalaContractRON + sumaTotalaAnexaRON;
     
     if (valoareProiectRON === 0) {
       return { valid: true, diferentaProcentuala: 0, mesaj: 'Nu se poate verifica (valoare proiect 0)' };
     }
     
-    const diferentaProcentuala = Math.abs((sumaTotalaContractRON - valoareProiectRON) / valoareProiectRON) * 100;
+    const diferentaProcentuala = Math.abs((sumaTotalaRON - valoareProiectRON) / valoareProiectRON) * 100;
     const valid = diferentaProcentuala <= 3;
     
     const mesaj = valid 
@@ -757,13 +1035,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     console.log('🔄 Actualizare parțială - doar subproiecte noi');
     
     // Păstrează etapele existente și adaugă doar subproiectele noi
-	const etapeExistente = termenePersonalizate.map(t => ({
-	  ...t,
-	  tip_modificare: t.subproiect_id ? 
-	    (modificariDetectate.subproiecte_sterse.some(s => s.subproiect_id === t.subproiect_id) ? 'sters' as const : 
-	     modificariDetectate.valori_modificate.some(v => v.etapa.subproiect_id === t.subproiect_id) ? 'modificat' as const : 'normal' as const) :
-	    'manual' as const
-	}));
+    const etapeExistente = termenePersonalizate.map(t => ({
+      ...t,
+      tip_modificare: t.subproiect_id ? 
+        (modificariDetectate.subproiecte_sterse.some(s => s.subproiect_id === t.subproiect_id) ? 'sters' as const : 
+         modificariDetectate.valori_modificate.some(v => v.etapa.subproiect_id === t.subproiect_id) ? 'modificat' as const : 'normal' as const) :
+        'manual' as const
+    }));
     
     // Adaugă subproiectele noi
     const etapeNoi = modificariDetectate.subproiecte_noi.map((sub: SubproiectInfo) => {
@@ -796,6 +1074,28 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     console.log('📋 Păstrează contractul actual');
     setShowModificariAlert(false);
     showToast('Contractul a fost păstrat în forma actuală', 'info');
+  };
+
+  // NOUĂ FUNCȚIE: Activează anexa și calculează diferențele
+  const handleActualizeazaCuAnexa = () => {
+    console.log('📄 Actualizează cu anexă pentru diferențe');
+    
+    if (!anexaActiva) {
+      setAnexaActiva(true);
+      const diferenteCalculate = calculeazaDiferenteSubproiecte();
+      setAnexaEtape(calculeazaProcenteInformative(diferenteCalculate));
+      
+      // Setează date default pentru anexă
+      const today = new Date().toISOString().split('T')[0];
+      setAnexaDataStart(today);
+      
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 30);
+      setAnexaDataFinal(futureDate.toISOString().split('T')[0]);
+    }
+    
+    setShowModificariAlert(false);
+    showToast('Anexă activată pentru gestionarea diferențelor', 'success');
   };
 
   // NOUĂ FUNCȚIE: Obține culoarea pentru tipul de modificare
@@ -894,6 +1194,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setModificariDetectate({ detected: false, subproiecte_noi: [], subproiecte_sterse: [], valori_modificate: [], etape_manuale: [] });
     setShowModificariAlert(false);
     
+    // Resetează și anexa
+    setAnexaActiva(false);
+    setAnexaEtape([]);
+    setAnexaDataStart('');
+    setAnexaDataFinal('');
+    setAnexaObservatii('');
+    
     await previewContractNumberForNewContract();
     
     if (subproiecte.length > 0) {
@@ -922,7 +1229,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setObservatii('');
     showToast('Mod contract nou activat cu număr nou', 'info');
   };
-
   const handleDeleteContract = async () => {
     if (!contractExistent) return;
     
@@ -957,6 +1263,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
+  // MODIFICAT: Funcția de generare cu suport pentru anexă
   const handleGenerateContract = async () => {
     setLoading(true);
     
@@ -973,6 +1280,27 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         return;
       }
 
+      // Validare anexă dacă este activă
+      if (anexaActiva) {
+        if (anexaEtape.some(t => !t.denumire.trim())) {
+          showToast('Toate etapele anexei trebuie să aibă o denumire', 'error');
+          setLoading(false);
+          return;
+        }
+
+        if (anexaEtape.length === 0) {
+          showToast('Anexa trebuie să aibă cel puțin o etapă', 'error');
+          setLoading(false);
+          return;
+        }
+
+        if (!anexaDataStart || !anexaDataFinal) {
+          showToast('Anexa trebuie să aibă date de început și sfârșit', 'error');
+          setLoading(false);
+          return;
+        }
+      }
+
       const validareProcentuala = verificaLimita3Procent();
       if (!validareProcentuala.valid) {
         showToast(`Nu se poate genera contractul: ${validareProcentuala.mesaj}`, 'error');
@@ -980,7 +1308,9 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         return;
       }
 
-      const actionText = isEditMode ? 'actualizează contractul' : 'generează contractul';
+      const actionText = anexaActiva ? 
+        'generează contractul și anexa' : 
+        (isEditMode ? 'actualizează contractul' : 'generează contractul');
       showToast(`Se ${actionText}...`, 'info');
 
       const response = await fetch('/api/actions/contracts/generate', {
@@ -994,32 +1324,59 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           isEdit: isEditMode,
           contractExistentId: contractExistent?.ID_Contract || null,
           contractPreview: contractPreviewForGeneration,
-          contractPrefix: contractPrefix
+          contractPrefix: contractPrefix,
+          
+          // NOUĂ: Date pentru anexă
+          anexaActiva,
+          anexaEtape: anexaActiva ? anexaEtape : [],
+          anexaNumar,
+          anexaDataStart: anexaActiva ? anexaDataStart : null,
+          anexaDataFinal: anexaActiva ? anexaDataFinal : null,
+          anexaObservatii: anexaActiva ? anexaObservatii : null
         })
       });
 
       if (response.ok) {
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
         
-        const contractNumber = response.headers.get('X-Contract-Number') || 
-                              contractPreviewForGeneration;
-        const fileName = `${contractNumber}.docx`;
+        const contractNumber = response.headers.get('X-Contract-Number') || contractPreviewForGeneration;
+        const anexaGenerated = response.headers.get('X-Anexa-Generated') === 'true';
         
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        window.URL.revokeObjectURL(url);
-        
-        const successMessage = isEditMode ? 
-          `Contract ${contractNumber} actualizat cu succes!` :
-          `Contract ${contractNumber} generat cu succes!`;
-        
-        showToast(successMessage, 'success');
+        if (anexaGenerated) {
+          // Pentru generare duală, trebuie să primim două fișiere
+          // API-ul va returna un ZIP sau două download-uri succesive
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = anexaActiva ? 
+            `${contractNumber}_cu_anexa.zip` : 
+            `${contractNumber}.docx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          const successMessage = `Contract ${contractNumber} ${anexaActiva ? 'și anexa' : ''} ${isEditMode ? 'actualizat' : 'generat'} cu succes!`;
+          showToast(successMessage, 'success');
+        } else {
+          // Generare doar contract
+          const url = window.URL.createObjectURL(blob);
+          const fileName = `${contractNumber}.docx`;
+          
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          const successMessage = isEditMode ? 
+            `Contract ${contractNumber} actualizat cu succes!` :
+            `Contract ${contractNumber} generat cu succes!`;
+          
+          showToast(successMessage, 'success');
+        }
         
         if (onSuccess) {
           onSuccess();
@@ -1046,6 +1403,16 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       }
     }
   }, [termenePersonalizate.map(t => t.valoare_ron).join(',')]);
+
+  // NOUĂ: Effect pentru recalcularea procentelor anexă
+  useEffect(() => {
+    if (anexaEtape.length > 0) {
+      const anexaWithPercents = calculeazaProcenteInformative(anexaEtape);
+      if (JSON.stringify(anexaWithPercents) !== JSON.stringify(anexaEtape)) {
+        setAnexaEtape(anexaWithPercents);
+      }
+    }
+  }, [anexaEtape.map(t => t.valoare_ron).join(',')]);
 
   if (!isOpen) return null;
 
@@ -1093,6 +1460,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   }
 
   const sumaTotala = calculeazaSumaTotala();
+  const sumaAnexa = calculeazaSumaAnexa();
   const { valuteSumar, totalRON } = calculeazaSumarValute();
   const validareProcentuala = verificaLimita3Procent();
 
@@ -1114,7 +1482,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         background: 'white',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-        maxWidth: '1200px',
+        maxWidth: '1400px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -1132,6 +1500,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             <div>
               <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: '700' }}>
                 {contractExistent ? 'Editare Contract Existent' : 'Generare Contract Nou'}
+                {anexaActiva && <span style={{ marginLeft: '10px', fontSize: '0.9em', opacity: 0.9 }}>+ Anexă {anexaNumar}</span>}
               </h2>
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
                 Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{proiect.ID_Proiect}</span> - {proiect.Denumire}
@@ -1145,6 +1514,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       <span> (≈ {calculeazaValoareProiectRON().toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON)</span>
                     )}
                      • Etape: {contractExistent.etape_count || 0}
+                    {anexeExistente.length > 0 && <span> • Anexe: {anexeExistente.length}</span>}
                   </div>
                 </div>
               )}
@@ -1208,6 +1578,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   </div>
                   <span>
                     {loadingDelete ? 'Se șterge contractul...' : 
+                     anexaActiva ? 'Se generează contractul și anexa...' :
                      isEditMode ? 'Se actualizează contractul...' : 'Se generează contractul...'}
                   </span>
                 </div>
@@ -1256,7 +1627,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h4 style={{ margin: 0, color: '#856404', fontSize: '16px', fontWeight: '700' }}>
-                  ⚠️ Modificări Detectate
+                  Modificări Detectate
                 </h4>
                 <button
                   onClick={() => setShowModificariAlert(false)}
@@ -1274,16 +1645,16 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               
               <div style={{ marginBottom: '1rem', fontSize: '13px', color: '#856404' }}>
                 {modificariDetectate.subproiecte_noi.length > 0 && (
-                  <div>🟢 {modificariDetectate.subproiecte_noi.length} subproiecte noi</div>
+                  <div>{modificariDetectate.subproiecte_noi.length} subproiecte noi</div>
                 )}
                 {modificariDetectate.subproiecte_sterse.length > 0 && (
-                  <div>🔴 {modificariDetectate.subproiecte_sterse.length} subproiecte șterse</div>
+                  <div>{modificariDetectate.subproiecte_sterse.length} subproiecte șterse</div>
                 )}
                 {modificariDetectate.valori_modificate.length > 0 && (
-                  <div>🟡 {modificariDetectate.valori_modificate.length} valori modificate</div>
+                  <div>{modificariDetectate.valori_modificate.length} valori modificate</div>
                 )}
                 {modificariDetectate.etape_manuale.length > 0 && (
-                  <div>⚪ {modificariDetectate.etape_manuale.length} etape manuale</div>
+                  <div>{modificariDetectate.etape_manuale.length} etape manuale</div>
                 )}
               </div>
               
@@ -1301,7 +1672,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     fontWeight: '600'
                   }}
                 >
-                  🔄 Actualizează din proiect (sincronizare completă)
+                  Actualizează din proiect (sincronizare completă)
                 </button>
                 <button
                   onClick={handleActualizeazaPartial}
@@ -1316,7 +1687,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     fontWeight: '600'
                   }}
                 >
-                  ➕ Actualizează parțial (doar subproiecte noi)
+                  Actualizează parțial (doar subproiecte noi)
                 </button>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
@@ -1333,30 +1704,28 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       fontWeight: '600'
                     }}
                   >
-                    📋 Păstrează actual
+                    Păstrează actual
                   </button>
                   <button
-                    disabled={true}
-                    title="În dezvoltare"
+                    onClick={handleActualizeazaCuAnexa}
                     style={{
                       flex: 1,
                       padding: '0.75rem',
-                      background: '#e9ecef',
-                      color: '#6c757d',
+                      background: '#e67e22',
+                      color: 'white',
                       border: 'none',
                       borderRadius: '6px',
-                      cursor: 'not-allowed',
+                      cursor: 'pointer',
                       fontSize: '13px',
                       fontWeight: '600'
                     }}
                   >
-                    📄 + Anexă
+                    + Anexă
                   </button>
                 </div>
               </div>
             </div>
           )}
-
           {/* Numărul contractului - doar pentru contract nou */}
           {!isEditMode && (
             <div style={{
@@ -1398,6 +1767,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#856404', marginBottom: '0.5rem' }}>
                     Se va actualiza contractul existent
+                    {anexeExistente.length > 0 && <span> • {anexeExistente.length} anexe existente</span>}
                   </div>
                   <div style={{ fontSize: '13px', color: '#856404' }}>
                     <strong>Nr. Contract:</strong> {contractExistent.numar_contract} •{' '}
@@ -1411,7 +1781,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     )}
                   </div>
                   <div style={{ fontSize: '12px', color: '#856404', marginTop: '0.25rem' }}>
-                    ✅ Numărul contractului se păstrează: <strong>{contractPreview}</strong>
+                    Numărul contractului se păstrează: <strong>{contractPreview}</strong>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1430,7 +1800,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       fontWeight: 'bold'
                     }}
                   >
-                    {loadingDelete ? '⏳ Șterge...' : '🗑️ Șterge Contract'}
+                    {loadingDelete ? 'Șterge...' : 'Șterge Contract'}
                   </button>
                   <button
                     type="button"
@@ -1479,8 +1849,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <div>
                 <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold' }}>VALOARE CALCULATĂ</div>
                 <div style={{ fontSize: '16px', color: '#27ae60', fontWeight: 'bold' }}>
-                  {sumaTotala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                  {totalRON.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
                 </div>
+                {anexaActiva && (
+                  <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>
+                    Contract: {sumaTotala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON + 
+                    Anexă: {sumaAnexa.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                  </div>
+                )}
                 {subproiecte.length > 0 ? (
                   <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '2px' }}>
                     Calculat din {subproiecte.length} subproiecte
@@ -1497,12 +1873,12 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           </div>
 
-          {/* Etape și Termene cu afișarea diferențelor vizuale */}
+          {/* SECȚIUNEA CONTRACT */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#2c3e50' }}>
-                  Etape și Termene de Plată
+                  Etape și Termene de Plată - Contract
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#7f8c8d' }}>
                   {contractExistent ? 
@@ -1511,26 +1887,45 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   }
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addTermen}
-                disabled={loading || loadingDelete}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#3498db',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                + Adaugă Etapă
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={addTermen}
+                  disabled={loading || loadingDelete}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#3498db',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  + Adaugă Etapă
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAnexa}
+                  disabled={loading || loadingDelete}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: anexaActiva ? '#e74c3c' : '#e67e22',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {anexaActiva ? 'Dezactivează Anexă' : 'Activează Anexă'}
+                </button>
+              </div>
             </div>
 
-            {/* HEADERS COMPLET CU TOATE COLOANELE */}
+            {/* Headers pentru etapele contract */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr auto',
@@ -1552,7 +1947,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <div style={{ textAlign: 'center' }}>Acțiuni</div>
             </div>
 
-            {/* RENDER COMPLET AL TUTUROR ETAPELOR CU DIFERENȚE VIZUALE */}
+            {/* Render etapele contract cu diferențe vizuale */}
             {termenePersonalizate.map((termen, index) => (
               <div key={termen.id} style={{
                 border: `1px solid ${getRowColor(termen.tip_modificare)}`,
@@ -1584,7 +1979,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     )}
                   </h5>
                   
-                  {/* Butoane de mutare sus/jos și ștergere */}
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
                     <button
                       type="button"
@@ -1644,7 +2038,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   </div>
                 </div>
                 
-                {/* GRID COMPLET CU TOATE CONTROALELE */}
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
@@ -1701,7 +2094,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     <option value="GBP">GBP</option>
                   </select>
                   
-                  {/* Afișaj valoare în RON calculată automat */}
                   <div style={{
                     padding: '0.5rem',
                     border: '1px solid #27ae60',
@@ -1715,7 +2107,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     {(termen.valoare_ron || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2 })}
                   </div>
                   
-                  {/* Coloana procent informativă */}
                   <div style={{
                     padding: '0.5rem',
                     border: '1px solid #f39c12',
@@ -1745,7 +2136,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   />
                 </div>
                 
-                {/* Afișare info conversie și modificări */}
                 {((termen.este_subproiect && termen.tip_modificare !== 'manual') || termen.moneda !== 'RON') && termen.valoare > 0 && (
                   <div style={{
                     marginTop: '0.5rem',
@@ -1770,7 +2160,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </div>
             ))}
             
-            {/* Verificare total procente */}
             <div style={{
               marginTop: '0.5rem',
               padding: '0.5rem',
@@ -1780,33 +2169,414 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               fontSize: '12px',
               color: '#1976d2'
             }}>
-              Total procente: {termenePersonalizate.reduce((sum, t) => sum + (t.procent_calculat || 0), 0).toFixed(1)}% 
+              Total procente contract: {termenePersonalizate.reduce((sum, t) => sum + (t.procent_calculat || 0), 0).toFixed(1)}% 
               (calculat automat din valorile în RON)
             </div>
+          </div>
+          {/* NOUĂ SECȚIUNEA ANEXĂ - doar dacă este activă */}
+          {anexaActiva && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              {/* Separator vizual între contract și anexă */}
+              <div style={{
+                margin: '2rem 0',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #e67e22 0%, #f39c12 100%)',
+                borderRadius: '8px',
+                color: 'white',
+                textAlign: 'center'
+              }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                  ANEXĂ NR. {anexaNumar} LA CONTRACT
+                </h3>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', opacity: 0.9 }}>
+                  Gestionarea diferențelor și serviciilor suplimentare
+                </p>
+              </div>
 
-            {/* Verificare limită 3% */}
-            <div style={{
-              marginTop: '0.5rem',
-              padding: '0.5rem',
-              background: validareProcentuala.valid ? '#d4edda' : '#f8d7da',
-              border: `1px solid ${validareProcentuala.valid ? '#c3e6cb' : '#f5c6cb'}`,
-              borderRadius: '4px',
-              fontSize: '12px',
-              color: validareProcentuala.valid ? '#155724' : '#721c24'
-            }}>
-              <strong>Validare diferență față de proiect:</strong> {validareProcentuala.mesaj}
-              {!validareProcentuala.valid && (
-                <div style={{ marginTop: '4px', fontSize: '11px' }}>
-                  Contractul nu poate fi generat dacă diferența depășește 3%.
+              {/* Date specifice anexă */}
+              <div style={{
+                background: '#fff8e1',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                padding: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: '#856404', fontSize: '16px' }}>
+                  Date Anexă
+                </h4>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404', fontSize: '12px' }}>
+                      DATA ÎNCEPUT ANEXĂ
+                    </label>
+                    <input
+                      type="date"
+                      value={anexaDataStart}
+                      onChange={(e) => setAnexaDataStart(e.target.value)}
+                      disabled={loading || loadingDelete}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404', fontSize: '12px' }}>
+                      DATA SFÂRȘIT ANEXĂ
+                    </label>
+                    <input
+                      type="date"
+                      value={anexaDataFinal}
+                      onChange={(e) => setAnexaDataFinal(e.target.value)}
+                      disabled={loading || loadingDelete}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404', fontSize: '12px' }}>
+                      DURATA (ZILE)
+                    </label>
+                    <div style={{
+                      padding: '0.5rem',
+                      border: '1px solid #ffc107',
+                      borderRadius: '4px',
+                      background: '#fff',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      color: '#856404',
+                      fontWeight: 'bold'
+                    }}>
+                      {anexaDataStart && anexaDataFinal ? 
+                        Math.ceil((new Date(anexaDataFinal).getTime() - new Date(anexaDataStart).getTime()) / (1000 * 60 * 60 * 24)) :
+                        'TBD'
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Etape anexă */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div>
+                  <h4 style={{ margin: 0, color: '#e67e22' }}>
+                    Etape și Termene - Anexă {anexaNumar}
+                  </h4>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '12px', color: '#856404' }}>
+                    Diferențele detectate automat și etapele manuale pentru anexă
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addAnexaEtapa}
+                  disabled={loading || loadingDelete}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#e67e22',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  + Adaugă Etapă Anexă
+                </button>
+              </div>
+
+              {/* Headers pentru etapele anexă */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr auto',
+                gap: '0.5rem',
+                marginBottom: '0.5rem',
+                padding: '0.5rem',
+                background: '#fff3cd',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: '#856404'
+              }}>
+                <div>Descriere</div>
+                <div style={{ textAlign: 'center' }}>Valoare</div>
+                <div style={{ textAlign: 'center' }}>Monedă</div>
+                <div style={{ textAlign: 'center' }}>Val. RON</div>
+                <div style={{ textAlign: 'center' }}>Procent (%)</div>
+                <div style={{ textAlign: 'center' }}>Termen</div>
+                <div style={{ textAlign: 'center' }}>Acțiuni</div>
+              </div>
+
+              {/* Render etapele anexă */}
+              {anexaEtape.map((termen, index) => (
+                <div key={termen.id} style={{
+                  border: `1px solid ${getRowColor(termen.tip_modificare)}`,
+                  borderRadius: '6px',
+                  padding: '1rem',
+                  marginBottom: '0.5rem',
+                  background: `${getRowColor(termen.tip_modificare)}15`,
+                  borderLeft: `4px solid ${getRowColor(termen.tip_modificare)}`
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.5rem'
+                  }}>
+                    <h5 style={{ margin: 0, color: '#e67e22', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      Anexă - {termen.este_subproiect ? 'Subproiect' : 'Etapa'} {index + 1}
+                      {termen.tip_modificare && termen.tip_modificare !== 'normal' && (
+                        <span style={{
+                          fontSize: '10px',
+                          background: getRowColor(termen.tip_modificare),
+                          color: 'white',
+                          padding: '2px 6px',
+                          borderRadius: '8px',
+                          fontWeight: 'bold'
+                        }}>
+                          {getRowLabel(termen.tip_modificare)}
+                        </span>
+                      )}
+                    </h5>
+                    
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => moveAnexaEtapaUp(index)}
+                        disabled={loading || loadingDelete || index === 0}
+                        title="Mută în sus"
+                        style={{
+                          background: index === 0 ? '#bdc3c7' : '#e67e22',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.4rem',
+                          cursor: (loading || loadingDelete || index === 0) ? 'not-allowed' : 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ↑
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => moveAnexaEtapaDown(index)}
+                        disabled={loading || loadingDelete || index === anexaEtape.length - 1}
+                        title="Mută în jos"
+                        style={{
+                          background: index === anexaEtape.length - 1 ? '#bdc3c7' : '#e67e22',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.4rem',
+                          cursor: (loading || loadingDelete || index === anexaEtape.length - 1) ? 'not-allowed' : 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ↓
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => removeAnexaEtapa(termen.id)}
+                        disabled={loading || loadingDelete}
+                        title="Șterge etapa anexă"
+                        style={{
+                          background: (loading || loadingDelete) ? '#bdc3c7' : '#e74c3c',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.5rem',
+                          cursor: (loading || loadingDelete) ? 'not-allowed' : 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr',
+                    gap: '0.5rem',
+                    alignItems: 'end'
+                  }}>
+                    <input
+                      type="text"
+                      value={termen.denumire}
+                      onChange={(e) => updateAnexaEtapa(termen.id, 'denumire', e.target.value)}
+                      disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
+                      placeholder="Denumire etapă anexă"
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#fff8e1' : 'white'
+                      }}
+                    />
+                    
+                    <input
+                      type="number"
+                      value={termen.valoare}
+                      onChange={(e) => updateAnexaEtapa(termen.id, 'valoare', parseFloat(e.target.value) || 0)}
+                      disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#fff8e1' : 'white'
+                      }}
+                    />
+                    
+                    <select
+                      value={termen.moneda}
+                      onChange={(e) => updateAnexaEtapa(termen.id, 'moneda', e.target.value)}
+                      disabled={loading || loadingDelete || (termen.este_subproiect && termen.tip_modificare !== 'manual')}
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        background: (termen.este_subproiect && termen.tip_modificare !== 'manual') ? '#fff8e1' : 'white'
+                      }}
+                    >
+                      <option value="RON">RON</option>
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                    
+                    <div style={{
+                      padding: '0.5rem',
+                      border: '1px solid #e67e22',
+                      borderRadius: '4px',
+                      background: '#fff8e1',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      color: '#e67e22',
+                      fontWeight: 'bold'
+                    }}>
+                      {(termen.valoare_ron || 0).toLocaleString('ro-RO', { minimumFractionDigits: 2 })}
+                    </div>
+                    
+                    <div style={{
+                      padding: '0.5rem',
+                      border: '1px solid #f39c12',
+                      borderRadius: '4px',
+                      background: '#fff8e1',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      color: '#f39c12',
+                      fontWeight: 'bold'
+                    }}>
+                      {termen.procent_calculat?.toFixed(1) || '0.0'}%
+                    </div>
+                    
+                    <input
+                      type="number"
+                      value={termen.termen_zile}
+                      onChange={(e) => updateAnexaEtapa(termen.id, 'termen_zile', parseInt(e.target.value) || 0)}
+                      disabled={loading || loadingDelete}
+                      placeholder="Zile"
+                      min="0"
+                      style={{
+                        padding: '0.5rem',
+                        border: '1px solid #ffc107',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  
+                  {termen.tip_modificare && termen.tip_modificare !== 'normal' && termen.tip_modificare !== 'manual' && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      fontSize: '11px',
+                      color: '#856404',
+                      fontStyle: 'italic'
+                    }}>
+                      {termen.tip_modificare === 'nou' && 'Subproiect nou detectat în proiect'}
+                      {termen.tip_modificare === 'modificat' && 'Diferență de valoare detectată'}
+                      {termen.subproiect_id && ` - ID: ${termen.subproiect_id}`}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {anexaEtape.length === 0 && (
+                <div style={{
+                  padding: '2rem',
+                  textAlign: 'center',
+                  color: '#856404',
+                  background: '#fff8e1',
+                  borderRadius: '8px',
+                  border: '1px dashed #ffc107'
+                }}>
+                  Nu există etape în anexă. Adaugă etape manual sau activează detectarea automată.
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Observații COMPLETE */}
+              <div style={{
+                marginTop: '0.5rem',
+                padding: '0.5rem',
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#856404'
+              }}>
+                Total procente anexă: {anexaEtape.reduce((sum, t) => sum + (t.procent_calculat || 0), 0).toFixed(1)}%
+                • Valoare anexă: {sumaAnexa.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+              </div>
+
+              {/* Observații anexă */}
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#e67e22' }}>
+                  Observații Anexă
+                </label>
+                <textarea
+                  value={anexaObservatii}
+                  onChange={(e) => setAnexaObservatii(e.target.value)}
+                  disabled={loading || loadingDelete}
+                  placeholder="Observații specifice pentru anexă..."
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ffc107',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Observații generale COMPLETE */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Observații și Note Speciale
+              Observații și Note Speciale - Contract
             </label>
             <textarea
               value={observatii}
@@ -1825,7 +2595,25 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             />
           </div>
 
-          {/* Sumar final cu valute separate */}
+          {/* Verificare limită 3% inclusiv anexa */}
+          <div style={{
+            marginBottom: '1.5rem',
+            padding: '0.5rem',
+            background: validareProcentuala.valid ? '#d4edda' : '#f8d7da',
+            border: `1px solid ${validareProcentuala.valid ? '#c3e6cb' : '#f5c6cb'}`,
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: validareProcentuala.valid ? '#155724' : '#721c24'
+          }}>
+            <strong>Validare diferență față de proiect (Contract {anexaActiva ? '+ Anexă' : ''}):</strong> {validareProcentuala.mesaj}
+            {!validareProcentuala.valid && (
+              <div style={{ marginTop: '4px', fontSize: '11px' }}>
+                Contractul nu poate fi generat dacă diferența depășește 3%.
+              </div>
+            )}
+          </div>
+
+          {/* Sumar final cu valute separate + anexă */}
           <div style={{
             background: '#e8f5e8',
             padding: '1.5rem',
@@ -1835,12 +2623,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
               {isEditMode ? 'Sumar Actualizare Contract' : 'Sumar Contract Nou'}
+              {anexaActiva && <span style={{ color: '#e67e22' }}> + Anexă {anexaNumar}</span>}
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
                 <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ACȚIUNE</div>
                 <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
-                  {isEditMode ? 'Actualizare' : 'Generare Nouă'}
+                  {anexaActiva ? 'Contract + Anexă' : (isEditMode ? 'Actualizare' : 'Generare Nouă')}
                 </div>
               </div>
               <div>
@@ -1848,12 +2637,17 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 <div style={{ fontSize: '16px', color: '#27ae60', fontWeight: 'bold', fontFamily: 'monospace' }}>
                   {contractPreview}
                 </div>
+                {anexaActiva && (
+                  <div style={{ fontSize: '12px', color: '#e67e22', fontWeight: 'bold' }}>
+                    + Anexă {anexaNumar}
+                  </div>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: '12px', color: '#155724', fontWeight: 'bold' }}>ETAPE PLATĂ</div>
                 <div style={{ fontSize: '16px', color: '#2c3e50', fontWeight: 'bold' }}>
-                  {termenePersonalizate.length} etape
-                  {subproiecte.length > 0 && ` (${termenePersonalizate.filter(t => t.este_subproiect).length} din proiect)`}
+                  Contract: {termenePersonalizate.length} etape
+                  {anexaActiva && <div style={{ color: '#e67e22' }}>Anexă: {anexaEtape.length} etape</div>}
                 </div>
               </div>
               
@@ -1877,8 +2671,40 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     Echivalent: {totalRON.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
                   </div>
                 )}
+                {anexaActiva && (
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: '#856404',
+                    marginTop: '0.25rem',
+                    borderTop: '1px dashed #ffc107',
+                    paddingTop: '0.25rem'
+                  }}>
+                    Contract: {sumaTotala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON<br/>
+                    Anexă: {sumaAnexa.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Informații anexe existente */}
+            {anexeExistente.length > 0 && (
+              <div style={{ 
+                marginTop: '1rem', 
+                padding: '0.75rem',
+                background: '#fff3cd',
+                borderRadius: '6px',
+                border: '1px solid #ffc107'
+              }}>
+                <div style={{ fontSize: '12px', color: '#856404', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                  ANEXE EXISTENTE
+                </div>
+                {anexeExistente.map(anexa => (
+                  <div key={anexa.anexa_numar} style={{ fontSize: '11px', color: '#856404' }}>
+                    Anexă {anexa.anexa_numar}: {anexa.etape.length} etape • {anexa.valoare_totala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Butoane finale COMPLETE cu validări */}
@@ -1894,7 +2720,10 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               color: '#7f8c8d',
               fontWeight: '500'
             }}>
-              Contractul va fi {isEditMode ? 'actualizat și regenerat' : 'generat'} ca fișier DOCX
+              {anexaActiva ? 
+                'Se vor genera Contract.docx și Anexa.docx' :
+                `Contractul va fi ${isEditMode ? 'actualizat și regenerat' : 'generat'} ca fișier DOCX`
+              }
             </div>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -1915,40 +2744,60 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 Anulează
               </button>
               
-              {/* NOUĂ: Buton Anexă pentru dezvoltare viitoare */}
-              <button
-                disabled={true}
-                title="În dezvoltare"
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#e9ecef',
-                  color: '#6c757d',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'not-allowed',
-                  fontSize: '14px',
-                  fontWeight: 'bold'
-                }}
-              >
-                📄 Generează Anexă
-              </button>
-              
               <button
                 onClick={handleGenerateContract}
-                disabled={loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid}
+                disabled={
+                  loading || 
+                  loadingDelete || 
+                  termenePersonalizate.some(t => !t.denumire.trim()) || 
+                  termenePersonalizate.length === 0 || 
+                  !validareProcentuala.valid ||
+                  (anexaActiva && (
+                    anexaEtape.some(t => !t.denumire.trim()) || 
+                    anexaEtape.length === 0 ||
+                    !anexaDataStart ||
+                    !anexaDataFinal
+                  ))
+                }
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: (loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid) ? '#bdc3c7' : 
+                  background: (
+                    loading || 
+                    loadingDelete || 
+                    termenePersonalizate.some(t => !t.denumire.trim()) || 
+                    termenePersonalizate.length === 0 || 
+                    !validareProcentuala.valid ||
+                    (anexaActiva && (
+                      anexaEtape.some(t => !t.denumire.trim()) || 
+                      anexaEtape.length === 0 ||
+                      !anexaDataStart ||
+                      !anexaDataFinal
+                    ))
+                  ) ? '#bdc3c7' : 
+                    anexaActiva ? '#e67e22' :
                     isEditMode ? '#f39c12' : '#27ae60',
                   color: 'white',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: (loading || loadingDelete || termenePersonalizate.some(t => !t.denumire.trim()) || termenePersonalizate.length === 0 || !validareProcentuala.valid) ? 'not-allowed' : 'pointer',
+                  cursor: (
+                    loading || 
+                    loadingDelete || 
+                    termenePersonalizate.some(t => !t.denumire.trim()) || 
+                    termenePersonalizate.length === 0 || 
+                    !validareProcentuala.valid ||
+                    (anexaActiva && (
+                      anexaEtape.some(t => !t.denumire.trim()) || 
+                      anexaEtape.length === 0 ||
+                      !anexaDataStart ||
+                      !anexaDataFinal
+                    ))
+                  ) ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold'
                 }}
               >
                 {loading ? 'Se procesează...' : 
+                 anexaActiva ? 'Generează Contract + Anexă' :
                  isEditMode ? 'Actualizează Contract' : 'Generează Contract'}
               </button>
             </div>
