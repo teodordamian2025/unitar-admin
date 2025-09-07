@@ -663,12 +663,15 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     }
     
     return { 
-      sumaFinala: sumaFinalaRON, 
-      monedaFinala: Object.keys(valuteBuckets).length === 1 ? Object.keys(valuteBuckets)[0] : 'MULTIPLE',
-      cursuriUtilizate,
-      sumaOriginala: sumaOriginalaString,
-      monedaOriginala: monedaOriginalaString
-    };
+	  sumaFinala: sumaFinalaRON, 
+	  monedaFinala: Object.keys(valuteBuckets).length === 1 ? Object.keys(valuteBuckets)[0] : 'MULTIPLE',
+	  cursuriUtilizate,
+	  sumaOriginala: sumaOriginalaString,
+	  monedaOriginala: monedaOriginalaString,
+	  // ADAUGĂ acestea pentru compatibilitate BigQuery:
+	  sumaOriginalaNumeric: Object.keys(valuteBuckets).length === 1 ? Object.values(valuteBuckets)[0] : sumaFinalaRON,
+	  monedaOriginalaForDB: Object.keys(valuteBuckets).length === 1 ? Object.keys(valuteBuckets)[0] : 'RON'
+	};
     
   } else {
     const sumaOriginala = proiect.Valoare_Estimata || 0;
@@ -1139,8 +1142,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
 	const parametriiUpdate = {
 	  contractId: contractInfo.contractExistentId,
-	  valoare: contractInfo.sumaOriginala,
-	  moneda: contractInfo.monedaOriginala,
+	  valoare: contractInfo.sumaOriginalaNumeric || contractInfo.sumaFinala,
+	  moneda: contractInfo.monedaOriginalaForDB || 'RON',
 	  cursValutar: cursValutarPrincipal,
 	  dataCurs: dataCursValutar,
 	  valoareRon: contractInfo.sumaFinala,
@@ -1201,8 +1204,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         dataSemnare: dataSemnare,
         dataExpirare: dataExpirare,
         status: 'Generat',
-        valoare: contractInfo.sumaOriginala,
-        moneda: contractInfo.monedaOriginala,
+        valoare: contractInfo.sumaOriginalaNumeric || contractInfo.sumaFinala,
+        moneda: contractInfo.monedaOriginalaForDB || 'RON',
         cursValutar: cursValutarPrincipal,
         dataCurs: dataCursValutar,
         valoareRon: contractInfo.sumaFinala,
@@ -1793,20 +1796,23 @@ export async function POST(request: NextRequest) {
 
     // 7. SALVAREA ÎN BIGQUERY CU LOGICA INTELIGENTĂ
     const contractInfo = {
-      isEdit,
-      contractExistentId,
-      proiectId,
-      tipDocument,
-      contractData,
-      placeholderData,
-      termenePersonalizate,
-      observatii,
-      proiect,
-      subproiecte,
-      sumaOriginala: calculContractResult.sumaOriginala,
-      monedaOriginala: calculContractResult.monedaOriginala,
-      sumaFinala: calculContractResult.sumaFinala,
-      cursuriUtilizate: calculContractResult.cursuriUtilizate,
+	  isEdit,
+	  contractExistentId,
+	  proiectId,
+	  tipDocument,
+	  contractData,
+	  placeholderData,
+	  termenePersonalizate,
+	  observatii,
+	  proiect,
+	  subproiecte,
+	  sumaOriginala: calculContractResult.sumaOriginala,
+	  monedaOriginala: calculContractResult.monedaOriginala,
+	  sumaFinala: calculContractResult.sumaFinala,
+	  cursuriUtilizate: calculContractResult.cursuriUtilizate,
+	  // ADAUGĂ acestea:
+	  sumaOriginalaNumeric: calculContractResult.sumaOriginalaNumeric,
+	  monedaOriginalaForDB: calculContractResult.monedaOriginalaForDB,
       
       // NOUĂ: Date anexă pentru salvare
       anexaActiva: anexaGenerated,
