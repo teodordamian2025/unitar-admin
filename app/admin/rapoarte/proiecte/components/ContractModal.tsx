@@ -368,7 +368,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         // Convertește în array de anexe
         const anexe: AnexaExistenta[] = Array.from(anexeMap.entries()).map(([numar, etape]) => {
           const valoareTotala = etape.reduce((sum, etapa) => sum + etapa.valoare_ron, 0);
-          const monede = [...new Set(etape.map(e => e.moneda))];
+          const monede = Array.from(new Set(etape.map(e => e.moneda)));
           
           return {
             anexa_numar: numar,
