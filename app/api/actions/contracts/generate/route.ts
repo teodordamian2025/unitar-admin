@@ -825,6 +825,7 @@ function prepareSimpleTemplateData(
 // NOUĂ FUNCȚIE: Preparare date template pentru anexă
 function prepareAnexaTemplateData(
   proiect: any, 
+  subproiecte: any[], 
   contractData: any,
   anexaEtape: any[],
   anexaNumar: number,
@@ -1550,7 +1551,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
 // NOUĂ FUNCȚIE: Generare template și fișier anexă
 async function generateAnexaDocument(
-  placeholderData: any,
+  proiectComplet: any,
+  subproiecte: any[],
+  contractData: any,
   anexaNumar: number,
   anexaDataStart: string,
   anexaDataFinal: string,
@@ -1558,10 +1561,11 @@ async function generateAnexaDocument(
   anexaObservatii: string
 ): Promise<Buffer> {
   
-  // Pregătește datele pentru anexă
+  // Pregătește datele pentru anexă folosind aceleași surse ca contractul
   const anexaTemplateData = prepareAnexaTemplateData(
-    placeholderData.proiect,
-    placeholderData.contract,
+    proiectComplet,
+    subproiecte,
+    contractData,
     anexaEtape,
     anexaNumar,
     anexaDataStart,
@@ -1787,13 +1791,15 @@ export async function POST(request: NextRequest) {
 
       try {
         anexaBuffer = await generateAnexaDocument(
-          placeholderData,
-          anexaNumar,
-          anexaDataStart,
-          anexaDataFinal,
-          anexaEtape,
-          anexaObservatii
-        );
+	  proiect,
+	  subproiecte,
+	  contractData,
+	  anexaNumar,
+	  anexaDataStart,
+	  anexaDataFinal,
+	  anexaEtape,
+	  anexaObservatii
+	);
         anexaGenerated = true;
         
         console.log('[CONTRACT-GENERATE] ✅ Anexă DOCX generată cu succes');
