@@ -63,10 +63,6 @@ Prezenta anexă are ca obiect completarea și/sau modificarea contractului princ
 
 3. **Forța majoră, litigiile și legislația aplicabilă** sunt cele stipulate în contractul principal.
 
-{{responsabil_clause}}
-
-{{contact_clause}}
-
 {{observatii_clause}}
 
 ---
