@@ -1,4 +1,6 @@
-**ANEXA NR. {{anexa.numar}} DIN {{anexa.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**
+**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{anexa.data}} LA CONTRACTUL NR. {{contract.numar}} din {{contract.data}}**
+
+Prin prezen
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
@@ -15,8 +17,6 @@ au convenit să încheie prezenta anexă la contractul de servicii nr. {{contrac
 Prezenta anexă are ca obiect completarea și/sau modificarea contractului principal cu următoarele servicii și/sau modificări:
 
 **{{proiect.denumire}}**
-
-{{anexa.descriere_lucrari}}
 
 {{proiect.adresa}}
 

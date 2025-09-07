@@ -279,6 +279,7 @@ function processPlaceholders(text: string, data: any): string {
     observatiiClause = `\n**OBSERVAȚII SUPLIMENTARE:**\n\n${data.observatii}\n`;
   }
   processed = processed.replace('{{observatii_clause}}', observatiiClause);
+  processed = processed.replace('{{anexa.descriere_lucrari}}', data.anexa_descriere_lucrari || '');
   
   return processed;
 }
@@ -831,7 +832,8 @@ function prepareAnexaTemplateData(
   anexaNumar: number,
   anexaDataStart: string,
   anexaDataFinal: string,
-  anexaObservatii?: string
+  anexaObservatii?: string,
+  anexaDescrierelucrari?: string
 ) {
   const { sumaOriginala, monedaOriginala } = calculeazaSumaAnexaCuValoriEstimate(anexaEtape);
   
@@ -886,6 +888,7 @@ function prepareAnexaTemplateData(
     suma_anexa_originala: sumaOriginala,
     moneda_anexa_originala: monedaOriginala,
     anexa_observatii: anexaObservatii || '',
+    anexa_descriere_lucrari: anexaDescrierelucrari || '',
     data_generare: new Date().toISOString()
   };
   
@@ -1645,24 +1648,25 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const {
-      proiectId,
-      tipDocument = 'contract',
-      termenePersonalizate = [],
-      observatii = '',
-      isEdit = false,
-      contractExistentId = null,
-      contractPreview,
-      contractPrefix,
-      
-      // NOUĂ: Parametri pentru anexă
-      anexaActiva = false,
-      anexaEtape = [],
-      anexaNumar = 1,
-      anexaDataStart = null,
-      anexaDataFinal = null,
-      anexaObservatii = ''
-    } = body;
+	const {
+	  proiectId,
+	  tipDocument = 'contract',
+	  termenePersonalizate = [],
+	  observatii = '',
+	  isEdit = false,
+	  contractExistentId = null,
+	  contractPreview,
+	  contractPrefix,
+	  
+	  // NOUĂ: Parametri pentru anexă
+	  anexaActiva = false,
+	  anexaEtape = [],
+	  anexaNumar = 1,
+	  anexaDataStart = null,
+	  anexaDataFinal = null,
+	  anexaObservatii = '',
+	  anexaDescrierelucrari = ''
+	} = body;
 
     console.log('[CONTRACT-GENERATE] =================================');
     console.log('[CONTRACT-GENERATE] PROCES ÎNCEPUT:', {

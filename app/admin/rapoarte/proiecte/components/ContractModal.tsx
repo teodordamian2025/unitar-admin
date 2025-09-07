@@ -228,6 +228,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [anexaDataStart, setAnexaDataStart] = useState('');
   const [anexaDataFinal, setAnexaDataFinal] = useState('');
   const [anexaObservatii, setAnexaObservatii] = useState('');
+  const [anexaDescrierelucrari, setAnexaDescrierelucrari] = useState('');
 
   // PĂSTRAT: State pentru detectarea modificărilor
   const [modificariDetectate, setModificariDetectate] = useState<ModificariDetectate>({
@@ -531,6 +532,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       setAnexaDataStart('');
       setAnexaDataFinal('');
       setAnexaObservatii('');
+      setAnexaDescrierelucrari('');
       console.log('📄 Anexă dezactivată');
       showToast('Anexă dezactivată', 'info');
     }
@@ -1200,6 +1202,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setAnexaDataStart('');
     setAnexaDataFinal('');
     setAnexaObservatii('');
+    setAnexaDescrierelucrari('');
     
     await previewContractNumberForNewContract();
     
@@ -1299,6 +1302,12 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           setLoading(false);
           return;
         }
+
+        if (!anexaDescrierelucrari.trim()) {
+          showToast('Anexa trebuie să aibă o descriere a lucrărilor', 'error');
+          setLoading(false);
+          return;
+        }
       }
 
       const validareProcentuala = verificaLimita3Procent();
@@ -1332,7 +1341,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
           anexaNumar,
           anexaDataStart: anexaActiva ? anexaDataStart : null,
           anexaDataFinal: anexaActiva ? anexaDataFinal : null,
-          anexaObservatii: anexaActiva ? anexaObservatii : null
+          anexaObservatii: anexaActiva ? anexaObservatii : null,
+          anexaDescrierelucrari: anexaActiva ? anexaDescrierelucrari : null
         })
       });
 
@@ -2266,9 +2276,36 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     </div>
                   </div>
                 </div>
+              
+              {/* Descrierea lucrărilor anexă */}
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#856404', fontSize: '12px' }}>
+                  DESCRIEREA LUCRĂRILOR ANEXĂ (OBLIGATORIU)
+                </label>
+                <textarea
+                  value={anexaDescrierelucrari}
+                  onChange={(e) => setAnexaDescrierelucrari(e.target.value)}
+                  disabled={loading || loadingDelete}
+                  placeholder="Descrierea detaliată a lucrărilor și serviciilor suplimentare din anexă..."
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ffc107',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+                {anexaDescrierelucrari.trim() === '' && (
+                  <div style={{ fontSize: '11px', color: '#dc3545', marginTop: '0.25rem' }}>
+                    Acest câmp este obligatoriu pentru generarea anexei
+                  </div>
+                )}
               </div>
+            </div>
 
-              {/* Etape anexă */}
+            {/* Etape anexă */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
                   <h4 style={{ margin: 0, color: '#e67e22' }}>
@@ -2757,6 +2794,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     anexaEtape.length === 0 ||
                     !anexaDataStart ||
                     !anexaDataFinal
+                    !anexaDescrierelucrari.trim()
                   ))
                 }
                 style={{
@@ -2772,6 +2810,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       anexaEtape.length === 0 ||
                       !anexaDataStart ||
                       !anexaDataFinal
+                      !anexaDescrierelucrari.trim()
                     ))
                   ) ? '#bdc3c7' : 
                     anexaActiva ? '#e67e22' :
@@ -2790,6 +2829,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                       anexaEtape.length === 0 ||
                       !anexaDataStart ||
                       !anexaDataFinal
+                      !anexaDescrierelucrari.trim()
                     ))
                   ) ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
