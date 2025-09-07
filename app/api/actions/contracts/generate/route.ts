@@ -1121,6 +1121,16 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
     const dataCursValutar = cursValutarPrincipal ? 
       formatDateForBigQuery(new Date().toISOString().split('T')[0]) : 
       null;
+      
+      // Calculează valoarea pentru DB înainte de UPDATE/INSERT
+	let valoarePentruDB = contractInfo.sumaFinala; // fallback la suma în RON
+	if (contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0) {
+	  // Folosește prima valoare din prima etapă sau suma totală
+	  const primeaEtapa = contractInfo.termenePersonalizate[0];
+	  if (primeaEtapa && primeaEtapa.moneda === 'RON') {
+	    valoarePentruDB = primeaEtapa.valoare || contractInfo.sumaFinala;
+	  }
+	}
 
     // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
@@ -1139,16 +1149,6 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      versiune = versiune + 1
 	    WHERE ID_Contract = @contractId
 	  `;
-
-	  // Forțează conversie la numeric pentru valori multiple
-	  let valoarePentruDB = contractInfo.sumaFinala; // fallback la suma în RON
-	  if (contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0) {
-	    // Folosește prima valoare din prima etapă sau suma totală
-	    const primeaEtapa = contractInfo.termenePersonalizate[0];
-	    if (primeaEtapa && primeaEtapa.moneda === 'RON') {
-	      valoarePentruDB = primeaEtapa.valoare || contractInfo.sumaFinala;
-	    }
-	  }
 
 	  const parametriiUpdate = {
 	    contractId: contractInfo.contractExistentId,
