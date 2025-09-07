@@ -279,7 +279,18 @@ function processPlaceholders(text: string, data: any): string {
     observatiiClause = `\n**OBSERVAȚII SUPLIMENTARE:**\n\n${data.observatii}\n`;
   }
   processed = processed.replace('{{observatii_clause}}', observatiiClause);
-  processed = processed.replace('{{anexa.descriere_lucrari}}', data.anexa_descriere_lucrari || '');
+  // Descriere lucrări anexă
+    let descriereClause = '';
+    if (data.anexa_descriere_lucrari && data.anexa_descriere_lucrari.trim()) {
+      descriereClause = data.anexa_descriere_lucrari.trim();
+    }
+    processed = processed.replace('{{anexa.descriere_lucrari}}', descriereClause);
+    
+    console.log('[DEBUG] Înlocuire descriere anexă:', {
+      input: data.anexa_descriere_lucrari,
+      output: descriereClause,
+      found_placeholder: processed.includes('{{anexa.descriere_lucrari}}')
+    });
   
   return processed;
 }
