@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProcesVerbalModal.tsx
-// DATA: 07.09.2025 20:45 (ora României)
-// DESCRIERE: Modal pentru generarea Proceselor Verbale de Predare-Primire
-// PĂSTRATE: Toate pattern-urile din ContractModal + logica selector subproiecte
+// DATA: 07.09.2025 23:30 (ora României)
+// MODIFICAT: Eliminare completă informații financiare din interfața PV
+// PĂSTRATE: Toate funcționalitățile operaționale + logica selector subproiecte
 // ==================================================================
 
 'use client';
@@ -30,7 +30,7 @@ interface ProiectData {
 interface SubproiectInfo {
   ID_Subproiect: string;
   Denumire: string;
-  Valoare_Estimata?: number;
+  Valoare_Estimata?: number; // PĂSTRAT pentru logica internă, nu se afișează
   Status: string;
   status_predare?: string;
   moneda?: string;
@@ -242,26 +242,19 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
     setSubproiecteSelectate(new Set());
   };
 
-  // Calculare statistici selectie
+  // MODIFICAT: Calculare statistici selecție FĂRĂ informații financiare
   const getStatisticiSelectie = () => {
     const totalSubproiecte = subproiecte.length;
     const subproiectePredate = subproiecte.filter(sub => sub.status_predare === 'Predat').length;
     const subproiecteDisponibile = totalSubproiecte - subproiectePredate;
     const subproiecteSelectate_count = subproiecteSelectate.size;
-    
-    let valoareTotalaSelectata = 0;
-    subproiecte.forEach(sub => {
-      if (subproiecteSelectate.has(sub.ID_Subproiect)) {
-        valoareTotalaSelectata += sub.valoare_ron || sub.Valoare_Estimata || 0;
-      }
-    });
 
     return {
       totalSubproiecte,
       subproiectePredate,
       subproiecteDisponibile,
-      subproiecteSelectate: subproiecteSelectate_count,
-      valoareTotalaSelectata
+      subproiecteSelectate: subproiecteSelectate_count
+      // ELIMINAT: valoareTotalaSelectata
     };
   };
 
@@ -416,7 +409,7 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
         background: 'white',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-        maxWidth: '1200px',
+        maxWidth: '1100px', // MODIFICAT: Redus din 1200px
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -621,10 +614,10 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                 </div>
               </div>
 
-              {/* Headers pentru tabel subproiecte */}
+              {/* MODIFICAT: Headers pentru tabel subproiecte FĂRĂ coloana Valoare */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '40px 2fr 1fr 1fr 1fr 1fr',
+                gridTemplateColumns: '40px 2fr 1fr 1fr 1fr', // MODIFICAT: 5 coloane în loc de 6
                 gap: '0.5rem',
                 marginBottom: '0.5rem',
                 padding: '0.5rem',
@@ -638,11 +631,11 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                 <div>Subproiect</div>
                 <div style={{ textAlign: 'center' }}>Status</div>
                 <div style={{ textAlign: 'center' }}>Status Predare</div>
-                <div style={{ textAlign: 'right' }}>Valoare</div>
                 <div style={{ textAlign: 'center' }}>Responsabil</div>
+                {/* ELIMINAT: coloana Valoare */}
               </div>
 
-              {/* Lista subproiecte */}
+              {/* MODIFICAT: Lista subproiecte FĂRĂ coloana Valoare */}
               <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '6px' }}>
                 {subproiecte.map((subproiect) => {
                   const isPredat = subproiect.status_predare === 'Predat';
@@ -653,7 +646,7 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                       key={subproiect.ID_Subproiect}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '40px 2fr 1fr 1fr 1fr 1fr',
+                        gridTemplateColumns: '40px 2fr 1fr 1fr 1fr', // MODIFICAT: 5 coloane în loc de 6
                         gap: '0.5rem',
                         padding: '0.75rem 0.5rem',
                         borderBottom: '1px solid #f8f9fa',
@@ -710,21 +703,17 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                         </span>
                       </div>
                       
-                      <div style={{ textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#27ae60' }}>
-                        {subproiect.Valoare_Estimata ? 
-                          `${subproiect.Valoare_Estimata.toLocaleString('ro-RO')} ${subproiect.moneda || 'RON'}` : 
-                          'N/A'}
-                      </div>
-                      
                       <div style={{ textAlign: 'center', fontSize: '12px', color: '#7f8c8d' }}>
                         {subproiect.Responsabil || 'N/A'}
                       </div>
+                      
+                      {/* ELIMINAT: div cu valoarea */}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Statistici selecție */}
+              {/* MODIFICAT: Statistici selecție FĂRĂ valoarea totală */}
               <div style={{
                 marginTop: '0.5rem',
                 padding: '0.75rem',
@@ -747,9 +736,7 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                   <div>
                     <strong>Selectate:</strong> {statistici.subproiecteSelectate}
                   </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <strong>Valoare selectată:</strong> {statistici.valoareTotalaSelectata.toLocaleString('ro-RO')} RON
-                  </div>
+                  {/* ELIMINAT: div cu valoarea selectată */}
                 </div>
               </div>
             </div>
@@ -816,6 +803,7 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
                   }
                 </div>
               </div>
+              {/* ELIMINAT: sumarele financiare */}
             </div>
           </div>
 
