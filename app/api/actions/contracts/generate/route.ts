@@ -1121,45 +1121,56 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
     // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
-      const updateQuery = `
-        UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
-        SET 
-          Valoare = @valoare,
-          Moneda = @moneda,
-          curs_valutar = @cursValutar,
-          data_curs_valutar = @dataCurs,
-          valoare_ron = @valoareRon,
-          articole_suplimentare = PARSE_JSON(@articoleSuplimentare),
-          data_actualizare = CURRENT_TIMESTAMP(),
-          continut_json = PARSE_JSON(@continutJson),
-          Observatii = @observatii,
-          versiune = versiune + 1
-        WHERE ID_Contract = @contractId
-      `;
+	const updateQuery = `
+	  UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+	  SET 
+	    Valoare = @valoare,
+	    Moneda = @moneda,
+	    curs_valutar = @cursValutar,
+	    data_curs_valutar = @dataCurs,
+	    valoare_ron = @valoareRon,
+	    articole_suplimentare = PARSE_JSON(@articoleSuplimentare),
+	    data_actualizare = CURRENT_TIMESTAMP(),
+	    continut_json = PARSE_JSON(@continutJson),
+	    Observatii = @observatii,
+	    versiune = versiune + 1
+	  WHERE ID_Contract = @contractId
+	`;
 
-      const parametriiUpdate = {
-        contractId: contractInfo.contractExistentId,
-        valoare: contractInfo.sumaOriginala,
-        moneda: contractInfo.monedaOriginala,
-        cursValutar: cursValutarPrincipal,
-        dataCurs: dataCursValutar,
-        valoareRon: contractInfo.sumaFinala,
-        articoleSuplimentare: JSON.stringify([]),
-        continutJson: JSON.stringify({
-          snapshot_original: {
-            subproiecte_originale: contractInfo.subproiecte || [],
-            data_snapshot: new Date().toISOString()
-          },
-          placeholderData: contractInfo.placeholderData
-        }),
-        observatii: sanitizeStringForBigQuery(contractInfo.observatii)
-      };
+	const parametriiUpdate = {
+	  contractId: contractInfo.contractExistentId,
+	  valoare: contractInfo.sumaOriginala,
+	  moneda: contractInfo.monedaOriginala,
+	  cursValutar: cursValutarPrincipal,
+	  dataCurs: dataCursValutar,
+	  valoareRon: contractInfo.sumaFinala,
+	  articoleSuplimentare: JSON.stringify([]),
+	  continutJson: JSON.stringify({
+	    snapshot_original: {
+	      subproiecte_originale: contractInfo.subproiecte || [],
+	      data_snapshot: new Date().toISOString()
+	    },
+	    placeholderData: contractInfo.placeholderData
+	  }),
+	  observatii: sanitizeStringForBigQuery(contractInfo.observatii)
+	};
 
-      await bigquery.query({
-        query: updateQuery,
-        params: parametriiUpdate,
-        location: 'EU',
-      });
+	await bigquery.query({
+	  query: updateQuery,
+	  params: parametriiUpdate,
+	  types: {
+	    contractId: 'STRING',
+	    valoare: 'STRING',
+	    moneda: 'STRING',
+	    cursValutar: 'NUMERIC',
+	    dataCurs: 'DATE',
+	    valoareRon: 'NUMERIC',
+	    articoleSuplimentare: 'STRING',
+	    continutJson: 'STRING',
+	    observatii: 'STRING'
+	  },
+	  location: 'EU',
+	});
       
     } else {
       const insertQuery = `
@@ -1208,10 +1219,32 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       };
 
       await bigquery.query({
-        query: insertQuery,
-        params: parametriiInsert,
-        location: 'EU',
-      });
+	  query: insertQuery,
+	  params: parametriiInsert,
+	  types: {
+	    contractId: 'STRING',
+	    numarContract: 'STRING',
+	    serieContract: 'STRING',
+	    tipDocument: 'STRING',
+	    proiectId: 'STRING',
+	    clientId: 'STRING',
+	    clientNume: 'STRING',
+	    denumireContract: 'STRING',
+	    dataSemnare: 'DATE',
+	    dataExpirare: 'DATE',
+	    status: 'STRING',
+	    valoare: 'STRING',
+	    moneda: 'STRING',
+	    cursValutar: 'NUMERIC',
+	    dataCurs: 'DATE',
+	    valoareRon: 'NUMERIC',
+	    articoleSuplimentare: 'STRING',
+	    continutJson: 'STRING',
+	    observatii: 'STRING',
+	    versiune: 'INT64'
+	  },
+	  location: 'EU',
+	});
     }
 
     // 2. LOGICĂ INTELIGENTĂ DE MERGE PENTRU ETAPECONTRACT cu proiect_id
