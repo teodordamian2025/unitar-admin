@@ -1481,8 +1481,18 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         }
       });
 
-      // 2.5 Execută toate query-urile
-      await Promise.all(queryPromises);
+      // 2.5 Execută toate query-urile SECVENȚIAL pentru a evita conflictele de concurrency
+      console.log(`[CONTRACT-GENERATE] Execuție secvențială a ${queryPromises.length} query-uri pentru a evita conflictele BigQuery`);
+      
+      for (let i = 0; i < queryPromises.length; i++) {
+        try {
+          await queryPromises[i];
+          console.log(`[CONTRACT-GENERATE] Query ${i + 1}/${queryPromises.length} executat cu succes`);
+        } catch (error) {
+          console.error(`[CONTRACT-GENERATE] Eroare la query ${i + 1}:`, error);
+          throw error;
+        }
+      }
       
       console.log(`[CONTRACT-GENERATE] ✅ Merge inteligent finalizat pentru contractul ${contractId}:`);
       console.log(`   - ${contractInfo.termenePersonalizate.length} etape procesate`);
@@ -1539,7 +1549,18 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         anexaQueryPromises.push(bigquery.query({ query: insertAnexaQuery, location: 'EU' }));
       });
       
-      await Promise.all(anexaQueryPromises);
+      // Execută query-urile anexă secvențial
+      console.log(`[CONTRACT-GENERATE] Execuție secvențială anexă: ${anexaQueryPromises.length} query-uri`);
+      
+      for (let i = 0; i < anexaQueryPromises.length; i++) {
+        try {
+          await anexaQueryPromises[i];
+          console.log(`[CONTRACT-GENERATE] Anexă query ${i + 1}/${anexaQueryPromises.length} executat cu succes`);
+        } catch (error) {
+          console.error(`[CONTRACT-GENERATE] Eroare la anexă query ${i + 1}:`, error);
+          throw error;
+        }
+      }
       
       console.log(`[CONTRACT-GENERATE] ✅ Anexă ${anexaNumar} salvată cu ${contractInfo.anexaEtape.length} etape`);
     }
