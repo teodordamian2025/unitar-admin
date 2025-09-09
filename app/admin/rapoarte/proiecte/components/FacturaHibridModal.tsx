@@ -295,7 +295,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         });
         
         contractData = contracteSortate[0];
-        console.log(`✅ Contract găsit: ${contractData.numar_contract} (Status: ${contractData.Status})`);
+        if (contractData) {
+	  console.log(`✅ Contract găsit: ${contractData.numar_contract} (Status: ${contractData.Status})`);
+	}
       }
 
       if (!contractData) {
