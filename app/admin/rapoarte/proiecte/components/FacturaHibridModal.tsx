@@ -1101,7 +1101,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       contract_id: etapa.contract_id,
       contract_numar: etapa.contract_numar,
       contract_data: etapa.contract_data,
-      anexa_numar: etapa.anexa_numar,
+      anexa_numar: etapa.anexa_numar?.toString(),
       anexa_data: etapa.anexa_data,
       subproiect_id: etapa.subproiect_id,
       monedaOriginala: monedaEtapa,
