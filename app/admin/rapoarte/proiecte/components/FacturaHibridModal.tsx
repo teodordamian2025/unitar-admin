@@ -286,7 +286,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const contractResponse = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
       const contractResult = await contractResponse.json();
 
-      let contractData = null;
+      let contractData: any = null;
       if (contractResult.success && contractResult.data && contractResult.data.length > 0) {
         // Prioritizează contractul cu status-ul cel mai avansat
         const contracteSortate = contractResult.data.sort((a: any, b: any) => {
