@@ -87,6 +87,7 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - package.json
 - README.md
 - lib
+- - templates-helpers.ts
 - - firebaseConfig.ts
 - tsconfig.json
 - .gitignore
@@ -110,6 +111,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - setari
 - - - - firma
 - - - - - page.tsx
+- - - - contracte
+- - - - - page.tsx
 - - - - banca
 - - - - - page.tsx
 - - - - page.tsx
@@ -131,10 +134,15 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - - page.tsx
 - - - - - page.tsx
 - - - - - components
+- - - - - - SarcinaNouaModal.tsx
 - - - - - - SubcontractantSearch.tsx
+- - - - - - ContractModal.tsx
+- - - - - - SarciniProiectModal.tsx
 - - - - - - ProiectEditModal.tsx
 - - - - - - ProiectActions.tsx
+- - - - - - TimeTrackingNouModal.tsx
 - - - - - - ResponsabilSearch.tsx
+- - - - - - ProcesVerbalModal.tsx
 - - - - - - SubproiectModal.tsx
 - - - - - - ProiectNouModal.tsx
 - - - - - - ProiecteTable.tsx
@@ -181,9 +189,17 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - clients
 - - - - - sync-factureaza
 - - - - - - route.ts
+- - - - pv
+- - - - - generate
+- - - - - - route.ts
 - - - - email
 - - - - - send-client
 - - - - - - route.ts
+- - - test-contract-data
+- - - - route.ts
+- - - utilizatori
+- - - - curent
+- - - - - route.ts
 - - - user-role
 - - - - route.ts
 - - - proceseaza-upload
@@ -220,22 +236,46 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - setari
 - - - - firma
 - - - - - route.ts
+- - - - contracte
+- - - - - route.ts
+- - - - - templates
+- - - - - - route.ts
+- - - - - next-number
+- - - - - - route.ts
 - - - - banca
 - - - - - route.ts
 - - - - facturare
 - - - - - route.ts
 - - - rapoarte
+- - - - sarcini
+- - - - - route.ts
 - - - - subproiecte
 - - - - - route.ts
+- - - - proiecte-responsabili
+- - - - - route.ts
+- - - - timetracking
+- - - - - route.ts
 - - - - utilizatori
+- - - - - route.ts
+- - - - comentarii
+- - - - - route.ts
+- - - - etape-contract
+- - - - - route.ts
+- - - - procese-verbale
 - - - - - route.ts
 - - - - cheltuieli
 - - - - - route.ts
 - - - - clienti
 - - - - - route.ts
+- - - - subproiecte-responsabili
+- - - - - route.ts
+- - - - contracte
+- - - - - route.ts
 - - - - facturi
 - - - - - last-number
 - - - - - - route.ts
+- - - - anexe-contract
+- - - - - route.ts
 - - - - proiecte
 - - - - - export
 - - - - - - route.ts
@@ -261,6 +301,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - route.ts
 - - - - pdf
 - - - - - route.ts
+- - - debug-template
+- - - - route.ts
 - - - bigquery
 - - - - route.ts
 - - - ai-database
@@ -287,8 +329,14 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - uploads
 - - temp
 - - contracte
+- - - templates
+- - - - contract-template.txt
+- - - - anexa-template.txt
+- - - - pv-template.txt
+- - - .gitignore
 - - facturi
 - git-filter-repo.py
+
 
 
 package.json:

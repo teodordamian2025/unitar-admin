@@ -1,28 +1,22 @@
 [CENTER]**PROCES VERBAL DE PREDARE PRIMIRE DIN DATA {{pv.data}} {{contract_sau_anexa_text}}**[/CENTER]
 
 Încheiat azi {{pv.data}} între:
-
-**S.C. UNITAR PROIECT TDA S.R.L.**, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, numită în continuare **PRESTATOR**.
-Și
+**S.C. UNITAR PROIECT TDA S.R.L.**, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, numită în continuare **PRESTATOR** și
 **{{client.nume}}**, având CIF {{client.cui}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, denumită în continuare **BENEFICIAR**
 
 Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} exemplare 
 Proiect: **{{proiect.denumire}}** din {{proiect.adresa}} 
 {{subproiecte_lista}}.
-
 {{observatii_clause}}
 ---
 [CENTER]**SEMNAT ÎN DATA: {{pv.data}}**[/CENTER]
-
 [CENTER]**BENEFICIAR:**[/CENTER]
 [CENTER]**{{client.nume}}**[/CENTER]
 [CENTER]{{client.reprezentant}}[/CENTER]
-
 [CENTER].................................[/CENTER]
 
 [CENTER]**PRESTATOR:**[/CENTER]
 [CENTER]**S.C. UNITAR PROIECT TDA S.R.L.**[/CENTER]
 [CENTER]**DAMIAN TEODOR**[/CENTER]
 [CENTER]Administrator[/CENTER]
-
 [CENTER].................................[/CENTER]
