@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DATA: 14.08.2025 21:45
-// RESCRIS COMPLET: Logică simplificată + cursuri editabile + zero erori TypeScript
-// PĂSTRATE: TOATE funcționalitățile (ANAF, client auto-complete, subproiecte, Edit/Storno)
+// DATA: 09.09.2025 15:30 (ora României)
+// MODIFICAT: Folosește etape din contracte/anexe în loc de proiecte/subproiecte
+// PĂSTRATE: TOATE funcționalitățile (ANAF, cursuri editabile, Edit/Storno)
 // ==================================================================
 
 'use client';
@@ -41,11 +41,19 @@ interface LineFactura {
   cantitate: number;
   pretUnitar: number;
   cotaTva: number;
-  tip?: 'proiect' | 'subproiect';
-  subproiect_id?: string;
+  tip?: 'etapa_contract' | 'etapa_anexa';
+  etapa_id?: string;
+  contract_id?: string;
+  anexa_id?: string;
   monedaOriginala?: string;
   valoareOriginala?: number;
   cursValutar?: number;
+  // NOUĂ: Informații pentru denumirea completă
+  contract_numar?: string;
+  contract_data?: string;
+  anexa_numar?: string;
+  anexa_data?: string;
+  subproiect_id?: string; // Pentru legături cu subproiecte
 }
 
 // ✅ SIMPLIFICAT: O singură interfață pentru cursuri
@@ -71,15 +79,30 @@ interface ClientInfo {
   platitorTva?: string;
 }
 
-interface SubproiectInfo {
-  ID_Subproiect: string;
-  Denumire: string;
-  Valoare_Estimata?: number;
-  Status: string;
-  adaugat?: boolean;
-  moneda?: string;
+// NOUĂ: Interfață pentru etapele de facturare
+interface EtapaFacturare {
+  ID_Etapa?: string;
+  ID_Anexa?: string;
+  tip: 'contract' | 'anexa';
+  contract_id: string;
+  contract_numar: string;
+  contract_data: string;
+  anexa_numar?: number;
+  anexa_data?: string;
+  etapa_index: number;
+  denumire: string;
+  valoare: number;
+  moneda: string;
+  valoare_ron: number;
+  termen_zile: number;
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  status_facturare: string;
   curs_valutar?: number;
-  valoare_ron?: number;
+  data_curs_valutar?: string;
+  procent_din_total?: number;
+  observatii?: string;
+  adaugat?: boolean;
 }
 
 interface SetariFacturare {
@@ -201,7 +224,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   );
   const [loadingCursuri, setLoadingCursuri] = useState(false);
 
-  // ✅ PĂSTRAT: Toate state-urile existente
+  // ✅ MODIFICAT: State pentru etapele de facturare în loc de subproiecte
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
     if (initialData?.liniiFactura) {
       return initialData.liniiFactura;
@@ -218,13 +241,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
     
     return [{
-      denumire: proiect.Denumire,
+      denumire: `Servicii proiect ${proiect.ID_Proiect}, ${proiect.Denumire}`, // ✅ MODIFICAT: Denumire standard
       cantitate: 1,
       pretUnitar: valoareProiect,
       cotaTva: 21,
-      tip: 'proiect',
+      tip: 'etapa_contract', // ✅ MODIFICAT: Tip nou
       monedaOriginala: monedaProiect,
-      valoareOriginala: valoareEstimata, // ✅ FIX: Întotdeauna număr
+      valoareOriginala: valoareEstimata,
       cursValutar: convertBigQueryNumeric(proiect.curs_valutar) || 1
     }];
   });
@@ -234,12 +257,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingANAF, setIsLoadingANAF] = useState(false);
   const [isLoadingClient, setIsLoadingClient] = useState(false);
-  const [isLoadingSubproiecte, setIsLoadingSubproiecte] = useState(false);
+  const [isLoadingEtape, setIsLoadingEtape] = useState(false); // ✅ MODIFICAT: Loading etape
   const [cuiInput, setCuiInput] = useState('');
   const [anafError, setAnafError] = useState<string | null>(null);
   const [isProcessingPDF, setIsProcessingPDF] = useState(false);
-  const [subproiecteDisponibile, setSubproiecteDisponibile] = useState<SubproiectInfo[]>([]);
-  const [showSubproiecteSelector, setShowSubproiecteSelector] = useState(false);
+  const [etapeDisponibile, setEtapeDisponibile] = useState<EtapaFacturare[]>([]); // ✅ MODIFICAT: Etape în loc de subproiecte
+  const [showEtapeSelector, setShowEtapeSelector] = useState(false); // ✅ MODIFICAT: Selector etape
   const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
   const [numarFactura, setNumarFactura] = useState(initialData?.numarFactura || '');
   const [dataFactura] = useState(new Date());
@@ -254,9 +277,155 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   // ✅ NOU: State pentru termen plată editabil
   const [termenPlata, setTermenPlata] = useState(setariFacturare?.termen_plata_standard || 30);
 
-  // ✅ PĂSTRAT: Toate funcțiile de loading existente
+  // ✅ NOUĂ: Funcție pentru căutarea contractelor și etapelor (adaptată din PV)
+  const findContractAndEtapeForProiect = async (proiectId: string) => {
+    try {
+      console.log(`🔍 [ETAPE-FACTURARE] Căutare contracte și etape pentru proiect: ${proiectId}`);
 
-  // ✅ FIX PROBLEMA 4: Încărcare cursuri din BigQuery pentru data exactă
+      // 1. CĂUTARE CONTRACT PRINCIPAL
+      const contractResponse = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
+      const contractResult = await contractResponse.json();
+
+      let contractData = null;
+      if (contractResult.success && contractResult.data && contractResult.data.length > 0) {
+        // Prioritizează contractul cu status-ul cel mai avansat
+        const contracteSortate = contractResult.data.sort((a: any, b: any) => {
+          const statusOrder: { [key: string]: number } = { 'Semnat': 3, 'Generat': 2, 'Draft': 1, 'Anulat': 0 };
+          return (statusOrder[b.Status] || 0) - (statusOrder[a.Status] || 0);
+        });
+        
+        contractData = contracteSortate[0];
+        console.log(`✅ Contract găsit: ${contractData.numar_contract} (Status: ${contractData.Status})`);
+      }
+
+      if (!contractData) {
+        console.log('⚠️ Nu s-a găsit contract pentru proiect');
+        return { etapeContract: [], etapeAnexe: [], contract: null };
+      }
+
+      // 2. ÎNCĂRCARE ETAPE DIN CONTRACT PRINCIPAL
+      const etapeContractResponse = await fetch(`/api/rapoarte/etape-contract?contract_id=${encodeURIComponent(contractData.ID_Contract)}`);
+      const etapeContractResult = await etapeContractResponse.json();
+
+      let etapeContract: EtapaFacturare[] = [];
+      if (etapeContractResult.success && etapeContractResult.data) {
+        etapeContract = etapeContractResult.data
+          .filter((etapa: any) => etapa.status_facturare === 'Nefacturat') // ✅ CRUCIAL: Doar etapele nefacturate
+          .map((etapa: any) => ({
+            ID_Etapa: etapa.ID_Etapa,
+            tip: 'contract' as const,
+            contract_id: etapa.contract_id,
+            contract_numar: etapa.numar_contract || contractData.numar_contract,
+            contract_data: formatDate(contractData.Data_Semnare) || formatDate(contractData.data_creare),
+            etapa_index: etapa.etapa_index,
+            denumire: etapa.denumire,
+            valoare: convertBigQueryNumeric(etapa.valoare),
+            moneda: etapa.moneda,
+            valoare_ron: convertBigQueryNumeric(etapa.valoare_ron),
+            termen_zile: etapa.termen_zile,
+            subproiect_id: etapa.subproiect_id,
+            subproiect_denumire: etapa.subproiect_denumire,
+            status_facturare: etapa.status_facturare,
+            curs_valutar: convertBigQueryNumeric(etapa.curs_valutar),
+            data_curs_valutar: etapa.data_curs_valutar,
+            procent_din_total: convertBigQueryNumeric(etapa.procent_din_total),
+            observatii: etapa.observatii,
+            adaugat: false
+          }));
+      }
+
+      // 3. ÎNCĂRCARE ETAPE DIN ANEXE
+      const anexeResponse = await fetch(`/api/rapoarte/anexe-contract?contract_id=${encodeURIComponent(contractData.ID_Contract)}`);
+      const anexeResult = await anexeResponse.json();
+
+      let etapeAnexe: EtapaFacturare[] = [];
+      if (anexeResult.success && anexeResult.data) {
+        etapeAnexe = anexeResult.data
+          .filter((anexa: any) => anexa.status_facturare === 'Nefacturat') // ✅ CRUCIAL: Doar etapele nefacturate
+          .map((anexa: any) => ({
+            ID_Anexa: anexa.ID_Anexa,
+            tip: 'anexa' as const,
+            contract_id: anexa.contract_id,
+            contract_numar: anexa.numar_contract || contractData.numar_contract,
+            contract_data: formatDate(contractData.Data_Semnare) || formatDate(contractData.data_creare),
+            anexa_numar: anexa.anexa_numar,
+            anexa_data: formatDate(anexa.data_start) || formatDate(anexa.data_creare),
+            etapa_index: anexa.etapa_index,
+            denumire: anexa.denumire,
+            valoare: convertBigQueryNumeric(anexa.valoare),
+            moneda: anexa.moneda,
+            valoare_ron: convertBigQueryNumeric(anexa.valoare_ron),
+            termen_zile: anexa.termen_zile,
+            subproiect_id: anexa.subproiect_id,
+            subproiect_denumire: anexa.subproiect_denumire,
+            status_facturare: anexa.status_facturare,
+            curs_valutar: convertBigQueryNumeric(anexa.curs_valutar),
+            data_curs_valutar: anexa.data_curs_valutar,
+            procent_din_total: convertBigQueryNumeric(anexa.procent_din_total),
+            observatii: anexa.observatii,
+            adaugat: false
+          }));
+      }
+
+      console.log(`📊 [ETAPE-FACTURARE] Găsite: ${etapeContract.length} etape contract + ${etapeAnexe.length} etape anexe`);
+
+      return {
+        etapeContract,
+        etapeAnexe,
+        contract: contractData
+      };
+
+    } catch (error) {
+      console.error('❌ [ETAPE-FACTURARE] Eroare la căutarea etapelor:', error);
+      return { etapeContract: [], etapeAnexe: [], contract: null };
+    }
+  };
+
+  // ✅ MODIFICATĂ: Funcție pentru încărcarea etapelor în loc de subproiecte
+  const loadEtape = async () => {
+    let proiectIdFinal = proiect.ID_Proiect;
+    
+    if ((isEdit || isStorno) && initialData) {
+      if (initialData.proiectInfo?.ID_Proiect) {
+        proiectIdFinal = initialData.proiectInfo.ID_Proiect;
+      } else if (initialData.proiectInfo?.id) {
+        proiectIdFinal = initialData.proiectInfo.id;
+      } else if (initialData.proiectId) {
+        proiectIdFinal = initialData.proiectId;
+      }
+    }
+    
+    if (!proiectIdFinal || proiectIdFinal === 'UNKNOWN') {
+      console.log('⚠️ Nu pot încărca etapele - lipsește ID proiect valid');
+      showToast('⚠️ ID proiect necunoscut - etapele nu pot fi încărcate', 'info');
+      return;
+    }
+    
+    setIsLoadingEtape(true);
+    try {
+      const { etapeContract, etapeAnexe, contract } = await findContractAndEtapeForProiect(proiectIdFinal);
+      
+      // ✅ COMBINĂ toate etapele disponibile
+      const toateEtapele = [...etapeContract, ...etapeAnexe];
+      
+      setEtapeDisponibile(toateEtapele);
+      
+      if (toateEtapele.length > 0) {
+        showToast(`📋 Găsite ${toateEtapele.length} etape disponibile pentru facturare`, 'success');
+      } else if (contract) {
+        showToast('ℹ️ Contractul găsit, dar toate etapele sunt deja facturate', 'info');
+      } else {
+        showToast('⚠️ Nu s-a găsit contract pentru acest proiect', 'info');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea etapelor:', error);
+      showToast('⚠️ Nu s-au putut încărca etapele', 'error');
+    } finally {
+      setIsLoadingEtape(false);
+    }
+  };
+
+  // ✅ FIX PROBLEMA 4: Încărcarea cursurilor din BigQuery pentru data exactă
   const loadCursuriPentruData = async (data: string, monede: string[]) => {
     if (monede.length === 0) return;
     
@@ -343,10 +512,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       monede.add(proiect.moneda);
     }
     
-    // Din subproiecte
-    subproiecteDisponibile.forEach(sub => {
-      if (sub.moneda && sub.moneda !== 'RON') {
-        monede.add(sub.moneda);
+    // Din etapele disponibile
+    etapeDisponibile.forEach(etapa => {
+      if (etapa.moneda && etapa.moneda !== 'RON') {
+        monede.add(etapa.moneda);
       }
     });
     
@@ -408,7 +577,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       });
     } else {
       loadClientFromDatabase();
-      loadSubproiecte();
+      loadEtape(); // ✅ MODIFICAT: Încarcă etape în loc de subproiecte
       loadSetariFacturare();
     }
     
@@ -423,7 +592,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (monede.length > 0) {
       loadCursuriPentruData(dataCursPersonalizata, monede);
     }
-  }, [dataCursPersonalizata, subproiecteDisponibile.length, liniiFactura.length]); // ✅ FIX: Adăugat liniiFactura.length
+  }, [dataCursPersonalizata, etapeDisponibile.length, liniiFactura.length]); // ✅ FIX: Adăugat liniiFactura.length
 
   // ✅ NOU: Effect pentru recalcularea liniilor când se schimbă cursurile
   useEffect(() => {
@@ -748,67 +917,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
-  const loadSubproiecte = async () => {
-    let proiectIdPentruSubproiecte = proiect.ID_Proiect;
-    
-    if ((isEdit || isStorno) && initialData) {
-      if (initialData.proiectInfo?.ID_Proiect) {
-        proiectIdPentruSubproiecte = initialData.proiectInfo.ID_Proiect;
-      } else if (initialData.proiectInfo?.id) {
-        proiectIdPentruSubproiecte = initialData.proiectInfo.id;
-      } else if (initialData.proiectId) {
-        proiectIdPentruSubproiecte = initialData.proiectId;
-      }
-    }
-    
-    if (!proiectIdPentruSubproiecte || proiectIdPentruSubproiecte === 'UNKNOWN') {
-      console.log('⚠️ Nu pot încărca subproiecte - lipsește ID proiect valid');
-      showToast('⚠️ ID proiect necunoscut - subproiectele nu pot fi încărcate', 'info');
-      return;
-    }
-    
-    setIsLoadingSubproiecte(true);
-    try {
-      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdPentruSubproiecte)}`);
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        const subproiecteFormatate = result.data.map((sub: any) => {
-          let cursSubproiect = 1;
-          let monedaSubproiect = sub.moneda || 'RON';
-          
-          // ✅ FIX: Conversie BigQuery NUMERIC pentru curs_valutar
-          if (sub.curs_valutar !== undefined && sub.curs_valutar !== null) {
-            cursSubproiect = convertBigQueryNumeric(sub.curs_valutar);
-            if (cursSubproiect <= 0) cursSubproiect = 1;
-          }
-          
-          return {
-            ID_Subproiect: sub.ID_Subproiect,
-            Denumire: sub.Denumire,
-            Valoare_Estimata: convertBigQueryNumeric(sub.Valoare_Estimata), // ✅ FIX: Conversie NUMERIC
-            Status: sub.Status,
-            adaugat: false,
-            moneda: monedaSubproiect,
-            curs_valutar: cursSubproiect,
-            valoare_ron: convertBigQueryNumeric(sub.valoare_ron) // ✅ FIX: Conversie NUMERIC
-          };
-        });
-        
-        setSubproiecteDisponibile(subproiecteFormatate);
-        
-        if (subproiecteFormatate.length > 0) {
-          showToast(`📋 Găsite ${subproiecteFormatate.length} subproiecte`, 'success');
-        }
-      }
-    } catch (error) {
-      console.error('Eroare la încărcarea subproiectelor:', error);
-      showToast('⚠️ Nu s-au putut încărca subproiectele', 'error');
-    } finally {
-      setIsLoadingSubproiecte(false);
-    }
-  };
-
   const addLine = () => {
     // ✅ FIX PROBLEMA 1: Linie nouă cu toate câmpurile necesare
     setLiniiFactura([...liniiFactura, { 
@@ -818,7 +926,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       cotaTva: 21,
       monedaOriginala: 'RON',      // ✅ NOU: Monedă editabilă
       valoareOriginala: 0,         // ✅ NOU: Valoare editabilă
-      cursValutar: 1              // ✅ NOU: Curs default RON
+      cursValutar: 1,              // ✅ NOU: Curs default RON
+      tip: 'etapa_contract'        // ✅ MODIFICAT: Tip nou
     }]);
   };
 
@@ -826,12 +935,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     if (liniiFactura.length > 1) {
       const linieSteasa = liniiFactura[index];
       
-      if (linieSteasa.tip === 'subproiect' && linieSteasa.subproiect_id) {
-        setSubproiecteDisponibile(prev => 
-          prev.map(sub => 
-            sub.ID_Subproiect === linieSteasa.subproiect_id 
-              ? { ...sub, adaugat: false }
-              : sub
+      // ✅ MODIFICAT: Pentru etape, marchează ca neadăugată
+      if ((linieSteasa.tip === 'etapa_contract' || linieSteasa.tip === 'etapa_anexa') && 
+          (linieSteasa.etapa_id || linieSteasa.anexa_id)) {
+        setEtapeDisponibile(prev => 
+          prev.map(etapa => 
+            (etapa.ID_Etapa === linieSteasa.etapa_id || etapa.ID_Anexa === linieSteasa.anexa_id)
+              ? { ...etapa, adaugat: false }
+              : etapa
           )
         );
       }
@@ -869,7 +980,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }
     
-// ✅ FIX DROPDOWN AMESTEC VALUTE: Logică corectată pentru monedaOriginala
+    // ✅ FIX DROPDOWN AMESTEC VALUTE: Logică corectată pentru monedaOriginala
     if (field === 'monedaOriginala') {
       const novaMoneda = String(value);
       console.log(`💱 SCHIMB MONEDA: ${linieCurenta.monedaOriginala} → ${novaMoneda}`);
@@ -935,46 +1046,65 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     });
   };
 
-// ✅ SIMPLIFICAT: addSubproiectToFactura cu refresh automat după adăugare
-  const addSubproiectToFactura = (subproiect: SubproiectInfo) => {
-    console.log('📋 ADĂUGARE SUBPROIECT: Start cu refresh automat...');
+  // ✅ NOUĂ: Funcție pentru generarea denumirii standardizate
+  const genereazaDenumireEtapa = (etapa: EtapaFacturare): string => {
+    const proiectId = proiect.ID_Proiect;
+    const denumireEtapa = etapa.denumire;
+    
+    if (etapa.tip === 'contract') {
+      return `Servicii proiect ${proiectId}, ${denumireEtapa}, conform contract nr. ${etapa.contract_numar} din ${etapa.contract_data}`;
+    } else {
+      return `Servicii proiect ${proiectId}, ${denumireEtapa}, conform anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data}`;
+    }
+  };
+
+  // ✅ MODIFICATĂ: addEtapaToFactura cu refresh automat după adăugare
+  const addEtapaToFactura = (etapa: EtapaFacturare) => {
+    console.log('📋 ADĂUGARE ETAPĂ: Start cu refresh automat...');
     
     // ✅ FIX: Conversie corectă BigQuery NUMERIC
-    const valoareEstimata = convertBigQueryNumeric(subproiect.Valoare_Estimata);
-    let valoareSubproiect = valoareEstimata;
-    let monedaSubproiect = subproiect.moneda || 'RON';
-    let cursSubproiect = 1;
+    const valoareEstimata = convertBigQueryNumeric(etapa.valoare);
+    let valoareEtapa = valoareEstimata;
+    let monedaEtapa = etapa.moneda || 'RON';
+    let cursEtapa = 1;
     
-    console.log(`📊 Subproiect original: ${valoareEstimata} ${monedaSubproiect} (din BD)`);
+    console.log(`📊 Etapă originală: ${valoareEstimata} ${monedaEtapa} (din BD)`);
     
     // ✅ CRUCIAL: Folosește cursul din STATE, NU din BD
-    if (monedaSubproiect !== 'RON') {
-      const cursState = cursuri[monedaSubproiect];
+    if (monedaEtapa !== 'RON') {
+      const cursState = cursuri[monedaEtapa];
       if (cursState) {
-        cursSubproiect = cursState.curs;
-        valoareSubproiect = valoareEstimata * cursState.curs; // Calculează în RON cu cursul actual
-        console.log(`🔄 REFRESH APLICAT: ${valoareEstimata} ${monedaSubproiect} × ${cursState.curs.toFixed(4)} = ${valoareSubproiect.toFixed(2)} RON`);
+        cursEtapa = cursState.curs;
+        valoareEtapa = valoareEstimata * cursState.curs; // Calculează în RON cu cursul actual
+        console.log(`🔄 REFRESH APLICAT: ${valoareEstimata} ${monedaEtapa} × ${cursState.curs.toFixed(4)} = ${valoareEtapa.toFixed(2)} RON`);
       } else {
-        console.log(`⚠️ Curs nu găsit în state pentru ${monedaSubproiect}, folosesc din BD`);
-        if (subproiect.curs_valutar && subproiect.curs_valutar > 0) {
-          cursSubproiect = convertBigQueryNumeric(subproiect.curs_valutar);
-          if (subproiect.valoare_ron) {
-            valoareSubproiect = convertBigQueryNumeric(subproiect.valoare_ron);
+        console.log(`⚠️ Curs nu găsit în state pentru ${monedaEtapa}, folosesc din BD`);
+        if (etapa.curs_valutar && etapa.curs_valutar > 0) {
+          cursEtapa = convertBigQueryNumeric(etapa.curs_valutar);
+          if (etapa.valoare_ron) {
+            valoareEtapa = convertBigQueryNumeric(etapa.valoare_ron);
           }
         }
       }
     }
 
     const nouaLinie: LineFactura = {
-      denumire: `${subproiect.Denumire} (Subproiect)`,
+      denumire: genereazaDenumireEtapa(etapa), // ✅ NOUĂ: Denumire standardizată
       cantitate: 1,
-      pretUnitar: valoareSubproiect, // ✅ Folosește valoarea calculată cu cursul actual
+      pretUnitar: valoareEtapa, // ✅ Folosește valoarea calculată cu cursul actual
       cotaTva: 21,
-      tip: 'subproiect',
-      subproiect_id: subproiect.ID_Subproiect,
-      monedaOriginala: monedaSubproiect,
+      tip: etapa.tip === 'contract' ? 'etapa_contract' : 'etapa_anexa',
+      etapa_id: etapa.ID_Etapa,
+      anexa_id: etapa.ID_Anexa,
+      contract_id: etapa.contract_id,
+      contract_numar: etapa.contract_numar,
+      contract_data: etapa.contract_data,
+      anexa_numar: etapa.anexa_numar,
+      anexa_data: etapa.anexa_data,
+      subproiect_id: etapa.subproiect_id,
+      monedaOriginala: monedaEtapa,
       valoareOriginala: valoareEstimata, // ✅ Valoarea originală din BD
-      cursValutar: cursSubproiect // ✅ Cursul din STATE (actual)
+      cursValutar: cursEtapa // ✅ Cursul din STATE (actual)
     };
 
     console.log('✅ Linie nouă creată:', {
@@ -983,24 +1113,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       monedaOriginala: nouaLinie.monedaOriginala,
       cursValutar: nouaLinie.cursValutar?.toFixed(4),
       pretUnitar: nouaLinie.pretUnitar?.toFixed(2),
-      sursa_curs: cursuri[monedaSubproiect] ? 'STATE_ACTUAL' : 'BD_FALLBACK'
+      sursa_curs: cursuri[monedaEtapa] ? 'STATE_ACTUAL' : 'BD_FALLBACK'
     });
 
     setLiniiFactura(prev => [...prev, nouaLinie]);
 
-    setSubproiecteDisponibile(prev => 
-      prev.map(sub => 
-        sub.ID_Subproiect === subproiect.ID_Subproiect 
-          ? { ...sub, adaugat: true }
-          : sub
+    setEtapeDisponibile(prev => 
+      prev.map(et => 
+        (et.ID_Etapa === etapa.ID_Etapa || et.ID_Anexa === etapa.ID_Anexa)
+          ? { ...et, adaugat: true }
+          : et
       )
     );
 
-    showToast(`✅ Subproiect "${subproiect.Denumire}" adăugat cu cursul actual ${cursSubproiect.toFixed(4)}`, 'success');
+    showToast(`✅ Etapă "${etapa.denumire}" adăugată cu cursul actual ${cursEtapa.toFixed(4)}`, 'success');
     
     // ✅ BONUS: Force re-render pentru a actualiza UI
     setTimeout(() => {
-      console.log('🔄 Force re-render după adăugare subproiect');
+      console.log('🔄 Force re-render după adăugare etapă');
       setLiniiFactura(prev => [...prev]); // Trigger re-render
     }, 100);
   };
@@ -1312,7 +1442,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
 
     // ✅ DEBUGGING: Ce se trimite la API
-    console.log('🔍 === DEBUGGING LINII FACTURA ===');
+    console.log('📋 === DEBUGGING LINII FACTURA ===');
     console.log('📊 Total linii:', liniiFactura.length);
     liniiFactura.forEach((linie, index) => {
       console.log(`📋 Linia ${index}:`, {
@@ -1322,7 +1452,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         cursValutar: linie.cursValutar,
         pretUnitar: linie.pretUnitar,
         tip: linie.tip,
-        subproiect_id: linie.subproiect_id
+        etapa_id: linie.etapa_id,
+        anexa_id: linie.anexa_id
       });
     });
     
@@ -1365,6 +1496,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           data: cursData.data
         };
       });
+
+      // ✅ NOUĂ: Pregătește etapele pentru update statusuri
+      const etapeFacturate = liniiFactura.filter(linie => 
+        (linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') && 
+        (linie.etapa_id || linie.anexa_id)
+      ).map(linie => ({
+        tip: linie.tip,
+        id: linie.etapa_id || linie.anexa_id,
+        contract_id: linie.contract_id,
+        subproiect_id: linie.subproiect_id
+      }));
       
       const response = await fetch('/api/actions/invoices/generate-hibrid', {
         method: 'POST',
@@ -1384,7 +1526,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           isEdit,
           isStorno,
           facturaId: isEdit ? initialData?.facturaId : null,
-          facturaOriginala: isStorno ? initialData?.facturaOriginala : null
+          facturaOriginala: isStorno ? initialData?.facturaOriginala : null,
+          etapeFacturate // ✅ NOUĂ: Pentru update statusuri
         })
       });
       
@@ -1509,7 +1652,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             <h2 style={{ margin: 0, color: '#2c3e50' }}>
               {isStorno ? '↩️ Generare Factură Stornare' : 
                isEdit ? '✏️ Editare Factură' : 
-               '💰 Generare Factură Hibridă'}
+               '💰 Generare Factură cu Etape Contract'}
             </h2>
             <button
               onClick={onClose}
@@ -1598,7 +1741,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
           
           <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            📊 Auto-completare client din BD + cursuri BNR editabile • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+            📊 Facturare pe bază de etape contract/anexe • cursuri BNR editabile • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
           </p>
         </div>
 
@@ -1642,8 +1785,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   }}>
                   </div>
                   <span>
-                    {isLoadingSetari && '📄 Se încarcă setările de facturare...'}
+                    {isLoadingSetari && '🔄 Se încarcă setările de facturare...'}
                     {loadingCursuri && '💱 Se preiau cursurile BNR...'}
+                    {isLoadingEtape && '📋 Se încarcă etapele din contracte...'}
                     {isGenerating && !isProcessingPDF && (sendToAnaf ? '📤 Se generează PDF + XML ANAF...' : '📄 Se generează template-ul...')}
                     {isProcessingPDF && '📄 Se procesează PDF-ul...'}
                   </span>
@@ -1747,8 +1891,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
             </div>
             
-            {/* Secțiunea subproiecte */}
-            {subproiecteDisponibile.length > 0 && (
+            {/* ✅ MODIFICATĂ: Secțiunea etape în loc de subproiecte */}
+            {etapeDisponibile.length > 0 && (
               <div style={{
                 marginTop: '1rem',
                 paddingTop: '1rem',
@@ -1761,7 +1905,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   marginBottom: '1rem'
                 }}>
                   <h4 style={{ margin: 0, color: '#2c3e50' }}>
-                    📋 Subproiecte Disponibile ({subproiecteDisponibile.length}) 
+                    📋 Etape Disponibile pentru Facturare ({etapeDisponibile.length}) 
                     {Object.keys(cursuri).length > 0 && (
                       <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
                         • Cursuri BNR ✓
@@ -1770,7 +1914,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </h4>
                   <button
                     type="button"
-                    onClick={() => setShowSubproiecteSelector(!showSubproiecteSelector)}
+                    onClick={() => setShowEtapeSelector(!showEtapeSelector)}
                     disabled={isLoading}
                     style={{
                       padding: '0.5rem 1rem',
@@ -1783,26 +1927,26 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       fontWeight: 'bold'
                     }}
                   >
-                    {showSubproiecteSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
+                    {showEtapeSelector ? '👁️ Ascunde' : '👀 Afișează'} Lista
                   </button>
                 </div>
                 
-                {showSubproiecteSelector && (
+                {showEtapeSelector && (
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
                     gap: '0.5rem',
-                    maxHeight: '200px',
+                    maxHeight: '250px',
                     overflowY: 'auto'
                   }}>
-                    {subproiecteDisponibile.map((subproiect) => (
+                    {etapeDisponibile.map((etapa) => (
                       <div 
-                        key={subproiect.ID_Subproiect} 
+                        key={etapa.ID_Etapa || etapa.ID_Anexa} 
                         style={{
                           border: '1px solid #dee2e6',
                           borderRadius: '6px',
                           padding: '1rem',
-                          background: subproiect.adaugat ? '#d4edda' : 'white'
+                          background: etapa.adaugat ? '#d4edda' : 'white'
                         }}
                       >
                         <div style={{
@@ -1814,46 +1958,64 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                             <div style={{
                               fontWeight: 'bold',
                               color: '#2c3e50',
-                              marginBottom: '0.5rem'
+                              marginBottom: '0.5rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
                             }}>
-                              📋 {subproiect.Denumire}
+                              {etapa.tip === 'contract' ? '📄' : '📎'} {etapa.denumire}
+                              {etapa.tip === 'anexa' && (
+                                <span style={{ 
+                                  background: '#e67e22', 
+                                  color: 'white', 
+                                  padding: '0.25rem 0.5rem', 
+                                  borderRadius: '4px', 
+                                  fontSize: '10px' 
+                                }}>
+                                  ANX {etapa.anexa_numar}
+                                </span>
+                              )}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                            <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '0.25rem' }}>
                               💰 Valoare: <span style={{ fontWeight: 'bold', color: '#27ae60' }}>
-                                {subproiect.Valoare_Estimata ? 
-                                  `${safeToFixed(subproiect.Valoare_Estimata, 2)} ${subproiect.moneda || 'RON'}` : 
+                                {etapa.valoare ? 
+                                  `${safeToFixed(etapa.valoare, 2)} ${etapa.moneda || 'RON'}` : 
                                   'Fără valoare'}
                               </span>
-                              {subproiect.moneda && subproiect.moneda !== 'RON' && subproiect.valoare_ron && (
+                              {etapa.moneda && etapa.moneda !== 'RON' && etapa.valoare_ron && (
                                 <span style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
-                                  ≈ {safeToFixed(subproiect.valoare_ron, 2)} RON
-                                  <br/>💱 Curs: {safeToFixed(subproiect.curs_valutar, 4)}
-                                  {cursuri[subproiect.moneda || ''] && (
+                                  ≈ {safeToFixed(etapa.valoare_ron, 2)} RON
+                                  <br/>💱 Curs: {safeToFixed(etapa.curs_valutar, 4)}
+                                  {cursuri[etapa.moneda || ''] && (
                                     <span style={{ color: '#27ae60', fontWeight: 'bold' }}> (BNR)</span>
                                   )}
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                              📊 Status: <span style={{ fontWeight: 'bold' }}>{subproiect.Status}</span>
+                            <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                              📊 {etapa.tip === 'contract' ? `Contract ${etapa.contract_numar}` : `Anexa ${etapa.anexa_numar} la ${etapa.contract_numar}`}
+                              <br/>📅 {etapa.tip === 'contract' ? etapa.contract_data : etapa.anexa_data}
+                              {etapa.subproiect_denumire && (
+                                <><br/>🔗 {etapa.subproiect_denumire}</>
+                              )}
                             </div>
                           </div>
                           <button
-                            onClick={() => addSubproiectToFactura(subproiect)}
-                            disabled={subproiect.adaugat || isLoading}
+                            onClick={() => addEtapaToFactura(etapa)}
+                            disabled={etapa.adaugat || isLoading}
                             style={{
                               marginLeft: '1rem',
                               padding: '0.5rem 1rem',
-                              background: subproiect.adaugat ? '#27ae60' : '#3498db',
+                              background: etapa.adaugat ? '#27ae60' : '#3498db',
                               color: 'white',
                               border: 'none',
                               borderRadius: '6px',
-                              cursor: (subproiect.adaugat || isLoading) ? 'not-allowed' : 'pointer',
+                              cursor: (etapa.adaugat || isLoading) ? 'not-allowed' : 'pointer',
                               fontSize: '12px',
                               fontWeight: 'bold'
                             }}
                           >
-                            {subproiect.adaugat ? '✓ Adăugat' : '+ Adaugă'}
+                            {etapa.adaugat ? '✓ Adăugat' : '+ Adaugă'}
                           </button>
                         </div>
                       </div>
@@ -2114,7 +2276,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               alignItems: 'center',
               marginBottom: '1rem'
             }}>
-              <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Servicii/Produse</h3>
+              <h3 style={{ margin: 0, color: '#2c3e50' }}>📋 Articole Facturare din Etape Contract</h3>
               <button
                 onClick={addLine}
                 disabled={isLoading}
@@ -2129,7 +2291,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   fontWeight: 'bold'
                 }}
               >
-                + Adaugă linie
+                + Adaugă linie manuală
               </button>
             </div>
 
@@ -2142,14 +2304,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
-                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'left', fontWeight: 'bold', color: '#2c3e50', width: '200px' }}>
-                      Denumire serviciu/produs *
+                    <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'left', fontWeight: 'bold', color: '#2c3e50', width: '250px' }}>
+                      Denumire articol / etapă *
                     </th>
                     <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
                       Cant.
                     </th>
                     <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '80px', fontWeight: 'bold', color: '#2c3e50' }}>
-                      Valoare Original
+                      Valoare Orig.
                     </th>
                     <th style={{ border: '1px solid #dee2e6', padding: '0.75rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#2c3e50' }}>
                       Valută
@@ -2193,21 +2355,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     
                     return (
                       <tr key={index} style={{
-                        background: linie.tip === 'subproiect' ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
+                        background: (linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') ? '#f0f8ff' : index % 2 === 0 ? 'white' : '#f8f9fa'
                       }}>
                         {/* Denumire */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {linie.tip === 'subproiect' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {(linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') && (
                               <span style={{
-                                background: '#3498db',
+                                background: linie.tip === 'etapa_contract' ? '#3498db' : '#e67e22',
                                 color: 'white',
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
                                 fontSize: '10px',
                                 fontWeight: 'bold'
                               }}>
-                                SUB
+                                {linie.tip === 'etapa_contract' ? 'CONTRACT' : 'ANEXĂ'}
                               </span>
                             )}
                             <input
@@ -2220,12 +2382,22 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                 padding: '0.5rem',
                                 border: '1px solid #dee2e6',
                                 borderRadius: '4px',
-                                fontSize: '14px'
+                                fontSize: '12px',
+                                minWidth: '200px'
                               }}
                               placeholder="Descrierea serviciului..."
                               required
                             />
                           </div>
+                          {/* Afișează informații suplimentare pentru etape */}
+                          {(linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') && (
+                            <div style={{ fontSize: '10px', color: '#666', marginTop: '0.25rem' }}>
+                              📄 {linie.contract_numar} din {linie.contract_data}
+                              {linie.tip === 'etapa_anexa' && linie.anexa_numar && (
+                                <span> • Anexa {linie.anexa_numar}</span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Cantitate */}
@@ -2248,8 +2420,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-
-                        {/* ✅ FIX PROBLEMA 1: Valoare Originală COMPLET EDITABILĂ */}
+                        {/* Valoare Originală COMPLET EDITABILĂ */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <input
                             type="number"
@@ -2267,8 +2438,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               borderRadius: '4px',
                               textAlign: 'center',
                               fontSize: '12px',
-                              backgroundColor: 'white', // ✅ FIX: Forțează fundal alb
-                              color: '#000000' // ✅ FIX: Forțează text negru
+                              backgroundColor: 'white',
+                              color: '#000000'
                             }}
                             step="0.01"
                             min="0"
@@ -2276,22 +2447,20 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                           />
                         </td>
 
-{/* ✅ FIX DROPDOWN BLOCAT: React controlled component forțat */}
+                        {/* Dropdown Valută cu re-render forțat */}
                         <td style={{ border: '1px solid #dee2e6', padding: '0.5rem' }}>
                           <select
-                            key={`valuta-${index}-${linie.monedaOriginala || 'RON'}`} // ✅ CRUCIAL: Key unic forțează re-render
+                            key={`valuta-${index}-${linie.monedaOriginala || 'RON'}`}
                             value={linie.monedaOriginala || 'RON'}
                             onChange={(e) => {
                               const novaMoneda = e.target.value;
                               console.log(`🔄 DROPDOWN CHANGE: ${linie.monedaOriginala} → ${novaMoneda} pentru linia ${index}`);
                               
-                              // ✅ FIX: Update direct cu delay pentru re-render
                               updateLine(index, 'monedaOriginala', novaMoneda);
                               
-                              // ✅ FORCE RE-RENDER cu timeout
                               setTimeout(() => {
                                 console.log(`✅ Re-render forțat pentru linia ${index}`);
-                                setLiniiFactura(prev => [...prev]); // Force re-render
+                                setLiniiFactura(prev => [...prev]);
                               }, 100);
                             }}
                             disabled={isLoading}
@@ -2302,7 +2471,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               borderRadius: '4px',
                               textAlign: 'center',
                               fontSize: '12px',
-                              backgroundColor: 'white' // ✅ Force white background
+                              backgroundColor: 'white'
                             }}
                           >
                             <option value="RON">RON</option>
@@ -2403,7 +2572,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ NOU: Afișare rezumat cursuri folosite */}
+          {/* Afișare rezumat cursuri folosite */}
           {Object.keys(cursuri).length > 0 && (
             <div style={{
               background: '#e8f5e8',
@@ -2479,7 +2648,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ FIX PROBLEMA 5: Termen plată editabil */}
+          {/* Termen plată editabil */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
               📅 Termen de plată (zile)
@@ -2676,6 +2845,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <li>💱 <strong>Cursuri BNR editabile pentru data selectată</strong></li>
               )}
               {isEdit && <li>✏️ <strong>Salvare completă în BigQuery pentru editări</strong></li>}
+              <li>📋 <strong>Facturare pe bază de etape din contracte și anexe</strong></li>
+              <li>🔄 <strong>Statusuri etape se actualizează automat la generarea facturii</strong></li>
             </ul>
           </div>
 
@@ -2692,7 +2863,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               color: '#7f8c8d',
               fontWeight: '500'
             }}>
-              ℹ️ Date client auto-completate din BD. ✅ Cursuri BNR editabile. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
+              ℹ️ Facturare pe etape contract/anexe cu cursuri BNR editabile. {sendToAnaf ? 'E-factura va fi trimisă la ANAF.' : 'Doar PDF va fi generat.'}
             </div>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -2730,7 +2901,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 {isLoading ? (
                   <>⏳ {isProcessingPDF ? 'Se generează PDF...' : (sendToAnaf ? 'Se procesează PDF + XML ANAF...' : 'Se procesează...')}</>
                 ) : (
-                  <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură cu cursuri BNR'}</>
+                  <>💰 {sendToAnaf ? 'Generează Factură + e-Factura ANAF' : 'Generează Factură din Etape Contract'}</>
                 )}
               </button>
             </div>
