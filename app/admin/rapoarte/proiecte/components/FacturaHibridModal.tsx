@@ -1646,18 +1646,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }).join(', ')}`;
   };
 
-  if (typeof window === 'undefined') return null;
-  
-  return createPortal(
-  (
-  <div style={{
+  return (
+    <div style={{
       position: 'fixed',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
       background: 'rgba(0,0,0,0.8)',
-      zIndex: 65000,
+      zIndex: 99999,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -2940,8 +2937,6 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         </div>
       </div>
     </div>
-   </div>,
-  ),
-   document.body
- );
+   </div>
+  );
 }
