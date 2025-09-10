@@ -1649,7 +1649,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   if (typeof window === 'undefined') return null;
   
   return createPortal(
-    <div style={{
+  (
+  <div style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -2940,6 +2941,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       </div>
     </div>
    </div>,
+  ),
    document.body
-  );
+ );
 }
