@@ -934,24 +934,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const removeLine = (index: number) => {
-    if (liniiFactura.length > 1) {
-      const linieSteasa = liniiFactura[index];
-      
-      // ✅ MODIFICAT: Pentru etape, marchează ca neadăugată
-      if ((linieSteasa.tip === 'etapa_contract' || linieSteasa.tip === 'etapa_anexa') && 
-          (linieSteasa.etapa_id || linieSteasa.anexa_id)) {
-        setEtapeDisponibile(prev => 
-          prev.map(etapa => 
-            (etapa.ID_Etapa === linieSteasa.etapa_id || etapa.ID_Anexa === linieSteasa.anexa_id)
-              ? { ...etapa, adaugat: false }
-              : etapa
-          )
-        );
-      }
-      
-      setLiniiFactura(liniiFactura.filter((_, i) => i !== index));
-    }
-  };
+	  if (liniiFactura.length > 1) {
+	    const linieSteasa = liniiFactura[index];
+	    
+	    // Pentru etape, marchează ca neadăugată
+	    if ((linieSteasa.tip === 'etapa_contract' || linieSteasa.tip === 'etapa_anexa') && 
+		(linieSteasa.etapa_id || linieSteasa.anexa_id)) {
+	      
+	      const etapaIdSteasa = linieSteasa.etapa_id || linieSteasa.anexa_id;
+	      
+	      // ✅ FIX: Marchează ca neadăugată DOAR etapa ștearsă
+	      setEtapeDisponibile(prev => 
+		prev.map(etapa => {
+		  const currentEtapaId = etapa.ID_Etapa || etapa.ID_Anexa;
+		  
+		  if (currentEtapaId === etapaIdSteasa) {
+		    console.log(`🗑️ Marcând etapa ${etapaIdSteasa} ca neadăugată`);
+		    return { ...etapa, adaugat: false };
+		  } else {
+		    // ✅ CRUCIAL: Nu modifica celelalte etape
+		    return etapa;
+		  }
+		})
+	      );
+	    }
+	    
+	    setLiniiFactura(liniiFactura.filter((_, i) => i !== index));
+	  }
+	};
 
   // ✅ FIX PROBLEME 1-3: updateLine cu logică completă pentru valoare/monedă/curs
   const updateLine = (index: number, field: keyof LineFactura, value: string | number) => {
@@ -1062,80 +1072,95 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // ✅ MODIFICATĂ: addEtapaToFactura cu refresh automat după adăugare
   const addEtapaToFactura = (etapa: EtapaFacturare) => {
-    console.log('📋 ADĂUGARE ETAPĂ: Start cu refresh automat...');
-    
-    // ✅ FIX: Conversie corectă BigQuery NUMERIC
-    const valoareEstimata = convertBigQueryNumeric(etapa.valoare);
-    let valoareEtapa = valoareEstimata;
-    let monedaEtapa = etapa.moneda || 'RON';
-    let cursEtapa = 1;
-    
-    console.log(`📊 Etapă originală: ${valoareEstimata} ${monedaEtapa} (din BD)`);
-    
-    // ✅ CRUCIAL: Folosește cursul din STATE, NU din BD
-    if (monedaEtapa !== 'RON') {
-      const cursState = cursuri[monedaEtapa];
-      if (cursState) {
-        cursEtapa = cursState.curs;
-        valoareEtapa = valoareEstimata * cursState.curs; // Calculează în RON cu cursul actual
-        console.log(`🔄 REFRESH APLICAT: ${valoareEstimata} ${monedaEtapa} × ${cursState.curs.toFixed(4)} = ${valoareEtapa.toFixed(2)} RON`);
-      } else {
-        console.log(`⚠️ Curs nu găsit în state pentru ${monedaEtapa}, folosesc din BD`);
-        if (etapa.curs_valutar && etapa.curs_valutar > 0) {
-          cursEtapa = convertBigQueryNumeric(etapa.curs_valutar);
-          if (etapa.valoare_ron) {
-            valoareEtapa = convertBigQueryNumeric(etapa.valoare_ron);
-          }
-        }
-      }
-    }
+	  console.log('📋 ADĂUGARE ETAPĂ: Start cu refresh automat...');
+	  
+	  // Verifică dacă etapa este deja adăugată
+	  if (etapa.adaugat) {
+	    console.log('⚠️ Etapa este deja adăugată, skip');
+	    return;
+	  }
+	  
+	  // FIX: Conversie corectă BigQuery NUMERIC
+	  const valoareEstimata = convertBigQueryNumeric(etapa.valoare);
+	  let valoareEtapa = valoareEstimata;
+	  let monedaEtapa = etapa.moneda || 'RON';
+	  let cursEtapa = 1;
+	  
+	  console.log(`📊 Etapă originală: ${valoareEstimata} ${monedaEtapa} (din BD)`);
+	  
+	  // CRUCIAL: Folosește cursul din STATE, NU din BD
+	  if (monedaEtapa !== 'RON') {
+	    const cursState = cursuri[monedaEtapa];
+	    if (cursState) {
+	      cursEtapa = cursState.curs;
+	      valoareEtapa = valoareEstimata * cursState.curs; // Calculează în RON cu cursul actual
+	      console.log(`🔄 REFRESH APLICAT: ${valoareEstimata} ${monedaEtapa} × ${cursState.curs.toFixed(4)} = ${valoareEtapa.toFixed(2)} RON`);
+	    } else {
+	      console.log(`⚠️ Curs nu găsit în state pentru ${monedaEtapa}, folosesc din BD`);
+	      if (etapa.curs_valutar && etapa.curs_valutar > 0) {
+		cursEtapa = convertBigQueryNumeric(etapa.curs_valutar);
+		if (etapa.valoare_ron) {
+		  valoareEtapa = convertBigQueryNumeric(etapa.valoare_ron);
+		}
+	      }
+	    }
+	  }
 
-    const nouaLinie: LineFactura = {
-      denumire: genereazaDenumireEtapa(etapa), // ✅ NOUĂ: Denumire standardizată
-      cantitate: 1,
-      pretUnitar: valoareEtapa, // ✅ Folosește valoarea calculată cu cursul actual
-      cotaTva: 21,
-      tip: etapa.tip === 'contract' ? 'etapa_contract' : 'etapa_anexa',
-      etapa_id: etapa.ID_Etapa,
-      anexa_id: etapa.ID_Anexa,
-      contract_id: etapa.contract_id,
-      contract_numar: etapa.contract_numar,
-      contract_data: etapa.contract_data,
-      anexa_numar: etapa.anexa_numar?.toString(),
-      anexa_data: etapa.anexa_data,
-      subproiect_id: etapa.subproiect_id,
-      monedaOriginala: monedaEtapa,
-      valoareOriginala: valoareEstimata, // ✅ Valoarea originală din BD
-      cursValutar: cursEtapa // ✅ Cursul din STATE (actual)
-    };
+	  const nouaLinie: LineFactura = {
+	    denumire: genereazaDenumireEtapa(etapa),
+	    cantitate: 1,
+	    pretUnitar: valoareEtapa,
+	    cotaTva: 21,
+	    tip: etapa.tip === 'contract' ? 'etapa_contract' : 'etapa_anexa',
+	    etapa_id: etapa.ID_Etapa,
+	    anexa_id: etapa.ID_Anexa,
+	    contract_id: etapa.contract_id,
+	    contract_numar: etapa.contract_numar,
+	    contract_data: etapa.contract_data,
+	    anexa_numar: etapa.anexa_numar?.toString(), // FIX din mesajul anterior
+	    anexa_data: etapa.anexa_data,
+	    subproiect_id: etapa.subproiect_id,
+	    monedaOriginala: monedaEtapa,
+	    valoareOriginala: valoareEstimata,
+	    cursValutar: cursEtapa
+	  };
 
-    console.log('✅ Linie nouă creată:', {
-      denumire: nouaLinie.denumire,
-      valoareOriginala: nouaLinie.valoareOriginala,
-      monedaOriginala: nouaLinie.monedaOriginala,
-      cursValutar: nouaLinie.cursValutar?.toFixed(4),
-      pretUnitar: nouaLinie.pretUnitar?.toFixed(2),
-      sursa_curs: cursuri[monedaEtapa] ? 'STATE_ACTUAL' : 'BD_FALLBACK'
-    });
+	  console.log('✅ Linie nouă creată:', {
+	    denumire: nouaLinie.denumire,
+	    valoareOriginala: nouaLinie.valoareOriginala,
+	    monedaOriginala: nouaLinie.monedaOriginala,
+	    cursValutar: nouaLinie.cursValutar?.toFixed(4),
+	    pretUnitar: nouaLinie.pretUnitar?.toFixed(2),
+	    sursa_curs: cursuri[monedaEtapa] ? 'STATE_ACTUAL' : 'BD_FALLBACK'
+	  });
 
-    setLiniiFactura(prev => [...prev, nouaLinie]);
+	  setLiniiFactura(prev => [...prev, nouaLinie]);
 
-    setEtapeDisponibile(prev => 
-      prev.map(et => 
-        (et.ID_Etapa === etapa.ID_Etapa || et.ID_Anexa === etapa.ID_Anexa)
-          ? { ...et, adaugat: true }
-          : et
-      )
-    );
+	  // ✅ FIX CRUCIAL: Marchează ca adăugată DOAR etapa selectată
+	  setEtapeDisponibile(prev => 
+	    prev.map(et => {
+	      // ✅ FIX: Verifică ID-ul exact pentru etapa curentă
+	      const etapaId = etapa.ID_Etapa || etapa.ID_Anexa;
+	      const currentEtapaId = et.ID_Etapa || et.ID_Anexa;
+	      
+	      if (currentEtapaId === etapaId) {
+		console.log(`✅ Marcând etapa ${etapaId} ca adăugată`);
+		return { ...et, adaugat: true };
+	      } else {
+		// ✅ CRUCIAL: Nu modifica celelalte etape
+		return et;
+	      }
+	    })
+	  );
 
-    showToast(`✅ Etapă "${etapa.denumire}" adăugată cu cursul actual ${cursEtapa.toFixed(4)}`, 'success');
-    
-    // ✅ BONUS: Force re-render pentru a actualiza UI
-    setTimeout(() => {
-      console.log('🔄 Force re-render după adăugare etapă');
-      setLiniiFactura(prev => [...prev]); // Trigger re-render
-    }, 100);
-  };
+	  showToast(`✅ Etapă "${etapa.denumire}" adăugată cu cursul actual ${cursEtapa.toFixed(4)}`, 'success');
+	  
+	  // Force re-render pentru a actualiza UI
+	  setTimeout(() => {
+	    console.log('🔄 Force re-render după adăugare etapă');
+	    setLiniiFactura(prev => [...prev]); // Trigger re-render
+	  }, 100);
+	};
 
   const handlePreluareDateANAF = async () => {
     if (!cuiInput.trim()) {
