@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturaHibridModal.tsx
-// DATA: 09.09.2025 15:30 (ora României)
-// MODIFICAT: Folosește etape din contracte/anexe în loc de proiecte/subproiecte
+// DATA: 10.09.2025 19:45 (ora României)
+// MODIFICAT: Centrare modal cu createPortal ca la TimeTrackingNouModal
 // PĂSTRATE: TOATE funcționalitățile (ANAF, cursuri editabile, Edit/Storno)
 // ==================================================================
 
@@ -134,27 +134,29 @@ declare global {
   }
 }
 
+// Toast system cu z-index crescut pentru a fi deasupra modalului
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
     color: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
     padding: 16px 20px;
-    border-radius: 12px;
-    z-index: 16000;
+    border-radius: 16px;
+    z-index: 70000;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 15px 30px rgba(0,0,0,0.2);
-    border: 1px solid #e0e0e0;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 400px;
     word-wrap: break-word;
     transform: translateY(-10px);
     opacity: 0;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   `;
   toastEl.textContent = message;
   document.body.appendChild(toastEl);
@@ -996,7 +998,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     // ✅ FIX DROPDOWN AMESTEC VALUTE: Logică corectată pentru monedaOriginala
     if (field === 'monedaOriginala') {
       const novaMoneda = String(value);
-      console.log(`💱 SCHIMB MONEDA: ${linieCurenta.monedaOriginala} → ${novaMoneda}`);
+      console.log(`💱 SCHIMB MONEDA: ${linieCurenta.monedaOriginala} → ${novaMoneda} pentru linia ${index}`);
       
       if (novaMoneda === 'RON') {
         // Pentru RON: curs = 1, pretUnitar = valoarea originală
@@ -1646,7 +1648,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }).join(', ')}`;
   };
 
-  return (
+  // Renderarea modalului folosind createPortal pentru centrare corectă
+  if (typeof window === 'undefined') return null;
+
+  return createPortal(
     <div style={{
       position: 'fixed',
       top: 0,
@@ -1654,7 +1659,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       right: 0,
       bottom: 0,
       background: 'rgba(0,0,0,0.8)',
-      zIndex: 99999,
+      zIndex: 65000,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1662,8 +1667,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
         maxWidth: '1200px',
         width: '100%',
         maxHeight: '90vh',
@@ -1673,11 +1678,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
-          background: '#f8f9fa',
-          borderRadius: '8px 8px 0 0'
+          background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+          borderRadius: '16px 16px 0 0'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, color: '#2c3e50' }}>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: '700' }}>
               {isStorno ? '↩️ Generare Factură Stornare' : 
                isEdit ? '✏️ Editare Factură' : 
                '💰 Generare Factură cu Etape Contract'}
@@ -1686,11 +1691,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               onClick={onClose}
               disabled={isLoading}
               style={{
-                background: 'transparent',
+                background: 'rgba(255, 255, 255, 0.2)',
                 border: 'none',
-                fontSize: '24px',
+                borderRadius: '12px',
+                width: '40px',
+                height: '40px',
+                fontSize: '20px',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                color: '#6c757d'
+                color: 'white'
               }}
             >
               ×
@@ -1701,22 +1709,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           <div style={{
             marginTop: '1rem',
             padding: '1rem',
-            background: 'white',
-            border: '2px solid #3498db',
-            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '12px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
             <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px' }}>
                   Număr factură:
                 </div>
                 <div style={{ 
                   fontSize: '20px', 
                   fontWeight: 'bold', 
-                  color: isStorno ? '#e67e22' : '#e74c3c',
+                  color: 'white',
                   fontFamily: 'monospace'
                 }}>
                   {isLoadingSetari ? '⏳ Se generează...' : numarFactura || 'Negenecat'}
@@ -1724,13 +1733,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
               
               <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px' }}>
                   Data emiterii:
                 </div>
                 <div style={{ 
                   fontSize: '16px', 
                   fontWeight: '600', 
-                  color: '#2c3e50'
+                  color: 'white'
                 }}>
                   {dataFactura.toLocaleDateString('ro-RO', {
                     day: '2-digit',
@@ -1741,13 +1750,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px' }}>
                   Termen plată:
                 </div>
                 <div style={{ 
                   fontSize: '16px', 
                   fontWeight: '600', 
-                  color: '#27ae60'
+                  color: 'white'
                 }}>
                   {termenPlata} zile
                 </div>
@@ -1757,10 +1766,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             {/* Indicator setări */}
             <div style={{
               padding: '0.5rem 1rem',
-              background: isEdit ? '#d4edda' : (setariFacturare ? '#d4edda' : '#fff3cd'),
-              borderRadius: '6px',
+              background: isEdit ? 'rgba(46, 204, 113, 0.3)' : (setariFacturare ? 'rgba(46, 204, 113, 0.3)' : 'rgba(241, 196, 15, 0.3)'),
+              borderRadius: '8px',
               fontSize: '12px',
-              color: isEdit ? '#155724' : (setariFacturare ? '#155724' : '#856404')
+              color: 'white',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
               {isEdit ? '✏️ Editare factură existentă' : 
                isStorno ? '↩️ Stornare factură' :
@@ -1768,8 +1779,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
           
-          <p style={{ margin: '0.5rem 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>
-            📊 Facturare pe bază de etape contract/anexe • cursuri BNR editabile • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#3498db' }}>{proiect.ID_Proiect}</span>
+          <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
+            📊 Facturare pe bază de etape contract/anexe • cursuri BNR editabile • Proiect: <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>{proiect.ID_Proiect}</span>
           </p>
         </div>
 
@@ -1783,7 +1794,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               right: 0,
               bottom: 0,
               background: 'rgba(0,0,0,0.8)',
-              zIndex: 99999,
+              zIndex: 70000,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -1791,8 +1802,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <div style={{
                 background: 'white',
                 padding: '2rem',
-                borderRadius: '8px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
                 textAlign: 'center'
               }}>
                 <div style={{
@@ -1836,7 +1847,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           <div style={{
             background: '#f8f9fa',
             padding: '1rem',
-            borderRadius: '6px',
+            borderRadius: '8px',
             border: '1px solid #dee2e6',
             marginBottom: '1rem'
           }}>
@@ -1936,7 +1947,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     📋 Etape Disponibile pentru Facturare ({etapeDisponibile.length}) 
                     {Object.keys(cursuri).length > 0 && (
                       <span style={{ fontSize: '12px', color: '#27ae60', fontWeight: '500' }}>
-                        • Cursuri BNR ✓
+                        • Cursuri BNR ✔
                       </span>
                     )}
                   </h4>
@@ -2043,7 +2054,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               fontWeight: 'bold'
                             }}
                           >
-                            {etapa.adaugat ? '✓ Adăugat' : '+ Adaugă'}
+                            {etapa.adaugat ? '✅ Adăugat' : '+ Adaugă'}
                           </button>
                         </div>
                       </div>
@@ -2261,7 +2272,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             )}
           </div>
 
-          {/* ✅ NOU: Secțiune pentru alegerea datei cursului */}
+          {/* Secțiune pentru alegerea datei cursului */}
           <div style={{ 
             background: '#fff3cd',
             border: '1px solid #ffeaa7',
@@ -2296,7 +2307,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             </div>
           </div>
 
-          {/* ✅ MODIFICAT: Secțiune Servicii/Produse cu coloane extinse */}
+          {/* Secțiune Servicii/Produse cu coloane extinse */}
           <div style={{ marginBottom: '1rem' }}>
             <div style={{
               display: 'flex',
@@ -2874,7 +2885,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               )}
               {isEdit && <li>✏️ <strong>Salvare completă în BigQuery pentru editări</strong></li>}
               <li>📋 <strong>Facturare pe bază de etape din contracte și anexe</strong></li>
-              <li>🔄 <strong>Statusuri etape se actualizează automat la generarea facturii</strong></li>
+              <li>📄 <strong>Statusuri etape se actualizează automat la generarea facturii</strong></li>
             </ul>
           </div>
 
@@ -2936,7 +2947,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           </div>
         </div>
       </div>
-    </div>
-   </div>
+    </div>,
+    document.body
   );
 }
