@@ -189,92 +189,91 @@ const types = {
 
 // ✅ PLUS: CORECTEAZĂ și query-ul pentru a converti STRING în DATE
 	const insertQuery = `
-	  INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
-	  (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
-	   valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
-	   data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
-	  VALUES (
-	    @etapaFacturaId,
-	    @proiectId,
-	    @etapaId,
-	    @anexaId,
-	    @tipEtapa,
-	    @subproiectId,
-	    @facturaId,
-	    @valoare,
-	    @moneda,
-	    @valoareRon,
-	    @cursValutar,
-	    DATE(@dataCursValutar), -- ✅ FIX: Conversie explicită STRING → DATE
-	    @procentDinEtapa,
-	    DATE(@dataFacturare), -- ✅ FIX: Conversie explicită STRING → DATE
-	    @statusIncasare,
-	    @valoareIncasata,
-	    @activ,
-	    @versiune,
-	    CURRENT_TIMESTAMP(),
-	    @creatDe
-	  )
-	`;
+	    INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+	    (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
+	     valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
+	     data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+	    VALUES (
+	      @etapaFacturaId,
+	      @proiectId,
+	      @etapaId,
+	      @anexaId,
+	      @tipEtapa,
+	      @subproiectId,
+	      @facturaId,
+	      @valoare,
+	      @moneda,
+	      @valoareRon,
+	      @cursValutar,
+	      DATE(@dataCursValutar),
+	      @procentDinEtapa,
+	      DATE(@dataFacturare),
+	      @statusIncasare,
+	      @valoareIncasata,
+	      @activ,
+	      @versiune,
+	      CURRENT_TIMESTAMP(),
+	      @creatDe
+	    )
+	  `;
 
-      // ✅ FIX: Parametrii cu types explicite
-      const params = {
-	  etapaFacturaId: etapaFacturaId,
-	  proiectId: proiectId,
-	  etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
-	  anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
-	  tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
-	  subproiectId: etapa.subproiect_id || null,
-	  facturaId: facturaId,
-	  valoare: etapa.valoare || 0,
-	  moneda: etapa.moneda || 'RON',
-	  valoareRon: etapa.valoare_ron || etapa.valoare || 0,
-	  cursValutar: etapa.curs_valutar || 1,
-	  // ✅ FIX CRUCIAL: Format corect pentru DATE în BigQuery
-	  dataCursValutar: new Date().toISOString().split('T')[0], // 'YYYY-MM-DD'
-	  procentDinEtapa: 100.0,
-	  dataFacturare: new Date().toISOString().split('T')[0], // 'YYYY-MM-DD' 
-	  statusIncasare: 'Neincasat',
-	  valoareIncasata: 0,
-	  activ: true,
-	  versiune: 1,
-	  creatDe: 'System'
-	}
+	  // Parametrii pentru query
+	  const queryParams = {
+	    etapaFacturaId: etapaFacturaId,
+	    proiectId: proiectId,
+	    etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
+	    anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
+	    tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
+	    subproiectId: etapa.subproiect_id || null,
+	    facturaId: facturaId,
+	    valoare: etapa.valoare || 0,
+	    moneda: etapa.moneda || 'RON',
+	    valoareRon: etapa.valoare_ron || etapa.valoare || 0,
+	    cursValutar: etapa.curs_valutar || 1,
+	    dataCursValutar: new Date().toISOString().split('T')[0],
+	    procentDinEtapa: 100.0,
+	    dataFacturare: new Date().toISOString().split('T')[0],
+	    statusIncasare: 'Neincasat',
+	    valoareIncasata: 0,
+	    activ: true,
+	    versiune: 1,
+	    creatDe: 'System'
+	  };
 
-      // ✅ FIX: Types explicite pentru BigQuery
-      const types = {
-	  etapaFacturaId: 'STRING',
-	  proiectId: 'STRING',
-	  etapaId: 'STRING',
-	  anexaId: 'STRING',
-	  tipEtapa: 'STRING',
-	  subproiectId: 'STRING',
-	  facturaId: 'STRING',
-	  valoare: 'NUMERIC',
-	  moneda: 'STRING',
-	  valoareRon: 'NUMERIC',
-	  cursValutar: 'NUMERIC',
-	  dataCursValutar: 'STRING', // ✅ FIX: STRING pentru format YYYY-MM-DD
-	  procentDinEtapa: 'NUMERIC',
-	  dataFacturare: 'STRING', // ✅ FIX: STRING pentru format YYYY-MM-DD
-	  statusIncasare: 'STRING',
-	  valoareIncasata: 'NUMERIC',
-	  activ: 'BOOL',
-	  versiune: 'INT64',
-	  creatDe: 'STRING'
-	};
+	  // Types pentru BigQuery - NUME DIFERIT pentru a evita conflictul
+	  const queryTypes = {
+	    etapaFacturaId: 'STRING',
+	    proiectId: 'STRING',
+	    etapaId: 'STRING',
+	    anexaId: 'STRING',
+	    tipEtapa: 'STRING',
+	    subproiectId: 'STRING',
+	    facturaId: 'STRING',
+	    valoare: 'NUMERIC',
+	    moneda: 'STRING',
+	    valoareRon: 'NUMERIC',
+	    cursValutar: 'NUMERIC',
+	    dataCursValutar: 'STRING',
+	    procentDinEtapa: 'NUMERIC',
+	    dataFacturare: 'STRING',
+	    statusIncasare: 'STRING',
+	    valoareIncasata: 'NUMERIC',
+	    activ: 'BOOL',
+	    versiune: 'INT64',
+	    creatDe: 'STRING'
+	  };
 
-      await bigquery.query({
-        query: insertQuery,
-        params: params,
-        types: types,
-        location: 'EU',
-      });
+	  await bigquery.query({
+	    query: insertQuery,
+	    params: queryParams,
+	    types: queryTypes,
+	    location: 'EU',
+	  });
 
-      console.log(`✅ [ETAPE-FACTURI] Inserată etapa ${etapa.id} în EtapeFacturi`);
-    });
+	  console.log(`✅ [ETAPE-FACTURI] Inserată etapa ${etapa.id} în EtapeFacturi`);
+	});
 
-    await Promise.all(insertPromises);
+	await Promise.all(insertPromises);
 
     // PASUL 2: Update statusuri în tabelele principale - PĂSTRAT LA FEL
     const updateEtapeContract = etapeFacturate
