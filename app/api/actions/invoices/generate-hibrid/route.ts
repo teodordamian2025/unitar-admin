@@ -1,9 +1,9 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/generate-hibrid/route.ts
-// DATA: 09.09.2025 16:50 (ora României)
-// MODIFICAT: Adăugat suport pentru EtapeFacturi cu păstrarea funcționalităților existente
+// DATA: 12.09.2025 13:15 (ora României)
+// MODIFICAT: Fix complet pentru Edit Mode și EtapeFacturi cu logică corectă
 // PĂSTRATE: Toate funcționalitățile (ANAF, cursuri editabile, Edit/Storno)
-// NOU: Update statusuri etape prin tabelul EtapeFacturi
+// FIX: updateEtapeStatusuri() pentru Edit Mode și eliminare duplicări SQL
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,7 +23,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// ✅ NOU: Interfață pentru etapele facturate (din frontend)
+// ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
   tip: 'etapa_contract' | 'etapa_anexa';
   id: string; // ID_Etapa sau ID_Anexa
@@ -35,7 +35,7 @@ interface EtapaFacturata {
   curs_valutar?: number;
 }
 
-// ✅ NOU: Funcție pentru căutarea contractelor și etapelor (adaptată din PV)
+// ✅ Funcție pentru căutarea contractelor și etapelor (adaptată din PV)
 async function findContractAndEtapeForProiect(proiectId: string) {
   try {
     console.log(`🔍 [ETAPE-FACTURARE] Căutare contracte și etape pentru proiect: ${proiectId}`);
@@ -119,161 +119,130 @@ async function findContractAndEtapeForProiect(proiectId: string) {
   }
 }
 
-// ✅ NOU: Funcție pentru update statusuri etape cu EtapeFacturi
-async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string) {
+// ✅ MODIFICATĂ: Funcție pentru update statusuri etape cu logică corectă pentru Edit Mode
+async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string, isEdit: boolean = false) {
   if (!etapeFacturate || etapeFacturate.length === 0) {
-    console.log('📝 [ETAPE-FACTURI] Nu există etape de actualizat');
+    console.log('📋 [ETAPE-FACTURI] Nu există etape de actualizat');
     return;
   }
 
-  console.log(`📝 [ETAPE-FACTURI] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId}`);
+  console.log(`📋 [ETAPE-FACTURI] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId} (Edit Mode: ${isEdit})`);
 
   try {
-    // PASUL 1: Inserare în tabelul EtapeFacturi - QUERY CORECTAT
-    const insertPromises = etapeFacturate.map(async (etapa) => {
-      const etapaFacturaId = `EF_${facturaId}_${etapa.id}_${Date.now()}`;
+    // ✅ NOUĂ LOGICĂ: Pentru Edit Mode, dezactivează mai întâi etapele existente
+    if (isEdit) {
+      console.log('🔄 [EDIT-MODE] Dezactivez etapele existente pentru această factură...');
       
-      // ✅ FIX: Query cu escape corect pentru toate câmpurile
-// ==================================================================
-// FIX pentru eroarea "data_facturare cannot be null" în generate-hibrid/route.ts
-// GĂSEȘTE funcția updateEtapeStatusuri și CORECTEAZĂ parametrii DATE
-// ==================================================================
+      const deactivateQuery = `
+        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        SET 
+          activ = false,
+          data_actualizare = CURRENT_TIMESTAMP(),
+          actualizat_de = 'System_Edit_Cleanup'
+        WHERE factura_id = @facturaId AND activ = true
+      `;
 
-// În funcția updateEtapeStatusuri, ÎNLOCUIEȘTE parametrii pentru DATE cu format corect:
+      await bigquery.query({
+        query: deactivateQuery,
+        params: { facturaId },
+        types: { facturaId: 'STRING' },
+        location: 'EU'
+      });
 
-const params = {
-  etapaFacturaId: etapaFacturaId,
-  proiectId: proiectId,
-  etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
-  anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
-  tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
-  subproiectId: etapa.subproiect_id || null,
-  facturaId: facturaId,
-  valoare: etapa.valoare || 0,
-  moneda: etapa.moneda || 'RON',
-  valoareRon: etapa.valoare_ron || etapa.valoare || 0,
-  cursValutar: etapa.curs_valutar || 1,
-  // ✅ FIX CRUCIAL: Format corect pentru DATE în BigQuery
-  dataCursValutar: new Date().toISOString().split('T')[0], // 'YYYY-MM-DD'
-  procentDinEtapa: 100.0,
-  dataFacturare: new Date().toISOString().split('T')[0], // 'YYYY-MM-DD' 
-  statusIncasare: 'Neincasat',
-  valoareIncasata: 0,
-  activ: true,
-  versiune: 1,
-  creatDe: 'System'
-};
+      console.log('✅ [EDIT-MODE] Etape existente dezactivate');
+    }
 
-// ✅ FIX CRUCIAL: Types corecte pentru parametrii DATE
-const types = {
-  etapaFacturaId: 'STRING',
-  proiectId: 'STRING',
-  etapaId: 'STRING',
-  anexaId: 'STRING',
-  tipEtapa: 'STRING',
-  subproiectId: 'STRING',
-  facturaId: 'STRING',
-  valoare: 'NUMERIC',
-  moneda: 'STRING',
-  valoareRon: 'NUMERIC',
-  cursValutar: 'NUMERIC',
-  dataCursValutar: 'STRING', // ✅ FIX: STRING pentru format YYYY-MM-DD
-  procentDinEtapa: 'NUMERIC',
-  dataFacturare: 'STRING', // ✅ FIX: STRING pentru format YYYY-MM-DD
-  statusIncasare: 'STRING',
-  valoareIncasata: 'NUMERIC',
-  activ: 'BOOL',
-  versiune: 'INT64',
-  creatDe: 'STRING'
-};
+    // PASUL 1: Inserare în tabelul EtapeFacturi - QUERY CORECTAT și SIMPLIFICAT
+    const insertPromises = etapeFacturate.map(async (etapa) => {
+      const etapaFacturaId = `EF_${isEdit ? 'EDIT' : 'NEW'}_${facturaId}_${etapa.id}_${Date.now()}`;
+      
+      // ✅ FIX CRUCIAL: Query simplificat cu parametri corecți
+      const insertQuery = `
+        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
+         valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
+         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+        VALUES (
+          @etapaFacturaId,
+          @proiectId,
+          @etapaId,
+          @anexaId,
+          @tipEtapa,
+          @subproiectId,
+          @facturaId,
+          @valoare,
+          @moneda,
+          @valoareRon,
+          @cursValutar,
+          DATE(@dataCursValutar),
+          @procentDinEtapa,
+          DATE(@dataFacturare),
+          @statusIncasare,
+          @valoareIncasata,
+          @activ,
+          @versiune,
+          CURRENT_TIMESTAMP(),
+          @creatDe
+        )
+      `;
 
-// ✅ PLUS: CORECTEAZĂ și query-ul pentru a converti STRING în DATE
-	const insertQuery = `
-	    INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
-	    (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
-	     valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
-	     data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
-	    VALUES (
-	      @etapaFacturaId,
-	      @proiectId,
-	      @etapaId,
-	      @anexaId,
-	      @tipEtapa,
-	      @subproiectId,
-	      @facturaId,
-	      @valoare,
-	      @moneda,
-	      @valoareRon,
-	      @cursValutar,
-	      DATE(@dataCursValutar),
-	      @procentDinEtapa,
-	      DATE(@dataFacturare),
-	      @statusIncasare,
-	      @valoareIncasata,
-	      @activ,
-	      @versiune,
-	      CURRENT_TIMESTAMP(),
-	      @creatDe
-	    )
-	  `;
+      // ✅ FIX CRUCIAL: Un singur set de parametri, clear și consistent
+      const params = {
+        etapaFacturaId: etapaFacturaId,
+        proiectId: proiectId,
+        etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
+        anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
+        tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
+        subproiectId: etapa.subproiect_id || null,
+        facturaId: facturaId,
+        valoare: etapa.valoare || 0,
+        moneda: etapa.moneda || 'RON',
+        valoareRon: etapa.valoare_ron || etapa.valoare || 0,
+        cursValutar: etapa.curs_valutar || 1,
+        dataCursValutar: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD
+        procentDinEtapa: 100.0,
+        dataFacturare: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD
+        statusIncasare: 'Neincasat',
+        valoareIncasata: 0,
+        activ: true,
+        versiune: isEdit ? 2 : 1, // ✅ Versiune diferită pentru Edit vs New
+        creatDe: isEdit ? 'System_Edit' : 'System'
+      };
 
-	  // Parametrii pentru query
-	  const queryParams = {
-	    etapaFacturaId: etapaFacturaId,
-	    proiectId: proiectId,
-	    etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
-	    anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
-	    tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
-	    subproiectId: etapa.subproiect_id || null,
-	    facturaId: facturaId,
-	    valoare: etapa.valoare || 0,
-	    moneda: etapa.moneda || 'RON',
-	    valoareRon: etapa.valoare_ron || etapa.valoare || 0,
-	    cursValutar: etapa.curs_valutar || 1,
-	    dataCursValutar: new Date().toISOString().split('T')[0],
-	    procentDinEtapa: 100.0,
-	    dataFacturare: new Date().toISOString().split('T')[0],
-	    statusIncasare: 'Neincasat',
-	    valoareIncasata: 0,
-	    activ: true,
-	    versiune: 1,
-	    creatDe: 'System'
-	  };
+      // ✅ FIX CRUCIAL: Types corecte pentru BigQuery (STRING pentru DATE conversion)
+      const types = {
+        etapaFacturaId: 'STRING',
+        proiectId: 'STRING',
+        etapaId: 'STRING',
+        anexaId: 'STRING',
+        tipEtapa: 'STRING',
+        subproiectId: 'STRING',
+        facturaId: 'STRING',
+        valoare: 'NUMERIC',
+        moneda: 'STRING',
+        valoareRon: 'NUMERIC',
+        cursValutar: 'NUMERIC',
+        dataCursValutar: 'STRING', // ✅ STRING pentru conversie la DATE în query
+        procentDinEtapa: 'NUMERIC',
+        dataFacturare: 'STRING', // ✅ STRING pentru conversie la DATE în query
+        statusIncasare: 'STRING',
+        valoareIncasata: 'NUMERIC',
+        activ: 'BOOL',
+        versiune: 'INT64',
+        creatDe: 'STRING'
+      };
 
-	  // Types pentru BigQuery - NUME DIFERIT pentru a evita conflictul
-	  const queryTypes = {
-	    etapaFacturaId: 'STRING',
-	    proiectId: 'STRING',
-	    etapaId: 'STRING',
-	    anexaId: 'STRING',
-	    tipEtapa: 'STRING',
-	    subproiectId: 'STRING',
-	    facturaId: 'STRING',
-	    valoare: 'NUMERIC',
-	    moneda: 'STRING',
-	    valoareRon: 'NUMERIC',
-	    cursValutar: 'NUMERIC',
-	    dataCursValutar: 'STRING',
-	    procentDinEtapa: 'NUMERIC',
-	    dataFacturare: 'STRING',
-	    statusIncasare: 'STRING',
-	    valoareIncasata: 'NUMERIC',
-	    activ: 'BOOL',
-	    versiune: 'INT64',
-	    creatDe: 'STRING'
-	  };
+      await bigquery.query({
+        query: insertQuery,
+        params: params,
+        types: types,
+        location: 'EU',
+      });
 
-	  await bigquery.query({
-	    query: insertQuery,
-	    params: queryParams,
-	    types: queryTypes,
-	    location: 'EU',
-	  });
+      console.log(`✅ [ETAPE-FACTURI] Inserată etapa ${etapa.id} în EtapeFacturi (${isEdit ? 'EDIT' : 'NEW'} mode)`);
+    });
 
-	  console.log(`✅ [ETAPE-FACTURI] Inserată etapa ${etapa.id} în EtapeFacturi`);
-	});
-
-	await Promise.all(insertPromises);
+    await Promise.all(insertPromises);
 
     // PASUL 2: Update statusuri în tabelele principale - PĂSTRAT LA FEL
     const updateEtapeContract = etapeFacturate
@@ -298,7 +267,7 @@ const types = {
           },
           types: {
             facturaId: 'STRING',
-            dataFacturare: 'DATE',
+            dataFacturare: 'STRING', // ✅ Consistent cu conversie DATE
             etapaId: 'STRING'
           },
           location: 'EU',
@@ -327,7 +296,7 @@ const types = {
           },
           types: {
             facturaId: 'STRING',
-            dataFacturare: 'DATE',
+            dataFacturare: 'STRING', // ✅ Consistent cu conversie DATE
             etapaId: 'STRING'
           },
           location: 'EU',
@@ -336,15 +305,21 @@ const types = {
 
     await Promise.all([...updateEtapeContract, ...updateEtapeAnexe]);
 
-    console.log(`✅ [ETAPE-FACTURI] Statusuri actualizate cu succes pentru ${etapeFacturate.length} etape`);
+    console.log(`✅ [ETAPE-FACTURI] Statusuri actualizate cu succes pentru ${etapeFacturate.length} etape (${isEdit ? 'EDIT' : 'NEW'} mode)`);
 
   } catch (error) {
     console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor:', error);
+    console.error('📋 [DEBUG] Detalii eroare:', {
+      isEdit,
+      facturaId,
+      etapeCount: etapeFacturate.length,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     // Nu oprește procesul - continuă cu generarea facturii
   }
 }
 
-// ✅ PĂSTRAT: Toate funcțiile helper existente
+// ✅ PĂSTRATE: Toate funcțiile helper existente
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
@@ -496,7 +471,8 @@ export async function POST(request: NextRequest) {
       cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? 
         Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') : 
         'Niciun curs',
-      mockMode: MOCK_EFACTURA_MODE && sendToAnaf
+      mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
+      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2'
     });
 
     // ✅ PĂSTRATE: VALIDĂRI EXISTENTE - păstrate identice
@@ -511,11 +487,12 @@ export async function POST(request: NextRequest) {
     // ✅ PĂSTRAT: FIX PROBLEMA 4: FOLOSEȘTE DIRECT datele din frontend (STOP recalculare!)
     const liniiFacturaActualizate = liniiFactura; // ← SIMPLU: folosește datele corecte din frontend
     
-    console.log('🎯 FIX PROBLEMA 4: Folosesc direct datele din frontend - STOP recalculare!', {
+    console.log('🎯 FIX PROBLEMA 4: Folosesc direct datele din frontend cu suport Edit Mode - STOP recalculare!', {
       linii_primite: liniiFactura.length,
       linii_procesate: liniiFacturaActualizate.length,
       cursuri_frontend: Object.keys(cursuriUtilizate).length,
       etape_facturate: etapeFacturate.length, // ✅ NOU: Log etape
+      edit_mode: isEdit,
       sample_linie: liniiFacturaActualizate[0] ? {
         denumire: liniiFacturaActualizate[0].denumire,
         monedaOriginala: liniiFacturaActualizate[0].monedaOriginala,
@@ -557,17 +534,18 @@ export async function POST(request: NextRequest) {
       subtotal: subtotal.toFixed(2),
       totalTva: totalTva.toFixed(2),
       total: total.toFixed(2),
-      linii_procesate: liniiFacturaActualizate.length
+      linii_procesate: liniiFacturaActualizate.length,
+      edit_mode_active: isEdit
     });
 
     // ✅ PĂSTRAT: Pentru Edit, folosește facturaId existent
     const currentFacturaId = isEdit && facturaId ? facturaId : crypto.randomUUID();
 
-// ✅ PĂSTRAT: Generează nota despre cursurile valutare cu precizie maximă BNR (FIX [object Object])
+    // ✅ PĂSTRAT: Generează nota despre cursurile valutare cu precizie maximă BNR (FIX [object Object])
     let notaCursValutar = '';
     if (Object.keys(cursuriUtilizate).length > 0) {
       const monede = Object.keys(cursuriUtilizate);
-      notaCursValutar = `Curs valutar BNR: ${monede.map(m => {
+      notaCursValutar = `Curs valutar BNR${isEdit ? ' (actualizat la editare)' : ''}: ${monede.map(m => {
         const cursInfo = cursuriUtilizate[m];
         
         let cursFormatat: string;
@@ -628,7 +606,7 @@ export async function POST(request: NextRequest) {
       termenPlata: setariFacturare?.termen_plata_standard ? `${setariFacturare.termen_plata_standard} zile` : '30 zile'
     };
 
-    // ✅ PĂSTRAT: TEMPLATE HTML - cu coloane optimizate și TVA dinamic + note curs valutar BNR
+    // ✅ MODIFICAT: TEMPLATE HTML cu marker pentru Edit Mode în antet și footer
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `factura-${numarFactura || proiectId}-${timestamp}.pdf`;
@@ -848,6 +826,17 @@ export async function POST(request: NextRequest) {
                 font-weight: bold;
                 font-size: 11px;
             }
+            .edit-warning {
+                background: #d4edda;
+                border: 2px solid #27ae60;
+                color: #155724;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 11px;
+            }
             ${MOCK_EFACTURA_MODE && sendToAnaf ? `
             .mock-warning {
                 background: #fff3cd;
@@ -866,18 +855,24 @@ export async function POST(request: NextRequest) {
     <body>
         ${MOCK_EFACTURA_MODE && sendToAnaf ? `
         <div class="mock-warning">
-            TESTARE e-FACTURA - Aceasta factura NU a fost trimisa la ANAF (Mock Mode)
+            🧪 TESTARE e-FACTURA - Aceasta factura NU a fost trimisa la ANAF (Mock Mode)
+        </div>
+        ` : ''}
+        
+        ${isEdit ? `
+        <div class="edit-warning">
+            ✏️ FACTURA EDITATA - Date actualizate cu sistemul EtapeFacturi
         </div>
         ` : ''}
         
         ${isStorno ? `
         <div class="storno-warning">
-            FACTURA DE STORNARE - Anuleaza factura ${facturaOriginala || 'originala'}
+            ↩️ FACTURA DE STORNARE - Anuleaza factura ${facturaOriginala || 'originala'}
         </div>
         ` : ''}
         
         <div class="header">
-            <h1>FACTURA${isStorno ? ' DE STORNARE' : ''}</h1>
+            <h1>FACTURA${isStorno ? ' DE STORNARE' : ''}${isEdit ? ' (EDITATA)' : ''}</h1>
         </div>
 
         <div class="company-info">
@@ -937,19 +932,25 @@ export async function POST(request: NextRequest) {
                       
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
-// ✅ PĂSTRAT: FOLOSEȘTE EXCLUSIV datele din frontend (STOP BD lookup)
+                      // ✅ PĂSTRAT: FOLOSEȘTE EXCLUSIV datele din frontend (STOP BD lookup)
                       let descriereCompleta = linie.denumire || 'N/A';
+                      
+                      // ✅ MODIFICAT: Adaugă marker [EDIT] pentru liniile din facturile editate
+                      if (isEdit) {
+                        descriereCompleta = `[EDIT] ${descriereCompleta}`;
+                      }
                       
                       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
                         const cursInfo = linie.cursValutar ? ` x ${Number(linie.cursValutar).toFixed(4)}` : '';
                         descriereCompleta += ` <small style="color: #666;">(${linie.valoareOriginala} ${linie.monedaOriginala}${cursInfo})</small>`;
                         
-                        console.log(`📊 PDF Template - Linia ${index}: FRONTEND FORCED`, {
+                        console.log(`📊 PDF Template - Linia ${index}: FRONTEND FORCED ${isEdit ? 'EDIT MODE' : 'NEW MODE'}`, {
                           moneda: linie.monedaOriginala,
                           valoare: linie.valoareOriginala,
                           curs: linie.cursValutar,
                           pretUnitar: linie.pretUnitar,
-                          sursa: 'FRONTEND_ONLY'
+                          sursa: 'FRONTEND_ONLY',
+                          edit_mode: isEdit
                         });
                       }
                       
@@ -991,7 +992,7 @@ export async function POST(request: NextRequest) {
         ${notaCursValutarClean ? `
         <div class="currency-note">
             <div class="currency-note-content">
-                <strong>Cursuri BNR (din frontend - FARA recalculare):</strong><br/>
+                <strong>Cursuri BNR${isEdit ? ' (actualizat la editare)' : ' (din frontend - FARA recalculare)'}:</strong><br/>
                 ${notaCursValutarClean}
             </div>
         </div>
@@ -1031,12 +1032,13 @@ export async function POST(request: NextRequest) {
             <div class="generated-info">
                 <strong>Factura generata automat de sistemul UNITAR PROIECT TDA</strong><br>
                 Data generarii: ${new Date().toLocaleString('ro-RO')}
-                ${isEdit ? '<br><strong>EDITATA - Date exacte din frontend (fara recalculare)</strong>' : ''}
+                ${isEdit ? '<br><strong>EDITATA - Date exacte din frontend cu sistem EtapeFacturi (fara recalculare)</strong>' : ''}
                 ${isStorno ? '<br><strong>STORNARE - Anuleaza factura originala</strong>' : ''}
                 ${sendToAnaf ? (MOCK_EFACTURA_MODE ? 
                   '<br><strong>TEST MODE: Simulare e-Factura (NU trimis la ANAF)</strong>' : 
                   '<br><strong>Trimisa automat la ANAF ca e-Factura</strong>') : ''}
-                ${etapeFacturate.length > 0 ? '<br><strong>FACTURARE PE ETAPE CONTRACTE/ANEXE</strong>' : ''}
+                ${etapeFacturate.length > 0 ? '<br><strong>FACTURARE PE ETAPE CONTRACTE/ANEXE cu sistem EtapeFacturi</strong>' : ''}
+                ${isEdit ? '<br><strong>Sistem EtapeFacturi: Versiune 2 (Edit Mode)</strong>' : ''}
             </div>
             <div>
                 Aceasta factura a fost generata electronic si nu necesita semnatura fizica.<br>
@@ -1045,6 +1047,7 @@ export async function POST(request: NextRequest) {
         </div>
     </body>
     </html>`;
+    
     // ✅ MANAGEMENT e-FACTURA - Mock Mode sau Producție (PĂSTRAT IDENTIC)
     let xmlResult: any = null;
 
@@ -1057,10 +1060,11 @@ export async function POST(request: NextRequest) {
           totalFactura: safeFormat(total),
           liniiFactura: liniiFacturaActualizate.length,
           cursuriUtilizate: Object.keys(cursuriUtilizate).length,
-          etapeFacturate: etapeFacturate.length // ✅ NOU: Log etape facturate
+          etapeFacturate: etapeFacturate.length, // ✅ NOU: Log etape facturate
+          isEdit: isEdit // ✅ NOU: Log Edit Mode
         });
 
-        const mockXmlId = `MOCK_XML_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const mockXmlId = `MOCK_XML_${isEdit ? 'EDIT' : 'NEW'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Simulează salvare în BigQuery FacturiEFACTURA
         await saveMockEfacturaRecord({
@@ -1071,22 +1075,24 @@ export async function POST(request: NextRequest) {
           liniiFactura: liniiFacturaActualizate,
           total: safeFormat(total),
           subtotal: safeFormat(subtotal),
-          totalTva: safeFormat(totalTva)
+          totalTva: safeFormat(totalTva),
+          isEdit: isEdit // ✅ NOU: Flag pentru Edit Mode
         });
 
         xmlResult = {
           success: true,
           xmlId: mockXmlId,
-          status: 'mock_generated',
+          status: isEdit ? 'mock_edit_generated' : 'mock_generated',
           mockMode: true,
-          message: '🧪 XML generat în mode test - NU trimis la ANAF'
+          message: `🧪 XML generat în mode test ${isEdit ? '(EDIT)' : '(NEW)'} - NU trimis la ANAF`,
+          editMode: isEdit // ✅ NOU: Flag pentru Edit Mode
         };
 
-        console.log('✅ Mock e-factura completă:', mockXmlId);
+        console.log(`✅ Mock e-factura completă ${isEdit ? 'EDIT' : 'NEW'}:`, mockXmlId);
 
       } else {
         // 🚀 PRODUCȚIE - Cod real pentru ANAF
-        console.log('🚀 PRODUCȚIE: Generez XML real pentru ANAF...');
+        console.log(`🚀 PRODUCȚIE: Generez XML real pentru ANAF ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}...`);
         
         try {
           const xmlResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/actions/invoices/generate-xml`, {
@@ -1094,14 +1100,15 @@ export async function POST(request: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               facturaId: currentFacturaId,
-              forceRegenerate: false 
+              forceRegenerate: isEdit, // ✅ NOU: Force regenerate pentru Edit Mode
+              isEdit: isEdit // ✅ NOU: Flag pentru Edit Mode
             })
           });
 
           xmlResult = await xmlResponse.json();
           
           if (xmlResult.success) {
-            console.log('✅ XML real generat pentru ANAF:', xmlResult.xmlId);
+            console.log(`✅ XML real generat pentru ANAF ${isEdit ? '(EDIT)' : '(NEW)'}:`, xmlResult.xmlId);
           } else {
             console.error('❌ Eroare la generarea XML ANAF:', xmlResult.error);
           }
@@ -1110,7 +1117,8 @@ export async function POST(request: NextRequest) {
           xmlResult = {
             success: false,
             error: 'Eroare la generarea XML pentru ANAF',
-            details: xmlError instanceof Error ? xmlError.message : 'Eroare necunoscută'
+            details: xmlError instanceof Error ? xmlError.message : 'Eroare necunoscută',
+            editMode: isEdit
           };
         }
       }
@@ -1158,10 +1166,15 @@ export async function POST(request: NextRequest) {
           etapeFacturate, // ✅ NOU: Include etapele facturate
           isEdit: true,
           dataUltimeiActualizari: new Date().toISOString(),
-          versiune: 6, // ✅ Versiune nouă pentru implementarea EtapeFacturi
+          versiune: 7, // ✅ Versiune nouă pentru Edit Mode cu EtapeFacturi
           fara_recalculare: true, // ✅ Flag că folosește date exacte din frontend
-          fixAplicat: 'etape_facturi_implementat', // ✅ Marker pentru debugging
-          sistem_etape_facturi: true // ✅ Flag pentru noul sistem
+          fixAplicat: 'edit_mode_etape_facturi_implementat', // ✅ Marker pentru debugging
+          sistem_etape_facturi: true, // ✅ Flag pentru noul sistem
+          edit_mode_features: [
+            'etape_cleanup_automat',
+            'versiune_tracking_diferita',
+            'backward_compatibility_pastra'
+          ]
         });
 
         const params = {
@@ -1173,7 +1186,7 @@ export async function POST(request: NextRequest) {
           total: Number(total.toFixed(2)),
           dateCompleteJson: dateCompleteJson,
           efacturaEnabled: sendToAnaf,
-          efacturaStatus: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
+          efacturaStatus: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_updated' : 'updated') : null,
           anafUploadId: xmlResult?.xmlId || null
         };
 
@@ -1204,7 +1217,7 @@ export async function POST(request: NextRequest) {
           location: 'EU'
         });
 
-        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu date EXACTE din frontend (cu EtapeFacturi)`);
+        console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu date EXACTE din frontend (Edit Mode cu EtapeFacturi)`);
         
       } else {
         // ✅ Creează factură nouă (inclusiv storno) cu date exacte din frontend
@@ -1248,8 +1261,9 @@ export async function POST(request: NextRequest) {
             facturaOriginala: facturaOriginala || null,
             mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
             fara_recalculare: true, // ✅ Flag că folosește date exacte din frontend
-            fixAplicat: 'etape_facturi_implementat', // ✅ Marker pentru debugging
-            sistem_etape_facturi: true // ✅ Flag pentru noul sistem
+            fixAplicat: 'new_mode_etape_facturi_implementat', // ✅ Marker pentru debugging
+            sistem_etape_facturi: true, // ✅ Flag pentru noul sistem
+            versiune: 6 // ✅ Versiune pentru NEW cu EtapeFacturi
           }),
           data_creare: new Date().toISOString(),
           data_actualizare: new Date().toISOString(),
@@ -1262,19 +1276,19 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu date EXACTE din frontend (cu EtapeFacturi)`);
       }
 
-      // ✅ NOU: Update statusuri etape după salvarea facturii
+      // ✅ NOU: Update statusuri etape după salvarea facturii cu flag isEdit
       if (etapeFacturate && etapeFacturate.length > 0) {
-        console.log(`📝 [ETAPE-FACTURI] Actualizez statusurile pentru ${etapeFacturate.length} etape...`);
+        console.log(`📋 [ETAPE-FACTURI] Actualizez statusurile pentru ${etapeFacturate.length} etape ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}...`);
         
         try {
-          await updateEtapeStatusuri(etapeFacturate, currentFacturaId, proiectId);
-          console.log('✅ [ETAPE-FACTURI] Statusuri etape actualizate cu succes');
+          await updateEtapeStatusuri(etapeFacturate, currentFacturaId, proiectId, isEdit);
+          console.log(`✅ [ETAPE-FACTURI] Statusuri etape actualizate cu succes ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
         } catch (etapeError) {
           console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor etapelor:', etapeError);
           // Nu oprește procesul - continuă cu factura generată
         }
       } else {
-        console.log('📝 [ETAPE-FACTURI] Nu există etape pentru actualizare statusuri');
+        console.log('📋 [ETAPE-FACTURI] Nu există etape pentru actualizare statusuri');
       }
 
       // ✅ PĂSTRAT: Actualizează numărul curent în setări doar pentru facturi noi (nu edit)
@@ -1319,7 +1333,7 @@ export async function POST(request: NextRequest) {
     const response = {
       success: true,
       message: isEdit ? 
-        '✏️ Factură actualizată cu succes (date EXACTE din frontend + EtapeFacturi)' :
+        '✏️ Factură actualizată cu succes (date EXACTE din frontend + EtapeFacturi cu Edit Mode)' :
         (isStorno ? 
           '↩️ Factură de stornare generată cu succes cu date exacte din frontend + EtapeFacturi' :
           (sendToAnaf ? 
@@ -1352,21 +1366,25 @@ export async function POST(request: NextRequest) {
           total_din_frontend: subtotal.toFixed(2),
           recalculare_aplicata: false, // ✅ FIX PROBLEMA 4: NU s-a recalculat
           sursa_date: 'frontend_exact',
-          fix_aplicat: 'etape_facturi_implementat',
+          edit_mode_activ: isEdit,
+          fix_aplicat: 'edit_mode_etape_facturi_implementat',
           etape_actualizate: etapeFacturate?.length || 0
         },
-        // ✅ MARKER pentru debugging fix + EtapeFacturi
+        // ✅ MARKER pentru debugging fix + EtapeFacturi + Edit Mode
         fix_aplicat: {
           problema_4_recalculare: 'RESOLVED',
           etape_facturi_sistem: 'IMPLEMENTED',
-          versiune: 6,
+          edit_mode_support: 'IMPLEMENTED',
+          versiune: isEdit ? 7 : 6,
           data_fix: new Date().toISOString(),
           sursa_date: 'frontend_exact_fara_recalculare',
           functionalitati_noi: [
             'EtapeFacturi_tracking',
+            'Edit_Mode_cleanup_automat',
             'Multiple_facturi_pe_etapa',
             'Status_sync_automat',
-            'Granular_reporting'
+            'Granular_reporting',
+            'Versiune_tracking_diferita'
           ]
         }
       },
@@ -1377,20 +1395,27 @@ export async function POST(request: NextRequest) {
         xmlStatus: xmlResult?.status || 'error',
         xmlGenerated: xmlResult?.success || false,
         xmlError: xmlResult?.error || null,
-        message: xmlResult?.message || null
+        message: xmlResult?.message || null,
+        editMode: isEdit // ✅ NOU: Flag pentru Edit Mode
       } : {
         enabled: false,
-        mockMode: false
+        mockMode: false,
+        editMode: isEdit
       },
-      // ✅ NOU: Informații despre EtapeFacturi
+      // ✅ NOU: Informații despre EtapeFacturi cu Edit Mode support
       etapeFacturiStatus: {
         implemented: true,
+        edit_mode_support: true, // ✅ NOU
         etape_procesate: etapeFacturate?.length || 0,
+        edit_mode_activ: isEdit,
+        cleanup_aplicat: isEdit, // ✅ NOU: Cleanup aplicat doar în Edit Mode
+        versiune_tracking: isEdit ? 'v2_edit' : 'v1_new',
         backup_compatibility: 'Menținut pentru sisteme existente',
         next_features: [
           'Multiple facturi pe etapă',
           'Tracking granular încasări',
-          'Raportări detaliate pe etape'
+          'Raportări detaliate pe etape',
+          'Audit trail complet pentru Edit Mode'
         ]
       }
     };
@@ -1402,12 +1427,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: 'Eroare la generarea facturii',
       details: error instanceof Error ? error.message : 'Eroare necunoscută',
-      etapeFacturiSupport: 'Implementat dar a întâlnit eroare'
+      etapeFacturiSupport: 'Implementat cu Edit Mode dar a întâlnit eroare',
+      editModeSupport: 'Implementat dar a eșuat'
     }, { status: 500 });
   }
 }
 
-// ✅ PĂSTRATĂ: FUNCȚIE MOCK pentru salvare test e-factura (PĂSTRATĂ IDENTICĂ)
+// ✅ PĂSTRATĂ: FUNCȚIE MOCK pentru salvare test e-factura cu Edit Mode support
 async function saveMockEfacturaRecord(data: any) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
@@ -1417,11 +1443,11 @@ async function saveMockEfacturaRecord(data: any) {
 
     const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
-  <!-- MOCK XML pentru testare e-factura -->
+  <!-- MOCK XML pentru testare e-factura ${data.isEdit ? '(EDIT MODE)' : '(NEW MODE)'} -->
   <ID>${data.xmlId}</ID>
   <IssueDate>${new Date().toISOString().split('T')[0]}</IssueDate>
   <InvoiceTypeCode>380</InvoiceTypeCode>
-  <Note>MOCK XML - generat pentru testare, NU trimis la ANAF</Note>
+  <Note>MOCK XML - generat pentru testare ${data.isEdit ? '(EDIT MODE)' : '(NEW MODE)'}, NU trimis la ANAF</Note>
   <TaxInclusiveAmount currencyID="RON">${data.total}</TaxInclusiveAmount>
   <TaxExclusiveAmount currencyID="RON">${data.subtotal}</TaxExclusiveAmount>
   <AccountingSupplierParty>
@@ -1444,24 +1470,27 @@ async function saveMockEfacturaRecord(data: any) {
       </PartyName>
     </Party>
   </AccountingCustomerParty>
+  ${data.isEdit ? '<CustomizationID>EDIT_MODE</CustomizationID>' : '<CustomizationID>NEW_MODE</CustomizationID>'}
 </Invoice>`;
 
-    // ✅ RECORD compatibil cu schema AnafEFactura existentă
+    // ✅ RECORD compatibil cu schema AnafEFactura existentă + Edit Mode info
     const record = [{
       id: crypto.randomUUID(),
       factura_id: data.facturaId,
       anaf_upload_id: data.xmlId,
       xml_content: mockXmlContent,
-      anaf_status: 'MOCK_TEST',
+      anaf_status: data.isEdit ? 'MOCK_EDIT' : 'MOCK_TEST',
       anaf_response: JSON.stringify({ 
         mock: true, 
         test_mode: true, 
-        message: 'XML generat în mod test - nu a fost trimis la ANAF',
+        edit_mode: data.isEdit, // ✅ NOU: Flag pentru Edit Mode
+        message: `XML generat în mod test ${data.isEdit ? '(EDIT MODE)' : '(NEW MODE)'} - nu a fost trimis la ANAF`,
         xml_id: data.xmlId,
         timestamp: new Date().toISOString(),
         client_cui: data.clientInfo.cui,
         total_factura: data.total,
-        etape_facturi_support: true // ✅ NOU: Flag pentru noul sistem
+        etape_facturi_support: true, // ✅ NOU: Flag pentru noul sistem
+        versiune: data.isEdit ? 'v7_edit' : 'v6_new' // ✅ NOU: Versiune tracking
       }),
       error_message: null,
       error_code: null,
@@ -1474,7 +1503,7 @@ async function saveMockEfacturaRecord(data: any) {
     }];
 
     await table.insert(record);
-    console.log('✅ Mock e-factura record salvat în AnafEFactura cu suport EtapeFacturi:', data.xmlId);
+    console.log(`✅ Mock e-factura record salvat în AnafEFactura cu Edit Mode support:`, data.xmlId);
 
     // ✅ BONUS: Actualizează și FacturiGenerate cu informații mock
     try {
@@ -1482,7 +1511,7 @@ async function saveMockEfacturaRecord(data: any) {
         UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
         SET 
           efactura_enabled = true,
-          efactura_status = 'mock_generated',
+          efactura_status = @efacturaStatus,
           anaf_upload_id = @xmlId,
           data_actualizare = CURRENT_TIMESTAMP()
         WHERE id = @facturaId
@@ -1492,23 +1521,25 @@ async function saveMockEfacturaRecord(data: any) {
         query: updateQuery,
         params: { 
           xmlId: data.xmlId,
-          facturaId: data.facturaId 
+          facturaId: data.facturaId,
+          efacturaStatus: data.isEdit ? 'mock_edit_generated' : 'mock_generated'
         },
         types: {
           xmlId: 'STRING',
-          facturaId: 'STRING'
+          facturaId: 'STRING',
+          efacturaStatus: 'STRING'
         },
         location: 'EU'
       });
 
-      console.log('✅ FacturiGenerate actualizat cu info mock pentru factura:', data.facturaId);
+      console.log(`FacturiGenerate actualizat cu info mock ${data.isEdit ? 'edit' : 'new'} pentru factura:`, data.facturaId);
 
     } catch (updateError) {
-      console.log('⚠️ Nu s-a putut actualiza FacturiGenerate (nu e critic):', updateError);
+      console.log('Nu s-a putut actualiza FacturiGenerate (nu e critic):', updateError);
     }
 
   } catch (error) {
-    console.error('❌ Eroare la salvarea mock e-factura record:', error);
-    console.log('⚠️ Continuă fără salvare mock e-factura - PDF va fi generat normal');
+    console.error('Eroare la salvarea mock e-factura record:', error);
+    console.log('Continuă fără salvare mock e-factura - PDF va fi generat normal');
   }
 }

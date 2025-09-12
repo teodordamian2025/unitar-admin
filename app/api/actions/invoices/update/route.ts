@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/update/route.ts
-// DATA: 11.08.2025 18:10
-// MODIFICAT: Salvare completă pentru Edit factură - toate câmpurile + date_complete_json
+// DATA: 11.09.2025 20:30 (ora României)
+// MODIFICAT: Suport complet pentru etape contracte + EtapeFacturi la editare
+// PĂSTRATE: Toate funcționalitățile existente (Edit simplu + Edit complet)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,6 +17,18 @@ const bigquery = new BigQuery({
   },
 });
 
+// NOUĂ: Interfață pentru etapele facturate (din frontend)
+interface EtapaFacturata {
+  tip: 'etapa_contract' | 'etapa_anexa';
+  id: string; // ID_Etapa sau ID_Anexa
+  contract_id: string;
+  subproiect_id?: string;
+  valoare?: number;
+  moneda?: string;
+  valoare_ron?: number;
+  curs_valutar?: number;
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -24,6 +37,7 @@ export async function PUT(request: NextRequest) {
       hasLiniiFactura: !!body.liniiFactura,
       hasClientInfo: !!body.clientInfo,
       hasObservatii: !!body.observatii,
+      hasEtapeFacturate: !!(body.etapeFacturate && body.etapeFacturate.length > 0), // NOUĂ
       keys: Object.keys(body)
     });
 
@@ -92,7 +106,254 @@ async function handleSimpleStatusUpdate(body: any) {
   });
 }
 
-// ✅ FUNCȚIE NOUĂ: Update complet pentru editare factură
+// NOUĂ: Funcție pentru update statusuri etape la editare (similară cu generate-hibrid)
+async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string) {
+  if (!etapeFacturate || etapeFacturate.length === 0) {
+    console.log('📝 [ETAPE-EDIT] Nu există etape de actualizat');
+    return;
+  }
+
+  console.log(`📝 [ETAPE-EDIT] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId}`);
+
+  try {
+    // PASUL 1: Verifică dacă etapele sunt deja în EtapeFacturi pentru această factură
+    const checkQuery = `
+      SELECT etapa_id, anexa_id, tip_etapa 
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+      WHERE factura_id = @facturaId AND activ = true
+    `;
+
+    const [existingEtape] = await bigquery.query({
+      query: checkQuery,
+      params: { facturaId },
+      types: { facturaId: 'STRING' },
+      location: 'EU'
+    });
+
+    console.log(`📝 [ETAPE-EDIT] Găsite ${existingEtape.length} etape existente în EtapeFacturi pentru această factură`);
+
+    // Creează set-uri pentru comparație
+    const existingEtapeIds = new Set(existingEtape.map((etapa: any) => etapa.etapa_id || etapa.anexa_id));
+    const noulEtapeIds = new Set(etapeFacturate.map(etapa => etapa.id));
+
+    // PASUL 2: Dezactivează etapele care nu mai sunt în factură
+    const etapeDeDezactivat = existingEtape.filter((etapa: any) => {
+      const etapaId = etapa.etapa_id || etapa.anexa_id;
+      return !noulEtapeIds.has(etapaId);
+    });
+
+    for (const etapa of etapeDeDezactivat) {
+      const etapaId = etapa.etapa_id || etapa.anexa_id;
+      
+      // Dezactivează din EtapeFacturi
+      const deactivateQuery = `
+        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        SET 
+          activ = false,
+          data_actualizare = CURRENT_TIMESTAMP(),
+          actualizat_de = 'System_Edit'
+        WHERE factura_id = @facturaId AND 
+              (etapa_id = @etapaId OR anexa_id = @etapaId)
+      `;
+
+      await bigquery.query({
+        query: deactivateQuery,
+        params: { facturaId, etapaId },
+        types: { facturaId: 'STRING', etapaId: 'STRING' },
+        location: 'EU'
+      });
+
+      // Resetează status în tabelele principale
+      if (etapa.tip_etapa === 'contract') {
+        const resetContractQuery = `
+          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          SET 
+            status_facturare = 'Nefacturat',
+            factura_id = NULL,
+            data_facturare = NULL,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Etapa = @etapaId
+        `;
+
+        await bigquery.query({
+          query: resetContractQuery,
+          params: { etapaId },
+          types: { etapaId: 'STRING' },
+          location: 'EU'
+        });
+      } else {
+        const resetAnexaQuery = `
+          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+          SET 
+            status_facturare = 'Nefacturat',
+            factura_id = NULL,
+            data_facturare = NULL,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Anexa = @etapaId
+        `;
+
+        await bigquery.query({
+          query: resetAnexaQuery,
+          params: { etapaId },
+          types: { etapaId: 'STRING' },
+          location: 'EU'
+        });
+      }
+
+      console.log(`📝 [ETAPE-EDIT] Dezactivată etapa ${etapaId} din factură`);
+    }
+
+    // PASUL 3: Adaugă etapele noi
+    const etapeDeAdaugat = etapeFacturate.filter(etapa => !existingEtapeIds.has(etapa.id));
+
+    for (const etapa of etapeDeAdaugat) {
+      const etapaFacturaId = `EF_EDIT_${facturaId}_${etapa.id}_${Date.now()}`;
+      
+      const insertQuery = `
+        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
+         valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
+         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+        VALUES (
+          @etapaFacturaId,
+          @proiectId,
+          @etapaId,
+          @anexaId,
+          @tipEtapa,
+          @subproiectId,
+          @facturaId,
+          @valoare,
+          @moneda,
+          @valoareRon,
+          @cursValutar,
+          DATE(@dataCursValutar),
+          @procentDinEtapa,
+          DATE(@dataFacturare),
+          @statusIncasare,
+          @valoareIncasata,
+          @activ,
+          @versiune,
+          CURRENT_TIMESTAMP(),
+          @creatDe
+        )
+      `;
+
+      const params = {
+        etapaFacturaId: etapaFacturaId,
+        proiectId: proiectId,
+        etapaId: etapa.tip === 'etapa_contract' ? etapa.id : null,
+        anexaId: etapa.tip === 'etapa_anexa' ? etapa.id : null,
+        tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
+        subproiectId: etapa.subproiect_id || null,
+        facturaId: facturaId,
+        valoare: etapa.valoare || 0,
+        moneda: etapa.moneda || 'RON',
+        valoareRon: etapa.valoare_ron || etapa.valoare || 0,
+        cursValutar: etapa.curs_valutar || 1,
+        dataCursValutar: new Date().toISOString().split('T')[0],
+        procentDinEtapa: 100.0,
+        dataFacturare: new Date().toISOString().split('T')[0],
+        statusIncasare: 'Neincasat',
+        valoareIncasata: 0,
+        activ: true,
+        versiune: 2, // Versiune edit
+        creatDe: 'System_Edit'
+      };
+
+      const types = {
+        etapaFacturaId: 'STRING',
+        proiectId: 'STRING',
+        etapaId: 'STRING',
+        anexaId: 'STRING',
+        tipEtapa: 'STRING',
+        subproiectId: 'STRING',
+        facturaId: 'STRING',
+        valoare: 'NUMERIC',
+        moneda: 'STRING',
+        valoareRon: 'NUMERIC',
+        cursValutar: 'NUMERIC',
+        dataCursValutar: 'STRING',
+        procentDinEtapa: 'NUMERIC',
+        dataFacturare: 'STRING',
+        statusIncasare: 'STRING',
+        valoareIncasata: 'NUMERIC',
+        activ: 'BOOL',
+        versiune: 'INT64',
+        creatDe: 'STRING'
+      };
+
+      await bigquery.query({
+        query: insertQuery,
+        params: params,
+        types: types,
+        location: 'EU'
+      });
+
+      // Actualizează statusul în tabelele principale
+      if (etapa.tip === 'etapa_contract') {
+        const updateContractQuery = `
+          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          SET 
+            status_facturare = 'Facturat',
+            factura_id = @facturaId,
+            data_facturare = DATE(@dataFacturare),
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Etapa = @etapaId
+        `;
+
+        await bigquery.query({
+          query: updateContractQuery,
+          params: { 
+            facturaId: facturaId,
+            dataFacturare: new Date().toISOString().split('T')[0],
+            etapaId: etapa.id 
+          },
+          types: {
+            facturaId: 'STRING',
+            dataFacturare: 'STRING',
+            etapaId: 'STRING'
+          },
+          location: 'EU'
+        });
+      } else {
+        const updateAnexaQuery = `
+          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+          SET 
+            status_facturare = 'Facturat',
+            factura_id = @facturaId,
+            data_facturare = DATE(@dataFacturare),
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Anexa = @etapaId
+        `;
+
+        await bigquery.query({
+          query: updateAnexaQuery,
+          params: { 
+            facturaId: facturaId,
+            dataFacturare: new Date().toISOString().split('T')[0],
+            etapaId: etapa.id 
+          },
+          types: {
+            facturaId: 'STRING',
+            dataFacturare: 'STRING',
+            etapaId: 'STRING'
+          },
+          location: 'EU'
+        });
+      }
+
+      console.log(`✅ [ETAPE-EDIT] Inserată etapa nouă ${etapa.id} în EtapeFacturi`);
+    }
+
+    console.log(`✅ [ETAPE-EDIT] Statusuri etape actualizate cu succes: ${etapeDeDezactivat.length} dezactivate, ${etapeDeAdaugat.length} adăugate`);
+
+  } catch (error) {
+    console.error('❌ [ETAPE-EDIT] Eroare la actualizarea statusurilor:', error);
+    // Nu oprește procesul - continuă cu editarea facturii
+  }
+}
+
+// ✅ FUNCȚIE NOUĂ: Update complet pentru editare factură cu suport etape
 async function handleCompleteEditUpdate(body: any) {
   const { 
     facturaId,
@@ -102,7 +363,8 @@ async function handleCompleteEditUpdate(body: any) {
     cursuriUtilizate,
     proiectInfo,
     setariFacturare,
-    contariBancare
+    contariBancare,
+    etapeFacturate // NOUĂ: Array cu etapele facturate
   } = body;
 
   if (!facturaId) {
@@ -130,7 +392,8 @@ async function handleCompleteEditUpdate(body: any) {
     linii_count: liniiFactura.length,
     client: clientInfo.denumire,
     has_cursuri: !!cursuriUtilizate,
-    has_proiect_info: !!proiectInfo
+    has_proiect_info: !!proiectInfo,
+    etape_facturate_count: etapeFacturate?.length || 0 // NOUĂ
   });
 
   // ✅ CALCULEAZĂ totalurile din liniile facturii
@@ -138,7 +401,7 @@ async function handleCompleteEditUpdate(body: any) {
   
   console.log('💰 Totaluri calculate din linii:', totals);
 
-  // ✅ CONSTRUIEȘTE date_complete_json actualizat cu cursuri noi
+  // ✅ CONSTRUIEȘTE date_complete_json actualizat cu cursuri noi ȘI etape
   const dateCompleteActualizate = {
     liniiFactura: liniiFactura.map((linie: any) => ({
       denumire: linie.denumire || '',
@@ -148,6 +411,14 @@ async function handleCompleteEditUpdate(body: any) {
       cotaTva: Number(linie.cotaTva) || 21, // ✅ Default 21%
       tip: linie.tip || 'produs',
       subproiect_id: linie.subproiect_id || null,
+      // NOUĂ: Suport pentru etape
+      etapa_id: linie.etapa_id || null,
+      anexa_id: linie.anexa_id || null,
+      contract_id: linie.contract_id || null,
+      contract_numar: linie.contract_numar || null,
+      contract_data: linie.contract_data || null,
+      anexa_numar: linie.anexa_numar || null,
+      anexa_data: linie.anexa_data || null,
       monedaOriginala: linie.monedaOriginala || 'RON',
       valoareOriginala: linie.valoareOriginala || null,
       cursValutar: linie.cursValutar || 1
@@ -177,10 +448,15 @@ async function handleCompleteEditUpdate(body: any) {
     
     contariBancare: contariBancare || [],
     
+    // NOUĂ: Etapele facturate pentru tracking
+    etapeFacturate: etapeFacturate || [],
+    
     // ✅ METADATA pentru tracking
     isUpdated: true,
     dataUltimeiActualizari: new Date().toISOString(),
-    versiune: 2 // ✅ Versiune pentru tracking
+    versiune: 3, // ✅ Versiune pentru tracking cu etape
+    sistem_etape_implementat: true, // ✅ Flag pentru noul sistem
+    tip_editare: 'complet_cu_etape'
   };
 
   // ✅ GENEREAZĂ nota cursuri pentru observații
@@ -223,24 +499,42 @@ async function handleCompleteEditUpdate(body: any) {
     location: 'EU'
   });
 
+  // NOUĂ: Actualizează statusurile etapelor dacă există
+  if (etapeFacturate && etapeFacturate.length > 0 && proiectInfo?.id) {
+    console.log(`📝 [ETAPE-EDIT] Actualizez statusurile pentru ${etapeFacturate.length} etape...`);
+    
+    try {
+      await updateEtapeStatusuriLaEditare(etapeFacturate, facturaId, proiectInfo.id);
+      console.log('✅ [ETAPE-EDIT] Statusuri etape actualizate cu succes');
+    } catch (etapeError) {
+      console.error('❌ [ETAPE-EDIT] Eroare la actualizarea statusurilor etapelor:', etapeError);
+      // Nu oprește procesul - continuă cu editarea facturii
+    }
+  } else {
+    console.log('📝 [ETAPE-EDIT] Nu există etape pentru actualizare statusuri sau lipsește proiectInfo');
+  }
+
   console.log(`✅ Factură ${facturaId} actualizată complet:`, {
     client: clientInfo.denumire,
     subtotal: totals.subtotal,
     total_tva: totals.totalTva,
     total: totals.totalGeneral,
     linii_factura: liniiFactura.length,
-    cursuri_count: Object.keys(cursuriUtilizate || {}).length
+    cursuri_count: Object.keys(cursuriUtilizate || {}).length,
+    etape_count: etapeFacturate?.length || 0 // NOUĂ
   });
 
   return NextResponse.json({
     success: true,
-    message: 'Factură editată și salvată cu succes',
+    message: 'Factură editată și salvată cu succes (cu suport etape contracte)',
     data: {
       facturaId,
       totals,
       linii_count: liniiFactura.length,
       cursuri_utilizate: Object.keys(cursuriUtilizate || {}).length,
-      client_actualizat: clientInfo.denumire
+      client_actualizat: clientInfo.denumire,
+      etape_actualizate: etapeFacturate?.length || 0, // NOUĂ
+      sistem_etape_activ: true // NOUĂ
     }
   });
 }
@@ -280,7 +574,7 @@ function generateCurrencyNote(cursuriUtilizate: any): string {
   const monede = Object.keys(cursuriUtilizate);
   if (monede.length === 0) return '';
   
-  return `\n\nCurs valutar BNR (actualizat): ${monede.map(m => {
+  return `\n\nCurs valutar BNR (actualizat la editare): ${monede.map(m => {
     const cursData = cursuriUtilizate[m];
     const cursNumeric = typeof cursData.curs === 'number' ? cursData.curs : parseFloat(cursData.curs || '1');
     

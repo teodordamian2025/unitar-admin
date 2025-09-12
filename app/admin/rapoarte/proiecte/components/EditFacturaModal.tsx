@@ -1,13 +1,14 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/EditFacturaModal.tsx
-// DATA: 17.08.2025 15:35
-// FIX COMPLET: Lucide-react icons + Eliminare UTF-8 encoding issues
-// PĂSTRATE: TOATE funcționalitățile existente
+// DATA: 11.09.2025 20:15 (ora României)
+// MODIFICAT: Centrare cu createPortal + etape contracte în loc de subproiecte
+// PĂSTRATE: TOATE funcționalitățile existente (Edit/Storno, cursuri BNR, ANAF)
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Clock,
   FileText,
@@ -47,6 +48,32 @@ interface EditFacturaModalProps {
   onClose: () => void;
   onSuccess: (action: 'updated' | 'cancelled' | 'reversed', facturaId: string) => void;
   mode?: 'edit' | 'storno';
+}
+
+// Interfață pentru etapele de facturare (adaptată din FacturaHibridModal)
+interface EtapaFacturare {
+  ID_Etapa?: string;
+  ID_Anexa?: string;
+  tip: 'contract' | 'anexa';
+  contract_id: string;
+  contract_numar: string;
+  contract_data: string;
+  anexa_numar?: number;
+  anexa_data?: string;
+  etapa_index: number;
+  denumire: string;
+  valoare: number;
+  moneda: string;
+  valoare_ron: number;
+  termen_zile: number;
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  status_facturare: string;
+  curs_valutar?: number;
+  data_curs_valutar?: string;
+  procent_din_total?: number;
+  observatii?: string;
+  adaugat?: boolean;
 }
 
 // Toast system cu Z-index compatibil cu modalele externe
@@ -104,10 +131,146 @@ export default function EditFacturaModal({
   const [loading, setLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
+  // Helper functions pentru BigQuery NUMERIC (adaptate din FacturaHibridModal)
+  const convertBigQueryNumeric = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    
+    if (typeof value === 'object' && value.value !== undefined) {
+      return parseFloat(value.value.toString()) || 0;
+    }
+    
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    
+    if (typeof value === 'number') {
+      return value;
+    }
+    
+    return 0;
+  };
+
+  const formatDate = (date?: string | { value: string }): string => {
+    if (!date) return '';
+    const dateValue = typeof date === 'string' ? date : date.value;
+    try {
+      return new Date(dateValue).toLocaleDateString('ro-RO');
+    } catch {
+      return '';
+    }
+  };
+
   // Funcție helper pentru log cu encoding corect
   const addDebugLog = (message: string) => {
     console.log(`DEBUG: ${message}`);
     setDebugInfo(prev => [...prev, `${new Date().toISOString().substr(11, 8)}: ${message}`]);
+  };
+
+  // NOUĂ: Funcție pentru căutarea contractelor și etapelor (adaptată din FacturaHibridModal)
+  const findContractAndEtapeForProiect = async (proiectId: string) => {
+    try {
+      addDebugLog(`Căutare contracte și etape pentru proiect: ${proiectId}`);
+
+      // 1. CĂUTARE CONTRACT PRINCIPAL
+      const contractResponse = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
+      const contractResult = await contractResponse.json();
+
+      let contractData: any = null;
+      if (contractResult.success && contractResult.data && contractResult.data.length > 0) {
+        // Prioritizează contractul cu status-ul cel mai avansat
+        const contracteSortate = contractResult.data.sort((a: any, b: any) => {
+          const statusOrder: { [key: string]: number } = { 'Semnat': 3, 'Generat': 2, 'Draft': 1, 'Anulat': 0 };
+          return (statusOrder[b.Status] || 0) - (statusOrder[a.Status] || 0);
+        });
+        
+        contractData = contracteSortate[0];
+        if (contractData) {
+          addDebugLog(`Contract găsit: ${contractData.numar_contract} (Status: ${contractData.Status})`);
+        }
+      }
+
+      if (!contractData) {
+        addDebugLog('Nu s-a găsit contract pentru proiect');
+        return { etapeContract: [], etapeAnexe: [], contract: null };
+      }
+
+      // 2. ÎNCĂRCARE ETAPE DIN CONTRACT PRINCIPAL
+      const etapeContractResponse = await fetch(`/api/rapoarte/etape-contract?contract_id=${encodeURIComponent(contractData.ID_Contract)}`);
+      const etapeContractResult = await etapeContractResponse.json();
+
+      let etapeContract: EtapaFacturare[] = [];
+      if (etapeContractResult.success && etapeContractResult.data) {
+        etapeContract = etapeContractResult.data
+          .filter((etapa: any) => etapa.status_facturare === 'Nefacturat') // Doar etapele nefacturate
+          .map((etapa: any) => ({
+            ID_Etapa: etapa.ID_Etapa,
+            tip: 'contract' as const,
+            contract_id: etapa.contract_id,
+            contract_numar: etapa.numar_contract || contractData.numar_contract,
+            contract_data: formatDate(contractData.Data_Semnare) || formatDate(contractData.data_creare),
+            etapa_index: etapa.etapa_index,
+            denumire: etapa.denumire,
+            valoare: convertBigQueryNumeric(etapa.valoare),
+            moneda: etapa.moneda,
+            valoare_ron: convertBigQueryNumeric(etapa.valoare_ron),
+            termen_zile: etapa.termen_zile,
+            subproiect_id: etapa.subproiect_id,
+            subproiect_denumire: etapa.subproiect_denumire,
+            status_facturare: etapa.status_facturare,
+            curs_valutar: convertBigQueryNumeric(etapa.curs_valutar),
+            data_curs_valutar: etapa.data_curs_valutar,
+            procent_din_total: convertBigQueryNumeric(etapa.procent_din_total),
+            observatii: etapa.observatii,
+            adaugat: false
+          }));
+      }
+
+      // 3. ÎNCĂRCARE ETAPE DIN ANEXE
+      const anexeResponse = await fetch(`/api/rapoarte/anexe-contract?contract_id=${encodeURIComponent(contractData.ID_Contract)}`);
+      const anexeResult = await anexeResponse.json();
+
+      let etapeAnexe: EtapaFacturare[] = [];
+      if (anexeResult.success && anexeResult.data) {
+        etapeAnexe = anexeResult.data
+          .filter((anexa: any) => anexa.status_facturare === 'Nefacturat') // Doar etapele nefacturate
+          .map((anexa: any) => ({
+            ID_Anexa: anexa.ID_Anexa,
+            tip: 'anexa' as const,
+            contract_id: anexa.contract_id,
+            contract_numar: anexa.numar_contract || contractData.numar_contract,
+            contract_data: formatDate(contractData.Data_Semnare) || formatDate(contractData.data_creare),
+            anexa_numar: anexa.anexa_numar,
+            anexa_data: formatDate(anexa.data_start) || formatDate(anexa.data_creare),
+            etapa_index: anexa.etapa_index,
+            denumire: anexa.denumire,
+            valoare: convertBigQueryNumeric(anexa.valoare),
+            moneda: anexa.moneda,
+            valoare_ron: convertBigQueryNumeric(anexa.valoare_ron),
+            termen_zile: anexa.termen_zile,
+            subproiect_id: anexa.subproiect_id,
+            subproiect_denumire: anexa.subproiect_denumire,
+            status_facturare: anexa.status_facturare,
+            curs_valutar: convertBigQueryNumeric(anexa.curs_valutar),
+            data_curs_valutar: anexa.data_curs_valutar,
+            procent_din_total: convertBigQueryNumeric(anexa.procent_din_total),
+            observatii: anexa.observatii,
+            adaugat: false
+          }));
+      }
+
+      addDebugLog(`Găsite: ${etapeContract.length} etape contract + ${etapeAnexe.length} etape anexe`);
+
+      return {
+        etapeContract,
+        etapeAnexe,
+        contract: contractData
+      };
+
+    } catch (error) {
+      addDebugLog(`EROARE la căutarea etapelor: ${error}`);
+      console.error('Eroare la căutarea etapelor:', error);
+      return { etapeContract: [], etapeAnexe: [], contract: null };
+    }
   };
 
   useEffect(() => {
@@ -122,7 +285,7 @@ export default function EditFacturaModal({
     setDebugInfo([]);
     
     try {
-      addDebugLog(`Incep incarcarea datelor pentru factura ID: ${factura.id}`);
+      addDebugLog(`Încep încărcarea datelor pentru factura ID: ${factura.id}`);
       
       const proiectIdPrioritar = factura.proiect_id || 
                                 factura.proiect_id_bigquery || 
@@ -146,9 +309,9 @@ export default function EditFacturaModal({
       }
 
       const proiectIdActual = proiectIdPrioritar || 'UNKNOWN';
-      addDebugLog(`Proiect ID pentru incarcarea datelor: ${proiectIdActual}`);
+      addDebugLog(`Proiect ID pentru încărcarea datelor: ${proiectIdActual}`);
       
-      console.log('Verificare completa ID proiect - NOUA ABORDARE:', {
+      console.log('Verificare completă ID proiect - NOUĂ ABORDARE:', {
         proiect_id_din_BigQuery: factura.proiect_id,
         proiect_id_backup: factura.proiect_id_bigquery,
         proiectId_transmis: factura.proiectId,
@@ -158,15 +321,15 @@ export default function EditFacturaModal({
       });
 
       if (!proiectIdActual || proiectIdActual === 'UNKNOWN') {
-        addDebugLog('ATENTIE: Nu s-a gasit un ID de proiect valid!');
-        console.error('ID proiect invalid sau lipsa chiar si din BigQuery');
+        addDebugLog('ATENȚIE: Nu s-a găsit un ID de proiect valid!');
+        console.error('ID proiect invalid sau lipsă chiar și din BigQuery');
       }
 
       // Încarcă date proiect din BD dacă avem ID valid
       let proiectInfo = dateComplete.proiectInfo || {};
       if (proiectIdActual && proiectIdActual !== 'UNKNOWN') {
         try {
-          addDebugLog(`Incarc proiectul ${proiectIdActual} din BD...`);
+          addDebugLog(`Încarcă proiectul ${proiectIdActual} din BD...`);
           
           const proiectResponse = await fetch(`/api/rapoarte/proiecte?search=${encodeURIComponent(proiectIdActual)}`);
           const proiectData = await proiectResponse.json();
@@ -191,14 +354,14 @@ export default function EditFacturaModal({
                 status: proiect.Status,
                 adresa: proiect.Adresa
               };
-              addDebugLog(`Proiect gasit: ${proiect.Denumire}`);
+              addDebugLog(`Proiect găsit: ${proiect.Denumire}`);
             }
           } else {
-            addDebugLog(`Proiectul ${proiectIdActual} nu a fost gasit in BD`);
+            addDebugLog(`Proiectul ${proiectIdActual} nu a fost găsit în BD`);
           }
         } catch (error) {
-          addDebugLog(`EROARE incarcare proiect: ${error}`);
-          console.error('Eroare la incarcarea datelor proiectului:', error);
+          addDebugLog(`EROARE încărcare proiect: ${error}`);
+          console.error('Eroare la încărcarea datelor proiectului:', error);
         }
       }
 
@@ -224,34 +387,40 @@ export default function EditFacturaModal({
         }));
       }
 
-      // Încarcă și subproiectele pentru proiectul identificat
-      let subproiecteDisponibile = [];
+      // MODIFICAT: Încarcă etapele în loc de subproiecte
+      let etapeDisponibile: EtapaFacturare[] = [];
       if (proiectIdActual && proiectIdActual !== 'UNKNOWN') {
         try {
-          addDebugLog(`Incarc subproiectele pentru proiectul ${proiectIdActual}...`);
+          addDebugLog(`Încarcă etapele pentru proiectul ${proiectIdActual}...`);
           
-          const subproiecteResponse = await fetch(`/api/rapoarte/subproiecte?proiect_id=${encodeURIComponent(proiectIdActual)}`);
-          const subproiecteData = await subproiecteResponse.json();
+          const { etapeContract, etapeAnexe, contract } = await findContractAndEtapeForProiect(proiectIdActual);
           
-          if (subproiecteData.success && subproiecteData.data) {
-            subproiecteDisponibile = subproiecteData.data;
-            addDebugLog(`Gasite ${subproiecteDisponibile.length} subproiecte`);
+          // Combină toate etapele disponibile
+          etapeDisponibile = [...etapeContract, ...etapeAnexe];
+          
+          addDebugLog(`Găsite ${etapeDisponibile.length} etape disponibile pentru facturare`);
+          
+          // Pentru edit, marchează etapele care sunt deja în factură
+          if (mode === 'edit' && dateComplete.liniiFactura) {
+            const etapeInFactura = dateComplete.liniiFactura
+              .filter((l: any) => l.tip === 'etapa_contract' || l.tip === 'etapa_anexa')
+              .map((l: any) => l.etapa_id || l.anexa_id);
             
-            if (dateComplete.liniiFactura) {
-              const subproiecteInFactura = dateComplete.liniiFactura
-                .filter((l: any) => l.tip === 'subproiect')
-                .map((l: any) => l.subproiect_id);
-              
-              if (subproiecteInFactura.length > 0) {
-                addDebugLog(`Marcheaza ${subproiecteInFactura.length} subproiecte ca fiind in factura`);
-              }
+            if (etapeInFactura.length > 0) {
+              addDebugLog(`Marchează ${etapeInFactura.length} etape ca fiind în factură`);
+              etapeDisponibile = etapeDisponibile.map(etapa => {
+                const etapaId = etapa.ID_Etapa || etapa.ID_Anexa;
+                return {
+                  ...etapa,
+                  adaugat: etapeInFactura.includes(etapaId)
+                };
+              });
             }
-          } else {
-            addDebugLog(`Nu s-au gasit subproiecte pentru proiectul ${proiectIdActual}`);
           }
+          
         } catch (error) {
-          addDebugLog(`EROARE incarcare subproiecte: ${error}`);
-          console.error('Eroare la incarcarea subproiectelor:', error);
+          addDebugLog(`EROARE încărcare etape: ${error}`);
+          console.error('Eroare la încărcarea etapelor:', error);
         }
       }
 
@@ -271,7 +440,7 @@ export default function EditFacturaModal({
         
         return {
           id: '',
-          denumire: factura.client_nume || 'Client din factura',
+          denumire: factura.client_nume || 'Client din factură',
           cui: factura.client_cui || '',
           nrRegCom: '',
           adresa: 'Adresa client',
@@ -280,9 +449,9 @@ export default function EditFacturaModal({
         };
       })();
 
-      addDebugLog(`Client info pregatit: ${clientInfoPregatit.denumire} (CUI: ${clientInfoPregatit.cui})`);
+      addDebugLog(`Client info pregătit: ${clientInfoPregatit.denumire} (CUI: ${clientInfoPregatit.cui})`);
 
-      // Date finale cu ID proiect corect și subproiecte
+      // Date finale cu ID proiect corect și etape în loc de subproiecte
       const dateFinale = {
         ID_Proiect: proiectIdActual,
         Denumire: proiectInfo.denumire || factura.proiect_denumire || 'Proiect necunoscut',
@@ -314,19 +483,28 @@ export default function EditFacturaModal({
             id: proiectIdActual
           },
           
-          subproiecteDisponibile: subproiecteDisponibile,
+          // MODIFICAT: etapeDisponibile în loc de subproiecteDisponibile
+          etapeDisponibile: etapeDisponibile,
           
           isEdit: mode === 'edit',
           isStorno: mode === 'storno',
           facturaOriginala: mode === 'storno' ? factura.numar : null,
           cursuriUtilizate: dateComplete.cursuriUtilizate || {},
-          setariFacturare: dateComplete.setariFacturare || null
+          setariFacturare: dateComplete.setariFacturare || null,
+          
+          // NOUĂ: Pentru compatibilitate backwards cu subproiectele
+          subproiecteDisponibile: [], // Gol pentru noul sistem
+          backward_compatibility: {
+            avea_subproiecte: !!(dateComplete.subproiecteDisponibile && dateComplete.subproiecteDisponibile.length > 0),
+            migrat_la_etape: true,
+            numar_etape_disponibile: etapeDisponibile.length
+          }
         }
       };
 
-      addDebugLog(`Date finale pregatite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Subproiecte: ${subproiecteDisponibile.length}`);
+      addDebugLog(`Date finale pregătite. ID Proiect final: ${dateFinale.ID_Proiect}, Client: ${clientInfoPregatit.denumire}, Etape: ${etapeDisponibile.length}`);
       
-      console.log('Date finale pentru FacturaHibridModal cu clientInfo standardizat:', {
+      console.log('Date finale pentru FacturaHibridModal cu etape în loc de subproiecte:', {
         ...dateFinale,
         _initialData: {
           ...dateFinale._initialData,
@@ -335,8 +513,9 @@ export default function EditFacturaModal({
             cui: clientInfoPregatit.cui,
             has_id: !!clientInfoPregatit.id
           },
-          subproiecte_count: subproiecteDisponibile.length,
-          linii_factura_count: liniiFacturaPregatite.length
+          etape_count: etapeDisponibile.length,
+          linii_factura_count: liniiFacturaPregatite.length,
+          sistem_nou_etape: true
         }
       });
       
@@ -344,9 +523,9 @@ export default function EditFacturaModal({
       setLoading(false);
       
     } catch (error) {
-      addDebugLog(`EROARE GENERALA: ${error}`);
-      console.error('Eroare la incarcarea datelor complete ale facturii:', error);
-      showToast('Eroare la incarcarea datelor facturii', 'error');
+      addDebugLog(`EROARE GENERALĂ: ${error}`);
+      console.error('Eroare la încărcarea datelor complete ale facturii:', error);
+      showToast('Eroare la încărcarea datelor facturii', 'error');
       setLoading(false);
     }
   };
@@ -359,10 +538,10 @@ export default function EditFacturaModal({
       if (mode === 'edit') {
         // Pentru Edit, se salvează automat în FacturaHibridModal prin generate-hibrid + /update
         // Nu mai e nevoie de apel separat la /update aici - fix-ul e în FacturaHibridModal
-        showToast('Factura actualizata cu succes (cu cursuri BNR precise)', 'success');
+        showToast('Factură actualizată cu succes (cu etape contracte și cursuri BNR precise)', 'success');
         onSuccess('updated', factura.id);
       } else if (mode === 'storno') {
-        console.log('DEBUG: Marchez factura originala ca stornata...');
+        console.log('DEBUG: Marchează factura originală ca stornată...');
         
         // Marchează factura originală ca stornată
         try {
@@ -372,45 +551,48 @@ export default function EditFacturaModal({
             body: JSON.stringify({
               facturaId: factura.id,
               status: 'stornata',
-              observatii: `Stornata prin factura ${invoiceId}`
+              observatii: `Stornată prin factură ${invoiceId}`
             })
           });
 
           if (response.ok) {
-            console.log('DEBUG: Factura marcata ca stornata');
-            showToast('Factura de stornare creata cu succes', 'success');
+            console.log('DEBUG: Factură marcată ca stornată');
+            showToast('Factură de stornare creată cu succes (cu sistem de etape)', 'success');
             onSuccess('reversed', invoiceId);
           }
         } catch (err) {
-          console.error('Eroare la marcarea ca stornata:', err);
+          console.error('Eroare la marcarea ca stornată:', err);
         }
       }
     } catch (error) {
       console.error('Eroare la procesarea facturii:', error);
-      showToast(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscuta'}`, 'error');
+      showToast(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
     }
 
     onClose();
   };
 
+  if (!isOpen) return null;
+
   if (loading) {
-    return (
+    return typeof window !== 'undefined' ? createPortal(
       <div style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.7)',
+        background: 'rgba(0,0,0,0.8)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        padding: '1rem'
       }}>
         <div style={{
           background: 'white',
           padding: '2rem',
-          borderRadius: '12px',
+          borderRadius: '16px',
           textAlign: 'center',
           maxWidth: '700px',
           width: '90%',
@@ -426,7 +608,7 @@ export default function EditFacturaModal({
             gap: '12px'
           }}>
             <Clock size={24} className="animate-spin" style={{ color: '#3498db' }} />
-            Se incarca datele complete ale facturii...
+            Se încarcă datele complete ale facturii...
           </div>
           
           <div style={{ 
@@ -441,12 +623,12 @@ export default function EditFacturaModal({
             {mode === 'edit' ? (
               <>
                 <Edit size={16} style={{ color: '#27ae60' }} />
-                Pregatesc datele pentru editare
+                Pregătesc datele pentru editare cu etape contracte
               </>
             ) : (
               <>
                 <RotateCcw size={16} style={{ color: '#f39c12' }} />
-                Pregatesc datele pentru stornare
+                Pregătesc datele pentru stornare cu etape contracte
               </>
             )}
           </div>
@@ -474,7 +656,7 @@ export default function EditFacturaModal({
                 color: '#495057'
               }}>
                 <Search size={14} />
-                Progres incarcare date:
+                Progres încărcare date (sistem nou etape):
               </div>
               {debugInfo.map((log, i) => (
                 <div key={i} style={{ 
@@ -499,20 +681,22 @@ export default function EditFacturaModal({
             gap: '6px'
           }}>
             <Loader size={12} className="animate-spin" />
-            Se verifica ID proiect din BigQuery si se incarca subproiectele...
+            Se verifică ID proiect din BigQuery și se încarcă etapele din contracte...
           </div>
         </div>
-      </div>
-    );
+      </div>,
+      document.body
+    ) : null;
   }
 
-  if (!isOpen || !proiectData) return null;
+  if (!proiectData) return null;
 
-  return (
+  return typeof window !== 'undefined' ? createPortal(
     <FacturaHibridModal
       proiect={proiectData}
       onClose={onClose}
       onSuccess={handleFacturaSuccess}
-    />
-  );
+    />,
+    document.body
+  ) : null;
 }
