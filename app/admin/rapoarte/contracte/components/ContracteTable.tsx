@@ -7,6 +7,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import ContractActions from './ContractActions';
 import ContractSignModal from './ContractSignModal';
 import FacturaHibridModal from '../../proiecte/components/FacturaHibridModal';
