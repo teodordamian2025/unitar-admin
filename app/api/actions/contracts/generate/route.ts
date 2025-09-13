@@ -38,15 +38,6 @@ async function validateCustomContractNumber(numarCustom: string, contractIdExist
   try {
     console.log(`[CONTRACT-VALIDATE] Validez numărul custom: ${numarCustom}`);
     
-    // Verifică formatul de bază
-    const formatPattern = /^[A-Z]+-\d+-\d{4}$/;
-    if (!formatPattern.test(numarCustom.trim())) {
-      return {
-        valid: false,
-        error: 'Format invalid. Folosește: SERIE-NUMAR-AN (ex: CONTR-1001-2025)'
-      };
-    }
-
     // Verifică unicitatea în BigQuery
     let duplicateQuery = `
       SELECT ID_Contract, numar_contract 

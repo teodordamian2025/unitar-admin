@@ -303,15 +303,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
 
     try {
-      // Verifică formatul (basic validation)
-      const formatPattern = /^[A-Z]+-\d+-\d{4}$/;
-      if (!formatPattern.test(numarContract.trim())) {
-        return {
-          isValid: false,
-          error: 'Format invalid. Folosește: SERIE-NUMAR-AN (ex: CONTR-1001-2025)',
-          isDuplicate: false
-        };
-      }
 
       // Verifică duplicatele în BigQuery
       const response = await fetch(`/api/rapoarte/contracte?search=${encodeURIComponent(numarContract.trim())}`);
@@ -1845,7 +1836,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </div>
               
               <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
-                Format: SERIE-NUMAR-AN
+                Orice format acceptat
               </div>
             </div>
             
