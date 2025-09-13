@@ -9,11 +9,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getNextContractNumber } from '../route';
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const tipDocument = searchParams.get('tipDocument') || 'contract';
-    const proiectId = searchParams.get('proiectId') || undefined;
+  const { searchParams } = new URL(request.url);
+  const tipDocument = searchParams.get('tipDocument') || 'contract';
+  const proiectId = searchParams.get('proiectId') || undefined;
 
+  try {
     console.log('[NEXT-NUMBER] 🔢 Preview număr contract pentru:', { tipDocument, proiectId });
 
     // VERIFICAT: Folosește funcția exportată din ../route.ts pentru numerotarea consecutivă
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
       fallback_number: fallbackNumber,
       message: 'Folosește numărul temporar sau verifică setările contractelor',
       debug_info: {
-        tip_document: searchParams.get('tipDocument'),
-        proiect_id: searchParams.get('proiectId'),
+        tip_document: tipDocument,
+        proiect_id: proiectId,
         error_type: error instanceof Error ? error.constructor.name : 'Unknown',
         timestamp: new Date().toISOString()
       }
