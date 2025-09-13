@@ -451,6 +451,12 @@ lib/templates-helpers.ts
 app/api/rapoarte/etape-contract/route.ts
 Tabel Bigquery Contracte si EtapeContract
 
+Coduri pentru lista contracte:
+app/admin/rapoarte/contracte/page.tsx
+app/admin/rapoarte/contracte/components/ContracteTable.tsx
+app/admin/rapoarte/contracte/components/ContractActions.tsx
+app/admin/rapoarte/contracte/components/ContractFilters.tsx
+
 Coduri pentru anexe contract:
 app/api/rapoarte/anexe-contract/route.ts
 

@@ -1,3 +1,4 @@
+// CALEA: app/admin/rapoarte/proiecte/components/ProiectFilters.tsx
 'use client';
 
 import FilterBar, { FilterConfig, FilterValues } from '../../components/FilterBar';

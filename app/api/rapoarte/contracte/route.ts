@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const proiectId = searchParams.get('proiect_id');
-    const clientId = searchParams.get('client_id');
+    const clientId = searchParams.get('client_id') || searchParams.get('client');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -204,14 +204,63 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      whereClause += ` AND (
-        LOWER(numar_contract) LIKE LOWER(@search) OR
-        LOWER(client_nume) LIKE LOWER(@search) OR
-        LOWER(Denumire_Contract) LIKE LOWER(@search)
-      )`;
-      params.search = `%${search}%`;
-      types.search = 'STRING';
-    }
+  whereClause += ` AND (
+    LOWER(c.numar_contract) LIKE LOWER(@search) OR
+    LOWER(c.client_nume) LIKE LOWER(@search) OR
+    LOWER(c.Denumire_Contract) LIKE LOWER(@search) OR
+    LOWER(c.proiect_id) LIKE LOWER(@search) OR
+    LOWER(COALESCE(cl.nume, '')) LIKE LOWER(@search)
+  )`;
+  params.search = `%${search}%`;
+  types.search = 'STRING';
+}
+
+	// Filtru după client
+	if (clientId) {
+	  whereClause += ' AND client_id = @clientId';
+	  params.clientId = clientId;
+	  types.clientId = 'STRING';
+	}
+
+	// Filtru după perioada de creare
+	const dataCreareStart = searchParams.get('data_creare_start');
+	const dataCreareEnd = searchParams.get('data_creare_end');
+
+	if (dataCreareStart) {
+	  whereClause += ' AND DATE(c.data_creare) >= @dataCreareStart';
+	  params.dataCreareStart = dataCreareStart;
+	  types.dataCreareStart = 'DATE';
+	}
+
+	if (dataCreareEnd) {
+	  whereClause += ' AND DATE(c.data_creare) <= @dataCreareEnd';
+	  params.dataCreareEnd = dataCreareEnd;
+	  types.dataCreareEnd = 'DATE';
+	}
+
+	// Filtru după valoare minimă
+	const valoareMin = searchParams.get('valoare_min');
+	if (valoareMin && !isNaN(Number(valoareMin))) {
+	  whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) >= @valoareMin';
+	  params.valoareMin = Number(valoareMin);
+	  types.valoareMin = 'NUMERIC';
+	}
+
+	// Filtru după valoare maximă
+	const valoareMax = searchParams.get('valoare_max');
+	if (valoareMax && !isNaN(Number(valoareMax))) {
+	  whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) <= @valoareMax';
+	  params.valoareMax = Number(valoareMax);
+	  types.valoareMax = 'NUMERIC';
+	}
+
+	// Filtru după moneda
+	const moneda = searchParams.get('moneda');
+	if (moneda) {
+	  whereClause += ' AND COALESCE(c.Moneda, "RON") = @moneda';
+	  params.moneda = moneda;
+	  types.moneda = 'STRING';
+	}
 
     // Query principal cu JOIN pentru date client complete
     const query = `

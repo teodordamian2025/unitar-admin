@@ -1,3 +1,5 @@
+// app/admin/rapoarte/components/FilterBar.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
