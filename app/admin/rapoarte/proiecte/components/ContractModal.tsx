@@ -1964,6 +1964,27 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           </div>
 
+          {/* MODIFICAT: Funcția de generare cu suport pentru numărul custom */}
+          {/* Effect pentru recalcularea procentelor contract */}
+          {useEffect(() => {
+            if (termenePersonalizate.length > 0) {
+              const termeneWithPercents = calculeazaProcenteInformative(termenePersonalizate);
+              if (JSON.stringify(termeneWithPercents) !== JSON.stringify(termenePersonalizate)) {
+                setTermenePersonalizate(termeneWithPercents);
+              }
+            }
+          }, [termenePersonalizate.map(t => t.valoare_ron).join(',')])}
+
+          {/* Effect pentru recalcularea procentelor anexă */}
+          {useEffect(() => {
+            if (anexaEtape.length > 0) {
+              const anexaWithPercents = calculeazaProcenteInformative(anexaEtape);
+              if (JSON.stringify(anexaWithPercents) !== JSON.stringify(anexaEtape)) {
+                setAnexaEtape(anexaWithPercents);
+              }
+            }
+          }, [anexaEtape.map(t => t.valoare_ron).join(',')])}
+
           {/* SECȚIUNEA CONTRACT */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -2830,27 +2851,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </div>
             )}
           </div>
-
-          {/* MODIFICAT: Funcția de generare cu suport pentru numărul custom */}
-          {/* Effect pentru recalcularea procentelor contract */}
-          {useEffect(() => {
-            if (termenePersonalizate.length > 0) {
-              const termeneWithPercents = calculeazaProcenteInformative(termenePersonalizate);
-              if (JSON.stringify(termeneWithPercents) !== JSON.stringify(termenePersonalizate)) {
-                setTermenePersonalizate(termeneWithPercents);
-              }
-            }
-          }, [termenePersonalizate.map(t => t.valoare_ron).join(',')])}
-
-          {/* Effect pentru recalcularea procentelor anexă */}
-          {useEffect(() => {
-            if (anexaEtape.length > 0) {
-              const anexaWithPercents = calculeazaProcenteInformative(anexaEtape);
-              if (JSON.stringify(anexaWithPercents) !== JSON.stringify(anexaEtape)) {
-                setAnexaEtape(anexaWithPercents);
-              }
-            }
-          }, [anexaEtape.map(t => t.valoare_ron).join(',')])}
 
           {/* Butoane finale COMPLETE cu validări și suport număr custom */}
           <div style={{
