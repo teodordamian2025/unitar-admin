@@ -457,6 +457,8 @@ app/admin/rapoarte/contracte/components/ContracteTable.tsx
 app/admin/rapoarte/contracte/components/ContractActions.tsx
 app/admin/rapoarte/contracte/components/ContractFilters.tsx
 app/api/rapoarte/contracte/export/route.ts
+app/admin/rapoarte/contracte/components/ContractSignModal.tsx
+
 
 Coduri pentru anexe contract:
 app/api/rapoarte/anexe-contract/route.ts

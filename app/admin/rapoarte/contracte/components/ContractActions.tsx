@@ -1,14 +1,15 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/contracte/components/ContractActions.tsx
-// DATA: 14.01.2025 14:10 (ora României)
-// CREAT: Componenta de acțiuni pentru contracte - IDENTICĂ cu ProiectActions.tsx
-// PATTERN: Dropdown identic vizual și funcțional, doar acțiuni adaptate pentru contracte
+// DATA: 15.01.2025 08:50 (ora României)
+// MODIFICAT: Adăugat ContractSignModal pentru setarea datei semnării
+// PĂSTRATE: Toate funcționalitățile existente + nou modal pentru semnare
 // ==================================================================
 
 'use client';
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import ContractSignModal from './ContractSignModal';
 
 interface ActionItem {
   key: string;
@@ -36,6 +37,7 @@ interface ContractActionsProps {
     etape_facturate?: number;
     etape_incasate?: number;
     Observatii?: string;
+    etape?: any[];
   };
   onRefresh?: () => void;
   // Callback-uri pentru modale externe (gestionate în ContracteTable)
@@ -100,9 +102,13 @@ export default function ContractActions({
   onShowPVModal
 }: ContractActionsProps) {
   
+  // ADĂUGAT: State pentru modalul de semnare
+  const [showSignModal, setShowSignModal] = useState(false);
+  
   // Logica pentru status contract
   const isActiv = contract.Status === 'Semnat' || contract.Status === 'Generat';
   const isAnulat = contract.Status === 'Anulat';
+  const isDejaSemat = contract.Status === 'Semnat';
 
   // Helper pentru formatarea datelor - IDENTIC cu ProiectActions
   const formatDate = (date?: string): string => {
@@ -114,7 +120,7 @@ export default function ContractActions({
     }
   };
 
-  // Construire acțiuni pentru contracte
+  // ACTUALIZAT: Construire acțiuni pentru contracte cu modal pentru semnare
   const actions: ActionItem[] = [
     {
       key: 'view',
@@ -158,10 +164,10 @@ export default function ContractActions({
     },
     {
       key: 'mark_signed',
-      label: 'Marchează Semnat',
+      label: isDejaSemat ? 'Actualizează Semnare' : 'Marchează Semnat',
       icon: '✅',
       color: 'success',
-      disabled: contract.Status === 'Semnat' || isAnulat
+      disabled: isAnulat
     },
     {
       key: 'mark_expired',
@@ -202,7 +208,8 @@ export default function ContractActions({
           handleGeneratePV();
           break;
         case 'mark_signed':
-          await handleUpdateStatus('Semnat');
+          // MODIFICAT: Deschide modalul în loc de actualizare directă
+          handleMarkSigned();
           break;
         case 'mark_expired':
           await handleUpdateStatus('Expirat');
@@ -219,7 +226,23 @@ export default function ContractActions({
     }
   };
 
-  // Handler pentru Editare Contract
+  // ADĂUGAT: Handler pentru deschiderea modalului de semnare
+  const handleMarkSigned = () => {
+    setShowSignModal(true);
+  };
+
+  // ADĂUGAT: Handler pentru succesul semnării
+  const handleSignSuccess = () => {
+    setShowSignModal(false);
+    onRefresh?.();
+  };
+
+  // ADĂUGAT: Handler pentru închiderea modalului de semnare
+  const handleSignClose = () => {
+    setShowSignModal(false);
+  };
+
+  // Handler pentru Editare Contract - PĂSTRAT
   const handleEdit = async () => {
     if (onShowEditModal) {
       onShowEditModal(contract);
@@ -229,7 +252,7 @@ export default function ContractActions({
     }
   };
 
-  // Handler pentru Generare Factură
+  // Handler pentru Generare Factură - PĂSTRAT
   const handleCreateInvoice = () => {
     if (onShowFacturaModal) {
       onShowFacturaModal(contract);
@@ -239,7 +262,7 @@ export default function ContractActions({
     }
   };
 
-  // Handler pentru Proces Verbal
+  // Handler pentru Proces Verbal - PĂSTRAT
   const handleGeneratePV = () => {
     if (onShowPVModal) {
       onShowPVModal(contract);
@@ -255,21 +278,25 @@ export default function ContractActions({
     const etapeInfo = contract.etape_count ? 
       `\n📋 Etape: ${contract.etape_count} total (${contract.etape_facturate || 0} facturate, ${contract.etape_incasate || 0} încasate)` : '';
     
+    // ACTUALIZAT: Afișează și datele de semnare/expirare
+    const dateInfo = contract.Data_Semnare || contract.Data_Expirare ? 
+      `\n📅 Semnat: ${formatDate(contract.Data_Semnare)}\n📅 Expirare: ${formatDate(contract.Data_Expirare)}` : 
+      '\n📅 Date semnare: Lipsesc - folosește "Marchează Semnat"';
+    
     const detalii = `📄 CONTRACT: ${contract.ID_Contract}
 
 🏷️ Număr: ${contract.numar_contract}
 👤 Client: ${contract.client_nume}
-🏗️ Proiect: ${contract.proiect_id}
+🗂️ Proiect: ${contract.proiect_id}
 📊 Status: ${contract.Status}${statusInfo}
-💰 Valoare: ${contract.Valoare ? `${contract.Valoare.toLocaleString('ro-RO')} ${contract.Moneda || 'RON'}` : 'N/A'}
-📅 Semnat: ${formatDate(contract.Data_Semnare)}
-📅 Expirare: ${formatDate(contract.Data_Expirare)}${etapeInfo}
+💰 Valoare: ${contract.Valoare ? `${contract.Valoare.toLocaleString('ro-RO')} ${contract.Moneda || 'RON'}` : 'N/A'}${dateInfo}${etapeInfo}
 📝 Observații: ${contract.Observatii || 'Fără observații'}`;
     
     showToast(detalii, 'info');
     console.log('Detalii contract:', contract);
   };
 
+  // MODIFICAT: Pentru alte status-uri (nu Semnat), păstrează logica veche
   const handleUpdateStatus = async (newStatus: string) => {
     const confirmare = confirm(`Sigur vrei să schimbi statusul contractului la "${newStatus}"?`);
     if (!confirmare) return;
@@ -320,11 +347,21 @@ export default function ContractActions({
   };
 
   return (
-    <EnhancedActionDropdown
-      actions={actions}
-      onAction={handleAction}
-      contract={contract}
-    />
+    <>
+      <EnhancedActionDropdown
+        actions={actions}
+        onAction={handleAction}
+        contract={contract}
+      />
+
+      {/* ADĂUGAT: Modal pentru semnarea contractului */}
+      <ContractSignModal
+        isOpen={showSignModal}
+        onClose={handleSignClose}
+        onSuccess={handleSignSuccess}
+        contract={contract}
+      />
+    </>
   );
 }
 
@@ -371,6 +408,7 @@ function EnhancedActionDropdown({ actions, onAction, contract }: EnhancedActionD
       }
     }
   }, [isOpen, dropdownId]);
+
   const calculateDropdownPosition = () => {
     if (!buttonRef.current) return;
 
@@ -567,6 +605,20 @@ function EnhancedActionDropdown({ actions, onAction, contract }: EnhancedActionD
                       {contract.etape_count} ETAPE
                     </span>
                   )}
+                  {/* ADĂUGAT: Indicator dacă lipsesc datele de semnare */}
+                  {!contract.Data_Semnare && contract.Status === 'Semnat' && (
+                    <span style={{
+                      marginLeft: '0.5rem',
+                      fontSize: '10px',
+                      background: '#f39c12',
+                      color: 'white',
+                      padding: '2px 6px',
+                      borderRadius: '8px',
+                      fontWeight: 'bold'
+                    }}>
+                      FĂRĂ DATE
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -628,6 +680,19 @@ function EnhancedActionDropdown({ actions, onAction, contract }: EnhancedActionD
                       </span>
                       <span>
                         {action.label}
+                        {action.key === 'mark_signed' && (
+                          <span style={{
+                            marginLeft: '0.5rem',
+                            fontSize: '10px',
+                            background: '#27ae60',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '8px',
+                            fontWeight: 'bold'
+                          }}>
+                            MODAL
+                          </span>
+                        )}
                         {action.key === 'edit' && (
                           <span style={{
                             marginLeft: '0.5rem',

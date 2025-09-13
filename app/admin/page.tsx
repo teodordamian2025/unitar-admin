@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/admin/page.tsx
-// MODIFICAT: Adăugat butonul pentru Zona de Setări în dashboard
+// MODIFICAT: Adăugat butonul pentru Lista contracte
 // ==================================================================
 
 'use client';

@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/contracte/route.ts
-// DATA: 06.09.2025 18:00 (ora României)
-// MODIFICAT: Eliminat câmpul etape JSON - folosește doar EtapeContract
-// PĂSTRATE: Toate funcționalitățile existente + integrare EtapeContract
+// DATA: 15.01.2025 09:30 (ora României)
+// MODIFICAT: Reparat filtrarea + adăugat suport Data_Semnare și Data_Expirare
+// PROBLEME REZOLVATE: Duplicarea filtrelor + filtrarea care nu funcționa
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,7 +21,43 @@ const bigquery = new BigQuery({
   },
 });
 
-// Helper pentru conversie BigQuery NUMERIC
+// Helper function pentru escape SQL - PĂSTRAT din TimeTracking
+const escapeString = (value: string): string => {
+  return value.replace(/'/g, "''");
+};
+
+// Helper pentru formatare DATE BigQuery - PĂSTRAT și ÎMBUNĂTĂȚIT din TimeTracking
+const formatDateLiteral = (dateString: string | null): string => {
+  if (!dateString || dateString === 'null' || dateString === 'undefined' || dateString === '') {
+    return 'NULL';
+  }
+  
+  // Verificare format ISO date (YYYY-MM-DD)
+  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoDateRegex.test(dateString)) {
+    return `DATE('${dateString}')`;
+  }
+  
+  // Încearcă să parseze data și să o convertească
+  try {
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      const isoString = date.toISOString().split('T')[0];
+      return `DATE('${isoString}')`;
+    }
+  } catch (error) {
+    console.warn(`Nu s-a putut parsa data: ${dateString}`);
+  }
+  
+  return 'NULL';
+};
+
+// Helper pentru actualizare timestamp
+const getCurrentTimestamp = (): string => {
+  return 'CURRENT_TIMESTAMP()';
+};
+
+// Helper pentru conversie BigQuery NUMERIC - PĂSTRAT din codul existent
 const convertBigQueryNumeric = (value: any): number => {
   if (value === null || value === undefined) return 0;
   
@@ -58,7 +94,7 @@ const convertBigQueryNumeric = (value: any): number => {
   }
 };
 
-// Helper pentru parsarea datelor BigQuery
+// Helper pentru parsarea datelor BigQuery - PĂSTRAT din codul existent
 const parseDate = (dateValue: any): string | null => {
   if (!dateValue) return null;
   
@@ -85,7 +121,7 @@ const parseDate = (dateValue: any): string | null => {
   }
 };
 
-// Helper pentru formatarea datei pentru afișare
+// Helper pentru formatarea datei pentru afișare - PĂSTRAT din codul existent
 const formatDate = (date?: string | { value: string }): string => {
   if (!date) return '';
   const dateValue = typeof date === 'string' ? date : date.value;
@@ -97,7 +133,7 @@ const formatDate = (date?: string | { value: string }): string => {
   }
 };
 
-// Helper pentru parsarea JSON-ului BigQuery
+// Helper pentru parsarea JSON-ului BigQuery - PĂSTRAT din codul existent
 const parseJsonField = (jsonString: any): any => {
   if (!jsonString) return null;
   
@@ -112,7 +148,7 @@ const parseJsonField = (jsonString: any): any => {
   }
 };
 
-// NOUĂ FUNCȚIE: Încărcarea etapelor din tabela EtapeContract
+// Încărcarea etapelor din tabela EtapeContract - PĂSTRAT din codul existent
 const loadEtapeContract = async (contractId: string) => {
   try {
     const etapeQuery = `
@@ -160,107 +196,94 @@ const loadEtapeContract = async (contractId: string) => {
   }
 };
 
-// GET - Listare și căutare contracte (ACTUALIZAT cu etape din EtapeContract)
+// GET - Listare și căutare contracte (REPARATĂ FILTRAREA)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const proiectId = searchParams.get('proiect_id');
-    const clientId = searchParams.get('client_id') || searchParams.get('client');
-    const status = searchParams.get('status');
-    const search = searchParams.get('search');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    
+    console.log('[CONTRACTE] GET contracte cu parametrii:', Object.fromEntries(searchParams.entries()));
 
-    console.log('[CONTRACTE] GET contracte cu parametrii:', {
-      proiectId,
-      clientId,
-      status,
-      search,
-      limit,
-      offset
-    });
-
-    // Construirea query-ului dinamic
+    // REPARATĂ: Construirea query-ului fără duplicări
     let whereClause = 'WHERE 1=1';
     const params: any = {};
     const types: any = {};
 
-    if (proiectId) {
-      whereClause += ' AND proiect_id = @proiectId';
-      params.proiectId = proiectId;
+    // REPARAT: Filtru după ID proiect
+    const proiectId = searchParams.get('proiect_id');
+    if (proiectId && proiectId.trim()) {
+      whereClause += ' AND c.proiect_id = @proiectId';
+      params.proiectId = proiectId.trim();
       types.proiectId = 'STRING';
     }
 
-    if (clientId) {
-      whereClause += ' AND client_id = @clientId';
-      params.clientId = clientId;
-      types.clientId = 'STRING';
-    }
-
-    if (status) {
-      whereClause += ' AND Status = @status';
-      params.status = status;
+    // REPARAT: Filtru după status
+    const status = searchParams.get('status');
+    if (status && status.trim()) {
+      whereClause += ' AND c.Status = @status';
+      params.status = status.trim();
       types.status = 'STRING';
     }
 
-    if (search) {
-  whereClause += ` AND (
-    LOWER(c.numar_contract) LIKE LOWER(@search) OR
-    LOWER(c.client_nume) LIKE LOWER(@search) OR
-    LOWER(c.Denumire_Contract) LIKE LOWER(@search) OR
-    LOWER(c.proiect_id) LIKE LOWER(@search) OR
-    LOWER(COALESCE(cl.nume, '')) LIKE LOWER(@search)
-  )`;
-  params.search = `%${search}%`;
-  types.search = 'STRING';
-}
+    // REPARAT: Filtru după client - ELIMINĂ dropdown-ul duplicat
+    const clientParam = searchParams.get('client') || searchParams.get('client_id');
+    if (clientParam && clientParam.trim()) {
+      // Pentru că avem și client_nume și client_id, căutăm în ambele
+      whereClause += ' AND (c.client_id = @clientParam OR LOWER(c.client_nume) LIKE LOWER(@clientParamLike))';
+      params.clientParam = clientParam.trim();
+      params.clientParamLike = `%${clientParam.trim()}%`;
+      types.clientParam = 'STRING';
+      types.clientParamLike = 'STRING';
+    }
 
-	// Filtru după client
-	if (clientId) {
-	  whereClause += ' AND client_id = @clientId';
-	  params.clientId = clientId;
-	  types.clientId = 'STRING';
-	}
+    // REPARAT: Căutarea generală - fără duplicare
+    const search = searchParams.get('search');
+    if (search && search.trim()) {
+      whereClause += ` AND (
+        LOWER(c.numar_contract) LIKE LOWER(@search) OR
+        LOWER(c.client_nume) LIKE LOWER(@search) OR
+        LOWER(c.Denumire_Contract) LIKE LOWER(@search) OR
+        LOWER(c.proiect_id) LIKE LOWER(@search) OR
+        LOWER(COALESCE(cl.nume, '')) LIKE LOWER(@search)
+      )`;
+      params.search = `%${search.trim()}%`;
+      types.search = 'STRING';
+    }
 
-	// Filtru după perioada de creare
-	const dataCreareStart = searchParams.get('data_creare_start');
-	const dataCreareEnd = searchParams.get('data_creare_end');
+    // Filtru după perioada de creare
+    const dataCreareStart = searchParams.get('data_creare_start');
+    const dataCreareEnd = searchParams.get('data_creare_end');
 
-	if (dataCreareStart) {
-	  whereClause += ' AND DATE(c.data_creare) >= @dataCreareStart';
-	  params.dataCreareStart = dataCreareStart;
-	  types.dataCreareStart = 'DATE';
-	}
+    if (dataCreareStart && dataCreareStart.trim()) {
+      whereClause += ' AND DATE(c.data_creare) >= @dataCreareStart';
+      params.dataCreareStart = dataCreareStart.trim();
+      types.dataCreareStart = 'DATE';
+    }
 
-	if (dataCreareEnd) {
-	  whereClause += ' AND DATE(c.data_creare) <= @dataCreareEnd';
-	  params.dataCreareEnd = dataCreareEnd;
-	  types.dataCreareEnd = 'DATE';
-	}
+    if (dataCreareEnd && dataCreareEnd.trim()) {
+      whereClause += ' AND DATE(c.data_creare) <= @dataCreareEnd';
+      params.dataCreareEnd = dataCreareEnd.trim();
+      types.dataCreareEnd = 'DATE';
+    }
 
-	// Filtru după valoare minimă
-	const valoareMin = searchParams.get('valoare_min');
-	if (valoareMin && !isNaN(Number(valoareMin))) {
-	  whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) >= @valoareMin';
-	  params.valoareMin = Number(valoareMin);
-	  types.valoareMin = 'NUMERIC';
-	}
+    // Filtru după valoare minimă
+    const valoareMin = searchParams.get('valoare_min');
+    if (valoareMin && valoareMin.trim() && !isNaN(Number(valoareMin))) {
+      whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) >= @valoareMin';
+      params.valoareMin = Number(valoareMin.trim());
+      types.valoareMin = 'NUMERIC';
+    }
 
-	// Filtru după valoare maximă
-	const valoareMax = searchParams.get('valoare_max');
-	if (valoareMax && !isNaN(Number(valoareMax))) {
-	  whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) <= @valoareMax';
-	  params.valoareMax = Number(valoareMax);
-	  types.valoareMax = 'NUMERIC';
-	}
+    // Filtru după valoare maximă
+    const valoareMax = searchParams.get('valoare_max');
+    if (valoareMax && valoareMax.trim() && !isNaN(Number(valoareMax))) {
+      whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) <= @valoareMax';
+      params.valoareMax = Number(valoareMax.trim());
+      types.valoareMax = 'NUMERIC';
+    }
 
-	// Filtru după moneda
-	const moneda = searchParams.get('moneda');
-	if (moneda) {
-	  whereClause += ' AND COALESCE(c.Moneda, "RON") = @moneda';
-	  params.moneda = moneda;
-	  types.moneda = 'STRING';
-	}
+    // Limitare și paginare
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
 
     // Query principal cu JOIN pentru date client complete
     const query = `
@@ -283,6 +306,9 @@ export async function GET(request: NextRequest) {
     types.limit = 'INT64';
     types.offset = 'INT64';
 
+    console.log('[CONTRACTE] Query executat:', query);
+    console.log('[CONTRACTE] Parametrii:', params);
+
     const [rows] = await bigquery.query({
       query,
       params,
@@ -290,11 +316,11 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     });
 
-    // PROCESARE ACTUALIZATĂ: Încărcarea etapelor din EtapeContract
+    // PROCESARE: Încărcarea etapelor din EtapeContract
     const contracteProcesate = await Promise.all(rows.map(async (contract: any) => {
       const continutJson = parseJsonField(contract.continut_json);
 
-      // MODIFICARE PRINCIPALĂ: Încarcă etapele din EtapeContract în loc de JSON
+      // Încarcă etapele din EtapeContract în loc de JSON
       const etape = await loadEtapeContract(contract.ID_Contract);
 
       const valoareConvertita = convertBigQueryNumeric(contract.Valoare);
@@ -323,7 +349,7 @@ export async function GET(request: NextRequest) {
         data_curs_valutar: formatDate(contract.data_curs_valutar),
         valoare_ron: valoareRonConvertita,
         
-        // NOUĂ STRUCTURĂ: Etape din EtapeContract
+        // Etape din EtapeContract
         etape: etape,
         etape_count: etape.length,
         etape_facturate: etape.filter(e => e.status_facturare === 'Facturat').length,
@@ -342,7 +368,9 @@ export async function GET(request: NextRequest) {
     let countQuery = `
       SELECT COUNT(*) as total
       FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\` c
-      ${whereClause.replace('LIMIT @limit OFFSET @offset', '')}
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Clienti\` cl
+        ON c.client_id = cl.id
+      ${whereClause}
     `;
 
     const countParams = { ...params };
@@ -385,15 +413,141 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Creare contract nou (doar metadata, generarea se face prin /actions/contracts/generate)
+// PUT - Actualizare contract (ADĂUGAT SUPORT PENTRU SEMNARE)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    console.log('PUT contracts request body:', body);
+    
+    const { ID_Contract, ...updateData } = body;
+
+    if (!ID_Contract) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'ID_Contract necesar pentru actualizare' 
+      }, { status: 400 });
+    }
+
+    // ADĂUGAT: Logica specială pentru semnarea contractelor
+    if (updateData.Status === 'Semnat' && updateData.Data_Semnare) {
+      // Validări pentru semnarea contractului
+      const dataSemnare = updateData.Data_Semnare;
+      const dataExpirare = updateData.Data_Expirare;
+      
+      if (!dataExpirare) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Data_Expirare este obligatorie când se marchează contractul ca semnat' 
+        }, { status: 400 });
+      }
+
+      // Validare că data semnării nu este prea în trecut (mai mult de 1 an)
+      const dataSemnareDate = new Date(dataSemnare);
+      const acumUnAn = new Date();
+      acumUnAn.setFullYear(acumUnAn.getFullYear() - 1);
+      
+      if (dataSemnareDate < acumUnAn) {
+        return NextResponse.json({ 
+          success: false,
+          error: `Data semnării (${dataSemnareDate.toLocaleDateString('ro-RO')}) pare să fie prea în trecut. Verifică dacă este corectă.` 
+        }, { status: 400 });
+      }
+
+      console.log(`Actualizare contract ${ID_Contract} - Status: Semnat, Data_Semnare: ${dataSemnare}, Data_Expirare: ${dataExpirare}`);
+    }
+
+    // Construire query UPDATE dinamic cu suport pentru date
+    const updateFields: string[] = [];
+    const allowedFields = [
+      'Status', 'Data_Semnare', 'Data_Expirare', 'Valoare', 'Moneda', 
+      'curs_valutar', 'valoare_ron', 'Observatii', 'note_interne',
+      'termen_executie_zile', 'observatii_semnare'
+    ];
+
+    Object.entries(updateData).forEach(([key, value]) => {
+      if (value !== undefined && allowedFields.includes(key)) {
+        // Tratare specială pentru câmpurile de tip DATE
+        if (key === 'Data_Semnare' || key === 'Data_Expirare') {
+          const dataLiteral = formatDateLiteral(value as string);
+          updateFields.push(`${key} = ${dataLiteral}`);
+        }
+        // Tratare pentru câmpurile numerice
+        else if (key === 'Valoare' || key === 'curs_valutar' || key === 'valoare_ron' || key === 'termen_executie_zile') {
+          const numericValue = parseFloat(value as string);
+          if (!isNaN(numericValue)) {
+            updateFields.push(`${key} = ${numericValue}`);
+          }
+        }
+        // Tratare pentru câmpurile text
+        else if (value === null || value === '') {
+          updateFields.push(`${key} = NULL`);
+        } else {
+          updateFields.push(`${key} = '${escapeString(value.toString())}'`);
+        }
+      }
+    });
+
+    // Adăugare timestamp actualizare
+    updateFields.push(`data_actualizare = ${getCurrentTimestamp()}`);
+    
+    // ADĂUGAT: Dacă avem observatii_semnare, le adăugăm la Observatii existente
+    if (updateData.observatii_semnare && updateData.observatii_semnare.trim()) {
+      const observatiiSemnare = escapeString(updateData.observatii_semnare.trim());
+      const timestampSemnare = new Date().toLocaleString('ro-RO');
+      
+      updateFields.push(`Observatii = CASE 
+        WHEN Observatii IS NULL OR Observatii = '' 
+        THEN 'SEMNAT ${timestampSemnare}: ${observatiiSemnare}'
+        ELSE CONCAT(Observatii, '\n\nSEMNAT ${timestampSemnare}: ${observatiiSemnare}')
+      END`);
+    }
+
+    if (updateFields.length === 1) { // Doar timestamp-ul
+      return NextResponse.json({ 
+        success: false,
+        error: 'Nu există câmpuri de actualizat' 
+      }, { status: 400 });
+    }
+
+    const updateQuery = `
+      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      SET ${updateFields.join(', ')}
+      WHERE ID_Contract = '${escapeString(ID_Contract)}'
+    `;
+
+    console.log('Update contract query:', updateQuery);
+
+    await bigquery.query({
+      query: updateQuery,
+      location: 'EU',
+    });
+
+    console.log(`Contract ${ID_Contract} actualizat cu succes`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Contract actualizat cu succes',
+      data: { 
+        ID_Contract,
+        updates_applied: Object.keys(updateData).filter(key => allowedFields.includes(key))
+      }
+    });
+
+  } catch (error) {
+    console.error('Eroare la actualizarea contractului:', error);
+    return NextResponse.json({ 
+      success: false,
+      error: 'Eroare la actualizarea contractului',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+    }, { status: 500 });
+  }
+}
+
+// POST - Păstrează logica existentă
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      proiect_id,
-      tip_document = 'contract',
-      observatii
-    } = body;
+    const { proiect_id, tip_document = 'contract', observatii } = body;
 
     if (!proiect_id) {
       return NextResponse.json({ 
@@ -452,89 +606,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Actualizare contract (doar metadata, nu generarea)
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const {
-      ID_Contract,
-      Status,
-      Observatii,
-      Data_Expirare
-    } = body;
-
-    if (!ID_Contract) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'ID contract obligatoriu' 
-      }, { status: 400 });
-    }
-
-    console.log('[CONTRACTE] PUT actualizare contract:', ID_Contract);
-
-    const updateFields: string[] = [];
-    const params: any = { ID_Contract };
-    const types: any = { ID_Contract: 'STRING' };
-
-    if (Status) {
-      updateFields.push('Status = @Status');
-      params.Status = Status;
-      types.Status = 'STRING';
-    }
-
-    if (Observatii !== undefined) {
-      updateFields.push('Observatii = @Observatii');
-      params.Observatii = Observatii || null;
-      types.Observatii = 'STRING';
-    }
-
-    if (Data_Expirare) {
-      updateFields.push('Data_Expirare = @Data_Expirare');
-      params.Data_Expirare = Data_Expirare;
-      types.Data_Expirare = 'DATE';
-    }
-
-    updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
-
-    if (updateFields.length === 1) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Niciun câmp de actualizat specificat' 
-      }, { status: 400 });
-    }
-
-    const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
-      SET ${updateFields.join(', ')}
-      WHERE ID_Contract = @ID_Contract
-    `;
-
-    await bigquery.query({
-      query: updateQuery,
-      params,
-      types,
-      location: 'EU',
-    });
-
-    console.log(`[CONTRACTE] Contract ${ID_Contract} actualizat cu succes`);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Contract actualizat cu succes',
-      updated_fields: Object.keys(params).filter(k => k !== 'ID_Contract')
-    });
-
-  } catch (error) {
-    console.error('[CONTRACTE] Eroare la actualizarea contractului:', error);
-    return NextResponse.json({ 
-      success: false,
-      error: 'Eroare la actualizarea contractului',
-      details: error instanceof Error ? error.message : 'Eroare necunoscută'
-    }, { status: 500 });
-  }
-}
-
-// DELETE - Ștergere contract (soft delete prin status)
+// DELETE - Păstrează logica existentă
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
