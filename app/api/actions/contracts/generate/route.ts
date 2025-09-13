@@ -11,7 +11,7 @@ import JSZip from 'jszip';
 import { readFile, readdir } from 'fs/promises';
 import path from 'path';
 // NOUĂ IMPORTARE: Folosește funcția din setări pentru numerotare
-import { getNextContractNumber } from '../../setari/contracte/route';
+import { getNextContractNumber } from '../../setari/contracte/route.js';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
