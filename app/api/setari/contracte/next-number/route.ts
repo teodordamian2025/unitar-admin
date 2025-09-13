@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/setari/contracte/next-number/route.ts
-// DATA: 01.09.2025 19:30 (ora României)
-// FIX PRINCIPAL: API pentru numerotare consecutivă (nu aleatorie)
-// PĂSTRATE: Toate funcționalitățile existente din getNextContractNumber()
+// DATA: 12.09.2025 21:00 (ora României)
+// VERIFICAT: Import corect din funcția exportată + logging îmbunătățit
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,12 +14,18 @@ export async function GET(request: NextRequest) {
     const tipDocument = searchParams.get('tipDocument') || 'contract';
     const proiectId = searchParams.get('proiectId') || undefined;
 
-    console.log('🔢 Preview număr contract pentru:', { tipDocument, proiectId });
+    console.log('[NEXT-NUMBER] 🔢 Preview număr contract pentru:', { tipDocument, proiectId });
 
-    // Folosește funcția existentă pentru numerotarea consecutivă
+    // VERIFICAT: Folosește funcția exportată din ../route.ts pentru numerotarea consecutivă
     const contractData = await getNextContractNumber(tipDocument, proiectId);
 
-    console.log('✅ Număr contract generat:', contractData.numar_contract);
+    console.log('[NEXT-NUMBER] ✅ Număr contract generat:', {
+      numar_contract: contractData.numar_contract,
+      numar_secvential: contractData.numar_secvential,
+      serie: contractData.serie,
+      prefix: contractData.setari.prefix || '',
+      format_folosit: contractData.setari.format_numerotare
+    });
 
     return NextResponse.json({
       success: true,
@@ -27,15 +33,38 @@ export async function GET(request: NextRequest) {
       numar_secvential: contractData.numar_secvential,
       serie: contractData.serie,
       prefix: contractData.setari.prefix || '',
-      message: `Următorul număr pentru ${tipDocument}: ${contractData.numar_contract}`
+      format_numerotare: contractData.setari.format_numerotare,
+      include_an: contractData.setari.include_an,
+      include_luna: contractData.setari.include_luna,
+      include_proiect_id: contractData.setari.include_proiect_id,
+      message: `Următorul număr pentru ${tipDocument}: ${contractData.numar_contract}`,
+      debug_info: {
+        tip_document: tipDocument,
+        proiect_id: proiectId,
+        setari_id: contractData.setari.id,
+        timestamp: new Date().toISOString()
+      }
     });
 
   } catch (error) {
-    console.error('❌ Eroare la generarea numărului contract:', error);
+    console.error('[NEXT-NUMBER] ❌ Eroare la generarea numărului contract:', error);
+    
+    // Fallback cu număr temporar dacă setările nu funcționează
+    const currentYear = new Date().getFullYear();
+    const fallbackNumber = 'TEMP-0001-' + currentYear;
+    
     return NextResponse.json({
       success: false,
       error: 'Eroare la generarea numărului de contract',
-      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+      details: error instanceof Error ? error.message : 'Eroare necunoscută',
+      fallback_number: fallbackNumber,
+      message: 'Folosește numărul temporar sau verifică setările contractelor',
+      debug_info: {
+        tip_document: searchParams.get('tipDocument'),
+        proiect_id: searchParams.get('proiectId'),
+        error_type: error instanceof Error ? error.constructor.name : 'Unknown',
+        timestamp: new Date().toISOString()
+      }
     }, { status: 500 });
   }
 }

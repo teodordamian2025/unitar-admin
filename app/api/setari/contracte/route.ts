@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/setari/contracte/route.ts
-// DATA: 26.08.2025 22:57 (ora României)
-// CORECȚII: Project ID corect + Helper functions + Pattern-uri consistente
+// DATA: 12.09.2025 20:45 (ora României)
+// MODIFICAT: Exportat getNextContractNumber pentru import în generate
+// PĂSTRATE: Toate funcționalitățile existente + verificări suplimentare
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -315,10 +316,12 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// Funcție helper pentru generarea următorului număr
+// MODIFICAT: Funcție helper pentru generarea următorului număr - EXPORTATĂ
 export async function getNextContractNumber(tipDocument: string, proiectId?: string, contractParinteId?: string) {
   try {
     await ensureTableExists();
+
+    console.log(`[SETARI-CONTRACTE] Generez numărul pentru tipDocument: ${tipDocument}, proiectId: ${proiectId}`);
 
     // Încarcă setările pentru tipul de document
     const setariQuery = `
@@ -335,11 +338,75 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
     });
 
     if (setariRows.length === 0) {
-      throw new Error(`Nu există setări pentru tipul de document: ${tipDocument}`);
+      // VERIFICARE SUPLIMENTARĂ: Creează setări default dacă nu există
+      console.log(`[SETARI-CONTRACTE] Nu există setări pentru ${tipDocument}, creez setări default`);
+      
+      const defaultSetareId = `${tipDocument}_default_${Date.now()}`;
+      const defaultInsertQuery = `
+        INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
+        (id, tip_document, serie, prefix, numar_curent, format_numerotare, separator, include_an, include_luna, include_proiect_id, activ, data_creare, data_actualizare)
+        VALUES 
+        (@id, @tip_document, @serie, @prefix, @numar_curent, @format_numerotare, @separator, @include_an, @include_luna, @include_proiect_id, @activ, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())
+      `;
+
+      const defaultParams = {
+        id: defaultSetareId,
+        tip_document: tipDocument,
+        serie: tipDocument === 'contract' ? 'CONTR' : tipDocument === 'pv' ? 'PV' : 'ANX',
+        prefix: '',
+        numar_curent: 1000,
+        format_numerotare: '{serie}-{numar}-{an}',
+        separator: '-',
+        include_an: true,
+        include_luna: false,
+        include_proiect_id: false,
+        activ: true
+      };
+
+      await bigquery.query({
+        query: defaultInsertQuery,
+        params: defaultParams,
+        types: {
+          id: 'STRING',
+          tip_document: 'STRING',
+          serie: 'STRING',
+          prefix: 'STRING',
+          numar_curent: 'INT64',
+          format_numerotare: 'STRING',
+          separator: 'STRING',
+          include_an: 'BOOL',
+          include_luna: 'BOOL',
+          include_proiect_id: 'BOOL',
+          activ: 'BOOL'
+        },
+        location: 'EU',
+      });
+
+      // Reîncarcă setările după inserare
+      const [newSetariRows] = await bigquery.query({
+        query: setariQuery,
+        params: { tip_document: tipDocument },
+        types: { tip_document: 'STRING' },
+        location: 'EU',
+      });
+
+      if (newSetariRows.length === 0) {
+        throw new Error(`Nu s-au putut crea setările pentru tipul de document: ${tipDocument}`);
+      }
+      
+      setariRows.push(...newSetariRows);
     }
 
     const setari = setariRows[0];
     const nextNumber = convertBigQueryNumeric(setari.numar_curent || 1000) + 1;
+
+    console.log(`[SETARI-CONTRACTE] Setări găsite:`, {
+      serie: setari.serie,
+      prefix: setari.prefix,
+      numar_curent: convertBigQueryNumeric(setari.numar_curent),
+      nextNumber: nextNumber,
+      format: setari.format_numerotare
+    });
 
     // Construiește numărul contractului
     let numarContract = setari.format_numerotare;
@@ -347,7 +414,7 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
     // Înlocuiește placeholder-urile
     numarContract = numarContract.replace('{serie}', setari.serie);
     numarContract = numarContract.replace('{prefix}', setari.prefix || '');
-    numarContract = numarContract.replace('{numar}', nextNumber.toString());
+    numarContract = numarContract.replace('{numar}', nextNumber.toString().padStart(4, '0'));
     
     if (setari.include_an) {
       numarContract = numarContract.replace('{an}', new Date().getFullYear().toString());
@@ -366,7 +433,9 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
       numarContract = numarContract.replace('{contract_id}', contractParinteId);
     }
 
-    // Actualizează numărul curent cu PROJECT ID CORECT
+    console.log(`[SETARI-CONTRACTE] Numărul generat ÎNAINTE de actualizare: ${numarContract}`);
+
+    // VERIFICARE CRITICĂ: Actualizează numărul curent cu PROJECT ID CORECT
     const updateQuery = `
       UPDATE \`${PROJECT_ID}.${dataset}.${table}\`
       SET 
@@ -375,7 +444,7 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
       WHERE id = @id
     `;
 
-    await bigquery.query({
+    const updateResult = await bigquery.query({
       query: updateQuery,
       params: {
         id: setari.id,
@@ -388,6 +457,33 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
       location: 'EU',
     });
 
+    console.log(`[SETARI-CONTRACTE] UPDATE executat pentru setarea ${setari.id}, nextNumber: ${nextNumber}`);
+    console.log(`[SETARI-CONTRACTE] UPDATE result:`, updateResult);
+
+    // VERIFICARE FINALĂ: Confirmă că actualizarea a avut loc
+    const verificareQuery = `
+      SELECT numar_curent FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      WHERE id = @id
+    `;
+
+    const [verificareRows] = await bigquery.query({
+      query: verificareQuery,
+      params: { id: setari.id },
+      types: { id: 'STRING' },
+      location: 'EU',
+    });
+
+    if (verificareRows.length > 0) {
+      const numarActualizat = convertBigQueryNumeric(verificareRows[0].numar_curent);
+      console.log(`[SETARI-CONTRACTE] VERIFICARE: Numărul curent după actualizare este: ${numarActualizat}`);
+      
+      if (numarActualizat !== nextNumber) {
+        console.error(`[SETARI-CONTRACTE] EROARE: Actualizarea a eșuat! Așteptat: ${nextNumber}, Găsit: ${numarActualizat}`);
+      } else {
+        console.log(`[SETARI-CONTRACTE] ✅ Actualizare confirmată cu succes`);
+      }
+    }
+
     return {
       numar_contract: numarContract,
       numar_secvential: nextNumber,
@@ -397,6 +493,7 @@ export async function getNextContractNumber(tipDocument: string, proiectId?: str
 
   } catch (error) {
     logError('Eroare la generarea numărului contract:', error);
+    console.error(`[SETARI-CONTRACTE] Stack trace:`, error);
     throw error;
   }
 }

@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts
-// DATA: 07.09.2025 18:45 (ora României)
-// COMPLETAT: Suport pentru generare duală Contract + Anexă cu proiect_id
+// DATA: 12.09.2025 20:15 (ora României)
+// MODIFICAT: Eliminat funcția locală getNextContractNumber + corectare procente
 // PĂSTRATE: Toate funcționalitățile existente + logica EtapeContract integrală
 // ==================================================================
 
@@ -10,6 +10,8 @@ import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
 import { readFile, readdir } from 'fs/promises';
 import path from 'path';
+// NOUĂ IMPORTARE: Folosește funcția din setări pentru numerotare
+import { getNextContractNumber } from '../../setari/contracte/route';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
@@ -167,15 +169,22 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
-// PĂSTRAT identic - Procesarea placeholder-urilor pentru contract
+// MODIFICAT: Procesarea placeholder-urilor pentru contract cu corectare procente
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // PROCESARE TERMENE PERSONALIZATE ÎNAINTE DE TOATE CELELALTE
+  // PROCESARE TERMENE PERSONALIZATE ÎNAINTE DE TOATE CELELALTE - CORECTARE PROCENTE
   let termeneText = '';
   if (data.termene_personalizate && Array.isArray(data.termene_personalizate) && data.termene_personalizate.length > 0) {
+    // CORECTARE: Calculează suma totală pentru procente corecte
+    const sumaTotala = data.termene_personalizate.reduce((sum: number, termen: any) => sum + (termen.valoare_ron || termen.valoare || 0), 0);
+    
     termeneText = data.termene_personalizate.map((termen: any, index: number) => {
-      const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'}) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
+      const valoareRON = termen.valoare_ron || termen.valoare || 0;
+      // CORECTARE: Calculează procentul corect din suma totală
+      const procentCorect = sumaTotala > 0 ? ((valoareRON / sumaTotala) * 100) : 0;
+      
+      const etapaString = `**Etapa ${index + 1}**: ${procentCorect.toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'}) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
       return etapaString;
     }).join('\n\n');
   } else {
@@ -184,7 +193,7 @@ function processPlaceholders(text: string, data: any): string {
 
   processed = processed.replace('{{termene_personalizate}}', termeneText);
   
-  // ÎNLOCUIRI SIMPLE DIRECTE
+  // ÎNLOCUIRI SIMPLE DIRECTE - PĂSTRATE identic
   const simpleReplacements: { [key: string]: string } = {
     // Contract info
     '{{contract.numar}}': data.contract?.numar || 'Contract-NR-TBD',
@@ -227,7 +236,7 @@ function processPlaceholders(text: string, data: any): string {
     processed = processed.replace(regex, value);
   }
   
-  // PROCESARE COMPLEXĂ pentru secțiuni condiționale
+  // PROCESARE COMPLEXĂ pentru secțiuni condiționale - PĂSTRATE identic
   
   // Adresa execuție
   if (data.proiect?.adresa && data.proiect.adresa.trim()) {
@@ -253,7 +262,7 @@ function processPlaceholders(text: string, data: any): string {
   const valutaClause = data.moneda_originala !== 'RON' ? ', plătiți în lei la cursul BNR din ziua facturării' : '';
   processed = processed.replace('{{valuta_clause}}', valutaClause);
   
-  // CLAUZE CONDIȚIONALE
+  // CLAUZE CONDIȚIONALE - PĂSTRATE identic
   
   // Responsabil proiect
   let responsabilClause = '';
@@ -279,31 +288,39 @@ function processPlaceholders(text: string, data: any): string {
     observatiiClause = `\n**OBSERVAȚII SUPLIMENTARE:**\n\n${data.observatii}\n`;
   }
   processed = processed.replace('{{observatii_clause}}', observatiiClause);
+
   // Descriere lucrări anexă
-    let descriereClause = '';
-    if (data.anexa_descriere_lucrari && data.anexa_descriere_lucrari.trim()) {
-      descriereClause = data.anexa_descriere_lucrari.trim();
-    }
-    processed = processed.replace('{{anexa.descriere_lucrari}}', descriereClause);
-    
-    console.log('[DEBUG] Înlocuire descriere anexă:', {
-      input: data.anexa_descriere_lucrari,
-      output: descriereClause,
-      found_placeholder: processed.includes('{{anexa.descriere_lucrari}}')
-    });
+  let descriereClause = '';
+  if (data.anexa_descriere_lucrari && data.anexa_descriere_lucrari.trim()) {
+    descriereClause = data.anexa_descriere_lucrari.trim();
+  }
+  processed = processed.replace('{{anexa.descriere_lucrari}}', descriereClause);
+  
+  console.log('[DEBUG] Înlocuire descriere anexă:', {
+    input: data.anexa_descriere_lucrari,
+    output: descriereClause,
+    found_placeholder: processed.includes('{{anexa.descriere_lucrari}}')
+  });
   
   return processed;
 }
 
-// NOUĂ FUNCȚIE: Procesarea placeholder-urilor pentru anexă
+// NOUĂ FUNCȚIE: Procesarea placeholder-urilor pentru anexă - PĂSTRATĂ identic
 function processAnexaPlaceholders(text: string, data: any): string {
   let processed = text;
   
-  // PROCESARE TERMENE ANEXĂ
+  // PROCESARE TERMENE ANEXĂ - CORECTARE PROCENTE
   let termeneText = '';
   if (data.anexa_etape && Array.isArray(data.anexa_etape) && data.anexa_etape.length > 0) {
+    // CORECTARE: Calculează suma totală pentru procente corecte
+    const sumaTotala = data.anexa_etape.reduce((sum: number, termen: any) => sum + (termen.valoare_ron || termen.valoare || 0), 0);
+    
     termeneText = data.anexa_etape.map((termen: any, index: number) => {
-      const etapaString = `**Etapa ${index + 1}**: ${(termen.procent_calculat || 0).toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'}) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
+      const valoareRON = termen.valoare_ron || termen.valoare || 0;
+      // CORECTARE: Calculează procentul corect din suma totală
+      const procentCorect = sumaTotala > 0 ? ((valoareRON / sumaTotala) * 100) : 0;
+      
+      const etapaString = `**Etapa ${index + 1}**: ${procentCorect.toFixed(1)}% (${(termen.valoare || 0).toFixed(2)} ${termen.moneda || 'RON'}) - ${termen.denumire || 'Fără denumire'} (termen: ${termen.termen_zile || 30} zile)`;
       return etapaString;
     }).join('\n\n');
   } else {
@@ -312,7 +329,7 @@ function processAnexaPlaceholders(text: string, data: any): string {
 
   processed = processed.replace('{{termene_personalizate}}', termeneText);
   
-  // ÎNLOCUIRI SPECIFICE ANEXĂ
+  // ÎNLOCUIRI SPECIFICE ANEXĂ - PĂSTRATE identic
   const anexaReplacements: { [key: string]: string } = {
     // Numere specifice anexă
     '{{anexa.numar}}': data.anexa?.numar || '1',
@@ -365,7 +382,7 @@ function processAnexaPlaceholders(text: string, data: any): string {
     processed = processed.replace(regex, value);
   }
   
-  // PROCESARE COMPLEXĂ pentru anexă
+  // PROCESARE COMPLEXĂ pentru anexă - PĂSTRATĂ identic
   
   // Adresa execuție anexă
   if (data.proiect?.adresa && data.proiect.adresa.trim()) {
@@ -434,6 +451,7 @@ function convertTextToWordXml(text: string): string {
   </w:body>
 </w:document>`;
 }
+
 // PĂSTRATE identic - Funcții template DOCX și TXT
 async function processDocxTemplate(templatePath: string, data: any): Promise<Buffer> {
   try {
@@ -705,7 +723,6 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     };
   }
 }
-
 // NOUĂ FUNCȚIE: Calculează suma anexei
 function calculeazaSumaAnexaCuValoriEstimate(anexaEtape: any[]) {
   if (anexaEtape.length === 0) {
@@ -907,53 +924,6 @@ function prepareAnexaTemplateData(
   return templateData;
 }
 
-// PĂSTRAT din original - Pentru obținerea următorului număr contract
-async function getNextContractNumber(tipDocument: string = 'contract', proiectId?: string): Promise<any> {
-  try {
-    const query = `
-      SELECT serie_contract, numar_start, numar_curent
-      FROM \`${PROJECT_ID}.PanouControlUnitar.SetariContracte\` 
-      WHERE activ = true
-      LIMIT 1
-    `;
-    const [results] = await bigquery.query({ query, location: 'EU' });
-    
-    if (results.length === 0) {
-      return { 
-        numar_contract: 'CON-0001-2025',
-        serie: 'CON',
-        setari: { tip_document: tipDocument }
-      };
-    }
-    
-    const setare = results[0];
-    const numarCurent = extractNumericValue(setare.numar_curent) || extractNumericValue(setare.numar_start) || 1;
-    const serie = setare.serie_contract || 'CON';
-    const anul = new Date().getFullYear();
-    
-    // Actualizează numărul curent
-    const updateQuery = `
-      UPDATE \`${PROJECT_ID}.PanouControlUnitar.SetariContracte\` 
-      SET numar_curent = ${numarCurent + 1}
-      WHERE activ = true
-    `;
-    await bigquery.query({ query: updateQuery, location: 'EU' });
-    
-    return { 
-      numar_contract: `${serie}-${numarCurent.toString().padStart(4, '0')}-${anul}`,
-      serie,
-      setari: { tip_document: tipDocument }
-    };
-  } catch (error) {
-    console.error('Eroare la obținerea numărului contract:', error);
-    return { 
-      numar_contract: 'CON-0001-2025',
-      serie: 'CON',
-      setari: { tip_document: tipDocument }
-    };
-  }
-}
-
 // NOUĂ FUNCȚIE: Obține următorul număr anexă pentru un contract
 async function getNextAnexaNumber(contractId: string): Promise<number> {
   try {
@@ -1056,7 +1026,7 @@ async function createAnexaFallbackTemplate(data: any): Promise<string> {
 
 1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
 
-Și
+și
 
 2. **S.C. UNITAR PROIECT TDA S.R.L.** cu sediul social în {{firma.adresa}}, având CIF {{firma.cui}} și nr. de înregistrare la Registrul Comerțului {{firma.nr_reg_com}}, având contul IBAN: {{firma.cont_ing}}, deschis la banca ING, și cont Trezorerie IBAN: {{firma.cont_trezorerie}}, e-mail: {{firma.email}}, reprezentată legal de Damian Teodor, în calitate de Administrator, numită în continuare **PRESTATOR**.
 
@@ -1087,7 +1057,7 @@ Servicii suplimentare și modificări la contractul de bază.
 
 Se vor respecta toate mai departe toate prevederile din **Contract**.
 
-3. Prezenta anexă a fost încheiată, în 2 exemplare, câte una pentru fiecare parte.
+3. Prezenta anexă a fost încheiat, în 2 exemplare, câte una pentru fiecare parte.
 
 {{observatii_clause}}
 
@@ -1114,6 +1084,7 @@ Administrator
 
   return processAnexaPlaceholders(templateContent, data);
 }
+
 // MODIFICATĂ: Salvare contract cu logică inteligentă de merge pentru EtapeContract + AnexeContract
 async function salveazaContractCuEtapeContract(contractInfo: any): Promise<string> {
   const contractId = contractInfo.isEdit && contractInfo.contractExistentId 
@@ -1402,7 +1373,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           }
           
           if (etapaExistentaManuala) {
-            // UPDATE etapă manuală existentă - păstrează datele business
+          // UPDATE etapă manuală existentă - păstrează datele business
             console.log(`[CONTRACT-GENERATE] UPDATE etapă manuală existentă: ${etapaExistentaManuala.ID_Etapa}`);
             
             const updateEtapaManualaQuery = `
@@ -1678,6 +1649,7 @@ async function createContractAnexaZip(
   
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
+
 // FUNCȚIA POST FINALĂ cu suport complet pentru anexă
 export async function POST(request: NextRequest) {
   try {
@@ -1726,7 +1698,7 @@ export async function POST(request: NextRequest) {
       subproiecte_count: subproiecte.length
     });
 
-    // 2. GENERAREA/PĂSTRAREA NUMĂRULUI DE CONTRACT
+    // 2. GENERAREA/PĂSTRAREA NUMĂRULUI DE CONTRACT - MODIFICAT să folosească funcția din setări
     let contractData: any;
     
     if (isEdit && contractExistentId && contractPreview) {
@@ -1737,7 +1709,7 @@ export async function POST(request: NextRequest) {
       };
       console.log('[CONTRACT-GENERATE] EDITARE - Number păstrat:', contractData.numar_contract);
     } else {
-      // Pentru contract nou, generează număr consecutiv
+      // MODIFICAT: Pentru contract nou, folosește funcția din setări
       contractData = await getNextContractNumber(tipDocument, proiectId);
       console.log('[CONTRACT-GENERATE] GENERARE NOUĂ - Number generat:', contractData.numar_contract);
     }
