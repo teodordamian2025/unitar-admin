@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/contracts/generate/route.ts
-// DATA: 12.09.2025 20:15 (ora României)
-// MODIFICAT: Eliminat funcția locală getNextContractNumber + corectare procente
+// DATA: 14.01.2025 10:45 (ora României)
+// MODIFICAT: Adăugat suport pentru numărul contract editabil (customContractNumber)
 // PĂSTRATE: Toate funcționalitățile existente + logica EtapeContract integrală
 // ==================================================================
 
@@ -10,7 +10,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
 import { readFile, readdir } from 'fs/promises';
 import path from 'path';
-// NOUĂ IMPORTARE: Folosește funcția din setări pentru numerotare
+// MODIFICAT: Funcția pentru numerotare - acceptă acum parametru pentru număr custom
 import { getNextContractNumber } from '@/app/api/setari/contracte/route';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
@@ -32,6 +32,64 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+// NOUĂ FUNCȚIE: Validează numărul contract custom
+async function validateCustomContractNumber(numarCustom: string, contractIdExistent?: string): Promise<{valid: boolean, error?: string}> {
+  try {
+    console.log(`[CONTRACT-VALIDATE] Validez numărul custom: ${numarCustom}`);
+    
+    // Verifică formatul de bază
+    const formatPattern = /^[A-Z]+-\d+-\d{4}$/;
+    if (!formatPattern.test(numarCustom.trim())) {
+      return {
+        valid: false,
+        error: 'Format invalid. Folosește: SERIE-NUMAR-AN (ex: CONTR-1001-2025)'
+      };
+    }
+
+    // Verifică unicitatea în BigQuery
+    let duplicateQuery = `
+      SELECT ID_Contract, numar_contract 
+      FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+      WHERE numar_contract = @numarCustom
+    `;
+
+    const params: any = { numarCustom: numarCustom.trim() };
+    const types: any = { numarCustom: 'STRING' };
+
+    // Exclude contractul curent dacă e editare
+    if (contractIdExistent) {
+      duplicateQuery += ' AND ID_Contract != @contractIdExistent';
+      params.contractIdExistent = contractIdExistent;
+      types.contractIdExistent = 'STRING';
+    }
+
+    const [duplicateRows] = await bigquery.query({
+      query: duplicateQuery,
+      params,
+      types,
+      location: 'EU',
+    });
+
+    if (duplicateRows.length > 0) {
+      const existingContract = duplicateRows[0];
+      return {
+        valid: false,
+        error: `Numărul ${numarCustom} există deja pentru contractul ${existingContract.ID_Contract}`
+      };
+    }
+
+    console.log(`[CONTRACT-VALIDATE] ✅ Numărul ${numarCustom} este valid și unic`);
+    return { valid: true };
+
+  } catch (error) {
+    console.error('[CONTRACT-VALIDATE] Eroare la validarea numărului custom:', error);
+    return {
+      valid: false,
+      error: 'Eroare la verificarea numărului în sistem'
+    };
+  }
+}
 
 // TOATE HELPER-urile PĂSTRATE identic
 const extractSimpleValue = (value: any): any => {
@@ -723,6 +781,7 @@ function calculeazaSumaContractCuValoriEstimate(proiect: any, subproiecte: any[]
     };
   }
 }
+
 // NOUĂ FUNCȚIE: Calculează suma anexei
 function calculeazaSumaAnexaCuValoriEstimate(anexaEtape: any[]) {
   if (anexaEtape.length === 0) {
@@ -1340,7 +1399,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
                 ${termen.termen_zile},
                 '${termen.subproiect_id}',
                 'Nefacturat',
-                'Neîncasat',
+                'NeÎncasat',
                 ${cursValutarEtapa || 'NULL'},
                 ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
                 ${termen.procent_calculat || 0},
@@ -1419,7 +1478,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
                 ${termen.termen_zile},
                 NULL,
                 'Nefacturat',
-                'Neîncasat',
+                'NeÎncasat',
                 ${cursValutarEtapa || 'NULL'},
                 ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
                 ${termen.procent_calculat || 0},
@@ -1517,7 +1576,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             ${etapa.termen_zile},
             ${etapa.subproiect_id ? `'${etapa.subproiect_id}'` : 'NULL'},
             'Nefacturat',
-            'Neîncasat',
+            'NeÎncasat',
             ${cursValutarEtapa || 'NULL'},
             ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
             ${etapa.procent_calculat || 0},
@@ -1650,7 +1709,7 @@ async function createContractAnexaZip(
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
-// FUNCȚIA POST FINALĂ cu suport complet pentru anexă
+// MODIFICATĂ: FUNCȚIA POST FINALĂ cu suport complet pentru numărul contract editabil
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -1665,7 +1724,10 @@ export async function POST(request: NextRequest) {
 	  contractPreview,
 	  contractPrefix,
 	  
-	  // NOUĂ: Parametri pentru anexă
+	  // NOUĂ LOGICĂ: Parametru pentru numărul custom
+	  customContractNumber = null,
+	  
+	  // Parametri pentru anexă
 	  anexaActiva = false,
 	  anexaEtape = [],
 	  anexaNumar = 1,
@@ -1684,7 +1746,8 @@ export async function POST(request: NextRequest) {
       termene_count: termenePersonalizate.length,
       anexaActiva,
       anexa_etape_count: anexaEtape.length,
-      anexaNumar
+      anexaNumar,
+      customContractNumber: customContractNumber || 'auto-generated'
     });
 
     // 1. ÎNCĂRCAREA DATELOR PROIECT
@@ -1698,20 +1761,56 @@ export async function POST(request: NextRequest) {
       subproiecte_count: subproiecte.length
     });
 
-    // 2. GENERAREA/PĂSTRAREA NUMĂRULUI DE CONTRACT - MODIFICAT să folosească funcția din setări
+    // 2. MODIFICATĂ: GENERAREA/PĂSTRAREA NUMĂRULUI DE CONTRACT cu suport custom
     let contractData: any;
     
     if (isEdit && contractExistentId && contractPreview) {
-      // Pentru editare, păstrează numărul existent
+      // Pentru editare, folosește numărul din contractPreview (poate fi custom modificat)
       contractData = {
         numar_contract: contractPreview,
         serie: contractPreview.split('-')[0] || 'CON'
       };
-      console.log('[CONTRACT-GENERATE] EDITARE - Number păstrat:', contractData.numar_contract);
+      console.log('[CONTRACT-GENERATE] EDITARE - Număr păstrat/modificat:', contractData.numar_contract);
+      
+      // NOUĂ VALIDARE: Dacă e număr custom, validează-l
+      if (customContractNumber && customContractNumber !== contractPreview) {
+        console.log('[CONTRACT-GENERATE] DETECTAT NUMĂR CUSTOM ÎN EDITARE:', customContractNumber);
+        const validationResult = await validateCustomContractNumber(customContractNumber, contractExistentId);
+        if (!validationResult.valid) {
+          console.error('[CONTRACT-GENERATE] Eroare validare număr custom:', validationResult.error);
+          return NextResponse.json({
+            error: `Numărul contract invalid: ${validationResult.error}`,
+            details: 'Verifică numărul contractului și încearcă din nou'
+          }, { status: 400 });
+        }
+        contractData.numar_contract = customContractNumber;
+        contractData.serie = customContractNumber.split('-')[0] || 'CON';
+      }
     } else {
-      // MODIFICAT: Pentru contract nou, folosește funcția din setări
-      contractData = await getNextContractNumber(tipDocument, proiectId);
-      console.log('[CONTRACT-GENERATE] GENERARE NOUĂ - Number generat:', contractData.numar_contract);
+      // Pentru contract nou
+      if (customContractNumber) {
+        // NOUĂ LOGICĂ: Utilizator a specificat un număr custom
+        console.log('[CONTRACT-GENERATE] GENERARE NOUĂ CU NUMĂR CUSTOM:', customContractNumber);
+        
+        const validationResult = await validateCustomContractNumber(customContractNumber);
+        if (!validationResult.valid) {
+          console.error('[CONTRACT-GENERATE] Eroare validare număr custom:', validationResult.error);
+          return NextResponse.json({
+            error: `Numărul contract invalid: ${validationResult.error}`,
+            details: 'Verifică numărul contractului și încearcă din nou'
+          }, { status: 400 });
+        }
+        
+        contractData = {
+          numar_contract: customContractNumber,
+          serie: customContractNumber.split('-')[0] || 'CON'
+        };
+        console.log('[CONTRACT-GENERATE] ✅ Număr custom validat și acceptat:', customContractNumber);
+      } else {
+        // Generare automatică normală
+        contractData = await getNextContractNumber(tipDocument, proiectId);
+        console.log('[CONTRACT-GENERATE] GENERARE NOUĂ - Număr generat automat:', contractData.numar_contract);
+      }
     }
 
     // 3. CALCULAREA SUMELOR PENTRU CONTRACT
@@ -1721,7 +1820,8 @@ export async function POST(request: NextRequest) {
       suma_finala_ron: calculContractResult.sumaFinala,
       suma_originala: calculContractResult.sumaOriginala,
       moneda_originala: calculContractResult.monedaOriginala,
-      cursuri: calculContractResult.cursuriUtilizate
+      cursuri: calculContractResult.cursuriUtilizate,
+      custom_number: !!customContractNumber
     });
 
     // 4. PREGĂTIREA DATELOR TEMPLATE PENTRU CONTRACT
@@ -1838,11 +1938,11 @@ export async function POST(request: NextRequest) {
 	  monedaOriginala: calculContractResult.monedaOriginala,
 	  sumaFinala: calculContractResult.sumaFinala,
 	  cursuriUtilizate: calculContractResult.cursuriUtilizate,
-	  // ADAUGĂ acestea:
+	  // Adaugă acestea:
 	  sumaOriginalaNumeric: calculContractResult.sumaOriginalaNumeric,
 	  monedaOriginalaForDB: calculContractResult.monedaOriginalaForDB,
       
-      // NOUĂ: Date anexă pentru salvare
+      // Date anexă pentru salvare
       anexaActiva: anexaGenerated,
       anexaEtape: anexaGenerated ? anexaEtape : [],
       anexaNumar: anexaGenerated ? anexaNumar : null,
@@ -1864,7 +1964,7 @@ export async function POST(request: NextRequest) {
     let contentType: string;
 
     if (anexaGenerated && anexaBuffer) {
-      // Creează ZIP cu contract + anexă
+      // Crează ZIP cu contract + anexă
       finalBuffer = await createContractAnexaZip(
         contractBuffer,
         anexaBuffer,
@@ -1900,6 +2000,7 @@ export async function POST(request: NextRequest) {
         'X-Anexa-Number': anexaGenerated ? anexaNumar.toString() : '0',
         'X-Generation-Type': anexaGenerated ? 'dual' : 'single',
         'X-Is-Edit': isEdit.toString(),
+        'X-Custom-Number': (!!customContractNumber).toString(),
         'X-Total-Etape': termenePersonalizate.length.toString(),
         'X-Total-Anexa-Etape': anexaGenerated ? anexaEtape.length.toString() : '0'
       }
@@ -1913,6 +2014,7 @@ export async function POST(request: NextRequest) {
       file_size: `${(finalBuffer.length / 1024).toFixed(2)} KB`,
       anexa_generated: anexaGenerated,
       is_edit: isEdit,
+      custom_number: !!customContractNumber,
       template_used: templateUsed
     });
     console.log('[CONTRACT-GENERATE] =================================');

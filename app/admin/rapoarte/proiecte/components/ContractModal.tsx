@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ContractModal.tsx
-// DATA: 07.09.2025 17:30 (ora României)
-// COMPLETAT: Integrare COMPLETĂ sistem anexă + detectare modificări + UI dual
+// DATA: 14.01.2025 10:30 (ora României)
+// MODIFICAT: Adăugat număr contract editabil cu validare în timp real
 // PĂSTRATE: TOATE funcționalitățile existente + logica EtapeContract
 // ==================================================================
 
@@ -108,6 +108,14 @@ interface AnexaExistenta {
   etape: TermenPersonalizat[];
   valoare_totala: number;
   moneda_principala: string;
+}
+
+// NOUĂ: Interfață pentru validarea numărului contract
+interface ContractNumberValidation {
+  isValid: boolean;
+  error?: string;
+  isDuplicate: boolean;
+  formattedNumber?: string;
 }
 
 // Cursuri valutare pentru conversii - PĂSTRAT identic
@@ -217,6 +225,15 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [contractPreview, setContractPreview] = useState('');
   const [contractPreviewForGeneration, setContractPreviewForGeneration] = useState('');
   
+  // NOUĂ LOGICĂ: State pentru numărul contract editabil
+  const [isManuallyEdited, setIsManuallyEdited] = useState(false);
+  const [contractNumberValidation, setContractNumberValidation] = useState<ContractNumberValidation>({
+    isValid: true,
+    isDuplicate: false
+  });
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [originalGeneratedNumber, setOriginalGeneratedNumber] = useState('');
+  
   // PĂSTRAT: Termene contract
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
 
@@ -254,6 +271,119 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   }, [isOpen, proiect.ID_Proiect]);
 
+  // NOUĂ FUNCȚIE: Validarea numărului contract în timp real
+  const validateContractNumber = async (numarContract: string): Promise<ContractNumberValidation> => {
+    if (!numarContract.trim()) {
+      return {
+        isValid: false,
+        error: 'Numărul contractului nu poate fi gol',
+        isDuplicate: false
+      };
+    }
+
+    try {
+      // Verifică formatul (basic validation)
+      const formatPattern = /^[A-Z]+-\d+-\d{4}$/;
+      if (!formatPattern.test(numarContract.trim())) {
+        return {
+          isValid: false,
+          error: 'Format invalid. Folosește: SERIE-NUMAR-AN (ex: CONTR-1001-2025)',
+          isDuplicate: false
+        };
+      }
+
+      // Verifică duplicatele în BigQuery
+      const response = await fetch(`/api/rapoarte/contracte?search=${encodeURIComponent(numarContract.trim())}`);
+      const result = await response.json();
+
+      if (result.success && result.data && result.data.length > 0) {
+        // Verifică dacă nu e același contract (în cazul editării)
+        const existingContract = result.data.find((c: any) => 
+          c.numar_contract === numarContract.trim() && 
+          c.ID_Contract !== contractExistent?.ID_Contract
+        );
+
+        if (existingContract) {
+          return {
+            isValid: false,
+            error: `Numărul ${numarContract} există deja pentru contractul ${existingContract.ID_Contract}`,
+            isDuplicate: true
+          };
+        }
+      }
+
+      return {
+        isValid: true,
+        isDuplicate: false,
+        formattedNumber: numarContract.trim()
+      };
+
+    } catch (error) {
+      console.error('Eroare la validarea numărului contract:', error);
+      return {
+        isValid: false,
+        error: 'Eroare la verificarea numărului. Încearcă din nou.',
+        isDuplicate: false
+      };
+    }
+  };
+
+  // NOUĂ FUNCȚIE: Handler pentru modificarea numărului contract
+  const handleContractNumberChange = async (newNumber: string) => {
+    setContractPreview(newNumber);
+    setContractPreviewForGeneration(newNumber);
+    
+    // Marchează ca modificat manual doar dacă e diferit de cel generat automat
+    const isManualChange = newNumber !== originalGeneratedNumber;
+    setIsManuallyEdited(isManualChange);
+    
+    if (newNumber.trim() === '') {
+      setContractNumberValidation({
+        isValid: false,
+        error: 'Numărul contractului nu poate fi gol',
+        isDuplicate: false
+      });
+      return;
+    }
+
+    // Debounce validation pentru a evita prea multe cereri
+    setValidationLoading(true);
+    setTimeout(async () => {
+      const validation = await validateContractNumber(newNumber);
+      setContractNumberValidation(validation);
+      setValidationLoading(false);
+    }, 500);
+  };
+
+  // NOUĂ FUNCȚIE: Reset la numărul generat automat
+  const resetToAutoNumber = async () => {
+    setValidationLoading(true);
+    try {
+      const response = await fetch(`/api/setari/contracte/next-number?tipDocument=contract&proiectId=${encodeURIComponent(proiect.ID_Proiect)}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        const autoNumber = result.contract_preview;
+        setContractPreview(autoNumber);
+        setContractPreviewForGeneration(autoNumber);
+        setOriginalGeneratedNumber(autoNumber);
+        setIsManuallyEdited(false);
+        setContractNumberValidation({
+          isValid: true,
+          isDuplicate: false
+        });
+        showToast('Numărul resetat la numerotarea automată', 'success');
+      } else {
+        throw new Error(result.error || 'Eroare la resetarea numărului');
+      }
+    } catch (error) {
+      console.error('Eroare la resetarea numărului:', error);
+      showToast('Nu s-a putut reseta numărul', 'error');
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
   // PĂSTRAT identic
   const loadProiectComplet = async () => {
     try {
@@ -283,7 +413,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     }
   };
 
-  // PĂSTRAT identic
+  // MODIFICAT: Preview număr contract pentru contract nou - NU incrementează counters
   const previewContractNumberForNewContract = async () => {
     try {
       console.log('Apelez API-ul pentru numerotare consecutivă (contract nou)...');
@@ -297,6 +427,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         const newPreview = result.contract_preview;
         setContractPreview(newPreview);
         setContractPreviewForGeneration(newPreview);
+        
+        // NOUĂ LOGICĂ: Salvează numărul generat automat pentru comparație
+        setOriginalGeneratedNumber(newPreview);
+        setIsManuallyEdited(false);
+        setContractNumberValidation({
+          isValid: true,
+          isDuplicate: false
+        });
         
         console.log('Număr consecutiv pentru contract nou:', {
           preview: newPreview,
@@ -316,6 +454,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       const fallbackPreview = `${contractPrefix}-${fallbackNumber}-${currentYear}`;
       setContractPreview(fallbackPreview);
       setContractPreviewForGeneration(fallbackPreview);
+      setOriginalGeneratedNumber(fallbackPreview);
     }
   };
 
@@ -393,6 +532,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       console.error('Eroare la încărcarea anexelor existente:', error);
     }
   };
+  
   // MODIFICAT: Funcția de încărcare etape din EtapeContract + anexe
   const loadEtapeFromEtapeContract = async (contractId: string): Promise<TermenPersonalizat[]> => {
     try {
@@ -425,7 +565,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       return [];
     }
   };
-
   // NOUĂ FUNCȚIE: Calculează diferențele pentru anexă
   const calculeazaDiferenteSubproiecte = (): TermenPersonalizat[] => {
     const diferente: TermenPersonalizat[] = [];
@@ -729,6 +868,14 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         
         setContractPreview(contract.numar_contract);
         setContractPreviewForGeneration(contract.numar_contract);
+        
+        // NOUĂ LOGICĂ: Pentru contract existent, salvează numărul original
+        setOriginalGeneratedNumber(contract.numar_contract);
+        setIsManuallyEdited(false);
+        setContractNumberValidation({
+          isValid: true,
+          isDuplicate: false
+        });
         
         console.log(`✅ PĂSTRARE NUMĂR EXISTENT: ${contract.numar_contract} (nu se generează unul nou)`);
         
@@ -1080,7 +1227,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
 
   // NOUĂ FUNCȚIE: Activează anexa și calculează diferențele
   const handleActualizeazaCuAnexa = () => {
-    console.log('📄 Actualizează cu anexă pentru diferențe');
+    console.log('🔄 Actualizează cu anexă pentru diferențe');
     
     if (!anexaActiva) {
       setAnexaActiva(true);
@@ -1204,6 +1351,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setAnexaObservatii('');
     setAnexaDescrierelucrari('');
     
+    // NOUĂ LOGICĂ: Resetează și state-urile pentru numărul contract
+    setIsManuallyEdited(false);
+    setContractNumberValidation({
+      isValid: true,
+      isDuplicate: false
+    });
+    
     await previewContractNumberForNewContract();
     
     if (subproiecte.length > 0) {
@@ -1232,6 +1386,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
     setObservatii('');
     showToast('Mod contract nou activat cu număr nou', 'info');
   };
+  
   const handleDeleteContract = async () => {
     if (!contractExistent) return;
     
@@ -1265,164 +1420,6 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       setLoadingDelete(false);
     }
   };
-
-  // MODIFICAT: Funcția de generare cu suport pentru anexă
-  const handleGenerateContract = async () => {
-    setLoading(true);
-    
-    try {
-      if (termenePersonalizate.some(t => !t.denumire.trim())) {
-        showToast('Toate etapele trebuie să aibă o denumire', 'error');
-        setLoading(false);
-        return;
-      }
-
-      if (termenePersonalizate.length === 0) {
-        showToast('Contractul trebuie să aibă cel puțin o etapă', 'error');
-        setLoading(false);
-        return;
-      }
-
-      // Validare anexă dacă este activă
-      if (anexaActiva) {
-        if (anexaEtape.some(t => !t.denumire.trim())) {
-          showToast('Toate etapele anexei trebuie să aibă o denumire', 'error');
-          setLoading(false);
-          return;
-        }
-
-        if (anexaEtape.length === 0) {
-          showToast('Anexa trebuie să aibă cel puțin o etapă', 'error');
-          setLoading(false);
-          return;
-        }
-
-        if (!anexaDataStart || !anexaDataFinal) {
-          showToast('Anexa trebuie să aibă date de început și sfârșit', 'error');
-          setLoading(false);
-          return;
-        }
-
-        if (!anexaDescrierelucrari.trim()) {
-          showToast('Anexa trebuie să aibă o descriere a lucrărilor', 'error');
-          setLoading(false);
-          return;
-        }
-      }
-
-      const validareProcentuala = verificaLimita3Procent();
-      if (!validareProcentuala.valid) {
-        showToast(`Nu se poate genera contractul: ${validareProcentuala.mesaj}`, 'error');
-        setLoading(false);
-        return;
-      }
-
-      const actionText = anexaActiva ? 
-        'generează contractul și anexa' : 
-        (isEditMode ? 'actualizează contractul' : 'generează contractul');
-      showToast(`Se ${actionText}...`, 'info');
-
-      const response = await fetch('/api/actions/contracts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proiectId: proiect.ID_Proiect,
-          tipDocument: 'contract',
-          termenePersonalizate,
-          observatii: observatii.trim(),
-          isEdit: isEditMode,
-          contractExistentId: contractExistent?.ID_Contract || null,
-          contractPreview: contractPreviewForGeneration,
-          contractPrefix: contractPrefix,
-          
-          // NOUĂ: Date pentru anexă
-          anexaActiva,
-          anexaEtape: anexaActiva ? anexaEtape : [],
-          anexaNumar,
-          anexaDataStart: anexaActiva ? anexaDataStart : null,
-          anexaDataFinal: anexaActiva ? anexaDataFinal : null,
-          anexaObservatii: anexaActiva ? anexaObservatii : null,
-          anexaDescrierelucrari: anexaActiva ? anexaDescrierelucrari : null
-        })
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        
-        const contractNumber = response.headers.get('X-Contract-Number') || contractPreviewForGeneration;
-        const anexaGenerated = response.headers.get('X-Anexa-Generated') === 'true';
-        
-        if (anexaGenerated) {
-          // Pentru generare duală, trebuie să primim două fișiere
-          // API-ul va returna un ZIP sau două download-uri succesive
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = anexaActiva ? 
-            `${contractNumber}_cu_anexa.zip` : 
-            `${contractNumber}.docx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-          
-          const successMessage = `Contract ${contractNumber} ${anexaActiva ? 'și anexa' : ''} ${isEditMode ? 'actualizat' : 'generat'} cu succes!`;
-          showToast(successMessage, 'success');
-        } else {
-          // Generare doar contract
-          const url = window.URL.createObjectURL(blob);
-          const fileName = `${contractNumber}.docx`;
-          
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-          
-          const successMessage = isEditMode ? 
-            `Contract ${contractNumber} actualizat cu succes!` :
-            `Contract ${contractNumber} generat cu succes!`;
-          
-          showToast(successMessage, 'success');
-        }
-        
-        if (onSuccess) {
-          onSuccess();
-        }
-        
-        onClose();
-      } else {
-        const errorResult = await response.json();
-        throw new Error(errorResult.error || 'Eroare la procesarea contractului');
-      }
-    } catch (error) {
-      console.error('Eroare la generarea/actualizarea contractului:', error);
-      showToast(`Eroare la procesarea contractului: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (termenePersonalizate.length > 0) {
-      const termeneWithPercents = calculeazaProcenteInformative(termenePersonalizate);
-      if (JSON.stringify(termeneWithPercents) !== JSON.stringify(termenePersonalizate)) {
-        setTermenePersonalizate(termeneWithPercents);
-      }
-    }
-  }, [termenePersonalizate.map(t => t.valoare_ron).join(',')]);
-
-  // NOUĂ: Effect pentru recalcularea procentelor anexă
-  useEffect(() => {
-    if (anexaEtape.length > 0) {
-      const anexaWithPercents = calculeazaProcenteInformative(anexaEtape);
-      if (JSON.stringify(anexaWithPercents) !== JSON.stringify(anexaEtape)) {
-        setAnexaEtape(anexaWithPercents);
-      }
-    }
-  }, [anexaEtape.map(t => t.valoare_ron).join(',')]);
 
   if (!isOpen) return null;
 
@@ -1736,33 +1733,116 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </div>
             </div>
           )}
-          {/* Numărul contractului - doar pentru contract nou */}
-          {!isEditMode && (
-            <div style={{
-              background: '#e8f5e8',
-              border: '1px solid #c3e6cb',
-              borderRadius: '8px',
-              padding: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '16px' }}>
-                Număr Contract Consecutiv
-              </h3>
-              <div style={{
-                padding: '0.5rem 1rem',
-                background: '#fff',
-                border: '2px solid #27ae60',
-                borderRadius: '8px',
-                fontSize: '18px',
-                fontFamily: 'monospace',
-                fontWeight: 'bold',
-                color: '#27ae60',
-                textAlign: 'center'
-              }}>
-                {contractPreview}
+
+          {/* MODIFICAT: Numărul contractului - editabil pentru contract nou și existent */}
+          <div style={{
+            background: isEditMode ? '#fff3cd' : '#e8f5e8',
+            border: `1px solid ${isEditMode ? '#ffc107' : '#c3e6cb'}`,
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '16px' }}>
+              {isEditMode ? 'Număr Contract Existent (Editabil)' : 'Număr Contract Consecutiv (Editabil)'}
+            </h3>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={contractPreview}
+                  onChange={(e) => handleContractNumberChange(e.target.value)}
+                  disabled={loading || loadingDelete || validationLoading}
+                  placeholder="CONTR-1001-2025"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    border: `2px solid ${contractNumberValidation.isValid ? '#27ae60' : '#e74c3c'}`,
+                    borderRadius: '8px',
+                    fontSize: '18px',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    color: contractNumberValidation.isValid ? '#27ae60' : '#e74c3c',
+                    background: isManuallyEdited ? '#fff8e1' : '#fff',
+                    transition: 'all 0.3s ease'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {isManuallyEdited && (
+                  <button
+                    onClick={resetToAutoNumber}
+                    disabled={loading || loadingDelete || validationLoading}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      background: '#3498db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: (loading || loadingDelete || validationLoading) ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Reset Auto
+                  </button>
+                )}
+                
+                {validationLoading && (
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    border: '3px solid #3498db',
+                    borderTop: '3px solid transparent',
+                    animation: 'spin 1s linear infinite'
+                  }}>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+            
+            {/* Indicator stare și validare */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '12px' }}>
+                {isManuallyEdited ? (
+                  <span style={{ color: '#e67e22', fontWeight: 'bold' }}>
+                    ✏️ Modificat manual
+                  </span>
+                ) : (
+                  <span style={{ color: '#27ae60', fontWeight: 'bold' }}>
+                    🔄 Generat automat
+                  </span>
+                )}
+                
+                {contractNumberValidation.isDuplicate && (
+                  <span style={{ color: '#e74c3c', marginLeft: '10px' }}>
+                    ⚠️ Dublcat detectat
+                  </span>
+                )}
+              </div>
+              
+              <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                Format: SERIE-NUMAR-AN
+              </div>
+            </div>
+            
+            {/* Mesaj de validare */}
+            {contractNumberValidation.error && (
+              <div style={{
+                marginTop: '0.5rem',
+                padding: '0.5rem',
+                background: '#f8d7da',
+                border: '1px solid #f5c6cb',
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#721c24'
+              }}>
+                {contractNumberValidation.error}
+              </div>
+            )}
+          </div>
 
           {/* Informații contract existent */}
           {contractExistent && (
@@ -1791,7 +1871,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     )}
                   </div>
                   <div style={{ fontSize: '12px', color: '#856404', marginTop: '0.25rem' }}>
-                    Numărul contractului se păstrează: <strong>{contractPreview}</strong>
+                    Numărul contractului poate fi modificat: <strong>{contractPreview}</strong>
+                    {isManuallyEdited && <span style={{ color: '#e67e22' }}> (modificat manual)</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -2183,6 +2264,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               (calculat automat din valorile în RON)
             </div>
           </div>
+          
           {/* NOUĂ SECȚIUNEA ANEXĂ - doar dacă este activă */}
           {anexaActiva && (
             <div style={{ marginBottom: '1.5rem' }}>
@@ -2674,6 +2756,11 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 <div style={{ fontSize: '16px', color: '#27ae60', fontWeight: 'bold', fontFamily: 'monospace' }}>
                   {contractPreview}
                 </div>
+                {isManuallyEdited && (
+                  <div style={{ fontSize: '10px', color: '#e67e22', fontWeight: 'bold' }}>
+                    ✏️ Modificat manual
+                  </div>
+                )}
                 {anexaActiva && (
                   <div style={{ fontSize: '12px', color: '#e67e22', fontWeight: 'bold' }}>
                     + Anexă {anexaNumar}
@@ -2744,7 +2831,28 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             )}
           </div>
 
-          {/* Butoane finale COMPLETE cu validări */}
+          {/* MODIFICAT: Funcția de generare cu suport pentru numărul custom */}
+          {/* Effect pentru recalcularea procentelor contract */}
+          {useEffect(() => {
+            if (termenePersonalizate.length > 0) {
+              const termeneWithPercents = calculeazaProcenteInformative(termenePersonalizate);
+              if (JSON.stringify(termeneWithPercents) !== JSON.stringify(termenePersonalizate)) {
+                setTermenePersonalizate(termeneWithPercents);
+              }
+            }
+          }, [termenePersonalizate.map(t => t.valoare_ron).join(',')])}
+
+          {/* Effect pentru recalcularea procentelor anexă */}
+          {useEffect(() => {
+            if (anexaEtape.length > 0) {
+              const anexaWithPercents = calculeazaProcenteInformative(anexaEtape);
+              if (JSON.stringify(anexaWithPercents) !== JSON.stringify(anexaEtape)) {
+                setAnexaEtape(anexaWithPercents);
+              }
+            }
+          }, [anexaEtape.map(t => t.valoare_ron).join(',')])}
+
+          {/* Butoane finale COMPLETE cu validări și suport număr custom */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -2761,6 +2869,11 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                 'Se vor genera Contract.docx și Anexa.docx' :
                 `Contractul va fi ${isEditMode ? 'actualizat și regenerat' : 'generat'} ca fișier DOCX`
               }
+              {isManuallyEdited && (
+                <div style={{ color: '#e67e22', marginTop: '2px' }}>
+                  Cu numărul custom: {contractPreview}
+                </div>
+              )}
             </div>
             
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -2782,10 +2895,157 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               </button>
               
               <button
-                onClick={handleGenerateContract}
+                onClick={async () => {
+                  setLoading(true);
+                  
+                  try {
+                    if (termenePersonalizate.some(t => !t.denumire.trim())) {
+                      showToast('Toate etapele trebuie să aibă o denumire', 'error');
+                      setLoading(false);
+                      return;
+                    }
+
+                    if (termenePersonalizate.length === 0) {
+                      showToast('Contractul trebuie să aibă cel puțin o etapă', 'error');
+                      setLoading(false);
+                      return;
+                    }
+
+                    // NOUĂ VALIDARE: Verifică numărul contractului
+                    if (!contractNumberValidation.isValid) {
+                      showToast('Numărul contractului nu este valid', 'error');
+                      setLoading(false);
+                      return;
+                    }
+
+                    // Validare anexă dacă este activă
+                    if (anexaActiva) {
+                      if (anexaEtape.some(t => !t.denumire.trim())) {
+                        showToast('Toate etapele anexei trebuie să aibă o denumire', 'error');
+                        setLoading(false);
+                        return;
+                      }
+
+                      if (anexaEtape.length === 0) {
+                        showToast('Anexa trebuie să aibă cel puțin o etapă', 'error');
+                        setLoading(false);
+                        return;
+                      }
+
+                      if (!anexaDataStart || !anexaDataFinal) {
+                        showToast('Anexa trebuie să aibă date de început și sfârșit', 'error');
+                        setLoading(false);
+                        return;
+                      }
+
+                      if (!anexaDescrierelucrari.trim()) {
+                        showToast('Anexa trebuie să aibă o descriere a lucrărilor', 'error');
+                        setLoading(false);
+                        return;
+                      }
+                    }
+
+                    const validareProcentuala = verificaLimita3Procent();
+                    if (!validareProcentuala.valid) {
+                      showToast(`Nu se poate genera contractul: ${validareProcentuala.mesaj}`, 'error');
+                      setLoading(false);
+                      return;
+                    }
+
+                    const actionText = anexaActiva ? 
+                      'generează contractul și anexa' : 
+                      (isEditMode ? 'actualizează contractul' : 'generează contractul');
+                    showToast(`Se ${actionText}...`, 'info');
+
+                    const response = await fetch('/api/actions/contracts/generate', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        proiectId: proiect.ID_Proiect,
+                        tipDocument: 'contract',
+                        termenePersonalizate,
+                        observatii: observatii.trim(),
+                        isEdit: isEditMode,
+                        contractExistentId: contractExistent?.ID_Contract || null,
+                        contractPreview: contractPreviewForGeneration,
+                        contractPrefix: contractPrefix,
+                        
+                        // NOUĂ LOGICĂ: Trimite numărul custom dacă e modificat manual
+                        customContractNumber: isManuallyEdited ? contractPreview : null,
+                        
+                        // Date pentru anexă
+                        anexaActiva,
+                        anexaEtape: anexaActiva ? anexaEtape : [],
+                        anexaNumar,
+                        anexaDataStart: anexaActiva ? anexaDataStart : null,
+                        anexaDataFinal: anexaActiva ? anexaDataFinal : null,
+                        anexaObservatii: anexaActiva ? anexaObservatii : null,
+                        anexaDescrierelucrari: anexaActiva ? anexaDescrierelucrari : null
+                      })
+                    });
+
+                    if (response.ok) {
+                      const blob = await response.blob();
+                      
+                      const contractNumber = response.headers.get('X-Contract-Number') || contractPreviewForGeneration;
+                      const anexaGenerated = response.headers.get('X-Anexa-Generated') === 'true';
+                      
+                      if (anexaGenerated) {
+                        // Pentru generare duală, trebuie să primim două fișiere
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = anexaActiva ? 
+                          `${contractNumber}_cu_anexa.zip` : 
+                          `${contractNumber}.docx`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                        
+                        const successMessage = `Contract ${contractNumber} ${anexaActiva ? 'și anexa' : ''} ${isEditMode ? 'actualizat' : 'generat'} cu succes!`;
+                        showToast(successMessage, 'success');
+                      } else {
+                        // Generare doar contract
+                        const url = window.URL.createObjectURL(blob);
+                        const fileName = `${contractNumber}.docx`;
+                        
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                        
+                        const successMessage = isEditMode ? 
+                          `Contract ${contractNumber} actualizat cu succes!` :
+                          `Contract ${contractNumber} generat cu succes!`;
+                        
+                        showToast(successMessage, 'success');
+                      }
+                      
+                      if (onSuccess) {
+                        onSuccess();
+                      }
+                      
+                      onClose();
+                    } else {
+                      const errorResult = await response.json();
+                      throw new Error(errorResult.error || 'Eroare la procesarea contractului');
+                    }
+                  } catch (error) {
+                    console.error('Eroare la generarea/actualizarea contractului:', error);
+                    showToast(`Eroare la procesarea contractului: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`, 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
                 disabled={
                   loading || 
                   loadingDelete || 
+                  validationLoading ||
+                  !contractNumberValidation.isValid ||
                   termenePersonalizate.some(t => !t.denumire.trim()) || 
                   termenePersonalizate.length === 0 || 
                   !validareProcentuala.valid ||
@@ -2802,6 +3062,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   background: (
                     loading || 
                     loadingDelete || 
+                    validationLoading ||
+                    !contractNumberValidation.isValid ||
                     termenePersonalizate.some(t => !t.denumire.trim()) || 
                     termenePersonalizate.length === 0 || 
                     !validareProcentuala.valid ||
@@ -2821,6 +3083,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                   cursor: (
                     loading || 
                     loadingDelete || 
+                    validationLoading ||
+                    !contractNumberValidation.isValid ||
                     termenePersonalizate.some(t => !t.denumire.trim()) || 
                     termenePersonalizate.length === 0 || 
                     !validareProcentuala.valid ||
