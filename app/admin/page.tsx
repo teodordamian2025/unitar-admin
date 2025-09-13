@@ -312,6 +312,30 @@ export default function AdminPage() {
             >
               👥 Management Clienți
             </Link>
+            
+            <Link 
+	  href="/admin/rapoarte/contracte" 
+	  style={{ 
+	    display: 'block',
+	    padding: '0.75rem 1rem',
+	    background: '#ecf0f1',
+	    color: '#2c3e50',
+	    textDecoration: 'none',
+	    borderRadius: '6px',
+	    border: '1px solid #bdc3c7',
+	    transition: 'all 0.3s ease'
+	  }}
+	  onMouseOver={(e) => {
+	    e.currentTarget.style.background = '#8e44ad';
+	    e.currentTarget.style.color = 'white';
+	  }}
+	  onMouseOut={(e) => {
+	    e.currentTarget.style.background = '#ecf0f1';
+	    e.currentTarget.style.color = '#2c3e50';
+	  }}
+	>
+	  📄 Management Contracte
+	</Link>
 
             <Link 
               href="/admin/rapoarte/facturi" 
