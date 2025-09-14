@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/contracte/components/ContractFilters.tsx
-// DATA: 14.01.2025 14:05 (ora României)
-// CREAT: Componenta de filtrare pentru contracte
-// PATTERN: Identic cu ProiectFilters.tsx - folosește FilterBar generic
+// DATA: 15.01.2025 10:15 (ora României)
+// MODIFICAT: Schimbat dropdown client cu input text pentru căutare LIKE
+// REPARAT: Elimină clienții fake din dropdown, folosește căutare liberă
 // ==================================================================
 
 'use client';
@@ -27,7 +27,7 @@ export default function ContractFilters({
       key: 'search',
       label: 'Căutare generală',
       type: 'text',
-      placeholder: 'Caută după număr contract, client, denumire...'
+      placeholder: 'Caută după număr contract, client, denumire, ID proiect...'
     },
     {
       key: 'status',
@@ -46,20 +46,14 @@ export default function ContractFilters({
       key: 'proiect_id',
       label: 'ID Proiect',
       type: 'text',
-      placeholder: 'Caută după ID proiect specific...'
+      placeholder: 'Caută după ID proiect (căutare parțială)...'
     },
     {
       key: 'client',
       label: 'Client',
-      type: 'select',
-      placeholder: 'Toți clienții',
-      options: [
-        { value: 'SC T&D PRO ELECTRIC SRL', label: 'SC T&D PRO ELECTRIC SRL' },
-        { value: 'SC PROD SRL', label: 'SC PROD SRL' },
-        { value: 'SC BUILD SRL', label: 'SC BUILD SRL' },
-        { value: 'SC CONSTRUCT SRL', label: 'SC CONSTRUCT SRL' },
-        { value: 'SC DEVELOPMENT SRL', label: 'SC DEVELOPMENT SRL' }
-      ]
+      type: 'text', // MODIFICAT: din 'select' în 'text'
+      placeholder: 'Caută după numele clientului...' // MODIFICAT: placeholder relevant
+      // ELIMINAT: options array cu clienții fake
     },
     {
       key: 'data_creare',

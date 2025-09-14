@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/contracte/route.ts
-// DATA: 15.01.2025 09:30 (ora României)
-// MODIFICAT: Reparat filtrarea + adăugat suport Data_Semnare și Data_Expirare
-// PROBLEME REZOLVATE: Duplicarea filtrelor + filtrarea care nu funcționa
+// DATA: 15.01.2025 10:00 (ora României)
+// REPARAT: Eliminat termen_executie_zile + LIKE în loc de = pentru filtrare
+// PARTEA 1/3: Helpers și configurare inițială
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -195,28 +195,27 @@ const loadEtapeContract = async (contractId: string) => {
     return [];
   }
 };
-
-// GET - Listare și căutare contracte (REPARATĂ FILTRAREA)
+// GET - Listare și căutare contracte (REPARATĂ FILTRAREA CU LIKE)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
     console.log('[CONTRACTE] GET contracte cu parametrii:', Object.fromEntries(searchParams.entries()));
 
-    // REPARATĂ: Construirea query-ului fără duplicări
+    // REPARATĂ: Construirea query-ului fără duplicări + LIKE pentru toate filtrele
     let whereClause = 'WHERE 1=1';
     const params: any = {};
     const types: any = {};
 
-    // REPARAT: Filtru după ID proiect
+    // REPARAT: Filtru după ID proiect - LIKE în loc de = pentru căutare parțială
     const proiectId = searchParams.get('proiect_id');
     if (proiectId && proiectId.trim()) {
-      whereClause += ' AND c.proiect_id = @proiectId';
-      params.proiectId = proiectId.trim();
+      whereClause += ' AND LOWER(c.proiect_id) LIKE LOWER(@proiectId)';
+      params.proiectId = `%${proiectId.trim()}%`;
       types.proiectId = 'STRING';
     }
 
-    // REPARAT: Filtru după status
+    // REPARAT: Filtru după status - păstrează = pentru că este exact match
     const status = searchParams.get('status');
     if (status && status.trim()) {
       whereClause += ' AND c.Status = @status';
@@ -224,18 +223,15 @@ export async function GET(request: NextRequest) {
       types.status = 'STRING';
     }
 
-    // REPARAT: Filtru după client - ELIMINĂ dropdown-ul duplicat
+    // REPARAT: Filtru după client - LIKE pentru căutare parțială (fără dropdown)
     const clientParam = searchParams.get('client') || searchParams.get('client_id');
     if (clientParam && clientParam.trim()) {
-      // Pentru că avem și client_nume și client_id, căutăm în ambele
-      whereClause += ' AND (c.client_id = @clientParam OR LOWER(c.client_nume) LIKE LOWER(@clientParamLike))';
-      params.clientParam = clientParam.trim();
-      params.clientParamLike = `%${clientParam.trim()}%`;
+      whereClause += ' AND (LOWER(c.client_nume) LIKE LOWER(@clientParam) OR LOWER(COALESCE(cl.nume, "")) LIKE LOWER(@clientParam))';
+      params.clientParam = `%${clientParam.trim()}%`;
       types.clientParam = 'STRING';
-      types.clientParamLike = 'STRING';
     }
 
-    // REPARAT: Căutarea generală - fără duplicare
+    // REPARAT: Căutarea generală - fără duplicare, menține logica existentă
     const search = searchParams.get('search');
     if (search && search.trim()) {
       whereClause += ` AND (
@@ -249,7 +245,7 @@ export async function GET(request: NextRequest) {
       types.search = 'STRING';
     }
 
-    // Filtru după perioada de creare
+    // Filtru după perioada de creare - păstrează = pentru date
     const dataCreareStart = searchParams.get('data_creare_start');
     const dataCreareEnd = searchParams.get('data_creare_end');
 
@@ -265,7 +261,7 @@ export async function GET(request: NextRequest) {
       types.dataCreareEnd = 'DATE';
     }
 
-    // Filtru după valoare minimă
+    // Filtru după valoare minimă - păstrează >= pentru numere
     const valoareMin = searchParams.get('valoare_min');
     if (valoareMin && valoareMin.trim() && !isNaN(Number(valoareMin))) {
       whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) >= @valoareMin';
@@ -273,7 +269,7 @@ export async function GET(request: NextRequest) {
       types.valoareMin = 'NUMERIC';
     }
 
-    // Filtru după valoare maximă
+    // Filtru după valoare maximă - păstrează <= pentru numere
     const valoareMax = searchParams.get('valoare_max');
     if (valoareMax && valoareMax.trim() && !isNaN(Number(valoareMax))) {
       whereClause += ' AND CAST(COALESCE(c.valoare_ron, c.Valoare, 0) AS FLOAT64) <= @valoareMax';
@@ -412,8 +408,7 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
-// PUT - Actualizare contract (ADĂUGAT SUPORT PENTRU SEMNARE)
+// PUT - Actualizare contract (ELIMINAT termen_executie_zile din allowedFields)
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -456,12 +451,13 @@ export async function PUT(request: NextRequest) {
       console.log(`Actualizare contract ${ID_Contract} - Status: Semnat, Data_Semnare: ${dataSemnare}, Data_Expirare: ${dataExpirare}`);
     }
 
-    // Construire query UPDATE dinamic cu suport pentru date
+    // MODIFICAT: Construire query UPDATE fără termen_executie_zile
     const updateFields: string[] = [];
     const allowedFields = [
       'Status', 'Data_Semnare', 'Data_Expirare', 'Valoare', 'Moneda', 
       'curs_valutar', 'valoare_ron', 'Observatii', 'note_interne',
-      'termen_executie_zile', 'observatii_semnare'
+      'observatii_semnare'
+      // ELIMINAT: 'termen_executie_zile' - nu există în BigQuery
     ];
 
     Object.entries(updateData).forEach(([key, value]) => {
@@ -471,8 +467,8 @@ export async function PUT(request: NextRequest) {
           const dataLiteral = formatDateLiteral(value as string);
           updateFields.push(`${key} = ${dataLiteral}`);
         }
-        // Tratare pentru câmpurile numerice
-        else if (key === 'Valoare' || key === 'curs_valutar' || key === 'valoare_ron' || key === 'termen_executie_zile') {
+        // Tratare pentru câmpurile numerice (fără termen_executie_zile)
+        else if (key === 'Valoare' || key === 'curs_valutar' || key === 'valoare_ron') {
           const numericValue = parseFloat(value as string);
           if (!isNaN(numericValue)) {
             updateFields.push(`${key} = ${numericValue}`);
