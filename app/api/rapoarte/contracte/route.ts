@@ -336,13 +336,13 @@ export async function GET(request: NextRequest) {
         client_telefon: contract.client_telefon,
         client_email: contract.client_email,
         Denumire_Contract: contract.Denumire_Contract,
-        Data_Semnare: formatDate(contract.Data_Semnare),
-        Data_Expirare: formatDate(contract.Data_Expirare),
+        Data_Semnare: contract.Data_Semnare?.value || contract.Data_Semnare,
+        Data_Expirare: contract.Data_Expirare?.value || contract.Data_Expirare,
         Status: contract.Status,
         Valoare: valoareConvertita,
         Moneda: contract.Moneda,
         curs_valutar: cursValutarConvertit,
-        data_curs_valutar: formatDate(contract.data_curs_valutar),
+        data_curs_valutar: contract.data_curs_valutar?.value || contract.data_curs_valutar,
         valoare_ron: valoareRonConvertita,
         
         // Etape din EtapeContract
