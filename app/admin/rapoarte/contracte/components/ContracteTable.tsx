@@ -453,51 +453,65 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   };
 
   // Funcție formatDate simplificată - identic cu ProiecteTable
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString || dateString === 'null' || dateString === 'undefined') {
-      return (
-        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Data lipsă
-        </span>
-      );
-    }
-    
-    try {
-      const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (isoDateRegex.test(dateString)) {
-        const date = new Date(dateString + 'T00:00:00');
-        
-        if (!isNaN(date.getTime())) {
-          return (
-            <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-              {date.toLocaleDateString()}
-            </span>
-          );
-        }
-      }
-      
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return (
-          <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-            {date.toLocaleDateString()}
-          </span>
-        );
-      }
-      
-      return (
-        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Data invalidă
-        </span>
-      );
-    } catch (error) {
-      return (
-        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-          Eroare formatare
-        </span>
-      );
-    }
-  };
+	const formatDate = (dateValue?: string | { value: string } | null) => {
+	  if (!dateValue) {
+	    return (
+	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+		Data lipsă
+	      </span>
+	    );
+	  }
+	  
+	  try {
+	    // REPARAT: Extrage string-ul din obiectul BigQuery
+	    let dateString = dateValue;
+	    if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
+	      dateString = dateValue.value;
+	    }
+	    
+	    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+	      return (
+		<span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+		  Data lipsă
+		</span>
+	      );
+	    }
+	    
+	    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+	    if (isoDateRegex.test(dateString)) {
+	      const date = new Date(dateString + 'T00:00:00');
+	      
+	      if (!isNaN(date.getTime())) {
+		return (
+		  <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+		    {date.toLocaleDateString()}
+		  </span>
+		);
+	      }
+	    }
+	    
+	    const date = new Date(dateString);
+	    if (!isNaN(date.getTime())) {
+	      return (
+		<span style={{ color: '#2c3e50', fontWeight: '500' }}>
+		  {date.toLocaleDateString()}
+		</span>
+	      );
+	    }
+	    
+	    return (
+	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+		Data invalidă
+	      </span>
+	    );
+	  } catch (error) {
+	    return (
+	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+		Eroare formatare
+	      </span>
+	    );
+	  }
+	};
 
   // Funcții pentru currency cu validări sigure - identic cu ProiecteTable
   const recalculeazaValoareaCuCursBNRLive = (
