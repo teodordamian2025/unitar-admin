@@ -1,20 +1,21 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/contracte/components/ContracteTable.tsx
-// DATA: 14.01.2025 14:20 (ora României)
-// CREAT: Componenta principală pentru tabelul contractelor
-// PATTERN: Identic cu ProiecteTable.tsx - același sistem de încărcare, filtrare și afișare
+// DATA: 15.01.2025 16:00 (ora României)
+// MODIFICAT: Afișare ierarhică Contract + Etape + Anexe cu coloană Status Facturare
+// ADĂUGAT: Încărcare etape și anexe, expand/collapse, indentări pe 3 niveluri
+// PĂSTRATE: Toate funcționalitățile existente + cursuri BNR live + export Excel
 // ==================================================================
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import ContractActions from './ContractActions';
 import ContractSignModal from './ContractSignModal';
 import FacturaHibridModal from '../../proiecte/components/FacturaHibridModal';
 import ContractModal from '../../proiecte/components/ContractModal';
 import ProcesVerbalModal from '../../proiecte/components/ProcesVerbalModal';
 
-// Interfețe pentru contracte
+// Interfețe pentru contracte cu etape și anexe
 interface Contract {
   ID_Contract: string;
   numar_contract: string;
@@ -33,14 +34,81 @@ interface Contract {
   valoare_ron?: number;
   curs_valutar?: number;
   data_curs_valutar?: string;
-  etape?: any[];
+  
+  // NOU: Etape și anexe cu status facturare
+  etape?: EtapaContract[];
   etape_count?: number;
   etape_facturate?: number;
   etape_incasate?: number;
+  
+  anexe?: AnexaContract[];
+  anexe_count?: number;
+  anexe_facturate?: number;
+  anexe_incasate?: number;
+  
+  // NOU: Status facturare general pentru contract
+  status_facturare_display?: string;
+  status_facturare_filtru?: string;
+  
   Observatii?: string;
   data_creare?: string;
   data_actualizare?: string;
   versiune?: number;
+}
+
+// NOU: Interfață pentru etapele contractului
+interface EtapaContract {
+  ID_Etapa: string;
+  contract_id: string;
+  etapa_index: number;
+  denumire: string;
+  valoare: number;
+  moneda: string;
+  valoare_ron: number;
+  termen_zile: number;
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  status_facturare: string;
+  status_incasare: string;
+  status_facturare_display: string;
+  status_facturare_filtru: string;
+  data_scadenta?: string;
+  curs_valutar: number;
+  procent_din_total: number;
+  observatii?: string;
+  este_din_subproiect: boolean;
+  este_manuala: boolean;
+  facturi: any[];
+}
+
+// NOU: Interfață pentru anexele contractului
+interface AnexaContract {
+  ID_Anexa: string;
+  contract_id: string;
+  proiect_id: string;
+  anexa_numar: number;
+  etapa_index: number;
+  denumire: string;
+  valoare: number;
+  moneda: string;
+  valoare_ron: number;
+  termen_zile: number;
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  status_facturare: string;
+  status_incasare: string;
+  status_facturare_display: string;
+  status_facturare_filtru: string;
+  data_scadenta?: string;
+  data_start?: string;
+  data_final?: string;
+  curs_valutar: number;
+  data_curs_valutar?: string;
+  procent_din_total: number;
+  observatii?: string;
+  este_din_subproiect: boolean;
+  este_manuala: boolean;
+  facturi: any[];
 }
 
 interface ContracteTableProps {
@@ -57,7 +125,7 @@ interface CursuriLive {
   };
 }
 
-// Funcție helper pentru validări sigure - identic cu ProiecteTable
+// Funcție helper pentru validări sigure - IDENTIC cu ProiecteTable
 const ensureNumber = (value: any, defaultValue: number = 0): number => {
   if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
     return value;
@@ -71,7 +139,7 @@ const ensureNumber = (value: any, defaultValue: number = 0): number => {
   return defaultValue;
 };
 
-// Funcție pentru formatare sigură cu precizie originală - identic cu ProiecteTable
+// Funcție pentru formatare sigură cu precizie originală - IDENTIC cu ProiecteTable
 const formatWithOriginalPrecision = (value: any, originalPrecision?: string): string => {
   if (originalPrecision && originalPrecision !== 'undefined' && originalPrecision !== 'null') {
     return originalPrecision;
@@ -81,7 +149,7 @@ const formatWithOriginalPrecision = (value: any, originalPrecision?: string): st
   return num.toString();
 };
 
-// Funcție pentru preluarea cursurilor BNR LIVE - identic cu ProiecteTable
+// Funcție pentru preluarea cursurilor BNR LIVE - IDENTIC cu ProiecteTable
 const getCursBNRLive = async (moneda: string, data?: string): Promise<number> => {
   if (moneda === 'RON') return 1;
   
@@ -114,7 +182,7 @@ const getCursBNRLive = async (moneda: string, data?: string): Promise<number> =>
   }
 };
 
-// Toast system - identic cu ProiecteTable
+// Toast system - IDENTIC cu ProiecteTable
 const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   const toastEl = document.createElement('div');
   toastEl.style.cssText = `
@@ -157,8 +225,47 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
+// NOU: Helper pentru formatarea status-ului de facturare cu line breaks
+const formatStatusFacturare = (statusDisplay?: string): JSX.Element => {
+  if (!statusDisplay || statusDisplay === 'Nefacturat') {
+    return (
+      <span style={{ 
+        color: '#95a5a6', 
+        fontSize: '12px', 
+        fontStyle: 'italic',
+        fontWeight: '500'
+      }}>
+        Nefacturat
+      </span>
+    );
+  }
+
+  // Împarte textul în linii și formatează
+  const lines = statusDisplay.split('\n').filter(line => line.trim());
+  
+  return (
+    <div style={{ 
+      fontSize: '11px', 
+      lineHeight: '1.3',
+      maxWidth: '250px',
+      wordBreak: 'break-word'
+    }}>
+      {lines.map((line, index) => (
+        <div key={index} style={{ 
+          marginBottom: index < lines.length - 1 ? '0.25rem' : '0',
+          color: line.includes('Încasat complet') ? '#27ae60' : 
+                 line.includes('Încasat parțial') ? '#f39c12' : 
+                 line.includes('Neîncasat') ? '#e74c3c' : '#2c3e50',
+          fontWeight: '500'
+        }}>
+          {line}
+        </div>
+      ))}
+    </div>
+  );
+};
 export default function ContracteTable({ searchParams }: ContracteTableProps) {
-  // State variables - adaptat pentru contracte
+  // State variables - ADAPTAT pentru contracte cu etape și anexe
   const [contracte, setContracte] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -171,24 +278,56 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   const [showPVModal, setShowPVModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState<any>(null);
 
-  // UseEffect-uri pentru încărcare date - adaptat pentru contracte
+  // NOU: State pentru expand/collapse contracte cu etape/anexe
+  const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
+
+  // UseEffect-uri pentru încărcarea datelor
   useEffect(() => {
     loadData();
   }, [searchParams, refreshTrigger]);
 
   useEffect(() => {
     if (contracte.length > 0) {
+      // Auto-expand contractele care au etape sau anexe
+      const contracteCuEtapeAnexe = contracte
+        .filter(c => (c.etape_count && c.etape_count > 0) || (c.anexe_count && c.anexe_count > 0))
+        .map(c => c.ID_Contract);
+      
+      if (contracteCuEtapeAnexe.length > 0) {
+        setExpandedContracts(new Set(contracteCuEtapeAnexe));
+      }
+      
+      // Identifică și preia cursuri live
       identificaSiPreiaCursuriLive();
     }
   }, [contracte]);
 
-  // Funcție pentru identificare și preluare cursuri LIVE - adaptată pentru contracte
+  // Funcție pentru identificare și preluare cursuri LIVE - ADAPTATĂ pentru contracte
   const identificaSiPreiaCursuriLive = async () => {
     const valuteNecesare = new Set<string>();
     
     contracte.forEach(c => {
+      // Valutele de la contract
       if (c.Moneda && c.Moneda !== 'RON') {
         valuteNecesare.add(c.Moneda);
+      }
+      
+      // Valutele de la etape
+      if (c.etape) {
+        c.etape.forEach(e => {
+          if (e.moneda && e.moneda !== 'RON') {
+            valuteNecesare.add(e.moneda);
+          }
+        });
+      }
+      
+      // Valutele de la anexe
+      if (c.anexe) {
+        c.anexe.forEach(a => {
+          if (a.moneda && a.moneda !== 'RON') {
+            valuteNecesare.add(a.moneda);
+          }
+        });
       }
     });
     
@@ -285,17 +424,21 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       const data = await response.json();
       
       if (data.success) {
+        // REPARAT: Procesează obiectele DATE de la BigQuery identic cu ProiecteTable
         const contracteFormatate = (data.data || []).map((c: any) => ({
           ...c,
           Data_Semnare: c.Data_Semnare?.value || c.Data_Semnare,
           Data_Expirare: c.Data_Expirare?.value || c.Data_Expirare,
-          data_curs_valutar: c.data_curs_valutar?.value || c.data_curs_valutar,
-          data_creare: c.data_creare?.value || c.data_creare,
-          data_actualizare: c.data_actualizare?.value || c.data_actualizare
+          data_curs_valutar: c.data_curs_valutar?.value || c.data_curs_valutar
         }));
         setContracte(contracteFormatate);
         
         console.log(`Contracte încărcate: ${contracteFormatate.length}`);
+        
+        // NOU: Log statistici pentru etape și anexe
+        if (data.stats) {
+          console.log('Statistici contracte:', data.stats);
+        }
       } else {
         throw new Error(data.error || 'Eroare la încărcarea contractelor');
       }
@@ -304,26 +447,26 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       setContracte([]);
     }
   };
-  // Handler-ele pentru modale - adaptate pentru contracte
+
+  // Handler-ele pentru modale - ADAPTATE pentru contracte
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     showToast('Date actualizate!', 'success');
   };
 
   const handleShowFacturaModal = (contract: any) => {
-    // Pentru factură din contract, trebuie să convertim contractul într-un format compatibil cu FacturaHibridModal
+    // Pentru factură din contract, convertim contractul într-un format compatibil cu FacturaHibridModal
     const proiectCompatibil = {
       ID_Proiect: contract.proiect_id,
       Denumire: contract.Denumire_Contract,
       Client: contract.client_nume,
-      Status: 'Activ', // Presupunem că dacă există contract, proiectul este activ
+      Status: 'Activ',
       Valoare_Estimata: contract.Valoare,
       Data_Start: contract.Data_Semnare,
       Data_Final: contract.Data_Expirare,
       moneda: contract.Moneda || 'RON',
       valoare_ron: contract.valoare_ron,
       curs_valutar: contract.curs_valutar,
-      // Date suplimentare pentru factură
       contract_id: contract.ID_Contract,
       numar_contract: contract.numar_contract,
       etape: contract.etape || []
@@ -333,7 +476,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   };
 
   const handleShowEditModal = (contract: any) => {
-    // Pentru editare contract, convertim datele
     const proiectCompatibil = {
       ID_Proiect: contract.proiect_id,
       Denumire: contract.Denumire_Contract,
@@ -345,7 +487,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       moneda: contract.Moneda || 'RON',
       valoare_ron: contract.valoare_ron,
       curs_valutar: contract.curs_valutar,
-      // Date specifice contract pentru editare
       contract_id: contract.ID_Contract,
       numar_contract: contract.numar_contract,
       observatii: contract.Observatii
@@ -355,7 +496,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   };
 
   const handleShowPVModal = (contract: any) => {
-    // Pentru PV din contract
     const proiectCompatibil = {
       ID_Proiect: contract.proiect_id,
       Denumire: contract.Denumire_Contract,
@@ -366,7 +506,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       Data_Final: contract.Data_Expirare,
       moneda: contract.Moneda || 'RON',
       valoare_ron: contract.valoare_ron,
-      // Date pentru PV
       contract_id: contract.ID_Contract,
       numar_contract: contract.numar_contract
     };
@@ -374,6 +513,18 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     setShowPVModal(true);
   };
 
+  // NOU: Toggle pentru expand/collapse contracte
+  const toggleContractExpansion = (contractId: string) => {
+    setExpandedContracts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contractId)) {
+        newSet.delete(contractId);
+      } else {
+        newSet.add(contractId);
+      }
+      return newSet;
+    });
+  };
   const handleFacturaSuccess = (invoiceId: string, downloadUrl?: string) => {
     setShowFacturaModal(false);
     setSelectedContract(null);
@@ -423,7 +574,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         });
       }
 
-      // Folosim același endpoint, dar cu parametrul type=contracte pentru a diferenția
       const response = await fetch(`/api/rapoarte/contracte/export?${queryParams.toString()}`);
       
       if (response.ok) {
@@ -452,70 +602,70 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     }
   };
 
-  // Funcție formatDate simplificată - identic cu ProiecteTable
-	const formatDate = (dateValue?: string | { value: string } | null) => {
-	  if (!dateValue) {
-	    return (
-	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-		Data lipsă
-	      </span>
-	    );
-	  }
-	  
-	  try {
-	    // REPARAT: Extrage string-ul din obiectul BigQuery
-		let dateString: string = '';
-		if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
-		  dateString = dateValue.value;
-		} else if (typeof dateValue === 'string') {
-		  dateString = dateValue;
-		}
-	    
-	    if (!dateString || dateString === 'null' || dateString === 'undefined') {
-	      return (
-		<span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-		  Data lipsă
-		</span>
-	      );
-	    }
-	    
-	    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-	    if (isoDateRegex.test(dateString)) {
-	      const date = new Date(dateString + 'T00:00:00');
-	      
-	      if (!isNaN(date.getTime())) {
-		return (
-		  <span style={{ color: '#2c3e50', fontWeight: '500' }}>
-		    {date.toLocaleDateString()}
-		  </span>
-		);
-	      }
-	    }
-	    
-	    const date = new Date(dateString);
-	    if (!isNaN(date.getTime())) {
-	      return (
-		<span style={{ color: '#2c3e50', fontWeight: '500' }}>
-		  {date.toLocaleDateString()}
-		</span>
-	      );
-	    }
-	    
-	    return (
-	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-		Data invalidă
-	      </span>
-	    );
-	  } catch (error) {
-	    return (
-	      <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
-		Eroare formatare
-	      </span>
-	    );
-	  }
-	};
+  // Funcție formatDate simplificată - IDENTIC cu ProiecteTable
+  const formatDate = (dateValue?: string | { value: string } | null) => {
+    if (!dateValue) {
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Data lipsă
+        </span>
+      );
+    }
+    
+    try {
+      // REPARAT: Extrage string-ul din obiectul BigQuery
+      let dateString: string = '';
+      if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
+        dateString = dateValue.value;
+      } else if (typeof dateValue === 'string') {
+        dateString = dateValue;
+      }
+      
+      if (!dateString || dateString === 'null' || dateString === 'undefined') {
+        return (
+          <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+            Data lipsă
+          </span>
+        );
+      }
+      
+      const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (isoDateRegex.test(dateString)) {
+        const date = new Date(dateString + 'T00:00:00');
+        
+        if (!isNaN(date.getTime())) {
+          return (
+            <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+              {date.toLocaleDateString()}
+            </span>
+          );
+        }
+      }
+      
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return (
+          <span style={{ color: '#2c3e50', fontWeight: '500' }}>
+            {date.toLocaleDateString()}
+          </span>
+        );
+      }
+      
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Data invalidă
+        </span>
+      );
+    } catch (error) {
+      return (
+        <span style={{ color: '#e74c3c', fontSize: '12px', fontStyle: 'italic' }}>
+          Eroare formatare
+        </span>
+      );
+    }
+  };
 
-  // Funcții pentru currency cu validări sigure - identic cu ProiecteTable
+  // Funcții pentru currency cu validări sigure - ADAPTATE pentru contracte
   const recalculeazaValoareaCuCursBNRLive = (
     valoareOriginala: number, 
     monedaOriginala: string, 
@@ -550,13 +700,15 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     amount?: number, 
     currency?: string, 
     ronValueBD?: number, 
-    cursVechiDinBD?: number
+    cursVechiDinBD?: number,
+    isEtapa = false,
+    isAnexa = false
   ) => {
     const amountSigur = ensureNumber(amount);
     if (amountSigur === 0 && !amount) return '';
     
     const originalCurrency = currency || 'RON';
-    const colorClass = '#3498db'; // Albastru pentru contracte
+    const colorClass = isAnexa ? '#f39c12' : isEtapa ? '#9b59b6' : '#3498db'; // Portocaliu pentru anexe, violet pentru etape, albastru pentru contracte
     
     if (originalCurrency === 'RON' || !currency) {
       return (
@@ -657,7 +809,8 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       default: return '⚪';
     }
   };
-  // Calculare total contracte cu validări robuste - adaptat pentru contracte
+
+  // Calculare total contracte cu validări robuste - ADAPTAT pentru contracte
   const calculateTotalValue = () => {
     let totalContracte = 0;
     let contracteCalculate = 0;
@@ -726,8 +879,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     
     return totalSigur;
   };
-
-  // Loading state - identic cu ProiecteTable
+  // Loading state - IDENTIC cu ProiecteTable
   if (loading) {
     return (
       <div style={{ 
@@ -748,7 +900,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     );
   }
 
-  // RENDER principal - adaptat pentru contracte
+  // RENDER principal - ADAPTAT pentru contracte cu etape și anexe
   return (
     <div style={{
       zIndex: 1,
@@ -775,7 +927,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
             fontSize: '1.4rem',
             fontWeight: '600'
           }}>
-            📄 Contracte găsite: {contracte.length}
+            📄 Contracte găsite: {contracte.length} 
+            {contracte.reduce((acc, c) => acc + (c.etape_count || 0) + (c.anexe_count || 0), 0) > 0 && (
+              ` (+ ${contracte.reduce((acc, c) => acc + (c.etape_count || 0), 0)} etape, ${contracte.reduce((acc, c) => acc + (c.anexe_count || 0), 0)} anexe)`
+            )}
           </h3>
           <p style={{ 
             margin: '0.5rem 0 0 0', 
@@ -785,7 +940,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
           }}>
             {searchParams && Object.keys(searchParams).length > 0 
               ? 'Rezultate filtrate' 
-              : 'Toate contractele din sistem'
+              : 'Toate contractele cu etape și anexe'
             }
             {Object.keys(cursuriLive).length > 0 && (
               <span style={{ 
@@ -802,7 +957,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
             )}
             <br/>
             <span style={{ color: '#3498db', fontWeight: 'bold', fontSize: '12px' }}>
-              ✅ Sistem contracte cu funcționalități complete
+              ✅ Sistem contracte cu afișare ierarhică: Contract → Etape + Anexe
             </span>
           </p>
         </div>
@@ -848,7 +1003,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         </div>
       </div>
 
-      {/* Tabelul cu contracte */}
+      {/* Tabelul cu afișare ierarhică pentru contracte, etape și anexe */}
       {contracte.length === 0 ? (
         <div style={{ 
           textAlign: 'center', 
@@ -894,9 +1049,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                     color: '#2c3e50',
                     fontSize: '13px',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    letterSpacing: '0.5px',
+                    minWidth: '300px'
                   }}>
-                    Contract
+                    Contract / Etapă / Anexă
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
@@ -953,6 +1109,19 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                   }}>
                     Valoare Contract
                   </th>
+                  {/* NOU: Coloana pentru Status Facturare/Încasare */}
+                  <th style={{ 
+                    padding: '1rem 0.75rem', 
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    minWidth: '280px'
+                  }}>
+                    Status Facturare/Încasare
+                  </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
                     textAlign: 'center',
@@ -967,133 +1136,386 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                 </tr>
               </thead>
               <tbody>
-                {contracte.map((contract, index) => (
-                  <tr 
-                    key={contract.ID_Contract}
-                    style={{ 
-                      borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-                      background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    <td style={{ 
-                      padding: '0.75rem',
-                      color: '#2c3e50',
-                      width: '280px',
-                      minWidth: '250px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ 
-                            fontFamily: 'monospace',
-                            fontWeight: 'bold',
-                            fontSize: '12px',
-                            color: '#3498db',
-                            marginBottom: '0.25rem'
-                          }}>
-                            📄 {contract.numar_contract}
+                {contracte.map((contract, index) => {
+                  const isExpanded = expandedContracts.has(contract.ID_Contract);
+                  const hasEtapeOrAnexe = (contract.etape_count && contract.etape_count > 0) || (contract.anexe_count && contract.anexe_count > 0);
+
+                  return (
+                    <Fragment key={contract.ID_Contract}>
+                      {/* Rândul contractului principal */}
+                      <tr style={{ 
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                        background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          color: '#2c3e50',
+                          minWidth: '300px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            {hasEtapeOrAnexe && (
+                              <button
+                                onClick={() => toggleContractExpansion(contract.ID_Contract)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '0.25rem',
+                                  fontSize: '12px',
+                                  color: '#3498db',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                {isExpanded ? '📂' : '📁'}
+                              </button>
+                            )}
+                            
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ 
+                                fontFamily: 'monospace',
+                                fontWeight: 'bold',
+                                fontSize: '12px',
+                                color: '#3498db',
+                                marginBottom: '0.25rem'
+                              }}>
+                                📄 {contract.numar_contract}
+                              </div>
+                              <div style={{ 
+                                color: '#2c3e50',
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: '1.4',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                              }}>
+                                {contract.Denumire_Contract}
+                              </div>
+                              {hasEtapeOrAnexe && (
+                                <div style={{ 
+                                  fontSize: '11px', 
+                                  color: '#3498db',
+                                  marginTop: '0.5rem',
+                                  display: 'flex',
+                                  gap: '0.5rem'
+                                }}>
+                                  {contract.etape_count && contract.etape_count > 0 && (
+                                    <span style={{
+                                      padding: '0.25rem 0.5rem',
+                                      background: 'rgba(155, 89, 182, 0.1)',
+                                      borderRadius: '6px',
+                                      display: 'inline-block'
+                                    }}>
+                                      📋 {contract.etape_count} etape
+                                    </span>
+                                  )}
+                                  {contract.anexe_count && contract.anexe_count > 0 && (
+                                    <span style={{
+                                      padding: '0.25rem 0.5rem',
+                                      background: 'rgba(243, 156, 18, 0.1)',
+                                      borderRadius: '6px',
+                                      display: 'inline-block'
+                                    }}>
+                                      📎 {contract.anexe_count} anexe
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          color: '#2c3e50'
+                        }}>
+                          <div style={{ fontWeight: '600', fontSize: '14px' }}>{contract.client_nume}</div>
                           <div style={{ 
-                            color: '#2c3e50',
-                            whiteSpace: 'normal',
-                            wordBreak: 'break-word',
-                            lineHeight: '1.4',
-                            fontSize: '14px',
+                            fontSize: '12px', 
+                            color: '#7f8c8d',
+                            marginTop: '0.25rem',
+                            fontFamily: 'monospace'
+                          }}>
+                            🗂️ {contract.proiect_id}
+                          </div>
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '16px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: 'white',
+                            background: `linear-gradient(135deg, ${getStatusColor(contract.Status)} 0%, ${getStatusColor(contract.Status)}dd 100%)`
+                          }}>
+                            {getStatusIcon(contract.Status)} {contract.Status}
+                          </span>
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          textAlign: 'center',
+                          fontFamily: 'monospace',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}>
+                          {formatDate(contract.Data_Semnare)}
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          textAlign: 'center',
+                          fontFamily: 'monospace',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}>
+                          {formatDate(contract.Data_Expirare)}
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          textAlign: 'right'
+                        }}>
+                          {formatCurrencyWithOriginal(
+                            contract.Valoare,
+                            contract.Moneda,
+                            contract.valoare_ron,
+                            contract.curs_valutar,
+                            false,
+                            false
+                          )}
+                        </td>
+                        {/* NOU: Coloana Status Facturare pentru contract */}
+                        <td style={{ 
+                          padding: '0.75rem',
+                          minWidth: '280px'
+                        }}>
+                          {formatStatusFacturare(contract.status_facturare_display)}
+                        </td>
+                        <td style={{ 
+                          padding: '0.75rem',
+                          textAlign: 'center' as const
+                        }}>
+                          <ContractActions 
+                            contract={contract}
+                            onRefresh={handleRefresh}
+                            onShowFacturaModal={handleShowFacturaModal}
+                            onShowEditModal={handleShowEditModal}
+                            onShowPVModal={handleShowPVModal}
+                          />
+                        </td>
+                      </tr>
+
+                      {/* NOU: Rândurile etapelor contractului */}
+                      {isExpanded && contract.etape && contract.etape.map((etapa, etapaIndex) => (
+                        <tr 
+                          key={`etapa-${etapa.ID_Etapa}`}
+                          style={{ 
+                            background: 'rgba(155, 89, 182, 0.05)',
+                            borderLeft: '4px solid #9b59b6',
+                            borderBottom: '1px solid rgba(155, 89, 182, 0.1)'
+                          }}
+                        >
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            paddingLeft: '3rem',
+                            color: '#2c3e50'
+                          }}>
+                            <div style={{ 
+                              fontFamily: 'monospace',
+                              fontWeight: 'bold',
+                              fontSize: '11px',
+                              color: '#9b59b6',
+                              marginBottom: '0.25rem'
+                            }}>
+                              └─ 📋 Etapa {etapa.etapa_index}
+                            </div>
+                            <div style={{ 
+                              color: '#2c3e50',
+                              fontStyle: 'italic',
+                              fontSize: '13px',
+                              fontWeight: '500'
+                            }}>
+                              {etapa.denumire}
+                            </div>
+                            {etapa.subproiect_denumire && (
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: '#7f8c8d',
+                                marginTop: '0.25rem'
+                              }}>
+                                🔗 {etapa.subproiect_denumire}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            fontSize: '11px',
+                            color: '#9b59b6',
                             fontWeight: '500'
                           }}>
-                            {contract.Denumire_Contract}
-                          </div>
-                          {contract.etape_count && contract.etape_count > 0 && (
+                            📋 Etapă
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'right'
+                          }}>
+                            {formatCurrencyWithOriginal(
+                              etapa.valoare,
+                              etapa.moneda,
+                              etapa.valoare_ron,
+                              etapa.curs_valutar,
+                              true,
+                              false
+                            )}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem'
+                          }}>
+                            {formatStatusFacturare(etapa.status_facturare_display)}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* NOU: Rândurile anexelor contractului */}
+                      {isExpanded && contract.anexe && contract.anexe.map((anexa, anexaIndex) => (
+                        <tr 
+                          key={`anexa-${anexa.ID_Anexa}`}
+                          style={{ 
+                            background: 'rgba(243, 156, 18, 0.05)',
+                            borderLeft: '4px solid #f39c12',
+                            borderBottom: '1px solid rgba(243, 156, 18, 0.1)'
+                          }}
+                        >
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            paddingLeft: '3rem',
+                            color: '#2c3e50'
+                          }}>
                             <div style={{ 
-                              fontSize: '11px', 
-                              color: '#3498db',
-                              marginTop: '0.5rem',
-                              padding: '0.25rem 0.5rem',
-                              background: 'rgba(52, 152, 219, 0.1)',
-                              borderRadius: '6px',
-                              display: 'inline-block'
+                              fontFamily: 'monospace',
+                              fontWeight: 'bold',
+                              fontSize: '11px',
+                              color: '#f39c12',
+                              marginBottom: '0.25rem'
                             }}>
-                              📋 {contract.etape_count} etape ({contract.etape_facturate || 0} facturate)
+                              └─ 📎 Anexa {anexa.anexa_numar}.{anexa.etapa_index}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      color: '#2c3e50'
-                    }}>
-                      <div style={{ fontWeight: '600', fontSize: '14px' }}>{contract.client_nume}</div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#7f8c8d',
-                        marginTop: '0.25rem',
-                        fontFamily: 'monospace'
-                      }}>
-                        🏗️ {contract.proiect_id}
-                      </div>
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      textAlign: 'center'
-                    }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem 0.75rem',
-                        borderRadius: '16px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: 'white',
-                        background: `linear-gradient(135deg, ${getStatusColor(contract.Status)} 0%, ${getStatusColor(contract.Status)}dd 100%)`
-                      }}>
-                        {getStatusIcon(contract.Status)} {contract.Status}
-                      </span>
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      fontFamily: 'monospace',
-                      fontSize: '13px',
-                      fontWeight: '500'
-                    }}>
-                      {formatDate(contract.Data_Semnare)}
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      fontFamily: 'monospace',
-                      fontSize: '13px',
-                      fontWeight: '500'
-                    }}>
-                      {formatDate(contract.Data_Expirare)}
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      textAlign: 'right'
-                    }}>
-                      {formatCurrencyWithOriginal(
-                        contract.Valoare,
-                        contract.Moneda,
-                        contract.valoare_ron,
-                        contract.curs_valutar
-                      )}
-                    </td>
-                    <td style={{ 
-                      padding: '0.75rem',
-                      textAlign: 'center' as const
-                    }}>
-                      <ContractActions 
-                        contract={contract}
-                        onRefresh={handleRefresh}
-                        onShowFacturaModal={handleShowFacturaModal}
-                        onShowEditModal={handleShowEditModal}
-                        onShowPVModal={handleShowPVModal}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                            <div style={{ 
+                              color: '#2c3e50',
+                              fontStyle: 'italic',
+                              fontSize: '13px',
+                              fontWeight: '500'
+                            }}>
+                              {anexa.denumire}
+                            </div>
+                            {anexa.subproiect_denumire && (
+                              <div style={{ 
+                                fontSize: '11px', 
+                                color: '#7f8c8d',
+                                marginTop: '0.25rem'
+                              }}>
+                                🔗 {anexa.subproiect_denumire}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            fontSize: '11px',
+                            color: '#f39c12',
+                            fontWeight: '500'
+                          }}>
+                            📎 Anexă
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'right'
+                          }}>
+                            {formatCurrencyWithOriginal(
+                              anexa.valoare,
+                              anexa.moneda,
+                              anexa.valoare_ron,
+                              anexa.curs_valutar,
+                              false,
+                              true
+                            )}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem'
+                          }}>
+                            {formatStatusFacturare(anexa.status_facturare_display)}
+                          </td>
+                          <td style={{ 
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1143,8 +1565,20 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
               }}>
                 <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Etape</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: '#3498db', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: '#9b59b6', marginTop: '0.25rem' }}>
                   {contracte.reduce((acc, c) => acc + (c.etape_count || 0), 0)}
+                </div>
+              </div>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.7)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+              }}>
+                <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Anexe</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: '#f39c12', marginTop: '0.25rem' }}>
+                  {contracte.reduce((acc, c) => acc + (c.anexe_count || 0), 0)}
                 </div>
               </div>
               {Object.keys(cursuriLive).length > 0 && (
@@ -1181,7 +1615,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
                   ✅ Calculat cu cursuri BNR live
                   <br/>
-                  (Sistem contracte funcțional)
+                  (Sistem contracte cu etape și anexe)
                 </div>
               </div>
             </div>
@@ -1189,7 +1623,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         </div>
       )}
 
-      {/* Modalele pentru contracte - identice cu proiectele */}
+      {/* Modalele pentru contracte - IDENTICE cu proiectele */}
       {showFacturaModal && selectedContract && (
         <div style={{ zIndex: 50000 }}>
           <FacturaHibridModal
