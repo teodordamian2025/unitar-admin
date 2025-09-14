@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/proiecte/route.ts
-// DATA: 03.09.2025 00:15 (ora României)
-// FIX CRITIC: Aplicare convertBigQueryNumeric îmbunătățită ca în versiunea [id]
+// DATA: 15.09.2025 12:35 (ora României)
+// MODIFICAT: Îmbunătățit filtrarea datelor pentru intervale cuprinse
 // PĂSTRATE: Toate funcționalitățile existente (filtrare, paginare, POST, PUT, DELETE)
+// PARTEA 1/3: Imports, helpers și începutul funcției GET
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -172,6 +173,7 @@ export async function GET(request: NextRequest) {
       types.status = 'STRING';
     }
 
+    // MODIFICAT: Filtrul client folosește LIKE pentru căutare parțială
     if (client) {
       conditions.push(`(
         LOWER(p.Client) LIKE LOWER(@client) OR
@@ -181,18 +183,26 @@ export async function GET(request: NextRequest) {
       types.client = 'STRING';
     }
 
-    // Filtrare pe baza datelor - PĂSTRATE
+    // ÎMBUNĂTĂȚIT: Filtrare pe baza datelor pentru intervale cuprinse
     const dataStartFrom = searchParams.get('data_start_start');
     const dataStartTo = searchParams.get('data_start_end');
+    
+    console.log('📅 DATE FILTER PARAMS:', { dataStartFrom, dataStartTo });
+    
     if (dataStartFrom) {
+      // Găsește proiectele care au Data_Start >= data specificată
       conditions.push('p.Data_Start >= @dataStartFrom');
       params.dataStartFrom = dataStartFrom;
       types.dataStartFrom = 'DATE';
+      console.log('📅 Aplicat filtru Data_Start >= ', dataStartFrom);
     }
+    
     if (dataStartTo) {
+      // Găsește proiectele care au Data_Start <= data specificată
       conditions.push('p.Data_Start <= @dataStartTo');
       params.dataStartTo = dataStartTo;
       types.dataStartTo = 'DATE';
+      console.log('📅 Aplicat filtru Data_Start <= ', dataStartTo);
     }
 
     // Filtrare pe baza valorii RON pentru acuratețe - PĂSTRATE
@@ -246,7 +256,6 @@ export async function GET(request: NextRequest) {
       params.statusAchitare = statusAchitare;
       types.statusAchitare = 'STRING';
     }
-
     // Adaugă condiții la query
     if (conditions.length > 0) {
       baseQuery += ' WHERE ' + conditions.join(' AND ');
@@ -480,7 +489,6 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
-
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();

@@ -1,4 +1,11 @@
+// ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/ProiectFilters.tsx
+// DATA: 15.09.2025 12:30 (ora României)
+// MODIFICAT: Schimbat filtrul client din select în text pentru căutare LIKE
+// ELIMINAT: Clientii fake din dropdown
+// PĂSTRATE: Toate celelalte funcționalități existente
+// ==================================================================
+
 'use client';
 
 import FilterBar, { FilterConfig, FilterValues } from '../../components/FilterBar';
@@ -37,15 +44,12 @@ export default function ProiectFilters({
       ]
     },
     {
+      // MODIFICAT: Schimbat din 'select' în 'text' pentru căutare LIKE
       key: 'client',
       label: 'Client',
-      type: 'select',
-      placeholder: 'Toți clienții',
-      options: [
-        { value: 'SC T&D PRO ELECTRIC SRL', label: 'SC T&D PRO ELECTRIC SRL' },
-        { value: 'SC PROD SRL', label: 'SC PROD SRL' },
-        { value: 'SC BUILD SRL', label: 'SC BUILD SRL' }
-      ]
+      type: 'text', // Schimbat din 'select'
+      placeholder: 'Caută după nume client...' // Placeholder actualizat
+      // ELIMINAT: options array cu clientii fake
     },
     {
       key: 'data_start',
@@ -77,4 +81,3 @@ export default function ProiectFilters({
     />
   );
 }
-
