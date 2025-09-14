@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/contracte/components/ContracteTable.tsx
-// DATA: 15.01.2025 16:00 (ora României)
-// MODIFICAT: Afișare ierarhică Contract + Etape + Anexe cu coloană Status Facturare
-// ADĂUGAT: Încărcare etape și anexe, expand/collapse, indentări pe 3 niveluri
+// DATA: 15.01.2025 17:15 (ora României)
+// MODIFICAT: Adăugat data_start și data_final în interfața AnexaContract
+// MODIFICAT: Afișare date start/final pentru anexe în loc de '-'
 // PĂSTRATE: Toate funcționalitățile existente + cursuri BNR live + export Excel
 // ==================================================================
 
@@ -81,7 +81,7 @@ interface EtapaContract {
   facturi: any[];
 }
 
-// NOU: Interfață pentru anexele contractului
+// MODIFICAT: Interfață pentru anexele contractului cu data_start și data_final
 interface AnexaContract {
   ID_Anexa: string;
   contract_id: string;
@@ -100,6 +100,7 @@ interface AnexaContract {
   status_facturare_display: string;
   status_facturare_filtru: string;
   data_scadenta?: string;
+  // ADĂUGAT: Câmpurile pentru data start și data final ale anexei
   data_start?: string;
   data_final?: string;
   curs_valutar: number;
@@ -264,6 +265,7 @@ const formatStatusFacturare = (statusDisplay?: string): JSX.Element => {
     </div>
   );
 };
+
 export default function ContracteTable({ searchParams }: ContracteTableProps) {
   // State variables - ADAPTAT pentru contracte cu etape și anexe
   const [contracte, setContracte] = useState<Contract[]>([]);
@@ -879,6 +881,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     
     return totalSigur;
   };
+
   // Loading state - IDENTIC cu ProiecteTable
   if (loading) {
     return (
@@ -1002,7 +1005,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
           </button>
         </div>
       </div>
-
       {/* Tabelul cu afișare ierarhică pentru contracte, etape și anexe */}
       {contracte.length === 0 ? (
         <div style={{ 
@@ -1052,7 +1054,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                     letterSpacing: '0.5px',
                     minWidth: '300px'
                   }}>
-                    Contract / Etapă / Anexă
+                    Contract / Etapa / Anexa
                   </th>
                   <th style={{ 
                     padding: '1rem 0.75rem', 
@@ -1364,7 +1366,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                             color: '#9b59b6',
                             fontWeight: '500'
                           }}>
-                            📋 Etapă
+                            📋 Etapa
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
@@ -1411,7 +1413,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                         </tr>
                       ))}
 
-                      {/* NOU: Rândurile anexelor contractului */}
+                      {/* MODIFICAT: Rândurile anexelor contractului cu data_start și data_final */}
                       {isExpanded && contract.anexe && contract.anexe.map((anexa, anexaIndex) => (
                         <tr 
                           key={`anexa-${anexa.ID_Anexa}`}
@@ -1467,23 +1469,27 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                             color: '#f39c12',
                             fontWeight: '500'
                           }}>
-                            📎 Anexă
+                            📎 Anexa
                           </td>
+                          {/* MODIFICAT: Afișare data_start în loc de '-' */}
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center',
-                            color: '#7f8c8d',
-                            fontSize: '12px'
+                            fontFamily: 'monospace',
+                            fontSize: '12px',
+                            fontWeight: '500'
                           }}>
-                            -
+                            {formatDate(anexa.data_start)}
                           </td>
+                          {/* MODIFICAT: Afișare data_final în loc de '-' */}
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center',
-                            color: '#7f8c8d',
-                            fontSize: '12px'
+                            fontFamily: 'monospace',
+                            fontSize: '12px',
+                            fontWeight: '500'
                           }}>
-                            -
+                            {formatDate(anexa.data_final)}
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',
@@ -1594,7 +1600,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                     {Object.keys(cursuriLive).filter(m => !cursuriLive[m].error).length}/{Object.keys(cursuriLive).length}
                   </div>
                   <div style={{ fontSize: '10px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
-                    Precizie originală
+                    Precizie originala
                   </div>
                 </div>
               )}
@@ -1607,7 +1613,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                 gridColumn: Object.keys(cursuriLive).length > 0 ? 'span 1' : 'span 2'
               }}>
                 <div style={{ fontSize: '12px', color: '#3498db', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Valoare Totală Contracte
+                  Valoare Totala Contracte
                 </div>
                 <div style={{ fontSize: '24px', fontWeight: '700', color: '#3498db', marginTop: '0.25rem' }}>
                   {formatCurrency(calculateTotalValue())}
@@ -1615,7 +1621,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                 <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem', opacity: 0.8 }}>
                   ✅ Calculat cu cursuri BNR live
                   <br/>
-                  (Sistem contracte cu etape și anexe)
+                  (Sistem contracte cu etape si anexe)
                 </div>
               </div>
             </div>
