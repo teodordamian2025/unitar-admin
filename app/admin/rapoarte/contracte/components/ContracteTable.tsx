@@ -464,10 +464,12 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
 	  
 	  try {
 	    // REPARAT: Extrage string-ul din obiectul BigQuery
-	    let dateString = dateValue;
-	    if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
-	      dateString = dateValue.value;
-	    }
+		let dateString: string = '';
+		if (typeof dateValue === 'object' && dateValue !== null && 'value' in dateValue) {
+		  dateString = dateValue.value;
+		} else if (typeof dateValue === 'string') {
+		  dateString = dateValue;
+		}
 	    
 	    if (!dateString || dateString === 'null' || dateString === 'undefined') {
 	      return (
