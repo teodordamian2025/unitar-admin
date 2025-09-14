@@ -163,12 +163,25 @@ const calculateFacturareStatus = (factureData: any[]): { status: string, display
     totalFacturat += valoare;
     totalIncasat += valoareIncasata;
 
-    // Formatare pentru display
-    const dataFacturare = factura.data_facturare ? 
-      new Date(factura.data_facturare).toLocaleDateString('ro-RO') : 'N/A';
-    const dataIncasare = factura.data_incasare ? 
-      new Date(factura.data_incasare).toLocaleDateString('ro-RO') : '';
+    // Formatare pentru display cu procesare BigQuery DATE
+	const dataFacturare = factura.data_facturare ? 
+	  (() => {
+	    let dateString = factura.data_facturare;
+	    if (typeof dateString === 'object' && dateString !== null && 'value' in dateString) {
+	      dateString = dateString.value;
+	    }
+	    return dateString ? new Date(dateString).toLocaleDateString('ro-RO') : 'N/A';
+	  })() : 'N/A';
 
+	const dataIncasare = factura.data_incasare ? 
+	  (() => {
+	    let dateString = factura.data_incasare;
+	    if (typeof dateString === 'object' && dateString !== null && 'value' in dateString) {
+	      dateString = dateString.value;
+	    }
+	    return dateString ? new Date(dateString).toLocaleDateString('ro-RO') : '';
+	  })() : '';
+  
     let statusIncasare = '';
     if (valoareIncasata === 0) {
       statusIncasare = 'Neincasat';
