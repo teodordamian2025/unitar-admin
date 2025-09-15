@@ -127,7 +127,11 @@ export default function GanttChart({
   };
 
   const generateTimelineHeaders = () => {
-    const headers = [];
+    const headers: Array<{
+      date: Date;
+      label: string;
+      isWeekend: boolean;
+    }> = [];
     const current = new Date(startDate);
     const end = new Date(endDate);
 
