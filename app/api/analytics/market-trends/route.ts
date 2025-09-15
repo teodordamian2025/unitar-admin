@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
             WHEN LOWER(s.titlu) LIKE '%cloud%' OR LOWER(s.titlu) LIKE '%devops%' THEN 170.0
             WHEN LOWER(s.titlu) LIKE '%fullstack%' OR LOWER(s.titlu) LIKE '%backend%' THEN 140.0
             ELSE 110.0
-          END as estimated_revenue_impact
+          END as estimated_revenue_impact,
           
         FROM `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s
         JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt ON s.id = tt.sarcina_id

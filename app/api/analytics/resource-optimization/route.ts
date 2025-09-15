@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.data_scadenta <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY) 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_deadline_apropiat,
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
-            AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
+            AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active,
           
         FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
         LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 

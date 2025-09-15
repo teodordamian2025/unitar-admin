@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           
           -- Overtime indicators
           COUNT(CASE WHEN tt.ore_lucrate > 8 THEN 1 END) as sesiuni_overtime,
-          SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total
+          SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total,
         
         FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
         LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
