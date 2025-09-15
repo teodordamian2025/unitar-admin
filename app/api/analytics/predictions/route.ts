@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN tt.ore_lucrate > 8 THEN 1 END) as sesiuni_overtime,
           COUNT(CASE WHEN EXTRACT(DAYOFWEEK FROM tt.data_lucru) IN (1, 7) THEN 1 END) as activitate_weekend
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           AND tt.data_lucru <= CURRENT_DATE()

@@ -52,9 +52,9 @@ export async function GET(request: NextRequest) {
           -- Overtime indicators
           COUNT(CASE WHEN tt.ore_lucrate > 8 THEN 1 END) as sesiuni_overtime,
           SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total
-          
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori` u
-        LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt 
+        
+        FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
+        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         WHERE u.activ = true
@@ -90,8 +90,8 @@ export async function GET(request: NextRequest) {
           -- Critical task load
           COUNT(DISTINCT CASE WHEN s.prioritate = 'Critică' AND s.status != 'Finalizată' THEN s.id END) as sarcini_critice_active
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili` sr
-        JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s ON sr.sarcina_id = s.id
+        FROM `hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili` sr
+        JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON sr.sarcina_id = s.id
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY sr.responsabil_uid
       ),
@@ -119,8 +119,8 @@ export async function GET(request: NextRequest) {
             AND p.Status = 'Activ' THEN pr.proiect_id 
           END) as proiecte_neachitate
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteResponsabili` pr
-        JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte` p ON pr.proiect_id = p.ID_Proiect
+        FROM `hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili` pr
+        JOIN `hale-mode-464009-i6.PanouControlUnitar.Proiecte` p ON pr.proiect_id = p.ID_Proiect
         GROUP BY pr.responsabil_uid
       ),
       
@@ -141,13 +141,13 @@ export async function GET(request: NextRequest) {
           -- Late work frequency
           AVG(CASE WHEN EXTRACT(HOUR FROM tt.created_at) > 20 THEN 1.0 ELSE 0.0 END) * 100 as frecventa_lucru_noapte
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt
+        FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
         JOIN (
           SELECT 
             utilizator_uid,
             DATE(data_lucru) as data,
             SUM(ore_lucrate) as ore_zilnice
-          FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking`
+          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking`
           WHERE data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY utilizator_uid, DATE(data_lucru)
         ) daily_hours ON tt.utilizator_uid = daily_hours.utilizator_uid AND DATE(tt.data_lucru) = daily_hours.data
@@ -157,9 +157,9 @@ export async function GET(request: NextRequest) {
             u.uid as user_uid
           FROM 
             UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY), CURRENT_DATE(), INTERVAL 1 DAY)) as dates(data_calendar)
-          CROSS JOIN (SELECT DISTINCT uid FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori` WHERE activ = true) u
+          CROSS JOIN (SELECT DISTINCT uid FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` WHERE activ = true) u
           WHERE NOT EXISTS (
-            SELECT 1 FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt2
+            SELECT 1 FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt2
             WHERE DATE(tt2.data_lucru) = dates.data_calendar 
             AND tt2.utilizator_uid = u.uid
           )
@@ -197,8 +197,8 @@ export async function GET(request: NextRequest) {
               ELSE 0
             END as weekly_efficiency
             
-          FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt
-          LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
+          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
+          LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt.utilizator_uid, EXTRACT(WEEK FROM tt.data_lucru)
         ) weekly_stats

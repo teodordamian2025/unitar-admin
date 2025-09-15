@@ -45,10 +45,10 @@ export async function GET(request: NextRequest) {
               s.timp_estimat_total_ore,
               EXTRACT(DAYOFWEEK FROM tt.data_lucru) as day_of_week,
               EXTRACT(WEEK FROM tt.data_lucru) as week_number
-            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-            LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+            FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
               ON tt.proiect_id = p.ID_Proiect
-            LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
               ON tt.sarcina_id = s.id
             WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
               AND tt.ore_lucrate > 0
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
             COUNT(DISTINCT tt.utilizator_uid) as utilizatori_activi,
             COUNT(DISTINCT tt.proiect_id) as proiecte_active,
             ROUND(AVG(tt.ore_lucrate), 2) as media_ore_per_utilizator
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
             AND tt.ore_lucrate > 0
           GROUP BY tt.data_lucru
@@ -126,8 +126,8 @@ export async function GET(request: NextRequest) {
             ROUND(SUM(CASE WHEN s.prioritate = 'normala' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_normala,
             ROUND(SUM(CASE WHEN s.prioritate = 'scazuta' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_scazuta
             
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
             ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
             AND tt.ore_lucrate > 0
@@ -159,10 +159,10 @@ export async function GET(request: NextRequest) {
               1
             ) as progres_procent
             
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
             ON tt.proiect_id = p.ID_Proiect
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
             ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
             AND tt.ore_lucrate > 0
@@ -189,10 +189,10 @@ export async function GET(request: NextRequest) {
               s.timp_estimat_total_ore,
               s.status as sarcina_status,
               EXTRACT(DAYOFWEEK FROM tt.data_lucru) as day_of_week
-            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-            LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+            FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
               ON tt.proiect_id = p.ID_Proiect
-            LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
               ON tt.sarcina_id = s.id
             WHERE tt.utilizator_uid = @userId
               AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)

@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
             ELSE 'Beginner'
           END as complexity_level
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
           ON s.proiect_id = p.ID_Proiect
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
       ),
@@ -144,9 +144,9 @@ export async function GET(request: NextRequest) {
           -- Ultima activitate pe skill
           MAX(tt.data_lucru) as last_activity_date
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
         JOIN skill_mapping sm ON tt.sarcina_id = sm.sarcina_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           AND tt.ore_lucrate > 0

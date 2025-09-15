@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
             ELSE 110.0
           END as estimated_revenue_impact
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s
-        JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt ON s.id = tt.sarcina_id
+        FROM `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s
+        JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt ON s.id = tt.sarcina_id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY skill_category
       ),

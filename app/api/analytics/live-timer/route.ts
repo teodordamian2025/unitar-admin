@@ -69,12 +69,12 @@ export async function GET(request: NextRequest) {
             ELSE 0
           END as break_time_seconds
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\` sl
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\` u 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
           ON sl.utilizator_uid = u.uid
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
           ON sl.proiect_id = p.ID_Proiect
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON sl.proiect_id = s.proiect_id
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 24 HOUR)
@@ -115,12 +115,12 @@ export async function GET(request: NextRequest) {
           data_stop as ultima_activitate, 85 as productivity_score, 0 as break_time,
           FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', data_start) as data_start_formatted,
           FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', data_stop) as ultima_activitate_formatted
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\` sl2
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\` u2 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl2
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u2 
           ON sl2.utilizator_uid = u2.uid
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p2 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2 
           ON sl2.proiect_id = p2.ID_Proiect
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s2 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s2 
           ON sl2.proiect_id = s2.proiect_id
         WHERE sl2.status = 'completat'
           AND sl2.data_start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 8 HOUR)
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
 
         // Verific dacă utilizatorul are deja o sesiune activă
         const checkActiveQuery = `
-          SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          SELECT id FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           WHERE utilizator_uid = @utilizatorUid 
             AND status IN ('activ', 'pausat')
         `;
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         const insertSessionQuery = `
-          INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
           VALUES (@sessionId, @utilizatorUid, @proiectId, CURRENT_DATETIME(), 'activ', @descriere, CURRENT_DATETIME())
         `;
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
 
         // Opresc sesiunea și calculez timpul total
         const stopSessionQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET 
             status = 'completat',
             data_stop = CURRENT_DATETIME(),
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
 
         // Adaug automat în TimeTracking pentru consistență
         const addToTimeTrackingQuery = `
-          INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
+          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
           (id, sarcina_id, utilizator_uid, utilizator_nume, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, proiect_id, created_at)
           SELECT 
             CONCAT('tt_', sl.id) as id,
@@ -319,8 +319,8 @@ export async function POST(request: NextRequest) {
             'live_timer' as tip_inregistrare,
             sl.proiect_id,
             CURRENT_DATETIME()
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\` sl
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\` u 
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
             ON sl.utilizator_uid = u.uid
           WHERE sl.id = @sessionId
         `;
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
         }
 
         const pauseSessionQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET 
             status = 'pausat',
             data_stop = CURRENT_DATETIME()
@@ -369,7 +369,7 @@ export async function POST(request: NextRequest) {
         }
 
         const resumeSessionQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET 
             status = 'activ',
             data_stop = NULL
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
         }
 
         const updateDescriptionQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET descriere_activitate = @descriere
           WHERE id = @sessionId
         `;
@@ -445,7 +445,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteSessionQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SesiuniLucru\`
+      DELETE FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
       WHERE id = @sessionId AND status IN ('activ', 'pausat')
     `;
 

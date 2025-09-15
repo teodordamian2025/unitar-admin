@@ -63,14 +63,14 @@ export async function GET(request: NextRequest) {
           -- Responsabili (agregat)
           STRING_AGG(DISTINCT COALESCE(pr.responsabil_nume, p.Responsabil), ', ') as all_responsabili
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` sp 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp 
           ON p.ID_Proiect = sp.ID_Proiect AND sp.activ = true
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON p.ID_Proiect = s.proiect_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteResponsabili\` pr 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili\` pr 
           ON p.ID_Proiect = pr.proiect_id
         WHERE p.Data_Start IS NOT NULL 
           AND p.Data_Final IS NOT NULL
@@ -168,12 +168,12 @@ export async function GET(request: NextRequest) {
           -- Responsabili
           STRING_AGG(DISTINCT COALESCE(spr.responsabil_nume, sp.Responsabil), ', ') as all_responsabili
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` sp
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON sp.ID_Subproiect = s.proiect_id AND s.tip_proiect = 'subproiect'
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SubproiecteResponsabili\` spr 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SubproiecteResponsabili\` spr 
           ON sp.ID_Subproiect = spr.subproiect_id
         WHERE sp.Data_Start IS NOT NULL 
           AND sp.Data_Final IS NOT NULL
@@ -253,12 +253,12 @@ export async function GET(request: NextRequest) {
           -- Dependencies (din alte sarcini cu deadline mai mic)
           ARRAY_AGG(DISTINCT dep.id IGNORE NULLS) as task_dependencies
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr 
           ON s.id = sr.sarcina_id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` dep 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` dep 
           ON s.proiect_id = dep.proiect_id 
           AND dep.data_scadenta < s.data_scadenta 
           AND dep.status = 'finalizata'
@@ -338,7 +338,7 @@ export async function GET(request: NextRequest) {
         NULL as workedHours,
         false as isCollapsed,
         1 as level
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\` ec
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\` ec
       WHERE ec.data_scadenta IS NOT NULL
         AND ec.activ = true
         ${projectIds ? 'AND ec.proiect_id IN UNNEST(@projectIds)' : ''}
@@ -489,7 +489,7 @@ export async function PUT(request: NextRequest) {
         }
 
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
           SET ${setClausesProiect.join(', ')}
           WHERE ID_Proiect = @taskId
         `;
@@ -515,7 +515,7 @@ export async function PUT(request: NextRequest) {
         }
 
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\`
           SET ${setClausesSubproiect.join(', ')}
           WHERE ID_Subproiect = @taskId
         `;
@@ -529,7 +529,7 @@ export async function PUT(request: NextRequest) {
         if (updates.priority) setClausesSarcina.push('prioritate = @priority');
 
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
           SET ${setClausesSarcina.join(', ')}
           WHERE id = @taskId
         `;
@@ -538,7 +538,7 @@ export async function PUT(request: NextRequest) {
       case 'milestone':
         const milestoneId = task_id.replace('milestone_', '');
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
           SET data_scadenta = @endDate
           WHERE ID_Etapa = @taskId
         `;

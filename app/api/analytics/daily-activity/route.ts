@@ -83,10 +83,10 @@ export async function GET(request: NextRequest) {
             ELSE tt.sarcina_id 
           END) as task_switches
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
           ON tt.proiect_id = p.ID_Proiect
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           AND tt.ore_lucrate > 0

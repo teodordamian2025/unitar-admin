@@ -84,11 +84,11 @@ export async function GET(request: NextRequest) {
             ELSE 0 
           END) as ore_penultima_saptamana
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\` u
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         WHERE u.activ = true
           AND u.rol IN ('admin', 'manager', 'developer', 'designer', 'analyst')

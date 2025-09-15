@@ -66,12 +66,12 @@ export async function GET(request: NextRequest) {
               ELSE 0 
             END as progres_procent
             
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
             ON s.proiect_id = p.ID_Proiect
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr 
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr 
             ON s.id = sr.sarcina_id
-          LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt 
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
             ON s.id = tt.sarcina_id
           WHERE s.data_scadenta IS NOT NULL
             AND s.data_scadenta >= @startDate
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
             WHEN DATE_DIFF(p.Data_Final, CURRENT_DATE(), DAY) <= 7 AND p.Status != 'Finalizat' THEN 'urgent'
             ELSE 'normal'
           END as urgency_status
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
         WHERE p.Data_Final IS NOT NULL
           AND p.Data_Final >= @startDate
           AND p.Data_Final <= @endDate
@@ -198,10 +198,10 @@ export async function GET(request: NextRequest) {
           NULL as ore_estimate,
           SUM(tt.ore_lucrate) as ore_lucrate,
           'completed' as urgency_status
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
           ON tt.proiect_id = p.ID_Proiect
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= @startDate
           AND tt.data_lucru <= @endDate
@@ -259,8 +259,8 @@ export async function GET(request: NextRequest) {
           WHEN DATE_DIFF(ec.data_scadenta, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
           ELSE 'normal'
         END as urgency_status
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\` ec
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\` ec
+      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
         ON ec.proiect_id = p.ID_Proiect
       WHERE ec.data_scadenta IS NOT NULL
         AND ec.data_scadenta >= @startDate
@@ -357,7 +357,7 @@ export async function POST(request: NextRequest) {
     switch (tip_eveniment) {
       case 'sarcina':
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
           SET data_scadenta = @newDate
           WHERE id = @eventId
         `;
@@ -365,7 +365,7 @@ export async function POST(request: NextRequest) {
 
       case 'deadline_proiect':
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
           SET Data_Final = @newDate
           WHERE ID_Proiect = @eventId
         `;
@@ -374,7 +374,7 @@ export async function POST(request: NextRequest) {
       case 'milestone':
         const milestoneId = event_id.replace('milestone_', '');
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
           SET data_scadenta = @newDate
           WHERE ID_Etapa = @eventId
         `;

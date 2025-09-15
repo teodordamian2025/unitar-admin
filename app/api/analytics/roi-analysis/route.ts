@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           COALESCE(p.status_facturare, 'Nefacturat') as status_facturare,
           COALESCE(p.status_achitare, 'Neachitat') as status_achitare
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
         WHERE p.Data_Start >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
       ),
       
@@ -83,8 +83,8 @@ export async function GET(request: NextRequest) {
             ELSE 0
           END as efficiency_factor
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY tt.proiect_id
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
             ELSE 0
           END) as status_mediu_facturi
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\` fg
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate\` fg
         WHERE fg.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY fg.proiect_id
       ),
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
           -- Priority distribution
           COUNT(CASE WHEN s.prioritate = 'Critică' THEN 1 END) as sarcini_critice
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY s.proiect_id
       ),
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
             ELSE 10
           END) as maturitate_contractuala
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Contracte\` c
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Contracte\` c
         WHERE c.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY c.proiect_id
       ),
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
           SUM(CASE WHEN pc.tip_cheltuiala LIKE '%subcontract%' THEN COALESCE(pc.valoare_ron, pc.valoare, 0) ELSE 0 END) as cheltuieli_subcontractare,
           SUM(CASE WHEN pc.tip_cheltuiala LIKE '%material%' THEN COALESCE(pc.valoare_ron, pc.valoare, 0) ELSE 0 END) as cheltuieli_materiale
           
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteCheltuieli\` pc
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\` pc
         WHERE pc.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY pc.proiect_id
       )

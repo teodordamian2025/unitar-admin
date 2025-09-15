@@ -76,20 +76,20 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.data_scadenta <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY) 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_deadline_apropiat,
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
-                     AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
+            AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori` u
-        LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt 
+        FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
+        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s 
+        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_inner.utilizator_uid,
             DATE(tt_inner.data_lucru) as data,
             SUM(tt_inner.ore_lucrate) as ore_zilnice
-          FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt_inner
+          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt_inner
           WHERE tt_inner.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_inner.utilizator_uid, DATE(tt_inner.data_lucru)
         ) daily_hours ON u.uid = daily_hours.utilizator_uid
@@ -178,8 +178,8 @@ export async function GET(request: NextRequest) {
             COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                        AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
             
-          FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt
-          JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
+          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
+          JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY skill_name, skill_category
         ) skill_analysis
@@ -228,18 +228,18 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte` p
-        LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt 
+        FROM `hale-mode-464009-i6.PanouControlUnitar.Proiecte` p
+        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
           ON p.ID_Proiect = tt.proiect_id 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini` s 
+        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_proj.proiect_id,
             DATE(tt_proj.data_lucru) as data,
             SUM(tt_proj.ore_lucrate) as ore_zilnice
-          FROM `${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking` tt_proj
+          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt_proj
           WHERE tt_proj.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_proj.proiect_id, DATE(tt_proj.data_lucru)
         ) daily_project_hours ON p.ID_Proiect = daily_project_hours.proiect_id
