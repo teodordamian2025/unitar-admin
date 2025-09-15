@@ -150,7 +150,7 @@ export default function AdvancedAnalytics({
   };
 
   const generateExecutiveInsights = (roi: ROIAnalysis[], burnout: BurnoutRisk[], optimization: ResourceOptimization[]) => {
-    const insights = [];
+    const insights: any[] = [];
 
     // ROI Insights
     const highROIProjects = roi.filter(p => p.roi_percentage > 150);
