@@ -188,7 +188,12 @@ export default function CalendarView({
     const daysBack = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     startDate.setDate(firstDay.getDate() - daysBack);
     
-    const days = [];
+    const days: Array<{
+      date: Date;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      events: CalendarEvent[];
+    }> = []; // <- ADAUGĂ TIPIZAREA EXPLICITĂ
     const currentDate = new Date(startDate);
     
     // Generare 42 zile (6 săptămâni × 7 zile)
