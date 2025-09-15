@@ -478,6 +478,30 @@ components/Chatbot.tsx
 app/api/ai-database/route.ts
 pages/api/chat.ts
 
+Coduri Timetracking si Management modern:
+app/api/analytics/time-tracking/route.ts = API pentru extragerea datelor de analiză time tracking
+app/admin/analytics/timetracking/page.tsx = Dashboard principal pentru analiza time tracking
+app/admin/analytics/components/QuickTimeEntryModal.tsx = Modal rapid pentru înregistrarea timpului lucrat cu timer live
+app/admin/analytics/components/CalendarView.tsx = Calendar view pentru vizualizarea sarcinilor și deadline-urilor
+app/api/analytics/calendar-data/route.ts = API pentru extragerea datelor de calendar (sarcini, deadlines, proiecte)
+app/admin/analytics/components/GanttChart.tsx = Gantt Chart pentru vizualizarea timeline proiecte cu dependencies
+app/api/analytics/gantt-data/route.ts = API pentru extragerea datelor Gantt Chart cu hierarhie și dependencies
+app/admin/analytics/components/TeamPerformanceDetail.tsx = Analiza detaliată performance echipă cu heatmap și insights
+app/api/analytics/team-performance/route.ts = API extins pentru analiza detaliată performance echipă
+app/api/analytics/daily-activity/route.ts = API pentru extragerea activității zilnice pentru heatmap și analysis
+app/api/analytics/skills-analysis/route.ts = API pentru analiza skills și growth tracking pe categorii
+app/admin/analytics/components/LiveTimerSystem.tsx = Sistem live timer cu management echipă și sesiuni active
+app/api/analytics/live-timer/route.ts = API pentru management live timer sessions cu real-time tracking
+app/admin/analytics/components/AdvancedAnalytics.tsx = Dashboard avansat cu predictive analytics și business insights
+app/api/analytics/predictions/route.ts = API pentru predictive analytics cu ML algorithms și trend forecasting
+app/api/analytics/roi-analysis/route.ts = API pentru analiza ROI cu cost analysis, completion probability și risk assessment
+app/api/analytics/burnout-analysis/route.ts = API pentru analiza burnout cu detection risc, stress indicators și recommended actions
+app/api/analytics/resource-optimization/route.ts = API pentru optimizarea resurselor cu bottleneck detection, utilization analysis și reallocation suggestions
+app/api/analytics/market-trends/route.ts = API pentru market trends și skills investment cu demand analysis și strategic recommendations
+app/admin/analytics/components/MobileTimeEntry.tsx = PWA-optimized mobile component pentru time tracking cu voice notes și offline capability
+app/admin/analytics/components/NotificationCenter.tsx = Sistem centralizat de notificări cu real-time alerts, custom rules și email/SMS integration
+
+
 
 ### 📋 Descriere Componente Cheie
 
