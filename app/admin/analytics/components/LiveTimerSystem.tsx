@@ -186,7 +186,7 @@ export default function LiveTimerSystem({
 
   const startTimer = async () => {
     if (!selectedProiect || !selectedSarcina) {
-      toast.error('Selectează proiectul și sarcina!');
+      showNotification('Selectează proiectul și sarcina!', 'error');
       return;
     }
 
@@ -242,7 +242,7 @@ export default function LiveTimerSystem({
       }
     } catch (error) {
       console.error('Eroare stop timer:', error);
-      toast.error('Eroare de conexiune');
+      showNotification('Eroare de conexiune', 'error');
     }
   };
 
