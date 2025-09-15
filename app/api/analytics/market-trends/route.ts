@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/analytics/market-trends/route.ts
-// CREAT: 15.09.2025 15:30 (ora României)
+// CREAT: 16.09.2025 12:50 (ora României)
 // DESCRIERE: API pentru market trends și skills investment cu demand analysis și strategic recommendations
 // ==================================================================
 
@@ -25,10 +25,9 @@ export async function GET(request: NextRequest) {
     const includeCompetitorAnalysis = searchParams.get('include_competitor_analysis') !== 'false';
     const region = searchParams.get('region') || 'Romania';
 
-    // Query complexă pentru analiza market trends
+    // Query pentru analiza market trends
     const marketTrendsQuery = `
       WITH skills_taxonomy AS (
-        -- Definesc taxonomia de skills cu categorii și valori de piață
         SELECT 
           skill_name,
           skill_category,
@@ -58,7 +57,6 @@ export async function GET(request: NextRequest) {
       ),
       
       internal_skills_analysis AS (
-        -- Analizez skills-urile din portofoliul intern
         SELECT 
           CASE 
             WHEN LOWER(s.titlu) LIKE '%frontend%' OR LOWER(s.titlu) LIKE '%react%' OR LOWER(s.titlu) LIKE '%javascript%' OR LOWER(s.titlu) LIKE '%vue%' OR LOWER(s.titlu) LIKE '%angular%' THEN 'Frontend Development'
@@ -80,13 +78,11 @@ export async function GET(request: NextRequest) {
             ELSE 'General Development'
           END as skill_category,
           
-          -- Metrici interne
           COUNT(*) as internal_tasks_count,
           COUNT(DISTINCT tt.utilizator_uid) as internal_specialists,
           SUM(tt.ore_lucrate) as total_hours_invested,
           AVG(tt.ore_lucrate) as avg_hours_per_task,
           
-          -- Calculez competența internă (1-10 scale)
           CASE 
             WHEN AVG(COALESCE(s.progres_procent, 0)) >= 95 THEN 10
             WHEN AVG(COALESCE(s.progres_procent, 0)) >= 85 THEN 8
@@ -96,19 +92,16 @@ export async function GET(request: NextRequest) {
             ELSE 3
           END as team_expertise_level,
           
-          -- Trend intern (compară ultimele 30 zile cu precedentele)
           COUNT(CASE WHEN tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) THEN 1 END) as recent_tasks,
           COUNT(CASE WHEN tt.data_lucru BETWEEN DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY) 
                                           AND DATE_SUB(CURRENT_DATE(), INTERVAL 31 DAY) THEN 1 END) as previous_tasks,
           
-          -- Eficiența pe skill
           CASE 
             WHEN SUM(tt.ore_lucrate) > 0 THEN
               AVG(COALESCE(s.progres_procent, 0)) / SUM(tt.ore_lucrate) * 100
             ELSE 0
           END as skill_efficiency,
           
-          -- Complexitatea proiectelor
           AVG(
             CASE 
               WHEN s.prioritate = 'Critică' THEN 5
@@ -118,23 +111,21 @@ export async function GET(request: NextRequest) {
             END
           ) as avg_project_complexity,
           
-          -- Revenue impact estimat
           COUNT(*) * 
           CASE 
             WHEN LOWER(s.titlu) LIKE '%machine%' OR LOWER(s.titlu) LIKE '%ai%' THEN 190.0
             WHEN LOWER(s.titlu) LIKE '%cloud%' OR LOWER(s.titlu) LIKE '%devops%' THEN 170.0
             WHEN LOWER(s.titlu) LIKE '%fullstack%' OR LOWER(s.titlu) LIKE '%backend%' THEN 140.0
             ELSE 110.0
-          END as estimated_revenue_impact,
+          END as estimated_revenue_impact
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s
-        JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt ON s.id = tt.sarcina_id
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+        JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt ON s.id = tt.sarcina_id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY skill_category
       ),
       
       market_demand_simulation AS (
-        -- Simulez cererea de piață pe baza trendurilor din industrie
         SELECT 
           st.skill_name as skill_category,
           st.skill_category as category_type,
@@ -143,7 +134,6 @@ export async function GET(request: NextRequest) {
           st.complexity_level,
           st.market_saturation,
           
-          -- Simulez demand trend bazat pe factori de piață reali
           CASE 
             WHEN st.skill_name IN ('Machine Learning', 'Data Science', 'Cloud Architecture') THEN 'rising'
             WHEN st.skill_name IN ('DevOps/Infrastructure', 'Cybersecurity', 'Mobile Development') THEN 'rising'
@@ -152,15 +142,13 @@ export async function GET(request: NextRequest) {
             ELSE 'declining'
           END as market_trend,
           
-          -- Calculez valoarea de piață ajustată pentru România
           st.base_market_rate * 
           CASE 
-            WHEN @region = 'Romania' THEN 0.6  -- Factor ajustare pentru piața locală
+            WHEN @region = 'Romania' THEN 0.6
             WHEN @region = 'Europe' THEN 0.85
             ELSE 1.0
           END as adjusted_market_value,
           
-          -- Market demand score (1-100)
           LEAST(100, GREATEST(10, 
             CAST(st.demand_multiplier * 35 + (1 - st.market_saturation) * 45 + 
             CASE st.complexity_level 
@@ -171,14 +159,12 @@ export async function GET(request: NextRequest) {
             END AS FLOAT64)
           )) as market_demand_score,
           
-          -- Investment priority calculation
           CASE 
             WHEN st.demand_multiplier > 1.8 AND st.market_saturation < 0.4 THEN 'high'
             WHEN st.demand_multiplier > 1.4 AND st.market_saturation < 0.7 THEN 'medium'
             ELSE 'low'
           END as investment_priority,
           
-          -- Future market projection (simplificat)
           CASE st.skill_name
             WHEN 'Machine Learning' THEN 'Creștere 45% în următorii 2 ani'
             WHEN 'Cloud Architecture' THEN 'Creștere 35% cu focus pe multi-cloud'
@@ -196,20 +182,17 @@ export async function GET(request: NextRequest) {
       ),
       
       competitive_analysis AS (
-        -- Simulez analiza competitivă (în realitate ar veni din surse externe)
         SELECT 
           skill_category,
           
-          -- Simulez competitive landscape
           CASE 
-            WHEN skill_category IN ('Machine Learning', 'Data Science') THEN 85.0  -- Competiție înaltă
+            WHEN skill_category IN ('Machine Learning', 'Data Science') THEN 85.0
             WHEN skill_category IN ('Cloud Architecture', 'DevOps/Infrastructure') THEN 75.0
-            WHEN skill_category IN ('Frontend Development', 'Backend Development') THEN 90.0  -- Piață saturată
-            WHEN skill_category IN ('Cybersecurity', 'Mobile Development') THEN 60.0  -- Oportunitate
+            WHEN skill_category IN ('Frontend Development', 'Backend Development') THEN 90.0
+            WHEN skill_category IN ('Cybersecurity', 'Mobile Development') THEN 60.0
             ELSE 70.0
           END as market_competition_intensity,
           
-          -- Barrier to entry
           CASE 
             WHEN skill_category LIKE '%Management%' THEN 'Medium - Experience required'
             WHEN skill_category IN ('Machine Learning', 'Data Science', 'Cloud Architecture') THEN 'High - Specialized knowledge needed'
@@ -217,7 +200,6 @@ export async function GET(request: NextRequest) {
             ELSE 'Medium - Standard technical skills'
           END as entry_barriers,
           
-          -- Market opportunities
           CASE 
             WHEN skill_category = 'Machine Learning' THEN '["AI consultancy", "Process automation", "Predictive analytics"]'
             WHEN skill_category = 'Cloud Architecture' THEN '["Cloud migration", "Multi-cloud strategy", "Cost optimization"]'
@@ -238,14 +220,12 @@ export async function GET(request: NextRequest) {
         mds.investment_priority,
         mds.market_projection,
         
-        -- Internal capabilities
         COALESCE(isa.team_expertise_level, 2) as team_expertise,
         COALESCE(isa.internal_specialists, 0) as internal_specialists_count,
         COALESCE(isa.total_hours_invested, 0) as internal_hours_invested,
         COALESCE(isa.skill_efficiency, 0) as internal_efficiency,
         COALESCE(isa.estimated_revenue_impact, 0) as estimated_revenue_impact,
         
-        -- Trend analysis
         CASE 
           WHEN COALESCE(isa.recent_tasks, 0) > COALESCE(isa.previous_tasks, 1) THEN 'increasing'
           WHEN COALESCE(isa.recent_tasks, 0) < COALESCE(isa.previous_tasks, 0) THEN 'decreasing'  
@@ -258,7 +238,6 @@ export async function GET(request: NextRequest) {
           ELSE 0
         END as internal_growth_rate,
         
-        -- Strategic gap analysis
         CASE 
           WHEN mds.investment_priority = 'high' AND COALESCE(isa.team_expertise_level, 2) < 6 THEN 'critical_gap'
           WHEN mds.investment_priority = 'high' AND COALESCE(isa.team_expertise_level, 2) >= 6 THEN 'scale_opportunity'
@@ -267,12 +246,10 @@ export async function GET(request: NextRequest) {
           ELSE 'balanced'
         END as strategic_position,
         
-        -- Competitive data
         ca.market_competition_intensity,
         ca.entry_barriers,
         ca.market_opportunities,
         
-        -- ROI projections
         CASE 
           WHEN mds.investment_priority = 'high' THEN
             GREATEST(0, (mds.adjusted_market_value * mds.demand_multiplier * 12) - (COALESCE(isa.internal_specialists, 1) * 60000))
@@ -282,7 +259,6 @@ export async function GET(request: NextRequest) {
             GREATEST(0, (mds.adjusted_market_value * mds.demand_multiplier * 4) - (COALESCE(isa.internal_specialists, 1) * 30000))
         END as projected_annual_roi,
         
-        -- Recommended actions
         CASE 
           WHEN mds.investment_priority = 'high' AND COALESCE(isa.team_expertise_level, 2) < 6 THEN
             '["Urgent hiring pentru acest skill", "Training intensiv echipa existentă", "Partnership cu specialiști externi"]'
@@ -304,7 +280,7 @@ export async function GET(request: NextRequest) {
       ORDER BY 
         mds.market_demand_score DESC,
         mds.investment_priority DESC,
-        COALESCE(isa.team_expertise_level, 0) ASC  -- Prioritizează skills cu gap mare
+        COALESCE(isa.team_expertise_level, 0) ASC
     `;
 
     // Parametri pentru query

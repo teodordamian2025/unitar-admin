@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/analytics/burnout-analysis/route.ts
-// CREAT: 15.09.2025 14:30 (ora României)
+// CREAT: 16.09.2025 12:45 (ora României)
 // DESCRIERE: API pentru analiza burnout cu detection risc, stress indicators și recommended actions
 // ==================================================================
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const includeRecommendations = searchParams.get('include_recommendations') !== 'false';
     const includeHistoricalTrends = searchParams.get('include_trends') !== 'false';
 
-    // Query complexă pentru analiza burnout cu indicatori multipli
+    // Query pentru analiza burnout
     const burnoutAnalysisQuery = `
       WITH user_workload_analysis AS (
         SELECT 
@@ -35,26 +35,22 @@ export async function GET(request: NextRequest) {
           u.email,
           u.rol,
           
-          -- Activitate de bază din TimeTracking
           COUNT(DISTINCT DATE(tt.data_lucru)) as zile_lucru_total,
           SUM(tt.ore_lucrate) as ore_lucrate_total,
           AVG(tt.ore_lucrate) as media_ore_per_sesiune,
           MAX(tt.ore_lucrate) as max_ore_sesiune,
           
-          -- Calculez intensitatea zilnică
           COUNT(DISTINCT DATE(tt.data_lucru)) / 
             GREATEST(1, DATE_DIFF(CURRENT_DATE(), DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY), DAY)) * 100 as frecventa_lucru_procent,
           
-          -- Analiza programului de lucru
           COUNT(CASE WHEN EXTRACT(DAYOFWEEK FROM tt.data_lucru) IN (1, 7) THEN 1 END) as zile_weekend,
           COUNT(CASE WHEN EXTRACT(HOUR FROM tt.created_at) > 18 OR EXTRACT(HOUR FROM tt.created_at) < 8 THEN 1 END) as sesiuni_ore_tarde,
           
-          -- Overtime indicators
           COUNT(CASE WHEN tt.ore_lucrate > 8 THEN 1 END) as sesiuni_overtime,
-          SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total,
-        
-        FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
-        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
+          SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total
+          
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         WHERE u.activ = true
@@ -68,7 +64,6 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT CASE WHEN s.status != 'Finalizată' THEN s.id END) as sarcini_active,
           COUNT(DISTINCT CASE WHEN s.prioritate IN ('Critică', 'Înaltă') THEN s.id END) as sarcini_prioritate_ridicata,
           
-          -- Deadline pressure analysis
           COUNT(DISTINCT CASE 
             WHEN s.data_scadenta IS NOT NULL 
             AND s.data_scadenta <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
@@ -81,17 +76,14 @@ export async function GET(request: NextRequest) {
             AND s.status != 'Finalizată' THEN s.id 
           END) as sarcini_intarziate,
           
-          -- Task switching frequency (proxy pentru fragmentare)
           COUNT(DISTINCT s.proiect_id) as proiecte_simultan,
           
-          -- Progres și completare
           AVG(CASE WHEN s.status != 'Finalizată' THEN COALESCE(s.progres_procent, 0) ELSE 100 END) as progres_mediu_sarcini_active,
           
-          -- Critical task load
           COUNT(DISTINCT CASE WHEN s.prioritate = 'Critică' AND s.status != 'Finalizată' THEN s.id END) as sarcini_critice_active
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili` sr
-        JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON sr.sarcina_id = s.id
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr
+        JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON sr.sarcina_id = s.id
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY sr.responsabil_uid
       ),
@@ -102,13 +94,10 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT pr.proiect_id) as proiecte_responsabil,
           COUNT(DISTINCT CASE WHEN p.Status = 'Activ' THEN pr.proiect_id END) as proiecte_active,
           
-          -- Diversitatea rolurilor (poate indica suprasolicitare)
           COUNT(DISTINCT pr.rol_in_proiect) as roluri_diferite,
           
-          -- Valoarea proiectelor gestionate (pressure indicator)
           SUM(COALESCE(p.valoare_ron, p.Valoare_Estimata, 0)) as valoare_proiecte_gestionate,
           
-          -- Status-uri critice care pot genera stress
           COUNT(DISTINCT CASE 
             WHEN p.status_facturare = 'Nefacturat' 
             AND p.Status = 'Activ' THEN pr.proiect_id 
@@ -119,8 +108,8 @@ export async function GET(request: NextRequest) {
             AND p.Status = 'Activ' THEN pr.proiect_id 
           END) as proiecte_neachitate
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili` pr
-        JOIN `hale-mode-464009-i6.PanouControlUnitar.Proiecte` p ON pr.proiect_id = p.ID_Proiect
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili\` pr
+        JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p ON pr.proiect_id = p.ID_Proiect
         GROUP BY pr.responsabil_uid
       ),
       
@@ -128,26 +117,22 @@ export async function GET(request: NextRequest) {
         SELECT 
           tt.utilizator_uid,
           
-          -- Consistency indicators
           STDDEV(daily_hours.ore_zilnice) as variabilitate_ore_zilnice,
           
-          -- Recovery patterns (măsură indirectă pentru odihnă)
           COUNT(DISTINCT consecutive_days.data_fara_lucru) as zile_pauza,
           
-          -- Intensitate temporală
           COUNT(CASE WHEN daily_hours.ore_zilnice > 10 THEN 1 END) as zile_intensive,
           COUNT(CASE WHEN daily_hours.ore_zilnice < 4 THEN 1 END) as zile_usoare,
           
-          -- Late work frequency
           AVG(CASE WHEN EXTRACT(HOUR FROM tt.created_at) > 20 THEN 1.0 ELSE 0.0 END) * 100 as frecventa_lucru_noapte
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
         JOIN (
           SELECT 
             utilizator_uid,
             DATE(data_lucru) as data,
             SUM(ore_lucrate) as ore_zilnice
-          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking`
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
           WHERE data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY utilizator_uid, DATE(data_lucru)
         ) daily_hours ON tt.utilizator_uid = daily_hours.utilizator_uid AND DATE(tt.data_lucru) = daily_hours.data
@@ -157,9 +142,9 @@ export async function GET(request: NextRequest) {
             u.uid as user_uid
           FROM 
             UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY), CURRENT_DATE(), INTERVAL 1 DAY)) as dates(data_calendar)
-          CROSS JOIN (SELECT DISTINCT uid FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` WHERE activ = true) u
+          CROSS JOIN (SELECT DISTINCT uid FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` WHERE activ = true) u
           WHERE NOT EXISTS (
-            SELECT 1 FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt2
+            SELECT 1 FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt2
             WHERE DATE(tt2.data_lucru) = dates.data_calendar 
             AND tt2.utilizator_uid = u.uid
           )
@@ -172,15 +157,12 @@ export async function GET(request: NextRequest) {
         SELECT 
           utilizator_uid,
           
-          -- Trend săptămânal pentru detectarea degradării performance
           CORR(week_number, avg_weekly_hours) as trend_ore_saptamana,
           CORR(week_number, weekly_efficiency) as trend_eficienta,
           
-          -- Variabilitate în performance (indicator instabilitate)
           STDDEV(weekly_efficiency) as variabilitate_eficienta,
           AVG(weekly_efficiency) as eficienta_medie,
           
-          -- Recent vs Historical comparison
           AVG(CASE WHEN week_number >= @period/7 - 2 THEN weekly_efficiency END) as eficienta_recenta,
           AVG(CASE WHEN week_number < @period/7 - 2 THEN weekly_efficiency END) as eficienta_istorica
           
@@ -190,15 +172,14 @@ export async function GET(request: NextRequest) {
             EXTRACT(WEEK FROM tt.data_lucru) as week_number,
             AVG(tt.ore_lucrate) as avg_weekly_hours,
             
-            -- Efficiency proxy: progres obținut per oră lucrată
             CASE 
               WHEN SUM(tt.ore_lucrate) > 0 THEN
                 AVG(COALESCE(s.progres_procent, 0)) / SUM(tt.ore_lucrate) * 10
               ELSE 0
             END as weekly_efficiency
             
-          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
-          LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt.utilizator_uid, EXTRACT(WEEK FROM tt.data_lucru)
         ) weekly_stats
@@ -212,20 +193,17 @@ export async function GET(request: NextRequest) {
         wa.email,
         wa.rol,
         
-        -- Workload Metrics
         wa.zile_lucru_total,
         wa.ore_lucrate_total,
         wa.media_ore_per_sesiune,
         wa.max_ore_sesiune,
         wa.frecventa_lucru_procent,
         
-        -- Stress Indicators
         wa.zile_weekend,
         wa.sesiuni_ore_tarde,
         wa.sesiuni_overtime,
         wa.ore_overtime_total,
         
-        -- Task Pressure
         COALESCE(tpa.sarcini_totale, 0) as sarcini_totale,
         COALESCE(tpa.sarcini_active, 0) as sarcini_active,
         COALESCE(tpa.sarcini_prioritate_ridicata, 0) as sarcini_prioritate_ridicata,
@@ -235,7 +213,6 @@ export async function GET(request: NextRequest) {
         COALESCE(tpa.progres_mediu_sarcini_active, 0) as progres_mediu_sarcini_active,
         COALESCE(tpa.sarcini_critice_active, 0) as sarcini_critice_active,
         
-        -- Project Responsibility Load
         COALESCE(prl.proiecte_responsabil, 0) as proiecte_responsabil,
         COALESCE(prl.proiecte_active, 0) as proiecte_active,
         COALESCE(prl.roluri_diferite, 0) as roluri_diferite,
@@ -243,14 +220,12 @@ export async function GET(request: NextRequest) {
         COALESCE(prl.proiecte_nefacturate, 0) as proiecte_nefacturate,
         COALESCE(prl.proiecte_neachitate, 0) as proiecte_neachitate,
         
-        -- Work Patterns
         COALESCE(wpa.variabilitate_ore_zilnice, 0) as variabilitate_ore_zilnice,
         COALESCE(wpa.zile_pauza, 0) as zile_pauza,
         COALESCE(wpa.zile_intensive, 0) as zile_intensive,
         COALESCE(wpa.zile_usoare, 0) as zile_usoare,
         COALESCE(wpa.frecventa_lucru_noapte, 0) as frecventa_lucru_noapte,
         
-        -- Performance Trends
         COALESCE(pta.trend_ore_saptamana, 0) as trend_ore_saptamana,
         COALESCE(pta.trend_eficienta, 0) as trend_eficienta,
         COALESCE(pta.variabilitate_eficienta, 0) as variabilitate_eficienta,
@@ -264,7 +239,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN work_pattern_analysis wpa ON wa.utilizator_uid = wpa.utilizator_uid  
       LEFT JOIN performance_trend_analysis pta ON wa.utilizator_uid = pta.utilizator_uid
       
-      WHERE wa.ore_lucrate_total > 0  -- Doar utilizatorii cu activitate în perioada
+      WHERE wa.ore_lucrate_total > 0
       ${teamFilter ? `AND wa.utilizator_uid = @teamFilter` : ''}
       ORDER BY wa.ore_lucrate_total DESC
     `;

@@ -1,6 +1,6 @@
 // ==================================================================
 // CALEA: app/api/analytics/resource-optimization/route.ts
-// CREAT: 15.09.2025 15:00 (ora României)
+// CREAT: 16.09.2025 12:55 (ora României)
 // DESCRIERE: API pentru optimizarea resurselor cu bottleneck detection, utilization analysis și reallocation suggestions
 // ==================================================================
 
@@ -26,10 +26,9 @@ export async function GET(request: NextRequest) {
     const includeReallocation = searchParams.get('include_reallocation') !== 'false';
     const includeForecasts = searchParams.get('include_forecasts') !== 'false';
 
-    // Query complexă pentru analiza optimizării resurselor
+    // Query pentru analiza optimizării resurselor
     const resourceOptimizationQuery = `
       WITH resource_utilization_analysis AS (
-        -- Analiza utilizării utilizatorilor
         SELECT 
           'utilizator' as resource_type,
           u.uid as resource_id,
@@ -37,59 +36,51 @@ export async function GET(request: NextRequest) {
           u.rol as resource_category,
           u.email as resource_contact,
           
-          -- Calculez utilizarea bazată pe time tracking
           COALESCE(SUM(tt.ore_lucrate), 0) as ore_utilizate,
           COUNT(DISTINCT DATE(tt.data_lucru)) as zile_active,
           COUNT(DISTINCT tt.proiect_id) as proiecte_active,
           COUNT(DISTINCT tt.sarcina_id) as sarcini_active,
           
-          -- Calculez capacitatea totală (presupun 8h/zi pentru zilele lucratoare în perioada)
           @period * 8.0 * (5.0/7.0) as capacitate_totala_estimata,
           
-          -- Utilizarea ca procent din capacitate
           CASE 
             WHEN (@period * 8.0 * (5.0/7.0)) > 0 THEN
               (COALESCE(SUM(tt.ore_lucrate), 0) / (@period * 8.0 * (5.0/7.0))) * 100
             ELSE 0
           END as utilizare_procent,
           
-          -- Eficiența (progres obținut per oră)
           CASE 
             WHEN SUM(tt.ore_lucrate) > 0 THEN
               AVG(COALESCE(s.progres_procent, 0)) / SUM(tt.ore_lucrate) * 10
             ELSE 0
           END as eficienta_score,
           
-          -- Diversitatea sarcinilor (indicator flexibilitate)
           COUNT(DISTINCT s.prioritate) as diversitate_prioritati,
           COUNT(DISTINCT s.tip_proiect) as diversitate_tipuri_proiect,
           
-          -- Load balancing indicators
           STDDEV(daily_hours.ore_zilnice) as variabilitate_zilnica,
           MAX(daily_hours.ore_zilnice) as max_ore_zi,
           MIN(CASE WHEN daily_hours.ore_zilnice > 0 THEN daily_hours.ore_zilnice END) as min_ore_zi,
           
-          -- Specialization vs generalization
           MODE() OVER (PARTITION BY u.uid ORDER BY s.prioritate) as prioritate_dominanta,
           
-          -- Bottleneck risk indicators
           COUNT(CASE WHEN s.data_scadenta <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY) 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_deadline_apropiat,
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
-            AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active,
+                     AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.Utilizatori` u
-        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_inner.utilizator_uid,
             DATE(tt_inner.data_lucru) as data,
             SUM(tt_inner.ore_lucrate) as ore_zilnice
-          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt_inner
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt_inner
           WHERE tt_inner.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_inner.utilizator_uid, DATE(tt_inner.data_lucru)
         ) daily_hours ON u.uid = daily_hours.utilizator_uid
@@ -98,7 +89,6 @@ export async function GET(request: NextRequest) {
         
         UNION ALL
         
-        -- Analiza utilizării skills/competențelor
         SELECT 
           'skill' as resource_type,
           skill_analysis.skill_name as resource_id,
@@ -111,17 +101,14 @@ export async function GET(request: NextRequest) {
           skill_analysis.proiecte_cu_skill,
           skill_analysis.utilizatori_cu_skill,
           
-          -- Capacitate skill = suma capacităților utilizatorilor cu acel skill
           skill_analysis.capacitate_skill,
           
-          -- Utilizare skill
           CASE 
             WHEN skill_analysis.capacitate_skill > 0 THEN
               (skill_analysis.ore_lucrate_skill / skill_analysis.capacitate_skill) * 100
             ELSE 0
           END as utilizare_procent,
           
-          -- Eficiența skill-ului
           skill_analysis.eficienta_skill,
           skill_analysis.diversitate_prioritati,
           skill_analysis.diversitate_tipuri_proiect,
@@ -157,7 +144,6 @@ export async function GET(request: NextRequest) {
             COUNT(DISTINCT tt.proiect_id) as proiecte_cu_skill,
             COUNT(DISTINCT tt.utilizator_uid) as utilizatori_cu_skill,
             
-            -- Capacitate = nr utilizatori * capacitate individuală
             COUNT(DISTINCT tt.utilizator_uid) * (@period * 8.0 * (5.0/7.0)) as capacitate_skill,
             
             CASE 
@@ -168,7 +154,7 @@ export async function GET(request: NextRequest) {
             
             COUNT(DISTINCT s.prioritate) as diversitate_prioritati,
             COUNT(DISTINCT s.tip_proiect) as diversitate_tipuri_proiect,
-            0 as variabilitate_zilnica, -- Simplified for skills
+            0 as variabilitate_zilnica,
             MAX(tt.ore_lucrate) as max_ore_zi,
             MIN(tt.ore_lucrate) as min_ore_zi,
             MODE() OVER (ORDER BY s.prioritate) as prioritate_dominanta,
@@ -178,15 +164,14 @@ export async function GET(request: NextRequest) {
             COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                        AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
             
-          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt
-          JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s ON tt.sarcina_id = s.id
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+          JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY skill_name, skill_category
         ) skill_analysis
         
         UNION ALL
         
-        -- Analiza utilizării proiectelor (ca resurse care consumă capacitate)
         SELECT 
           'proiect' as resource_type,
           p.ID_Proiect as resource_id,
@@ -199,17 +184,14 @@ export async function GET(request: NextRequest) {
           COUNT(DISTINCT tt.utilizator_uid) as utilizatori_alocati,
           COUNT(DISTINCT tt.sarcina_id) as sarcini_proiect,
           
-          -- Capacitate proiect = valoare estimată convertită în ore (presupun rate de 100 RON/oră)
           COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) / 100.0 as capacitate_buget_ore,
           
-          -- Utilizarea bugetului ca procent
           CASE 
             WHEN COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) > 0 THEN
               (COALESCE(SUM(tt.ore_lucrate), 0) * 100) / COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) * 100
             ELSE 0
           END as utilizare_buget_procent,
           
-          -- Eficiența proiectului
           CASE 
             WHEN SUM(tt.ore_lucrate) > 0 THEN
               AVG(COALESCE(s.progres_procent, 0)) / SUM(tt.ore_lucrate) * 10
@@ -217,7 +199,7 @@ export async function GET(request: NextRequest) {
           END as eficienta_proiect,
           
           COUNT(DISTINCT s.prioritate) as diversitate_prioritati,
-          1 as diversitate_tipuri_proiect, -- Un proiect = un tip
+          1 as diversitate_tipuri_proiect,
           STDDEV(daily_project_hours.ore_zilnice) as variabilitate_zilnica,
           MAX(daily_project_hours.ore_zilnice) as max_ore_zi,
           MIN(CASE WHEN daily_project_hours.ore_zilnice > 0 THEN daily_project_hours.ore_zilnice END) as min_ore_zi,
@@ -228,18 +210,18 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM `hale-mode-464009-i6.PanouControlUnitar.Proiecte` p
-        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt 
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
           ON p.ID_Proiect = tt.proiect_id 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN `hale-mode-464009-i6.PanouControlUnitar.Sarcini` s 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_proj.proiect_id,
             DATE(tt_proj.data_lucru) as data,
             SUM(tt_proj.ore_lucrate) as ore_zilnice
-          FROM `hale-mode-464009-i6.PanouControlUnitar.TimeTracking` tt_proj
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt_proj
           WHERE tt_proj.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_proj.proiect_id, DATE(tt_proj.data_lucru)
         ) daily_project_hours ON p.ID_Proiect = daily_project_hours.proiect_id
@@ -255,21 +237,19 @@ export async function GET(request: NextRequest) {
           utilizare_procent,
           eficienta_score,
           
-          -- Calculez bottleneck risk
           CASE 
             WHEN utilizare_procent > 90 AND sarcini_prioritare_active > 5 THEN 95
             WHEN utilizare_procent > 85 AND sarcini_deadline_apropiat > 3 THEN 85
             WHEN utilizare_procent > 80 AND eficienta_score < 5 THEN 75
             WHEN utilizare_procent > 75 THEN 60
-            WHEN utilizare_procent < 30 AND eficienta_score > 8 THEN -20  -- Under-utilized
+            WHEN utilizare_procent < 30 AND eficienta_score > 8 THEN -20
             ELSE GREATEST(0, utilizare_procent * 0.8 + (sarcini_prioritare_active * 5))
           END as bottleneck_risk_score,
           
-          -- Optimization potential calculation
           CASE 
-            WHEN utilizare_procent > 85 THEN (utilizare_procent - 75) * 0.8  -- Reduce overload
-            WHEN utilizare_procent < 40 THEN (65 - utilizare_procent) * 0.6  -- Increase utilization
-            ELSE ABS(70 - utilizare_procent) * 0.3  -- Move toward optimal 70%
+            WHEN utilizare_procent > 85 THEN (utilizare_procent - 75) * 0.8
+            WHEN utilizare_procent < 40 THEN (65 - utilizare_procent) * 0.6
+            ELSE ABS(70 - utilizare_procent) * 0.3
           END as optimization_potential,
           
           sarcini_prioritare_active,
@@ -286,10 +266,8 @@ export async function GET(request: NextRequest) {
           under_utilized.resource_id as to_resource_id,
           under_utilized.resource_name as to_resource_name,
           
-          -- Calculate reallocation benefit
           (over_utilized.utilizare_procent - 75) + (65 - under_utilized.utilizare_procent) as total_reallocation_benefit,
           
-          -- Compatibility score (simplified)
           CASE 
             WHEN over_utilized.resource_category = under_utilized.resource_category THEN 100
             WHEN over_utilized.prioritate_dominanta = under_utilized.prioritate_dominanta THEN 80
@@ -314,24 +292,20 @@ export async function GET(request: NextRequest) {
         rua.resource_category,
         rua.resource_contact,
         
-        -- Utilization metrics
         rua.ore_utilizate as current_allocation,
         rua.capacitate_totala_estimata as total_capacity,
         rua.utilizare_procent as utilization_rate,
         
-        -- Optimal allocation suggestion
         CASE 
-          WHEN rua.utilizare_procent > 85 THEN rua.ore_utilizate * 0.85  -- Reduce by 15%
-          WHEN rua.utilizare_procent < 40 THEN rua.ore_utilizate * 1.6   -- Increase by 60%
-          ELSE rua.ore_utilizate * (70.0 / GREATEST(1, rua.utilizare_procent))  -- Target 70%
+          WHEN rua.utilizare_procent > 85 THEN rua.ore_utilizate * 0.85
+          WHEN rua.utilizare_procent < 40 THEN rua.ore_utilizate * 1.6
+          ELSE rua.ore_utilizate * (70.0 / GREATEST(1, rua.utilizare_procent))
         END as optimal_allocation,
         
-        -- Performance metrics
         rua.eficienta_score as efficiency_score,
         rua.diversitate_prioritati as skill_diversity,
         rua.variabilitate_zilnica as workload_variability,
         
-        -- Bottleneck analysis
         ba.bottleneck_risk_score,
         CASE 
           WHEN ba.bottleneck_risk_score > 80 THEN 'critical'
@@ -341,7 +315,6 @@ export async function GET(request: NextRequest) {
           ELSE 'optimal'
         END as bottleneck_status,
         
-        -- Optimization suggestions
         ba.optimization_potential as expected_improvement,
         
         CASE 
@@ -352,13 +325,11 @@ export async function GET(request: NextRequest) {
           ELSE 'Monitor and maintain current allocation level'
         END as reallocation_suggestion,
         
-        -- Additional context
         rua.proiecte_active as active_projects,
         rua.sarcini_active as active_tasks,
         ba.sarcini_prioritare_active as high_priority_tasks,
         ba.sarcini_deadline_apropiat as urgent_tasks,
         
-        -- Reallocation opportunities
         (SELECT COUNT(*) FROM reallocation_opportunities ro 
          WHERE ro.from_resource_id = rua.resource_id 
          OR ro.to_resource_id = rua.resource_id) as reallocation_opportunities_count
@@ -674,7 +645,7 @@ function generateOptimizationInsights(resources: any[], stats: any): any[] {
   return insights;
 }
 
-// Generare plan realoceare (simplificat)
+// Generare plan realocoare (simplificat)
 async function generateReallocationPlan(resources: any[]): Promise<any> {
   const overloaded = resources.filter(r => r.utilization_rate > 85);
   const underutilized = resources.filter(r => r.utilization_rate < 50);
