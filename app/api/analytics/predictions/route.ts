@@ -219,10 +219,6 @@ function generatePredictions(
   period: string;
   predicted_hours: number;
   trend: string;
-  confidence_interval: {
-    lower: number;
-    upper: number;
-  };
   model_type: string;
 }> = [];
   const lastDataPoint = historicalData[historicalData.length - 1];
