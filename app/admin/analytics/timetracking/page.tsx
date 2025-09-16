@@ -334,7 +334,7 @@ export default function TimeTrackingDashboard() {
                     cy="50%"
                     outerRadius={80}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
+                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(1)}%`}
                   >
                     {priorityDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
