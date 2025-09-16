@@ -462,15 +462,11 @@ function generateFallbackPredictions(horizonDays: number, granularity: string): 
     }
 
     predictions.push({
-      period: futureDate.toISOString().split('T')[0],
-      predicted_hours: 40 + (Math.random() * 20 - 10), // Base 40h ± 10h
-      trend: 'stable',
-      confidence_interval: {
-        lower: 30,
-        upper: 60
-      },
-      model_type: 'fallback'
-    });
+	  period: futureDate.toISOString().split('T')[0],
+	  predicted_hours: 40 + (Math.random() * 20 - 10), // Base 40h ± 10h
+	  trend: 'stable',
+	  model_type: 'fallback'
+	});
   }
 
   return predictions;
