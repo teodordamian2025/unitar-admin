@@ -335,7 +335,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Insights automate
-    const insights = [];
+    const insights: string[] = [];
     
     if (heatmapStats.weekend_work_days > 0) {
       insights.push(`📅 ${heatmapStats.weekend_work_days} zile de weekend cu activitate - monitorizează work-life balance`);
