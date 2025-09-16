@@ -341,21 +341,19 @@ export default function MobileTimeEntry({
     let syncedCount = 0;
     
     try {
-      const updatedQueue = [...offlineQueue];
-      
-      for (let i = 0; i < updatedQueue.length; i++) {
-        const entry = updatedQueue[i];
+      for (const entry of offlineQueue) {
         if (entry.sync_status === 'pending') {
           await syncTimeEntry(entry);
-          // Contorizăm doar dacă s-a schimbat status-ul
-          if (entry.sync_status === 'synced') {
+          // Folosim type assertion pentru a evita eroarea TypeScript
+          const currentEntry = entry as TimeEntry;
+          if (currentEntry.sync_status === 'synced') {
             syncedCount++;
           }
         }
       }
       
       // Remove synced entries
-      const remaining = updatedQueue.filter(e => e.sync_status !== 'synced');
+      const remaining = offlineQueue.filter(e => e.sync_status !== 'synced');
       setOfflineQueue(remaining);
       localStorage.setItem('offline_time_entries', JSON.stringify(remaining));
       
