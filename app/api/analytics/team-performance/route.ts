@@ -7,6 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// Tipuri pentru siguranță TypeScript
+interface TeamRecommendation {
+  type: 'efficiency' | 'wellbeing' | 'optimization';
+  priority: 'urgent' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  actions: string[];
+}
+
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {
@@ -208,23 +217,20 @@ export async function GET(request: NextRequest) {
       ORDER BY eficienta_procent DESC, total_ore DESC
     `;
 
-    const queryParams = [
-      { name: 'period', parameterType: { type: 'INT64' }, parameterValue: { value: period } }
-    ];
+    const queryParams: Record<string, any> = { period: period };
+	const queryTypes: Record<string, string> = { period: 'INT64' };
 
-    if (userId) {
-      queryParams.push({ 
-        name: 'userId', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: userId } 
-      });
-    }
+	if (userId) {
+	  queryParams.userId = userId;
+	  queryTypes.userId = 'STRING';
+	}
 
-    const [rows] = await bigquery.query({
-      query: teamPerformanceQuery,
-      location: 'EU',
-      params: queryParams,
-    });
+	const [rows] = await bigquery.query({
+	  query: teamPerformanceQuery,
+	  params: queryParams,
+	  types: queryTypes,
+	  location: 'EU',
+	});
 
     // Calculez statistici agregat pentru echipă
     const teamStats = {
@@ -251,7 +257,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Team-level insights
-    const teamInsights = [];
+    const teamInsights: string[] = [];
     
     if (teamStats.burnout_high_risk > teamStats.total_members * 0.3) {
       teamInsights.push('⚠️ Risc burnout ridicat în echipă - redistribuie workload-ul');
@@ -274,7 +280,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Recommendations pe baza analizei
-    const recommendations = [];
+    const recommendations: TeamRecommendation[] = [];
     
     if (teamStats.avg_efficiency < 90) {
       recommendations.push({
