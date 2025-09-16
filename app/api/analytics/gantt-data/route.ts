@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
       ORDER BY Data_Start ASC
     `;
 
-    const proiecteParams = [];
+    const proiecteParams: any[] = [];
     if (projectIds) {
       proiecteParams.push({ 
         name: 'projectIds', 
