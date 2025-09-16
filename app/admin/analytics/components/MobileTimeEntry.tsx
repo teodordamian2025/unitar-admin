@@ -341,10 +341,13 @@ export default function MobileTimeEntry({
     let syncedCount = 0;
     
     try {
-      for (const entry of offlineQueue) {
+      const updatedQueue = [...offlineQueue];
+      
+      for (let i = 0; i < updatedQueue.length; i++) {
+        const entry = updatedQueue[i];
         if (entry.sync_status === 'pending') {
           await syncTimeEntry(entry);
-          // Verificăm din nou status-ul după sincronizare
+          // Contorizăm doar dacă s-a schimbat status-ul
           if (entry.sync_status === 'synced') {
             syncedCount++;
           }
@@ -352,7 +355,7 @@ export default function MobileTimeEntry({
       }
       
       // Remove synced entries
-      const remaining = offlineQueue.filter(e => e.sync_status !== 'synced');
+      const remaining = updatedQueue.filter(e => e.sync_status !== 'synced');
       setOfflineQueue(remaining);
       localStorage.setItem('offline_time_entries', JSON.stringify(remaining));
       
