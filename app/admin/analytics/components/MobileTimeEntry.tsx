@@ -343,8 +343,10 @@ export default function MobileTimeEntry({
     try {
       for (const entry of offlineQueue) {
         if (entry.sync_status === 'pending') {
+          const originalStatus = entry.sync_status;
           await syncTimeEntry(entry);
-          if (entry.sync_status === 'synced') {
+          // Verificăm dacă sincronizarea a reușit
+          if (originalStatus === 'pending' && entry.sync_status === 'synced') {
             syncedCount++;
           }
         }
