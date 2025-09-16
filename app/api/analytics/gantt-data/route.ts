@@ -466,7 +466,7 @@ export async function PUT(request: NextRequest) {
     // Construiesc query-ul în funcție de tipul task-ului
     switch (task_type) {
       case 'proiect':
-        const setClausesProiect = [];
+        const setClausesProiect: string[] = [];
         if (updates.startDate) setClausesProiect.push('Data_Start = @startDate');
         if (updates.endDate) setClausesProiect.push('Data_Final = @endDate');
         if (updates.status) {
