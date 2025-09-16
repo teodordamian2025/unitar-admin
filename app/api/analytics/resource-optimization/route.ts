@@ -592,7 +592,30 @@ function generateOptimizationRecommendations(
 
 // Calculare statistici optimizare
 function calculateOptimizationStats(resources: any[]): OptimizationStats {
-  if (resources.length === 0) return {};
+  if (resources.length === 0) return {
+    total_resources: 0,
+    resource_distribution: {
+      optimal: 0,
+      overloaded: 0,
+      underutilized: 0,
+      critical: 0
+    },
+    utilization_stats: {
+      average: 0,
+      optimal_range: '60-80%',
+      resources_in_optimal_range: 0
+    },
+    efficiency_stats: {
+      average: 0,
+      high_efficiency_resources: 0,
+      low_efficiency_resources: 0
+    },
+    optimization_potential: {
+      total_improvement: 0,
+      high_impact_opportunities: 0,
+      reallocation_opportunities: 0
+    }
+  };
 
   const overloadedResources = resources.filter(r => r.resource_status === 'overloaded');
   const underutilizedResources = resources.filter(r => r.resource_status === 'underutilized');
