@@ -7,6 +7,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// Tipuri pentru siguranță TypeScript
+interface ROIInsight {
+  type: 'success' | 'warning' | 'info' | 'danger';
+  title: string;
+  description: string;
+  value: string;
+  recommendation: string;
+}
+
+interface SummaryStats {
+  total_projects: number;
+  total_investment: number;
+  total_revenue: number;
+  net_profit: number;
+  average_roi: number;
+  high_performers: number;
+  under_performers: number;
+  high_risk_projects: number;
+  success_rate: number;
+  completion_rate: number;
+}
+
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {
@@ -258,8 +280,8 @@ export async function GET(request: NextRequest) {
     `;
 
     // Parametri pentru query
-    const queryParams: any = { period: period };
-    const queryTypes: any = { period: 'INT64' };
+    const queryParams: Record<string, any> = { period: period };
+    const queryTypes: Record<string, string> = { period: 'INT64' };
 
     if (projectFilter) {
       queryParams.projectFilter = projectFilter;
@@ -427,8 +449,19 @@ function getRiskFactors(projectData: any, roi: number, completionProb: number, p
 }
 
 // Calculare statistici sumar
-function calculateSummaryStats(projects: any[]): any {
-  if (projects.length === 0) return {};
+function calculateSummaryStats(projects: any[]): SummaryStats {
+  if (projects.length === 0) return {
+    total_projects: 0,
+    total_investment: 0,
+    total_revenue: 0,
+    net_profit: 0,
+    average_roi: 0,
+    high_performers: 0,
+    under_performers: 0,
+    high_risk_projects: 0,
+    success_rate: 0,
+    completion_rate: 0
+  };
 
   const totalInvestment = projects.reduce((sum, p) => sum + p.total_investment, 0);
   const totalRevenue = projects.reduce((sum, p) => sum + p.actual_revenue, 0);
@@ -453,8 +486,8 @@ function calculateSummaryStats(projects: any[]): any {
 }
 
 // Generare insights ROI
-function generateROIInsights(projects: any[]): any[] {
-  const insights = [];
+function generateROIInsights(projects: any[]): ROIInsight[] {
+  const insights: ROIInsight[] = [];
 
   const avgROI = projects.reduce((sum, p) => sum + p.roi_percentage, 0) / projects.length;
   const highPerformers = projects.filter(p => p.roi_percentage > 150);
@@ -494,7 +527,14 @@ function generateROIInsights(projects: any[]): any[] {
 }
 
 // Generare prognoze ROI
-function generateROIForecasts(projects: any[]): any {
+function generateROIForecasts(projects: any[]): {
+  active_projects: number;
+  forecasts: any[];
+  portfolio_forecast: {
+    expected_avg_roi: number;
+    high_confidence_projects: number;
+  };
+} {
   const activeProjects = projects.filter(p => p.proiect_status === 'Activ');
   
   const forecastData = activeProjects.map(project => {
