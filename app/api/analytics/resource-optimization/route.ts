@@ -7,6 +7,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// Tipuri pentru siguranță TypeScript
+interface OptimizationInsight {
+  type: 'danger' | 'warning' | 'success' | 'info';
+  title: string;
+  description: string;
+  value: string;
+  recommendation: string;
+}
+
+interface OptimizationStats {
+  total_resources: number;
+  resource_distribution: {
+    optimal: number;
+    overloaded: number;
+    underutilized: number;
+    critical: number;
+  };
+  utilization_stats: {
+    average: number;
+    optimal_range: string;
+    resources_in_optimal_range: number;
+  };
+  efficiency_stats: {
+    average: number;
+    high_efficiency_resources: number;
+    low_efficiency_resources: number;
+  };
+  optimization_potential: {
+    total_improvement: number;
+    high_impact_opportunities: number;
+    reallocation_opportunities: number;
+  };
+}
+
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {
@@ -346,8 +380,8 @@ export async function GET(request: NextRequest) {
     `;
 
     // Parametri pentru query
-    const queryParams: any = { period: period };
-    const queryTypes: any = { period: 'INT64' };
+    const queryParams: Record<string, any> = { period: period };
+    const queryTypes: Record<string, string> = { period: 'INT64' };
 
     if (resourceType) {
       queryParams.resourceType = resourceType;
@@ -557,7 +591,7 @@ function generateOptimizationRecommendations(
 }
 
 // Calculare statistici optimizare
-function calculateOptimizationStats(resources: any[]): any {
+function calculateOptimizationStats(resources: any[]): OptimizationStats {
   if (resources.length === 0) return {};
 
   const overloadedResources = resources.filter(r => r.resource_status === 'overloaded');
@@ -596,8 +630,8 @@ function calculateOptimizationStats(resources: any[]): any {
 }
 
 // Generare insights optimizare
-function generateOptimizationInsights(resources: any[], stats: any): any[] {
-  const insights = [];
+function generateOptimizationInsights(resources: any[], stats: OptimizationStats): OptimizationInsight[] {
+  const insights: OptimizationInsight[] = [];
 
   const criticalBottlenecks = resources.filter(r => r.bottleneck_risk > 80);
   const highImpactOpportunities = resources.filter(r => r.expected_improvement > 20);
@@ -646,7 +680,11 @@ function generateOptimizationInsights(resources: any[], stats: any): any[] {
 }
 
 // Generare plan realocoare (simplificat)
-async function generateReallocationPlan(resources: any[]): Promise<any> {
+async function generateReallocationPlan(resources: any[]): Promise<{
+  total_suggestions: number;
+  suggestions: any[];
+  implementation_priority: any[];
+}> {
   const overloaded = resources.filter(r => r.utilization_rate > 85);
   const underutilized = resources.filter(r => r.utilization_rate < 50);
 
@@ -679,7 +717,16 @@ async function generateReallocationPlan(resources: any[]): Promise<any> {
 }
 
 // Generare prognoze capacitate
-function generateCapacityForecasts(resources: any[]): any {
+function generateCapacityForecasts(resources: any[]): {
+  current_capacity_utilization: number;
+  projected_optimal_utilization: number;
+  capacity_gap: number;
+  growth_recommendations: {
+    immediate_actions: number;
+    mid_term_hiring_needs: number;
+    skill_development_priorities: string[];
+  };
+} {
   const totalCurrentCapacity = resources.reduce((sum, r) => sum + r.total_capacity, 0);
   const totalCurrentUtilization = resources.reduce((sum, r) => sum + r.current_allocation, 0);
   
