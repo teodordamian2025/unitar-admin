@@ -215,7 +215,16 @@ function generatePredictions(
     return generateFallbackPredictions(horizonDays, granularity);
   }
 
-  const predictions = [];
+  const predictions: Array<{
+  period: string;
+  predicted_hours: number;
+  trend: string;
+  confidence_interval: {
+    lower: number;
+    upper: number;
+  };
+  model_type: string;
+}> = [];
   const lastDataPoint = historicalData[historicalData.length - 1];
   const periodsToPredict = granularity === 'weekly' ? Math.ceil(horizonDays / 7) : 
                           granularity === 'monthly' ? Math.ceil(horizonDays / 30) : horizonDays;
@@ -368,7 +377,13 @@ function calculateAccuracy(historicalData: any[]): any {
 
 // Funcție pentru generarea insights
 function generatePredictiveInsights(predictions: any[], historicalData: any[]): any[] {
-  const insights = [];
+  const insights: Array<{
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  recommendation: string;
+}> = [];
 
   if (predictions.length === 0) return insights;
 
@@ -431,7 +446,12 @@ function generatePredictiveInsights(predictions: any[], historicalData: any[]): 
 
 // Fallback pentru date insuficiente
 function generateFallbackPredictions(horizonDays: number, granularity: string): any[] {
-  const predictions = [];
+  const predictions: Array<{
+  period: string;
+  predicted_hours: number;
+  trend: string;
+  model_type: string;
+}> = [];
   const periodsToPredict = granularity === 'weekly' ? Math.ceil(horizonDays / 7) : 
                           granularity === 'monthly' ? Math.ceil(horizonDays / 30) : horizonDays;
 
