@@ -461,7 +461,13 @@ function calculateMarketStats(skills: any[]): any {
 }
 
 function generateStrategicInsights(skills: any[], stats: any): any[] {
-  const insights = [];
+  const insights: Array<{
+    type: string;
+    title: string;
+    description: string;
+    value: string;
+    recommendation: string;
+  }> = [];
   
   const emergingTech = skills.filter(s => 
     ['Machine Learning', 'Data Science', 'Cloud Architecture'].includes(s.skill_category)
