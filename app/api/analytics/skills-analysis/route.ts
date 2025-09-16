@@ -7,6 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// Tipuri pentru siguranță TypeScript
+interface StrategicRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  category: string;
+  title: string;
+  description: string;
+  skills: string[];
+  actions: string[];
+}
+
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {
@@ -288,31 +298,25 @@ export async function GET(request: NextRequest) {
       ORDER BY sa.total_hours DESC
     `;
 
-    const queryParams = [
-      { name: 'period', parameterType: { type: 'INT64' }, parameterValue: { value: period } }
-    ];
+    const queryParams: Record<string, any> = { period: period };
+    const queryTypes: Record<string, string> = { period: 'INT64' };
 
     if (userId) {
-      queryParams.push({ 
-        name: 'userId', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: userId } 
-      });
-    }
+  queryParams.userId = userId;
+  queryTypes.userId = 'STRING';
+}
 
-    if (skillCategory) {
-      queryParams.push({ 
-        name: 'skillCategory', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: skillCategory } 
-      });
-    }
+if (skillCategory) {
+  queryParams.skillCategory = skillCategory;
+  queryTypes.skillCategory = 'STRING';
+}
 
-    const [skillsRows] = await bigquery.query({
-      query: skillsAnalysisQuery,
-      location: 'EU',
-      params: queryParams,
-    });
+const [skillsRows] = await bigquery.query({
+  query: skillsAnalysisQuery,
+  params: queryParams,
+  types: queryTypes,
+  location: 'EU',
+});
 
     // Query separat pentru individual skills dacă e specificat userId
     let individualSkills = null;
@@ -323,30 +327,23 @@ export async function GET(request: NextRequest) {
       `;
       
       const [individualRows] = await bigquery.query({
-        query: `
-          WITH ${skillsAnalysisQuery.substring(skillsAnalysisQuery.indexOf('skill_mapping AS'))}
-          
-          SELECT 
-            utilizator_uid,
-            utilizator_nume,
-            skills_count,
-            skill_balance_score,
-            growth_percentage,
-            top_skills
-          FROM individual_skill_summary
-          WHERE utilizator_uid = @userId
-        `,
-        location: 'EU',
-        params: [{ 
-          name: 'userId', 
-          parameterType: { type: 'STRING' }, 
-          parameterValue: { value: userId } 
-        }, { 
-          name: 'period', 
-          parameterType: { type: 'INT64' }, 
-          parameterValue: { value: period } 
-        }]
-      });
+	  query: `
+	    WITH ${skillsAnalysisQuery.substring(skillsAnalysisQuery.indexOf('skill_mapping AS'))}
+	    
+	    SELECT 
+	      utilizator_uid,
+	      utilizator_nume,
+	      skills_count,
+	      skill_balance_score,
+	      growth_percentage,
+	      top_skills
+	    FROM individual_skill_summary
+	    WHERE utilizator_uid = @userId
+	  `,
+	  params: { userId: userId, period: period },
+	  types: { userId: 'STRING', period: 'INT64' },
+	  location: 'EU',
+	});
       
       individualSkills = individualRows[0] || null;
     }
@@ -369,7 +366,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Strategic recommendations
-    const strategicRecommendations = [];
+    const strategicRecommendations: StrategicRecommendation[] = [];
     
     if (skillsMarketplace.knowledge_risks.length > 0) {
       strategicRecommendations.push({
