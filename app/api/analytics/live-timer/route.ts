@@ -128,7 +128,11 @@ export async function GET(request: NextRequest) {
       ` : ''}
     `;
 
-    const queryParams = [];
+    const queryParams: Array<{
+	  name: string;
+	  parameterType: any;
+	  parameterValue: any;
+	}> = [];
     if (userId) {
       queryParams.push({ 
         name: 'userId', 
