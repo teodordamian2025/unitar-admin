@@ -461,7 +461,11 @@ export async function PUT(request: NextRequest) {
     }
 
     let updateQuery = '';
-    let updateParams: any[] = [];
+    let updateParams: Array<{
+	  name: string;
+	  parameterType: any;
+	  parameterValue: any;
+	}> = [];
 
     // Construiesc query-ul în funcție de tipul task-ului
     switch (task_type) {
@@ -496,7 +500,7 @@ export async function PUT(request: NextRequest) {
         break;
 
       case 'subproiect':
-        const setClausesSubproiect = [];
+        const setClausesSubproiect: string[] = [];
         if (updates.startDate) setClausesSubproiect.push('Data_Start = @startDate');
         if (updates.endDate) setClausesSubproiect.push('Data_Final = @endDate');
         if (updates.status) {
@@ -522,7 +526,7 @@ export async function PUT(request: NextRequest) {
         break;
 
       case 'sarcina':
-        const setClausesSarcina = [];
+        const setClausesSarcina: string[] = [];
         if (updates.startDate) setClausesSarcina.push('data_creare = @startDate');
         if (updates.endDate) setClausesSarcina.push('data_scadenta = @endDate');
         if (updates.status) setClausesSarcina.push('status = @status');
