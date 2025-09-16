@@ -584,7 +584,7 @@ function calculateTeamBurnoutStats(teamMembers: any[]): any {
 
 // Generare insights burnout
 function generateBurnoutInsights(teamMembers: any[], teamStats: any): any[] {
-  const insights = [];
+  const insights: any[] = [];
 
   const criticalMembers = teamMembers.filter(m => m.risk_level === 'critical');
   const highRiskMembers = teamMembers.filter(m => m.risk_level === 'high');
