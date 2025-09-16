@@ -711,7 +711,13 @@ async function generateReallocationPlan(resources: any[]): Promise<{
   const overloaded = resources.filter(r => r.utilization_rate > 85);
   const underutilized = resources.filter(r => r.utilization_rate < 50);
 
-  const reallocationSuggestions = [];
+  const reallocationSuggestions: Array<{
+  from: string;
+  to: string;
+  resource_type: string;
+  suggested_transfer: number;
+  expected_balance_improvement: number;
+}> = [];
 
   overloaded.forEach(over => {
     const suitable = underutilized.find(under => 
