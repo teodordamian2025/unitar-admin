@@ -470,7 +470,7 @@ const TranzactiiImportPage: React.FC = () => {
               <ul className="space-y-1">
                 <li>• Tranzacțiile sunt automat deduplicate</li>
                 <li>• Se încearcă matching automat cu facturile</li>
-                <li>• Matching-urile cu confidence > 70% sunt aplicate</li>
+                <li>• Matching-urile cu confidence &gt; 70% sunt aplicate</li>
                 <li>• Restul pot fi procesate manual în Dashboard</li>
               </ul>
             </div>
