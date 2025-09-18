@@ -340,9 +340,17 @@ const TransactionTable: React.FC<{
     }).format(amount);
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ro-RO');
-  };
+  const formatDate = (dateStr: string | any) => {
+	  // Procesează formatul BigQuery DATE field
+	  let actualDate = dateStr;
+	  if (typeof dateStr === 'object' && dateStr !== null && 'value' in dateStr) {
+	    actualDate = dateStr.value;
+	  }
+	  
+	  if (!actualDate) return 'N/A';
+	  
+	  return new Date(actualDate).toLocaleDateString('ro-RO');
+	};
 
   const truncateText = (text: string, maxLength: number = 50) => {
     if (!text) return '';

@@ -382,6 +382,30 @@ export default function AdminPage() {
                 e.currentTarget.style.color = '#2c3e50';
               }}
             >
+            <Link 
+		  href="/admin/tranzactii/dashboard" 
+		  style={{ 
+		    display: 'block',
+		    padding: '0.75rem 1rem',
+		    background: '#ecf0f1',
+		    color: '#2c3e50',
+		    textDecoration: 'none',
+		    borderRadius: '6px',
+		    border: '1px solid #bdc3c7',
+		    transition: 'all 0.3s ease'
+		  }}
+		  onMouseOver={(e) => {
+		    e.currentTarget.style.background = '#17a2b8';
+		    e.currentTarget.style.color = 'white';
+		  }}
+		  onMouseOut={(e) => {
+		    e.currentTarget.style.background = '#ecf0f1';
+		    e.currentTarget.style.color = '#2c3e50';
+		  }}
+		>
+		  💳 Dashboard Tranzacții
+		</Link>
+                        
               📊 ANAF Monitoring
             </Link>
           </div>

@@ -19,6 +19,7 @@ export default function RapoarteLayout({ children }: RapoarteLayoutProps) {
     { href: '/admin/rapoarte/clienti', label: '👥 Clienți' },
     { href: '/admin/rapoarte/contracte', label: '📄 Contracte' },
     { href: '/admin/rapoarte/facturi', label: '💰 Facturi' },
+    { href: '/admin/tranzactii/dashboard', label: '💳 Tranzacții' },
     { href: '/admin/rapoarte/financiar', label: '💰 Financiar' }
   ];
 

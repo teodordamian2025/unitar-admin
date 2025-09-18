@@ -311,7 +311,7 @@ async function getTransactionsList(filters: FilterParams): Promise<{
     // Procesăm rezultatele pentru display
     const transactions: TranzactieDetail[] = dataResults.map((row: any) => ({
       id: row.id,
-      data_procesare: row.data_procesare,
+      data_procesare: row.data_procesare?.value || row.data_procesare,  // CORECȚIA
       suma: parseFloat(row.suma) || 0,
       directie: row.directie,
       tip_categorie: row.tip_categorie,
