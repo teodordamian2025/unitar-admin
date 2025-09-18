@@ -782,14 +782,3 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-    // Apelăm POST cu dry_run = true
-    const mockRequest = new NextRequest('http://localhost/api/tranzactii/auto-match', {
-      method: 'POST',
-      body: JSON.stringify({
-        min_confidence,
-        tolerance_percent,
-        account_id,
-        dry_run: true
-      }),
-      headers: {
-        'Content-Type': 'application/json'
