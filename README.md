@@ -126,6 +126,13 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - - ANAFClientSearch.tsx
 - - - - - - ClientEditModal.tsx
 - - - - - - ClientNouModal.tsx
+- - - - contracte
+- - - - - page.tsx
+- - - - - components
+- - - - - - ContractActions.tsx
+- - - - - - ContractFilters.tsx
+- - - - - - ContractSignModal.tsx
+- - - - - - ContracteTable.tsx
 - - - - page.tsx
 - - - - facturi
 - - - - - page.tsx
@@ -155,7 +162,26 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - ActionDropdown.tsx
 - - - - - FilterBar.tsx
 - - - - - BaseTable.tsx
+- - - tranzactii
+- - - - import
+- - - - - page.tsx
+- - - - dashboard
+- - - - - page.tsx
+- - - - - components
+- - - - - - ManualMatchingModal.tsx
 - - - page.tsx
+- - - analytics
+- - - - timetracking
+- - - - - page.tsx
+- - - - components
+- - - - - GanttChart.tsx
+- - - - - QuickTimeEntryModal.tsx
+- - - - - LiveTimerSystem.tsx
+- - - - - CalendarView.tsx
+- - - - - TeamPerformanceDetail.tsx
+- - - - - MobileTimeEntry.tsx
+- - - - - NotificationCenter.tsx
+- - - - - AdvancedAnalytics.tsx
 - - layout.tsx
 - - api
 - - - actions
@@ -270,6 +296,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - subproiecte-responsabili
 - - - - - route.ts
 - - - - contracte
+- - - - - export
+- - - - - - route.ts
 - - - - - route.ts
 - - - - facturi
 - - - - - last-number
@@ -288,6 +316,15 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - route.ts
 - - - queryOpenAI
 - - - - route.ts
+- - - tranzactii
+- - - - import-csv
+- - - - - route.ts
+- - - - auto-match
+- - - - - route.ts
+- - - - dashboard
+- - - - - route.ts
+- - - - manual-match
+- - - - - route.ts
 - - - verify-recaptcha
 - - - - route.ts
 - - - curs-valutar
@@ -303,6 +340,31 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - - - route.ts
 - - - debug-template
 - - - - route.ts
+- - - analytics
+- - - - predictions
+- - - - - route.ts
+- - - - daily-activity
+- - - - - route.ts
+- - - - team-performance
+- - - - - route.ts
+- - - - market-trends
+- - - - - route.ts
+- - - - burnout-analysis
+- - - - - route.ts
+- - - - calendar-data
+- - - - - route.ts
+- - - - resource-optimization
+- - - - - route.ts
+- - - - skills-analysis
+- - - - - route.ts
+- - - - gantt-data
+- - - - - route.ts
+- - - - live-timer
+- - - - - route.ts
+- - - - time-tracking
+- - - - - route.ts
+- - - - roi-analysis
+- - - - - route.ts
 - - - bigquery
 - - - - route.ts
 - - - ai-database
@@ -336,6 +398,8 @@ Accesează: `http://localhost:3000/admin/rapoarte/proiecte`
 - - - .gitignore
 - - facturi
 - git-filter-repo.py
+
+
 
 
 
@@ -501,7 +565,14 @@ app/api/analytics/market-trends/route.ts = API pentru market trends și skills i
 app/admin/analytics/components/MobileTimeEntry.tsx = PWA-optimized mobile component pentru time tracking cu voice notes și offline capability
 app/admin/analytics/components/NotificationCenter.tsx = Sistem centralizat de notificări cu real-time alerts, custom rules și email/SMS integration
 
-
+Coduri pentru Tranzactii Bancare CSV Manual:
+app/api/tranzactii/import-csv/route.ts = API IMPORT CSV TRANZACTII BANCARE - ING ROMANIA
+app/api/tranzactii/auto-match/route.ts = API AUTO-MATCHING TRANZACTII CU ETAPEFACTURI
+app/api/tranzactii/dashboard/route.ts = API DASHBOARD TRANZACTII CU FILTRARE AVANSATA
+app/admin/tranzactii/import/page.tsx = PAGINA IMPORT CSV TRANZACTII ING ROMANIA
+app/admin/tranzactii/dashboard/page.tsx = DASHBOARD PRINCIPAL TRANZACTII CU FILTRARE SI MANAGEMENT
+app/api/tranzactii/manual-match/route.ts = API MANUAL MATCHING CU CANDIDATI INTELIGENTI
+app/admin/tranzactii/dashboard/components/ManualMatchingModal.tsx = MODAL MANUAL MATCHING CU CANDIDATI INTELIGENTI
 
 ### 📋 Descriere Componente Cheie
 
@@ -641,19 +712,10 @@ app/api/anaf/search-clients/route.ts // DESCRIERE: Căutare și import clienți 
 app/api/verify-anaf/route.ts
 app/admin/rapoarte/clienti/components/ANAFClientSearch.tsx // DESCRIERE: Componentă pentru căutare și import clienți din ANAF
 app/admin/rapoarte/clienti/components/ClientNouModal.tsx // MODIFICAT: Integrare completă ANAF cu componenta ANAFClientSearch
-2. Realizare Contract- de facut
-Motivație:
+2. Realizare Contract = implementat complet, proiectele si subproiectele devin articole ale contractului
 
-Ușor de implementat cu infrastructura actuală
-Funcționalitate completă de management proiecte
-Valoare comercială imediată.
-3. E-factura ANAF
-Motivație:
+3. E-factura ANAF = Implementat
 
-Cel mai complex dar și cel mai valoros
-Necesită date client validate (din etapa 1)
-Impact major pentru conformitatea fiscală
-Rezumat implementare OAuth ANAF
 ✅ API Endpoints create:
 
 /api/anaf/oauth/authorize - Inițiază flow OAuth
@@ -717,19 +779,16 @@ Componente de modificat:
 ProiectNouModal.tsx - adaugă câmpuri noi = implementat
 ProiecteTable.tsx - afișare status-uri multiple = este implementat
 ProiectActions.tsx - acțiuni pentru cheltuieli = este implementat
-La pagina Proiecte Actuni/Editeaza pagina ar trebui sa fie identica cu cea pentru Proiect nou, in plus cu optiunea sterge proiect = este implementat
-La pagina Proiecte Totalul estimat este aratat in RON, nu este coroborat cu moneda si valoarea din Proiect Nou= nu este implementat
 
-
-ETAPA 3: SISTEM MULTI-VALUTĂ 💱
+ETAPA 3: SISTEM MULTI-VALUTĂ 💱 = Implementat
 Prioritate: MEDIE - necesită API BNR
 API-uri noi:
 
 app/api/curs-valutar/route.ts - Integrare BNR = implementat
-De facut tabel in Bigquery cu cursul valutar din 2025 si sa se scrie zilnic cursul zilei, ma intereseaza doar EUR, USD, GBP.
+
 Modificare generate-hibrid/route.ts - calcule multi-valută
 
-ETAPA 4: EDITARE/STORNARE FACTURI ✏️
+ETAPA 4: EDITARE/STORNARE FACTURI ✏️ = Implementat
 Prioritate: ÎNALTĂ - funcționalitate critică
 Componente noi:
 
@@ -742,4 +801,5 @@ app/api/actions/invoices/ - endpoints pentru editare/stornare = este implementat
 Informare despre date:
 Extragere Date din Bigquery
 BigQuery prin Node.js client returnează DATE fields ca obiecte {value: "2025-08-16"} în loc de string-uri simple.
+Logica programului. Se creaza intai proiecte cu subproiecte. Apoi se fac contracte si anexe la contract daca e cazul cu etape, iar etapele sunt corelate cu subproiectele, sau direct cu proiectele daca nu au subproiecte. Apoi se fac facturi in baza contractelor, iar continutul facturilor vor fi articole identice cu etapele din contracte sau contractele in intregime. Apoi cand se fac incasarile ar trebui sa se inchida facturile. Daca se achita partial atunci ar trebui sa se inchida articolele facturilor , adica etapele facturilor in ordine crescatoare.
 
