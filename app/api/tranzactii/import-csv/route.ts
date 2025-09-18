@@ -153,15 +153,17 @@ function extractInvoiceReferences(detalii: string): string[] {
   
   const references: string[] = [];
   patterns.forEach(pattern => {
-    const matches = detalii.matchAll(pattern);
-    for (const match of matches) {
+    let match;
+    while ((match = pattern.exec(detalii)) !== null) {
       if (match[1]) {
         references.push(match[1].replace(/\s+/g, ''));
       }
     }
+    // Reset regex pentru următoarea utilizare
+    pattern.lastIndex = 0;
   });
   
-  return [...new Set(references)]; // Elimină duplicatele
+  return Array.from(new Set(references)); // Elimină duplicatele
 }
 
 // =================================================================
