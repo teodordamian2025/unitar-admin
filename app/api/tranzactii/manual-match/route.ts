@@ -167,13 +167,15 @@ function extractInvoiceNumbers(text: string): string[] {
   
   const numbers: string[] = [];
   patterns.forEach(pattern => {
-    const matches = text.matchAll(pattern);
-    for (const match of matches) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
       if (match[1]) {
         const cleanNumber = match[1].replace(/\s+/g, '').toUpperCase();
         if (cleanNumber) numbers.push(cleanNumber);
       }
     }
+    // Reset regex pentru următoarea utilizare
+    pattern.lastIndex = 0;
   });
   
   return [...new Set(numbers)];
