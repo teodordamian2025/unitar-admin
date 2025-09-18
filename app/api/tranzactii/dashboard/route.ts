@@ -538,15 +538,15 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        const [updateResult] = await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-          SET 
-            status = '${new_status}',
-            data_actualizare = CURRENT_TIMESTAMP()
-          WHERE id IN (${idsString})
-        `);
-        
-        updatedCount = updateResult.numDmlAffectedRows || 0;
+        await bigquery.query(`
+	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+	  SET 
+	    status = '${new_status}',
+	    data_actualizare = CURRENT_TIMESTAMP()
+	  WHERE id IN (${idsString})
+	`);
+
+	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       case 'remove_matches':
@@ -559,31 +559,31 @@ export async function POST(request: NextRequest) {
           WHERE tranzactie_id IN (${idsString}) AND status = 'active'
         `);
 
-        // Resetează tranzacțiile
-        const [resetResult] = await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-          SET 
-            matching_tip = 'none',
-            matching_confidence = 0,
-            status = 'nou',
-            processed = FALSE,
-            data_actualizare = CURRENT_TIMESTAMP()
-          WHERE id IN (${idsString})
-        `);
-        
-        updatedCount = resetResult.numDmlAffectedRows || 0;
+        // Reset tranzacțiile
+	await bigquery.query(`
+	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+	  SET 
+	    matching_tip = 'none',
+	    matching_confidence = 0,
+	    status = 'nou',
+	    processed = FALSE,
+	    data_actualizare = CURRENT_TIMESTAMP()
+	  WHERE id IN (${idsString})
+	`);
+
+	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       case 'mark_review':
-        const [reviewResult] = await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-          SET 
-            needs_review = TRUE,
-            data_actualizare = CURRENT_TIMESTAMP()
-          WHERE id IN (${idsString})
-        `);
-        
-        updatedCount = reviewResult.numDmlAffectedRows || 0;
+        await bigquery.query(`
+	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+	  SET 
+	    needs_review = TRUE,
+	    data_actualizare = CURRENT_TIMESTAMP()
+	  WHERE id IN (${idsString})
+	`);
+
+	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       default:
