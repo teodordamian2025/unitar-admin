@@ -178,7 +178,7 @@ function extractInvoiceNumbers(text: string): string[] {
     pattern.lastIndex = 0;
   });
   
-  return [...new Set(numbers)];
+  return Array.from(new Set(numbers));
 }
 
 /**
