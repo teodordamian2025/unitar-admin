@@ -122,7 +122,7 @@ function levenshteinSimilarity(str1: string, str2: string): number {
   
   if (s1 === s2) return 100;
   
-  const matrix = [];
+  const matrix: number[][] = [];
   const len1 = s1.length;
   const len2 = s2.length;
 
