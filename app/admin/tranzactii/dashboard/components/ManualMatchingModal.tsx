@@ -728,7 +728,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
                     />
                     <span className="text-sm text-red-600">
-                      Forțează matching-ul (diferența > 10%)
+                      Forțează matching-ul (diferența &gt; 10%)
                     </span>
                   </label>
                 </div>
