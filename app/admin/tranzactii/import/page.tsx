@@ -1,18 +1,24 @@
-// =================================================================
-// PAGINA IMPORT CSV TRANZACTII ING ROMANIA
-// Generat: 18 septembrie 2025, 00:05 (Romania)
-// Cale: app/admin/tranzactii/import/page.tsx
-// =================================================================
+// ==================================================================
+// CALEA: app/admin/tranzactii/import/page.tsx
+// DATA: 19.09.2025 23:45 (ora României)
+// DESCRIERE: Pagina modernă pentru import CSV tranzacții bancare
+// FUNCȚIONALITATE: Upload drag&drop cu preview și validare avansată
+// ==================================================================
 
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
+import ModernLayout from '@/app/components/ModernLayout';
+import { Card, Button, Alert, LoadingSpinner } from '@/app/components/ui';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import { useRouter } from 'next/navigation';
 
-// =================================================================
+// ==================================================================
 // TIPURI TYPESCRIPT
-// =================================================================
+// ==================================================================
 
 interface ImportStats {
   totalRows: number;
@@ -42,449 +48,452 @@ interface RecentImport {
   data_creare: string;
 }
 
-// =================================================================
-// COMPONENTE HELPER
-// =================================================================
+// ==================================================================
+// COMPONENTE MODERNE
+// ==================================================================
 
-const ImportStatsCard: React.FC<{ stats: ImportStats }> = ({ stats }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4">Rezultate Import</h3>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+const ModernImportStats: React.FC<{ stats: ImportStats }> = ({ stats }) => (
+  <Card variant="default" className="p-6">
+    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+      📊 Rezultate Import
+    </h3>
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
       <div className="text-center">
-        <div className="text-2xl font-bold text-blue-600">{stats.totalRows}</div>
+        <div className="text-3xl font-bold text-blue-600 mb-2">{stats.totalRows}</div>
         <div className="text-sm text-gray-500">Total linii</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-green-600">{stats.newTransactions}</div>
+        <div className="text-3xl font-bold text-green-600 mb-2">{stats.newTransactions}</div>
         <div className="text-sm text-gray-500">Noi importate</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-yellow-600">{stats.duplicatesFound}</div>
+        <div className="text-3xl font-bold text-yellow-600 mb-2">{stats.duplicatesFound}</div>
         <div className="text-sm text-gray-500">Duplicate</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-red-600">{stats.errorRows}</div>
+        <div className="text-3xl font-bold text-red-600 mb-2">{stats.errorRows}</div>
         <div className="text-sm text-gray-500">Erori</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-purple-600">{Math.round(stats.processingTimeMs / 1000)}s</div>
+        <div className="text-3xl font-bold text-purple-600 mb-2">
+          {Math.round(stats.processingTimeMs / 1000)}s
+        </div>
         <div className="text-sm text-gray-500">Timp procesare</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-indigo-600">
+        <div className="text-3xl font-bold text-indigo-600 mb-2">
           {stats.totalRows > 0 ? Math.round((stats.newTransactions / stats.totalRows) * 100) : 0}%
         </div>
         <div className="text-sm text-gray-500">Rata succes</div>
       </div>
     </div>
-  </div>
+  </Card>
 );
 
-const RecentImportsCard: React.FC<{ imports: RecentImport[] }> = ({ imports }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4">Import-uri Recente</h3>
+const ModernRecentImports: React.FC<{ imports: RecentImport[] }> = ({ imports }) => (
+  <Card variant="default" className="p-6">
+    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+      🕒 Import-uri Recente
+    </h3>
     {imports.length === 0 ? (
-      <p className="text-gray-500 text-center py-4">Nu există import-uri recente</p>
+      <div className="text-center py-12">
+        <div className="text-4xl mb-4">📋</div>
+        <p className="text-gray-500">Nu există import-uri recente</p>
+      </div>
     ) : (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {imports.slice(0, 5).map((imp, index) => (
-          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div
+            key={index}
+            className="flex items-center justify-between p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/60 transition-all duration-200"
+          >
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  imp.operation_status === 'success' 
-                    ? 'bg-green-100 text-green-800' 
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                  imp.operation_status === 'success'
+                    ? 'bg-green-100 text-green-800'
                     : 'bg-red-100 text-red-800'
                 }`}>
                   {imp.operation_status === 'success' ? '✅ Succes' : '❌ Eșuat'}
                 </span>
-                <span className="text-sm font-medium text-gray-900">{imp.file_name}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {imp.file_name}
+                </span>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {imp.records_success} noi, {imp.records_duplicates} duplicate
-                • {Math.round(imp.processing_time_ms / 1000)}s
-                • {new Date(imp.data_creare).toLocaleDateString('ro-RO')}
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <span>📄 {imp.records_processed} procesate</span>
+                <span>✅ {imp.records_success} succes</span>
+                <span>🔄 {imp.records_duplicates} duplicate</span>
+                <span>⏱️ {Math.round(imp.processing_time_ms / 1000)}s</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm font-medium text-gray-900">{imp.records_processed}</div>
-              <div className="text-xs text-gray-500">procesate</div>
+            <div className="text-xs text-gray-400">
+              {new Date(imp.data_creare).toLocaleDateString('ro-RO')}
             </div>
           </div>
         ))}
       </div>
     )}
-  </div>
+  </Card>
 );
 
-const UploadInstructions: React.FC = () => (
-  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-    <h3 className="text-lg font-semibold text-blue-900 mb-3">
-      📋 Instrucțiuni Import CSV ING România
+const ModernDropzone: React.FC<{
+  onFileSelect: (file: File) => void;
+  isProcessing: boolean;
+}> = ({ onFileSelect, isProcessing }) => {
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        onFileSelect(file);
+      } else {
+        toast.error('Vă rugăm să selectați un fișier CSV valid');
+      }
+    }
+  }, [onFileSelect]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv']
+    },
+    maxFiles: 1,
+    disabled: isProcessing
+  });
+
+  return (
+    <Card variant="default" className="p-8">
+      <div
+        {...getRootProps()}
+        className={`
+          border-2 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer
+          transition-all duration-300 hover:border-blue-400 hover:bg-blue-50/30
+          ${isDragActive ? 'border-blue-500 bg-blue-50/50' : ''}
+          ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+        `}
+      >
+        <input {...getInputProps()} />
+
+        <div className="text-6xl mb-4">
+          {isProcessing ? '⏳' : isDragActive ? '📂' : '📄'}
+        </div>
+
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          {isProcessing
+            ? 'Se procesează fișierul...'
+            : isDragActive
+            ? 'Eliberează fișierul aici'
+            : 'Drag & Drop fișier CSV'
+          }
+        </h3>
+
+        <p className="text-gray-600 mb-6">
+          {isProcessing
+            ? 'Vă rugăm să așteptați...'
+            : 'sau faceți clic pentru a selecta un fișier CSV cu tranzacții ING România'
+          }
+        </p>
+
+        {!isProcessing && (
+          <Button variant="primary" size="lg">
+            📤 Selectează Fișier CSV
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+const FormatGuide: React.FC = () => (
+  <Card variant="info" className="p-6">
+    <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
+      📋 Format CSV Acceptat
     </h3>
-    <div className="space-y-3 text-sm text-blue-800">
-      <div className="flex items-start gap-2">
-        <span className="font-semibold">1.</span>
-        <span>Accesează <strong>ING Homebank</strong> → Contul tău → Export tranzacții</span>
+    <div className="space-y-4 text-sm">
+      <div>
+        <h4 className="font-medium text-blue-800 mb-2">Coloane necesare (ordine exactă):</h4>
+        <ul className="list-disc list-inside space-y-1 text-blue-700">
+          <li>Data tranzacției (format: DD.MM.YYYY)</li>
+          <li>Detalii tranzacție</li>
+          <li>Debit (suma negativă)</li>
+          <li>Credit (suma pozitivă)</li>
+          <li>Sold</li>
+        </ul>
       </div>
-      <div className="flex items-start gap-2">
-        <span className="font-semibold">2.</span>
-        <span>Selectează perioada dorită (max 12 luni)</span>
-      </div>
-      <div className="flex items-start gap-2">
-        <span className="font-semibold">3.</span>
-        <span>Alege format <strong>CSV</strong> și descarcă fișierul</span>
-      </div>
-      <div className="flex items-start gap-2">
-        <span className="font-semibold">4.</span>
-        <span>Trage fișierul CSV în zona de mai jos sau click pentru a-l selecta</span>
+
+      <div>
+        <h4 className="font-medium text-blue-800 mb-2">Observații importante:</h4>
+        <ul className="list-disc list-inside space-y-1 text-blue-700">
+          <li>Fișierul trebuie să fie în format CSV cu separatorul ","</li>
+          <li>Prima linie poate conține header-ele (vor fi ignorate)</li>
+          <li>Encoding recomandat: UTF-8</li>
+          <li>Duplicatele vor fi detectate automat</li>
+        </ul>
       </div>
     </div>
-    <div className="mt-4 p-3 bg-blue-100 rounded-md">
-      <p className="text-xs text-blue-700">
-        <strong>💡 Tip:</strong> Sistemul detectează automat duplicate și nu le va re-importa. 
-        Poți importa în siguranță același fișier de mai multe ori.
-      </p>
-    </div>
-  </div>
+  </Card>
 );
 
-// =================================================================
+// ==================================================================
 // COMPONENTA PRINCIPALĂ
-// =================================================================
+// ==================================================================
 
-const TranzactiiImportPage: React.FC = () => {
-  const [isUploading, setIsUploading] = useState(false);
+const ModernImportPage: React.FC = () => {
+  const [user, loading] = useAuthState(auth);
+  const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [recentImports, setRecentImports] = useState<RecentImport[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('user');
 
-  // =================================================================
-  // DROPZONE CONFIGURATION
-  // =================================================================
+  // ==================================================================
+  // AUTHENTICATION
+  // ==================================================================
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-
-    const file = acceptedFiles[0];
-    
-    // Validare fișier
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Te rog selectează un fișier CSV valid');
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
       return;
     }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+    setUserRole(localStorage.getItem('userRole') || 'user');
+    loadRecentImports();
+  }, [user, loading, router]);
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      toast.error('Fișierul este prea mare. Dimensiunea maximă este 10MB');
-      return;
+  // ==================================================================
+  // DATA LOADING
+  // ==================================================================
+
+  const loadRecentImports = async () => {
+    try {
+      const response = await fetch('/api/tranzactii/import-csv?action=recent');
+      const data = await response.json();
+
+      if (data.success) {
+        setRecentImports(data.imports || []);
+      }
+    } catch (error) {
+      console.error('❌ Eroare la încărcarea import-urilor recente:', error);
     }
+  };
 
+  // ==================================================================
+  // HANDLERS
+  // ==================================================================
+
+  const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setImportResult(null);
-  }, []);
+  };
 
-  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-    onDrop,
-    accept: {
-      'text/csv': ['.csv'],
-      'application/csv': ['.csv']
-    },
-    multiple: false,
-    maxSize: 10 * 1024 * 1024 // 10MB
-  });
-
-  // =================================================================
-  // UPLOAD HANDLER
-  // =================================================================
-
-  const handleUpload = async () => {
+  const processImport = async () => {
     if (!selectedFile) {
-      toast.error('Te rog selectează un fișier CSV');
+      toast.error('Vă rugăm să selectați un fișier CSV');
       return;
     }
 
-    setIsUploading(true);
-    const toastId = toast.loading(`Se importă ${selectedFile.name}...`);
+    setIsProcessing(true);
+    setImportResult(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append('csvFile', selectedFile);
 
       const response = await fetch('/api/tranzactii/import-csv', {
         method: 'POST',
         body: formData
       });
 
-      const result: ImportResult = await response.json();
+      const result = await response.json();
 
       if (result.success) {
-        toast.success(result.message, { id: toastId });
         setImportResult(result);
-        setSelectedFile(null);
-        
-        // Reload recent imports
-        await loadRecentImports();
+        toast.success(result.message);
+        loadRecentImports(); // Refresh recent imports
       } else {
-        toast.error(result.error || 'Eroare la import', { id: toastId });
+        toast.error(result.error || 'Eroare la procesarea fișierului');
         setImportResult(result);
-      }
-
-    } catch (error: any) {
-      console.error('❌ Eroare upload:', error);
-      toast.error('Eroare la încărcarea fișierului', { id: toastId });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // =================================================================
-  // LOAD RECENT IMPORTS
-  // =================================================================
-
-  const loadRecentImports = async () => {
-    try {
-      const response = await fetch('/api/tranzactii/import-csv');
-      const data = await response.json();
-      
-      if (data.success) {
-        setRecentImports(data.recentImports || []);
       }
     } catch (error) {
-      console.error('❌ Eroare loading recent imports:', error);
+      console.error('❌ Eroare import CSV:', error);
+      toast.error('Eroare la upload-ul fișierului');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // =================================================================
-  // EFFECTS
-  // =================================================================
+  const resetImport = () => {
+    setSelectedFile(null);
+    setImportResult(null);
+  };
 
-  useEffect(() => {
-    loadRecentImports();
-  }, []);
+  if (loading) {
+    return <LoadingSpinner overlay />;
+  }
 
-  // =================================================================
+  if (!user) {
+    return null;
+  }
+
+  // ==================================================================
   // RENDER
-  // =================================================================
+  // ==================================================================
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            💳 Import Tranzacții Bancare
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Importă extractele CSV de la ING România pentru reconciliation automat
-          </p>
-        </div>
-
-        {/* Instructions */}
-        <div className="mb-8">
-          <UploadInstructions />
-        </div>
-
-        {/* Upload Zone */}
-        <div className="mb-8">
-          <div
-            {...getRootProps()}
-            className={`
-              relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
-              ${isDragActive 
-                ? 'border-blue-400 bg-blue-50' 
-                : isDragReject
-                ? 'border-red-400 bg-red-50'
-                : selectedFile
-                ? 'border-green-400 bg-green-50'
-                : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
-              }
-            `}
-          >
-            <input {...getInputProps()} />
-            
-            {/* Upload Icon */}
-            <div className="mb-4">
-              {selectedFile ? (
-                <div className="mx-auto w-16 h-16 text-green-500">
-                  📄
-                </div>
-              ) : (
-                <div className="mx-auto w-16 h-16 text-gray-400">
-                  📁
-                </div>
-              )}
-            </div>
-
-            {/* Upload Text */}
-            <div className="text-lg font-semibold text-gray-900 mb-2">
-              {selectedFile ? (
-                `✅ ${selectedFile.name}`
-              ) : isDragActive ? (
-                'Eliberează fișierul aici...'
-              ) : (
-                'Trage CSV-ul aici sau click pentru a selecta'
-              )}
-            </div>
-            
-            {selectedFile ? (
-              <div className="text-sm text-gray-600">
-                Dimensiune: {Math.round(selectedFile.size / 1024)} KB
-                <br />
-                <span className="text-green-600 font-medium">Gata pentru import!</span>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">
-                Doar fișiere CSV, max 10MB
-                <br />
-                Format acceptat: Export ING România
-              </div>
-            )}
-
-            {/* Upload Button */}
-            {selectedFile && (
-              <div className="mt-6">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUpload();
-                  }}
-                  disabled={isUploading}
-                  className={`
-                    inline-flex items-center px-6 py-3 rounded-lg font-medium transition-all duration-200
-                    ${isUploading
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
-                    }
-                  `}
-                >
-                  {isUploading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Se procesează...
-                    </>
-                  ) : (
-                    <>
-                      🚀 Importă Tranzacțiile
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              📤 Import CSV Tranzacții
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Import automat tranzacții bancare din fișiere CSV ING România
+            </p>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/admin/tranzactii/dashboard')}
+          >
+            ← Înapoi la Dashboard
+          </Button>
+        </div>
+      </div>
 
-          {/* Remove File Button */}
-          {selectedFile && !isUploading && (
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => {
-                  setSelectedFile(null);
-                  setImportResult(null);
-                }}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
-              >
-                🗑️ Elimină fișierul selectat
-              </button>
+      {/* Format Guide */}
+      <div className="mb-8">
+        <FormatGuide />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Upload Section */}
+        <div className="space-y-6">
+          <ModernDropzone
+            onFileSelect={handleFileSelect}
+            isProcessing={isProcessing}
+          />
+
+          {selectedFile && !isProcessing && (
+            <Card variant="success" className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">📄</div>
+                  <div>
+                    <div className="font-medium text-green-800">
+                      {selectedFile.name}
+                    </div>
+                    <div className="text-sm text-green-600">
+                      {(selectedFile.size / 1024).toFixed(1)} KB
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={processImport}
+                    loading={isProcessing}
+                  >
+                    🚀 Procesează
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetImport}
+                  >
+                    🗑️
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {isProcessing && (
+            <Card variant="warning" className="p-6 text-center">
+              <LoadingSpinner />
+              <p className="mt-4 text-lg font-medium text-yellow-800">
+                Se procesează fișierul CSV...
+              </p>
+              <p className="text-sm text-yellow-600">
+                Vă rugăm să nu închideți această pagină.
+              </p>
+            </Card>
+          )}
+
+          {/* Import Results */}
+          {importResult && (
+            <div className="space-y-4">
+              {importResult.success ? (
+                <Alert type="success" title="Import finalizat cu succes!">
+                  {importResult.message}
+                </Alert>
+              ) : (
+                <Alert type="error" title="Eroare la import">
+                  {importResult.error || 'Eroare necunoscută'}
+                </Alert>
+              )}
+
+              {importResult.stats && (
+                <ModernImportStats stats={importResult.stats} />
+              )}
+
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="primary"
+                  onClick={() => router.push('/admin/tranzactii/dashboard')}
+                >
+                  📊 Vezi Tranzacții
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetImport}
+                >
+                  📤 Importă Alt Fișier
+                </Button>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Import Results */}
-        {importResult && importResult.success && importResult.stats && (
-          <div className="mb-8">
-            <ImportStatsCard stats={importResult.stats} />
-            
-            {/* Action Buttons After Successful Import */}
-            <div className="mt-6 flex flex-wrap gap-4 justify-center">
-              <a
-                href="/admin/tranzactii/dashboard"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                📊 Vezi Dashboard-ul
-              </a>
-              <button
-                onClick={async () => {
-                  const toastId = toast.loading('Se rulează auto-matching...');
-                  try {
-                    const response = await fetch('/api/tranzactii/auto-match', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ min_confidence: 70 })
-                    });
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                      toast.success(`${result.stats.matchesApplied} matching-uri aplicate!`, { id: toastId });
-                    } else {
-                      toast.error(result.error || 'Eroare auto-matching', { id: toastId });
-                    }
-                  } catch (error) {
-                    toast.error('Eroare la auto-matching', { id: toastId });
-                  }
-                }}
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                🤖 Rulează Auto-Matching
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {importResult && !importResult.success && (
-          <div className="mb-8 bg-red-50 border border-red-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-red-900 mb-2">❌ Eroare Import</h3>
-            <p className="text-red-800">{importResult.error}</p>
-            
-            {importResult.stats && (
-              <div className="mt-4 text-sm text-red-700">
-                <p>Linii procesate: {importResult.stats.processedRows} din {importResult.stats.totalRows}</p>
-                <p>Erori: {importResult.stats.errorRows}</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Recent Imports */}
-        <div className="mb-8">
-          <RecentImportsCard imports={recentImports} />
-        </div>
-
-        {/* Help Section */}
-        <div className="bg-gray-100 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">🆘 Ajutor</h3>
-          <div className="grid md:grid-cols-2 gap-6 text-sm text-gray-700">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Probleme frecvente:</h4>
-              <ul className="space-y-1">
-                <li>• Verifică că fișierul este exportat din ING Homebank</li>
-                <li>• Formatul trebuie să fie CSV (nu Excel)</li>
-                <li>• Fișierul nu trebuie modificat manual</li>
-                <li>• Verifică că perioada nu depășește 12 luni</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">După import:</h4>
-              <ul className="space-y-1">
-                <li>• Tranzacțiile sunt automat deduplicate</li>
-                <li>• Se încearcă matching automat cu facturile</li>
-                <li>• Matching-urile cu confidence &gt; 70% sunt aplicate</li>
-                <li>• Restul pot fi procesate manual în Dashboard</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
-              💡 Pentru suport tehnic: <a href="mailto:contact@unitarproiect.eu" className="text-blue-600 hover:underline">contact@unitarproiect.eu</a>
-            </p>
-          </div>
+        <div>
+          <ModernRecentImports imports={recentImports} />
         </div>
       </div>
-    </div>
+
+      {/* Help Section */}
+      <div className="mt-12">
+        <Card variant="default" className="p-6">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            ❓ Ajutor și Suport
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+            <div>
+              <h4 className="font-medium text-gray-800 mb-2">🔧 Probleme tehnice</h4>
+              <p className="text-gray-600">
+                Dacă întâmpinați probleme la import, verificați formatul fișierului și încercați din nou.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-800 mb-2">📊 Duplicate</h4>
+              <p className="text-gray-600">
+                Sistemul detectează automat tranzacțiile duplicate pe baza datei și sumei.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-800 mb-2">⚡ Performance</h4>
+              <p className="text-gray-600">
+                Fișierele mari (&gt;10MB) pot dura câteva minute pentru procesare.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </ModernLayout>
   );
 };
 
-export default TranzactiiImportPage;
+export default ModernImportPage;

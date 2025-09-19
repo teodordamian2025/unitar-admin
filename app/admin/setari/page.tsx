@@ -1,14 +1,18 @@
 // ==================================================================
 // CALEA: app/admin/setari/page.tsx
-// DATA: 31.08.2025 12:30 (ora României)
-// MODIFICAT: Adăugat buton pentru setări contracte
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 19.09.2025 23:50 (ora României)
+// DESCRIERE: Settings Hub modern cu glassmorphism design
+// FUNCȚIONALITATE: Dashboard central pentru toate setările sistemului
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
+import { Card, Button, LoadingSpinner } from '@/app/components/ui';
 
 interface SystemStats {
   tabeleExistente: number;
@@ -17,19 +21,46 @@ interface SystemStats {
   backupAutomat: boolean;
 }
 
-export default function SetariDashboard() {
+interface SettingCard {
+  title: string;
+  description: string;
+  icon: string;
+  href: string;
+  color: string;
+  stats?: { label: string; value: string }[];
+}
+
+const ModernSettingsPage: React.FC = () => {
+  const [user, loading] = useAuthState(auth);
+  const router = useRouter();
   const [stats, setStats] = useState<SystemStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('user');
+
+  // ==================================================================
+  // AUTHENTICATION
+  // ==================================================================
 
   useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+    setUserRole(localStorage.getItem('userRole') || 'user');
     loadSystemStats();
-  }, []);
+  }, [user, loading, router]);
+
+  // ==================================================================
+  // DATA LOADING
+  // ==================================================================
 
   const loadSystemStats = async () => {
     try {
-      // Simulează încărcarea stats-urilor sistemului
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       setStats({
         tabeleExistente: 16,
         versiuneApp: '2.1.0',
@@ -39,351 +70,319 @@ export default function SetariDashboard() {
     } catch (error) {
       console.error('Eroare la încărcarea statisticilor:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  // ==================================================================
+  // SETTINGS CONFIGURATION
+  // ==================================================================
+
+  const settingsCards: SettingCard[] = [
+    {
+      title: 'Facturare',
+      description: 'Configurare numerotare, serii și parametri e-factura ANAF',
+      icon: '📄',
+      href: '/admin/setari/facturare',
+      color: 'bg-gradient-to-br from-blue-500/20 to-blue-600/30 border-blue-200',
+      stats: [
+        { label: 'Serie curentă', value: 'INV-{proiectId}' },
+        { label: 'Proforme', value: 'PRF' },
+        { label: 'Delay e-factura', value: '30 min' }
+      ]
+    },
+    {
+      title: 'Date Firmă',
+      description: 'Informații complete despre companie și date legale',
+      icon: '🏢',
+      href: '/admin/setari/firma',
+      color: 'bg-gradient-to-br from-green-500/20 to-green-600/30 border-green-200',
+      stats: [
+        { label: 'Firma', value: 'UNITAR PROIECT TDA SRL' },
+        { label: 'CUI', value: 'RO35639210' },
+        { label: 'Reg. Com.', value: 'J2016002024405' }
+      ]
+    },
+    {
+      title: 'Contracte',
+      description: 'Configurare numerotare și format pentru contracte, PV-uri și anexe',
+      icon: '📋',
+      href: '/admin/setari/contracte',
+      color: 'bg-gradient-to-br from-purple-500/20 to-purple-600/30 border-purple-200',
+      stats: [
+        { label: 'Contracte', value: 'CONTR' },
+        { label: 'Procese Verbale', value: 'PV' },
+        { label: 'Anexe', value: 'ANX' }
+      ]
+    },
+    {
+      title: 'Conturi Bancare',
+      description: 'Management conturi bancare și configurare tranzacții',
+      icon: '🏦',
+      href: '/admin/setari/banca',
+      color: 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/30 border-indigo-200',
+      stats: [
+        { label: 'ING Bank', value: 'RO82INGB***7533' },
+        { label: 'Trezorerie', value: 'RO29TREZ***8857' }
+      ]
+    }
+  ];
+
+  const systemActions = [
+    {
+      title: 'Export Setări',
+      description: 'Exportă toate configurațiile sistemului',
+      icon: '📤',
+      action: 'export',
+      color: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+    },
+    {
+      title: 'Import Setări',
+      description: 'Importă configurații dintr-un backup',
+      icon: '📥',
+      action: 'import',
+      color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+    },
+    {
+      title: 'Reset Default',
+      description: 'Resetează toate setările la valorile implicite',
+      icon: '🔄',
+      action: 'reset',
+      color: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+    },
+    {
+      title: 'Curăță Cache',
+      description: 'Șterge cache-ul și datele temporare',
+      icon: '🧹',
+      action: 'cache',
+      color: 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+    },
+    {
+      title: 'Diagnosticare',
+      description: 'Verifică starea sistemului și conexiunile',
+      icon: '📊',
+      action: 'diagnostic',
+      color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+    },
+    {
+      title: 'ANAF Monitoring',
+      description: 'Monitorizare și erori ANAF e-factura',
+      icon: '📈',
+      action: 'anaf',
+      color: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+    }
+  ];
+
+  // ==================================================================
+  // HANDLERS
+  // ==================================================================
+
+  const handleSystemAction = (action: string) => {
+    switch (action) {
+      case 'export':
+        // TODO: Implement export
+        break;
+      case 'import':
+        // TODO: Implement import
+        break;
+      case 'reset':
+        // TODO: Implement reset
+        break;
+      case 'cache':
+        // TODO: Implement cache clear
+        break;
+      case 'diagnostic':
+        // TODO: Implement diagnostic
+        break;
+      case 'anaf':
+        router.push('/admin/anaf/monitoring');
+        break;
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner overlay />;
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  // ==================================================================
+  // RENDER
+  // ==================================================================
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              ⚙️ Setări Sistem
+            <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+              ⚙️ Settings Hub
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 text-lg">
               Configurare completă pentru UNITAR PROIECT - Numerotare, date firmă și parametri sistem
             </p>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin"
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
-            >
-              ← Înapoi la Dashboard
-            </Link>
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/admin')}
+          >
+            ← Înapoi la Dashboard
+          </Button>
         </div>
       </div>
 
-      {/* System Overview Cards */}
-      {loading ? (
+      {/* System Stats */}
+      {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white p-6 rounded-lg shadow border">
+            <Card key={i} variant="default" className="p-6">
               <div className="animate-pulse">
                 <div className="h-4 bg-gray-200 rounded mb-4"></div>
                 <div className="h-8 bg-gray-200 rounded"></div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       ) : stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Tabele Sistem */}
-          <div className="bg-white p-6 rounded-lg shadow border border-blue-200">
-            <div className="flex items-center">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">Tabele Sistem</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.tabeleExistente}</p>
+          <Card variant="default" className="p-6 border-l-4 border-blue-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Tabele Sistem</p>
+                <p className="text-3xl font-bold text-blue-600">{stats.tabeleExistente}</p>
               </div>
-              <div className="text-3xl">🗃️</div>
+              <div className="text-4xl opacity-80">🗃️</div>
             </div>
-          </div>
+          </Card>
 
-          {/* Versiune App */}
-          <div className="bg-white p-6 rounded-lg shadow border border-green-200">
-            <div className="flex items-center">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">Versiune App</p>
-                <p className="text-2xl font-bold text-green-600">{stats.versiuneApp}</p>
+          <Card variant="default" className="p-6 border-l-4 border-green-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Versiune App</p>
+                <p className="text-3xl font-bold text-green-600">{stats.versiuneApp}</p>
               </div>
-              <div className="text-3xl">🚀</div>
+              <div className="text-4xl opacity-80">🚀</div>
             </div>
-          </div>
+          </Card>
 
-          {/* Ultima Actualizare */}
-          <div className="bg-white p-6 rounded-lg shadow border border-purple-200">
-            <div className="flex items-center">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">Ultima Actualizare</p>
+          <Card variant="default" className="p-6 border-l-4 border-purple-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Ultima Actualizare</p>
                 <p className="text-lg font-bold text-purple-600">{stats.ultimaActualizare}</p>
               </div>
-              <div className="text-3xl">📅</div>
+              <div className="text-4xl opacity-80">📅</div>
             </div>
-          </div>
+          </Card>
 
-          {/* Backup Status */}
-          <div className="bg-white p-6 rounded-lg shadow border border-orange-200">
-            <div className="flex items-center">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600">Backup Automat</p>
+          <Card variant="default" className="p-6 border-l-4 border-orange-500">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Backup Automat</p>
                 <p className="text-2xl font-bold text-orange-600">
                   {stats.backupAutomat ? 'Activ' : 'Inactiv'}
                 </p>
               </div>
-              <div className="text-3xl">{stats.backupAutomat ? '✅' : '❌'}</div>
+              <div className="text-4xl opacity-80">
+                {stats.backupAutomat ? '✅' : '❌'}
+              </div>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* Setări Principale */}
+      {/* Main Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Setări Facturare */}
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              📄 Setări Facturare
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Configurare numerotare, serii și parametri e-factura
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Serie Facturi</div>
-                  <div className="text-sm text-gray-600">Curent: INV-{'{proiectId}'}-{'{timestamp}'}</div>
-                </div>
-                <div className="text-blue-600 text-2xl">📋</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Proforme</div>
-                  <div className="text-sm text-gray-600">Serie: PRF</div>
-                </div>
-                <div className="text-green-600 text-2xl">📝</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">e-Factura ANAF</div>
-                  <div className="text-sm text-gray-600">Timp întârziere: 30 min</div>
-                </div>
-                <div className="text-purple-600 text-2xl">📤</div>
+        {settingsCards.map((setting, index) => (
+          <Card
+            key={index}
+            variant="default"
+            className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${setting.color}`}
+            onClick={() => router.push(setting.href)}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  {setting.icon} {setting.title}
+                </h3>
+                <p className="text-gray-600 text-sm mb-4">
+                  {setting.description}
+                </p>
               </div>
             </div>
-            
-            <div className="mt-6">
-              <Link
-                href="/admin/setari/facturare"
-                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium"
-              >
-                ⚙️ Configurează Facturare
-              </Link>
-            </div>
-          </div>
-        </div>
 
-        {/* Setări Firmă */}
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              🏢 Date Firmă
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Informații complete despre companie
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">UNITAR PROIECT TDA SRL</div>
-                  <div className="text-sm text-gray-600">CUI: RO35639210</div>
-                </div>
-                <div className="text-blue-600 text-2xl">🏢</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Nr. Reg. Com.</div>
-                  <div className="text-sm text-gray-600">J2016002024405</div>
-                </div>
-                <div className="text-orange-600 text-2xl">📋</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Contact</div>
-                  <div className="text-sm text-gray-600">📞 0765486044</div>
-                </div>
-                <div className="text-green-600 text-2xl">📞</div>
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <Link
-                href="/admin/setari/firma"
-                className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 font-medium"
-              >
-                🏢 Editează Date Firmă
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* SECȚIUNE NOUĂ: Setări Contracte */}
-      <div className="mb-8">
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              📄 Setări Contracte
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Configurare numerotare și format pentru contracte, PV-uri și anexe
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Contracte</div>
-                  <div className="text-sm text-gray-600">Serie: CONTR</div>
-                </div>
-                <div className="text-blue-600 text-2xl">📄</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Procese Verbale</div>
-                  <div className="text-sm text-gray-600">Serie: PV</div>
-                </div>
-                <div className="text-green-600 text-2xl">📋</div>
-              </div>
-              
-              <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
-                <div>
-                  <div className="font-medium text-gray-900">Anexe</div>
-                  <div className="text-sm text-gray-600">Serie: ANX</div>
-                </div>
-                <div className="text-purple-600 text-2xl">📎</div>
-              </div>
-            </div>
-            
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">⚙️</div>
-                <div>
-                  <div className="font-medium text-amber-900">Configurare Numerotare</div>
-                  <div className="text-sm text-amber-700">
-                    Setează formatul și seriile pentru toate tipurile de contracte
+            {setting.stats && (
+              <div className="space-y-3 mb-6">
+                {setting.stats.map((stat, statIndex) => (
+                  <div
+                    key={statIndex}
+                    className="flex justify-between items-center p-3 bg-white/30 backdrop-blur-sm rounded-lg"
+                  >
+                    <span className="text-sm font-medium text-gray-700">
+                      {stat.label}
+                    </span>
+                    <span className="text-sm text-gray-600 font-mono">
+                      {stat.value}
+                    </span>
                   </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => router.push(setting.href)}
+            >
+              ⚙️ Configurează
+            </Button>
+          </Card>
+        ))}
+      </div>
+
+      {/* System Actions */}
+      <Card variant="default" className="p-6 mb-8">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          🔧 Unelte Sistem
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {systemActions.map((action, index) => (
+            <button
+              key={index}
+              onClick={() => handleSystemAction(action.action)}
+              className={`p-4 rounded-xl border transition-all duration-200 hover:scale-105 ${action.color}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">{action.icon}</div>
+                <div className="text-left">
+                  <div className="font-medium">{action.title}</div>
+                  <div className="text-xs opacity-80">{action.description}</div>
                 </div>
               </div>
-            </div>
-            
-            <div className="mt-6">
-              <Link
-                href="/admin/setari/contracte"
-                className="w-full bg-amber-600 text-white px-4 py-3 rounded-lg hover:bg-amber-700 flex items-center justify-center gap-2 font-medium"
-              >
-                📄 Configurează Contracte
-              </Link>
-            </div>
-          </div>
+            </button>
+          ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Setări Avansate */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Conturi Bancare */}
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              🏦 Conturi Bancare
-            </h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="font-medium text-gray-900">ING Bank</div>
-                <div className="text-sm text-gray-600">RO82INGB***7533</div>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <div className="font-medium text-gray-900">Trezorerie</div>
-                <div className="text-sm text-gray-600">RO29TREZ***8857</div>
-              </div>
-            </div>
-            
-            <div className="mt-4">
-              <Link
-                href="/admin/setari/banca"
-                className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 text-sm font-medium"
-              >
-                🏦 Gestionează Conturi
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Import/Export */}
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              📦 Import/Export
-            </h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              <button className="w-full p-3 bg-green-50 text-green-800 rounded-lg hover:bg-green-100 flex items-center justify-center gap-2">
-                📤 Export Setări
-              </button>
-              <button className="w-full p-3 bg-blue-50 text-blue-800 rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2">
-                📥 Import Setări
-              </button>
-              <button className="w-full p-3 bg-orange-50 text-orange-800 rounded-lg hover:bg-orange-100 flex items-center justify-center gap-2">
-                🔄 Reset la Default
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* System Tools */}
-        <div className="bg-white rounded-lg shadow border">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              🔧 Unelte Sistem
-            </h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              <button className="w-full p-3 bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100 flex items-center justify-center gap-2">
-                🧹 Curăță Cache
-              </button>
-              <button className="w-full p-3 bg-purple-50 text-purple-800 rounded-lg hover:bg-purple-100 flex items-center justify-center gap-2">
-                📊 Diagnosticare
-              </button>
-              <Link
-                href="/admin/anaf/monitoring"
-                className="w-full p-3 bg-red-50 text-red-800 rounded-lg hover:bg-red-100 flex items-center justify-center gap-2"
-              >
-                📈 ANAF Monitoring
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer Info */}
-      <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-6">
+      {/* Important Notice */}
+      <Card variant="warning" className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium text-gray-900">Notă Importantă</h4>
-            <p className="text-sm text-gray-600 mt-1">
-              Modificările la setări vor afecta generarea documentelor viitoare. 
+            <h4 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
+              ⚠️ Notă Importantă
+            </h4>
+            <p className="text-sm text-yellow-800">
+              Modificările la setări vor afecta generarea documentelor viitoare.
               Documentele existente nu vor fi modificate.
             </p>
           </div>
-          <div className="text-4xl">⚠️</div>
         </div>
-      </div>
-    </div>
+      </Card>
+    </ModernLayout>
   );
-}
+};
+
+export default ModernSettingsPage;

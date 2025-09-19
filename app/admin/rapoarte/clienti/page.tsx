@@ -1,9 +1,19 @@
-//app/admin/rapoarte/clienti/page.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/clienti/page.tsx
+// DATA: 19.09.2025 22:00 (ora României)
+// DESCRIERE: Management Clienți modernizat cu design glassmorphism
+// FUNCȚIONALITATE: CRUD clienți cu integrare ANAF și UI modern
+// ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import ModernLayout from '@/app/components/ModernLayout';
+import { Card, Button, LoadingSpinner } from '@/app/components/ui';
 import ClientNouModal from './components/ClientNouModal';
 import ClientEditModal from './components/ClientEditModal';
 
@@ -22,19 +32,31 @@ interface Client {
 }
 
 export default function ClientiPage() {
+  const [user, loading] = useAuthState(auth);
+  const router = useRouter();
   const [clienti, setClienti] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('user');
 
   useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+    setUserRole(localStorage.getItem('userRole') || 'user');
     loadClienti();
-  }, []);
+  }, [user, loading, router]);
 
   const loadClienti = async () => {
     try {
-      setLoading(true);
+      setLoadingData(true);
       
       const response = await fetch('/api/rapoarte/clienti');
       const data = await response.json();
@@ -50,7 +72,7 @@ export default function ClientiPage() {
       toast.error('Eroare de conectare');
       setClienti([]);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -108,299 +130,219 @@ export default function ClientiPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '300px',
-        fontSize: '16px',
-        color: '#7f8c8d'
-      }}>
-        ⏳ Se încarcă clienții...
-      </div>
-    );
+  if (loading || loadingData) {
+    return <LoadingSpinner overlay message="Se încarcă clienții..." />;
   }
 
   return (
-    <div style={{ padding: '1.5rem' }}>
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
       {/* Header */}
-      <div style={{ 
-        marginBottom: '2rem',
-        borderBottom: '2px solid #e9ecef',
-        paddingBottom: '1rem'
-      }}>
-        <h1 style={{ 
-          margin: 0, 
-          color: '#2c3e50',
-          fontSize: '2rem',
-          fontWeight: 'bold'
-        }}>
-          👥 Management Clienți
-        </h1>
-        <p style={{ 
-          margin: '0.5rem 0 0 0', 
-          color: '#7f8c8d',
-          fontSize: '1.1rem'
-        }}>
-          Gestionează clienții și sincronizează cu ANAF
-        </p>
-      </div>
-
-      {/* Header cu acțiuni */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <div style={{
+        display: 'flex',
         alignItems: 'center',
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        border: '1px solid #dee2e6'
+        justifyContent: 'space-between',
+        marginBottom: '2rem'
       }}>
         <div>
-          <h3 style={{ margin: 0, color: '#2c3e50' }}>
-            👥 Clienți găsiți: {clienti.length}
-          </h3>
-          <p style={{ margin: '0.25rem 0 0 0', fontSize: '14px', color: '#7f8c8d' }}>
-            Clienți activi în baza de date
+          <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
+            👥 Management Clienți
+          </h1>
+          <p style={{ margin: 0, color: '#6b7280' }}>
+            Gestionează clienții și sincronizează cu ANAF
           </p>
         </div>
-        
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#27ae60',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
-          >
-            + Client Nou
-          </button>
-          
-          <button
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <Button
+            variant="outline"
+            size="sm"
+            icon="🔄"
             onClick={loadClienti}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#f39c12',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
+            loading={loadingData}
           >
-            🔄 Reîmprospătează
-          </button>
+            Reîmprospătează
+          </Button>
+          <Button
+            variant="success"
+            size="sm"
+            icon="+"
+            onClick={() => setShowModal(true)}
+          >
+            Client Nou
+          </Button>
         </div>
       </div>
 
-      {/* Tabel clienți */}
-      {clienti.length === 0 ? (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '3rem',
-          background: '#f8f9fa',
-          borderRadius: '8px',
-          border: '2px dashed #dee2e6'
+      {/* Stats Card */}
+      <Card variant="info" size="sm" style={{ marginBottom: '2rem' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}>
-          <p style={{ fontSize: '18px', color: '#7f8c8d', margin: 0 }}>
-            👥 Nu au fost găsiți clienți
-          </p>
-          <p style={{ fontSize: '14px', color: '#bdc3c7', margin: '0.5rem 0' }}>
-            Adaugă primul client sau importă din ANAF
-          </p>
-          <div style={{ marginTop: '1rem' }}>
-            <button
-              onClick={() => setShowModal(true)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#27ae60',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold'
-              }}
-            >
-              + Adaugă Client
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ fontSize: '2rem' }}>👥</div>
+            <div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                {clienti.length}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                Clienți în baza de date
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '0.875rem', color: '#6b7280' }}>
+            <div>Sincronizare ANAF activă</div>
+            <div>Validare automată CUI/CNP</div>
           </div>
         </div>
+      </Card>
+
+      {/* Clients List */}
+      {clienti.length === 0 ? (
+        <Card>
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>👥</div>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>
+              Nu au fost găsiți clienți
+            </h3>
+            <p style={{ margin: '0 0 2rem 0', color: '#6b7280' }}>
+              Adaugă primul client sau importă date din ANAF
+            </p>
+            <Button
+              variant="success"
+              size="md"
+              icon="+"
+              onClick={() => setShowModal(true)}
+            >
+              Adaugă Primul Client
+            </Button>
+          </div>
+        </Card>
       ) : (
-        <div style={{ 
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #dee2e6',
-          overflow: 'hidden',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+          gap: '1.5rem'
         }}>
-          <table style={{ 
-            width: '100%', 
-            borderCollapse: 'collapse',
-            fontSize: '14px'
-          }}>
-            <thead>
-              <tr style={{ 
-                background: '#f8f9fa',
-                borderBottom: '2px solid #dee2e6'
+          {clienti.map((client) => (
+            <Card key={client.id}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                marginBottom: '1rem'
               }}>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Tip
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Nume
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  CUI/CNP
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Contact
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'left',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Localitate
-                </th>
-                <th style={{ 
-                  padding: '1rem 0.75rem', 
-                  textAlign: 'center',
-                  fontWeight: 'bold',
-                  color: '#2c3e50'
-                }}>
-                  Acțiuni
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {clienti.map((client, index) => (
-                <tr 
-                  key={client.id}
-                  style={{ 
-                    borderBottom: '1px solid #f1f2f6',
-                    background: index % 2 === 0 ? 'white' : '#fafbfc'
-                  }}
-                >
-                  <td style={{ 
-                    padding: '0.75rem',
-                    textAlign: 'center'
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    background: client.tip_client.includes('juridic') || client.tip_client.includes('Juridic') ?
+                      'linear-gradient(135deg, #3b82f6, #1e40af)' :
+                      'linear-gradient(135deg, #10b981, #059669)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '18px' }}>
-                        {getTipClientIcon(client.tip_client)}
-                      </span>
-                      <span style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                        {getTipClientLabel(client.tip_client)}
-                      </span>
+                    {getTipClientIcon(client.tip_client)}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600', color: '#1f2937' }}>
+                      {client.nume}
+                    </h3>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '0.125rem 0.5rem',
+                      background: client.tip_client.includes('juridic') || client.tip_client.includes('Juridic') ?
+                        '#dbeafe' : '#d1fae5',
+                      color: client.tip_client.includes('juridic') || client.tip_client.includes('Juridic') ?
+                        '#1e40af' : '#059669',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      marginTop: '0.25rem'
+                    }}>
+                      {getTipClientLabel(client.tip_client)}
                     </div>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    color: '#2c3e50',
-                    fontWeight: 'bold'
-                  }}>
-                    {client.nume}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    color: '#7f8c8d',
-                    fontFamily: 'monospace'
-                  }}>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="✏️"
+                    onClick={() => handleEditClient(client)}
+                    style={{ padding: '0.25rem 0.5rem' }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon="🗑️"
+                    onClick={() => handleDeleteClient(client.id, client.nume)}
+                    style={{ padding: '0.25rem 0.5rem' }}
+                  >
+                    Del
+                  </Button>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '1rem',
+                padding: '1rem',
+                background: 'rgba(249, 250, 251, 0.8)',
+                borderRadius: '8px',
+                fontSize: '0.875rem'
+              }}>
+                <div>
+                  <div style={{ color: '#6b7280', marginBottom: '0.25rem' }}>CUI/CNP:</div>
+                  <div style={{ color: '#1f2937', fontFamily: 'monospace', fontWeight: '500' }}>
                     {client.cui || client.cnp || '-'}
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    color: '#2c3e50'
-                  }}>
-                    <div>{client.email || '-'}</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                      {client.telefon || '-'}
-                    </div>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    color: '#2c3e50'
-                  }}>
-                    <div>{client.oras || '-'}</div>
-                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                      {client.judet || '-'}
-                    </div>
-                  </td>
-                  <td style={{ 
-                    padding: '0.75rem',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                      <button
-                        onClick={() => handleEditClient(client)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
-                        }}
-                        title="Editează client"
-                      >
-                        ✏️ Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClient(client.id, client.nume)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: '#e74c3c',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
-                        }}
-                        title="Șterge client"
-                      >
-                        🗑️ Del
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Email:</div>
+                  <div style={{ color: '#1f2937' }}>
+                    {client.email || '-'}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Telefon:</div>
+                  <div style={{ color: '#1f2937' }}>
+                    {client.telefon || '-'}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Localitate:</div>
+                  <div style={{ color: '#1f2937' }}>
+                    {client.oras ? `${client.oras}${client.judet ? `, ${client.judet}` : ''}` : '-'}
+                  </div>
+                </div>
+              </div>
+
+              {client.adresa && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: 'rgba(243, 244, 246, 0.5)',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}>
+                  <div style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Adresă:</div>
+                  <div style={{ color: '#1f2937' }}>{client.adresa}</div>
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
       )}
 
@@ -421,6 +363,6 @@ export default function ClientiPage() {
         onClientUpdated={loadClienti}
         client={selectedClient}
       />
-    </div>
+    </ModernLayout>
   );
 }
