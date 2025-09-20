@@ -31,7 +31,7 @@ interface NavItem {
 
 const navStructure: NavItem[] = [
   {
-    href: '/admin/dashboard',
+    href: '/admin',
     label: 'Dashboard Executive',
     icon: '🏠',
     exact: true
@@ -126,7 +126,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
         position: 'relative'
       }}
     >
@@ -138,7 +138,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(248, 250, 252, 0.1)',
+          background: 'rgba(248, 250, 252, 0.3)',
           backdropFilter: 'blur(10px)',
           zIndex: 0
         }}
