@@ -710,20 +710,25 @@ export default function ProiectDetailsPage() {
       {/* FACTURA MODAL */}
       {showFacturaModal && proiect && (
         <FacturaHibridModal
-          isOpen={showFacturaModal}
-          onClose={() => setShowFacturaModal(false)}
-          onSuccess={(result) => {
-            toast.success('Factură generată cu succes!');
-            if (result.downloadUrl) {
-              window.open(result.downloadUrl, '_blank');
-            }
-            setShowFacturaModal(false);
-          }}
-          proiectData={{
+          proiect={{
             ID_Proiect: proiect.ID_Proiect,
             Denumire: proiect.Denumire,
             Client: proiect.Client,
-            Valoare_Estimata: proiect.Valoare_Estimata
+            Status: proiect.Status,
+            Valoare_Estimata: proiect.Valoare_Estimata,
+            Data_Start: proiect.Data_Start,
+            Data_Final: proiect.Data_Final,
+            moneda: proiect.moneda,
+            valoare_ron: proiect.valoare_ron,
+            curs_valutar: proiect.curs_valutar
+          }}
+          onClose={() => setShowFacturaModal(false)}
+          onSuccess={(invoiceId: string, downloadUrl: string) => {
+            toast.success('Factură generată cu succes!');
+            if (downloadUrl) {
+              window.open(downloadUrl, '_blank');
+            }
+            setShowFacturaModal(false);
           }}
         />
       )}
