@@ -108,85 +108,126 @@ export default function AdminPage() {
     try {
       setLoadingData(true);
 
-      // Simulare date KPI - în realitate vor fi apeluri API către BigQuery
-      const mockKPIData: KPIData = {
-        cashFlow: {
-          amount: 87450,
-          change: 12.3,
-          currency: 'EUR'
-        },
-        projects: {
-          active: 24,
-          atDeadline: 3,
-          total: 45
-        },
-        invoices: {
-          unpaid: 15,
-          amount: 42300,
-          overdue: 3
-        },
-        transactions: {
-          matched: 89,
-          total: 100,
-          percentage: 89,
-          unmatched: 8
-        }
-      };
+      // Apeluri reale către BigQuery pentru date dashboard
+      const [dashboardResponse, tranzactiiResponse] = await Promise.all([
+        fetch('/api/rapoarte/dashboard'),
+        fetch('/api/tranzactii/dashboard')
+      ]);
 
-      const mockAlerts: AlertItem[] = [
-        {
-          id: '1',
-          type: 'error',
-          title: 'Eroare ANAF',
-          message: '1 factură cu eroare de upload',
-          count: 1,
-          action: 'Vezi detalii',
-          href: '/admin/anaf/monitoring'
-        },
-        {
-          id: '2',
-          type: 'warning',
-          title: 'Facturi întârziate',
-          message: '3 facturi depășesc termenul de plată',
-          count: 3,
-          action: 'Gestionează',
-          href: '/admin/rapoarte/facturi'
-        },
-        {
-          id: '3',
-          type: 'warning',
-          title: 'Proiecte la termen',
-          message: '2 proiecte se apropie de deadline',
-          count: 2,
-          action: 'Verifică',
-          href: '/admin/rapoarte/proiecte'
-        },
-        {
-          id: '4',
-          type: 'info',
-          title: 'Tranzacții neimperecheate',
-          message: '12 tranzacții necesită procesare manuală',
-          count: 12,
-          action: 'Procesează',
-          href: '/admin/tranzactii/dashboard'
-        },
-        {
-          id: '5',
-          type: 'warning',
-          title: 'Contracte nesemnate',
-          message: '5 contracte în așteptarea semnării',
-          count: 5,
-          action: 'Urmărește',
-          href: '/admin/rapoarte/contracte'
-        }
-      ];
+      const dashboardData = await dashboardResponse.json();
+      const tranzactiiData = await tranzactiiResponse.json();
 
-      setKpiData(mockKPIData);
-      setAlerts(mockAlerts);
+      if (dashboardData.success) {
+        const { proiecte, facturi, contracte } = dashboardData.data;
+
+        // Construiește KPI-urile cu date reale
+        const realKPIData: KPIData = {
+          cashFlow: {
+            amount: facturi?.valoare_incasata || 0,
+            change: 0, // Va fi calculat din istoricul facturilor
+            currency: 'RON'
+          },
+          projects: {
+            active: proiecte?.active || 0,
+            atDeadline: 0, // Va fi calculat din proiectele cu deadline aproape
+            total: proiecte?.total || 0
+          },
+          invoices: {
+            unpaid: facturi?.total || 0,
+            amount: facturi?.valoare_de_incasat || 0,
+            overdue: 0 // Va fi calculat din facturile cu termen depășit
+          },
+          transactions: {
+            matched: 0,
+            total: 0,
+            percentage: 0,
+            unmatched: 0
+          }
+        };
+
+        // Actualizează cu date tranzacții dacă sunt disponibile
+        if (tranzactiiData.success && tranzactiiData.stats) {
+          const stats = tranzactiiData.stats;
+          const totalMatched = stats.totalTransactions - (stats.pendingMatches || 0) - (stats.needsReview || 0);
+
+          realKPIData.transactions = {
+            total: stats.totalTransactions || 0,
+            matched: totalMatched || 0,
+            percentage: Math.round(stats.matchingRate || 0),
+            unmatched: (stats.pendingMatches || 0) + (stats.needsReview || 0)
+          };
+        }
+
+        // Generează alerturi pe baza datelor reale
+        const realAlerts: AlertItem[] = [];
+
+        // Alert pentru tranzacții neimperecheate
+        if (realKPIData.transactions.unmatched > 0) {
+          realAlerts.push({
+            id: 'tranzactii',
+            type: 'info',
+            title: 'Tranzactii neimperecheate',
+            message: `${realKPIData.transactions.unmatched} tranzactii necesita procesare manuala`,
+            count: realKPIData.transactions.unmatched,
+            action: 'Proceseaza',
+            href: '/admin/tranzactii/dashboard'
+          });
+        }
+
+        // Alert pentru proiecte active
+        if (realKPIData.projects.active > 0) {
+          realAlerts.push({
+            id: 'proiecte',
+            type: 'info',
+            title: 'Proiecte active',
+            message: `${realKPIData.projects.active} proiecte in curs de desfasurare`,
+            count: realKPIData.projects.active,
+            action: 'Gestioneaza',
+            href: '/admin/rapoarte/proiecte'
+          });
+        }
+
+        // Alert pentru facturi de incasat
+        if (realKPIData.invoices.amount > 0) {
+          realAlerts.push({
+            id: 'facturi',
+            type: 'warning',
+            title: 'Facturi de incasat',
+            message: `${realKPIData.invoices.amount.toLocaleString('ro-RO')} RON de incasat`,
+            count: realKPIData.invoices.unpaid,
+            action: 'Urmareste',
+            href: '/admin/rapoarte/facturi'
+          });
+        }
+
+        setKpiData(realKPIData);
+        setAlerts(realAlerts);
+
+      } else {
+        // Fallback la date mock în caz de eroare
+        console.warn('Nu s-au putut încărca datele BigQuery, folosesc date mock');
+
+        setKpiData({
+          cashFlow: { amount: 0, change: 0, currency: 'RON' },
+          projects: { active: 0, atDeadline: 0, total: 0 },
+          invoices: { unpaid: 0, amount: 0, overdue: 0 },
+          transactions: { matched: 0, total: 0, percentage: 0, unmatched: 0 }
+        });
+        setAlerts([]);
+      }
 
     } catch (error) {
       console.error('Eroare la încărcarea datelor dashboard:', error);
-      toast.error('Eroare la încărcarea datelor!');
+      toast.error('Eroare la încărcarea datelor din BigQuery!');
+
+      // Fallback la date mock în caz de eroare gravă
+      setKpiData({
+        cashFlow: { amount: 0, change: 0, currency: 'RON' },
+        projects: { active: 0, atDeadline: 0, total: 0 },
+        invoices: { unpaid: 0, amount: 0, overdue: 0 },
+        transactions: { matched: 0, total: 0, percentage: 0, unmatched: 0 }
+      });
+      setAlerts([]);
     } finally {
       setLoadingData(false);
     }
