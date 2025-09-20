@@ -32,29 +32,29 @@ interface NavItem {
 const navStructure: NavItem[] = [
   {
     href: '/admin',
-    label: 'Dashboard Executive',
+    label: 'Panou Principal',
     icon: '🏠',
     exact: true
   },
   {
     href: '/admin/analytics',
-    label: 'Analytics Hub',
+    label: 'Panou Analiza',
     icon: '📊',
     children: [
-      { href: '/admin/analytics/timetracking', label: 'Time Tracking', icon: '⏱️' },
-      { href: '/admin/analytics/calendar', label: 'Calendar View', icon: '📅' },
-      { href: '/admin/analytics/gantt', label: 'Gantt Projects', icon: '📋' },
-      { href: '/admin/analytics/team', label: 'Team Performance', icon: '👥' },
-      { href: '/admin/analytics/live', label: 'Live Tracking', icon: '🔴' }
+      { href: '/admin/analytics/timetracking', label: 'Timp Masurare', icon: '⏱️' },
+      { href: '/admin/analytics/calendar', label: 'Calendar', icon: '📅' },
+      { href: '/admin/analytics/gantt', label: 'Gantt', icon: '📋' },
+      { href: '/admin/analytics/team', label: 'Echipa Indicatori', icon: '👥' },
+      { href: '/admin/analytics/live', label: 'Timp Acum', icon: '🔴' }
     ]
   },
   {
     href: '/admin/rapoarte',
-    label: 'Operations',
+    label: 'Operatiuni',
     icon: '💼',
     children: [
       { href: '/admin/rapoarte/proiecte', label: 'Proiecte', icon: '📋' },
-      { href: '/admin/rapoarte/clienti', label: 'Clienți', icon: '👥' },
+      { href: '/admin/rapoarte/clienti', label: 'Clienti', icon: '👥' },
       { href: '/admin/rapoarte/contracte', label: 'Contracte', icon: '📄' },
       { href: '/admin/rapoarte/facturi', label: 'Facturi', icon: '💰' },
       { href: '/admin/anaf/monitoring', label: 'ANAF Monitor', icon: '📊' }
@@ -62,13 +62,13 @@ const navStructure: NavItem[] = [
   },
   {
     href: '/admin/tranzactii',
-    label: 'Financial Hub',
+    label: 'Panou Financiar',
     icon: '💰',
     children: [
       { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '💳' },
-      { href: '/admin/tranzactii/dashboard', label: 'Dashboard', icon: '📊' },
-      { href: '/admin/tranzactii/matching', label: 'Auto Matching', icon: '🔄' },
-      { href: '/admin/tranzactii/manual', label: 'Manual Match', icon: '✍️' }
+      { href: '/admin/tranzactii/dashboard', label: 'Panou', icon: '📊' },
+      { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
+      { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' }
     ]
   },
   {

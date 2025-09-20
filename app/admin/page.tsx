@@ -164,7 +164,7 @@ export default function AdminPage() {
         {
           id: '4',
           type: 'info',
-          title: 'Tranzacții nematchate',
+          title: 'Tranzacții neimperecheate',
           message: '12 tranzacții necesită procesare manuală',
           count: 12,
           action: 'Procesează',

@@ -61,7 +61,7 @@ export default function MatchingPage() {
     setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
   }, [user, loading, router]);
 
-  // Încărcare tranzacții nematchate
+  // Încărcare tranzacții neimperecheate
   useEffect(() => {
     if (!user) return;
     loadTranzactiiNematchate();
@@ -70,11 +70,11 @@ export default function MatchingPage() {
   const loadTranzactiiNematchate = async () => {
     try {
       setLoadingTranzactii(true);
-      const response = await fetch('/api/tranzactii/dashboard?tip=nematchate&limit=50');
+      const response = await fetch('/api/tranzactii/dashboard?tip=neimperecheate&limit=50');
       const data = await response.json();
 
       if (data.success && data.tranzactii) {
-        setTranzactiiNematchate(data.tranzactii.filter((t: TranzactieDetail) => t.status === 'nematchat'));
+        setTranzactiiNematchate(data.tranzactii.filter((t: TranzactieDetail) => t.status === 'neimperecheat'));
       }
     } catch (error) {
       console.error('Eroare încărcare tranzacții:', error);
@@ -179,7 +179,7 @@ export default function MatchingPage() {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent'
               }}>
-                🔗 Manual Matching
+                🔄 Asociere Auto
               </h1>
               <p style={{
                 margin: '0.75rem 0 0 0',
@@ -187,7 +187,7 @@ export default function MatchingPage() {
                 fontSize: '1.1rem',
                 fontWeight: '500'
               }}>
-                Asociază manual tranzacțiile cu facturile corespunzătoare
+                Asociere automată a tranzacțiilor cu facturile pe baza algoritmilor inteligenți
               </p>
             </div>
 
@@ -200,7 +200,7 @@ export default function MatchingPage() {
               fontWeight: '700',
               boxShadow: '0 4px 12px rgba(231, 76, 60, 0.3)'
             }}>
-              <div style={{ fontSize: '12px', opacity: 0.9 }}>Tranzacții nematchate</div>
+              <div style={{ fontSize: '12px', opacity: 0.9 }}>Tranzacții neimperecheate</div>
               <div style={{ fontSize: '18px' }}>{tranzactiiNematchate.length}</div>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function MatchingPage() {
             gap: '2rem',
             height: 'calc(100vh - 300px)'
           }}>
-            {/* Coloana stângă - Tranzacții nematchate */}
+            {/* Coloana stângă - Tranzacții neimperecheate */}
             <div style={{
               background: 'rgba(255, 255, 255, 0.85)',
               backdropFilter: 'blur(8px)',
