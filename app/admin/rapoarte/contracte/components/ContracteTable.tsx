@@ -11,6 +11,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import ContractActions from './ContractActions';
 import ContractSignModal from './ContractSignModal';
+import AnexaSignModal from './AnexaSignModal';
 import FacturaHibridModal from '../../proiecte/components/FacturaHibridModal';
 import ContractModal from '../../proiecte/components/ContractModal';
 import ProcesVerbalModal from '../../proiecte/components/ProcesVerbalModal';
@@ -103,6 +104,8 @@ interface AnexaContract {
   // ADĂUGAT: Câmpurile pentru data start și data final ale anexei
   data_start?: string;
   data_final?: string;
+  // ADĂUGAT: Status general al anexei (similar cu Status din Contracte)
+  status?: string;
   curs_valutar: number;
   data_curs_valutar?: string;
   procent_din_total: number;
@@ -279,6 +282,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPVModal, setShowPVModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState<any>(null);
+
+  // ✅ ADĂUGAT: State pentru modalul de anexă
+  const [showAnexaModal, setShowAnexaModal] = useState(false);
+  const [selectedAnexa, setSelectedAnexa] = useState<AnexaContract | null>(null);
 
   // NOU: State pentru expand/collapse contracte cu etape/anexe
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
@@ -561,6 +568,24 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   const handleClosePVModal = () => {
     setShowPVModal(false);
     setSelectedContract(null);
+  };
+
+  // ✅ ADĂUGAT: Handlere pentru modalul de anexă
+  const handleShowAnexaModal = (anexa: AnexaContract, contract: Contract) => {
+    setSelectedAnexa(anexa);
+    setSelectedContract(contract); // Pentru informații context în modal
+    setShowAnexaModal(true);
+  };
+
+  const handleCloseAnexaModal = () => {
+    setShowAnexaModal(false);
+    setSelectedAnexa(null);
+    setSelectedContract(null);
+  };
+
+  const handleAnexaModalSuccess = () => {
+    // Refresh datele după actualizarea anexei
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleExportExcel = async () => {
@@ -1124,8 +1149,21 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                   }}>
                     Status Facturare/Încasare
                   </th>
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  {/* ✅ ADĂUGAT: Coloană pentru Status general anexe */}
+                  <th style={{
+                    padding: '1rem 0.75rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    minWidth: '120px'
+                  }}>
+                    Status
+                  </th>
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'center',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1290,13 +1328,33 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                           )}
                         </td>
                         {/* NOU: Coloana Status Facturare pentru contract */}
-                        <td style={{ 
+                        <td style={{
                           padding: '0.75rem',
                           minWidth: '280px'
                         }}>
                           {formatStatusFacturare(contract.status_facturare_display)}
                         </td>
-                        <td style={{ 
+                        {/* ✅ ADĂUGAT: Coloană pentru Status contract */}
+                        <td style={{
+                          padding: '0.75rem',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            background: contract.Status === 'Semnat' ? 'linear-gradient(135deg, #27ae60, #2ecc71)' :
+                                      contract.Status === 'Generat' ? 'linear-gradient(135deg, #3498db, #5dade2)' :
+                                      contract.Status === 'Expirat' ? 'linear-gradient(135deg, #e74c3c, #ec7063)' :
+                                      'linear-gradient(135deg, #95a5a6, #bdc3c7)',
+                            color: 'white',
+                            textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                          }}>
+                            {contract.Status || 'Nedefinit'}
+                          </span>
+                        </td>
+                        <td style={{
                           padding: '0.75rem',
                           textAlign: 'center' as const
                         }}>
@@ -1397,12 +1455,21 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                               false
                             )}
                           </td>
-                          <td style={{ 
+                          <td style={{
                             padding: '0.5rem 0.75rem'
                           }}>
                             {formatStatusFacturare(etapa.status_facturare_display)}
                           </td>
-                          <td style={{ 
+                          {/* ✅ ADĂUGAT: Coloană pentru Status etapă (nu are status propriu, afișez "-") */}
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
+                          <td style={{
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center',
                             color: '#7f8c8d',
@@ -1504,18 +1571,73 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                               true
                             )}
                           </td>
-                          <td style={{ 
+                          <td style={{
                             padding: '0.5rem 0.75rem'
                           }}>
                             {formatStatusFacturare(anexa.status_facturare_display)}
                           </td>
-                          <td style={{ 
+                          {/* ✅ ADĂUGAT: Coloană pentru Status anexă */}
+                          <td style={{
                             padding: '0.5rem 0.75rem',
-                            textAlign: 'center',
-                            color: '#7f8c8d',
-                            fontSize: '12px'
+                            textAlign: 'center'
                           }}>
-                            -
+                            {anexa.status ? (
+                              <span style={{
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '8px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                background: anexa.status === 'Semnata' ? 'linear-gradient(135deg, #27ae60, #2ecc71)' :
+                                          anexa.status === 'In lucru' ? 'linear-gradient(135deg, #3498db, #5dade2)' :
+                                          anexa.status === 'Finalizata' ? 'linear-gradient(135deg, #8e44ad, #9b59b6)' :
+                                          anexa.status === 'Suspendata' ? 'linear-gradient(135deg, #f39c12, #f7dc6f)' :
+                                          anexa.status === 'Anulata' ? 'linear-gradient(135deg, #e74c3c, #ec7063)' :
+                                          'linear-gradient(135deg, #95a5a6, #bdc3c7)',
+                                color: 'white',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                              }}>
+                                {anexa.status}
+                              </span>
+                            ) : (
+                              <span style={{
+                                color: '#7f8c8d',
+                                fontSize: '11px',
+                                fontStyle: 'italic'
+                              }}>
+                                Nedefinit
+                              </span>
+                            )}
+                          </td>
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center'
+                          }}>
+                            <button
+                              onClick={() => handleShowAnexaModal(anexa, contract)}
+                              style={{
+                                background: 'linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(142, 68, 173, 0.3)'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(142, 68, 173, 0.4)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(142, 68, 173, 0.3)';
+                              }}
+                              title="Actualizează status și date anexă"
+                            >
+                              📋 Actualizează
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1658,6 +1780,23 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
             isOpen={showPVModal}
             onClose={handleClosePVModal}
             onSuccess={handlePVSuccess}
+          />
+        </div>
+      )}
+
+      {/* ✅ ADĂUGAT: Modal pentru actualizarea anexelor */}
+      {showAnexaModal && selectedAnexa && selectedContract && (
+        <div style={{ zIndex: 50000 }}>
+          <AnexaSignModal
+            isOpen={showAnexaModal}
+            onClose={handleCloseAnexaModal}
+            onSuccess={handleAnexaModalSuccess}
+            anexa={selectedAnexa}
+            contract={{
+              numar_contract: selectedContract.numar_contract,
+              client_nume: selectedContract.client_nume,
+              Denumire_Contract: selectedContract.Denumire_Contract
+            }}
           />
         </div>
       )}

@@ -334,12 +334,14 @@ export async function PUT(request: NextRequest) {
       'denumire', 'valoare', 'moneda', 'valoare_ron', 'termen_zile',
       'status_facturare', 'status_incasare', 'factura_id',
       'data_scadenta', 'data_facturare', 'data_incasare',
-      'curs_valutar', 'data_curs_valutar', 'procent_din_total', 'observatii'
+      'curs_valutar', 'data_curs_valutar', 'procent_din_total', 'observatii',
+      // ✅ ADĂUGAT pentru suport AnexaSignModal
+      'status', 'data_start', 'data_final'
     ];
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && allowedFields.includes(key)) {
-        if (['data_scadenta', 'data_facturare', 'data_incasare', 'data_curs_valutar'].includes(key)) {
+        if (['data_scadenta', 'data_facturare', 'data_incasare', 'data_curs_valutar', 'data_start', 'data_final'].includes(key)) {
           const formattedDate = formatDateLiteral(value as string);
           updateFields.push(`${key} = ${formattedDate}`);
         } else if (value === null || value === '') {
