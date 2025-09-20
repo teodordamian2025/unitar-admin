@@ -130,7 +130,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
         position: 'relative'
       }}
     >
-      {/* Glassmorphism Background Overlay */}
+      {/* Glassmorphism Background Overlay - Redus opacitatea pentru a evita shadow issues */}
       <div
         style={{
           position: 'fixed',
@@ -138,8 +138,8 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(248, 250, 252, 0.3)',
-          backdropFilter: 'blur(10px)',
+          background: 'rgba(248, 250, 252, 0.1)',
+          backdropFilter: 'blur(5px)',
           zIndex: 0
         }}
       />
