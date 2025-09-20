@@ -7,6 +7,9 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 import ProiectFilters from './components/ProiectFilters';
 import ProiecteTable from './components/ProiecteTable';
 import ProiectNouModal from './components/ProiectNouModal';
@@ -24,7 +27,10 @@ interface FilterValues {
 export default function ProiectePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [user, loading] = useAuthState(auth);
   const [showProiectModal, setShowProiectModal] = useState(false);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('user');
   
   // Inițializează filtrele din URL
   const [filters, setFilters] = useState<FilterValues>({
@@ -80,7 +86,24 @@ export default function ProiectePage() {
     window.location.reload();
   };
 
+  // Auth check
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+    setUserRole('admin'); // Pentru pagini admin
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      {/* Content wrapper cu styling existent */}
     <div style={{ 
       padding: '2rem',
       minHeight: '100vh',
@@ -403,5 +426,6 @@ export default function ProiectePage() {
         }
       `}</style>
     </div>
+    </ModernLayout>
   );
 }

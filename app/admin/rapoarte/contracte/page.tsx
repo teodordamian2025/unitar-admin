@@ -9,6 +9,9 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 import ContractFilters from './components/ContractFilters';
 import ContracteTable from './components/ContracteTable';
 
@@ -26,6 +29,9 @@ interface FilterValues {
 export default function ContractePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [user, loading] = useAuthState(auth);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
   
   // Inițializează filtrele din URL
   const [filters, setFilters] = useState<FilterValues>({
@@ -78,7 +84,22 @@ export default function ContractePage() {
     router.push('/admin/rapoarte/contracte');
   };
 
+  // Auth check
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
     <div style={{ 
       padding: '2rem',
       minHeight: '100vh',
@@ -351,5 +372,6 @@ export default function ContractePage() {
         }
       `}</style>
     </div>
+    </ModernLayout>
   );
 }

@@ -7,6 +7,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import { useRouter } from 'next/navigation';
+import ModernLayout from '@/app/components/ModernLayout';
 import FacturiList from '../proiecte/components/FacturiList';
 
 interface FacturiStats {
@@ -22,6 +26,10 @@ interface FacturiStats {
 }
 
 export default function FacturiPage() {
+  const [user, authLoading] = useAuthState(auth);
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
   const [stats, setStats] = useState<FacturiStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [perioada, setPerioada] = useState(30);
@@ -57,7 +65,22 @@ export default function FacturiPage() {
     }).format(amount);
   };
 
+  // Auth check
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
@@ -329,5 +352,6 @@ export default function FacturiPage() {
         />
       </div>
     </div>
+    </ModernLayout>
   );
 }

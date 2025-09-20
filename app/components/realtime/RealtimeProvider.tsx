@@ -88,33 +88,37 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
 
   const refreshAllData = useCallback(async () => {
     try {
-      // Fetch dashboard stats
+      // Fetch dashboard stats din BigQuery
       const dashboardResponse = await fetch('/api/rapoarte/dashboard');
       const dashboardStats = dashboardResponse.ok ? await dashboardResponse.json() : null;
 
-      // Fetch analytics data (simulat pentru demo)
+      // Fetch analytics data REALE din BigQuery
+      const timeTrackingResponse = await fetch('/api/analytics/time-tracking');
+      const timeTrackingData = timeTrackingResponse.ok ? await timeTrackingResponse.json() : null;
+
       const analyticsData = {
         timeTracking: {
-          totalHours: Math.floor(1200 + Math.random() * 100),
-          activeUsers: Math.floor(6 + Math.random() * 4),
-          thisWeek: Math.floor(40 + Math.random() * 15)
+          totalHours: timeTrackingData?.totalHours || 0,
+          activeUsers: 1, // Doar utilizatorul curent autentificat
+          thisWeek: timeTrackingData?.thisWeek || 0
         },
         projects: {
-          totalActive: Math.floor(20 + Math.random() * 8),
-          onTrack: Math.floor(15 + Math.random() * 5),
-          delayed: Math.floor(2 + Math.random() * 3)
+          totalActive: dashboardStats?.proiecte?.active || 0,
+          onTrack: dashboardStats?.proiecte?.active || 0,
+          delayed: 0
         }
       };
 
-      // Generate random notifications pentru demo
-      const notifications = generateRandomNotifications();
+      // Notificări REALE din BigQuery (nu random)
+      const notificationsResponse = await fetch('/api/anaf/notifications');
+      const realNotifications = notificationsResponse.ok ? await notificationsResponse.json() : [];
 
       const newData: RealtimeData = {
         dashboardStats,
         analyticsData,
-        notifications,
-        activeUsers: Math.floor(8 + Math.random() * 5),
-        systemStatus: Math.random() > 0.95 ? 'maintenance' : 'online',
+        notifications: realNotifications || [],
+        activeUsers: 1, // Doar utilizatorul curent
+        systemStatus: 'online', // Status constant, nu random
         lastUpdate: new Date()
       };
 
@@ -142,48 +146,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
     }
   }, []);
 
-  const generateRandomNotifications = (): Notification[] => {
-    const notifications: Notification[] = [];
-
-    // Random notification generation pentru demo
-    if (Math.random() > 0.7) {
-      notifications.push({
-        id: `notif-${Date.now()}`,
-        type: 'info',
-        title: 'Actualizare Sistem',
-        message: 'Date actualizate în timp real',
-        timestamp: new Date(),
-        read: false,
-        urgent: false
-      });
-    }
-
-    if (Math.random() > 0.85) {
-      notifications.push({
-        id: `notif-anaf-${Date.now()}`,
-        type: 'warning',
-        title: 'ANAF Alert',
-        message: 'Verificare automată ANAF în progres',
-        timestamp: new Date(),
-        read: false,
-        urgent: true
-      });
-    }
-
-    if (Math.random() > 0.9) {
-      notifications.push({
-        id: `notif-success-${Date.now()}`,
-        type: 'success',
-        title: 'Factură Procesată',
-        message: 'Factură #2025-156 generată cu succes',
-        timestamp: new Date(),
-        read: false,
-        urgent: false
-      });
-    }
-
-    return notifications;
-  };
+  // Funcția generateRandomNotifications a fost eliminată - folosim doar date reale din BigQuery
 
   const checkForImportantChanges = (oldStats: any, newStats: any) => {
     // Check for significant changes
