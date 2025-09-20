@@ -71,8 +71,12 @@ interface PaymentInfo {
 export default function ProiectDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const proiectId = params?.id as string;
+  // Fix: Decodifică URL pentru a obține ID-ul corect
+  const proiectId = params?.id ? decodeURIComponent(params.id as string) : '';
   const [user, loadingAuth] = useAuthState(auth);
+
+  console.log('🎯 Project ID from URL params:', params?.id);
+  console.log('🎯 Project ID decoded:', proiectId);
 
   const [proiect, setProiect] = useState<ProiectDetails | null>(null);
   const [contracte, setContracte] = useState<ContractInfo[]>([]);
@@ -141,6 +145,8 @@ export default function ProiectDetailsPage() {
       // Foloseste exact aceeasi logica ca in ContracteTable
       const queryParams = new URLSearchParams();
       queryParams.append('proiect_id', proiectId);
+      console.log('📄 Contract fetch with proiectId:', proiectId);
+      console.log('📄 Query params:', queryParams.toString());
 
       const response = await fetch(`/api/rapoarte/contracte?${queryParams.toString()}`);
       if (!response.ok) {
@@ -179,6 +185,8 @@ export default function ProiectDetailsPage() {
       // Foloseste aceeasi logica robusta ca la contracte
       const queryParams = new URLSearchParams();
       queryParams.append('proiectId', proiectId);
+      console.log('💰 Invoice fetch with proiectId:', proiectId);
+      console.log('💰 Query params:', queryParams.toString());
 
       const response = await fetch(`/api/actions/invoices/list?${queryParams.toString()}`);
       if (!response.ok) {
