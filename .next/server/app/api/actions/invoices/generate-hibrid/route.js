@@ -1284,10 +1284,27 @@ async function POST(request) {
             const table = dataset.table("FacturiGenerate");
             if (isEdit && facturaId) {
                 console.log("\uD83D\uDCDD EDIT MODE: Actualizez factură existentă \xeen BigQuery cu date exacte din frontend...");
-                // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile + date exacte din frontend
+                // ✅ FIX: Extragere număr fără seria pentru Edit Mode
+                const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
+                const serieFactura = setariFacturare?.serie_facturi || "INV";
+                const separatorFactura = setariFacturare?.separator_numerotare || "-";
+                // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
+                let numarFacturaExtras = fullInvoiceNumber;
+                if (fullInvoiceNumber.includes(separatorFactura)) {
+                    const parts = fullInvoiceNumber.split(separatorFactura);
+                    // Găsește partea care pare să fie numărul (primele cifre consecutive)
+                    const numarPart = parts.find((part)=>/^\d+$/.test(part));
+                    if (numarPart) {
+                        numarFacturaExtras = numarPart;
+                    }
+                }
+                console.log(`🔢 FIX NUMAR FACTURA (EDIT): ${fullInvoiceNumber} -> serie: "${serieFactura}", numar: "${numarFacturaExtras}"`);
+                // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile + date exacte din frontend + FIX serie/numar
                 const updateQuery = `
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
-          SET 
+          SET
+            serie = @serie,
+            numar = @numar,
             client_nume = @client_nume,
             client_cui = @client_cui,
             subtotal = @subtotal,
@@ -1329,6 +1346,8 @@ async function POST(request) {
                 });
                 const params = {
                     facturaId: facturaId,
+                    serie: serieFactura,
+                    numar: numarFacturaExtras,
                     client_nume: safeClientData.nume,
                     client_cui: safeClientData.cui,
                     subtotal: Number(subtotal.toFixed(2)),
@@ -1342,6 +1361,8 @@ async function POST(request) {
                 // ✅ CRUCIAL: Types pentru BigQuery - foarte important pentru null values
                 const types = {
                     facturaId: "STRING",
+                    serie: "STRING",
+                    numar: "STRING",
                     client_nume: "STRING",
                     client_cui: "STRING",
                     subtotal: "NUMERIC",
@@ -1367,12 +1388,27 @@ async function POST(request) {
             } else {
                 // ✅ Creează factură nouă (inclusiv storno) cu date exacte din frontend
                 console.log("\uD83D\uDCDD NEW MODE: Creez factură nouă \xeen BigQuery cu date exacte din frontend...");
+                // ✅ FIX: Extragere număr fără seria pentru coloana numar
+                const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
+                const serieFactura = setariFacturare?.serie_facturi || "INV";
+                const separatorFactura = setariFacturare?.separator_numerotare || "-";
+                // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
+                let numarFacturaExtras = fullInvoiceNumber;
+                if (fullInvoiceNumber.includes(separatorFactura)) {
+                    const parts = fullInvoiceNumber.split(separatorFactura);
+                    // Găsește partea care pare să fie numărul (primele cifre consecutive)
+                    const numarPart = parts.find((part)=>/^\d+$/.test(part));
+                    if (numarPart) {
+                        numarFacturaExtras = numarPart;
+                    }
+                }
+                console.log(`🔢 FIX NUMAR FACTURA: ${fullInvoiceNumber} -> serie: "${serieFactura}", numar: "${numarFacturaExtras}"`);
                 const facturaData = [
                     {
                         id: currentFacturaId,
                         proiect_id: proiectId,
-                        serie: setariFacturare?.serie_facturi || "INV",
-                        numar: numarFactura || safeInvoiceData.numarFactura,
+                        serie: serieFactura,
+                        numar: numarFacturaExtras,
                         data_factura: new Date().toISOString().split("T")[0],
                         data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
                         id_factura_externa: null,
