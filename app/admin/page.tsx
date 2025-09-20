@@ -665,7 +665,7 @@ export default function AdminPage() {
               fontSize: '0.75rem',
               fontWeight: '600'
             }}>
-              {kpiData?.transactions.percentage}% matched
+              {kpiData?.transactions.percentage}% imperecheate
             </div>
           </div>
           <h3 style={{
@@ -684,7 +684,7 @@ export default function AdminPage() {
             color: '#1f2937',
             marginBottom: '0.25rem'
           }}>
-            {kpiData?.transactions.percentage}% matched
+            {kpiData?.transactions.percentage}% imperecheate
           </div>
           <div style={{
             fontSize: '0.9rem',
@@ -698,7 +698,7 @@ export default function AdminPage() {
             fontSize: '0.8rem',
             color: '#6b7280'
           }}>
-            Procesează →
+            Proceseaza →
           </p>
         </div>
       </div>

@@ -7,6 +7,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 
 interface SetariFirma {
   id: string;
@@ -33,6 +37,11 @@ interface SetariFirma {
 }
 
 export default function SetariFirma() {
+  const router = useRouter();
+  const [user, loading] = useAuthState(auth);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
+
   const [setari, setSetari] = useState<SetariFirma>({
     id: 'setari_firma_main',
     nume_firma: 'UNITAR PROIECT TDA SRL',
@@ -55,16 +64,27 @@ export default function SetariFirma() {
     observatii: ''
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [originalSetari, setOriginalSetari] = useState<SetariFirma | null>(null);
 
+  // Auth check
   useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(user.displayName || user.email || 'Utilizator');
+  }, [user, loading, router]);
+
+  useEffect(() => {
+    if (!user) return;
     loadSetari();
-  }, []);
+  }, [user]);
 
   const loadSetari = async () => {
-    setLoading(true);
+    setLoadingData(true);
     try {
       const response = await fetch('/api/setari/firma');
       const data = await response.json();
@@ -81,7 +101,7 @@ export default function SetariFirma() {
       console.error('Eroare la încărcarea setărilor:', error);
       showToast('Eroare la încărcarea setărilor', 'error');
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -175,7 +195,7 @@ export default function SetariFirma() {
     }, 4000);
   };
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="animate-pulse">
@@ -191,7 +211,8 @@ export default function SetariFirma() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -548,6 +569,7 @@ export default function SetariFirma() {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </ModernLayout>
   );
 }
