@@ -111,7 +111,52 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
 
       // Notificări REALE din BigQuery (nu random)
       const notificationsResponse = await fetch('/api/anaf/notifications');
-      const realNotifications = notificationsResponse.ok ? await notificationsResponse.json() : [];
+      const anafData = notificationsResponse.ok ? await notificationsResponse.json() : null;
+
+      // Convertim health check în notificări pentru UI
+      const realNotifications: any[] = [];
+      if (anafData?.success && anafData.data) {
+        const checks = anafData.data;
+
+        // Token expiry warning
+        if (!checks.tokenStatus?.healthy) {
+          realNotifications.push({
+            id: 'token-warning',
+            type: 'warning',
+            title: 'Token ANAF',
+            message: checks.tokenStatus?.message || 'Token ANAF necesită atenție',
+            timestamp: new Date(),
+            read: false,
+            urgent: true
+          });
+        }
+
+        // Error rates warning
+        if (!checks.errorRates?.healthy) {
+          realNotifications.push({
+            id: 'error-rates',
+            type: 'error',
+            title: 'Rate Erori ANAF',
+            message: `Rate erori: ${checks.errorRates?.rate || 'N/A'}%`,
+            timestamp: new Date(),
+            read: false,
+            urgent: true
+          });
+        }
+
+        // Recent errors
+        if (checks.recentErrors?.count > 0) {
+          realNotifications.push({
+            id: 'recent-errors',
+            type: 'info',
+            title: 'Erori Recente',
+            message: `${checks.recentErrors.count} erori în ultimele 24h`,
+            timestamp: new Date(),
+            read: false,
+            urgent: false
+          });
+        }
+      }
 
       const newData: RealtimeData = {
         dashboardStats,
