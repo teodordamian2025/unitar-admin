@@ -32,7 +32,7 @@ interface NavItem {
 const navStructure: NavItem[] = [
   {
     href: '/admin',
-    label: 'Panou Principal',
+    label: 'Panou UNITAR PROIECT TDA',
     icon: '🏠',
     exact: true
   },
@@ -382,7 +382,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
               fontWeight: '700',
               color: '#1f2937'
             }}>
-              Panou Principal
+              Panou UNITAR PROIECT TDA
             </h1>
             <p style={{
               margin: '0.25rem 0 0 0',

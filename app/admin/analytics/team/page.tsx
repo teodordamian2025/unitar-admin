@@ -130,10 +130,18 @@ export default function TeamPerformance() {
       const timeTrackingData = await timeTrackingResponse.json();
       const utilizatoriData = await utilizatoriResponse.json();
 
-      if (timeTrackingData.success && utilizatoriData.success) {
-        // Procesează datele pentru a calcula statistici
-        const timeTracking = timeTrackingData.data || [];
-        const utilizatori = utilizatoriData.data || [];
+      // Verifică dacă API-urile au returnat date valide
+      const timeTracking = (timeTrackingData.success && timeTrackingData.data) ? timeTrackingData.data : [];
+      const utilizatori = (utilizatoriData.success && utilizatoriData.data) ? utilizatoriData.data : [];
+
+      if (!timeTrackingData.success) {
+        console.error('Time tracking API error:', timeTrackingData.error);
+      }
+      if (!utilizatoriData.success) {
+        console.error('Utilizatori API error:', utilizatoriData.error);
+      }
+
+      if (utilizatori.length > 0) {
 
         // Calculează statistici per utilizator
         const userStats = utilizatori.map((user: any) => {
@@ -237,7 +245,20 @@ export default function TeamPerformance() {
         setTeamStats(calculatedTeamStats);
         setRecommendations(generatedRecommendations);
       } else {
-        toast.error('Eroare la încărcarea datelor echipă!');
+        // Setează date goale dacă nu sunt utilizatori
+        setTeamData([]);
+        setTeamStats({
+          total_members: 0,
+          active_members: 0,
+          media_eficienta_echipa: 0,
+          media_ore_echipa: 0,
+          total_ore_echipa: 0,
+          burnout_high_count: 0,
+          overworked_count: 0,
+          underutilized_count: 0
+        });
+        setRecommendations([]);
+        toast.warn('Nu s-au găsit utilizatori sau date de time tracking!');
       }
 
     } catch (error) {
