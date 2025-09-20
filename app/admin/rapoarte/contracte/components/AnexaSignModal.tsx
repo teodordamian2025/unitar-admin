@@ -88,7 +88,7 @@ export default function AnexaSignModal({
   const [formData, setFormData] = useState({
     data_start: new Date().toISOString().split('T')[0], // Default la data curentă
     data_final: '', // Va fi calculată automat
-    status: 'Semnata', // Default status pentru anexă semnată
+    status: 'Semnat', // Default status pentru anexă semnată
     observatii_semnare: ''
   });
 
@@ -247,7 +247,7 @@ export default function AnexaSignModal({
     setFormData({
       data_start: new Date().toISOString().split('T')[0],
       data_final: '',
-      status: 'Semnata',
+      status: 'Semnat',
       observatii_semnare: ''
     });
     setErrors({});
@@ -437,7 +437,7 @@ export default function AnexaSignModal({
                 backgroundColor: loading ? '#f8f9fa' : 'white'
               }}
             >
-              <option value="Semnata">Semnată</option>
+              <option value="Semnat">Semnat</option>
               <option value="In lucru">În lucru</option>
               <option value="Finalizata">Finalizată</option>
               <option value="Suspendata">Suspendată</option>
