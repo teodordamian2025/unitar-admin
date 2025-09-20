@@ -151,7 +151,7 @@ export default function CalendarView() {
 
       console.log('[CALENDAR DEBUG] API responses:', {
         proiecteStatus: proiecteResponse.status,
-        timeTrackingStatus: timeTrackingResponse.status
+        timeTrackingStatus: 'status' in timeTrackingResponse ? timeTrackingResponse.status : 'mock'
       });
 
       const proiecteData = await proiecteResponse.json();

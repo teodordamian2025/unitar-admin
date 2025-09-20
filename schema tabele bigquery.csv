@@ -73,6 +73,7 @@ AnexeContract,observatii,STRING,YES,23
 AnexeContract,activ,BOOL,NO,24
 AnexeContract,data_creare,TIMESTAMP,NO,25
 AnexeContract,data_actualizare,TIMESTAMP,YES,26
+AnexeContract,status,STRING,YES,27
 Clienti,id,STRING,NO,1
 Clienti,nume,STRING,NO,2
 Clienti,tip_client,STRING,NO,3

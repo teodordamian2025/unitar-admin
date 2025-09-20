@@ -1567,7 +1567,6 @@ const Modal = ({ isOpen, onClose, title, children, size = "md", closable = true,
                             variant: "ghost",
                             size: "sm",
                             onClick: onClose,
-                            icon: "✕",
                             style: {
                                 padding: "0.5rem",
                                 borderRadius: "8px",

@@ -176,12 +176,12 @@ export default function TeamPerformance() {
           const sarciniUnice = new Set(userTimeData.map((tt: any) => tt.sarcina_id)).size;
 
           // Calculează workload status
-          let workloadStatus = 'under';
+          let workloadStatus: 'under' | 'optimal' | 'over' = 'under';
           if (mediaOreZilnic >= 7 && mediaOreZilnic <= 9) workloadStatus = 'optimal';
           else if (mediaOreZilnic > 9) workloadStatus = 'over';
 
           // Calculează burnout risk
-          let burnoutRisk = 'low';
+          let burnoutRisk: 'high' | 'medium' | 'low' = 'low';
           if (mediaOreZilnic > 10) burnoutRisk = 'high';
           else if (mediaOreZilnic > 8.5) burnoutRisk = 'medium';
 
@@ -200,7 +200,7 @@ export default function TeamPerformance() {
             eficienta_procent: eficientaProcent,
             sarcini_la_timp: Math.max(0, sarciniUnice - 1),
             sarcini_intarziate: Math.min(1, sarciniUnice),
-            trend_saptamanal: totalOre > 30 ? 'up' : totalOre > 15 ? 'stable' : 'down',
+            trend_saptamanal: (totalOre > 30 ? 'up' : totalOre > 15 ? 'stable' : 'down') as 'up' | 'down' | 'stable',
             workload_status: workloadStatus,
             burnout_risk: burnoutRisk,
             ore_urgent: Math.round(totalOre * 0.2),

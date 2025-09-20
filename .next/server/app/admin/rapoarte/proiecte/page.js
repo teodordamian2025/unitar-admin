@@ -3513,6 +3513,7 @@ function SarciniProiectModal({ isOpen, onClose, proiect }) {
 
 
 
+
 // System global pentru management dropdown-uri multiple
 let currentOpenDropdown = null;
 const openDropdowns = new Map();
@@ -3559,6 +3560,7 @@ const ProiectActions_showToast = (message, type = "info")=>{
 };
 function ProiectActions({ proiect, onRefresh, onShowFacturaModal, onShowSubproiectModal, onShowEditModal, onShowContractModal, onShowPVModal// ✅ NOU: Callback PV
  }) {
+    const router = (0,navigation.useRouter)();
     // State pentru modalul de sarcini
     const [showSarciniModal, setShowSarciniModal] = (0,react_experimental_.useState)(false);
     // ACTUALIZAT: Logica pentru tipul de proiect și status
@@ -3771,22 +3773,8 @@ function ProiectActions({ proiect, onRefresh, onShowFacturaModal, onShowSubproie
         }
     };
     const handleViewDetails = async ()=>{
-        const tipText = proiect.tip === "subproiect" ? "SUBPROIECT" : "PROIECT";
-        const monedaInfo = proiect.moneda && proiect.moneda !== "RON" ? `\n💱 Monedă: ${proiect.moneda}\n💰 Valoare RON: ${proiect.valoare_ron ? `${proiect.valoare_ron.toLocaleString("ro-RO")} RON` : "N/A"}` : "";
-        const statusuriInfo = proiect.status_predare || proiect.status_contract || proiect.status_facturare || proiect.status_achitare ? `\n📊 Status Predare: ${proiect.status_predare || "N/A"}\n📄 Status Contract: ${proiect.status_contract || "N/A"}\n🧾 Status Facturare: ${proiect.status_facturare || "N/A"}\n💳 Status Achitare: ${proiect.status_achitare || "N/A"}` : "";
-        const detalii = `📋 ${tipText}: ${proiect.ID_Proiect}
-
-🏷️ Denumire: ${proiect.Denumire}
-👤 Client: ${proiect.Client}
-📊 Status: ${proiect.Status}${isActiv ? " ✅" : ""}
-💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString("ro-RO")} ${proiect.moneda || "RON"}` : "N/A"}${monedaInfo}
-📅 Începe: ${formatDate(proiect.Data_Start)}
-📅 Finalizare: ${formatDate(proiect.Data_Final)}
-👤 Responsabil: ${proiect.Responsabil || "Neatribuit"}
-📍 Adresă: ${proiect.Adresa || "Nespecificată"}${statusuriInfo}
-📝 Observații: ${proiect.Observatii || "Fără observații"}`;
-        ProiectActions_showToast(detalii, "info");
-        console.log(`Detalii ${tipText.toLowerCase()}:`, proiect);
+        // Redirect către pagina de detalii proiect
+        router.push(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`);
     };
     const handleEdit = async ()=>{
         if (onShowEditModal) {
@@ -11012,7 +11000,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,8045,1440,8313,9850,6166,6128,6549,7509,1727,9518,2594], () => (__webpack_exec__(224)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,8045,1440,8313,9850,6166,6128,6549,1727,7509,9518,2594], () => (__webpack_exec__(224)));
 module.exports = __webpack_exports__;
 
 })();
