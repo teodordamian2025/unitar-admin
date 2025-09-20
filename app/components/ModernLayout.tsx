@@ -73,7 +73,7 @@ const navStructure: NavItem[] = [
   },
   {
     href: '/admin/setari',
-    label: 'Settings',
+    label: 'Setari',
     icon: '⚙️',
     children: [
       { href: '/admin/setari/firma', label: 'Date Firmă', icon: '🏢' },
@@ -382,14 +382,14 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
               fontWeight: '700',
               color: '#1f2937'
             }}>
-              Dashboard
+              Panou Principal
             </h1>
             <p style={{
               margin: '0.25rem 0 0 0',
               fontSize: '0.875rem',
               color: '#6b7280'
             }}>
-              Bun venit în panoul de control modern
+              Bun venit in panoul de control modern
             </p>
           </div>
 
@@ -433,7 +433,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
               onClick={() => router.push('/admin/rapoarte/facturi')}
             >
               <span>💰</span>
-              <span>+ Factură</span>
+              <span>+ Factura</span>
             </button>
           </div>
         </div>

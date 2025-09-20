@@ -230,7 +230,7 @@ export default function MatchingPage() {
                 fontSize: '1.5rem',
                 fontWeight: '600'
               }}>
-                Tranzacții Nematchate
+                Tranzactii Neimperecheate
               </h2>
 
               <div style={{
@@ -248,7 +248,7 @@ export default function MatchingPage() {
                     padding: '3rem',
                     color: '#6c757d'
                   }}>
-                    🎉 Toate tranzacțiile sunt matchate!
+                    🎉 Toate tranzactiile sunt imperecheate!
                   </div>
                 ) : (
                   tranzactiiNematchate.map((tranzactie) => (
@@ -314,7 +314,7 @@ export default function MatchingPage() {
                 fontSize: '1.5rem',
                 fontWeight: '600'
               }}>
-                Candidați Facturi
+                Facturi Candidat
               </h2>
 
               <div style={{
@@ -328,11 +328,11 @@ export default function MatchingPage() {
                     padding: '3rem',
                     color: '#6c757d'
                   }}>
-                    👈 Selectează o tranzacție pentru a vedea candidații
+                    👈 Selecteaza o tranzactie pentru a vedea candidatii
                   </div>
                 ) : loadingCandidati ? (
                   <div style={{ textAlign: 'center', padding: '2rem' }}>
-                    Se caută candidați...
+                    Se cauta candidati...
                   </div>
                 ) : candidatiFacuri.length === 0 ? (
                   <div style={{
@@ -340,7 +340,7 @@ export default function MatchingPage() {
                     padding: '3rem',
                     color: '#6c757d'
                   }}>
-                    ❌ Nu s-au găsit candidați potriviți
+                    ❌ Nu s-au gasit candidati potriviti
                   </div>
                 ) : (
                   candidatiFacuri.map((candidat) => (
