@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     siteName: 'UNITAR ERP',
     images: [
       {
-        url: '/icons/icon-512x512.png',
+        url: '/icons/icon-512x512.svg',
         width: 512,
         height: 512,
         alt: 'UNITAR ERP Logo',
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'UNITAR PROIECT - ERP Management',
     description: 'Sistem ERP modern pentru management proiecte, clienți și facturare cu integrare ANAF',
-    images: ['/icons/icon-512x512.png'],
+    images: ['/icons/icon-512x512.svg'],
   },
   robots: {
     index: false,
@@ -73,16 +73,16 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/icon-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
+      { url: '/icons/icon-512x512.svg', sizes: '512x512', type: 'image/svg+xml' },
     ],
     apple: [
-      { url: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/icon-152x152.svg', sizes: '152x152', type: 'image/svg+xml' },
     ],
     other: [
       {
         rel: 'apple-touch-icon-precomposed',
-        url: '/icons/icon-152x152.png',
+        url: '/icons/icon-152x152.svg',
       },
     ],
   },
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     title: 'UNITAR ERP',
     startupImage: [
       {
-        url: '/icons/icon-512x512.png',
+        url: '/icons/icon-512x512.svg',
         media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
       },
     ],
@@ -124,12 +124,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-tap-highlight" content="no" />
 
-        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.svg" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.svg" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.svg" />
 
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+        <link rel="icon" type="image/svg+xml" sizes="32x32" href="/icons/icon-32x32.svg" />
+        <link rel="icon" type="image/svg+xml" sizes="16x16" href="/icons/icon-16x16.svg" />
 
         <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#3b82f6" />
         <link rel="shortcut icon" href="/favicon.ico" />

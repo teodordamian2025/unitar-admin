@@ -13,7 +13,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { useRouter } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
-import { LiveMetrics, LiveNotifications } from '@/app/components/realtime';
+import { LiveMetrics, LiveNotifications, RealtimeProvider } from '@/app/components/realtime';
 import { toast } from 'react-toastify';
 
 interface KPIData {
@@ -233,23 +233,24 @@ export default function AdminPage() {
   }
 
   return (
-    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
-      {/* Live Notifications */}
-      <div style={{
-        position: 'fixed',
-        top: '1rem',
-        right: '1rem',
-        zIndex: 1000
-      }}>
-        <LiveNotifications />
-      </div>
+    <RealtimeProvider updateInterval={30000}>
+      <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+        {/* Live Notifications */}
+        <div style={{
+          position: 'fixed',
+          top: '1rem',
+          right: '1rem',
+          zIndex: 1000
+        }}>
+          <LiveNotifications />
+        </div>
 
-      {/* Live Metrics Dashboard */}
-      <LiveMetrics
-        className="mb-6"
-        showTrends={true}
-        animated={true}
-      />
+        {/* Live Metrics Dashboard */}
+        <LiveMetrics
+          className="mb-6"
+          showTrends={true}
+          animated={true}
+        />
 
       {/* Alerturi Critice */}
       <div style={{
@@ -816,6 +817,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-    </ModernLayout>
+      </ModernLayout>
+    </RealtimeProvider>
   );
 }
