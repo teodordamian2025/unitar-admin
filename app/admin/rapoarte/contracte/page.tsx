@@ -112,8 +112,8 @@ export default function ContractePage() {
           alignItems: 'center',
           marginBottom: '2rem',
           padding: '2rem',
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(4px)',
           borderRadius: '20px',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
@@ -163,8 +163,8 @@ export default function ContractePage() {
         {/* Filtre Glassmorphism - Backdrop redus */}
         <div style={{ 
           marginBottom: '2rem',
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(4px)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: '20px',
           padding: '2rem',
@@ -211,8 +211,8 @@ export default function ContractePage() {
 
         {/* Tabel Glassmorphism - Backdrop redus */}
         <div style={{ 
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(4px)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: '20px',
           overflow: 'hidden' as const,
@@ -251,8 +251,8 @@ export default function ContractePage() {
         {/* Footer Info Glassmorphism - Backdrop redus */}
         <div style={{ 
           padding: '1.5rem',
-          background: 'rgba(255, 255, 255, 0.75)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(3px)',
           borderRadius: '16px',
           border: '1px solid rgba(255, 255, 255, 0.4)',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',

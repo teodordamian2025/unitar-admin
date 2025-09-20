@@ -130,19 +130,7 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
         position: 'relative'
       }}
     >
-      {/* Glassmorphism Background Overlay - Redus opacitatea pentru a evita shadow issues */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(248, 250, 252, 0.1)',
-          backdropFilter: 'blur(5px)',
-          zIndex: 0
-        }}
-      />
+      {/* Background Overlay ELIMINAT - cauzează efecte de shadow cumulative cu glassmorphism cards */}
 
       {/* Sidebar */}
       <div
@@ -372,11 +360,11 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           zIndex: 1
         }}
       >
-        {/* Top Bar */}
+        {/* Top Bar - Redus backdrop blur pentru a evita cumul cu page cards */}
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
             padding: '1rem 2rem',
             position: 'sticky',
