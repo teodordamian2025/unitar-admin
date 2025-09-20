@@ -9,6 +9,7 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import SarciniProiectModal from './SarciniProiectModal';
 
 interface ActionItem {
@@ -101,16 +102,17 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   }, type === 'success' ? 4000 : type === 'error' ? 5000 : type === 'info' && message.length > 200 ? 10000 : 6000);
 };
 
-export default function ProiectActions({ 
-  proiect, 
-  onRefresh, 
-  onShowFacturaModal, 
+export default function ProiectActions({
+  proiect,
+  onRefresh,
+  onShowFacturaModal,
   onShowSubproiectModal,
   onShowEditModal,
   onShowContractModal,
   onShowPVModal  // ✅ NOU: Callback PV
 }: ProiectActionsProps) {
-  
+  const router = useRouter();
+
   // State pentru modalul de sarcini
   const [showSarciniModal, setShowSarciniModal] = useState(false);
   
@@ -331,29 +333,8 @@ export default function ProiectActions({
   };
 
   const handleViewDetails = async () => {
-    const tipText = proiect.tip === 'subproiect' ? 'SUBPROIECT' : 'PROIECT';
-    const monedaInfo = proiect.moneda && proiect.moneda !== 'RON' 
-      ? `\n💱 Monedă: ${proiect.moneda}\n💰 Valoare RON: ${proiect.valoare_ron ? `${proiect.valoare_ron.toLocaleString('ro-RO')} RON` : 'N/A'}`
-      : '';
-    
-    const statusuriInfo = proiect.status_predare || proiect.status_contract || proiect.status_facturare || proiect.status_achitare
-      ? `\n📊 Status Predare: ${proiect.status_predare || 'N/A'}\n📄 Status Contract: ${proiect.status_contract || 'N/A'}\n🧾 Status Facturare: ${proiect.status_facturare || 'N/A'}\n💳 Status Achitare: ${proiect.status_achitare || 'N/A'}`
-      : '';
-
-    const detalii = `📋 ${tipText}: ${proiect.ID_Proiect}
-
-🏷️ Denumire: ${proiect.Denumire}
-👤 Client: ${proiect.Client}
-📊 Status: ${proiect.Status}${isActiv ? ' ✅' : ''}
-💰 Valoare: ${proiect.Valoare_Estimata ? `${proiect.Valoare_Estimata.toLocaleString('ro-RO')} ${proiect.moneda || 'RON'}` : 'N/A'}${monedaInfo}
-📅 Începe: ${formatDate(proiect.Data_Start)}
-📅 Finalizare: ${formatDate(proiect.Data_Final)}
-👤 Responsabil: ${proiect.Responsabil || 'Neatribuit'}
-📍 Adresă: ${proiect.Adresa || 'Nespecificată'}${statusuriInfo}
-📝 Observații: ${proiect.Observatii || 'Fără observații'}`;
-    
-    showToast(detalii, 'info');
-    console.log(`Detalii ${tipText.toLowerCase()}:`, proiect);
+    // Redirect către pagina de detalii proiect
+    router.push(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`);
   };
 
   const handleEdit = async () => {

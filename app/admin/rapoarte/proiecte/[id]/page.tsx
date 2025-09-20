@@ -11,6 +11,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 import ContractModal from '../components/ContractModal';
 import FacturaHibridModal from '../components/FacturaHibridModal';
 
@@ -30,16 +33,60 @@ interface ProiectDetails {
   Responsabil?: string;
 }
 
+interface ContractInfo {
+  ID_Contract: string;
+  numar_contract: string;
+  Status: string;
+  Data_Semnare: any;
+  Data_Expirare: any;
+  Valoare: number;
+  Moneda: string;
+  etape_count?: number;
+  anexe_count?: number;
+  status_facturare_display?: string;
+}
+
+interface InvoiceInfo {
+  id: string;
+  numar: string;
+  data_factura: any;
+  data_scadenta: any;
+  total: number;
+  valoare_platita: number;
+  status: string;
+  rest_de_plata: number;
+  status_scadenta: string;
+}
+
+interface PaymentInfo {
+  id: string;
+  data_tranzactie: any;
+  suma: number;
+  moneda: string;
+  descriere: string;
+  factura_id?: string;
+  status: string;
+}
+
 export default function ProiectDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const proiectId = params?.id as string;
-  
+  const [user, loadingAuth] = useAuthState(auth);
+
   const [proiect, setProiect] = useState<ProiectDetails | null>(null);
+  const [contracte, setContracte] = useState<ContractInfo[]>([]);
+  const [facturi, setFacturi] = useState<InvoiceInfo[]>([]);
+  const [plati, setPlati] = useState<PaymentInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingContracts, setLoadingContracts] = useState(false);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [loadingPayments, setLoadingPayments] = useState(false);
   const [editing, setEditing] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
-  
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
+
   // State pentru modals
   const [showContractModal, setShowContractModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -47,8 +94,20 @@ export default function ProiectDetailsPage() {
   const [showProgressModal, setShowProgressModal] = useState(false);
 
   useEffect(() => {
+    if (loadingAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Admin');
+  }, [user, loadingAuth, router]);
+
+  useEffect(() => {
     if (proiectId) {
       fetchProiectDetails();
+      fetchContractInfo();
+      fetchInvoiceInfo();
+      fetchPaymentInfo();
     } else {
       router.push('/admin/rapoarte/proiecte');
     }
@@ -56,7 +115,7 @@ export default function ProiectDetailsPage() {
 
   const fetchProiectDetails = async () => {
     if (!proiectId) return;
-    
+
     try {
       const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`);
       if (response.ok) {
@@ -71,6 +130,57 @@ export default function ProiectDetailsPage() {
       alert('Eroare la încărcarea detaliilor proiectului');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchContractInfo = async () => {
+    if (!proiectId) return;
+
+    setLoadingContracts(true);
+    try {
+      const response = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setContracte(data.data || []);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea contractelor:', error);
+    } finally {
+      setLoadingContracts(false);
+    }
+  };
+
+  const fetchInvoiceInfo = async () => {
+    if (!proiectId) return;
+
+    setLoadingInvoices(true);
+    try {
+      const response = await fetch(`/api/actions/invoices/list?proiectId=${encodeURIComponent(proiectId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFacturi(data.facturi || []);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea facturilor:', error);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const fetchPaymentInfo = async () => {
+    if (!proiectId) return;
+
+    setLoadingPayments(true);
+    try {
+      const response = await fetch(`/api/tranzactii/list?proiect_id=${encodeURIComponent(proiectId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPlati(data.tranzactii || []);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea plăților:', error);
+    } finally {
+      setLoadingPayments(false);
     }
   };
 
@@ -234,8 +344,26 @@ export default function ProiectDetailsPage() {
     );
   }
 
+  if (loadingAuth || loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div>Se încarcă...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
-    <div>
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      <div>
       {/* Header */}
       <div style={{ 
         display: 'flex', 
@@ -376,6 +504,219 @@ export default function ProiectDetailsPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Informații Contract */}
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📄 Informații Contract
+          </h3>
+
+          {loadingContracts ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Se încarcă contractele...</div>
+          ) : contracte.length === 0 ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Nu există contracte pentru acest proiect</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {contracte.map((contract) => (
+                <div key={contract.ID_Contract} style={{
+                  padding: '1rem',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '6px',
+                  background: '#f8f9fa'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: '#2c3e50' }}>{contract.numar_contract}</strong>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: contract.Status === 'Semnat' ? '#d4edda' : '#fff3cd',
+                      color: contract.Status === 'Semnat' ? '#155724' : '#856404'
+                    }}>
+                      {contract.Status}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', fontSize: '14px' }}>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Data semnare: </span>
+                      <span style={{ fontWeight: 500 }}>{contract.Data_Semnare ? renderData(contract.Data_Semnare) : 'Nesemnat'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Data expirare: </span>
+                      <span style={{ fontWeight: 500 }}>{contract.Data_Expirare ? renderData(contract.Data_Expirare) : '-'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Valoare: </span>
+                      <span style={{ fontWeight: 500 }}>{renderValoare(contract.Valoare, contract.Moneda)}</span>
+                    </div>
+                    {contract.etape_count && contract.etape_count > 0 && (
+                      <div>
+                        <span style={{ color: '#6c757d' }}>Etape: </span>
+                        <span style={{ fontWeight: 500 }}>{contract.etape_count}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {contract.status_facturare_display && (
+                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: '#e9ecef', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>Status Facturare/Încasare:</div>
+                      <div style={{ fontSize: '13px', whiteSpace: 'pre-line' }}>{contract.status_facturare_display}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Informații Facturi */}
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            💰 Informații Facturi
+          </h3>
+
+          {loadingInvoices ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Se încarcă facturile...</div>
+          ) : facturi.length === 0 ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Nu există facturi pentru acest proiect</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {facturi.map((factura) => (
+                <div key={factura.id} style={{
+                  padding: '1rem',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '6px',
+                  background: '#f8f9fa'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: '#2c3e50' }}>Factura {factura.numar}</strong>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: factura.status_scadenta === 'Plătită' ? '#d4edda' :
+                                factura.status_scadenta === 'Expirată' ? '#f8d7da' : '#fff3cd',
+                      color: factura.status_scadenta === 'Plătită' ? '#155724' :
+                             factura.status_scadenta === 'Expirată' ? '#721c24' : '#856404'
+                    }}>
+                      {factura.status_scadenta}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', fontSize: '14px' }}>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Data emitere: </span>
+                      <span style={{ fontWeight: 500 }}>{renderData(factura.data_factura)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Data scadență: </span>
+                      <span style={{ fontWeight: 500 }}>{renderData(factura.data_scadenta)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Valoare totală: </span>
+                      <span style={{ fontWeight: 500 }}>{renderValoare(factura.total)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Valoare plătită: </span>
+                      <span style={{ fontWeight: 500 }}>{renderValoare(factura.valoare_platita)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Rest de plată: </span>
+                      <span style={{ fontWeight: 500, color: factura.rest_de_plata > 0 ? '#dc3545' : '#28a745' }}>
+                        {renderValoare(factura.rest_de_plata)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Informații Plăți */}
+        <div style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            💳 Informații Plăți
+          </h3>
+
+          {loadingPayments ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Se încarcă plățile...</div>
+          ) : plati.length === 0 ? (
+            <div style={{ color: '#6c757d', fontStyle: 'italic' }}>Nu există plăți pentru acest proiect</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {plati.slice(0, 5).map((plata) => (
+                <div key={plata.id} style={{
+                  padding: '1rem',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '6px',
+                  background: '#f8f9fa'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: '#2c3e50' }}>{renderValoare(plata.suma, plata.moneda)}</strong>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: plata.status === 'confirmat' ? '#d4edda' : '#fff3cd',
+                      color: plata.status === 'confirmat' ? '#155724' : '#856404'
+                    }}>
+                      {plata.status}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', fontSize: '14px' }}>
+                    <div>
+                      <span style={{ color: '#6c757d' }}>Data tranzacție: </span>
+                      <span style={{ fontWeight: 500 }}>{renderData(plata.data_tranzactie)}</span>
+                    </div>
+                    {plata.descriere && (
+                      <div>
+                        <span style={{ color: '#6c757d' }}>Descriere: </span>
+                        <span style={{ fontWeight: 500 }}>{plata.descriere}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {plati.length > 5 && (
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  <button style={{
+                    padding: '0.5rem 1rem',
+                    background: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}>
+                    Vezi toate plățile ({plati.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Acțiuni rapide */}
@@ -1114,6 +1455,7 @@ export default function ProiectDetailsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModernLayout>
   );
 }
