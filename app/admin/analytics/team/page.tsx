@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/admin/analytics/team/page.tsx
-// DATA: 19.09.2025 21:00 (ora României)
+// DATA: 20.09.2025 21:15 (ora României) - ACTUALIZAT
 // DESCRIERE: Team Performance dashboard cu analiză detaliată și insights
 // FUNCȚIONALITATE: Monitorizare echipă, productivity, burnout analysis și recomandări
+// FIXAT: Verificări defensive și debugging pentru producție
 // ==================================================================
 
 'use client';
@@ -120,6 +121,7 @@ export default function TeamPerformance() {
   const loadTeamData = async () => {
     try {
       setLoadingData(true);
+      console.log('[TEAM DEBUG] Starting loadTeamData...');
 
       // Folosește API-urile existente și simple
       const [timeTrackingResponse, utilizatoriResponse] = await Promise.all([
@@ -127,21 +129,42 @@ export default function TeamPerformance() {
         fetch('/api/rapoarte/utilizatori')
       ]);
 
+      console.log('[TEAM DEBUG] API responses received:', {
+        timeTrackingStatus: timeTrackingResponse.status,
+        utilizatoriStatus: utilizatoriResponse.status
+      });
+
       const timeTrackingData = await timeTrackingResponse.json();
       const utilizatoriData = await utilizatoriResponse.json();
 
-      // Verifică dacă API-urile au returnat date valide
-      const timeTracking = (timeTrackingData.success && timeTrackingData.data) ? timeTrackingData.data : [];
-      const utilizatori = (utilizatoriData.success && utilizatoriData.data) ? utilizatoriData.data : [];
+      console.log('[TEAM DEBUG] API data parsed:', {
+        timeTrackingSuccess: timeTrackingData.success,
+        timeTrackingDataType: typeof timeTrackingData.data,
+        timeTrackingDataLength: Array.isArray(timeTrackingData.data) ? timeTrackingData.data.length : 'not_array',
+        utilizatoriSuccess: utilizatoriData.success,
+        utilizatoriDataType: typeof utilizatoriData.data,
+        utilizatoriDataLength: Array.isArray(utilizatoriData.data) ? utilizatoriData.data.length : 'not_array'
+      });
+
+      // Verifică dacă API-urile au returnat date valide cu verificări foarte defensive
+      const timeTracking = (timeTrackingData && timeTrackingData.success && Array.isArray(timeTrackingData.data)) ? timeTrackingData.data : [];
+      const utilizatori = (utilizatoriData && utilizatoriData.success && Array.isArray(utilizatoriData.data)) ? utilizatoriData.data : [];
+
+      console.log('[TEAM DEBUG] Final arrays:', {
+        timeTrackingLength: timeTracking.length,
+        utilizatoriLength: utilizatori.length
+      });
 
       if (!timeTrackingData.success) {
         console.error('Time tracking API error:', timeTrackingData.error);
+        toast.warn('Nu s-au putut încărca datele de time tracking');
       }
       if (!utilizatoriData.success) {
         console.error('Utilizatori API error:', utilizatoriData.error);
+        toast.warn('Nu s-au putut încărca datele utilizatorilor');
       }
 
-      if (utilizatori.length > 0) {
+      if (Array.isArray(utilizatori) && utilizatori.length > 0) {
 
         // Calculează statistici per utilizator
         const userStats = utilizatori.map((user: any) => {

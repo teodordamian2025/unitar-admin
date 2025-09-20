@@ -142,32 +142,53 @@ export default function CalendarView() {
       if (filters.proiect_id) params.append('proiect_id', filters.proiect_id);
 
       // Folosește API-uri simple ca la Team Analytics
+      console.log('[CALENDAR DEBUG] Starting calendar data load...');
+
       const [proiecteResponse, timeTrackingResponse] = await Promise.all([
         fetch('/api/rapoarte/proiecte'),
         filters.include_timetracking ? fetch('/api/rapoarte/timetracking') : Promise.resolve({json: () => ({success: false})})
       ]);
 
+      console.log('[CALENDAR DEBUG] API responses:', {
+        proiecteStatus: proiecteResponse.status,
+        timeTrackingStatus: timeTrackingResponse.status
+      });
+
       const proiecteData = await proiecteResponse.json();
       const timeTrackingData = filters.include_timetracking ? await timeTrackingResponse.json() : {success: false};
+
+      console.log('[CALENDAR DEBUG] API data:', {
+        proiecteSuccess: proiecteData.success,
+        proiecteDataLength: Array.isArray(proiecteData.data) ? proiecteData.data.length : 'not_array',
+        timeTrackingSuccess: timeTrackingData.success
+      });
 
       // Simulează date pentru calendar cu proiecte reale
       let events: CalendarEvent[] = [];
 
-      if (proiecteData.success && proiecteData.data) {
+      if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
         const proiecte = proiecteData.data.slice(0, 5); // Limitează la primele 5 proiecte
-        events = proiecte.map((p: any, index: number) => ({
-          id: p.ID_Proiect || `proj_${index}`,
-          titlu: p.Denumire || `Proiect ${index + 1}`,
-          proiect_nume: p.Denumire || `Proiect ${index + 1}`,
-          proiect_id: p.ID_Proiect || `proj_${index}`,
-          data_scadenta: p.Data_Final || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          data_start: p.Data_Start,
-          prioritate: index < 2 ? 'urgent' : 'normala',
-          status: p.Status || 'in_progress',
-          responsabil_nume: p.Responsabil,
-          tip_eveniment: 'deadline_proiect',
-          urgency_status: index === 0 ? 'urgent' : 'normal'
-        }));
+        console.log('[CALENDAR DEBUG] Processing proiecte:', proiecte.length);
+
+        events = proiecte.map((p: any, index: number) => {
+          const event = {
+            id: p.ID_Proiect || `proj_${index}`,
+            titlu: p.Denumire || `Proiect ${index + 1}`,
+            proiect_nume: p.Denumire || `Proiect ${index + 1}`,
+            proiect_id: p.ID_Proiect || `proj_${index}`,
+            data_scadenta: p.Data_Final?.value || p.Data_Final || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: p.Data_Start?.value || p.Data_Start,
+            prioritate: index < 2 ? 'urgent' : 'normala',
+            status: p.Status || 'in_progress',
+            responsabil_nume: p.Responsabil,
+            tip_eveniment: 'deadline_proiect',
+            urgency_status: index === 0 ? 'urgent' : 'normal'
+          };
+          console.log('[CALENDAR DEBUG] Created event:', event);
+          return event;
+        });
+      } else {
+        console.log('[CALENDAR DEBUG] No proiecte data, using fallback');
       }
 
       // Adaugă câteva evenimente mock pentru demonstrație
@@ -200,8 +221,10 @@ export default function CalendarView() {
         ];
       }
 
+      console.log('[CALENDAR DEBUG] Final events:', events.length, events);
+
       setCalendarData(events);
-      setStats({
+      const stats = {
         total_events: events.length,
         urgent_count: events.filter(e => e.urgency_status === 'urgent').length,
         overdue_count: 0,
@@ -212,7 +235,10 @@ export default function CalendarView() {
         timetracking_count: 0,
         total_estimated_hours: 0,
         total_worked_hours: 0
-      });
+      };
+
+      console.log('[CALENDAR DEBUG] Final stats:', stats);
+      setStats(stats);
 
     } catch (error) {
       console.error('Eroare la încărcarea datelor calendar:', error);
