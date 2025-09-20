@@ -144,52 +144,120 @@ export default function CalendarView() {
       // Folosește API-uri simple ca la Team Analytics
       console.log('[CALENDAR DEBUG] Starting calendar data load...');
 
-      const [proiecteResponse, timeTrackingResponse] = await Promise.all([
+      const [proiecteResponse, subproiecteResponse, sarciniResponse, timeTrackingResponse] = await Promise.all([
         fetch('/api/rapoarte/proiecte'),
+        filters.include_proiecte ? fetch('/api/rapoarte/subproiecte') : Promise.resolve({json: () => ({success: false})}),
+        filters.include_sarcini ? fetch('/api/rapoarte/sarcini') : Promise.resolve({json: () => ({success: false})}),
         filters.include_timetracking ? fetch('/api/rapoarte/timetracking') : Promise.resolve({json: () => ({success: false})})
       ]);
 
       console.log('[CALENDAR DEBUG] API responses:', {
         proiecteStatus: proiecteResponse.status,
+        subproiecteStatus: 'status' in subproiecteResponse ? subproiecteResponse.status : 'mock',
+        sarciniStatus: 'status' in sarciniResponse ? sarciniResponse.status : 'mock',
         timeTrackingStatus: 'status' in timeTrackingResponse ? timeTrackingResponse.status : 'mock'
       });
 
       const proiecteData = await proiecteResponse.json();
+      const subproiecteData = filters.include_proiecte ? await subproiecteResponse.json() : {success: false};
+      const sarciniData = filters.include_sarcini ? await sarciniResponse.json() : {success: false};
       const timeTrackingData = filters.include_timetracking ? await timeTrackingResponse.json() : {success: false};
 
       console.log('[CALENDAR DEBUG] API data:', {
         proiecteSuccess: proiecteData.success,
         proiecteDataLength: Array.isArray(proiecteData.data) ? proiecteData.data.length : 'not_array',
+        subproiecteSuccess: subproiecteData.success,
+        subproiecteDataLength: Array.isArray(subproiecteData.data) ? subproiecteData.data.length : 'not_array',
+        sarciniSuccess: sarciniData.success,
+        sarciniDataLength: Array.isArray(sarciniData.data) ? sarciniData.data.length : 'not_array',
         timeTrackingSuccess: timeTrackingData.success
       });
 
-      // Simulează date pentru calendar cu proiecte reale
+      // Procesează toate tipurile de evenimente
       let events: CalendarEvent[] = [];
 
+      // 1. PROIECTE - afișează proiect_id în loc de denumire
       if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
-        const proiecte = proiecteData.data.slice(0, 5); // Limitează la primele 5 proiecte
-        console.log('[CALENDAR DEBUG] Processing proiecte:', proiecte.length);
+        console.log('[CALENDAR DEBUG] Processing proiecte:', proiecteData.data.length);
 
-        events = proiecte.map((p: any, index: number) => {
-          const event = {
-            id: p.ID_Proiect || `proj_${index}`,
-            titlu: p.Denumire || `Proiect ${index + 1}`,
+        const proiecteEvents = proiecteData.data.map((p: any, index: number) => {
+          // Handle BigQuery DATE fields cu .value property
+          const dataFinal = p.Data_Final?.value || p.Data_Final;
+          const dataStart = p.Data_Start?.value || p.Data_Start;
+
+          return {
+            id: `proj_${p.ID_Proiect || index}`,
+            titlu: p.ID_Proiect || `proj_${index}`, // Afișează proiect_id în loc de denumire
             proiect_nume: p.Denumire || `Proiect ${index + 1}`,
             proiect_id: p.ID_Proiect || `proj_${index}`,
-            data_scadenta: p.Data_Final?.value || p.Data_Final || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            data_start: p.Data_Start?.value || p.Data_Start,
+            data_scadenta: dataFinal || new Date(Date.now() + index * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: dataStart,
             prioritate: index < 2 ? 'urgent' : 'normala',
             status: p.Status || 'in_progress',
             responsabil_nume: p.Responsabil,
             tip_eveniment: 'deadline_proiect',
             urgency_status: index === 0 ? 'urgent' : 'normal'
           };
-          console.log('[CALENDAR DEBUG] Created event:', event);
-          return event;
         });
-      } else {
-        console.log('[CALENDAR DEBUG] No proiecte data, using fallback');
+        events.push(...proiecteEvents);
+        console.log('[CALENDAR DEBUG] Added proiecte events:', proiecteEvents.length);
       }
+
+      // 2. SUBPROIECTE - afișează Denumire + proiect_id
+      if (subproiecteData.success && Array.isArray(subproiecteData.data) && subproiecteData.data.length > 0) {
+        console.log('[CALENDAR DEBUG] Processing subproiecte:', subproiecteData.data.length);
+
+        const subproiecteEvents = subproiecteData.data.map((s: any, index: number) => {
+          // Handle BigQuery DATE fields cu .value property
+          const dataFinal = s.Data_Final?.value || s.Data_Final;
+          const dataStart = s.Data_Start?.value || s.Data_Start;
+
+          return {
+            id: `subproj_${s.ID_Subproiect || index}`,
+            titlu: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`, // Denumire + proiect_id
+            proiect_nume: s.Proiect_Denumire || s.Denumire,
+            proiect_id: s.ID_Proiect,
+            data_scadenta: dataFinal || new Date(Date.now() + index * 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: dataStart,
+            prioritate: s.Status === 'Activ' ? 'urgent' : 'normala',
+            status: s.Status || 'planificat',
+            responsabil_nume: s.Responsabil,
+            tip_eveniment: 'deadline_subproiect',
+            urgency_status: s.Status === 'Activ' ? 'urgent' : 'normal'
+          };
+        });
+        events.push(...subproiecteEvents);
+        console.log('[CALENDAR DEBUG] Added subproiecte events:', subproiecteEvents.length);
+      }
+
+      // 3. SARCINI - afișează titlu + proiect_id
+      if (sarciniData.success && Array.isArray(sarciniData.data) && sarciniData.data.length > 0) {
+        console.log('[CALENDAR DEBUG] Processing sarcini:', sarciniData.data.length);
+
+        const sarciniEvents = sarciniData.data.map((s: any, index: number) => {
+          // Handle BigQuery DATE fields cu .value property
+          const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
+          const dataCreare = s.data_creare?.value || s.data_creare;
+
+          return {
+            id: `task_${s.id || index}`,
+            titlu: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`, // Titlu + proiect_id
+            proiect_nume: s.titlu,
+            proiect_id: s.proiect_id,
+            data_scadenta: dataScadenta || new Date(Date.now() + index * 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: dataCreare,
+            prioritate: s.prioritate?.toLowerCase() || 'normala',
+            status: s.status || 'de_facut',
+            responsabil_nume: s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : 'Neatribuit',
+            tip_eveniment: 'deadline_sarcina',
+            urgency_status: s.prioritate === 'Ridicată' ? 'urgent' : 'normal'
+          };
+        });
+        events.push(...sarciniEvents);
+        console.log('[CALENDAR DEBUG] Added sarcini events:', sarciniEvents.length);
+      }
+
+      console.log('[CALENDAR DEBUG] Total events created:', events.length);
 
       // Adaugă câteva evenimente mock pentru demonstrație
       if (events.length === 0) {

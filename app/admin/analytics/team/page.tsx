@@ -264,9 +264,32 @@ export default function TeamPerformance() {
           });
         }
 
-        setTeamData(userStats);
-        setTeamStats(calculatedTeamStats);
-        setRecommendations(generatedRecommendations);
+        // Verificare finală înainte de setare
+        console.log('[TEAM DEBUG] Before setting state:', {
+          userStatsType: typeof userStats,
+          userStatsIsArray: Array.isArray(userStats),
+          userStatsLength: Array.isArray(userStats) ? userStats.length : 'not_array'
+        });
+
+        if (Array.isArray(userStats)) {
+          setTeamData(userStats);
+          setTeamStats(calculatedTeamStats);
+          setRecommendations(generatedRecommendations);
+        } else {
+          console.error('[TEAM DEBUG] userStats is not an array:', userStats);
+          setTeamData([]);
+          setTeamStats({
+            total_members: 0,
+            active_members: 0,
+            media_eficienta_echipa: 0,
+            media_ore_echipa: 0,
+            total_ore_echipa: 0,
+            burnout_high_count: 0,
+            overworked_count: 0,
+            underutilized_count: 0
+          });
+          setRecommendations([]);
+        }
       } else {
         // Setează date goale dacă nu sunt utilizatori
         setTeamData([]);
