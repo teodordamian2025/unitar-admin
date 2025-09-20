@@ -227,7 +227,7 @@ export default function ManualMatchingPage() {
 
   return (
     <RealtimeProvider>
-      <ModernLayout userEmail={user.email || ''} displayName={displayName} userRole={userRole}>
+      <ModernLayout user={user} displayName={displayName} userRole={userRole}>
         <Suspense fallback={
           <div style={{
             display: 'flex',
