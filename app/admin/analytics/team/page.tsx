@@ -509,7 +509,7 @@ export default function TeamPerformance() {
       </div>
 
       {/* Recommendations */}
-      {recommendations.length > 0 && (
+      {Array.isArray(recommendations) && recommendations.length > 0 && (
         <Card style={{ marginBottom: '2rem' }}>
           <h3 style={{
             margin: '0 0 1.5rem 0',
@@ -524,7 +524,7 @@ export default function TeamPerformance() {
           </h3>
 
           <div style={{ display: 'grid', gap: '1rem' }}>
-            {recommendations.slice(0, 3).map((rec, index) => (
+            {Array.isArray(recommendations) && recommendations.slice(0, 3).map((rec, index) => (
               <Alert
                 key={index}
                 type={rec.priority === 'urgent' ? 'error' : rec.priority === 'high' ? 'warning' : 'info'}
@@ -535,7 +535,7 @@ export default function TeamPerformance() {
                 <div>
                   <strong>Acțiuni recomandate:</strong>
                   <ul style={{ margin: '0.5rem 0 0 1.5rem', paddingLeft: 0 }}>
-                    {rec.actions.map((action, actionIndex) => (
+                    {Array.isArray(rec.actions) && rec.actions.map((action, actionIndex) => (
                       <li key={actionIndex} style={{ marginBottom: '0.25rem' }}>{action}</li>
                     ))}
                   </ul>
@@ -563,7 +563,7 @@ export default function TeamPerformance() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
             gap: '1.5rem'
           }}>
-            {teamData.map((member) => (
+            {Array.isArray(teamData) && teamData.map((member) => (
               <Card
                 key={member.utilizator_uid}
                 hover
@@ -711,7 +711,7 @@ export default function TeamPerformance() {
                 </tr>
               </thead>
               <tbody>
-                {teamData.map((member, index) => (
+                {Array.isArray(teamData) && teamData.map((member, index) => (
                   <tr
                     key={member.utilizator_uid}
                     style={{
