@@ -370,6 +370,7 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
           data_scadenta: parseDate(row.data_scadenta),
           data_start: parseDate(row.data_start),
           data_final: parseDate(row.data_final),
+          status: row.status, // ✅ ADĂUGAT: Status anexă pentru afișare în lista contracte
           curs_valutar: convertBigQueryNumeric(row.curs_valutar),
           data_curs_valutar: parseDate(row.data_curs_valutar),
           procent_din_total: convertBigQueryNumeric(row.procent_din_total),
