@@ -23,10 +23,6 @@ export default function ContractFilters({
   loading = false 
 }: ContractFiltersProps) {
   
-  // NOU: Handler pentru resetarea completă a filtrelor
-  const handleResetAll = () => {
-    onReset();
-  };
 
   const filters: FilterConfig[] = [
     {
@@ -102,49 +98,6 @@ export default function ContractFilters({
         onReset={onReset}
         loading={loading}
       />
-      
-      {/* NOU: Buton pentru resetare completă a filtrelor */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginTop: '1rem',
-        paddingTop: '1rem',
-        borderTop: '1px solid rgba(0, 0, 0, 0.1)'
-      }}>
-        <button
-          onClick={handleResetAll}
-          disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: loading ? '#bdc3c7' : 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '12px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            boxShadow: loading ? 'none' : '0 4px 12px rgba(149, 165, 166, 0.4)',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-          onMouseOver={(e) => {
-            if (!loading) {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(149, 165, 166, 0.5)';
-            }
-          }}
-          onMouseOut={(e) => {
-            if (!loading) {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(149, 165, 166, 0.4)';
-            }
-          }}
-        >
-          {loading ? '⏳' : '🗑️'} Șterge toate filtrele
-        </button>
-      </div>
       
       {/* NOU: Indicator pentru filtrele active */}
       {Object.values(values).some(value => value !== '') && (

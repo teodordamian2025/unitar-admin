@@ -1587,7 +1587,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                                 borderRadius: '8px',
                                 fontSize: '11px',
                                 fontWeight: 'bold',
-                                background: anexa.status === 'Semnata' ? 'linear-gradient(135deg, #27ae60, #2ecc71)' :
+                                background: anexa.status === 'Semnat' ? 'linear-gradient(135deg, #27ae60, #2ecc71)' :
                                           anexa.status === 'In lucru' ? 'linear-gradient(135deg, #3498db, #5dade2)' :
                                           anexa.status === 'Finalizata' ? 'linear-gradient(135deg, #8e44ad, #9b59b6)' :
                                           anexa.status === 'Suspendata' ? 'linear-gradient(135deg, #f39c12, #f7dc6f)' :
