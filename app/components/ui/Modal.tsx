@@ -171,7 +171,6 @@ const Modal: React.FC<ModalProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                icon="✕"
                 style={{
                   padding: '0.5rem',
                   borderRadius: '8px',

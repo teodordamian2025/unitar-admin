@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-toastify';
 import ContractModal from '../components/ContractModal';
+import FacturaHibridModal from '../components/FacturaHibridModal';
 
 interface ProiectDetails {
   ID_Proiect: string;
@@ -39,8 +40,11 @@ export default function ProiectDetailsPage() {
   const [editing, setEditing] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   
-  // State pentru ContractModal
+  // State pentru modals
   const [showContractModal, setShowContractModal] = useState(false);
+  const [showFacturaModal, setShowFacturaModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
 
   useEffect(() => {
     if (proiectId) {
@@ -403,24 +407,23 @@ export default function ProiectDetailsPage() {
             </button>
             
             <button
-              onClick={handleGenerateInvoice}
-              disabled={isGeneratingInvoice}
+              onClick={() => setShowFacturaModal(true)}
               style={{
                 padding: '0.75rem',
-                background: isGeneratingInvoice ? '#6c757d' : '#ffc107',
-                color: isGeneratingInvoice ? 'white' : 'black',
+                background: '#ffc107',
+                color: 'black',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: isGeneratingInvoice ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
                 fontSize: '14px',
                 textAlign: 'left'
               }}
             >
-              {isGeneratingInvoice ? '⏳ Se generează...' : '💰 Generează Factură PDF'}
+              💰 Generează Factură PDF
             </button>
             
             <button
-              onClick={() => alert('Trimitere email în dezvoltare')}
+              onClick={() => setShowEmailModal(true)}
               style={{
                 padding: '0.75rem',
                 background: '#17a2b8',
@@ -436,7 +439,7 @@ export default function ProiectDetailsPage() {
             </button>
             
             <button
-              onClick={() => alert('Raport progres în dezvoltare')}
+              onClick={() => setShowProgressModal(true)}
               style={{
                 padding: '0.75rem',
                 background: '#6f42c1',
@@ -476,20 +479,209 @@ export default function ProiectDetailsPage() {
           </div>
         )}
 
-        {/* Timeline / Istoric */}
+        {/* Timeline Proiect Modern */}
         <div style={{
           background: 'white',
-          borderRadius: '8px',
+          borderRadius: '12px',
           padding: '1.5rem',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           gridColumn: 'span 2'
         }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
+          <h3 style={{ margin: '0 0 1.5rem 0', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             📅 Timeline Proiect
           </h3>
-          
-          <div style={{ color: '#6c757d', fontStyle: 'italic' }}>
-            Timeline-ul proiectului va fi implementat în următoarea fază...
+
+          <div style={{ position: 'relative' }}>
+            {/* Timeline Line */}
+            <div style={{
+              position: 'absolute',
+              left: '20px',
+              top: '0',
+              bottom: '0',
+              width: '2px',
+              background: 'linear-gradient(to bottom, #3b82f6, #10b981)',
+              borderRadius: '2px'
+            }} />
+
+            {/* Timeline Items */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Start Project */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 8px rgba(59, 130, 246, 0.3)',
+                  zIndex: 1
+                }}>
+                  🚀
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
+                    Început Proiect
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    {renderData(proiect.Data_Start)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    Proiect inițiat pentru {proiect.Client}
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: proiect.Status === 'Finalizat'
+                    ? 'linear-gradient(135deg, #10b981, #059669)'
+                    : proiect.Status === 'Activ' || proiect.Status === 'În lucru'
+                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(135deg, #6b7280, #4b5563)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  boxShadow: proiect.Status === 'Finalizat'
+                    ? '0 4px 8px rgba(16, 185, 129, 0.3)'
+                    : '0 4px 8px rgba(245, 158, 11, 0.3)',
+                  zIndex: 1
+                }}>
+                  {proiect.Status === 'Finalizat' ? '✅' :
+                   proiect.Status === 'Activ' || proiect.Status === 'În lucru' ? '⚡' : '⏸️'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
+                    Status Curent: {proiect.Status}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    {new Date().toLocaleDateString('ro-RO')}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    {proiect.Status === 'Finalizat'
+                      ? 'Proiect finalizat cu succes'
+                      : proiect.Status === 'Activ' || proiect.Status === 'În lucru'
+                      ? 'Proiect în desfășurare'
+                      : 'Proiect suspendat/anulat'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Project End */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: new Date(proiect.Data_Final?.value || proiect.Data_Final) > new Date()
+                    ? 'linear-gradient(135deg, #e5e7eb, #d1d5db)'
+                    : 'linear-gradient(135deg, #10b981, #059669)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  boxShadow: new Date(proiect.Data_Final?.value || proiect.Data_Final) > new Date()
+                    ? '0 4px 8px rgba(229, 231, 235, 0.3)'
+                    : '0 4px 8px rgba(16, 185, 129, 0.3)',
+                  zIndex: 1
+                }}>
+                  🏁
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
+                    {new Date(proiect.Data_Final?.value || proiect.Data_Final) > new Date()
+                      ? 'Finalizare Planificată'
+                      : 'Proiect Finalizat'}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    {renderData(proiect.Data_Final)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    {new Date(proiect.Data_Final?.value || proiect.Data_Final) > new Date()
+                      ? `Estimat în ${Math.ceil((new Date(proiect.Data_Final?.value || proiect.Data_Final).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} zile`
+                      : 'Proiect completat'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div style={{
+              marginTop: '2rem',
+              padding: '1rem',
+              background: 'rgba(59, 130, 246, 0.05)',
+              borderRadius: '8px',
+              border: '1px solid rgba(59, 130, 246, 0.1)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                  Progres Proiect
+                </span>
+                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#3b82f6' }}>
+                  {(() => {
+                    if (proiect.Status === 'Finalizat') return '100%';
+                    if (proiect.Status === 'Anulat') return '0%';
+
+                    const startDate = new Date(proiect.Data_Start?.value || proiect.Data_Start);
+                    const endDate = new Date(proiect.Data_Final?.value || proiect.Data_Final);
+                    const currentDate = new Date();
+
+                    if (currentDate < startDate) return '0%';
+                    if (currentDate > endDate) return '100%';
+
+                    const totalDuration = endDate.getTime() - startDate.getTime();
+                    const elapsed = currentDate.getTime() - startDate.getTime();
+                    const progress = Math.round((elapsed / totalDuration) * 100);
+
+                    return Math.max(0, Math.min(100, progress)) + '%';
+                  })()}
+                </span>
+              </div>
+              <div style={{
+                width: '100%',
+                height: '8px',
+                background: 'rgba(229, 231, 235, 0.8)',
+                borderRadius: '4px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                  borderRadius: '4px',
+                  width: (() => {
+                    if (proiect.Status === 'Finalizat') return '100%';
+                    if (proiect.Status === 'Anulat') return '0%';
+
+                    const startDate = new Date(proiect.Data_Start?.value || proiect.Data_Start);
+                    const endDate = new Date(proiect.Data_Final?.value || proiect.Data_Final);
+                    const currentDate = new Date();
+
+                    if (currentDate < startDate) return '0%';
+                    if (currentDate > endDate) return '100%';
+
+                    const totalDuration = endDate.getTime() - startDate.getTime();
+                    const elapsed = currentDate.getTime() - startDate.getTime();
+                    const progress = Math.round((elapsed / totalDuration) * 100);
+
+                    return Math.max(0, Math.min(100, progress)) + '%';
+                  })(),
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -513,6 +705,409 @@ export default function ProiectDetailsPage() {
           onClose={() => setShowContractModal(false)}
           onSuccess={handleContractSuccess}
         />
+      )}
+
+      {/* FACTURA MODAL */}
+      {showFacturaModal && proiect && (
+        <FacturaHibridModal
+          isOpen={showFacturaModal}
+          onClose={() => setShowFacturaModal(false)}
+          onSuccess={(result) => {
+            toast.success('Factură generată cu succes!');
+            if (result.downloadUrl) {
+              window.open(result.downloadUrl, '_blank');
+            }
+            setShowFacturaModal(false);
+          }}
+          proiectData={{
+            ID_Proiect: proiect.ID_Proiect,
+            Denumire: proiect.Denumire,
+            Client: proiect.Client,
+            Valoare_Estimata: proiect.Valoare_Estimata
+          }}
+        />
+      )}
+
+      {/* EMAIL MODAL */}
+      {showEmailModal && proiect && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }} onClick={() => setShowEmailModal(false)}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: 'calc(100vh - 4rem)',
+            overflow: 'hidden'
+          }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{
+              padding: '1.5rem 2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(255, 255, 255, 0.5)'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                📧 Trimite Email Client
+              </h2>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.5rem'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '2rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1))',
+                borderRadius: '12px',
+                marginBottom: '1.5rem',
+                border: '1px solid rgba(59, 130, 246, 0.2)'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #3b82f6, #10b981)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem'
+                }}>
+                  📧
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937' }}>
+                    Email Client pentru Proiect
+                  </h3>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Trimite un email automat către clientul {proiect.Client} cu detaliile proiectului {proiect.Denumire}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Template Email
+                  </label>
+                  <select style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid rgba(209, 213, 219, 0.8)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.9)'
+                  }}>
+                    <option>Status Update - Proiect în desfășurare</option>
+                    <option>Invoice Ready - Factură disponibilă</option>
+                    <option>Project Completed - Proiect finalizat</option>
+                    <option>Contract Ready - Contract disponibil</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Mesaj Personalizat (Opțional)
+                  </label>
+                  <textarea
+                    placeholder="Adaugă un mesaj personalizat pentru client..."
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      padding: '0.75rem',
+                      border: '1px solid rgba(209, 213, 219, 0.8)',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <div style={{
+                  padding: '1rem',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(245, 158, 11, 0.2)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                    <strong style={{ color: '#92400e' }}>Funcționalitate în dezvoltare</strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#78716c' }}>
+                    Sistemul de email automat va fi implementat în următoarea versiune și va include:
+                  </p>
+                  <ul style={{ margin: '0.5rem 0 0 1.5rem', fontSize: '0.875rem', color: '#78716c' }}>
+                    <li>Template-uri personalizabile</li>
+                    <li>Atașamente automate (contracte, facturi)</li>
+                    <li>Tracking și confirmări de citire</li>
+                    <li>Integrare cu calendar pentru follow-up</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+                <button
+                  onClick={() => setShowEmailModal(false)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'rgba(107, 114, 128, 0.1)',
+                    color: '#374151',
+                    border: '1px solid rgba(209, 213, 219, 0.8)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={() => {
+                    toast.info('Funcționalitatea va fi disponibilă în următoarea versiune!');
+                    setShowEmailModal(false);
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                  }}
+                >
+                  📧 Trimite Email
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROGRESS MODAL */}
+      {showProgressModal && proiect && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }} onClick={() => setShowProgressModal(false)}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: 'calc(100vh - 4rem)',
+            overflow: 'hidden'
+          }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{
+              padding: '1.5rem 2rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(255, 255, 255, 0.5)'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                📊 Raport Progres Proiect
+              </h2>
+              <button
+                onClick={() => setShowProgressModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.5rem'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '2rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                padding: '1.5rem',
+                background: 'linear-gradient(135deg, rgba(111, 66, 193, 0.1), rgba(59, 130, 246, 0.1))',
+                borderRadius: '12px',
+                marginBottom: '1.5rem',
+                border: '1px solid rgba(111, 66, 193, 0.2)'
+              }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #6f42c1, #3b82f6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem'
+                }}>
+                  📊
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937' }}>
+                    Raport Detaliat Progres
+                  </h3>
+                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                    Generează un raport complet cu progresul proiectului {proiect.Denumire}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Tip Raport
+                  </label>
+                  <select style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid rgba(209, 213, 219, 0.8)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.9)'
+                  }}>
+                    <option>Raport Executive Summary</option>
+                    <option>Raport Tehnic Detaliat</option>
+                    <option>Raport Financiar</option>
+                    <option>Raport Complet</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Format Export
+                  </label>
+                  <select style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid rgba(209, 213, 219, 0.8)',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    background: 'rgba(255, 255, 255, 0.9)'
+                  }}>
+                    <option>PDF Report</option>
+                    <option>Excel Spreadsheet</option>
+                    <option>PowerPoint Presentation</option>
+                    <option>Word Document</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{
+                padding: '1rem',
+                background: 'rgba(245, 158, 11, 0.1)',
+                borderRadius: '8px',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '1.2rem' }}>🚧</span>
+                  <strong style={{ color: '#92400e' }}>Sistemul de raportare în dezvoltare</strong>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#78716c' }}>
+                  Modulul de raportare va include în următoarea versiune:
+                </p>
+                <ul style={{ margin: '0.5rem 0 0 1.5rem', fontSize: '0.875rem', color: '#78716c' }}>
+                  <li>Grafice interactive de progres și timeline</li>
+                  <li>Analiza bugetului și cost tracking</li>
+                  <li>Compararea milestone-urilor planificate vs realizate</li>
+                  <li>Export automat în multiple formate</li>
+                  <li>Integrare cu BigQuery pentru date istorice</li>
+                </ul>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowProgressModal(false)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'rgba(107, 114, 128, 0.1)',
+                    color: '#374151',
+                    border: '1px solid rgba(209, 213, 219, 0.8)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={() => {
+                    toast.info('Modulul de raportare va fi disponibil în următoarea versiune!');
+                    setShowProgressModal(false);
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #6f42c1, #3b82f6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    boxShadow: '0 4px 12px rgba(111, 66, 193, 0.3)'
+                  }}
+                >
+                  📊 Generează Raport
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

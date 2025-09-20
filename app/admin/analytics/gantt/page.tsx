@@ -119,8 +119,9 @@ export default function GanttView() {
       if (result.success) {
         const tasks = result.data.map((task: any) => ({
           ...task,
-          startDate: task.startDate,
-          endDate: task.endDate,
+          // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+          startDate: task.startDate?.value || task.startDate,
+          endDate: task.endDate?.value || task.endDate,
           isCollapsed: false
         }));
 
@@ -141,10 +142,15 @@ export default function GanttView() {
   const calculateTimelineRange = (tasks: GanttTask[]) => {
     if (tasks.length === 0) return;
 
-    const dates = tasks.flatMap(task => [
-      new Date(task.startDate),
-      new Date(task.endDate)
-    ]);
+    const dates = tasks.flatMap(task => {
+      // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+      const startDateValue = task.startDate?.value || task.startDate;
+      const endDateValue = task.endDate?.value || task.endDate;
+      return [
+        new Date(startDateValue),
+        new Date(endDateValue)
+      ];
+    });
 
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
@@ -184,8 +190,11 @@ export default function GanttView() {
   };
 
   const calculateTaskPosition = (task: GanttTask) => {
-    const startDate = new Date(task.startDate);
-    const endDate = new Date(task.endDate);
+    // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+    const startDateValue = task.startDate?.value || task.startDate;
+    const endDateValue = task.endDate?.value || task.endDate;
+    const startDate = new Date(startDateValue);
+    const endDate = new Date(endDateValue);
     const timelineStart = timelineSettings.startDate;
     const timelineEnd = timelineSettings.endDate;
 
@@ -589,7 +598,7 @@ export default function GanttView() {
       <Modal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        title="Detalii Task"
+        title="Detalii Sarcina"
         size="lg"
       >
         {selectedTask && (
@@ -621,8 +630,16 @@ export default function GanttView() {
               <div>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Timeline</h4>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  <div>Start: {selectedTask.startDate && !isNaN(new Date(selectedTask.startDate).getTime()) ? new Date(selectedTask.startDate).toLocaleDateString('ro-RO') : 'Data neprecizată'}</div>
-                  <div>Final: {selectedTask.endDate && !isNaN(new Date(selectedTask.endDate).getTime()) ? new Date(selectedTask.endDate).toLocaleDateString('ro-RO') : 'Data neprecizată'}</div>
+                  <div>Start: {(() => {
+                    // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+                    const dateValue = selectedTask.startDate?.value || selectedTask.startDate;
+                    return dateValue && !isNaN(new Date(dateValue).getTime()) ? new Date(dateValue).toLocaleDateString('ro-RO') : 'Data neprecizată';
+                  })()}</div>
+                  <div>Final: {(() => {
+                    // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+                    const dateValue = selectedTask.endDate?.value || selectedTask.endDate;
+                    return dateValue && !isNaN(new Date(dateValue).getTime()) ? new Date(dateValue).toLocaleDateString('ro-RO') : 'Data neprecizată';
+                  })()}</div>
                   <div>Progres: {selectedTask.progress}%</div>
                 </div>
               </div>
