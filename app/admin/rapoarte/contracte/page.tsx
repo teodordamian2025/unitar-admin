@@ -100,33 +100,11 @@ export default function ContractePage() {
 
   return (
     <ModernLayout user={user} displayName={displayName} userRole={userRole}>
-    <div style={{ 
+      <div style={{
       padding: '2rem',
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       position: 'relative' as const,
       zIndex: 1
     }}>
-      {/* Background Pattern Glassmorphism - Opacity redusă */}
-      <div style={{
-        position: 'absolute' as const,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%)
-        `,
-        pointerEvents: 'none' as const,
-        zIndex: 0
-      }} />
-
-      <div style={{ 
-        position: 'relative' as const, 
-        zIndex: 1
-      }}>
         {/* Header Glassmorphism Premium - Backdrop redus */}
         <div style={{ 
           display: 'flex',
@@ -296,9 +274,8 @@ export default function ContractePage() {
             Click pe "Acțiuni" pentru a gestiona fiecare contract individual.
           </p>
         </div>
-      </div>
 
-      {/* CSS Global pentru Z-index Management Universal - identic cu proiectele */}
+        {/* CSS Global pentru Z-index Management Universal - identic cu proiectele */}
       <style jsx global>{`
         /* Z-index Management Universal pentru toate modalele și dropdown-urile */
         
@@ -371,7 +348,7 @@ export default function ContractePage() {
           z-index: 51000 !important;
         }
       `}</style>
-    </div>
+      </div>
     </ModernLayout>
   );
 }

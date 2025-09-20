@@ -74,10 +74,10 @@ export async function GET(request: NextRequest) {
           LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
             ON s.id = tt.sarcina_id
           WHERE s.data_scadenta IS NOT NULL
-            AND s.data_scadenta >= @startDate
-            AND s.data_scadenta <= @endDate
-            ${userId ? 'AND sr.responsabil_uid = @userId' : ''}
-            ${proiectId ? 'AND s.proiect_id = @proiectId' : ''}
+            AND s.data_scadenta >= '${startDate}'
+            AND s.data_scadenta <= '${endDate}'
+            ${userId ? `AND sr.responsabil_uid = '${userId}'` : ''}
+            ${proiectId ? `AND s.proiect_id = '${proiectId}'` : ''}
           GROUP BY s.id, s.titlu, s.descriere, s.prioritate, s.status, 
                    s.data_scadenta, s.data_creare, s.data_finalizare, 
                    s.proiect_id, s.timp_estimat_total_ore, p.Denumire, p.Status
@@ -156,10 +156,10 @@ export async function GET(request: NextRequest) {
           END as urgency_status
         FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
         WHERE p.Data_Final IS NOT NULL
-          AND p.Data_Final >= @startDate
-          AND p.Data_Final <= @endDate
+          AND p.Data_Final >= '${startDate}'
+          AND p.Data_Final <= '${endDate}'
           AND p.Status != 'Anulat'
-          ${proiectId ? 'AND p.ID_Proiect = @proiectId' : ''}
+          ${proiectId ? `AND p.ID_Proiect = '${proiectId}'` : ''}
       `;
 
       const proiecteParams = [
@@ -203,11 +203,11 @@ export async function GET(request: NextRequest) {
           ON tt.proiect_id = p.ID_Proiect
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON tt.sarcina_id = s.id
-        WHERE tt.data_lucru >= @startDate
-          AND tt.data_lucru <= @endDate
+        WHERE tt.data_lucru >= '${startDate}'
+          AND tt.data_lucru <= '${endDate}'
           AND tt.ore_lucrate > 0
-          ${userId ? 'AND tt.utilizator_uid = @userId' : ''}
-          ${proiectId ? 'AND tt.proiect_id = @proiectId' : ''}
+          ${userId ? `AND tt.utilizator_uid = '${userId}'` : ''}
+          ${proiectId ? `AND tt.proiect_id = '${proiectId}'` : ''}
         GROUP BY tt.data_lucru, tt.proiect_id, p.Denumire, s.titlu, tt.utilizator_nume
         ORDER BY tt.data_lucru DESC
       `;
@@ -263,10 +263,10 @@ export async function GET(request: NextRequest) {
       LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
         ON ec.proiect_id = p.ID_Proiect
       WHERE ec.data_scadenta IS NOT NULL
-        AND ec.data_scadenta >= @startDate
-        AND ec.data_scadenta <= @endDate
+        AND ec.data_scadenta >= '${startDate}'
+        AND ec.data_scadenta <= '${endDate}'
         AND ec.activ = true
-        ${proiectId ? 'AND ec.proiect_id = @proiectId' : ''}
+        ${proiectId ? `AND ec.proiect_id = '${proiectId}'` : ''}
     `;
 
     const milestonesParams = [
@@ -358,16 +358,16 @@ export async function POST(request: NextRequest) {
       case 'sarcina':
         updateQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
-          SET data_scadenta = @newDate
-          WHERE id = @eventId
+          SET data_scadenta = '${new_date}'
+          WHERE id = '${event_id}'
         `;
         break;
 
       case 'deadline_proiect':
         updateQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
-          SET Data_Final = @newDate
-          WHERE ID_Proiect = @eventId
+          SET Data_Final = '${new_date}'
+          WHERE ID_Proiect = '${event_id}'
         `;
         break;
 
@@ -375,8 +375,8 @@ export async function POST(request: NextRequest) {
         const milestoneId = event_id.replace('milestone_', '');
         updateQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
-          SET data_scadenta = @newDate
-          WHERE ID_Etapa = @eventId
+          SET data_scadenta = '${new_date}'
+          WHERE ID_Etapa = '${milestoneId}'
         `;
         break;
 
