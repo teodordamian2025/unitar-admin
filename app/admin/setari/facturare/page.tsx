@@ -7,6 +7,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 
 interface SetariFacturare {
   // Serii documente
@@ -53,6 +57,11 @@ const formatExamples = {
 };
 
 export default function SetariFacturare() {
+  const router = useRouter();
+  const [user, loadingAuth] = useAuthState(auth);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
+
   const [setari, setSetari] = useState<SetariFacturare>({
     serie_facturi: 'INV',
     serie_proforme: 'PRF',
@@ -76,16 +85,27 @@ export default function SetariFacturare() {
     termen_plata_standard: 30
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [originalSetari, setOriginalSetari] = useState<SetariFacturare | null>(null);
 
+  // Auth check
   useEffect(() => {
+    if (loadingAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+  }, [user, loadingAuth, router]);
+
+  useEffect(() => {
+    if (!user) return;
     loadSetari();
-  }, []);
+  }, [user]);
 
   const loadSetari = async () => {
-    setLoading(true);
+    setLoadingData(true);
     try {
       const response = await fetch('/api/setari/facturare');
       const data = await response.json();
@@ -103,7 +123,7 @@ export default function SetariFacturare() {
       console.error('Eroare la încărcarea setărilor:', error);
       showToast('Eroare la încărcarea setărilor', 'error');
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -220,7 +240,7 @@ export default function SetariFacturare() {
     }, 4000);
   };
 
-  if (loading) {
+  if (loadingAuth || loadingData) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="animate-pulse">
@@ -235,8 +255,13 @@ export default function SetariFacturare() {
     );
   }
 
+  if (!user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -661,6 +686,7 @@ export default function SetariFacturare() {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </ModernLayout>
   );
 }

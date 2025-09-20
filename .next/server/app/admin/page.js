@@ -496,82 +496,146 @@ function AdminPage() {
     const loadDashboardData = async ()=>{
         try {
             setLoadingData(true);
-            // Simulare date KPI - în realitate vor fi apeluri API către BigQuery
-            const mockKPIData = {
-                cashFlow: {
-                    amount: 87450,
-                    change: 12.3,
-                    currency: "EUR"
-                },
-                projects: {
-                    active: 24,
-                    atDeadline: 3,
-                    total: 45
-                },
-                invoices: {
-                    unpaid: 15,
-                    amount: 42300,
-                    overdue: 3
-                },
-                transactions: {
-                    matched: 89,
-                    total: 100,
-                    percentage: 89,
-                    unmatched: 8
+            // Apeluri reale către BigQuery pentru date dashboard
+            const [dashboardResponse, tranzactiiResponse] = await Promise.all([
+                fetch("/api/rapoarte/dashboard"),
+                fetch("/api/tranzactii/dashboard")
+            ]);
+            const dashboardData = await dashboardResponse.json();
+            const tranzactiiData = await tranzactiiResponse.json();
+            if (dashboardData.success) {
+                const { proiecte, facturi, contracte } = dashboardData.data;
+                // Construiește KPI-urile cu date reale
+                const realKPIData = {
+                    cashFlow: {
+                        amount: facturi?.valoare_incasata || 0,
+                        change: 0,
+                        currency: "RON"
+                    },
+                    projects: {
+                        active: proiecte?.active || 0,
+                        atDeadline: 0,
+                        total: proiecte?.total || 0
+                    },
+                    invoices: {
+                        unpaid: facturi?.total || 0,
+                        amount: facturi?.valoare_de_incasat || 0,
+                        overdue: 0 // Va fi calculat din facturile cu termen depășit
+                    },
+                    transactions: {
+                        matched: 0,
+                        total: 0,
+                        percentage: 0,
+                        unmatched: 0
+                    }
+                };
+                // Actualizează cu date tranzacții dacă sunt disponibile
+                if (tranzactiiData.success && tranzactiiData.stats) {
+                    const stats = tranzactiiData.stats;
+                    const totalMatched = stats.totalTransactions - (stats.pendingMatches || 0) - (stats.needsReview || 0);
+                    realKPIData.transactions = {
+                        total: stats.totalTransactions || 0,
+                        matched: totalMatched || 0,
+                        percentage: Math.round(stats.matchingRate || 0),
+                        unmatched: (stats.pendingMatches || 0) + (stats.needsReview || 0)
+                    };
                 }
-            };
-            const mockAlerts = [
-                {
-                    id: "1",
-                    type: "error",
-                    title: "Eroare ANAF",
-                    message: "1 factură cu eroare de upload",
-                    count: 1,
-                    action: "Vezi detalii",
-                    href: "/admin/anaf/monitoring"
-                },
-                {
-                    id: "2",
-                    type: "warning",
-                    title: "Facturi \xeent\xe2rziate",
-                    message: "3 facturi depășesc termenul de plată",
-                    count: 3,
-                    action: "Gestionează",
-                    href: "/admin/rapoarte/facturi"
-                },
-                {
-                    id: "3",
-                    type: "warning",
-                    title: "Proiecte la termen",
-                    message: "2 proiecte se apropie de deadline",
-                    count: 2,
-                    action: "Verifică",
-                    href: "/admin/rapoarte/proiecte"
-                },
-                {
-                    id: "4",
-                    type: "info",
-                    title: "Tranzacții nematchate",
-                    message: "12 tranzacții necesită procesare manuală",
-                    count: 12,
-                    action: "Procesează",
-                    href: "/admin/tranzactii/dashboard"
-                },
-                {
-                    id: "5",
-                    type: "warning",
-                    title: "Contracte nesemnate",
-                    message: "5 contracte \xeen așteptarea semnării",
-                    count: 5,
-                    action: "Urmărește",
-                    href: "/admin/rapoarte/contracte"
+                // Generează alerturi pe baza datelor reale
+                const realAlerts = [];
+                // Alert pentru tranzacții neimperecheate
+                if (realKPIData.transactions.unmatched > 0) {
+                    realAlerts.push({
+                        id: "tranzactii",
+                        type: "info",
+                        title: "Tranzactii neimperecheate",
+                        message: `${realKPIData.transactions.unmatched} tranzactii necesita procesare manuala`,
+                        count: realKPIData.transactions.unmatched,
+                        action: "Proceseaza",
+                        href: "/admin/tranzactii/dashboard"
+                    });
                 }
-            ];
-            setKpiData(mockKPIData);
-            setAlerts(mockAlerts);
+                // Alert pentru proiecte active
+                if (realKPIData.projects.active > 0) {
+                    realAlerts.push({
+                        id: "proiecte",
+                        type: "info",
+                        title: "Proiecte active",
+                        message: `${realKPIData.projects.active} proiecte in curs de desfasurare`,
+                        count: realKPIData.projects.active,
+                        action: "Gestioneaza",
+                        href: "/admin/rapoarte/proiecte"
+                    });
+                }
+                // Alert pentru facturi de incasat
+                if (realKPIData.invoices.amount > 0) {
+                    realAlerts.push({
+                        id: "facturi",
+                        type: "warning",
+                        title: "Facturi de incasat",
+                        message: `${realKPIData.invoices.amount.toLocaleString("ro-RO")} RON de incasat`,
+                        count: realKPIData.invoices.unpaid,
+                        action: "Urmareste",
+                        href: "/admin/rapoarte/facturi"
+                    });
+                }
+                setKpiData(realKPIData);
+                setAlerts(realAlerts);
+            } else {
+                // Fallback la date mock în caz de eroare
+                console.warn("Nu s-au putut \xeencărca datele BigQuery, folosesc date mock");
+                setKpiData({
+                    cashFlow: {
+                        amount: 0,
+                        change: 0,
+                        currency: "RON"
+                    },
+                    projects: {
+                        active: 0,
+                        atDeadline: 0,
+                        total: 0
+                    },
+                    invoices: {
+                        unpaid: 0,
+                        amount: 0,
+                        overdue: 0
+                    },
+                    transactions: {
+                        matched: 0,
+                        total: 0,
+                        percentage: 0,
+                        unmatched: 0
+                    }
+                });
+                setAlerts([]);
+            }
         } catch (error) {
             console.error("Eroare la \xeencărcarea datelor dashboard:", error);
-            react_toastify__WEBPACK_IMPORTED_MODULE_7__.toast.error("Eroare la \xeencărcarea datelor!");
+            react_toastify__WEBPACK_IMPORTED_MODULE_7__.toast.error("Eroare la \xeencărcarea datelor din BigQuery!");
+            // Fallback la date mock în caz de eroare gravă
+            setKpiData({
+                cashFlow: {
+                    amount: 0,
+                    change: 0,
+                    currency: "RON"
+                },
+                projects: {
+                    active: 0,
+                    atDeadline: 0,
+                    total: 0
+                },
+                invoices: {
+                    unpaid: 0,
+                    amount: 0,
+                    overdue: 0
+                },
+                transactions: {
+                    matched: 0,
+                    total: 0,
+                    percentage: 0,
+                    unmatched: 0
+                }
+            });
+            setAlerts([]);
         } finally{
             setLoadingData(false);
         }
@@ -1112,7 +1176,7 @@ function AdminPage() {
                                             },
                                             children: [
                                                 kpiData?.transactions.percentage,
-                                                "% matched"
+                                                "% imperecheate"
                                             ]
                                         })
                                     ]
@@ -1137,7 +1201,7 @@ function AdminPage() {
                                     },
                                     children: [
                                         kpiData?.transactions.percentage,
-                                        "% matched"
+                                        "% imperecheate"
                                     ]
                                 }),
                                 /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
@@ -1157,7 +1221,7 @@ function AdminPage() {
                                         fontSize: "0.8rem",
                                         color: "#6b7280"
                                     },
-                                    children: "Procesează →"
+                                    children: "Proceseaza →"
                                 })
                             ]
                         })
@@ -1406,7 +1470,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,1440,8045,8313,9850,6166,6128], () => (__webpack_exec__(54481)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,8045,1440,8313,9850,6166,6128], () => (__webpack_exec__(54481)));
 module.exports = __webpack_exports__;
 
 })();

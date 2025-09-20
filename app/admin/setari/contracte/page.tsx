@@ -8,6 +8,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 
 interface SetareContract {
   id: string;
@@ -57,19 +61,35 @@ const tipuriDocument = [
 ];
 
 export default function SetariContracte() {
+  const router = useRouter();
+  const [user, loadingAuth] = useAuthState(auth);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
+
   const [setari, setSetari] = useState<SetareContract[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingSetare, setEditingSetare] = useState<SetareContract | null>(null);
   const [formData, setFormData] = useState<FormData>(defaultFormData);
 
+  // Auth check
   useEffect(() => {
+    if (loadingAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+  }, [user, loadingAuth, router]);
+
+  useEffect(() => {
+    if (!user) return;
     loadSetari();
-  }, []);
+  }, [user]);
 
   const loadSetari = async () => {
-    setLoading(true);
+    setLoadingData(true);
     try {
       const response = await fetch('/api/setari/contracte');
       const data = await response.json();
@@ -83,7 +103,7 @@ export default function SetariContracte() {
       console.error('Eroare la încărcarea setărilor:', error);
       showToast('Eroare la încărcarea setărilor contracte', 'error');
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -205,7 +225,7 @@ export default function SetariContracte() {
     }, 4000);
   };
 
-  if (loading) {
+  if (loadingAuth || loadingData) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="animate-pulse">
@@ -220,8 +240,13 @@ export default function SetariContracte() {
     );
   }
 
+  if (!user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -613,6 +638,7 @@ export default function SetariContracte() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModernLayout>
   );
 }

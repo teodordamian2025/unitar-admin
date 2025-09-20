@@ -7,6 +7,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import ModernLayout from '@/app/components/ModernLayout';
 
 interface ContBancar {
   id: string;
@@ -34,19 +38,35 @@ const defaultFormData: FormData = {
 };
 
 export default function SetariBanca() {
+  const router = useRouter();
+  const [user, loadingAuth] = useAuthState(auth);
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('admin');
+
   const [conturi, setConturi] = useState<ContBancar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingCont, setEditingCont] = useState<ContBancar | null>(null);
   const [formData, setFormData] = useState<FormData>(defaultFormData);
 
+  // Auth check
   useEffect(() => {
+    if (loadingAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setDisplayName(localStorage.getItem('displayName') || 'Utilizator');
+  }, [user, loadingAuth, router]);
+
+  useEffect(() => {
+    if (!user) return;
     loadConturi();
-  }, []);
+  }, [user]);
 
   const loadConturi = async () => {
-    setLoading(true);
+    setLoadingData(true);
     try {
       const response = await fetch('/api/setari/banca');
       const data = await response.json();
@@ -60,7 +80,7 @@ export default function SetariBanca() {
       console.error('Eroare la încărcarea conturilor:', error);
       showToast('Eroare la încărcarea conturilor bancare', 'error');
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -185,7 +205,7 @@ export default function SetariBanca() {
     }, 4000);
   };
 
-  if (loading) {
+  if (loadingAuth || loadingData) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <div className="animate-pulse">
@@ -200,8 +220,13 @@ export default function SetariBanca() {
     );
   }
 
+  if (!user) {
+    return <div>Se încarcă...</div>;
+  }
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -477,6 +502,7 @@ export default function SetariBanca() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModernLayout>
   );
 }
