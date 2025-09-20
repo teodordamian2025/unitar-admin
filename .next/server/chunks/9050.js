@@ -4571,7 +4571,7 @@ var formats = {};
     }
     return false;
 };
-vending.registerFormat("zip", __webpack_require__(5442));
+vending.registerFormat("zip", __webpack_require__(85896));
 vending.registerFormat("tar", __webpack_require__(60513));
 vending.registerFormat("json", __webpack_require__(57482));
 module.exports = vending;
@@ -5671,7 +5671,7 @@ module.exports = Tar; /**
 
 /***/ }),
 
-/***/ 5442:
+/***/ 85896:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -13724,7 +13724,7 @@ try {
 } catch (e) {
     firstLineError = e;
 }
-var schedule = __webpack_require__(47069);
+var schedule = __webpack_require__(5425);
 var Queue = __webpack_require__(73815);
 var util = __webpack_require__(64935);
 function Async() {
@@ -17538,7 +17538,7 @@ module.exports = function(Promise, PromiseArray, apiRejection, tryConvertToPromi
 
 /***/ }),
 
-/***/ 47069:
+/***/ 5425:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -37373,7 +37373,7 @@ module.exports = PageMarginsXform;
 
 /***/ }),
 
-/***/ 3241:
+/***/ 59512:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -37844,7 +37844,7 @@ module.exports = SheetFormatPropertiesXform;
 
 const BaseXform = __webpack_require__(90884);
 const ColorXform = __webpack_require__(47287);
-const PageSetupPropertiesXform = __webpack_require__(3241);
+const PageSetupPropertiesXform = __webpack_require__(59512);
 const OutlinePropertiesXform = __webpack_require__(96107);
 class SheetPropertiesXform extends BaseXform {
     constructor(){
@@ -59259,7 +59259,7 @@ Object.defineProperty(exports, "__esModule", ({
 }));
 const ed5 = __webpack_require__(50829);
 const ed2 = __webpack_require__(35679);
-const NSed3 = __webpack_require__(89483);
+const NSed3 = __webpack_require__(60996);
 var isS = ed5.isS;
 var isChar10 = ed5.isChar;
 var isNameStartChar = ed5.isNameStartChar;
@@ -63147,7 +63147,7 @@ module.exports = function centralDirectory(source, options) {
 
 /***/ }),
 
-/***/ 54417:
+/***/ 70788:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -66202,7 +66202,7 @@ __webpack_require__(89570);
 exports.Parse = __webpack_require__(15695);
 exports.ParseOne = __webpack_require__(63465);
 exports.Extract = __webpack_require__(77871);
-exports.Open = __webpack_require__(54417);
+exports.Open = __webpack_require__(70788);
 
 
 /***/ }),
@@ -66410,7 +66410,7 @@ exports.isNameChar = isNameChar; //# sourceMappingURL=ed2.js.map
 
 /***/ }),
 
-/***/ 89483:
+/***/ 60996:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";

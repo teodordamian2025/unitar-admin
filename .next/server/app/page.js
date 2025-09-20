@@ -28,7 +28,7 @@ module.exports = require("next/dist/compiled/react-experimental/jsx-runtime");
 
 /***/ }),
 
-/***/ 64119:
+/***/ 67597:
 /***/ ((module) => {
 
 "use strict";
@@ -302,7 +302,7 @@ const tree = {
         '',
         {
         children: ['__PAGE__', {}, {
-          page: [() => Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 19690)), "/home/teodor/PM1-2025-07-17/unitar-admin/app/page.tsx"],
+          page: [() => Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 48045)), "/home/teodor/PM1-2025-07-17/unitar-admin/app/page.tsx"],
           
         }]
       },
@@ -345,10 +345,212 @@ const routeModule = new AppPageRouteModule({
 
 /***/ }),
 
-/***/ 17864:
+/***/ 81047:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __webpack_require__) => {
 
-Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 22495))
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 7365));
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 22495));
+Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_require__, 59961))
+
+/***/ }),
+
+/***/ 59961:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ PWAProvider),
+/* harmony export */   usePWA: () => (/* binding */ usePWA)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(76931);
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17640);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+// ==================================================================
+// CALEA: app/components/PWAProvider.tsx
+// DATA: 19.09.2025 22:25 (ora României)
+// DESCRIERE: PWA Provider pentru notificări și offline status
+// FUNCȚIONALITATE: Service worker registration, offline indicator, install prompt
+// ==================================================================
+/* __next_internal_client_entry_do_not_use__ usePWA,default auto */ 
+
+const PWAContext = /*#__PURE__*/ (0,react__WEBPACK_IMPORTED_MODULE_1__.createContext)({
+    isOnline: true,
+    isInstallable: false,
+    installPWA: ()=>{},
+    isInstalled: false
+});
+const usePWA = ()=>(0,react__WEBPACK_IMPORTED_MODULE_1__.useContext)(PWAContext);
+function PWAProvider({ children }) {
+    const [isOnline, setIsOnline] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
+    const [isInstallable, setIsInstallable] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const [isInstalled, setIsInstalled] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const [deferredPrompt, setDeferredPrompt] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(null);
+    (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(()=>{
+        // Check if already installed
+        if (false) {}
+        // Online/Offline status
+        const handleOnline = ()=>setIsOnline(true);
+        const handleOffline = ()=>setIsOnline(false);
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+        // PWA Install prompt
+        const handleBeforeInstallPrompt = (e)=>{
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setIsInstallable(true);
+        };
+        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+        // App installed
+        const handleAppInstalled = ()=>{
+            setIsInstalled(true);
+            setIsInstallable(false);
+            setDeferredPrompt(null);
+            console.log("PWA was installed");
+        };
+        window.addEventListener("appinstalled", handleAppInstalled);
+        // Service Worker registration
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/sw.js").then((registration)=>{
+                console.log("SW registered: ", registration);
+            }).catch((registrationError)=>{
+                console.log("SW registration failed: ", registrationError);
+            });
+        }
+        return ()=>{
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+            window.removeEventListener("appinstalled", handleAppInstalled);
+        };
+    }, []);
+    const installPWA = async ()=>{
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            setDeferredPrompt(null);
+            setIsInstallable(false);
+        }
+    };
+    return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(PWAContext.Provider, {
+        value: {
+            isOnline,
+            isInstallable,
+            installPWA,
+            isInstalled
+        },
+        children: [
+            children,
+            !isOnline && /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                style: {
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    background: "#ef4444",
+                    color: "white",
+                    padding: "0.5rem 1rem",
+                    textAlign: "center",
+                    fontSize: "0.875rem",
+                    zIndex: 9999,
+                    backdropFilter: "blur(10px)"
+                },
+                children: "\uD83D\uDCE1 Aplicația funcționează offline - Datele vor fi sincronizate c\xe2nd conexiunea va fi restabilită"
+            }),
+            isInstallable && !isInstalled && /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                style: {
+                    position: "fixed",
+                    bottom: "1rem",
+                    right: "1rem",
+                    background: "rgba(59, 130, 246, 0.95)",
+                    color: "white",
+                    padding: "1rem",
+                    borderRadius: "12px",
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    maxWidth: "300px",
+                    zIndex: 9998
+                },
+                children: [
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.75rem",
+                            marginBottom: "0.75rem"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                style: {
+                                    fontSize: "1.5rem"
+                                },
+                                children: "\uD83D\uDCF1"
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                        style: {
+                                            fontWeight: "600",
+                                            fontSize: "0.875rem"
+                                        },
+                                        children: "Instalează UNITAR ERP"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                        style: {
+                                            fontSize: "0.75rem",
+                                            opacity: 0.9
+                                        },
+                                        children: "Acces rapid de pe ecranul principal"
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            display: "flex",
+                            gap: "0.5rem"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                onClick: installPWA,
+                                style: {
+                                    background: "rgba(255,255,255,0.2)",
+                                    border: "1px solid rgba(255,255,255,0.3)",
+                                    color: "white",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "6px",
+                                    fontSize: "0.75rem",
+                                    fontWeight: "500",
+                                    cursor: "pointer",
+                                    flex: 1
+                                },
+                                children: "Instalează"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
+                                onClick: ()=>setIsInstallable(false),
+                                style: {
+                                    background: "transparent",
+                                    border: "1px solid rgba(255,255,255,0.2)",
+                                    color: "white",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "6px",
+                                    fontSize: "0.75rem",
+                                    cursor: "pointer"
+                                },
+                                children: "✕"
+                            })
+                        ]
+                    })
+                ]
+            })
+        ]
+    });
+}
+
 
 /***/ }),
 
@@ -369,7 +571,7 @@ var jsx_runtime_ = __webpack_require__(76931);
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
 var react_experimental_ = __webpack_require__(17640);
 // EXTERNAL MODULE: ./node_modules/react-firebase-hooks/auth/dist/index.cjs.js
-var index_cjs = __webpack_require__(48045);
+var index_cjs = __webpack_require__(75792);
 // EXTERNAL MODULE: ./lib/firebaseConfig.ts
 var firebaseConfig = __webpack_require__(79850);
 // EXTERNAL MODULE: ./node_modules/next/navigation.js
@@ -377,6 +579,7 @@ var navigation = __webpack_require__(57114);
 // EXTERNAL MODULE: ./node_modules/react-dropzone/dist/es/index.js + 1 modules
 var es = __webpack_require__(92170);
 ;// CONCATENATED MODULE: ./app/components/UserChatbot.tsx
+// app/components/UserChatbot.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
@@ -918,7 +1121,7 @@ function UserDashboard() {
 
 /***/ }),
 
-/***/ 19690:
+/***/ 48045:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -947,12 +1150,64 @@ const __default__ = proxy.default;
 
 
 /* harmony default export */ const UserDashboard = (__default__);
+;// CONCATENATED MODULE: ./app/components/PWAProvider.tsx
+
+const PWAProvider_proxy = (0,module_proxy.createProxy)(String.raw`/home/teodor/PM1-2025-07-17/unitar-admin/app/components/PWAProvider.tsx`)
+
+// Accessing the __esModule property and exporting $$typeof are required here.
+// The __esModule getter forces the proxy target to create the default export
+// and the $$typeof value is for rendering logic to determine if the module
+// is a client boundary.
+const { __esModule: PWAProvider_esModule, $$typeof: PWAProvider_$$typeof } = PWAProvider_proxy;
+const PWAProvider_default_ = PWAProvider_proxy.default;
+
+const e0 = PWAProvider_proxy["usePWA"];
+
+
+/* harmony default export */ const PWAProvider = (PWAProvider_default_);
+// EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs
+var dist = __webpack_require__(76094);
+// EXTERNAL MODULE: ./node_modules/react-toastify/dist/ReactToastify.css
+var ReactToastify = __webpack_require__(97001);
 ;// CONCATENATED MODULE: ./app/page.tsx
+// ==================================================================
+// CALEA: app/page.tsx
+// DATA: 19.09.2025 22:30 (ora României)
+// DESCRIERE: Homepage cu PWA Provider și Toast Container
+// FUNCȚIONALITATE: Entry point cu PWA support și global providers
+// ==================================================================
+
+
+
 
 
 function HomePage() {
-    return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-        children: /*#__PURE__*/ jsx_runtime_.jsx(UserDashboard, {})
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(PWAProvider, {
+        children: [
+            /*#__PURE__*/ jsx_runtime_.jsx(UserDashboard, {}),
+            /*#__PURE__*/ jsx_runtime_.jsx(dist/* ToastContainer */.Ix, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                newestOnTop: false,
+                closeOnClick: true,
+                rtl: false,
+                pauseOnFocusLoss: true,
+                draggable: true,
+                pauseOnHover: true,
+                theme: "light",
+                style: {
+                    zIndex: 10000
+                },
+                toastStyle: {
+                    background: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    borderRadius: "12px",
+                    color: "#1f2937"
+                }
+            })
+        ]
     });
 }
 
@@ -966,7 +1221,7 @@ function HomePage() {
 var __webpack_require__ = require("../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,8045,5601,4971,4646,9850], () => (__webpack_exec__(49529)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,8045,5601,2170,4812,8313,9850], () => (__webpack_exec__(49529)));
 module.exports = __webpack_exports__;
 
 })();

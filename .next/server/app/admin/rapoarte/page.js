@@ -28,7 +28,7 @@ module.exports = require("next/dist/compiled/react-experimental/jsx-runtime");
 
 /***/ }),
 
-/***/ 64119:
+/***/ 67597:
 /***/ ((module) => {
 
 "use strict";
@@ -416,23 +416,55 @@ Promise.resolve(/* import() eager */).then(__webpack_require__.bind(__webpack_re
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (/* binding */ RapoarteDashboard)
+/* harmony export */   "default": () => (/* binding */ OperationsHub)
 /* harmony export */ });
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(76931);
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17640);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(11440);
-/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(next_link__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var react_firebase_hooks_auth__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(75792);
+/* harmony import */ var _lib_firebaseConfig__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(79850);
+/* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(57114);
+/* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(11440);
+/* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(next_link__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _app_components_ModernLayout__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(56128);
+/* harmony import */ var _app_components_ui__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(79877);
+// ==================================================================
+// CALEA: app/admin/rapoarte/page.tsx
+// DATA: 19.09.2025 21:45 (ora României)
+// DESCRIERE: Operations Hub modernizat cu design glassmorphism
+// FUNCȚIONALITATE: Dashboard central pentru management operațiuni (proiecte, clienți, contracte)
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
-function RapoarteDashboard() {
+
+
+
+
+
+function OperationsHub() {
+    const [user, loading] = (0,react_firebase_hooks_auth__WEBPACK_IMPORTED_MODULE_2__/* .useAuthState */ .F_)(_lib_firebaseConfig__WEBPACK_IMPORTED_MODULE_3__/* .auth */ .I);
+    const router = (0,next_navigation__WEBPACK_IMPORTED_MODULE_4__.useRouter)();
     const [stats, setStats] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(null);
-    const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
+    const [loadingData, setLoadingData] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
+    const [displayName, setDisplayName] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)("Utilizator");
+    const [userRole, setUserRole] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)("user");
     (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(()=>{
+        if (loading) return;
+        if (!user) {
+            router.push("/login");
+            return;
+        }
+        setDisplayName(localStorage.getItem("displayName") || "Utilizator");
+        setUserRole(localStorage.getItem("userRole") || "user");
         fetchDashboardStats();
-    }, []);
+    }, [
+        user,
+        loading,
+        router
+    ]);
     const fetchDashboardStats = async ()=>{
         try {
             const response = await fetch("/api/rapoarte/dashboard");
@@ -443,214 +475,250 @@ function RapoarteDashboard() {
         } catch (error) {
             console.error("Eroare la \xeencărcarea statisticilor:", error);
         } finally{
-            setLoading(false);
+            setLoadingData(false);
         }
     };
-    if (loading) {
-        return /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-            style: {
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "50vh"
-            },
-            children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                children: "Se \xeencarcă statisticile..."
-            })
+    if (loading || loadingData) {
+        return /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .LoadingSpinner */ .TK, {
+            overlay: true,
+            message: "Se \xeencarcă Operations Hub..."
         });
     }
-    return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+    return /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ModernLayout__WEBPACK_IMPORTED_MODULE_6__/* ["default"] */ .Z, {
+        user: user,
+        displayName: displayName,
+        userRole: userRole,
         children: [
-            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h2", {
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
-                    marginBottom: "2rem",
-                    color: "#2c3e50"
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "2rem"
                 },
-                children: "\uD83D\uDCCA Dashboard Rapoarte"
+                children: [
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h1", {
+                                style: {
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "2rem",
+                                    fontWeight: "700",
+                                    color: "#1f2937"
+                                },
+                                children: "\uD83D\uDCBC Operations Hub"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    margin: 0,
+                                    color: "#6b7280"
+                                },
+                                children: "Management central pentru proiecte, clienți și contracte"
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                        variant: "outline",
+                        size: "sm",
+                        icon: "\uD83D\uDD04",
+                        onClick: fetchDashboardStats,
+                        loading: loadingData,
+                        children: "Actualizează"
+                    })
+                ]
             }),
             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                     gap: "1.5rem",
-                    marginBottom: "3rem"
+                    marginBottom: "2rem"
                 },
                 children: [
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
-                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
+                        variant: "success",
+                        size: "sm",
+                        children: /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                             style: {
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center"
+                                textAlign: "center"
                             },
-                            children: /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
-                                children: [
-                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
-                                        style: {
-                                            margin: 0,
-                                            color: "#6c757d",
-                                            fontSize: "14px",
-                                            textTransform: "uppercase"
-                                        },
-                                        children: "\uD83D\uDCCB Proiecte"
-                                    }),
-                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                                        style: {
-                                            margin: "0.5rem 0",
-                                            fontSize: "2rem",
-                                            fontWeight: "bold",
-                                            color: "#28a745"
-                                        },
-                                        children: stats?.proiecte?.total || 0
-                                    }),
-                                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
-                                        style: {
-                                            margin: 0,
-                                            fontSize: "14px",
-                                            color: "#6c757d"
-                                        },
-                                        children: [
-                                            stats?.proiecte?.active || 0,
-                                            " active • ",
-                                            stats?.proiecte?.finalizate || 0,
-                                            " finalizate"
-                                        ]
-                                    })
-                                ]
-                            })
+                            children: [
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                    style: {
+                                        fontSize: "2.5rem",
+                                        marginBottom: "0.5rem"
+                                    },
+                                    children: "\uD83D\uDCCB"
+                                }),
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                    style: {
+                                        fontSize: "2.5rem",
+                                        fontWeight: "700",
+                                        color: "#1f2937",
+                                        marginBottom: "0.5rem"
+                                    },
+                                    children: stats?.proiecte?.total || 0
+                                }),
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                    style: {
+                                        fontSize: "1rem",
+                                        fontWeight: "600",
+                                        color: "#1f2937",
+                                        marginBottom: "0.25rem"
+                                    },
+                                    children: "Proiecte Total"
+                                }),
+                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                    style: {
+                                        fontSize: "0.875rem",
+                                        color: "#6b7280"
+                                    },
+                                    children: [
+                                        stats?.proiecte?.active || 0,
+                                        " active • ",
+                                        stats?.proiecte?.finalizate || 0,
+                                        " finalizate"
+                                    ]
+                                })
+                            ]
                         })
                     }),
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
+                        variant: "primary",
+                        size: "sm",
                         children: /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                            style: {
+                                textAlign: "center"
+                            },
                             children: [
-                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        color: "#6c757d",
-                                        fontSize: "14px",
-                                        textTransform: "uppercase"
+                                        fontSize: "2.5rem",
+                                        marginBottom: "0.5rem"
                                     },
-                                    children: "\uD83D\uDC65 Clienți"
+                                    children: "\uD83D\uDC65"
                                 }),
-                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: "0.5rem 0",
-                                        fontSize: "2rem",
-                                        fontWeight: "bold",
-                                        color: "#007bff"
+                                        fontSize: "2.5rem",
+                                        fontWeight: "700",
+                                        color: "#1f2937",
+                                        marginBottom: "0.5rem"
                                     },
                                     children: stats?.clienti?.total || 0
                                 }),
-                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        fontSize: "14px",
-                                        color: "#6c757d"
+                                        fontSize: "1rem",
+                                        fontWeight: "600",
+                                        color: "#1f2937",
+                                        marginBottom: "0.25rem"
+                                    },
+                                    children: "Clienți Total"
+                                }),
+                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                    style: {
+                                        fontSize: "0.875rem",
+                                        color: "#6b7280"
                                     },
                                     children: [
                                         stats?.clienti?.activi || 0,
-                                        " activi"
+                                        " clienți activi"
                                     ]
                                 })
                             ]
                         })
                     }),
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
+                        variant: "warning",
+                        size: "sm",
                         children: /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                            style: {
+                                textAlign: "center"
+                            },
                             children: [
-                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        color: "#6c757d",
-                                        fontSize: "14px",
-                                        textTransform: "uppercase"
+                                        fontSize: "2.5rem",
+                                        marginBottom: "0.5rem"
                                     },
-                                    children: "\uD83D\uDCC4 Contracte"
+                                    children: "\uD83D\uDCC4"
                                 }),
-                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: "0.5rem 0",
-                                        fontSize: "2rem",
-                                        fontWeight: "bold",
-                                        color: "#ffc107"
+                                        fontSize: "2.5rem",
+                                        fontWeight: "700",
+                                        color: "#1f2937",
+                                        marginBottom: "0.5rem"
                                     },
                                     children: stats?.contracte?.total || 0
                                 }),
-                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        fontSize: "14px",
-                                        color: "#6c757d"
+                                        fontSize: "1rem",
+                                        fontWeight: "600",
+                                        color: "#1f2937",
+                                        marginBottom: "0.25rem"
+                                    },
+                                    children: "Contracte Total"
+                                }),
+                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                    style: {
+                                        fontSize: "0.875rem",
+                                        color: "#6b7280"
                                     },
                                     children: [
                                         stats?.contracte?.active || 0,
-                                        " \xeen curs"
+                                        " contracte \xeen curs"
                                     ]
                                 })
                             ]
                         })
                     }),
-                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
+                        variant: "danger",
+                        size: "sm",
                         children: /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                            style: {
+                                textAlign: "center"
+                            },
                             children: [
-                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        color: "#6c757d",
-                                        fontSize: "14px",
-                                        textTransform: "uppercase"
+                                        fontSize: "2.5rem",
+                                        marginBottom: "0.5rem"
                                     },
-                                    children: "\uD83D\uDCB0 Financiar"
+                                    children: "\uD83D\uDCB0"
                                 }),
-                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                     style: {
-                                        margin: "0.5rem 0",
-                                        fontSize: "2rem",
-                                        fontWeight: "bold",
-                                        color: "#dc3545"
+                                        fontSize: "2.5rem",
+                                        fontWeight: "700",
+                                        color: "#1f2937",
+                                        marginBottom: "0.5rem"
                                     },
                                     children: [
                                         stats?.financiar?.venit_luna || 0,
-                                        " €"
+                                        "€"
                                     ]
                                 }),
-                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("p", {
+                                /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                     style: {
-                                        margin: 0,
-                                        fontSize: "14px",
-                                        color: "#6c757d"
+                                        fontSize: "1rem",
+                                        fontWeight: "600",
+                                        color: "#1f2937",
+                                        marginBottom: "0.25rem"
+                                    },
+                                    children: "Venit Luna Curentă"
+                                }),
+                                /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                    style: {
+                                        fontSize: "0.875rem",
+                                        color: "#6b7280"
                                     },
                                     children: [
                                         stats?.financiar?.de_incasat || 0,
-                                        " € de \xeencasat"
+                                        "€ de \xeencasat"
                                     ]
                                 })
                             ]
@@ -661,258 +729,365 @@ function RapoarteDashboard() {
             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                 style: {
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                    gap: "1.5rem"
+                    gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+                    gap: "1.5rem",
+                    marginBottom: "2rem"
                 },
                 children: [
-                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
                         children: [
                             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                 style: {
                                     display: "flex",
-                                    justifyContent: "space-between",
                                     alignItems: "center",
+                                    justifyContent: "space-between",
                                     marginBottom: "1rem"
                                 },
                                 children: [
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
                                         style: {
                                             margin: 0,
-                                            color: "#2c3e50"
+                                            fontSize: "1.25rem",
+                                            fontWeight: "700",
+                                            color: "#1f2937"
                                         },
-                                        children: "\uD83D\uDCCB Proiecte Active"
+                                        children: "\uD83D\uDCCB Management Proiecte"
                                     }),
-                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                        style: {
+                                            fontSize: "1.5rem"
+                                        },
+                                        children: "\uD83D\uDE80"
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    color: "#6b7280",
+                                    margin: "0 0 1.5rem 0",
+                                    fontSize: "0.875rem"
+                                },
+                                children: "Creează, monitorizează și gestionează proiectele active. Vizualizează progresul și statusul fiecărui proiect."
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    gap: "0.75rem",
+                                    flexWrap: "wrap"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
                                         href: "/admin/rapoarte/proiecte",
                                         style: {
-                                            color: "#007bff",
-                                            textDecoration: "none",
-                                            fontSize: "14px"
+                                            textDecoration: "none"
                                         },
-                                        children: "Vezi toate →"
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "success",
+                                            size: "sm",
+                                            icon: "\uD83D\uDCCA",
+                                            children: "Vezi Proiecte"
+                                        })
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/proiecte",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "outline",
+                                            size: "sm",
+                                            icon: "+",
+                                            children: "Proiect Nou"
+                                        })
                                     })
                                 ]
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                                style: {
-                                    color: "#6c757d",
-                                    margin: 0
-                                },
-                                children: "Ultimele proiecte \xeen desfășurare și statusul lor actual."
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                                style: {
-                                    marginTop: "1rem"
-                                },
-                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
-                                    href: "/admin/rapoarte/proiecte",
-                                    style: {
-                                        display: "inline-block",
-                                        padding: "0.5rem 1rem",
-                                        background: "#28a745",
-                                        color: "white",
-                                        textDecoration: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px"
-                                    },
-                                    children: "\uD83D\uDCCA Deschide Raportul"
-                                })
                             })
                         ]
                     }),
-                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
                         children: [
                             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                 style: {
                                     display: "flex",
-                                    justifyContent: "space-between",
                                     alignItems: "center",
+                                    justifyContent: "space-between",
                                     marginBottom: "1rem"
                                 },
                                 children: [
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
                                         style: {
                                             margin: 0,
-                                            color: "#2c3e50"
+                                            fontSize: "1.25rem",
+                                            fontWeight: "700",
+                                            color: "#1f2937"
                                         },
-                                        children: "\uD83D\uDC65 Clienți Activi"
+                                        children: "\uD83D\uDC65 Management Clienți"
                                     }),
-                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                        style: {
+                                            fontSize: "1.5rem"
+                                        },
+                                        children: "\uD83E\uDD1D"
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    color: "#6b7280",
+                                    margin: "0 0 1.5rem 0",
+                                    fontSize: "0.875rem"
+                                },
+                                children: "Gestionează baza de clienți, informații de contact și integrarea cu ANAF pentru validarea datelor."
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    gap: "0.75rem",
+                                    flexWrap: "wrap"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
                                         href: "/admin/rapoarte/clienti",
                                         style: {
-                                            color: "#007bff",
-                                            textDecoration: "none",
-                                            fontSize: "14px"
+                                            textDecoration: "none"
                                         },
-                                        children: "Vezi toate →"
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "primary",
+                                            size: "sm",
+                                            icon: "\uD83D\uDCCA",
+                                            children: "Vezi Clienți"
+                                        })
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/clienti",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "outline",
+                                            size: "sm",
+                                            icon: "+",
+                                            children: "Client Nou"
+                                        })
                                     })
                                 ]
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
-                                style: {
-                                    color: "#6c757d",
-                                    margin: 0
-                                },
-                                children: "Lista clienților cu proiecte active și contracte \xeen curs."
-                            }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
-                                style: {
-                                    marginTop: "1rem"
-                                },
-                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
-                                    href: "/admin/rapoarte/clienti",
-                                    style: {
-                                        display: "inline-block",
-                                        padding: "0.5rem 1rem",
-                                        background: "#007bff",
-                                        color: "white",
-                                        textDecoration: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px"
-                                    },
-                                    children: "\uD83D\uDCCA Deschide Raportul"
-                                })
                             })
                         ]
                     }),
-                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
-                        style: {
-                            background: "white",
-                            borderRadius: "8px",
-                            padding: "1.5rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            border: "1px solid #dee2e6"
-                        },
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
                         children: [
                             /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                 style: {
                                     display: "flex",
-                                    justifyContent: "space-between",
                                     alignItems: "center",
+                                    justifyContent: "space-between",
                                     marginBottom: "1rem"
                                 },
                                 children: [
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
                                         style: {
                                             margin: 0,
-                                            color: "#2c3e50"
+                                            fontSize: "1.25rem",
+                                            fontWeight: "700",
+                                            color: "#1f2937"
                                         },
-                                        children: "\uD83D\uDCB0 Situația Financiară"
+                                        children: "\uD83D\uDCC4 Management Contracte"
                                     }),
-                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
-                                        href: "/admin/rapoarte/financiar",
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
                                         style: {
-                                            color: "#007bff",
-                                            textDecoration: "none",
-                                            fontSize: "14px"
+                                            fontSize: "1.5rem"
                                         },
-                                        children: "Vezi toate →"
+                                        children: "\uD83D\uDCDD"
                                     })
                                 ]
                             }),
                             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
                                 style: {
-                                    color: "#6c757d",
-                                    margin: 0
+                                    color: "#6b7280",
+                                    margin: "0 0 1.5rem 0",
+                                    fontSize: "0.875rem"
                                 },
-                                children: "\xcencasări, plăți, facturi și situația financiară generală."
+                                children: "Creează și gestionează contractele cu clienții. Urmărește statusul și etapele de implementare."
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                 style: {
-                                    marginTop: "1rem"
+                                    display: "flex",
+                                    gap: "0.75rem",
+                                    flexWrap: "wrap"
                                 },
-                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
-                                    href: "/admin/rapoarte/financiar",
-                                    style: {
-                                        display: "inline-block",
-                                        padding: "0.5rem 1rem",
-                                        background: "#dc3545",
-                                        color: "white",
-                                        textDecoration: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px"
-                                    },
-                                    children: "\uD83D\uDCCA Deschide Raportul"
-                                })
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/contracte",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "warning",
+                                            size: "sm",
+                                            icon: "\uD83D\uDCCA",
+                                            children: "Vezi Contracte"
+                                        })
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/contracte",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "outline",
+                                            size: "sm",
+                                            icon: "+",
+                                            children: "Contract Nou"
+                                        })
+                                    })
+                                ]
+                            })
+                        ]
+                    }),
+                    /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
+                        children: [
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: "1rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                        style: {
+                                            margin: 0,
+                                            fontSize: "1.25rem",
+                                            fontWeight: "700",
+                                            color: "#1f2937"
+                                        },
+                                        children: "\uD83D\uDCCB Management Facturi"
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                        style: {
+                                            fontSize: "1.5rem"
+                                        },
+                                        children: "\uD83D\uDCBC"
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("p", {
+                                style: {
+                                    color: "#6b7280",
+                                    margin: "0 0 1.5rem 0",
+                                    fontSize: "0.875rem"
+                                },
+                                children: "Generează și gestionează facturile. Integrare ANAF pentru facturare electronică și raportări."
+                            }),
+                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                style: {
+                                    display: "flex",
+                                    gap: "0.75rem",
+                                    flexWrap: "wrap"
+                                },
+                                children: [
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/facturi",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "danger",
+                                            size: "sm",
+                                            icon: "\uD83D\uDCCA",
+                                            children: "Vezi Facturi"
+                                        })
+                                    }),
+                                    /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                        href: "/admin/rapoarte/facturi",
+                                        style: {
+                                            textDecoration: "none"
+                                        },
+                                        children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                            variant: "outline",
+                                            size: "sm",
+                                            icon: "+",
+                                            children: "Factură Nouă"
+                                        })
+                                    })
+                                ]
                             })
                         ]
                     })
                 ]
             }),
-            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
-                style: {
-                    marginTop: "3rem",
-                    background: "white",
-                    borderRadius: "8px",
-                    padding: "1.5rem",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    border: "1px solid #dee2e6"
-                },
+            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Card */ .Zb, {
                 children: [
                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
                         style: {
-                            marginBottom: "1rem",
-                            color: "#2c3e50"
+                            margin: "0 0 1.5rem 0",
+                            fontSize: "1.25rem",
+                            fontWeight: "700",
+                            color: "#1f2937"
                         },
                         children: "\uD83D\uDE80 Acțiuni Rapide"
                     }),
                     /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                         style: {
-                            display: "flex",
-                            gap: "1rem",
-                            flexWrap: "wrap"
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                            gap: "1rem"
                         },
                         children: [
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
                                 href: "/admin/rapoarte/proiecte",
                                 style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#28a745",
-                                    color: "white",
-                                    textDecoration: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "14px"
+                                    textDecoration: "none"
                                 },
-                                children: "+ Proiect Nou"
+                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                    variant: "success",
+                                    size: "md",
+                                    icon: "\uD83D\uDCCB",
+                                    style: {
+                                        width: "100%"
+                                    },
+                                    children: "Proiect Nou"
+                                })
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_2___default()), {
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
                                 href: "/admin/rapoarte/clienti",
                                 style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#007bff",
-                                    color: "white",
-                                    textDecoration: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "14px"
+                                    textDecoration: "none"
                                 },
-                                children: "+ Client Nou"
+                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                    variant: "primary",
+                                    size: "md",
+                                    icon: "\uD83D\uDC65",
+                                    style: {
+                                        width: "100%"
+                                    },
+                                    children: "Client Nou"
+                                })
                             }),
-                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
-                                onClick: ()=>alert("Funcționalitate \xeen dezvoltare"),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx((next_link__WEBPACK_IMPORTED_MODULE_5___default()), {
+                                href: "/admin/rapoarte/contracte",
                                 style: {
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#ffc107",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    fontSize: "14px",
-                                    cursor: "pointer"
+                                    textDecoration: "none"
                                 },
-                                children: "\uD83D\uDCCA Export General"
+                                children: /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                    variant: "warning",
+                                    size: "md",
+                                    icon: "\uD83D\uDCC4",
+                                    style: {
+                                        width: "100%"
+                                    },
+                                    children: "Contract Nou"
+                                })
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_app_components_ui__WEBPACK_IMPORTED_MODULE_7__/* .Button */ .zx, {
+                                variant: "secondary",
+                                size: "md",
+                                icon: "\uD83D\uDCCA",
+                                style: {
+                                    width: "100%"
+                                },
+                                onClick: ()=>alert("Export general \xeen dezvoltare"),
+                                children: "Export General"
                             })
                         ]
                     })
@@ -958,7 +1133,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,2322,4646,9850,6166,6549], () => (__webpack_exec__(88154)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,1440,8045,8313,9850,6166,6128,6549], () => (__webpack_exec__(88154)));
 module.exports = __webpack_exports__;
 
 })();

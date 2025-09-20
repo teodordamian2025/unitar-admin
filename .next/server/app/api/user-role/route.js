@@ -264,6 +264,7 @@ var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: ./node_modules/@google-cloud/bigquery/build/src/index.js
 var src = __webpack_require__(63452);
 ;// CONCATENATED MODULE: ./app/api/user-role/route.ts
+// app/api/user-role/route.ts
 
 
 const bigquery = new src.BigQuery({

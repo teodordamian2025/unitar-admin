@@ -1535,14 +1535,19 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       });
 
       // NOUĂ: Pregătește etapele pentru update statusuri cu compatibilitate EditFacturaModal
-      const etapeFacturate = liniiFactura.filter(linie => 
-        (linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') && 
+      const etapeFacturate = liniiFactura.filter(linie =>
+        (linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') &&
         (linie.etapa_id || linie.anexa_id)
       ).map(linie => ({
         tip: linie.tip,
         id: linie.etapa_id || linie.anexa_id,
         contract_id: linie.contract_id,
-        subproiect_id: linie.subproiect_id
+        subproiect_id: linie.subproiect_id,
+        // ✅ FIX CRUCIAL: Include valorile pentru BigQuery EtapeFacturi
+        valoare: linie.valoareOriginala || (linie.pretUnitar * linie.cantitate), // Valoarea în moneda originală
+        moneda: linie.monedaOriginala || 'RON',
+        valoare_ron: linie.pretUnitar * linie.cantitate, // Valoarea convertită în RON
+        curs_valutar: linie.cursValutar || 1
       }));
 
       console.log('📋 [EDIT-COMPAT] Etape pentru transmitere la API:', {

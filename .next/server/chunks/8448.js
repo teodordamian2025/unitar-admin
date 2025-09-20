@@ -2507,7 +2507,7 @@ Object.defineProperty(exports, "fetchServerResponse", ({
         return fetchServerResponse;
     }
 }));
-const _client = __webpack_require__(64119);
+const _client = __webpack_require__(67597);
 const _approuterheaders = __webpack_require__(66265);
 const _approuter = __webpack_require__(52987);
 const _appcallserver = __webpack_require__(56937);
@@ -3848,7 +3848,7 @@ const _appcallserver = __webpack_require__(56937);
 const _approuterheaders = __webpack_require__(66265);
 const _createrecordfromthenable = __webpack_require__(14621);
 const _readrecordvalue = __webpack_require__(22401);
-const _client = __webpack_require__(64119);
+const _client = __webpack_require__(67597);
 const _addbasepath = __webpack_require__(24578);
 const _createhreffromurl = __webpack_require__(34331);
 const _navigatereducer = __webpack_require__(9962);

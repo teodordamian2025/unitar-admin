@@ -28,7 +28,7 @@ module.exports = require("next/dist/compiled/react-experimental/jsx-runtime");
 
 /***/ }),
 
-/***/ 64119:
+/***/ 67597:
 /***/ ((module) => {
 
 "use strict";
@@ -443,7 +443,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(57114);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_2__);
 /* harmony import */ var react_toastify__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(7365);
+/* harmony import */ var _components_ContractModal__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(17509);
+// ==================================================================
+// CALEA: app/admin/rapoarte/proiecte/[id]/page.tsx
+// DATA: 31.08.2025 13:00 (ora României)
+// MODIFICAT: Integrat ContractModal funcțional
+// PĂSTRATE: Toate funcționalitățile existente
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
+
 
 
 
@@ -451,16 +459,17 @@ __webpack_require__.r(__webpack_exports__);
 function ProiectDetailsPage() {
     const router = (0,next_navigation__WEBPACK_IMPORTED_MODULE_2__.useRouter)();
     const params = (0,next_navigation__WEBPACK_IMPORTED_MODULE_2__.useParams)();
-    const proiectId = params?.id; // Adăugat optional chaining
+    const proiectId = params?.id;
     const [proiect, setProiect] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(null);
     const [loading, setLoading] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(true);
     const [editing, setEditing] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     const [isGeneratingInvoice, setIsGeneratingInvoice] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    // State pentru ContractModal
+    const [showContractModal, setShowContractModal] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(()=>{
         if (proiectId) {
             fetchProiectDetails();
         } else {
-            // Dacă nu avem ID, redirectionează înapoi
             router.push("/admin/rapoarte/proiecte");
         }
     }, [
@@ -468,7 +477,7 @@ function ProiectDetailsPage() {
         router
     ]);
     const fetchProiectDetails = async ()=>{
-        if (!proiectId) return; // Verificare suplimentară
+        if (!proiectId) return;
         try {
             const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`);
             if (response.ok) {
@@ -489,7 +498,7 @@ function ProiectDetailsPage() {
         if (!proiect) return;
         setIsGeneratingInvoice(true);
         try {
-            react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.info("Se generează factura PDF...");
+            react_toastify__WEBPACK_IMPORTED_MODULE_3__.toast.info("Se generează factura PDF...");
             const response = await fetch("/api/actions/invoices/generate-hibrid", {
                 method: "POST",
                 headers: {
@@ -510,8 +519,7 @@ function ProiectDetailsPage() {
             });
             const result = await response.json();
             if (result.success) {
-                react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.success("Factură PDF generată cu succes!");
-                // Download automat
+                react_toastify__WEBPACK_IMPORTED_MODULE_3__.toast.success("Factură PDF generată cu succes!");
                 if (result.downloadUrl) {
                     window.open(result.downloadUrl, "_blank");
                 }
@@ -520,10 +528,17 @@ function ProiectDetailsPage() {
             }
         } catch (error) {
             console.error("Eroare factură:", error);
-            react_toastify__WEBPACK_IMPORTED_MODULE_3__/* .toast */ .Am.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
+            react_toastify__WEBPACK_IMPORTED_MODULE_3__.toast.error(`Eroare la generarea facturii: ${error instanceof Error ? error.message : "Eroare necunoscută"}`);
         } finally{
             setIsGeneratingInvoice(false);
         }
+    };
+    // Handler pentru succesul contractului
+    const handleContractSuccess = ()=>{
+        react_toastify__WEBPACK_IMPORTED_MODULE_3__.toast.success("Contract procesat cu succes!");
+        setShowContractModal(false);
+    // Opțional: refresh datele proiectului dacă e nevoie
+    // fetchProiectDetails();
     };
     const renderStatus = (status)=>{
         const statusConfig = {
@@ -579,9 +594,14 @@ function ProiectDetailsPage() {
         }
         return new Date(data).toLocaleDateString("ro-RO");
     };
-    const renderValoare = (valoare)=>{
+    const renderValoare = (valoare, moneda)=>{
         if (!valoare) return "-";
         const amount = typeof valoare === "string" ? parseFloat(valoare) : valoare;
+        if (moneda && moneda !== "RON") {
+            return `${amount.toLocaleString("ro-RO", {
+                minimumFractionDigits: 2
+            })} ${moneda}`;
+        }
         return new Intl.NumberFormat("ro-RO", {
             style: "currency",
             currency: "RON"
@@ -722,7 +742,7 @@ function ProiectDetailsPage() {
                                 children: "✏️ Editează"
                             }),
                             /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
-                                onClick: ()=>alert("Generare contract \xeen dezvoltare"),
+                                onClick: ()=>setShowContractModal(true),
                                 style: {
                                     padding: "0.75rem 1.5rem",
                                     background: "#28a745",
@@ -834,13 +854,65 @@ function ProiectDetailsPage() {
                                                 },
                                                 children: "Valoare Estimată"
                                             }),
-                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                            /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                                                 style: {
                                                     color: "#6c757d",
                                                     fontSize: "1.1rem",
                                                     fontWeight: 500
                                                 },
-                                                children: renderValoare(proiect.Valoare_Estimata)
+                                                children: [
+                                                    renderValoare(proiect.Valoare_Estimata, proiect.moneda),
+                                                    proiect.moneda && proiect.moneda !== "RON" && proiect.valoare_ron && /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                                        style: {
+                                                            fontSize: "0.9rem",
+                                                            color: "#8e8e93",
+                                                            marginTop: "0.25rem"
+                                                        },
+                                                        children: [
+                                                            "(",
+                                                            renderValoare(proiect.valoare_ron, "RON"),
+                                                            ")"
+                                                        ]
+                                                    })
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    proiect.Responsabil && /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    fontWeight: 500,
+                                                    color: "#495057",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "Responsabil"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                                style: {
+                                                    color: "#6c757d"
+                                                },
+                                                children: proiect.Responsabil
+                                            })
+                                        ]
+                                    }),
+                                    proiect.Adresa && /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("label", {
+                                                style: {
+                                                    display: "block",
+                                                    fontWeight: 500,
+                                                    color: "#495057",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "Adresă"
+                                            }),
+                                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                                style: {
+                                                    color: "#6c757d"
+                                                },
+                                                children: proiect.Adresa
                                             })
                                         ]
                                     })
@@ -870,7 +942,7 @@ function ProiectDetailsPage() {
                                 },
                                 children: [
                                     /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("button", {
-                                        onClick: ()=>alert("Generare contract \xeen dezvoltare"),
+                                        onClick: ()=>setShowContractModal(true),
                                         style: {
                                             padding: "0.75rem",
                                             background: "#28a745",
@@ -930,6 +1002,32 @@ function ProiectDetailsPage() {
                             })
                         ]
                     }),
+                    proiect.Descriere && /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
+                        style: {
+                            background: "white",
+                            borderRadius: "8px",
+                            padding: "1.5rem",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                            gridColumn: "span 2"
+                        },
+                        children: [
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("h3", {
+                                style: {
+                                    margin: "0 0 1rem 0",
+                                    color: "#2c3e50"
+                                },
+                                children: "\uD83D\uDCDD Descriere Proiect"
+                            }),
+                            /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx("div", {
+                                style: {
+                                    color: "#6c757d",
+                                    lineHeight: "1.6",
+                                    whiteSpace: "pre-wrap"
+                                },
+                                children: proiect.Descriere
+                            })
+                        ]
+                    }),
                     /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", {
                         style: {
                             background: "white",
@@ -956,6 +1054,23 @@ function ProiectDetailsPage() {
                         ]
                     })
                 ]
+            }),
+            showContractModal && proiect && /*#__PURE__*/ react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx(_components_ContractModal__WEBPACK_IMPORTED_MODULE_4__/* ["default"] */ .Z, {
+                proiect: {
+                    ID_Proiect: proiect.ID_Proiect,
+                    Denumire: proiect.Denumire,
+                    Client: proiect.Client,
+                    Status: proiect.Status,
+                    Valoare_Estimata: proiect.Valoare_Estimata,
+                    Data_Start: proiect.Data_Start,
+                    Data_Final: proiect.Data_Final,
+                    moneda: proiect.moneda,
+                    valoare_ron: proiect.valoare_ron,
+                    curs_valutar: proiect.curs_valutar
+                },
+                isOpen: showContractModal,
+                onClose: ()=>setShowContractModal(false),
+                onSuccess: handleContractSuccess
             })
         ]
     });
@@ -997,7 +1112,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,2322,7365,4646,9850,6166,6549], () => (__webpack_exec__(59039)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,1440,8313,9850,6166,6549,7509], () => (__webpack_exec__(59039)));
 module.exports = __webpack_exports__;
 
 })();

@@ -28,7 +28,7 @@ module.exports = require("next/dist/compiled/react-experimental/jsx-runtime");
 
 /***/ }),
 
-/***/ 64119:
+/***/ 67597:
 /***/ ((module) => {
 
 "use strict";
@@ -435,8 +435,18 @@ __webpack_require__.d(__webpack_exports__, {
 var jsx_runtime_ = __webpack_require__(76931);
 // EXTERNAL MODULE: external "next/dist/compiled/react-experimental"
 var react_experimental_ = __webpack_require__(17640);
+// EXTERNAL MODULE: ./node_modules/react-firebase-hooks/auth/dist/index.cjs.js
+var index_cjs = __webpack_require__(75792);
+// EXTERNAL MODULE: ./lib/firebaseConfig.ts
+var firebaseConfig = __webpack_require__(79850);
+// EXTERNAL MODULE: ./node_modules/next/navigation.js
+var navigation = __webpack_require__(57114);
 // EXTERNAL MODULE: ./node_modules/react-toastify/dist/index.mjs + 1 modules
 var dist = __webpack_require__(7365);
+// EXTERNAL MODULE: ./app/components/ModernLayout.tsx
+var ModernLayout = __webpack_require__(56128);
+// EXTERNAL MODULE: ./app/components/ui/index.ts + 6 modules
+var ui = __webpack_require__(79877);
 // EXTERNAL MODULE: ./app/admin/rapoarte/clienti/components/ClientNouModal.tsx + 1 modules
 var ClientNouModal = __webpack_require__(19518);
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/clienti/components/ClientEditModal.tsx
@@ -1254,37 +1264,63 @@ function ClientEditModal({ isOpen, onClose, onClientUpdated, client }) {
 }
 
 ;// CONCATENATED MODULE: ./app/admin/rapoarte/clienti/page.tsx
+// ==================================================================
+// CALEA: app/admin/rapoarte/clienti/page.tsx
+// DATA: 19.09.2025 22:00 (ora României)
+// DESCRIERE: Management Clienți modernizat cu design glassmorphism
+// FUNCȚIONALITATE: CRUD clienți cu integrare ANAF și UI modern
+// ==================================================================
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
 
 
+
+
+
+
+
 function ClientiPage() {
+    const [user, loading] = (0,index_cjs/* useAuthState */.F_)(firebaseConfig/* auth */.I);
+    const router = (0,navigation.useRouter)();
     const [clienti, setClienti] = (0,react_experimental_.useState)([]);
-    const [loading, setLoading] = (0,react_experimental_.useState)(true);
+    const [loadingData, setLoadingData] = (0,react_experimental_.useState)(true);
     const [showModal, setShowModal] = (0,react_experimental_.useState)(false);
     const [showEditModal, setShowEditModal] = (0,react_experimental_.useState)(false);
     const [selectedClient, setSelectedClient] = (0,react_experimental_.useState)(null);
+    const [displayName, setDisplayName] = (0,react_experimental_.useState)("Utilizator");
+    const [userRole, setUserRole] = (0,react_experimental_.useState)("user");
     (0,react_experimental_.useEffect)(()=>{
+        if (loading) return;
+        if (!user) {
+            router.push("/login");
+            return;
+        }
+        setDisplayName(localStorage.getItem("displayName") || "Utilizator");
+        setUserRole(localStorage.getItem("userRole") || "user");
         loadClienti();
-    }, []);
+    }, [
+        user,
+        loading,
+        router
+    ]);
     const loadClienti = async ()=>{
         try {
-            setLoading(true);
+            setLoadingData(true);
             const response = await fetch("/api/rapoarte/clienti");
             const data = await response.json();
             if (data.success) {
                 setClienti(data.data || []);
             } else {
-                dist/* toast */.Am.error("Eroare la \xeencărcarea clienților");
+                dist.toast.error("Eroare la \xeencărcarea clienților");
                 setClienti([]);
             }
         } catch (error) {
             console.error("Eroare la \xeencărcarea clienților:", error);
-            dist/* toast */.Am.error("Eroare de conectare");
+            dist.toast.error("Eroare de conectare");
             setClienti([]);
         } finally{
-            setLoading(false);
+            setLoadingData(false);
         }
     };
     const handleEditClient = (client)=>{
@@ -1300,14 +1336,14 @@ function ClientiPage() {
             });
             const result = await response.json();
             if (result.success) {
-                dist/* toast */.Am.success(`Clientul "${numeClient}" a fost șters cu succes`);
+                dist.toast.success(`Clientul "${numeClient}" a fost șters cu succes`);
                 loadClienti(); // Reîncarcă lista
             } else {
-                dist/* toast */.Am.error(`Eroare la ștergerea clientului: ${result.error}`);
+                dist.toast.error(`Eroare la ștergerea clientului: ${result.error}`);
             }
         } catch (error) {
             console.error("Eroare la ștergerea clientului:", error);
-            dist/* toast */.Am.error("Eroare la ștergerea clientului");
+            dist.toast.error("Eroare la ștergerea clientului");
         }
     };
     const getTipClientIcon = (tip)=>{
@@ -1331,383 +1367,377 @@ function ClientiPage() {
                 return tip;
         }
     };
-    if (loading) {
-        return /*#__PURE__*/ jsx_runtime_.jsx("div", {
-            style: {
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "300px",
-                fontSize: "16px",
-                color: "#7f8c8d"
-            },
-            children: "⏳ Se \xeencarcă clienții..."
+    if (loading || loadingData) {
+        return /*#__PURE__*/ jsx_runtime_.jsx(ui/* LoadingSpinner */.TK, {
+            overlay: true,
+            message: "Se \xeencarcă clienții..."
         });
     }
-    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-        style: {
-            padding: "1.5rem"
-        },
+    return /*#__PURE__*/ (0,jsx_runtime_.jsxs)(ModernLayout/* default */.Z, {
+        user: user,
+        displayName: displayName,
+        userRole: userRole,
         children: [
             /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                 style: {
-                    marginBottom: "2rem",
-                    borderBottom: "2px solid #e9ecef",
-                    paddingBottom: "1rem"
-                },
-                children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("h1", {
-                        style: {
-                            margin: 0,
-                            color: "#2c3e50",
-                            fontSize: "2rem",
-                            fontWeight: "bold"
-                        },
-                        children: "\uD83D\uDC65 Management Clienți"
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        style: {
-                            margin: "0.5rem 0 0 0",
-                            color: "#7f8c8d",
-                            fontSize: "1.1rem"
-                        },
-                        children: "Gestionează clienții și sincronizează cu ANAF"
-                    })
-                ]
-            }),
-            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
-                style: {
                     display: "flex",
-                    justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: "1.5rem",
-                    padding: "1rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6"
+                    justifyContent: "space-between",
+                    marginBottom: "2rem"
                 },
                 children: [
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         children: [
-                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("h3", {
+                            /*#__PURE__*/ jsx_runtime_.jsx("h1", {
                                 style: {
-                                    margin: 0,
-                                    color: "#2c3e50"
+                                    margin: "0 0 0.5rem 0",
+                                    fontSize: "2rem",
+                                    fontWeight: "700",
+                                    color: "#1f2937"
                                 },
-                                children: [
-                                    "\uD83D\uDC65 Clienți găsiți: ",
-                                    clienti.length
-                                ]
+                                children: "\uD83D\uDC65 Management Clienți"
                             }),
                             /*#__PURE__*/ jsx_runtime_.jsx("p", {
                                 style: {
-                                    margin: "0.25rem 0 0 0",
-                                    fontSize: "14px",
-                                    color: "#7f8c8d"
+                                    margin: 0,
+                                    color: "#6b7280"
                                 },
-                                children: "Clienți activi \xeen baza de date"
+                                children: "Gestionează clienții și sincronizează cu ANAF"
                             })
                         ]
                     }),
                     /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                         style: {
                             display: "flex",
-                            gap: "0.5rem"
+                            gap: "0.75rem"
                         },
                         children: [
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                onClick: ()=>setShowModal(true),
-                                style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#27ae60",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    fontWeight: "bold"
-                                },
-                                children: "+ Client Nou"
-                            }),
-                            /*#__PURE__*/ jsx_runtime_.jsx("button", {
+                            /*#__PURE__*/ jsx_runtime_.jsx(ui/* Button */.zx, {
+                                variant: "outline",
+                                size: "sm",
+                                icon: "\uD83D\uDD04",
                                 onClick: loadClienti,
-                                style: {
-                                    padding: "0.5rem 1rem",
-                                    background: "#f39c12",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    fontSize: "14px",
-                                    fontWeight: "bold"
-                                },
-                                children: "\uD83D\uDD04 Re\xeemprospătează"
+                                loading: loadingData,
+                                children: "Re\xeemprospătează"
+                            }),
+                            /*#__PURE__*/ jsx_runtime_.jsx(ui/* Button */.zx, {
+                                variant: "success",
+                                size: "sm",
+                                icon: "+",
+                                onClick: ()=>setShowModal(true),
+                                children: "Client Nou"
                             })
                         ]
                     })
                 ]
             }),
-            clienti.length === 0 ? /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+            /*#__PURE__*/ jsx_runtime_.jsx(ui/* Card */.Zb, {
+                variant: "info",
+                size: "sm",
                 style: {
-                    textAlign: "center",
-                    padding: "3rem",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    border: "2px dashed #dee2e6"
+                    marginBottom: "2rem"
                 },
-                children: [
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        style: {
-                            fontSize: "18px",
-                            color: "#7f8c8d",
-                            margin: 0
-                        },
-                        children: "\uD83D\uDC65 Nu au fost găsiți clienți"
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("p", {
-                        style: {
-                            fontSize: "14px",
-                            color: "#bdc3c7",
-                            margin: "0.5rem 0"
-                        },
-                        children: "Adaugă primul client sau importă din ANAF"
-                    }),
-                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                        style: {
-                            marginTop: "1rem"
-                        },
-                        children: /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                            onClick: ()=>setShowModal(true),
-                            style: {
-                                padding: "0.75rem 1.5rem",
-                                background: "#27ae60",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontSize: "16px",
-                                fontWeight: "bold"
-                            },
-                            children: "+ Adaugă Client"
-                        })
-                    })
-                ]
-            }) : /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                style: {
-                    background: "white",
-                    borderRadius: "8px",
-                    border: "1px solid #dee2e6",
-                    overflow: "hidden",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                },
-                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("table", {
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                     style: {
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "14px"
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
                     },
                     children: [
-                        /*#__PURE__*/ jsx_runtime_.jsx("thead", {
-                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "1rem"
+                            },
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    style: {
+                                        fontSize: "2rem"
+                                    },
+                                    children: "\uD83D\uDC65"
+                                }),
+                                /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                    children: [
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            style: {
+                                                fontSize: "1.5rem",
+                                                fontWeight: "700",
+                                                color: "#1f2937"
+                                            },
+                                            children: clienti.length
+                                        }),
+                                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                            style: {
+                                                fontSize: "0.875rem",
+                                                color: "#6b7280"
+                                            },
+                                            children: "Clienți \xeen baza de date"
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                            style: {
+                                textAlign: "right",
+                                fontSize: "0.875rem",
+                                color: "#6b7280"
+                            },
+                            children: [
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    children: "Sincronizare ANAF activă"
+                                }),
+                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                    children: "Validare automată CUI/CNP"
+                                })
+                            ]
+                        })
+                    ]
+                })
+            }),
+            clienti.length === 0 ? /*#__PURE__*/ jsx_runtime_.jsx(ui/* Card */.Zb, {
+                children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                    style: {
+                        textAlign: "center",
+                        padding: "3rem"
+                    },
+                    children: [
+                        /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                            style: {
+                                fontSize: "4rem",
+                                marginBottom: "1rem"
+                            },
+                            children: "\uD83D\uDC65"
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("h3", {
+                            style: {
+                                margin: "0 0 0.5rem 0",
+                                fontSize: "1.25rem",
+                                fontWeight: "600",
+                                color: "#1f2937"
+                            },
+                            children: "Nu au fost găsiți clienți"
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx("p", {
+                            style: {
+                                margin: "0 0 2rem 0",
+                                color: "#6b7280"
+                            },
+                            children: "Adaugă primul client sau importă date din ANAF"
+                        }),
+                        /*#__PURE__*/ jsx_runtime_.jsx(ui/* Button */.zx, {
+                            variant: "success",
+                            size: "md",
+                            icon: "+",
+                            onClick: ()=>setShowModal(true),
+                            children: "Adaugă Primul Client"
+                        })
+                    ]
+                })
+            }) : /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                style: {
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
+                    gap: "1.5rem"
+                },
+                children: clienti.map((client)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)(ui/* Card */.Zb, {
+                        children: [
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                 style: {
-                                    background: "#f8f9fa",
-                                    borderBottom: "2px solid #dee2e6"
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    justifyContent: "space-between",
+                                    marginBottom: "1rem"
                                 },
                                 children: [
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                         style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "left",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.75rem"
                                         },
-                                        children: "Tip"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                        style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "left",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Nume"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                        style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "left",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "CUI/CNP"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                        style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "left",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Contact"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                        style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "left",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Localitate"
-                                    }),
-                                    /*#__PURE__*/ jsx_runtime_.jsx("th", {
-                                        style: {
-                                            padding: "1rem 0.75rem",
-                                            textAlign: "center",
-                                            fontWeight: "bold",
-                                            color: "#2c3e50"
-                                        },
-                                        children: "Acțiuni"
-                                    })
-                                ]
-                            })
-                        }),
-                        /*#__PURE__*/ jsx_runtime_.jsx("tbody", {
-                            children: clienti.map((client, index)=>/*#__PURE__*/ (0,jsx_runtime_.jsxs)("tr", {
-                                    style: {
-                                        borderBottom: "1px solid #f1f2f6",
-                                        background: index % 2 === 0 ? "white" : "#fafbfc"
-                                    },
-                                    children: [
-                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                textAlign: "center"
-                                            },
-                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                 style: {
+                                                    width: "50px",
+                                                    height: "50px",
+                                                    borderRadius: "50%",
+                                                    background: client.tip_client.includes("juridic") || client.tip_client.includes("Juridic") ? "linear-gradient(135deg, #3b82f6, #1e40af)" : "linear-gradient(135deg, #10b981, #059669)",
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    gap: "0.5rem"
+                                                    justifyContent: "center",
+                                                    fontSize: "1.5rem"
                                                 },
+                                                children: getTipClientIcon(client.tip_client)
+                                            }),
+                                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
                                                 children: [
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("h3", {
                                                         style: {
-                                                            fontSize: "18px"
+                                                            margin: 0,
+                                                            fontSize: "1.125rem",
+                                                            fontWeight: "600",
+                                                            color: "#1f2937"
                                                         },
-                                                        children: getTipClientIcon(client.tip_client)
+                                                        children: client.nume
                                                     }),
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("span", {
+                                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
                                                         style: {
-                                                            fontSize: "12px",
-                                                            color: "#7f8c8d"
+                                                            display: "inline-block",
+                                                            padding: "0.125rem 0.5rem",
+                                                            background: client.tip_client.includes("juridic") || client.tip_client.includes("Juridic") ? "#dbeafe" : "#d1fae5",
+                                                            color: client.tip_client.includes("juridic") || client.tip_client.includes("Juridic") ? "#1e40af" : "#059669",
+                                                            borderRadius: "6px",
+                                                            fontSize: "0.75rem",
+                                                            fontWeight: "500",
+                                                            marginTop: "0.25rem"
                                                         },
                                                         children: getTipClientLabel(client.tip_client)
                                                     })
                                                 ]
                                             })
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                color: "#2c3e50",
-                                                fontWeight: "bold"
-                                            },
-                                            children: client.nume
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                color: "#7f8c8d",
-                                                fontFamily: "monospace"
-                                            },
-                                            children: client.cui || client.cnp || "-"
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                color: "#2c3e50"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    children: client.email || "-"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        fontSize: "12px",
-                                                        color: "#7f8c8d"
-                                                    },
-                                                    children: client.telefon || "-"
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ (0,jsx_runtime_.jsxs)("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                color: "#2c3e50"
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    children: client.oras || "-"
-                                                }),
-                                                /*#__PURE__*/ jsx_runtime_.jsx("div", {
-                                                    style: {
-                                                        fontSize: "12px",
-                                                        color: "#7f8c8d"
-                                                    },
-                                                    children: client.judet || "-"
-                                                })
-                                            ]
-                                        }),
-                                        /*#__PURE__*/ jsx_runtime_.jsx("td", {
-                                            style: {
-                                                padding: "0.75rem",
-                                                textAlign: "center"
-                                            },
-                                            children: /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        style: {
+                                            display: "flex",
+                                            gap: "0.5rem"
+                                        },
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx(ui/* Button */.zx, {
+                                                variant: "primary",
+                                                size: "sm",
+                                                icon: "✏️",
+                                                onClick: ()=>handleEditClient(client),
                                                 style: {
-                                                    display: "flex",
-                                                    gap: "0.5rem",
-                                                    justifyContent: "center"
+                                                    padding: "0.25rem 0.5rem"
                                                 },
-                                                children: [
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                        onClick: ()=>handleEditClient(client),
-                                                        style: {
-                                                            padding: "0.25rem 0.5rem",
-                                                            background: "#3498db",
-                                                            color: "white",
-                                                            border: "none",
-                                                            borderRadius: "4px",
-                                                            cursor: "pointer",
-                                                            fontSize: "12px",
-                                                            fontWeight: "bold"
-                                                        },
-                                                        title: "Editează client",
-                                                        children: "✏️ Edit"
-                                                    }),
-                                                    /*#__PURE__*/ jsx_runtime_.jsx("button", {
-                                                        onClick: ()=>handleDeleteClient(client.id, client.nume),
-                                                        style: {
-                                                            padding: "0.25rem 0.5rem",
-                                                            background: "#e74c3c",
-                                                            color: "white",
-                                                            border: "none",
-                                                            borderRadius: "4px",
-                                                            cursor: "pointer",
-                                                            fontSize: "12px",
-                                                            fontWeight: "bold"
-                                                        },
-                                                        title: "Șterge client",
-                                                        children: "\uD83D\uDDD1️ Del"
-                                                    })
-                                                ]
+                                                children: "Edit"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx(ui/* Button */.zx, {
+                                                variant: "danger",
+                                                size: "sm",
+                                                icon: "\uD83D\uDDD1️",
+                                                onClick: ()=>handleDeleteClient(client.id, client.nume),
+                                                style: {
+                                                    padding: "0.25rem 0.5rem"
+                                                },
+                                                children: "Del"
                                             })
-                                        })
-                                    ]
-                                }, client.id))
-                        })
-                    ]
-                })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "1rem",
+                                    padding: "1rem",
+                                    background: "rgba(249, 250, 251, 0.8)",
+                                    borderRadius: "8px",
+                                    fontSize: "0.875rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#6b7280",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "CUI/CNP:"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#1f2937",
+                                                    fontFamily: "monospace",
+                                                    fontWeight: "500"
+                                                },
+                                                children: client.cui || client.cnp || "-"
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#6b7280",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "Email:"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#1f2937"
+                                                },
+                                                children: client.email || "-"
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#6b7280",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "Telefon:"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#1f2937"
+                                                },
+                                                children: client.telefon || "-"
+                                            })
+                                        ]
+                                    }),
+                                    /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                        children: [
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#6b7280",
+                                                    marginBottom: "0.25rem"
+                                                },
+                                                children: "Localitate:"
+                                            }),
+                                            /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                                style: {
+                                                    color: "#1f2937"
+                                                },
+                                                children: client.oras ? `${client.oras}${client.judet ? `, ${client.judet}` : ""}` : "-"
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }),
+                            client.adresa && /*#__PURE__*/ (0,jsx_runtime_.jsxs)("div", {
+                                style: {
+                                    marginTop: "1rem",
+                                    padding: "0.75rem",
+                                    background: "rgba(243, 244, 246, 0.5)",
+                                    borderRadius: "6px",
+                                    fontSize: "0.875rem"
+                                },
+                                children: [
+                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                        style: {
+                                            color: "#6b7280",
+                                            marginBottom: "0.25rem"
+                                        },
+                                        children: "Adresă:"
+                                    }),
+                                    /*#__PURE__*/ jsx_runtime_.jsx("div", {
+                                        style: {
+                                            color: "#1f2937"
+                                        },
+                                        children: client.adresa
+                                    })
+                                ]
+                            })
+                        ]
+                    }, client.id))
             }),
             /*#__PURE__*/ jsx_runtime_.jsx(ClientNouModal/* default */.Z, {
                 isOpen: showModal,
@@ -1763,7 +1793,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,2322,7365,4646,9850,6166,6549,9518], () => (__webpack_exec__(33841)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,8222,9493,6369,1440,8045,8313,9850,6166,6128,6549,9518], () => (__webpack_exec__(33841)));
 module.exports = __webpack_exports__;
 
 })();

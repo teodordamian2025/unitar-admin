@@ -17736,7 +17736,7 @@ protobuf.Enum             = __webpack_require__(59246);
 protobuf.Type             = __webpack_require__(59340);
 protobuf.Field            = __webpack_require__(23980);
 protobuf.OneOf            = __webpack_require__(32866);
-protobuf.MapField         = __webpack_require__(67597);
+protobuf.MapField         = __webpack_require__(28350);
 protobuf.Service          = __webpack_require__(82791);
 protobuf.Method           = __webpack_require__(28909);
 
@@ -17821,7 +17821,7 @@ protobuf.Root._configure(protobuf.Type, protobuf.parse, protobuf.common);
 
 /***/ }),
 
-/***/ 67597:
+/***/ 28350:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -19453,7 +19453,7 @@ var tokenize  = __webpack_require__(86116),
     Root      = __webpack_require__(98373),
     Type      = __webpack_require__(59340),
     Field     = __webpack_require__(23980),
-    MapField  = __webpack_require__(67597),
+    MapField  = __webpack_require__(28350),
     OneOf     = __webpack_require__(32866),
     Enum      = __webpack_require__(59246),
     Service   = __webpack_require__(82791),
@@ -22166,7 +22166,7 @@ var Namespace = __webpack_require__(97540);
 var Enum      = __webpack_require__(59246),
     OneOf     = __webpack_require__(32866),
     Field     = __webpack_require__(23980),
-    MapField  = __webpack_require__(67597),
+    MapField  = __webpack_require__(28350),
     Service   = __webpack_require__(82791),
     Message   = __webpack_require__(34294),
     Reader    = __webpack_require__(95199),

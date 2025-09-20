@@ -76,6 +76,7 @@ var next_response = __webpack_require__(89335);
 var lib = __webpack_require__(3189);
 var lib_default = /*#__PURE__*/__webpack_require__.n(lib);
 ;// CONCATENATED MODULE: ./app/api/genereaza/docx/route.ts
+//app/api/genereaza/docx/route.ts
 
 
 async function POST(request) {

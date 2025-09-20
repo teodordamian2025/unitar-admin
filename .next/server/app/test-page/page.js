@@ -28,7 +28,7 @@ module.exports = require("next/dist/compiled/react-experimental/jsx-runtime");
 
 /***/ }),
 
-/***/ 64119:
+/***/ 67597:
 /***/ ((module) => {
 
 "use strict";
@@ -316,7 +316,7 @@ const __default__ = proxy.default;
 var __webpack_require__ = require("../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7335,4646], () => (__webpack_exec__(80222)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,8448,7335,8313], () => (__webpack_exec__(80222)));
 module.exports = __webpack_exports__;
 
 })();

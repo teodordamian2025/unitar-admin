@@ -5,6 +5,13 @@ exports.id = 7137;
 exports.ids = [7137];
 exports.modules = {
 
+/***/ 73292:
+/***/ ((module) => {
+
+module.exports = require("fs/promises");
+
+/***/ }),
+
 /***/ 22037:
 /***/ ((module) => {
 
@@ -19,7 +26,7 @@ module.exports = require("path");
 
 /***/ }),
 
-/***/ 80555:
+/***/ 605:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 // ESM COMPAT FLAG
@@ -54,9 +61,9 @@ var next_response = __webpack_require__(89335);
 // EXTERNAL MODULE: external "path"
 var external_path_ = __webpack_require__(71017);
 var external_path_default = /*#__PURE__*/__webpack_require__.n(external_path_);
-;// CONCATENATED MODULE: external "fs/promises"
-const promises_namespaceObject = require("fs/promises");
-var promises_default = /*#__PURE__*/__webpack_require__.n(promises_namespaceObject);
+// EXTERNAL MODULE: external "fs/promises"
+var promises_ = __webpack_require__(73292);
+var promises_default = /*#__PURE__*/__webpack_require__.n(promises_);
 ;// CONCATENATED MODULE: ./app/api/actions/invoices/download/[id]/route.ts
 // ==================================================================
 // CALEA: app/api/actions/invoices/download/[id]/route.ts
@@ -141,7 +148,7 @@ const originalPathname = "/api/actions/invoices/download/[id]/route";
 var __webpack_require__ = require("../../../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335], () => (__webpack_exec__(80555)));
+var __webpack_exports__ = __webpack_require__.X(0, [8478,5501,9335], () => (__webpack_exec__(605)));
 module.exports = __webpack_exports__;
 
 })();

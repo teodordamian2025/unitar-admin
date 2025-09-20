@@ -155,7 +155,18 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
     // PASUL 1: Inserare în tabelul EtapeFacturi - QUERY CORECTAT și SIMPLIFICAT
     const insertPromises = etapeFacturate.map(async (etapa) => {
       const etapaFacturaId = `EF_${isEdit ? 'EDIT' : 'NEW'}_${facturaId}_${etapa.id}_${Date.now()}`;
-      
+
+      console.log(`📊 [DEBUG] Procesez etapa pentru inserare în EtapeFacturi:`, {
+        etapa_id: etapa.id,
+        tip: etapa.tip,
+        valoare: etapa.valoare,
+        moneda: etapa.moneda,
+        valoare_ron: etapa.valoare_ron,
+        curs_valutar: etapa.curs_valutar,
+        contract_id: etapa.contract_id,
+        subproiect_id: etapa.subproiect_id
+      });
+
       // ✅ FIX CRUCIAL: Query simplificat cu parametri corecți
       const insertQuery = `
         INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
@@ -186,7 +197,7 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
         )
       `;
 
-      // ✅ FIX CRUCIAL: Un singur set de parametri, clear și consistent
+      // ✅ FIX CRUCIAL: Un singur set de parametri, clear și consistent cu valorile corecte
       const params = {
         etapaFacturaId: etapaFacturaId,
         proiectId: proiectId,
@@ -195,6 +206,7 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
         tipEtapa: etapa.tip === 'etapa_contract' ? 'contract' : 'anexa',
         subproiectId: etapa.subproiect_id || null,
         facturaId: facturaId,
+        // ✅ FIX PROBLEMA: Folosește valorile transmise din frontend
         valoare: etapa.valoare || 0,
         moneda: etapa.moneda || 'RON',
         valoareRon: etapa.valoare_ron || etapa.valoare || 0,

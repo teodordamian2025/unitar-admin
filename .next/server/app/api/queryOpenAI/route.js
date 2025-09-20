@@ -45,6 +45,7 @@ var route_kind = __webpack_require__(19513);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/web/exports/next-response.js
 var next_response = __webpack_require__(89335);
 ;// CONCATENATED MODULE: ./app/api/queryOpenAI/route.ts
+// app/api/gueryOpenAI/route.ts
 
 async function POST(req) {
     try {

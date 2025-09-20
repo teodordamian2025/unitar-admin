@@ -45,6 +45,7 @@ var route_kind = __webpack_require__(19513);
 // EXTERNAL MODULE: ./node_modules/next/dist/server/web/exports/next-response.js
 var next_response = __webpack_require__(89335);
 ;// CONCATENATED MODULE: ./app/api/ai-database/route.ts
+// app/api/ai-database/route.ts
 
 // Stocare temporară pentru query-urile pending
 const pendingQueries = new Map();

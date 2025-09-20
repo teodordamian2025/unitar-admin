@@ -48,6 +48,7 @@ var helpers = __webpack_require__(37305);
 ;// CONCATENATED MODULE: external "openai"
 const external_openai_namespaceObject = require("openai");
 ;// CONCATENATED MODULE: ./pages/api/chat.ts
+// pages/api/chat.ts
 
 const openai = new external_openai_namespaceObject.OpenAI({
     apiKey: process.env.OPENAI_API_KEY

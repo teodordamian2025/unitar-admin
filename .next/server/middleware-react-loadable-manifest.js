@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"../app/admin/page.tsx -> @/components/Chatbot":{"id":3904,"files":["static/chunks/647-e9528b852f60d0f1.js","static/chunks/904.00694f94410fda2b.js"]},"../app/test-page/page.tsx -> @/components/Chatbot":{"id":3904,"files":["static/chunks/647-e9528b852f60d0f1.js","static/chunks/126.0dd9ca734ed46b9b.js"]}}';
+self.__REACT_LOADABLE_MANIFEST='{"../app/test-page/page.tsx -> @/components/Chatbot":{"id":83904,"files":["static/chunks/8647-7b41b38fa51d1dc3.js","static/chunks/126.6e2f2be66b84b41d.js"]}}';

@@ -23,6 +23,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var next_link__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(next_link__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(57114);
 /* harmony import */ var next_navigation__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(next_navigation__WEBPACK_IMPORTED_MODULE_2__);
+// app/admin/rapoarte/layout.tsx
 /* __next_internal_client_entry_do_not_use__ default auto */ 
 
 
@@ -45,6 +46,14 @@ function RapoarteLayout({ children }) {
         {
             href: "/admin/rapoarte/contracte",
             label: "\uD83D\uDCC4 Contracte"
+        },
+        {
+            href: "/admin/rapoarte/facturi",
+            label: "\uD83D\uDCB0 Facturi"
+        },
+        {
+            href: "/admin/tranzactii/dashboard",
+            label: "\uD83D\uDCB3 Tranzacții"
         },
         {
             href: "/admin/rapoarte/financiar",

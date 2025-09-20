@@ -48,6 +48,7 @@ var helpers = __webpack_require__(37305);
 ;// CONCATENATED MODULE: external "@google-cloud/bigquery"
 const bigquery_namespaceObject = require("@google-cloud/bigquery");
 ;// CONCATENATED MODULE: ./pages/api/queryBigQuery.ts
+// pages/api/queryBigQuery.ts
 
 async function handler(req, res) {
     if (req.method !== "POST") return res.status(405).end();
