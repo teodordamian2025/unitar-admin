@@ -127,48 +127,63 @@ export default function EnhancedTimeTrackingDashboard() {
   const fetchAnalyticsData = async () => {
     setLoadingData(true);
     try {
-      // Mock data - în realitate va fi fetch din API BigQuery
-      const mockOverview: OverviewStats = {
-        total_utilizatori: 8,
-        total_proiecte: 12,
-        total_ore_lucrate: 1247,
-        media_ore_pe_zi: 6.8,
-        eficienta_procent: 87,
-        media_luni: 8.2,
-        media_marti: 8.5,
-        media_miercuri: 7.8,
-        media_joi: 8.1,
-        media_vineri: 7.5,
-        media_sambata: 4.2,
-        media_duminica: 2.1
-      };
+      // ✅ REAL BigQuery data - înlocuire mock cu API calls
+      const [overviewResponse, dailyTrendResponse, teamResponse, projectResponse] = await Promise.all([
+        fetch(`/api/analytics/time-tracking?type=overview&period=${period}`),
+        fetch(`/api/analytics/time-tracking?type=daily-trend&period=${period}`),
+        fetch(`/api/analytics/time-tracking?type=team-performance&period=${period}`),
+        fetch(`/api/analytics/time-tracking?type=project-breakdown&period=${period}`)
+      ]);
 
-      const mockDailyTrend: DailyTrend[] = [
-        { data_lucru: '2025-09-13', total_ore: 45, utilizatori_activi: 6, proiecte_active: 8, media_ore_per_utilizator: 7.5 },
-        { data_lucru: '2025-09-14', total_ore: 52, utilizatori_activi: 7, proiecte_active: 10, media_ore_per_utilizator: 7.4 },
-        { data_lucru: '2025-09-15', total_ore: 38, utilizatori_activi: 5, proiecte_active: 7, media_ore_per_utilizator: 7.6 },
-        { data_lucru: '2025-09-16', total_ore: 47, utilizatori_activi: 6, proiecte_active: 9, media_ore_per_utilizator: 7.8 },
-        { data_lucru: '2025-09-17', total_ore: 41, utilizatori_activi: 6, proiecte_active: 8, media_ore_per_utilizator: 6.8 },
-        { data_lucru: '2025-09-18', total_ore: 35, utilizatori_activi: 5, proiecte_active: 6, media_ore_per_utilizator: 7.0 },
-        { data_lucru: '2025-09-19', total_ore: 28, utilizatori_activi: 4, proiecte_active: 5, media_ore_per_utilizator: 7.0 }
-      ];
+      const [overviewData, dailyTrendData, teamData, projectData] = await Promise.all([
+        overviewResponse.json(),
+        dailyTrendResponse.json(),
+        teamResponse.json(),
+        projectResponse.json()
+      ]);
 
-      const mockTeamData: TeamMember[] = [
-        { utilizator_uid: '1', utilizator_nume: 'Maria Popescu', total_ore: 167, media_ore_zilnic: 8.2, zile_active: 22, proiecte_lucrate: 3, sarcini_lucrate: 18, eficienta_procent: 92, ore_urgent: 25, ore_ridicata: 45, ore_normala: 87, ore_scazuta: 10 },
-        { utilizator_uid: '2', utilizator_nume: 'Ion Vasile', total_ore: 152, media_ore_zilnic: 7.8, zile_active: 21, proiecte_lucrate: 2, sarcini_lucrate: 15, eficienta_procent: 88, ore_urgent: 20, ore_ridicata: 38, ore_normala: 82, ore_scazuta: 12 },
-        { utilizator_uid: '3', utilizator_nume: 'Ana Georgescu', total_ore: 145, media_ore_zilnic: 7.5, zile_active: 20, proiecte_lucrate: 4, sarcini_lucrate: 22, eficienta_procent: 95, ore_urgent: 30, ore_ridicata: 42, ore_normala: 65, ore_scazuta: 8 }
-      ];
+      // Process overview data
+      if (overviewData.success && overviewData.data.length > 0) {
+        const stats = overviewData.data[0];
+        setOverviewStats({
+          total_utilizatori: stats.total_utilizatori || 0,
+          total_proiecte: stats.total_proiecte || 0,
+          total_ore_lucrate: stats.total_ore_lucrate || 0,
+          media_ore_pe_zi: stats.media_ore_pe_zi || 0,
+          eficienta_procent: stats.eficienta_procent || 0,
+          media_luni: stats.media_luni || 0,
+          media_marti: stats.media_marti || 0,
+          media_miercuri: stats.media_miercuri || 0,
+          media_joi: stats.media_joi || 0,
+          media_vineri: stats.media_vineri || 0,
+          media_sambata: stats.media_sambata || 0,
+          media_duminica: stats.media_duminica || 0
+        });
+      } else {
+        setOverviewStats(null);
+      }
 
-      const mockProjectData: ProjectBreakdown[] = [
-        { proiect_id: '1', proiect_nume: 'Website E-commerce', proiect_status: 'Activ', valoare_estimata: 15000, moneda: 'EUR', total_ore: 284, utilizatori_implicati: 4, sarcini_lucrate: 28, media_ore_pe_sesiune: 5.2, progres_procent: 75 },
-        { proiect_id: '2', proiect_nume: 'API Development', proiect_status: 'Activ', valoare_estimata: 8500, moneda: 'EUR', total_ore: 156, utilizatori_implicati: 2, sarcini_lucrate: 15, media_ore_pe_sesiune: 6.8, progres_procent: 45 },
-        { proiect_id: '3', proiect_nume: 'Mobile App', proiect_status: 'Întârziat', valoare_estimata: 22000, moneda: 'EUR', total_ore: 378, utilizatori_implicati: 5, sarcini_lucrate: 42, media_ore_pe_sesiune: 4.9, progres_procent: 60 }
-      ];
+      // Process daily trend data
+      if (dailyTrendData.success) {
+        setDailyTrend(dailyTrendData.data || []);
+      }
 
-      setOverviewStats(mockOverview);
-      setDailyTrend(mockDailyTrend);
-      setTeamData(mockTeamData);
-      setProjectData(mockProjectData);
+      // Process team data
+      if (teamData.success) {
+        setTeamData(teamData.data || []);
+      }
+
+      // Process project data
+      if (projectData.success) {
+        setProjectData(projectData.data || []);
+      }
+
+      console.log('📊 TimeTracking data loaded:', {
+        overview: overviewData.data?.[0],
+        dailyTrend: dailyTrendData.data?.length,
+        team: teamData.data?.length,
+        projects: projectData.data?.length
+      });
 
     } catch (error) {
       console.error('Eroare la încărcarea datelor:', error);

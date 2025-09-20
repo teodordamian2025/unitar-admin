@@ -81,9 +81,9 @@ export async function GET(request: NextRequest) {
         GROUP BY p.ID_Proiect, p.Denumire, p.Data_Start, p.Data_Final, 
                  p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil
       )
-      SELECT 
+      SELECT
         ID_Proiect as id,
-        Denumire as name,
+        ID_Proiect as name,
         Data_Start as startDate,
         Data_Final as endDate,
         progress_from_sarcini as progress,

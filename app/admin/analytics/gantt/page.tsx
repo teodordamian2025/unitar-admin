@@ -621,8 +621,8 @@ export default function GanttView() {
               <div>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Timeline</h4>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  <div>Start: {new Date(selectedTask.startDate).toLocaleDateString('ro-RO')}</div>
-                  <div>Final: {new Date(selectedTask.endDate).toLocaleDateString('ro-RO')}</div>
+                  <div>Start: {selectedTask.startDate && !isNaN(new Date(selectedTask.startDate).getTime()) ? new Date(selectedTask.startDate).toLocaleDateString('ro-RO') : 'Data neprecizată'}</div>
+                  <div>Final: {selectedTask.endDate && !isNaN(new Date(selectedTask.endDate).getTime()) ? new Date(selectedTask.endDate).toLocaleDateString('ro-RO') : 'Data neprecizată'}</div>
                   <div>Progres: {selectedTask.progress}%</div>
                 </div>
               </div>
@@ -635,7 +635,7 @@ export default function GanttView() {
                       <div key={index}>👤 {resource}</div>
                     ))
                   ) : (
-                    <div>Niciun responsabil asignat</div>
+                    <div>Niciun responsabil atribuit</div>
                   )}
                 </div>
               </div>
@@ -672,13 +672,6 @@ export default function GanttView() {
                 onClick={() => router.push(`/admin/rapoarte/proiecte/${selectedTask.parentId || selectedTask.id}`)}
               >
                 Vezi Proiectul
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setShowTaskModal(false)}
-              >
-                Închide
               </Button>
             </div>
           </div>
