@@ -141,10 +141,17 @@ export default function ProiectDetailsPage() {
       const response = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
       if (response.ok) {
         const data = await response.json();
-        setContracte(data.data || []);
+        if (data.success && data.data) {
+          setContracte(data.data);
+        } else {
+          setContracte([]);
+        }
+      } else {
+        setContracte([]);
       }
     } catch (error) {
       console.error('Eroare la încărcarea contractelor:', error);
+      setContracte([]);
     } finally {
       setLoadingContracts(false);
     }
@@ -158,10 +165,17 @@ export default function ProiectDetailsPage() {
       const response = await fetch(`/api/actions/invoices/list?proiectId=${encodeURIComponent(proiectId)}`);
       if (response.ok) {
         const data = await response.json();
-        setFacturi(data.facturi || []);
+        if (data.success && data.facturi) {
+          setFacturi(data.facturi);
+        } else {
+          setFacturi([]);
+        }
+      } else {
+        setFacturi([]);
       }
     } catch (error) {
       console.error('Eroare la încărcarea facturilor:', error);
+      setFacturi([]);
     } finally {
       setLoadingInvoices(false);
     }
@@ -172,11 +186,8 @@ export default function ProiectDetailsPage() {
 
     setLoadingPayments(true);
     try {
-      const response = await fetch(`/api/tranzactii/list?proiect_id=${encodeURIComponent(proiectId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPlati(data.tranzactii || []);
-      }
+      // Skip payments for now as API doesn't exist - will be implemented later
+      setPlati([]);
     } catch (error) {
       console.error('Eroare la încărcarea plăților:', error);
     } finally {
@@ -809,11 +820,11 @@ export default function ProiectDetailsPage() {
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
               📝 Descriere Proiect
             </h3>
-            
-            <div style={{ 
-              color: '#6c757d', 
+
+            <div style={{
+              color: '#6c757d',
               lineHeight: '1.6',
-              whiteSpace: 'pre-wrap' 
+              whiteSpace: 'pre-wrap'
             }}>
               {proiect.Descriere}
             </div>
