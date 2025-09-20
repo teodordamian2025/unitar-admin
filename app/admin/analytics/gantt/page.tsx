@@ -18,8 +18,8 @@ import { toast } from 'react-toastify';
 interface GanttTask {
   id: string;
   name: string;
-  startDate: string;
-  endDate: string;
+  startDate: string | { value: string };
+  endDate: string | { value: string };
   progress: number;
   type: 'proiect' | 'subproiect' | 'sarcina';
   parentId?: string;
@@ -144,8 +144,8 @@ export default function GanttView() {
 
     const dates = tasks.flatMap(task => {
       // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
-      const startDateValue = task.startDate?.value || task.startDate;
-      const endDateValue = task.endDate?.value || task.endDate;
+      const startDateValue = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+      const endDateValue = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
       return [
         new Date(startDateValue),
         new Date(endDateValue)
@@ -191,8 +191,8 @@ export default function GanttView() {
 
   const calculateTaskPosition = (task: GanttTask) => {
     // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
-    const startDateValue = task.startDate?.value || task.startDate;
-    const endDateValue = task.endDate?.value || task.endDate;
+    const startDateValue = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+    const endDateValue = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
     const startDate = new Date(startDateValue);
     const endDate = new Date(endDateValue);
     const timelineStart = timelineSettings.startDate;
@@ -632,12 +632,12 @@ export default function GanttView() {
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                   <div>Start: {(() => {
                     // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
-                    const dateValue = selectedTask.startDate?.value || selectedTask.startDate;
+                    const dateValue = typeof selectedTask.startDate === 'object' ? selectedTask.startDate.value : selectedTask.startDate;
                     return dateValue && !isNaN(new Date(dateValue).getTime()) ? new Date(dateValue).toLocaleDateString('ro-RO') : 'Data neprecizată';
                   })()}</div>
                   <div>Final: {(() => {
                     // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
-                    const dateValue = selectedTask.endDate?.value || selectedTask.endDate;
+                    const dateValue = typeof selectedTask.endDate === 'object' ? selectedTask.endDate.value : selectedTask.endDate;
                     return dateValue && !isNaN(new Date(dateValue).getTime()) ? new Date(dateValue).toLocaleDateString('ro-RO') : 'Data neprecizată';
                   })()}</div>
                   <div>Progres: {selectedTask.progress}%</div>
