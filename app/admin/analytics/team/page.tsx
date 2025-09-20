@@ -240,27 +240,51 @@ export default function TeamPerformance() {
         if (burnoutHighCount > 0) {
           generatedRecommendations.push({
             type: 'warning',
+            priority: 'high',
             title: 'Risc de Burnout Detectat',
-            message: `${burnoutHighCount} membri ai echipei prezintă risc ridicat de burnout.`,
-            action: 'Revizuiește programul echipei cu risc ridicat'
+            description: `${burnoutHighCount} membri ai echipei prezintă risc ridicat de burnout.`,
+            actions: ['Revizuiește programul echipei cu risc ridicat', 'Redistribuie sarcinile urgent', 'Programează consultări cu echipa']
           });
         }
 
         if (underutilizedCount > overworkedCount + 1) {
           generatedRecommendations.push({
             type: 'info',
+            priority: 'medium',
             title: 'Oportunitate de Optimizare',
-            message: `${underutilizedCount} membri sunt subutilizați.`,
-            action: 'Atribuie mai multe sarcini membrilor subutilizați'
+            description: `${underutilizedCount} membri sunt subutilizați. Aceștia ar putea prelua mai multe responsabilități.`,
+            actions: ['Atribuie mai multe sarcini membrilor subutilizați', 'Identifică proiecte noi pentru aceștia', 'Organizează training pentru creșterea capacității']
           });
         }
 
         if (mediaEficientaEchipa < 70) {
           generatedRecommendations.push({
             type: 'warning',
+            priority: 'high',
             title: 'Eficiența Echipei Scăzută',
-            message: `Eficiența medie a echipei este ${Math.round(mediaEficientaEchipa)}%.`,
-            action: 'Organizează ședințe de îmbunătățire a proceselor'
+            description: `Eficiența medie a echipei este ${Math.round(mediaEficientaEchipa)}%. Este necesară îmbunătățirea proceselor.`,
+            actions: ['Organizează ședințe de îmbunătățire a proceselor', 'Identifică blocajele în workflow', 'Implementează instrumente de productivitate']
+          });
+        }
+
+        // Recomandări suplimentare bazate pe experiența echipei
+        if (utilizatori.length > 5 && totalOreEchipa / utilizatori.length < 20) {
+          generatedRecommendations.push({
+            type: 'info',
+            priority: 'low',
+            title: 'Echipă Mare - Ore Puține',
+            description: `Echipa are ${utilizatori.length} membri dar media de ore/membru este mică (${Math.round(totalOreEchipa / utilizatori.length)} ore).`,
+            actions: ['Verifică utilitatea tuturor membrilor', 'Consideră reoptimizarea echipei', 'Atribuie responsabilități clare fiecărui membru']
+          });
+        }
+
+        if (overworkedCount > utilizatori.length / 2) {
+          generatedRecommendations.push({
+            type: 'error',
+            priority: 'urgent',
+            title: 'Majoritate Supraîncărcată',
+            description: `${overworkedCount} din ${utilizatori.length} membri sunt supraîncărcați. Aceasta este o situație critică!`,
+            actions: ['Angajează personal suplimentar urgent', 'Redistribuie sarcinile imediat', 'Revizuiește prioritățile proiectelor']
           });
         }
 
@@ -365,10 +389,13 @@ export default function TeamPerformance() {
 
   const getRecommendationIcon = (type: string) => {
     switch (type) {
+      case 'warning': return '⚠️';
+      case 'error': return '🚨';
+      case 'info': return '💡';
       case 'efficiency': return '⚡';
       case 'wellbeing': return '💚';
       case 'optimization': return '🎯';
-      default: return '💡';
+      default: return 'ℹ️';
     }
   };
 
