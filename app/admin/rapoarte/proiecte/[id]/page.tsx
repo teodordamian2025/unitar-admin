@@ -138,19 +138,33 @@ export default function ProiectDetailsPage() {
 
     setLoadingContracts(true);
     try {
-      const response = await fetch(`/api/rapoarte/contracte?proiect_id=${encodeURIComponent(proiectId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setContracte(data.data);
-        } else {
-          setContracte([]);
-        }
+      // Foloseste exact aceeasi logica ca in ContracteTable
+      const queryParams = new URLSearchParams();
+      queryParams.append('proiect_id', proiectId);
+
+      const response = await fetch(`/api/rapoarte/contracte?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Procesează obiectele DATE de la BigQuery identic cu ContracteTable
+        const contracteFormatate = (data.data || []).map((c: any) => ({
+          ...c,
+          Data_Semnare: c.Data_Semnare?.value || c.Data_Semnare,
+          Data_Expirare: c.Data_Expirare?.value || c.Data_Expirare,
+          data_curs_valutar: c.data_curs_valutar?.value || c.data_curs_valutar
+        }));
+        setContracte(contracteFormatate);
+        console.log(`📄 Contracte încărcate pentru proiect ${proiectId}: ${contracteFormatate.length}`);
       } else {
+        console.warn('📄 API contracte nu a returnat success:', data);
         setContracte([]);
       }
     } catch (error) {
-      console.error('Eroare la încărcarea contractelor:', error);
+      console.error('📄 Eroare la încărcarea contractelor:', error);
       setContracte([]);
     } finally {
       setLoadingContracts(false);
@@ -162,19 +176,34 @@ export default function ProiectDetailsPage() {
 
     setLoadingInvoices(true);
     try {
-      const response = await fetch(`/api/actions/invoices/list?proiectId=${encodeURIComponent(proiectId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.facturi) {
-          setFacturi(data.facturi);
-        } else {
-          setFacturi([]);
-        }
+      // Foloseste aceeasi logica robusta ca la contracte
+      const queryParams = new URLSearchParams();
+      queryParams.append('proiectId', proiectId);
+
+      const response = await fetch(`/api/actions/invoices/list?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Procesează datele de facturi identic
+        const facturiFormatate = (data.facturi || []).map((f: any) => ({
+          ...f,
+          data_factura: f.data_factura?.value || f.data_factura,
+          data_scadenta: f.data_scadenta?.value || f.data_scadenta,
+          data_creare: f.data_creare?.value || f.data_creare,
+          data_actualizare: f.data_actualizare?.value || f.data_actualizare
+        }));
+        setFacturi(facturiFormatate);
+        console.log(`💰 Facturi încărcate pentru proiect ${proiectId}: ${facturiFormatate.length}`);
       } else {
+        console.warn('💰 API facturi nu a returnat success:', data);
         setFacturi([]);
       }
     } catch (error) {
-      console.error('Eroare la încărcarea facturilor:', error);
+      console.error('💰 Eroare la încărcarea facturilor:', error);
       setFacturi([]);
     } finally {
       setLoadingInvoices(false);
