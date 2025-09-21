@@ -82,8 +82,7 @@ export async function POST(request: NextRequest) {
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
           SET
             Data_Start = @startDate,
-            Data_Final = @endDate,
-            Data_Actualizare = CURRENT_DATETIME()
+            Data_Final = @endDate
           WHERE ID_Proiect = @actualId
         `;
         break;
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
           SET
             Data_Start = @startDate,
             Data_Final = @endDate,
-            Data_Actualizare = CURRENT_DATETIME()
+            data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Subproiect = @actualId
         `;
         break;
@@ -105,7 +104,7 @@ export async function POST(request: NextRequest) {
           SET
             data_creare = @startDate,
             data_scadenta = @endDate,
-            data_modificare = CURRENT_DATETIME()
+            updated_at = CURRENT_TIMESTAMP()
           WHERE id = @actualId
         `;
         break;

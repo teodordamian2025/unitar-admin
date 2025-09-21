@@ -1106,8 +1106,7 @@ export default function GanttView() {
                         background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'transparent',
                         position: 'relative',
                         display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.5rem 0'
+                        alignItems: 'center'
                       }}
                     >
                       {/* Start Date Label */}
