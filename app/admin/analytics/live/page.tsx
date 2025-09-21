@@ -11,6 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { useRouter } from 'next/navigation';
+import ModernLayout from '@/app/components/ModernLayout';
 import { toast } from 'react-hot-toast';
 
 interface LiveSession {
@@ -497,13 +498,14 @@ export default function LiveTracking() {
     return (
       <div style={{
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
+        alignItems: 'center',
         height: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         <div style={{
           background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px)',
           padding: '2rem',
           borderRadius: '16px',
           textAlign: 'center'
@@ -516,61 +518,51 @@ export default function LiveTracking() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '2rem'
-    }}>
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+      {/* Header */}
       <div style={{
-        maxWidth: '1400px',
-        margin: '0 auto'
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '2rem'
       }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '2rem',
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '1.5rem',
-          borderRadius: '16px',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div>
-            <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
-              🔴 Live Tracking
-            </h1>
-            <p style={{ margin: 0, color: '#6b7280' }}>
-              Monitorizează activitatea echipei în timp real
-            </p>
-          </div>
-
-          <button
-            onClick={loadLiveData}
-            disabled={loadingData}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: loadingData ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: loadingData ? 'not-allowed' : 'pointer',
-              fontWeight: '500',
-              fontSize: '0.875rem',
-              transition: 'all 0.2s'
-            }}
-          >
-            {loadingData ? '⏳ Se încarcă...' : '🔄 Actualizează'}
-          </button>
+        <div>
+          <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
+            🔴 Live Tracking
+          </h1>
+          <p style={{ margin: 0, color: '#6b7280' }}>
+            Monitorizează activitatea echipei în timp real
+          </p>
         </div>
+
+        <button
+          onClick={loadLiveData}
+          disabled={loadingData}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: loadingData ? '#9ca3af' : '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: loadingData ? 'not-allowed' : 'pointer',
+            fontWeight: '500',
+            fontSize: '0.875rem',
+            transition: 'all 0.2s'
+          }}
+        >
+          {loadingData ? '⏳ Se încarcă...' : '🔄 Actualizează'}
+        </button>
+      </div>
 
         {/* Personal Timer */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '1.5rem',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px)',
           borderRadius: '16px',
-          backdropFilter: 'blur(10px)',
-          marginBottom: '2rem'
+          padding: '1.5rem',
+          marginBottom: '2rem',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
         }}>
           <div style={{
             display: 'flex',
@@ -771,10 +763,12 @@ export default function LiveTracking() {
 
         {/* Live Sessions */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '1.5rem',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px)',
           borderRadius: '16px',
-          backdropFilter: 'blur(10px)'
+          padding: '1.5rem',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
         }}>
           <h3 style={{
             margin: '0 0 1.5rem 0',
@@ -1128,7 +1122,7 @@ export default function LiveTracking() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+
+    </ModernLayout>
   );
 }
