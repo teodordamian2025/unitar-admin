@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
 import { Card, Button, Alert, LoadingSpinner, Modal } from '@/app/components/ui';
 import { toast } from 'react-toastify';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 
 interface GanttTask {
   id: string;
@@ -60,6 +61,11 @@ export default function GanttView() {
   const [selectedTask, setSelectedTask] = useState<GanttTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
+
+  // Drag and drop state
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedTask, setDraggedTask] = useState<GanttTask | null>(null);
+  const [savingChanges, setSavingChanges] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -178,6 +184,112 @@ export default function GanttView() {
       toast.error('Eroare la încărcarea datelor!');
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // Enhanced drag and drop handlers with mouse position tracking
+  const onDragStart = (start: any) => {
+    setIsDragging(true);
+    const task = ganttData.find(t => t.id === start.draggableId);
+    setDraggedTask(task || null);
+
+    // Add visual feedback
+    document.body.style.cursor = 'grabbing';
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    setIsDragging(false);
+    setDraggedTask(null);
+    document.body.style.cursor = '';
+
+    if (!result.destination || !draggedTask) {
+      return;
+    }
+
+    // Calculate new dates based on drop position
+    const newDates = calculateNewDatesFromMousePosition(draggedTask);
+    if (newDates) {
+      await updateTaskDates(draggedTask.id, newDates.startDate, newDates.endDate);
+    }
+  };
+
+  // Track mouse position for better timeline calculation
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const calculateNewDatesFromMousePosition = (task: GanttTask) => {
+    if (!ganttRef.current) return null;
+
+    const ganttContainer = ganttRef.current.querySelector('[data-timeline-body]') as HTMLElement;
+    if (!ganttContainer) return null;
+
+    const containerRect = ganttContainer.getBoundingClientRect();
+
+    // Calculate relative position within the timeline container
+    const relativeX = mousePosition.x - containerRect.left;
+    const dropPercentage = Math.max(0, Math.min(1, relativeX / containerRect.width));
+
+    // Calculate the percentage of drop position within timeline
+    const timelineStart = timelineSettings.startDate;
+    const timelineEnd = timelineSettings.endDate;
+    const totalDuration = timelineEnd.getTime() - timelineStart.getTime();
+
+    // Convert drop position to date
+    const newStartTime = timelineStart.getTime() + (totalDuration * dropPercentage);
+    const newStartDate = new Date(newStartTime);
+
+    // Calculate duration from original task
+    const originalStartValue = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+    const originalEndValue = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
+    const originalStart = new Date(originalStartValue);
+    const originalEnd = new Date(originalEndValue);
+    const taskDuration = originalEnd.getTime() - originalStart.getTime();
+
+    const newEndDate = new Date(newStartTime + taskDuration);
+
+    return {
+      startDate: newStartDate.toISOString().split('T')[0],
+      endDate: newEndDate.toISOString().split('T')[0]
+    };
+  };
+
+  const updateTaskDates = async (taskId: string, startDate: string, endDate: string) => {
+    try {
+      setSavingChanges(true);
+
+      const response = await fetch('/api/analytics/gantt-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId,
+          startDate,
+          endDate
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update local state
+        setGanttData(prev => prev.map(task =>
+          task.id === taskId
+            ? { ...task, startDate, endDate }
+            : task
+        ));
+        toast.success('Datele au fost actualizate cu succes!');
+      } else {
+        toast.error(result.error || 'Eroare la actualizarea datelor!');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea task-ului:', error);
+      toast.error('Eroare la salvarea modificărilor!');
+    } finally {
+      setSavingChanges(false);
     }
   };
 
@@ -770,17 +882,30 @@ export default function GanttView() {
 
       {/* Gantt Chart */}
       <Card>
+        {savingChanges && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: '8px',
+            color: '#92400e',
+            marginBottom: '1rem'
+          }}>
+            🔄 Se salvează modificările...
+          </div>
+        )}
         <div style={{ overflow: 'auto' }}>
-          <div
-            ref={ganttRef}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '300px 1fr',
-              minWidth: '800px',
-              borderRadius: '8px',
-              overflow: 'hidden'
-            }}
-          >
+          <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <div
+              ref={ganttRef}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '300px 1fr',
+                minWidth: '800px',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}
+            >
             {/* Task List */}
             <div style={{ background: 'rgba(249, 250, 251, 0.8)' }}>
               {/* Header */}
@@ -895,7 +1020,18 @@ export default function GanttView() {
               </div>
 
               {/* Timeline Body */}
-              <div style={{ position: 'relative' }}>
+              <Droppable droppableId="timeline" direction="horizontal">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    data-timeline-body
+                    onMouseMove={handleMouseMove}
+                    style={{
+                      position: 'relative',
+                      backgroundColor: snapshot.isDraggingOver ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
+                    }}
+                  >
                 {visibleTasks.map((task, index) => {
                   const position = calculateTaskPosition(task);
                   return (
@@ -934,26 +1070,38 @@ export default function GanttView() {
                       )}
 
                       {/* Task Bar */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: position.left,
-                          width: position.width,
-                          height: '24px',
-                          background: getTaskColor(task),
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                          opacity: task.status === 'anulata' ? 0.5 : 1
-                        }}
-                        onClick={() => {
-                          setSelectedTask(task);
-                          setShowTaskModal(true);
-                        }}
-                      >
+                      <Draggable draggableId={task.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              position: 'absolute',
+                              left: position.left,
+                              width: position.width,
+                              height: '24px',
+                              background: getTaskColor(task),
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: snapshot.isDragging ? 'grabbing' : 'grab',
+                              boxShadow: snapshot.isDragging
+                                ? '0 8px 16px rgba(0, 0, 0, 0.3)'
+                                : '0 2px 4px rgba(0, 0, 0, 0.1)',
+                              opacity: task.status === 'anulata' ? 0.5 : 1,
+                              transform: snapshot.isDragging ? 'rotate(5deg)' : 'none',
+                              zIndex: snapshot.isDragging ? 1000 : 1,
+                              ...provided.draggableProps.style
+                            }}
+                            onClick={(e) => {
+                              if (!snapshot.isDragging) {
+                                setSelectedTask(task);
+                                setShowTaskModal(true);
+                              }
+                            }}
+                          >
                         {/* Progress Bar */}
                         <div
                           style={{
@@ -967,16 +1115,18 @@ export default function GanttView() {
                           }}
                         />
 
-                        <span style={{
-                          color: 'white',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          position: 'relative',
-                          zIndex: 1
-                        }}>
-                          {task.progress}%
-                        </span>
-                      </div>
+                            <span style={{
+                              color: 'white',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              position: 'relative',
+                              zIndex: 1
+                            }}>
+                              {task.progress}%
+                            </span>
+                          </div>
+                        )}
+                      </Draggable>
 
                       {/* End Date Label */}
                       {parseFloat(position.width.replace('%', '')) > 10 && (
@@ -1030,9 +1180,13 @@ export default function GanttView() {
                   }
                   return null;
                 })()}
-              </div>
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
           </div>
+          </DragDropContext>
         </div>
       </Card>
 
