@@ -751,7 +751,7 @@ function AdminPage() {
                                         alignItems: "center",
                                         gap: "0.5rem"
                                     },
-                                    children: "\uD83D\uDEA8 Alerturi Critice"
+                                    children: "\uD83D\uDEA8 Alerte Critice"
                                 }),
                                 /*#__PURE__*/ (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("button", {
                                     onClick: loadDashboardData,

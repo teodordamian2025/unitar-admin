@@ -72,6 +72,11 @@ export default function TeamPerformance() {
 
   // Filters and settings
   const [period, setPeriod] = useState('30');
+  const [customDateRange, setCustomDateRange] = useState({
+    start: '',
+    end: '',
+    enabled: false
+  });
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'chart'>('grid');
@@ -89,7 +94,7 @@ export default function TeamPerformance() {
     if (isAuthorized) {
       loadTeamData();
     }
-  }, [isAuthorized, period]);
+  }, [isAuthorized, period, customDateRange]);
 
   const checkUserRole = async () => {
     if (!user) return;
@@ -123,9 +128,29 @@ export default function TeamPerformance() {
       setLoadingData(true);
       console.log('[TEAM DEBUG] Starting loadTeamData...');
 
+      // Construiește parametrii pentru date filtering
+      let timeTrackingURL = '/api/rapoarte/timetracking';
+      const urlParams = new URLSearchParams();
+
+      if (customDateRange.enabled && customDateRange.start && customDateRange.end) {
+        urlParams.append('start_date', customDateRange.start);
+        urlParams.append('end_date', customDateRange.end);
+      } else {
+        // Folosește perioada standard
+        const currentDate = new Date();
+        const pastDate = new Date();
+        pastDate.setDate(currentDate.getDate() - parseInt(period));
+        urlParams.append('start_date', pastDate.toISOString().split('T')[0]);
+        urlParams.append('end_date', currentDate.toISOString().split('T')[0]);
+      }
+
+      if (urlParams.toString()) {
+        timeTrackingURL += '?' + urlParams.toString();
+      }
+
       // Folosește API-urile existente și simple
       const [timeTrackingResponse, utilizatoriResponse] = await Promise.all([
-        fetch('/api/rapoarte/timetracking'),
+        fetch(timeTrackingURL),
         fetch('/api/rapoarte/utilizatori')
       ]);
 
@@ -421,24 +446,68 @@ export default function TeamPerformance() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
+            value={customDateRange.enabled ? 'custom' : period}
+            onChange={(e) => {
+              if (e.target.value === 'custom') {
+                setCustomDateRange(prev => ({ ...prev, enabled: true }));
+                setPeriod('30'); // fallback if custom is disabled later
+              } else {
+                setCustomDateRange(prev => ({ ...prev, enabled: false }));
+                setPeriod(e.target.value);
+              }
+            }}
             style={{
               padding: '0.5rem 1rem',
               borderRadius: '8px',
               border: '1px solid rgba(209, 213, 219, 0.5)',
               background: 'rgba(255, 255, 255, 0.9)',
               backdropFilter: 'blur(10px)',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              minWidth: '180px'
             }}
           >
             <option value="7">Ultima săptămână</option>
             <option value="30">Ultima lună</option>
             <option value="90">Ultimele 3 luni</option>
             <option value="180">Ultimele 6 luni</option>
+            <option value="custom">Perioada personalizată</option>
           </select>
+
+          {customDateRange.enabled && (
+            <>
+              <input
+                type="date"
+                value={customDateRange.start}
+                onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                placeholder="De la..."
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(209, 213, 219, 0.5)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  fontSize: '0.875rem'
+                }}
+              />
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>până la</span>
+              <input
+                type="date"
+                value={customDateRange.end}
+                onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                placeholder="Până la..."
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(209, 213, 219, 0.5)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </>
+          )}
 
           <div style={{ display: 'flex', background: 'rgba(249, 250, 251, 0.8)', borderRadius: '8px', padding: '0.25rem' }}>
             <Button
