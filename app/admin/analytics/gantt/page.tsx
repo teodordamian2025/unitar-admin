@@ -290,8 +290,13 @@ export default function GanttView() {
       });
     }
     if (filters.proiect_nume) {
+      const searchTerm = filters.proiect_nume.toLowerCase();
       filteredTasks = filteredTasks.filter(task =>
-        task.name.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+        task.id.toLowerCase().includes(searchTerm) ||
+        task.name.toLowerCase().includes(searchTerm) ||
+        (task as any).proiect_id?.toLowerCase().includes(searchTerm) ||
+        (task as any).adresa?.toLowerCase().includes(searchTerm) ||
+        (task as any).client_nume?.toLowerCase().includes(searchTerm)
       );
     }
     if (filters.responsabil_nume) {
@@ -526,7 +531,7 @@ export default function GanttView() {
               </select>
             </div>
 
-            {/* Project Name Search */}
+            {/* Project Search */}
             <div>
               <label style={{
                 display: 'block',
@@ -535,13 +540,13 @@ export default function GanttView() {
                 color: '#6b7280',
                 marginBottom: '0.25rem'
               }}>
-                🔍 Căutare nume
+                🔍 Căutare generală
               </label>
               <input
                 type="text"
                 value={filters.proiect_nume}
                 onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
-                placeholder="Căută după nume proiect..."
+                placeholder="ID proiect, nume, adresă..."
                 style={{
                   width: '100%',
                   padding: '0.5rem',

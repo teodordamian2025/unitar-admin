@@ -219,8 +219,12 @@ export default function CalendarView() {
           filteredProiecte = filteredProiecte.filter((p: any) => p.ID_Proiect === filters.proiect_id);
         }
         if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
           filteredProiecte = filteredProiecte.filter((p: any) =>
-            p.Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+            p.ID_Proiect?.toLowerCase().includes(searchTerm) ||
+            p.Denumire?.toLowerCase().includes(searchTerm) ||
+            p.Adresa?.toLowerCase().includes(searchTerm) ||
+            p.Client_Nume?.toLowerCase().includes(searchTerm)
           );
         }
         if (filters.client_nume) {
@@ -268,9 +272,12 @@ export default function CalendarView() {
           filteredSubproiecte = filteredSubproiecte.filter((s: any) => s.ID_Proiect === filters.proiect_id);
         }
         if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
           filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
-            s.Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase()) ||
-            s.Proiect_Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+            s.ID_Proiect?.toLowerCase().includes(searchTerm) ||
+            s.Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Proiect_Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Adresa?.toLowerCase().includes(searchTerm)
           );
         }
         if (filters.responsabil_nume) {
@@ -313,8 +320,11 @@ export default function CalendarView() {
           filteredSarcini = filteredSarcini.filter((s: any) => s.proiect_id === filters.proiect_id);
         }
         if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
           filteredSarcini = filteredSarcini.filter((s: any) =>
-            s.titlu?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+            s.proiect_id?.toLowerCase().includes(searchTerm) ||
+            s.titlu?.toLowerCase().includes(searchTerm) ||
+            s.descriere?.toLowerCase().includes(searchTerm)
           );
         }
         if (filters.responsabil_nume) {
@@ -348,9 +358,18 @@ export default function CalendarView() {
       }
 
       console.log('[CALENDAR DEBUG] Total events created:', events.length);
+      console.log('[CALENDAR DEBUG] Proiecte success:', proiecteData.success);
+      console.log('[CALENDAR DEBUG] Subproiecte success:', subproiecteData.success);
+      console.log('[CALENDAR DEBUG] Sarcini success:', sarciniData.success);
+      console.log('[CALENDAR DEBUG] Applied filters:', filters);
 
-      // Adaugă câteva evenimente mock pentru demonstrație
-      if (events.length === 0) {
+      // Adaugă câteva evenimente mock pentru demonstrație DOAR dacă nu sunt date reale
+      if (events.length === 0 &&
+          (!proiecteData.success || !Array.isArray(proiecteData.data) || proiecteData.data.length === 0) &&
+          (!subproiecteData.success || !Array.isArray(subproiecteData.data) || subproiecteData.data.length === 0) &&
+          (!sarciniData.success || !Array.isArray(sarciniData.data) || sarciniData.data.length === 0)) {
+
+        console.log('[CALENDAR DEBUG] No real data available, using mock data');
         events = [
           {
             id: '1',
@@ -377,6 +396,8 @@ export default function CalendarView() {
             urgency_status: 'normal'
           }
         ];
+      } else if (events.length === 0) {
+        console.log('[CALENDAR DEBUG] Real data exists but filtered out, showing no events');
       }
 
       console.log('[CALENDAR DEBUG] Final events:', events.length, events);
@@ -742,7 +763,7 @@ export default function CalendarView() {
               </select>
             </div>
 
-            {/* Project Name Search */}
+            {/* Project Search */}
             <div>
               <label style={{
                 display: 'block',
@@ -751,13 +772,13 @@ export default function CalendarView() {
                 color: '#6b7280',
                 marginBottom: '0.25rem'
               }}>
-                🔍 Căutare nume
+                🔍 Căutare generală
               </label>
               <input
                 type="text"
                 value={filters.proiect_nume}
                 onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
-                placeholder="Căută după nume proiect..."
+                placeholder="ID proiect, nume, adresă..."
                 style={{
                   width: '100%',
                   padding: '0.5rem',
