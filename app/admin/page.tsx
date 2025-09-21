@@ -275,7 +275,7 @@ export default function AdminPage() {
   }
 
   return (
-    <RealtimeProvider updateInterval={30000}>
+    <RealtimeProvider>
       <ModernLayout user={user} displayName={displayName} userRole={userRole}>
         {/* Live Notifications */}
         <div style={{

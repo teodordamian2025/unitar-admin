@@ -14,7 +14,7 @@ import { ReactNode } from 'react';
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
-      <RealtimeProvider updateInterval={30000}>
+      <RealtimeProvider>
         {children}
       </RealtimeProvider>
     </ProtectedRoute>
