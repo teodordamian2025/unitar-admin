@@ -159,11 +159,11 @@ export default function LiveTracking() {
       const result = await response.json();
 
       if (result.success) {
-        setLiveSessions(result.data);
-        setTimerStats(result.stats);
+        setLiveSessions(result.data || []);
+        setTimerStats(result.stats || null);
 
         // Check if user has active session
-        const userSession = result.data.find((session: LiveSession) =>
+        const userSession = result.data?.find((session: LiveSession) =>
           session.utilizator_uid === user?.uid &&
           (session.status === 'activ' || session.status === 'pausat')
         );
@@ -183,6 +183,9 @@ export default function LiveTracking() {
       }
     } catch (error) {
       console.error('Eroare la încărcarea datelor live:', error);
+      // Set safe defaults in case of error
+      setLiveSessions([]);
+      setTimerStats(null);
     } finally {
       setLoadingData(false);
     }
@@ -198,16 +201,19 @@ export default function LiveTracking() {
       }
     } catch (error) {
       console.error('Eroare la încărcarea proiectelor:', error);
+      // Set safe defaults in case of error
+      setProjects([]);
+      setFilteredProjects([]);
     }
   };
 
   // Effect pentru filtrarea proiectelor
   useEffect(() => {
     if (projectSearchTerm.trim() === '') {
-      setFilteredProjects(projects);
+      setFilteredProjects(projects || []);
     } else {
       const searchLower = projectSearchTerm.toLowerCase();
-      const filtered = projects.filter(project =>
+      const filtered = (projects || []).filter(project =>
         project.ID_Proiect?.toLowerCase().includes(searchLower) ||
         project.Denumire?.toLowerCase().includes(searchLower) ||
         project.Adresa?.toLowerCase().includes(searchLower)
@@ -240,6 +246,8 @@ export default function LiveTracking() {
       }
     } catch (error) {
       console.error('Eroare la încărcarea sarcinilor:', error);
+      // Set safe defaults in case of error
+      setSarcini([]);
     }
   };
 
@@ -461,7 +469,7 @@ export default function LiveTracking() {
           <div>
             {personalTimer.projectId && (
               <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                📁 {projects.find(p => p.ID_Proiect === personalTimer.projectId)?.Denumire || 'Proiect necunoscut'}
+                📁 {projects?.find(p => p.ID_Proiect === personalTimer.projectId)?.Denumire || 'Proiect necunoscut'}
                 {personalTimer.description && (
                   <span> • {personalTimer.description}</span>
                 )}
@@ -592,16 +600,16 @@ export default function LiveTracking() {
           fontWeight: '700',
           color: '#1f2937'
         }}>
-          🔴 Sesiuni Live ({liveSessions.length})
+          🔴 Sesiuni Live ({liveSessions?.length || 0})
         </h3>
 
-        {liveSessions.length > 0 ? (
+        {(liveSessions?.length || 0) > 0 ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
             gap: '1.5rem'
           }}>
-            {liveSessions.map((session) => (
+            {(liveSessions || []).map((session) => (
               <Card
                 key={session.id}
                 style={{
@@ -761,7 +769,7 @@ export default function LiveTracking() {
                 }}
               />
 
-              {showProjectDropdown && filteredProjects.length > 0 && (
+              {showProjectDropdown && (filteredProjects?.length || 0) > 0 && (
                 <div
                   onClick={(e) => e.stopPropagation()}
                   style={{
@@ -778,7 +786,7 @@ export default function LiveTracking() {
                   zIndex: 50,
                   marginTop: '2px'
                 }}>
-                  {filteredProjects.slice(0, 10).map((project) => (
+                  {(filteredProjects || []).slice(0, 10).map((project) => (
                     <div
                       key={project.ID_Proiect}
                       onClick={() => {
@@ -807,7 +815,7 @@ export default function LiveTracking() {
                       )}
                     </div>
                   ))}
-                  {filteredProjects.length > 10 && (
+                  {(filteredProjects?.length || 0) > 10 && (
                     <div style={{
                       padding: '0.5rem 0.75rem',
                       fontSize: '0.75rem',
@@ -815,7 +823,7 @@ export default function LiveTracking() {
                       textAlign: 'center',
                       borderTop: '1px solid rgba(229, 231, 235, 0.5)'
                     }}>
-                      +{filteredProjects.length - 10} rezultate mai multe...
+                      +{(filteredProjects?.length || 0) - 10} rezultate mai multe...
                     </div>
                   )}
                 </div>
@@ -823,7 +831,7 @@ export default function LiveTracking() {
             </div>
           </div>
 
-          {personalTimer.projectId && sarcini.length > 0 && (
+          {personalTimer.projectId && (sarcini?.length || 0) > 0 && (
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                 Sarcină (opțional)
@@ -842,7 +850,7 @@ export default function LiveTracking() {
                 }}
               >
                 <option value="">Selectează sarcina...</option>
-                {sarcini.map((sarcina) => (
+                {(sarcini || []).map((sarcina) => (
                   <option key={sarcina.id} value={sarcina.id}>
                     {sarcina.titlu}
                   </option>
