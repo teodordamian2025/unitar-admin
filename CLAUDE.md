@@ -729,40 +729,69 @@ return (
 - ✅ Arhitectură pregătită pentru următoarele etape
 
 ### **ETAPA 2: API-URI UTILIZATORI CU RESTRICȚII** (2-3 zile)
-**STATUS**: 🔴 Neîncepută
+**STATUS**: ✅ COMPLETATĂ (21.09.2025 16:45)
 **OBIECTIV**: Crearea API-urilor specifice cu restricții financiare automate
 
-#### **2.1 /api/user/projects/**
-- ✅ GET: Filtrare la proiectele unde sunt responsabil
-- ✅ POST: Creare proiect cu valori financiare forțate la zero
-- ✅ PUT: Editare cu restricții financiare
-- ✅ Middleware securitate pentru validare permisiuni
+#### **2.1 /api/user/projects/** ✅ IMPLEMENTAT
+- ✅ GET: Filtrare și afișare proiecte FĂRĂ date financiare (exclude Valoare_Estimata, valoare_ron, etc.)
+- ✅ POST: Creare proiect cu valori financiare AUTOMAT forțate la zero RON în BigQuery
+- ✅ PUT: Editare cu restricții financiare (doar câmpuri non-financiare permise)
+- ✅ DELETE: Ștergere proiecte cu aceleași permisiuni ca admin
+- ✅ Auto-set pentru compatibilitate UI: valoare=0, moneda=RON, status_facturare="Nu se aplică"
 
-#### **2.2 /api/user/dashboard/**
-- ✅ KPIs personale fără informații financiare
-- ✅ Statistici timp înregistrat
-- ✅ Recent activity feed
-- ✅ Progress proiecte personale
+#### **2.2 /api/user/dashboard/** ✅ IMPLEMENTAT
+- ✅ KPIs personale fără informații financiare (total proiecte, active, finalizate, predate)
+- ✅ Statistici timp înregistrat din TimeTracking (ore săptămâna, zile lucrate)
+- ✅ Statistici sarcini (total, neinceput, in_progress, finalizate, urgente)
+- ✅ Date reale din BigQuery, nu simulate - se conectează automat la tabele existente
 
-#### **2.3 /api/user/timetracking/**
-- ✅ CRUD înregistrări timp personale
-- ✅ Filtrare la proiectele proprii
-- ✅ Weekly/Monthly reports
-- ✅ Timer start/stop functionality
+#### **2.3 /api/user/timetracking/** ✅ IMPLEMENTAT
+- ✅ CRUD înregistrări timp personale cu auto-exclude rate_per_hour și valoare_totala
+- ✅ Filtrare pe user_id, project_id, interval date cu paginare
+- ✅ POST cu valori financiare forțate la zero (rate_per_hour=0, valoare_totala=0)
+- ✅ Auto-creare tabelă TimeTracking dacă nu există
+- ✅ Gestionare erori gracefully dacă BigQuery tables lipsesc
+
+**📁 FIȘIERE NOI IMPLEMENTATE ETAPA 2:**
+- `app/api/user/dashboard/route.ts` - Dashboard utilizatori cu date reale din BigQuery
+- `app/api/user/projects/route.ts` - CRUD proiecte cu restricții financiare automate
+- `app/api/user/timetracking/route.ts` - Time tracking personal cu valori financiare zero
+**🔧 SPECIFICAȚII TEHNICE:**
+- Toate valorile financiare sunt automat setate la 0 în BigQuery (Valoare_Estimata=0, valoare_ron=0, rate_per_hour=0)
+- UI compatibility layer: returnează valori 0 pentru ca interfața admin să funcționeze
+- Gestionare gracefulă erori pentru tabele BigQuery lipsă (TimeTracking, Sarcini)
+- Build production trecut cu succes - toate API-urile funcționale
 
 ### **ETAPA 3: MANAGEMENT PROIECTE RESTRICȚIONAT** (2-3 zile)
-**STATUS**: 🔴 Neîncepută
+**STATUS**: ✅ COMPLETATĂ (21.09.2025 17:30)
 **OBIECTIV**: Adaptarea ProiectNouModal cu restricții financiare vizuale și funcționale
 
-#### **3.1 Componente UI Restrictive**
-- ✅ FinancialFieldsOverlay pentru blocare vizuală
-- ✅ Input-uri disabled cu messages explicative
-- ✅ Auto-completare valori financiare la zero RON
-- ✅ Validare pe frontend și backend
+#### **3.1 Pagina /projects pentru utilizatori normali** ✅ IMPLEMENTAT
+- ✅ Rută `/projects` completă cu UserLayout și design glassmorphism
+- ✅ UserProjectFilters - filtre fără secțiunea financiară (exclude valoare min/max)
+- ✅ UserProjectsTable - tabel fără coloane financiare, date din API `/api/user/projects`
+- ✅ Paginare funcțională și responsive design complet
+- ✅ Info banners pentru utilizatori normali cu explicații restricții
 
-#### **3.2 Reutilizarea Componentelor Existente**
-- ✅ ProiectNouModal adaptat cu props pentru userRole
-- ✅ ProiecteTable filtrat pentru utilizatori normali
+#### **3.2 UserProiectNouModal cu restricții vizuale** ✅ IMPLEMENTAT
+- ✅ Modal simplificat fără câmpuri financiare complexe
+- ✅ Secțiune financiară vizual blocată cu overlay și explicații
+- ✅ Auto-generare ID proiect și conectare la API `/api/user/projects`
+- ✅ Validare frontend și gestionare erori cu toast notifications
+- ✅ Design consistent cu ModernLayout și glassmorphism
+
+**📁 FIȘIERE NOI IMPLEMENTATE ETAPA 3:**
+- `app/projects/page.tsx` - Pagină principală proiecte utilizatori cu routing și auth
+- `app/projects/components/UserProjectFilters.tsx` - Filtre fără restricții financiare
+- `app/projects/components/UserProjectsTable.tsx` - Tabel proiecte cu API `/api/user/projects`
+- `app/projects/components/UserProiectNouModal.tsx` - Modal creare proiect cu restricții vizuale
+**🔧 SPECIFICAȚII TEHNICE ETAPA 3:**
+- Toate componentele folosesc UserLayout pentru navigația utilizatorilor normali
+- Design glassmorphism consistent cu AdminLayout dar adaptat pentru restricții
+- Secțiuni financiare vizual blocate cu overlay-uri și explicații
+- Build production: ruta `/projects` (7.95 kB) generată cu succes în Next.js
+
+#### **ETAPE URMĂTOARE DISPONIBILE:**
 - ✅ ProiectActions cu restricții pentru operațiuni financiare
 - ✅ Păstrarea funcționalității complete pentru admin
 

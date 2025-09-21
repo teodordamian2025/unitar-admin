@@ -301,7 +301,7 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
       position: 'relative'
     }}>
       {/* Backdrop pentru glassmorphism */}

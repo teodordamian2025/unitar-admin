@@ -87,29 +87,44 @@ export default function UserDashboard() {
     try {
       setLoadingData(true);
 
-      // Mock data pentru moment - va fi înlocuit cu API real
-      // TODO: Implementare /api/user/dashboard
-      const mockKPIs: UserKPIs = {
+      // Conectare la API real pentru utilizatori normali
+      console.log('🔄 Loading real user dashboard data...');
+      const response = await fetch('/api/user/dashboard');
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown API error');
+      }
+
+      console.log('✅ Real user dashboard data loaded:', result.data);
+
+      // Transformare date API în format compatibil cu UI
+      const realKPIs: UserKPIs = {
         myProjects: {
-          active: 3,
-          completed: 8,
-          atDeadline: 1,
-          total: 11
+          active: result.data.proiecte?.active || 0,
+          completed: result.data.proiecte?.finalizate || 0,
+          atDeadline: result.data.proiecte?.nepredate || 0, // Proiecte cu deadline aproape
+          total: result.data.proiecte?.total || 0
         },
         timeTracking: {
-          thisWeek: 32,
-          thisMonth: 142,
-          avgDaily: 6.4
+          thisWeek: result.data.timeTracking?.ore_saptamana_curenta || 0,
+          thisMonth: result.data.timeTracking?.ore_saptamana_curenta * 4 || 0, // Estimare
+          avgDaily: (result.data.timeTracking?.ore_saptamana_curenta || 0) / (result.data.timeTracking?.zile_lucrate || 1)
         },
         tasks: {
-          pending: 5,
-          inProgress: 3,
-          completed: 12,
-          total: 20
+          pending: result.data.sarcini?.neinceput || 0,
+          inProgress: result.data.sarcini?.in_progress || 0,
+          completed: result.data.sarcini?.finalizate || 0,
+          total: result.data.sarcini?.total || 0
         }
       };
 
-      setKpiData(mockKPIs);
+      setKpiData(realKPIs);
     } catch (error) {
       console.error('Eroare la încărcarea datelor dashboard:', error);
       toast.error('Eroare la încărcarea datelor!');
@@ -125,7 +140,7 @@ export default function UserDashboard() {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)'
       }}>
         <div style={{
           background: 'rgba(255, 255, 255, 0.9)',
@@ -152,7 +167,7 @@ export default function UserDashboard() {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)'
       }}>
         <div style={{
           background: 'rgba(255, 255, 255, 0.9)',
