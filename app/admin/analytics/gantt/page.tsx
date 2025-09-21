@@ -312,11 +312,30 @@ export default function GanttView() {
     try {
       setSavingChanges(true);
 
+      // Find task to determine type for API call
+      const task = ganttData.find(t => t.id === taskId);
+      if (!task) {
+        toast.error('Task nu a fost găsit!');
+        return;
+      }
+
+      // Construct proper taskId format for API: "tip_id"
+      let apiTaskId = taskId;
+      if (task.type === 'proiect') {
+        apiTaskId = `proiect_${taskId}`;
+      } else if (task.type === 'subproiect') {
+        apiTaskId = `subproiect_${taskId}`;
+      } else if (task.type === 'sarcina') {
+        apiTaskId = `sarcina_${taskId}`;
+      }
+
+      console.log('🔧 Sending API request:', { originalTaskId: taskId, apiTaskId, taskType: task.type });
+
       const response = await fetch('/api/analytics/gantt-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId,
+          taskId: apiTaskId,
           startDate,
           endDate
         })
@@ -973,6 +992,7 @@ export default function GanttView() {
                 <div
                   key={task.id}
                   style={{
+                    height: '60px',
                     padding: '0.75rem',
                     borderBottom: '1px solid rgba(229, 231, 235, 0.5)',
                     background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'transparent',
