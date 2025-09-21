@@ -83,64 +83,7 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
   const [analyticsIntervalId, setAnalyticsIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [notificationsIntervalId, setNotificationsIntervalId] = useState<NodeJS.Timeout | null>(null);
 
-  // Smart connection cu intervale separate pentru fiecare tip de data
-  const initializeConnection = useCallback(async () => {
-    try {
-      setIsConnected(true);
-
-      // Încărcare inițială de date
-      await refreshDashboardData();
-      await refreshAnalyticsData();
-      await refreshNotificationsData();
-
-      // Setup intervale separate bazate pe tab focus
-      setupSmartIntervals();
-
-      console.log('🔄 Smart real-time connection established with optimized intervals');
-
-    } catch (error) {
-      console.error('❌ Failed to initialize real-time connection:', error);
-      setIsConnected(false);
-    }
-  }, [isTabActive]);
-
-  // Smart setup pentru intervale separate bazate pe focus
-  const setupSmartIntervals = useCallback(() => {
-    // Clear existing intervals
-    clearAllIntervals();
-
-    const intervals = isTabActive ? SMART_INTERVALS.ACTIVE : SMART_INTERVALS.INACTIVE;
-
-    // Dashboard data (cel mai frecvent folosit)
-    const dashboardId = setInterval(refreshDashboardData, intervals.DASHBOARD);
-    setDashboardIntervalId(dashboardId);
-
-    // Analytics data (moderat de important)
-    const analyticsId = setInterval(refreshAnalyticsData, intervals.ANALYTICS);
-    setAnalyticsIntervalId(analyticsId);
-
-    // Notifications (cel mai puțin frecvent - ANAF se schimbă rar)
-    const notificationsId = setInterval(refreshNotificationsData, intervals.NOTIFICATIONS);
-    setNotificationsIntervalId(notificationsId);
-
-    console.log(`🔄 Smart intervals set for ${isTabActive ? 'ACTIVE' : 'INACTIVE'} tab:`, {
-      dashboard: `${intervals.DASHBOARD/1000}s`,
-      analytics: `${intervals.ANALYTICS/1000}s`,
-      notifications: `${intervals.NOTIFICATIONS/60000}min`
-    });
-  }, [isTabActive]);
-
-  const clearAllIntervals = useCallback(() => {
-    if (dashboardIntervalId) clearInterval(dashboardIntervalId);
-    if (analyticsIntervalId) clearInterval(analyticsIntervalId);
-    if (notificationsIntervalId) clearInterval(notificationsIntervalId);
-
-    setDashboardIntervalId(null);
-    setAnalyticsIntervalId(null);
-    setNotificationsIntervalId(null);
-  }, [dashboardIntervalId, analyticsIntervalId, notificationsIntervalId]);
-
-  // Separate refresh functions pentru fiecare tip de data
+  // Separate refresh functions pentru fiecare tip de data - DECLARE FIRST
   const refreshDashboardData = useCallback(async () => {
     try {
       const dashboardResponse = await fetch('/api/rapoarte/dashboard');
@@ -252,6 +195,63 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
       console.error('❌ Error refreshing notifications data:', error);
     }
   }, []);
+
+  // Smart connection cu intervale separate pentru fiecare tip de data
+  const initializeConnection = useCallback(async () => {
+    try {
+      setIsConnected(true);
+
+      // Încărcare inițială de date
+      await refreshDashboardData();
+      await refreshAnalyticsData();
+      await refreshNotificationsData();
+
+      console.log('🔄 Smart real-time connection established with optimized intervals');
+
+    } catch (error) {
+      console.error('❌ Failed to initialize real-time connection:', error);
+      setIsConnected(false);
+    }
+  }, [refreshDashboardData, refreshAnalyticsData, refreshNotificationsData]);
+
+  // Smart setup pentru intervale separate bazate pe focus
+  const setupSmartIntervals = useCallback(() => {
+    // Clear existing intervals FĂRĂ dependencies circulare
+    if (dashboardIntervalId) clearInterval(dashboardIntervalId);
+    if (analyticsIntervalId) clearInterval(analyticsIntervalId);
+    if (notificationsIntervalId) clearInterval(notificationsIntervalId);
+
+    const intervals = isTabActive ? SMART_INTERVALS.ACTIVE : SMART_INTERVALS.INACTIVE;
+
+    // Dashboard data (cel mai frecvent folosit)
+    const dashboardId = setInterval(refreshDashboardData, intervals.DASHBOARD);
+    setDashboardIntervalId(dashboardId);
+
+    // Analytics data (moderat de important)
+    const analyticsId = setInterval(refreshAnalyticsData, intervals.ANALYTICS);
+    setAnalyticsIntervalId(analyticsId);
+
+    // Notifications (cel mai puțin frecvent - ANAF se schimbă rar)
+    const notificationsId = setInterval(refreshNotificationsData, intervals.NOTIFICATIONS);
+    setNotificationsIntervalId(notificationsId);
+
+    console.log(`🔄 Smart intervals set for ${isTabActive ? 'ACTIVE' : 'INACTIVE'} tab:`, {
+      dashboard: `${intervals.DASHBOARD/1000}s`,
+      analytics: `${intervals.ANALYTICS/1000}s`,
+      notifications: `${intervals.NOTIFICATIONS/60000}min`
+    });
+  }, [isTabActive, dashboardIntervalId, analyticsIntervalId, notificationsIntervalId, refreshDashboardData, refreshAnalyticsData, refreshNotificationsData]);
+
+  const clearAllIntervals = useCallback(() => {
+    if (dashboardIntervalId) clearInterval(dashboardIntervalId);
+    if (analyticsIntervalId) clearInterval(analyticsIntervalId);
+    if (notificationsIntervalId) clearInterval(notificationsIntervalId);
+
+    setDashboardIntervalId(null);
+    setAnalyticsIntervalId(null);
+    setNotificationsIntervalId(null);
+  }, [dashboardIntervalId, analyticsIntervalId, notificationsIntervalId]);
+
 
   // Funcția generateRandomNotifications a fost eliminată - folosim doar date reale din BigQuery
 
@@ -370,26 +370,30 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isConnected, initializeConnection]);
+  }, [isConnected]); // Removed initializeConnection dependency
 
-  // Re-setup intervals când tab focus se schimbă
-  useEffect(() => {
-    if (isConnected) {
-      setupSmartIntervals();
-    }
-  }, [isTabActive, isConnected, setupSmartIntervals]);
-
-  // Initialize connection on mount
+  // Initialize connection on mount - DOAR O DATĂ
   useEffect(() => {
     initializeConnection();
 
     // Cleanup on unmount
     return () => {
-      clearAllIntervals();
+      // Clear intervals pe cleanup
+      if (dashboardIntervalId) clearInterval(dashboardIntervalId);
+      if (analyticsIntervalId) clearInterval(analyticsIntervalId);
+      if (notificationsIntervalId) clearInterval(notificationsIntervalId);
+
       setIsConnected(false);
       setSubscribers(new Map());
     };
-  }, [initializeConnection, clearAllIntervals]);
+  }, []); // Empty dependency array - run only once on mount
+
+  // Setup intervals când conexiunea sau focus se schimbă
+  useEffect(() => {
+    if (isConnected) {
+      setupSmartIntervals();
+    }
+  }, [isConnected, isTabActive]); // Setup intervals when connection is established or tab focus changes
 
   const contextValue: RealtimeContextType = {
     data,
