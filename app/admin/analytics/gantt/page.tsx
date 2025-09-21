@@ -14,7 +14,6 @@ import { useRouter } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
 import { Card, Button, Alert, LoadingSpinner, Modal } from '@/app/components/ui';
 import { toast } from 'react-toastify';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 
 interface GanttTask {
   id: string;
@@ -62,10 +61,21 @@ export default function GanttView() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
 
-  // Drag and drop state
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedTask, setDraggedTask] = useState<GanttTask | null>(null);
+  // Resize state
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeInfo, setResizeInfo] = useState<{
+    taskId: string;
+    type: 'start' | 'end';
+    originalDate: string;
+    previewDate: string;
+  } | null>(null);
   const [savingChanges, setSavingChanges] = useState(false);
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    date: string;
+  }>({ visible: false, x: 0, y: 0, date: '' });
 
   // Filters
   const [filters, setFilters] = useState({
@@ -187,75 +197,115 @@ export default function GanttView() {
     }
   };
 
-  // Enhanced drag and drop handlers with mouse position tracking
-  const onDragStart = (start: any) => {
-    setIsDragging(true);
-    const task = ganttData.find(t => t.id === start.draggableId);
-    setDraggedTask(task || null);
+  // Resize handlers for task bar edges
+  const handleResizeStart = (taskId: string, type: 'start' | 'end', e: React.MouseEvent) => {
+    e.stopPropagation();
 
-    // Add visual feedback
-    document.body.style.cursor = 'grabbing';
+    const task = ganttData.find(t => t.id === taskId);
+    if (!task) return;
+
+    const originalDate = type === 'start'
+      ? (typeof task.startDate === 'object' ? task.startDate.value : task.startDate)
+      : (typeof task.endDate === 'object' ? task.endDate.value : task.endDate);
+
+    setIsResizing(true);
+    setResizeInfo({
+      taskId,
+      type,
+      originalDate,
+      previewDate: originalDate
+    });
+
+    document.body.style.cursor = 'ew-resize';
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
   };
 
-  const onDragEnd = async (result: DropResult) => {
-    setIsDragging(false);
-    setDraggedTask(null);
-    document.body.style.cursor = '';
-
-    if (!result.destination || !draggedTask) {
-      return;
-    }
-
-    // Calculate new dates based on drop position
-    const newDates = calculateNewDatesFromMousePosition(draggedTask);
-    if (newDates) {
-      await updateTaskDates(draggedTask.id, newDates.startDate, newDates.endDate);
-    }
-  };
-
-  // Track mouse position for better timeline calculation
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const calculateNewDatesFromMousePosition = (task: GanttTask) => {
-    if (!ganttRef.current) return null;
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!resizeInfo || !ganttRef.current) return;
 
     const ganttContainer = ganttRef.current.querySelector('[data-timeline-body]') as HTMLElement;
-    if (!ganttContainer) return null;
+    if (!ganttContainer) return;
 
     const containerRect = ganttContainer.getBoundingClientRect();
+    const relativeX = e.clientX - containerRect.left;
+    const percentage = Math.max(0, Math.min(1, relativeX / containerRect.width));
 
-    // Calculate relative position within the timeline container
-    const relativeX = mousePosition.x - containerRect.left;
-    const dropPercentage = Math.max(0, Math.min(1, relativeX / containerRect.width));
-
-    // Calculate the percentage of drop position within timeline
+    // Calculate new date based on mouse position
     const timelineStart = timelineSettings.startDate;
     const timelineEnd = timelineSettings.endDate;
     const totalDuration = timelineEnd.getTime() - timelineStart.getTime();
+    const newDateTime = timelineStart.getTime() + (totalDuration * percentage);
+    const newDate = new Date(newDateTime);
+    const newDateString = newDate.toISOString().split('T')[0];
 
-    // Convert drop position to date
-    const newStartTime = timelineStart.getTime() + (totalDuration * dropPercentage);
-    const newStartDate = new Date(newStartTime);
+    // Update preview date
+    setResizeInfo(prev => prev ? { ...prev, previewDate: newDateString } : null);
 
-    // Calculate duration from original task
-    const originalStartValue = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
-    const originalEndValue = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
-    const originalStart = new Date(originalStartValue);
-    const originalEnd = new Date(originalEndValue);
-    const taskDuration = originalEnd.getTime() - originalStart.getTime();
+    // Show tooltip with date
+    setTooltip({
+      visible: true,
+      x: e.clientX + 10,
+      y: e.clientY - 30,
+      date: newDate.toLocaleDateString('ro-RO', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+    });
+  };
 
-    const newEndDate = new Date(newStartTime + taskDuration);
+  const handleResizeEnd = async () => {
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+    document.body.style.cursor = '';
 
-    return {
-      startDate: newStartDate.toISOString().split('T')[0],
-      endDate: newEndDate.toISOString().split('T')[0]
-    };
+    setTooltip({ visible: false, x: 0, y: 0, date: '' });
+
+    if (!resizeInfo) {
+      setIsResizing(false);
+      return;
+    }
+
+    const task = ganttData.find(t => t.id === resizeInfo.taskId);
+    if (!task) {
+      setIsResizing(false);
+      setResizeInfo(null);
+      return;
+    }
+
+    // Validate the new date
+    const currentStartDate = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+    const currentEndDate = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
+
+    let newStartDate = currentStartDate;
+    let newEndDate = currentEndDate;
+
+    if (resizeInfo.type === 'start') {
+      newStartDate = resizeInfo.previewDate;
+      // Ensure start date is before end date
+      if (new Date(newStartDate) >= new Date(currentEndDate)) {
+        toast.error('Data de început trebuie să fie înainte de data de sfârșit!');
+        setIsResizing(false);
+        setResizeInfo(null);
+        return;
+      }
+    } else {
+      newEndDate = resizeInfo.previewDate;
+      // Ensure end date is after start date
+      if (new Date(newEndDate) <= new Date(currentStartDate)) {
+        toast.error('Data de sfârșit trebuie să fie după data de început!');
+        setIsResizing(false);
+        setResizeInfo(null);
+        return;
+      }
+    }
+
+    // Update task dates
+    await updateTaskDates(resizeInfo.taskId, newStartDate, newEndDate);
+
+    setIsResizing(false);
+    setResizeInfo(null);
   };
 
   const updateTaskDates = async (taskId: string, startDate: string, endDate: string) => {
@@ -895,17 +945,16 @@ export default function GanttView() {
           </div>
         )}
         <div style={{ overflow: 'auto' }}>
-          <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-            <div
-              ref={ganttRef}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '300px 1fr',
-                minWidth: '800px',
-                borderRadius: '8px',
-                overflow: 'hidden'
-              }}
-            >
+          <div
+            ref={ganttRef}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '300px 1fr',
+              minWidth: '800px',
+              borderRadius: '8px',
+              overflow: 'hidden'
+            }}
+          >
             {/* Task List */}
             <div style={{ background: 'rgba(249, 250, 251, 0.8)' }}>
               {/* Header */}
@@ -1020,18 +1069,12 @@ export default function GanttView() {
               </div>
 
               {/* Timeline Body */}
-              <Droppable droppableId="timeline" direction="horizontal">
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    data-timeline-body
-                    onMouseMove={handleMouseMove}
-                    style={{
-                      position: 'relative',
-                      backgroundColor: snapshot.isDraggingOver ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
-                    }}
-                  >
+              <div
+                data-timeline-body
+                style={{
+                  position: 'relative'
+                }}
+              >
                 {visibleTasks.map((task, index) => {
                   const position = calculateTaskPosition(task);
                   return (
@@ -1069,39 +1112,77 @@ export default function GanttView() {
                         </div>
                       )}
 
-                      {/* Task Bar */}
-                      <Draggable draggableId={task.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            style={{
-                              position: 'absolute',
-                              left: position.left,
-                              width: position.width,
-                              height: '24px',
-                              background: getTaskColor(task),
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-                              boxShadow: snapshot.isDragging
-                                ? '0 8px 16px rgba(0, 0, 0, 0.3)'
-                                : '0 2px 4px rgba(0, 0, 0, 0.1)',
-                              opacity: task.status === 'anulata' ? 0.5 : 1,
-                              transform: snapshot.isDragging ? 'rotate(5deg)' : 'none',
-                              zIndex: snapshot.isDragging ? 1000 : 1,
-                              ...provided.draggableProps.style
-                            }}
-                            onClick={(e) => {
-                              if (!snapshot.isDragging) {
-                                setSelectedTask(task);
-                                setShowTaskModal(true);
-                              }
-                            }}
-                          >
+                      {/* Task Bar with Resize Handles */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: position.left,
+                          width: position.width,
+                          height: '24px',
+                          background: getTaskColor(task),
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                          opacity: task.status === 'anulata' ? 0.5 : 1,
+                          border: resizeInfo?.taskId === task.id ? '2px solid #3b82f6' : 'none'
+                        }}
+                        onClick={() => {
+                          if (!isResizing) {
+                            setSelectedTask(task);
+                            setShowTaskModal(true);
+                          }
+                        }}
+                      >
+                        {/* Left Resize Handle */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: '-2px',
+                            top: '0',
+                            bottom: '0',
+                            width: '6px',
+                            cursor: 'ew-resize',
+                            background: 'rgba(59, 130, 246, 0.8)',
+                            borderRadius: '4px 0 0 4px',
+                            opacity: 0,
+                            transition: 'opacity 0.2s'
+                          }}
+                          className="resize-handle-left"
+                          onMouseDown={(e) => handleResizeStart(task.id, 'start', e)}
+                          onMouseEnter={(e) => {
+                            (e.target as HTMLElement).style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.target as HTMLElement).style.opacity = '0';
+                          }}
+                        />
+
+                        {/* Right Resize Handle */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: '-2px',
+                            top: '0',
+                            bottom: '0',
+                            width: '6px',
+                            cursor: 'ew-resize',
+                            background: 'rgba(59, 130, 246, 0.8)',
+                            borderRadius: '0 4px 4px 0',
+                            opacity: 0,
+                            transition: 'opacity 0.2s'
+                          }}
+                          className="resize-handle-right"
+                          onMouseDown={(e) => handleResizeStart(task.id, 'end', e)}
+                          onMouseEnter={(e) => {
+                            (e.target as HTMLElement).style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.target as HTMLElement).style.opacity = '0';
+                          }}
+                        />
                         {/* Progress Bar */}
                         <div
                           style={{
@@ -1115,18 +1196,17 @@ export default function GanttView() {
                           }}
                         />
 
-                            <span style={{
-                              color: 'white',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              position: 'relative',
-                              zIndex: 1
-                            }}>
-                              {task.progress}%
-                            </span>
-                          </div>
-                        )}
-                      </Draggable>
+                        {/* Progress Percentage */}
+                        <span style={{
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          position: 'relative',
+                          zIndex: 1
+                        }}>
+                          {task.progress}%
+                        </span>
+                      </div>
 
                       {/* End Date Label */}
                       {parseFloat(position.width.replace('%', '')) > 10 && (
@@ -1180,15 +1260,32 @@ export default function GanttView() {
                   }
                   return null;
                 })()}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
+              </div>
             </div>
           </div>
-          </DragDropContext>
         </div>
       </Card>
+
+      {/* Resize Tooltip */}
+      {tooltip.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltip.x + 10,
+            top: tooltip.y - 10,
+            background: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            padding: '0.5rem',
+            borderRadius: '4px',
+            fontSize: '0.75rem',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {tooltip.date}
+        </div>
+      )}
 
       {/* Task Details Modal */}
       <Modal
