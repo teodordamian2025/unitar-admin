@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
+import PersistentTimer from './PersistentTimer';
 
 interface ModernLayoutProps {
   children: ReactNode;
@@ -394,7 +395,10 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           </div>
 
           {/* Quick Actions */}
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {/* Persistent Timer */}
+            <PersistentTimer />
+
             <button
               style={{
                 padding: '0.5rem 1rem',
