@@ -77,8 +77,15 @@ export default function CalendarView() {
     include_sarcini: true,
     include_timetracking: false,
     user_id: '',
-    proiect_id: ''
+    proiect_id: '',
+    responsabil_nume: '',
+    proiect_nume: '',
+    client_nume: ''
   });
+
+  // Data for filter options
+  const [utilizatori, setUtilizatori] = useState<any[]>([]);
+  const [proiecte, setProiecte] = useState<any[]>([]);
 
   useEffect(() => {
     if (loading) return;
@@ -92,8 +99,33 @@ export default function CalendarView() {
   useEffect(() => {
     if (isAuthorized) {
       loadCalendarData();
+      loadFilterData();
     }
   }, [isAuthorized, currentDate, filters]);
+
+  const loadFilterData = async () => {
+    try {
+      // Load utilizatori for user filter
+      const utilizatoriResponse = await fetch('/api/rapoarte/utilizatori');
+      if (utilizatoriResponse.ok) {
+        const utilizatoriData = await utilizatoriResponse.json();
+        if (utilizatoriData.success) {
+          setUtilizatori(utilizatoriData.data);
+        }
+      }
+
+      // Load proiecte for project filter
+      const proiecteResponse = await fetch('/api/rapoarte/proiecte');
+      if (proiecteResponse.ok) {
+        const proiecteData = await proiecteResponse.json();
+        if (proiecteData.success) {
+          setProiecte(proiecteData.data);
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea datelor pentru filtre:', error);
+    }
+  };
 
   const checkUserRole = async () => {
     if (!user) return;
@@ -180,7 +212,29 @@ export default function CalendarView() {
       if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
         console.log('[CALENDAR DEBUG] Processing proiecte:', proiecteData.data.length);
 
-        const proiecteEvents = proiecteData.data.map((p: any, index: number) => {
+        let filteredProiecte = proiecteData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredProiecte = filteredProiecte.filter((p: any) => p.ID_Proiect === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+          );
+        }
+        if (filters.client_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Client_Nume?.toLowerCase().includes(filters.client_nume.toLowerCase())
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+          );
+        }
+
+        const proiecteEvents = filteredProiecte.map((p: any, index: number) => {
           // Handle BigQuery DATE fields cu .value property
           const dataFinal = p.Data_Final?.value || p.Data_Final;
           const dataStart = p.Data_Start?.value || p.Data_Start;
@@ -200,14 +254,32 @@ export default function CalendarView() {
           };
         });
         events.push(...proiecteEvents);
-        console.log('[CALENDAR DEBUG] Added proiecte events:', proiecteEvents.length);
+        console.log('[CALENDAR DEBUG] Added filtered proiecte events:', proiecteEvents.length);
       }
 
       // 2. SUBPROIECTE - afișează Denumire + proiect_id
       if (subproiecteData.success && Array.isArray(subproiecteData.data) && subproiecteData.data.length > 0) {
         console.log('[CALENDAR DEBUG] Processing subproiecte:', subproiecteData.data.length);
 
-        const subproiecteEvents = subproiecteData.data.map((s: any, index: number) => {
+        let filteredSubproiecte = subproiecteData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) => s.ID_Proiect === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase()) ||
+            s.Proiect_Denumire?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+          );
+        }
+
+        const subproiecteEvents = filteredSubproiecte.map((s: any, index: number) => {
           // Handle BigQuery DATE fields cu .value property
           const dataFinal = s.Data_Final?.value || s.Data_Final;
           const dataStart = s.Data_Start?.value || s.Data_Start;
@@ -227,14 +299,32 @@ export default function CalendarView() {
           };
         });
         events.push(...subproiecteEvents);
-        console.log('[CALENDAR DEBUG] Added subproiecte events:', subproiecteEvents.length);
+        console.log('[CALENDAR DEBUG] Added filtered subproiecte events:', subproiecteEvents.length);
       }
 
       // 3. SARCINI - afișează titlu + proiect_id
       if (sarciniData.success && Array.isArray(sarciniData.data) && sarciniData.data.length > 0) {
         console.log('[CALENDAR DEBUG] Processing sarcini:', sarciniData.data.length);
 
-        const sarciniEvents = sarciniData.data.map((s: any, index: number) => {
+        let filteredSarcini = sarciniData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSarcini = filteredSarcini.filter((s: any) => s.proiect_id === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          filteredSarcini = filteredSarcini.filter((s: any) =>
+            s.titlu?.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSarcini = filteredSarcini.filter((s: any) => {
+            const responsabil = s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : '';
+            return responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase());
+          });
+        }
+
+        const sarciniEvents = filteredSarcini.map((s: any, index: number) => {
           // Handle BigQuery DATE fields cu .value property
           const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
           const dataCreare = s.data_creare?.value || s.data_creare;
@@ -254,7 +344,7 @@ export default function CalendarView() {
           };
         });
         events.push(...sarciniEvents);
-        console.log('[CALENDAR DEBUG] Added sarcini events:', sarciniEvents.length);
+        console.log('[CALENDAR DEBUG] Added filtered sarcini events:', sarciniEvents.length);
       }
 
       console.log('[CALENDAR DEBUG] Total events created:', events.length);
@@ -543,38 +633,188 @@ export default function CalendarView() {
 
         {/* Filters */}
         <div style={{
-          display: 'flex',
-          gap: '1rem',
-          alignItems: 'center',
-          flexWrap: 'wrap',
           padding: '1rem',
           background: 'rgba(249, 250, 251, 0.5)',
           borderRadius: '8px'
         }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-            <input
-              type="checkbox"
-              checked={filters.include_sarcini}
-              onChange={(e) => setFilters(prev => ({ ...prev, include_sarcini: e.target.checked }))}
-            />
-            📋 Sarcini
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-            <input
-              type="checkbox"
-              checked={filters.include_proiecte}
-              onChange={(e) => setFilters(prev => ({ ...prev, include_proiecte: e.target.checked }))}
-            />
-            🎯 Deadline Proiecte
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
-            <input
-              type="checkbox"
-              checked={filters.include_timetracking}
-              onChange={(e) => setFilters(prev => ({ ...prev, include_timetracking: e.target.checked }))}
-            />
-            ⏱️ Time Tracking
-          </label>
+          {/* Event Type Filters */}
+          <div style={{
+            display: 'flex',
+            gap: '1rem',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginBottom: '1rem'
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <input
+                type="checkbox"
+                checked={filters.include_sarcini}
+                onChange={(e) => setFilters(prev => ({ ...prev, include_sarcini: e.target.checked }))}
+              />
+              📋 Sarcini
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <input
+                type="checkbox"
+                checked={filters.include_proiecte}
+                onChange={(e) => setFilters(prev => ({ ...prev, include_proiecte: e.target.checked }))}
+              />
+              🎯 Deadline Proiecte
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <input
+                type="checkbox"
+                checked={filters.include_timetracking}
+                onChange={(e) => setFilters(prev => ({ ...prev, include_timetracking: e.target.checked }))}
+              />
+              ⏱️ Time Tracking
+            </label>
+          </div>
+
+          {/* Advanced Filters */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            alignItems: 'end'
+          }}>
+            {/* User Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                👤 Responsabil
+              </label>
+              <select
+                value={filters.responsabil_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, responsabil_nume: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toți responsabilii</option>
+                {utilizatori.map((user) => (
+                  <option key={user.uid} value={user.nume_complet}>
+                    {user.nume_complet}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Project Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                📁 Proiect
+              </label>
+              <select
+                value={filters.proiect_id}
+                onChange={(e) => setFilters(prev => ({ ...prev, proiect_id: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate proiectele</option>
+                {proiecte.map((project) => (
+                  <option key={project.ID_Proiect} value={project.ID_Proiect}>
+                    {project.ID_Proiect} - {project.Denumire}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Project Name Search */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                🔍 Căutare nume
+              </label>
+              <input
+                type="text"
+                value={filters.proiect_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
+                placeholder="Căută după nume proiect..."
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            {/* Client Search */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                🏢 Client
+              </label>
+              <input
+                type="text"
+                value={filters.client_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, client_nume: e.target.value }))}
+                placeholder="Căută după nume client..."
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            {/* Reset Filters Button */}
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters({
+                  include_proiecte: true,
+                  include_sarcini: true,
+                  include_timetracking: false,
+                  user_id: '',
+                  proiect_id: '',
+                  responsabil_nume: '',
+                  proiect_nume: '',
+                  client_nume: ''
+                })}
+                style={{ width: '100%' }}
+              >
+                🔄 Reset filtre
+              </Button>
+            </div>
+          </div>
         </div>
       </Card>
 

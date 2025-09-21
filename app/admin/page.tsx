@@ -318,7 +318,7 @@ export default function AdminPage() {
             alignItems: 'center',
             gap: '0.5rem'
           }}>
-            🚨 Alerturi Critice
+            🚨 Alerte Critice
           </h2>
           <button
             onClick={loadDashboardData}

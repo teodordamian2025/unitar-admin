@@ -61,6 +61,21 @@ export default function GanttView() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
 
+  // Filters
+  const [filters, setFilters] = useState({
+    proiect_id: '',
+    responsabil_nume: '',
+    proiect_nume: '',
+    client_nume: '',
+    tip_task: '', // 'proiect', 'subproiect', 'sarcina'
+    status: '', // 'to_do', 'in_progress', 'finalizata', 'anulata'
+    prioritate: '' // 'normala', 'ridicata', 'urgent'
+  });
+
+  // Data for filter options
+  const [utilizatori, setUtilizatori] = useState<any[]>([]);
+  const [proiecte, setProiecte] = useState<any[]>([]);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -73,8 +88,33 @@ export default function GanttView() {
   useEffect(() => {
     if (isAuthorized) {
       loadGanttData();
+      loadFilterData();
     }
-  }, [isAuthorized, timelineSettings.viewMode]);
+  }, [isAuthorized, timelineSettings.viewMode, filters]);
+
+  const loadFilterData = async () => {
+    try {
+      // Load utilizatori for user filter
+      const utilizatoriResponse = await fetch('/api/rapoarte/utilizatori');
+      if (utilizatoriResponse.ok) {
+        const utilizatoriData = await utilizatoriResponse.json();
+        if (utilizatoriData.success) {
+          setUtilizatori(utilizatoriData.data);
+        }
+      }
+
+      // Load proiecte for project filter
+      const proiecteResponse = await fetch('/api/rapoarte/proiecte');
+      if (proiecteResponse.ok) {
+        const proiecteData = await proiecteResponse.json();
+        if (proiecteData.success) {
+          setProiecte(proiecteData.data);
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea datelor pentru filtre:', error);
+    }
+  };
 
   const checkUserRole = async () => {
     if (!user) return;
@@ -240,10 +280,41 @@ export default function GanttView() {
   };
 
   const getVisibleTasks = () => {
+    let filteredTasks = ganttData;
+
+    // Apply filters
+    if (filters.proiect_id) {
+      filteredTasks = filteredTasks.filter(task => {
+        // For tasks, look for proiect_id in the ID or name
+        return task.id.includes(filters.proiect_id) || task.name.includes(filters.proiect_id);
+      });
+    }
+    if (filters.proiect_nume) {
+      filteredTasks = filteredTasks.filter(task =>
+        task.name.toLowerCase().includes(filters.proiect_nume.toLowerCase())
+      );
+    }
+    if (filters.responsabil_nume) {
+      filteredTasks = filteredTasks.filter(task =>
+        task.resources.some(resource =>
+          resource.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+        )
+      );
+    }
+    if (filters.tip_task) {
+      filteredTasks = filteredTasks.filter(task => task.type === filters.tip_task);
+    }
+    if (filters.status) {
+      filteredTasks = filteredTasks.filter(task => task.status === filters.status);
+    }
+    if (filters.prioritate) {
+      filteredTasks = filteredTasks.filter(task => task.priority === filters.prioritate);
+    }
+
     const visible: GanttTask[] = [];
     const collapsedParents = new Set<string>();
 
-    ganttData.forEach(task => {
+    filteredTasks.forEach(task => {
       if (task.isCollapsed) {
         collapsedParents.add(task.id);
       }
@@ -366,6 +437,231 @@ export default function GanttView() {
               {Math.round(ganttData.reduce((acc, t) => acc + t.progress, 0) / ganttData.length) || 0}%
             </div>
             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Progres Mediu</div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{
+          padding: '1rem',
+          background: 'rgba(249, 250, 251, 0.5)',
+          borderRadius: '8px',
+          marginTop: '1rem'
+        }}>
+          <h3 style={{
+            margin: '0 0 1rem 0',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            🔍 Filtrare Date
+          </h3>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            alignItems: 'end'
+          }}>
+            {/* User Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                👤 Responsabil
+              </label>
+              <select
+                value={filters.responsabil_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, responsabil_nume: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toți responsabilii</option>
+                {utilizatori.map((user) => (
+                  <option key={user.uid} value={user.nume_complet}>
+                    {user.nume_complet}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Project Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                📁 Proiect
+              </label>
+              <select
+                value={filters.proiect_id}
+                onChange={(e) => setFilters(prev => ({ ...prev, proiect_id: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate proiectele</option>
+                {proiecte.map((project) => (
+                  <option key={project.ID_Proiect} value={project.ID_Proiect}>
+                    {project.ID_Proiect} - {project.Denumire}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Project Name Search */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                🔍 Căutare nume
+              </label>
+              <input
+                type="text"
+                value={filters.proiect_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
+                placeholder="Căută după nume proiect..."
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            {/* Task Type Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                📋 Tip Task
+              </label>
+              <select
+                value={filters.tip_task}
+                onChange={(e) => setFilters(prev => ({ ...prev, tip_task: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate tipurile</option>
+                <option value="proiect">📁 Proiect</option>
+                <option value="subproiect">📂 Subproiect</option>
+                <option value="sarcina">📋 Sarcină</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                🔄 Status
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate statusurile</option>
+                <option value="to_do">⏳ De făcut</option>
+                <option value="in_progress">🔄 În progres</option>
+                <option value="finalizata">✅ Finalizată</option>
+                <option value="anulata">❌ Anulată</option>
+              </select>
+            </div>
+
+            {/* Priority Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                ⚡ Prioritate
+              </label>
+              <select
+                value={filters.prioritate}
+                onChange={(e) => setFilters(prev => ({ ...prev, prioritate: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate prioritățile</option>
+                <option value="normala">🔵 Normală</option>
+                <option value="ridicata">🟡 Ridicată</option>
+                <option value="urgent">🔴 Urgent</option>
+              </select>
+            </div>
+
+            {/* Reset Filters Button */}
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters({
+                  proiect_id: '',
+                  responsabil_nume: '',
+                  proiect_nume: '',
+                  client_nume: '',
+                  tip_task: '',
+                  status: '',
+                  prioritate: ''
+                })}
+                style={{ width: '100%' }}
+              >
+                🔄 Reset filtre
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
