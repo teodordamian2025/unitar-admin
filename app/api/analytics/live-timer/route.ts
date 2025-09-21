@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
           sl.descriere_activitate as descriere_sesiune,
           
           -- Calculez timpul elapsed în secunde
-          CASE 
-            WHEN sl.status = 'activ' THEN 
-              DATETIME_DIFF(CURRENT_DATETIME(), sl.data_start, SECOND)
+          CASE
+            WHEN sl.status = 'activ' THEN
+              TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), sl.data_start, SECOND)
             WHEN sl.status = 'pausat' AND sl.data_stop IS NOT NULL THEN
-              DATETIME_DIFF(sl.data_stop, sl.data_start, SECOND)
+              TIMESTAMP_DIFF(sl.data_stop, sl.data_start, SECOND)
             ELSE 0
           END as timp_elapsed_seconds,
-          
+
           -- Ultima activitate
           COALESCE(sl.data_stop, sl.data_start) as ultima_activitate,
           
@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
           END as productivity_score,
           
           -- Break time calculation (sesiuni cu pauze frecvente)
-          CASE 
-            WHEN sl.status = 'pausat' THEN 
-              DATETIME_DIFF(CURRENT_DATETIME(), COALESCE(sl.data_stop, sl.data_start), SECOND)
+          CASE
+            WHEN sl.status = 'pausat' THEN
+              TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), COALESCE(sl.data_stop, sl.data_start), SECOND)
             ELSE 0
           END as break_time_seconds
           
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
           ON sl.proiect_id = s.proiect_id
         WHERE sl.status IN ('activ', 'pausat')
-          AND sl.data_start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 24 HOUR)
+          AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
           ${userId ? 'AND sl.utilizator_uid = @userId' : ''}
         ORDER BY sl.data_start DESC
       )
@@ -101,8 +101,8 @@ export async function GET(request: NextRequest) {
         break_time_seconds as break_time,
         
         -- Format pentru frontend
-        FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', data_start) as data_start_formatted,
-        FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', ultima_activitate) as ultima_activitate_formatted
+        FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', data_start) as data_start_formatted,
+        FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', ultima_activitate) as ultima_activitate_formatted
         
       FROM active_sessions
       ${includeCompleted ? `
@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
         const insertSessionQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
-          VALUES (@sessionId, @utilizatorUid, @proiectId, CURRENT_DATETIME(), 'activ', @descriere, CURRENT_DATETIME())
+          VALUES (@sessionId, @utilizatorUid, @proiectId, CURRENT_TIMESTAMP(), 'activ', @descriere, CURRENT_TIMESTAMP())
         `;
 
         await bigquery.query({
@@ -291,10 +291,10 @@ export async function POST(request: NextRequest) {
         // Opresc sesiunea și calculez timpul total
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          SET 
+          SET
             status = 'completat',
-            data_stop = CURRENT_DATETIME(),
-            ore_lucrate = DATETIME_DIFF(CURRENT_DATETIME(), data_start, SECOND) / 3600.0
+            data_stop = CURRENT_TIMESTAMP(),
+            ore_lucrate = TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0
           WHERE id = @sessionId
         `;
 
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
             sl.descriere_activitate,
             'live_timer' as tip_inregistrare,
             sl.proiect_id,
-            CURRENT_DATETIME()
+            CURRENT_TIMESTAMP()
           FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
           LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
             ON sl.utilizator_uid = u.uid
@@ -348,9 +348,9 @@ export async function POST(request: NextRequest) {
 
         const pauseSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          SET 
+          SET
             status = 'pausat',
-            data_stop = CURRENT_DATETIME()
+            data_stop = CURRENT_TIMESTAMP()
           WHERE id = @sessionId AND status = 'activ'
         `;
 

@@ -78,6 +78,9 @@ export default function LiveTracking() {
   // UI State
   const [showStartModal, setShowStartModal] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<any[]>([]);
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [sarcini, setSarcini] = useState<any[]>([]);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -191,11 +194,42 @@ export default function LiveTracking() {
       const result = await response.json();
       if (result.success) {
         setProjects(result.data);
+        setFilteredProjects(result.data);
       }
     } catch (error) {
       console.error('Eroare la încărcarea proiectelor:', error);
     }
   };
+
+  // Effect pentru filtrarea proiectelor
+  useEffect(() => {
+    if (projectSearchTerm.trim() === '') {
+      setFilteredProjects(projects);
+    } else {
+      const searchLower = projectSearchTerm.toLowerCase();
+      const filtered = projects.filter(project =>
+        project.ID_Proiect?.toLowerCase().includes(searchLower) ||
+        project.Denumire?.toLowerCase().includes(searchLower) ||
+        project.Adresa?.toLowerCase().includes(searchLower)
+      );
+      setFilteredProjects(filtered);
+    }
+  }, [projectSearchTerm, projects]);
+
+  // Effect pentru închiderea dropdown-ului la click în afara lui
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowProjectDropdown(false);
+    };
+
+    if (showProjectDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showProjectDropdown]);
 
   const loadSarcini = async (projectId: string) => {
     try {
@@ -692,7 +726,11 @@ export default function LiveTracking() {
       {/* Start Timer Modal */}
       <Modal
         isOpen={showStartModal}
-        onClose={() => setShowStartModal(false)}
+        onClose={() => {
+          setShowStartModal(false);
+          setProjectSearchTerm('');
+          setShowProjectDropdown(false);
+        }}
         title="▶️ Începe Sesiune Nouă"
         size="md"
       >
@@ -701,31 +739,88 @@ export default function LiveTracking() {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
               Proiect *
             </label>
-            <select
-              value={personalTimer.projectId}
-              onChange={(e) => {
-                setPersonalTimer(prev => ({ ...prev, projectId: e.target.value, sarcinaId: '' }));
-                if (e.target.value) {
-                  loadSarcini(e.target.value);
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(209, 213, 219, 0.5)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(10px)',
-                fontSize: '0.875rem'
-              }}
-            >
-              <option value="">Selectează proiectul...</option>
-              {projects.map((project) => (
-                <option key={project.ID_Proiect} value={project.ID_Proiect}>
-                  {project.ID_Proiect} - {project.Denumire}
-                </option>
-              ))}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Caută după ID, nume sau adresă..."
+                value={projectSearchTerm}
+                onChange={(e) => {
+                  setProjectSearchTerm(e.target.value);
+                  setShowProjectDropdown(true);
+                }}
+                onFocus={() => setShowProjectDropdown(true)}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(209, 213, 219, 0.5)',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  fontSize: '0.875rem'
+                }}
+              />
+
+              {showProjectDropdown && filteredProjects.length > 0 && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(209, 213, 219, 0.5)',
+                  borderRadius: '8px',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 50,
+                  marginTop: '2px'
+                }}>
+                  {filteredProjects.slice(0, 10).map((project) => (
+                    <div
+                      key={project.ID_Proiect}
+                      onClick={() => {
+                        setPersonalTimer(prev => ({ ...prev, projectId: project.ID_Proiect, sarcinaId: '' }));
+                        setProjectSearchTerm(`${project.ID_Proiect} - ${project.Denumire}`);
+                        setShowProjectDropdown(false);
+                        loadSarcini(project.ID_Proiect);
+                      }}
+                      style={{
+                        padding: '0.75rem',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(229, 231, 235, 0.5)',
+                        fontSize: '0.875rem',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                        {project.ID_Proiect} - {project.Denumire}
+                      </div>
+                      {project.Adresa && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                          📍 {project.Adresa}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {filteredProjects.length > 10 && (
+                    <div style={{
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      textAlign: 'center',
+                      borderTop: '1px solid rgba(229, 231, 235, 0.5)'
+                    }}>
+                      +{filteredProjects.length - 10} rezultate mai multe...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {personalTimer.projectId && sarcini.length > 0 && (
