@@ -59,6 +59,23 @@ const PREDEFINED_PERMISSIONS = {
   }
 };
 
+// Helper function pentru formatarea datelor BigQuery
+const formatBigQueryDate = (dateField: any): string => {
+  if (!dateField) return 'Niciodată';
+
+  // BigQuery returnează { value: "2025-08-16T10:30:00.000Z" }
+  const dateString = dateField.value || dateField;
+
+  if (!dateString) return 'Niciodată';
+
+  try {
+    return new Date(dateString).toLocaleDateString('ro-RO');
+  } catch (error) {
+    console.error('Eroare formatare dată:', error, dateField);
+    return 'Data invalidă';
+  }
+};
+
 const ModernUsersPage: React.FC = () => {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
@@ -453,7 +470,7 @@ const ModernUsersPage: React.FC = () => {
                         <div>
                           <div className="font-medium text-gray-900">{user.nume_complet}</div>
                           <div className="text-sm text-gray-500">
-                            Creat: {new Date(user.data_creare).toLocaleDateString('ro-RO')}
+                            Creat: {formatBigQueryDate(user.data_creare)}
                           </div>
                         </div>
                       </div>
@@ -478,10 +495,7 @@ const ModernUsersPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-4 px-4 text-gray-600">
-                      {user.data_ultima_conectare
-                        ? new Date(user.data_ultima_conectare).toLocaleDateString('ro-RO')
-                        : 'Niciodată'
-                      }
+                      {formatBigQueryDate(user.data_ultima_conectare)}
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex gap-2">
