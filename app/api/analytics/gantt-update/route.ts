@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
           SET
             Data_Start = @startDate,
-            Data_Finalizare = @endDate,
+            Data_Final = @endDate,
             Data_Actualizare = CURRENT_DATETIME()
           WHERE ID_Proiect = @actualId
         `;
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
           SET
             Data_Start = @startDate,
-            Data_Finalizare = @endDate,
+            Data_Final = @endDate,
             Data_Actualizare = CURRENT_DATETIME()
           WHERE ID_Subproiect = @actualId
         `;
@@ -103,10 +103,10 @@ export async function POST(request: NextRequest) {
         updateQuery = `
           UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
           SET
-            Data_Start = @startDate,
-            Data_Finalizare = @endDate,
-            Data_Actualizare = CURRENT_DATETIME()
-          WHERE ID_Sarcina = @actualId
+            data_creare = @startDate,
+            data_scadenta = @endDate,
+            data_modificare = CURRENT_DATETIME()
+          WHERE id = @actualId
         `;
         break;
     }
@@ -127,15 +127,26 @@ export async function POST(request: NextRequest) {
     console.log('📊 Update query executed successfully');
 
     // Verify the update by checking affected rows
-    const verifyQuery = `
-      SELECT COUNT(*) as updated_count
-      FROM (
-        SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
-        WHERE ID_Proiect = @actualId AND Data_Start = @startDate AND Data_Finalizare = @endDate
-        ${taskType === 'proiect' ? '' : 'UNION ALL SELECT 1 FROM \`' + process.env.GOOGLE_CLOUD_PROJECT_ID + '.PanouControlUnitar.Subproiecte\` WHERE ID_Subproiect = @actualId AND Data_Start = @startDate AND Data_Finalizare = @endDate'}
-        ${taskType === 'sarcina' ? 'UNION ALL SELECT 1 FROM \`' + process.env.GOOGLE_CLOUD_PROJECT_ID + '.PanouControlUnitar.Sarcini\` WHERE ID_Sarcina = @actualId AND Data_Start = @startDate AND Data_Finalizare = @endDate' : ''}
-      )
-    `;
+    let verifyQuery = '';
+    if (taskType === 'proiect') {
+      verifyQuery = `
+        SELECT COUNT(*) as updated_count
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+        WHERE ID_Proiect = @actualId AND Data_Start = @startDate AND Data_Final = @endDate
+      `;
+    } else if (taskType === 'subproiect') {
+      verifyQuery = `
+        SELECT COUNT(*) as updated_count
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+        WHERE ID_Subproiect = @actualId AND Data_Start = @startDate AND Data_Final = @endDate
+      `;
+    } else if (taskType === 'sarcina') {
+      verifyQuery = `
+        SELECT COUNT(*) as updated_count
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+        WHERE id = @actualId AND data_creare = @startDate AND data_scadenta = @endDate
+      `;
+    }
 
     const verifyOptions = {
       query: verifyQuery,

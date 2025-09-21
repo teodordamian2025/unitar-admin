@@ -1137,6 +1137,8 @@ export default function GanttView() {
                         style={{
                           position: 'absolute',
                           left: position.left,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           width: position.width,
                           height: '24px',
                           background: getTaskColor(task),
