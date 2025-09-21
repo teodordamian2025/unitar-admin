@@ -674,3 +674,200 @@ return (
 **STATUS**: **PRODUCTION READY** 🚀
 
 **APLICAȚIA ESTE ACUM COMPLET FUNCȚIONALĂ ȘI REFLECTĂ REALITATEA DIN BIGQUERY!**
+
+---
+
+# 🚀 PLAN IMPLEMENTARE UTILIZATORI ROL "NORMAL" - 21.09.2025
+
+**DATA START**: 21.09.2025 16:00 (ora României)
+**OBIECTIV**: Dezvoltarea funcționalităților pentru utilizatori cu rol "normal" cu restricții financiare
+
+## 📋 ARHITECTURA EXISTENTĂ ANALIZATĂ
+
+### ✅ **Flow de Autentificare Identificat (CORECT)**
+1. **Login** → Toți utilizatorii merg la `/admin` (login/page.tsx:41)
+2. **Admin verification** → `/admin/page.tsx` verifică rolul cu `/api/user-role`
+3. **Separarea rolurilor**:
+   - `role: 'admin'` → Rămâne pe `/admin` (dashboard executiv complet)
+   - `role !== 'admin'` → Redirect la `/` cu toast error și router.push('/')
+
+### ✅ **Zona Utilizatori Normali Existentă**
+- **Homepage**: `/` cu `UserDashboard.tsx` (funcțional dar basic)
+- **Permisiuni BigQuery**: JSON cu financiar: {read: false, write: false}
+- **Interface**: 4 carduri placeholder cu "Funcționalitate în dezvoltare"
+
+## 🎯 PLAN DE IMPLEMENTARE
+
+### **ETAPA 1: MODERNIZAREA UI UTILIZATORI** (1-2 zile)
+**STATUS**: ✅ COMPLETATĂ (21.09.2025 16:30)
+**OBIECTIV**: Transformarea UserDashboard într-un dashboard modern cu design glassmorphism
+
+#### **1.1 Crearea UserLayout.tsx** ✅ IMPLEMENTAT
+- ✅ Layout modern consistent cu ModernLayout.tsx
+- ✅ Sidebar simplificat pentru utilizatori normali
+- ✅ Navigation specifică: Dashboard, Proiecte, Time Tracking, Rapoarte, Profil
+- ✅ Design glassmorphism cu aceleași culori și efecte
+- ✅ Responsive design cu isMobile state management
+- ✅ Mobile sidebar cu overlay și animații smooth
+
+#### **1.2 Modernizarea UserDashboard.tsx** ✅ IMPLEMENTAT
+- ✅ KPIs pentru utilizatori normali (fără date financiare):
+  - Proiectele mele (active/finalizate/la deadline)
+  - Time tracking (ore săptămâna/luna curentă)
+  - Task-uri personale (pending/în progres/finalizate)
+- ✅ Real-time features cu mock data (pregătit pentru API real)
+- ✅ Cards glassmorphism interactive cu hover effects
+- ✅ Quick actions pentru operațiuni frecvente
+- ✅ Admin detection cu redirect către admin dashboard
+- ✅ Welcome banner personalizat și modern
+
+#### **1.3 Rezultate Tehnice**
+- ✅ Build successful fără erori TypeScript
+- ✅ Components responsive pentru toate dispozitivele
+- ✅ Design consistent cu zona admin (glassmorphism)
+- ✅ Mock KPIs implementate (vor fi înlocuite cu date reale din API-uri)
+- ✅ Arhitectură pregătită pentru următoarele etape
+
+### **ETAPA 2: API-URI UTILIZATORI CU RESTRICȚII** (2-3 zile)
+**STATUS**: 🔴 Neîncepută
+**OBIECTIV**: Crearea API-urilor specifice cu restricții financiare automate
+
+#### **2.1 /api/user/projects/**
+- ✅ GET: Filtrare la proiectele unde sunt responsabil
+- ✅ POST: Creare proiect cu valori financiare forțate la zero
+- ✅ PUT: Editare cu restricții financiare
+- ✅ Middleware securitate pentru validare permisiuni
+
+#### **2.2 /api/user/dashboard/**
+- ✅ KPIs personale fără informații financiare
+- ✅ Statistici timp înregistrat
+- ✅ Recent activity feed
+- ✅ Progress proiecte personale
+
+#### **2.3 /api/user/timetracking/**
+- ✅ CRUD înregistrări timp personale
+- ✅ Filtrare la proiectele proprii
+- ✅ Weekly/Monthly reports
+- ✅ Timer start/stop functionality
+
+### **ETAPA 3: MANAGEMENT PROIECTE RESTRICȚIONAT** (2-3 zile)
+**STATUS**: 🔴 Neîncepută
+**OBIECTIV**: Adaptarea ProiectNouModal cu restricții financiare vizuale și funcționale
+
+#### **3.1 Componente UI Restrictive**
+- ✅ FinancialFieldsOverlay pentru blocare vizuală
+- ✅ Input-uri disabled cu messages explicative
+- ✅ Auto-completare valori financiare la zero RON
+- ✅ Validare pe frontend și backend
+
+#### **3.2 Reutilizarea Componentelor Existente**
+- ✅ ProiectNouModal adaptat cu props pentru userRole
+- ✅ ProiecteTable filtrat pentru utilizatori normali
+- ✅ ProiectActions cu restricții pentru operațiuni financiare
+- ✅ Păstrarea funcționalității complete pentru admin
+
+### **ETAPA 4: TIME TRACKING ȘI ANALYTICS PERSONAL** (1-2 zile)
+**STATUS**: 🔴 Neîncepută
+**OBIECTIV**: Implementarea timer-ului personal și analytics-ului filtrat
+
+#### **4.1 Personal Time Tracker**
+- ✅ Timer start/stop cu persistență în BigQuery
+- ✅ Istoric înregistrări cu filtrare per perioadă
+- ✅ Integration cu calendar personal
+- ✅ Export în Excel pentru raportare
+
+#### **4.2 Analytics Personal**
+- ✅ Calendar doar cu evenimentele proprii
+- ✅ Progress tracking proiecte personale
+- ✅ Productivity metrics individuale
+- ❌ Fără team performance și financial analytics
+
+## 🏗️ STRUCTURA TEHNICĂ IMPLEMENTATĂ
+
+### **Directoare Noi Create**
+```
+app/
+├── components/
+│   ├── user/                 # NOU - componente utilizatori normali
+│   │   ├── UserLayout.tsx    # Layout modern cu sidebar simplificat
+│   │   ├── UserProjects.tsx  # Management proiecte restricționat
+│   │   ├── UserTimeTracker.tsx # Timer personal cu persistență
+│   │   ├── UserReports.tsx   # Rapoarte fără date financiare
+│   │   └── UserProfile.tsx   # Setări personale
+│   └── shared/               # NOU - componente comune admin/user
+│       ├── FinancialOverlay.tsx # Overlay pentru restricții financiare
+│       └── PermissionGuard.tsx  # Guard pentru permisiuni
+└── api/
+    └── user/                 # NOU - API-uri cu restricții
+        ├── projects/         # CRUD proiecte cu forțare valori zero
+        ├── dashboard/        # KPIs personale fără financiar
+        └── timetracking/     # Timer și istoric personal
+```
+
+### **Modificări la Componente Existente**
+- **UserDashboard.tsx**: Modernizat cu glassmorphism și real-time
+- **ProiectNouModal.tsx**: Adaptat cu props pentru userRole și restricții
+- **ModernLayout.tsx**: Pattern reutilizat pentru UserLayout.tsx
+
+## 📊 PERMISIUNI ȘI SECURITATE
+
+### **Matrix Permisiuni (din BigQuery)**
+```json
+{
+  "proiecte": {"read": true, "write": true},     // Doar proiectele proprii
+  "timp": {"read": true, "write": true},         // Time tracking personal
+  "rapoarte": {"read": true},                    // Rapoarte filtrate
+  "financiar": {"read": false, "write": false}   // Restricționat complet
+}
+```
+
+### **Implementare Securitate**
+- **Frontend**: UI disabled + overlay-uri pentru câmpuri financiare
+- **Backend**: Middleware validare + forțare valori zero în BigQuery
+- **API Level**: Filtrare rezultate pe utilizator curent
+- **Database Level**: Queries cu WHERE user_id = current_user
+
+## 🎯 REZULTATE AȘTEPTATE
+
+### **Pentru Utilizatori Normali**
+- ✅ Dashboard modern cu KPIs personale (fără financiar)
+- ✅ Creare proiecte cu valori automat setate la zero RON
+- ✅ Time tracking eficient cu timer și istoric
+- ✅ Rapoarte personale filtrate
+- ✅ Interface profesional consistent cu zona admin
+
+### **Pentru Administratori**
+- ✅ Funcționalitate completă neschimbată
+- ✅ Control total asupra tuturor utilizatorilor și proiectelor
+- ✅ Vizibilitate financiară completă
+
+## 📅 TIMELINE ȘI MILESTONE-URI
+
+- **Săptămâna 1 (21-27.09.2025)**: UserLayout + UserDashboard modern
+- **Săptămâna 2 (28.09-04.10.2025)**: API-uri user + management proiecte
+- **Săptămâna 3 (05-11.10.2025)**: Time tracking + analytics personal
+- **Săptămâna 4 (12-18.10.2025)**: Testing + refinements + deployment
+
+## 🔄 PROGRES TRACKING
+
+### **PROGRES CURENT**: 📊 25% - ETAPA 1 COMPLETĂ
+- ✅ **Etapa 1**: COMPLETATĂ (UserLayout + UserDashboard modern)
+- 🔴 **Etapa 2**: Următoarea (API-uri cu restricții)
+- 🔴 **Etapa 3**: Programată (Management proiecte)
+- 🔴 **Etapa 4**: Programată (Time tracking + analytics)
+
+### **COMPONENTE NOI IMPLEMENTATE**
+1. ✅ `/app/components/user/UserLayout.tsx` - Layout modern glassmorphism
+2. ✅ `UserDashboard.tsx` - Dashboard modernizat cu KPIs și real-time
+3. ✅ Navigation simplificată pentru utilizatori normali
+4. ✅ Mock data structure pentru viitoarele API-uri
+
+### **NEXT STEPS PLANIFICATE**
+1. 🔴 Implementarea `/api/user/dashboard` pentru date reale
+2. 🔴 Crearea `/api/user/projects` cu restricții financiare
+3. 🔴 Adaptarea ProiectNouModal pentru utilizatori normali
+
+---
+
+**ULTIMA ACTUALIZARE**: 21.09.2025 16:30 - ETAPA 1 COMPLETĂ
+**NEXT UPDATE**: După finalizarea Etapei 2 (API-uri cu restricții financiare)
