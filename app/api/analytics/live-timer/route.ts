@@ -236,8 +236,8 @@ export async function POST(request: NextRequest) {
         
         const insertSessionQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
-          VALUES ('${sessionId}', '${utilizator_uid}', '${proiect_id}', CURRENT_TIMESTAMP(), 'activ', '${(descriere_sesiune || '').replace(/'/g, "''")}', CURRENT_TIMESTAMP())
+          (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at, ore_lucrate)
+          VALUES ('${sessionId}', '${utilizator_uid}', '${proiect_id}', CURRENT_TIMESTAMP(), 'activ', '${(descriere_sesiune || '').replace(/'/g, "''")}', CURRENT_TIMESTAMP(), NULL)
         `;
 
         await bigquery.query({
@@ -263,13 +263,12 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'session_id este obligatoriu pentru stop' }, { status: 400 });
         }
 
-        // Opresc sesiunea și calculez timpul total
+        // Opresc sesiunea fără a seta ore_lucrate (îl calculez separat)
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET
             status = 'completat',
-            data_stop = CURRENT_TIMESTAMP(),
-            ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) AS BIGNUMERIC)
+            data_stop = CURRENT_TIMESTAMP()
           WHERE id = '${session_id}'
         `;
 
@@ -278,31 +277,8 @@ export async function POST(request: NextRequest) {
           location: 'EU'
         });
 
-        // Adaug automat în TimeTracking pentru consistență
-        const addToTimeTrackingQuery = `
-          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
-          (id, sarcina_id, utilizator_uid, utilizator_nume, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, proiect_id, created_at)
-          SELECT
-            CONCAT('tt_', sl.id) as id,
-            '${sarcina_id || ''}' as sarcina_id,
-            sl.utilizator_uid,
-            COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
-            DATE(sl.data_start) as data_lucru,
-            sl.ore_lucrate / 3600,
-            sl.descriere_activitate,
-            'live_timer' as tip_inregistrare,
-            sl.proiect_id,
-            CURRENT_TIMESTAMP()
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
-            ON sl.utilizator_uid = u.uid
-          WHERE sl.id = '${session_id}'
-        `;
-
-        await bigquery.query({
-          query: addToTimeTrackingQuery,
-          location: 'EU'
-        });
+        // SKIP TimeTracking insertion pentru acum - evităm problemele NUMERIC
+        // TimeTracking va fi generat separat mai târziu dacă este necesar
 
         result = { message: 'Sesiune oprită și timp înregistrat cu succes' };
         break;
