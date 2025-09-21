@@ -244,15 +244,40 @@ export default function GanttView() {
 
     const containerRect = timelineBody.getBoundingClientRect();
     const relativeX = Math.max(0, Math.min(containerRect.width, e.clientX - containerRect.left));
-    const percentage = relativeX / containerRect.width;
-
-    // Calculate new date based on mouse position
+    
+    // CORECTARE: Calcul precis bazat pe timeline headers
     const timelineStart = timelineSettings.startDate;
     const timelineEnd = timelineSettings.endDate;
     const totalDuration = timelineEnd.getTime() - timelineStart.getTime();
-    const newDateTime = timelineStart.getTime() + (totalDuration * percentage);
-    const newDate = new Date(newDateTime);
-    const newDateString = newDate.toISOString().split('T')[0];
+    
+    // Calculez exact poziția în timeline bazat pe grid
+    const timelineHeaders = generateTimelineHeaders();
+    const headerWidth = containerRect.width / timelineHeaders.length;
+    const headerIndex = Math.floor(relativeX / headerWidth);
+    const offsetInHeader = relativeX - (headerIndex * headerWidth);
+    const percentageInHeader = offsetInHeader / headerWidth;
+    
+    // Calculez data exactă din header + offset
+    let targetDate: Date;
+    if (headerIndex >= timelineHeaders.length) {
+      // Dacă sunt la sfârșitul timeline-ului
+      targetDate = timelineEnd;
+    } else if (headerIndex < 0) {
+      // Dacă sunt la începutul timeline-ului
+      targetDate = timelineStart;
+    } else {
+      // Calculez data exactă în header-ul curent
+      const currentHeaderDate = timelineHeaders[headerIndex];
+      const nextHeaderDate = headerIndex + 1 < timelineHeaders.length 
+        ? timelineHeaders[headerIndex + 1] 
+        : timelineEnd;
+      
+      const headerDuration = nextHeaderDate.getTime() - currentHeaderDate.getTime();
+      const timeInHeader = headerDuration * percentageInHeader;
+      targetDate = new Date(currentHeaderDate.getTime() + timeInHeader);
+    }
+    
+    const newDateString = targetDate.toISOString().split('T')[0];
 
     // Update preview date
     setResizeInfo(prev => prev ? { ...prev, previewDate: newDateString } : null);
@@ -262,7 +287,7 @@ export default function GanttView() {
       visible: true,
       x: e.clientX + 10,
       y: e.clientY - 30,
-      date: newDate.toLocaleDateString('ro-RO', {
+      date: targetDate.toLocaleDateString('ro-RO', {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
