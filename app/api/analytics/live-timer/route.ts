@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/analytics/live-timer/route.ts
-// CREAT: 21.09.2025 21:45 (ora României)
-// DESCRIERE: API pentru management live timer sessions cu real-time tracking - CORECTAT pentru BigQuery objects
+// CREAT: 21.09.2025 22:05 (ora României)
+// DESCRIERE: API pentru management live timer sessions cu salvare corectă timp în BD
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -37,6 +37,15 @@ function processBigQueryRows(rows: any[]): any[] {
   });
 }
 
+// Helper function pentru a calcula ore lucrate
+function calculateWorkedHours(startTime: string, endTime: string): number {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const diffMs = end.getTime() - start.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60); // conversie la ore
+  return Math.round(diffHours * 100) / 100; // rotunjesc la 2 decimale
+}
+
 // GET - Obținere sesiuni active și statistici
 export async function GET(request: NextRequest) {
   try {
@@ -68,6 +77,7 @@ export async function GET(request: NextRequest) {
           sl.data_stop,
           sl.status,
           sl.descriere_activitate as descriere_sesiune,
+          sl.ore_lucrate,
           
           -- Calculez timpul elapsed în secunde - FORȚAT ca NUMERIC
           CAST(
@@ -124,6 +134,7 @@ export async function GET(request: NextRequest) {
         data_stop,
         status,
         descriere_sesiune,
+        ore_lucrate,
         elapsed_seconds,
         ultima_activitate,
         productivity_score,
@@ -147,6 +158,7 @@ export async function GET(request: NextRequest) {
           sl2.data_stop,
           'completat' as status, 
           sl2.descriere_activitate as descriere_sesiune,
+          sl2.ore_lucrate,
           CAST(TIMESTAMP_DIFF(sl2.data_stop, sl2.data_start, SECOND) AS INT64) as elapsed_seconds,
           sl2.data_stop as ultima_activitate, 
           85 as productivity_score, 
@@ -366,21 +378,95 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'session_id este obligatoriu pentru stop' }, { status: 400 });
         }
 
+        // Obțin datele sesiunii pentru calcule
+        const getSessionQuery = `
+          SELECT 
+            sl.id,
+            sl.utilizator_uid,
+            sl.proiect_id,
+            sl.data_start,
+            sl.data_stop,
+            sl.descriere_activitate,
+            COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
+            ON sl.utilizator_uid = u.uid
+          WHERE sl.id = @session_id
+        `;
+
+        const [sessionData] = await bigquery.query({
+          query: getSessionQuery,
+          location: 'EU',
+          params: { session_id: session_id }
+        });
+
+        if (sessionData.length === 0) {
+          return NextResponse.json({ error: 'Sesiunea nu a fost găsită' }, { status: 404 });
+        }
+
+        const session = processBigQueryRows(sessionData)[0];
+        const currentTimestamp = new Date();
+        
+        // Calculez ore lucrate
+        const startTime = new Date(session.data_start);
+        const workedHours = calculateWorkedHours(startTime.toISOString(), currentTimestamp.toISOString());
+
+        // Actualizez sesiunea cu timp calculat
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET
             status = 'completat',
-            data_stop = CURRENT_TIMESTAMP()
+            data_stop = CURRENT_TIMESTAMP(),
+            ore_lucrate = @ore_lucrate
           WHERE id = @session_id
         `;
 
         await bigquery.query({
           query: stopSessionQuery,
           location: 'EU',
-          params: { session_id: session_id }
+          params: { 
+            session_id: session_id,
+            ore_lucrate: workedHours
+          }
         });
 
-        result = { message: 'Sesiune oprită și timp înregistrat cu succes' };
+        // Creez înregistrarea în TimeTracking
+        const timeTrackingId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const insertTimeTrackingQuery = `
+          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+          (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
+          VALUES (
+            @id,
+            @utilizator_uid,
+            @utilizator_nume,
+            @proiect_id,
+            CURRENT_DATE(),
+            @ore_lucrate,
+            @descriere_lucru,
+            'live_timer',
+            CURRENT_TIMESTAMP(),
+            'live_session'
+          )
+        `;
+
+        await bigquery.query({
+          query: insertTimeTrackingQuery,
+          location: 'EU',
+          params: {
+            id: timeTrackingId,
+            utilizator_uid: session.utilizator_uid,
+            utilizator_nume: session.utilizator_nume,
+            proiect_id: session.proiect_id,
+            ore_lucrate: workedHours,
+            descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer'
+          }
+        });
+
+        result = { 
+          message: 'Sesiune oprită și timp înregistrat cu succes',
+          worked_hours: workedHours,
+          time_tracking_id: timeTrackingId
+        };
         break;
 
       case 'pause':
