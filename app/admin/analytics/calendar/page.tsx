@@ -26,7 +26,7 @@ interface CalendarEvent {
   prioritate: 'normala' | 'ridicata' | 'urgent';
   status: string;
   responsabil_nume?: string;
-  tip_eveniment: 'sarcina' | 'deadline_proiect' | 'milestone' | 'time_tracking';
+  tip_eveniment: 'sarcina' | 'deadline_proiect' | 'deadline_subproiect' | 'deadline_sarcina' | 'milestone' | 'time_tracking';
   ore_estimate?: number;
   ore_lucrate?: number;
   urgency_status: 'normal' | 'urgent' | 'overdue' | 'completed';
@@ -70,6 +70,11 @@ export default function CalendarView() {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
+
+  // Date editing state
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [tempDate, setTempDate] = useState('');
+  const [savingDate, setSavingDate] = useState(false);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -533,6 +538,105 @@ export default function CalendarView() {
 
   const dayNames = ['Dum', 'Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm'];
 
+  // Date editing functions
+  const startEditingDate = () => {
+    if (selectedEvent) {
+      setTempDate(selectedEvent.data_scadenta);
+      setIsEditingDate(true);
+    }
+  };
+
+  const cancelEditingDate = () => {
+    setIsEditingDate(false);
+    setTempDate('');
+  };
+
+  const adjustDate = (days: number) => {
+    if (selectedEvent) {
+      const currentDate = new Date(selectedEvent.data_scadenta);
+      currentDate.setDate(currentDate.getDate() + days);
+      const newDate = currentDate.toISOString().split('T')[0];
+      setTempDate(newDate);
+    }
+  };
+
+  const setToToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setTempDate(today);
+  };
+
+  const saveDate = async () => {
+    if (!selectedEvent || !tempDate) return;
+
+    setSavingDate(true);
+    try {
+      // Determine the API endpoint based on event type
+      let apiEndpoint = '';
+      let updateData = {};
+
+      switch (selectedEvent.tip_eveniment) {
+        case 'deadline_proiect':
+          apiEndpoint = '/api/rapoarte/proiecte';
+          updateData = {
+            ID_Proiect: selectedEvent.proiect_id,
+            Data_Final: tempDate
+          };
+          break;
+        case 'deadline_subproiect':
+          apiEndpoint = '/api/rapoarte/subproiecte';
+          updateData = {
+            ID_Subproiect: selectedEvent.id.replace('subproj_', ''),
+            Data_Final: tempDate
+          };
+          break;
+        case 'deadline_sarcina':
+          apiEndpoint = '/api/rapoarte/sarcini';
+          updateData = {
+            id: selectedEvent.id.replace('task_', ''),
+            data_scadenta: tempDate
+          };
+          break;
+        default:
+          throw new Error('Tip eveniment nesuportat pentru editare');
+      }
+
+      const response = await fetch(apiEndpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Eroare la actualizarea datei');
+      }
+
+      // Update local state
+      setSelectedEvent(prev => prev ? { ...prev, data_scadenta: tempDate } : null);
+      setIsEditingDate(false);
+      setTempDate('');
+
+      // Show success message
+      toast.success('Data a fost actualizată cu succes!');
+
+      // Refresh calendar data
+      await loadCalendarData();
+
+    } catch (error) {
+      console.error('Eroare la salvarea datei:', error);
+      toast.error(`Eroare la actualizarea datei: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
   if (loading || !isAuthorized) {
     return <LoadingSpinner overlay message="Se încarcă Calendar View..." />;
   }
@@ -944,7 +1048,11 @@ export default function CalendarView() {
       {/* Event Details Modal */}
       <Modal
         isOpen={showEventModal}
-        onClose={() => setShowEventModal(false)}
+        onClose={() => {
+          setShowEventModal(false);
+          setIsEditingDate(false);
+          setTempDate('');
+        }}
         title="Detalii Eveniment"
         size="md"
       >
@@ -971,11 +1079,221 @@ export default function CalendarView() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <strong>Data:</strong><br />
-                {new Date(selectedEvent.data_scadenta).toLocaleDateString('ro-RO')}
+            {/* Modern Date Editor Section */}
+            <div style={{
+              padding: '1.5rem',
+              background: 'rgba(59, 130, 246, 0.05)',
+              borderRadius: '12px',
+              border: '1px solid rgba(59, 130, 246, 0.1)',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1rem'
+              }}>
+                <strong style={{ color: '#1f2937', fontSize: '1rem' }}>
+                  📅 Data Eveniment
+                </strong>
+                {!isEditingDate && (
+                  <button
+                    onClick={startEditingDate}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#3b82f6',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    ✏️ Editează
+                  </button>
+                )}
               </div>
+
+              {!isEditingDate ? (
+                // Display mode
+                <div
+                  onClick={startEditingDate}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'white',
+                    borderRadius: '8px',
+                    border: '2px dashed #d1d5db',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    color: '#1f2937'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                    e.currentTarget.style.background = 'white';
+                  }}
+                >
+                  📅 {new Date(selectedEvent.data_scadenta).toLocaleDateString('ro-RO', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+              ) : (
+                // Edit mode
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Quick Actions */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap'
+                  }}>
+                    <button
+                      onClick={() => adjustDate(-1)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.borderColor = '#9ca3af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                      }}
+                    >
+                      ← Zi anterioară
+                    </button>
+                    <button
+                      onClick={setToToday}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #3b82f6',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#3b82f6',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#3b82f6';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.color = '#3b82f6';
+                      }}
+                    >
+                      Astăzi
+                    </button>
+                    <button
+                      onClick={() => adjustDate(1)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.borderColor = '#9ca3af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                      }}
+                    >
+                      Zi următoare →
+                    </button>
+                  </div>
+
+                  {/* Date Input */}
+                  <input
+                    type="date"
+                    value={tempDate}
+                    onChange={(e) => setTempDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #3b82f6',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      textAlign: 'center',
+                      outline: 'none'
+                    }}
+                  />
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                    <button
+                      onClick={saveDate}
+                      disabled={savingDate}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: savingDate ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: savingDate ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {savingDate ? '⏳' : '💾'} {savingDate ? 'Se salvează...' : 'Salvează'}
+                    </button>
+                    <button
+                      onClick={cancelEditingDate}
+                      disabled={savingDate}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'white',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        cursor: savingDate ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      ✕ Anulează
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <strong>Prioritate:</strong><br />
                 <span style={{
@@ -995,6 +1313,10 @@ export default function CalendarView() {
               <div>
                 <strong>Responsabil:</strong><br />
                 {selectedEvent.responsabil_nume || 'Neasignat'}
+              </div>
+              <div>
+                <strong>Tip Eveniment:</strong><br />
+                {getEventIcon(selectedEvent.tip_eveniment)} {selectedEvent.tip_eveniment.replace('_', ' ')}
               </div>
             </div>
 
