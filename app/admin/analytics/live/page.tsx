@@ -50,6 +50,7 @@ interface TimerSession {
   projectId: string;
   sarcinaId?: string;
   description: string;
+  sessionId?: string;
 }
 
 export default function LiveTracking() {
@@ -70,7 +71,8 @@ export default function LiveTracking() {
     elapsedTime: 0,
     projectId: '',
     sarcinaId: '',
-    description: ''
+    description: '',
+    sessionId: ''
   });
 
   // UI State
@@ -171,7 +173,8 @@ export default function LiveTracking() {
             elapsedTime: userSession.elapsed_seconds,
             projectId: userSession.proiect_id,
             sarcinaId: userSession.sarcina_id || '',
-            description: userSession.descriere_sesiune || ''
+            description: userSession.descriere_sesiune || '',
+            sessionId: userSession.id
           });
         }
       }
@@ -212,6 +215,11 @@ export default function LiveTracking() {
       return;
     }
 
+    if (!user?.uid) {
+      toast.error('Eroare de autentificare. Te rog să te reconectezi!');
+      return;
+    }
+
     try {
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
@@ -219,8 +227,9 @@ export default function LiveTracking() {
         body: JSON.stringify({
           action: 'start',
           proiect_id: personalTimer.projectId,
-          sarcina_id: personalTimer.sarcinaId || null,
-          descriere: personalTimer.description
+          sarcina_id: personalTimer.sarcinaId || 'default_task',
+          descriere_sesiune: personalTimer.description,
+          utilizator_uid: user.uid
         })
       });
 
@@ -232,13 +241,14 @@ export default function LiveTracking() {
           isActive: true,
           startTime: new Date(),
           pausedTime: 0,
-          elapsedTime: 0
+          elapsedTime: 0,
+          sessionId: result.session?.id || ''
         }));
         setShowStartModal(false);
         toast.success('Timer pornit cu succes!');
         loadLiveData();
       } else {
-        toast.error('Eroare la pornirea timer-ului!');
+        toast.error(result.error || 'Eroare la pornirea timer-ului!');
       }
     } catch (error) {
       console.error('Eroare la pornirea timer-ului:', error);
@@ -247,12 +257,18 @@ export default function LiveTracking() {
   };
 
   const pauseTimer = async () => {
+    if (!personalTimer.sessionId) {
+      toast.error('Nu există o sesiune activă pentru a fi pausată!');
+      return;
+    }
+
     try {
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'pause'
+          action: 'pause',
+          session_id: personalTimer.sessionId
         })
       });
 
@@ -274,12 +290,19 @@ export default function LiveTracking() {
   };
 
   const stopTimer = async () => {
+    if (!personalTimer.sessionId) {
+      toast.error('Nu există o sesiune activă pentru a fi oprită!');
+      return;
+    }
+
     try {
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'stop'
+          action: 'stop',
+          session_id: personalTimer.sessionId,
+          sarcina_id: personalTimer.sarcinaId || 'default_task'
         })
       });
 
@@ -293,7 +316,8 @@ export default function LiveTracking() {
           elapsedTime: 0,
           projectId: '',
           sarcinaId: '',
-          description: ''
+          description: '',
+          sessionId: ''
         });
         toast.success('Timer oprit și sesiunea salvată!');
         loadLiveData();
@@ -698,7 +722,7 @@ export default function LiveTracking() {
               <option value="">Selectează proiectul...</option>
               {projects.map((project) => (
                 <option key={project.ID_Proiect} value={project.ID_Proiect}>
-                  {project.Denumire}
+                  {project.ID_Proiect} - {project.Denumire}
                 </option>
               ))}
             </select>
