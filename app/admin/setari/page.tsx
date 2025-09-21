@@ -80,6 +80,18 @@ const ModernSettingsPage: React.FC = () => {
 
   const settingsCards: SettingCard[] = [
     {
+      title: 'Utilizatori',
+      description: 'Management utilizatori, roluri și permisiuni Firebase + BigQuery',
+      icon: '👥',
+      href: '/admin/setari/utilizatori',
+      color: 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/30 border-indigo-200',
+      stats: [
+        { label: 'Utilizatori activi', value: '2' },
+        { label: 'Administratori', value: '1' },
+        { label: 'Permisiuni', value: '5 categorii' }
+      ]
+    },
+    {
       title: 'Facturare',
       description: 'Configurare numerotare, serii și parametri e-factura ANAF',
       icon: '📄',
