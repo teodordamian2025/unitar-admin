@@ -32,9 +32,10 @@ export async function GET(request: NextRequest) {
     // 1. PROIECTE - nivel principal în hierarchy
     const proiecteQuery = `
       WITH project_stats AS (
-        SELECT 
+        SELECT
           p.ID_Proiect,
           p.Denumire,
+          p.Adresa,
           p.Data_Start,
           p.Data_Final,
           p.Status,
@@ -78,12 +79,13 @@ export async function GET(request: NextRequest) {
           ${projectIds ? 'AND p.ID_Proiect IN UNNEST(@projectIds)' : ''}
           ${startDate ? 'AND p.Data_Final >= @startDate' : ''}
           ${endDate ? 'AND p.Data_Start <= @endDate' : ''}
-        GROUP BY p.ID_Proiect, p.Denumire, p.Data_Start, p.Data_Final, 
+        GROUP BY p.ID_Proiect, p.Denumire, p.Adresa, p.Data_Start, p.Data_Final,
                  p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil
       )
       SELECT
         ID_Proiect as id,
-        ID_Proiect as name,
+        CONCAT(ID_Proiect, ' - ', Denumire) as name,
+        Adresa,
         Data_Start as startDate,
         Data_Final as endDate,
         progress_from_sarcini as progress,

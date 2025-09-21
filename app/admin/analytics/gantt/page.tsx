@@ -69,7 +69,9 @@ export default function GanttView() {
     client_nume: '',
     tip_task: '', // 'proiect', 'subproiect', 'sarcina'
     status: '', // 'to_do', 'in_progress', 'finalizata', 'anulata'
-    prioritate: '' // 'normala', 'ridicata', 'urgent'
+    prioritate: '', // 'normala', 'ridicata', 'urgent'
+    start_date: '',
+    end_date: ''
   });
 
   // Data for filter options
@@ -295,7 +297,7 @@ export default function GanttView() {
         task.id.toLowerCase().includes(searchTerm) ||
         task.name.toLowerCase().includes(searchTerm) ||
         (task as any).proiect_id?.toLowerCase().includes(searchTerm) ||
-        (task as any).adresa?.toLowerCase().includes(searchTerm) ||
+        (task as any).Adresa?.toLowerCase().includes(searchTerm) ||
         (task as any).client_nume?.toLowerCase().includes(searchTerm)
       );
     }
@@ -314,6 +316,18 @@ export default function GanttView() {
     }
     if (filters.prioritate) {
       filteredTasks = filteredTasks.filter(task => task.priority === filters.prioritate);
+    }
+    if (filters.start_date) {
+      filteredTasks = filteredTasks.filter(task => {
+        const taskEndDate = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
+        return new Date(taskEndDate) >= new Date(filters.start_date);
+      });
+    }
+    if (filters.end_date) {
+      filteredTasks = filteredTasks.filter(task => {
+        const taskStartDate = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+        return new Date(taskStartDate) <= new Date(filters.end_date);
+      });
     }
 
     const visible: GanttTask[] = [];
@@ -335,15 +349,21 @@ export default function GanttView() {
   };
 
   const formatDate = (date: Date) => {
+    const currentYear = new Date().getFullYear();
+    const dateYear = date.getFullYear();
+    const shouldShowYear = dateYear !== currentYear;
+
     switch (timelineSettings.viewMode) {
       case 'days':
-        return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' });
+        const dayFormat = date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' });
+        return shouldShowYear ? `${dayFormat} ${dateYear}` : dayFormat;
       case 'weeks':
-        return `S${Math.ceil(date.getDate() / 7)} ${date.toLocaleDateString('ro-RO', { month: 'short' })}`;
+        const weekFormat = `S${Math.ceil(date.getDate() / 7)} ${date.toLocaleDateString('ro-RO', { month: 'short' })}`;
+        return shouldShowYear ? `${weekFormat} ${dateYear}` : weekFormat;
       case 'months':
         return date.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
       default:
-        return date.toLocaleDateString('ro-RO');
+        return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short', year: 'numeric' });
     }
   };
 
@@ -408,6 +428,81 @@ export default function GanttView() {
               Actualizează
             </Button>
           </div>
+        </div>
+
+        {/* Period Filter */}
+        <div style={{
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'center',
+          marginBottom: '1rem',
+          padding: '1rem',
+          background: 'rgba(243, 244, 246, 0.5)',
+          borderRadius: '8px'
+        }}>
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            📅 Perioadă afișare:
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.75rem', color: '#6b7280' }}>De la:</label>
+            <input
+              type="date"
+              value={filters.start_date}
+              onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+              style={{
+                padding: '0.25rem 0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '0.75rem'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.75rem', color: '#6b7280' }}>Până la:</label>
+            <input
+              type="date"
+              value={filters.end_date}
+              onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+              style={{
+                padding: '0.25rem 0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '0.75rem'
+              }}
+            />
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              const nextYear = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+              setFilters(prev => ({
+                ...prev,
+                start_date: today.toISOString().split('T')[0],
+                end_date: nextYear.toISOString().split('T')[0]
+              }));
+            }}
+          >
+            Următor an
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setFilters(prev => ({ ...prev, start_date: '', end_date: '' }));
+            }}
+          >
+            Resetează
+          </Button>
         </div>
 
         {/* Stats */}
@@ -660,7 +755,9 @@ export default function GanttView() {
                   client_nume: '',
                   tip_task: '',
                   status: '',
-                  prioritate: ''
+                  prioritate: '',
+                  start_date: '',
+                  end_date: ''
                 })}
                 style={{ width: '100%' }}
               >
@@ -814,6 +911,28 @@ export default function GanttView() {
                         padding: '0.5rem 0'
                       }}
                     >
+                      {/* Start Date Label */}
+                      {parseFloat(position.width.replace('%', '')) > 10 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: `calc(${position.left} - 60px)`,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            fontSize: '0.65rem',
+                            color: '#6b7280',
+                            fontWeight: '500',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {(() => {
+                            const startDateValue = typeof task.startDate === 'object' ? task.startDate.value : task.startDate;
+                            const startDate = new Date(startDateValue);
+                            return startDate.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' });
+                          })()}
+                        </div>
+                      )}
+
                       {/* Task Bar */}
                       <div
                         style={{
@@ -858,6 +977,28 @@ export default function GanttView() {
                           {task.progress}%
                         </span>
                       </div>
+
+                      {/* End Date Label */}
+                      {parseFloat(position.width.replace('%', '')) > 10 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: `calc(${position.left} + ${position.width} + 5px)`,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            fontSize: '0.65rem',
+                            color: '#6b7280',
+                            fontWeight: '500',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {(() => {
+                            const endDateValue = typeof task.endDate === 'object' ? task.endDate.value : task.endDate;
+                            const endDate = new Date(endDateValue);
+                            return endDate.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' });
+                          })()}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
