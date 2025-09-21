@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/analytics/live-timer/route.ts
-// CREAT: 21.09.2025 21:30 (ora României)
-// DESCRIERE: API pentru management live timer sessions cu real-time tracking - CORECTAT
+// CREAT: 21.09.2025 21:45 (ora României)
+// DESCRIERE: API pentru management live timer sessions cu real-time tracking - CORECTAT pentru BigQuery objects
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,6 +16,27 @@ const bigquery = new BigQuery({
   },
 });
 
+// Helper function pentru a extrage valoarea din obiectele BigQuery
+function extractBigQueryValue(field: any): any {
+  if (field && typeof field === 'object' && 'value' in field) {
+    return field.value;
+  }
+  return field;
+}
+
+// Helper function pentru a procesa rândurile BigQuery
+function processBigQueryRows(rows: any[]): any[] {
+  return rows.map(row => {
+    const processedRow: any = {};
+    
+    for (const [key, value] of Object.entries(row)) {
+      processedRow[key] = extractBigQueryValue(value);
+    }
+    
+    return processedRow;
+  });
+}
+
 // GET - Obținere sesiuni active și statistici
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +45,7 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('include_completed') === 'true';
     const teamView = searchParams.get('team_view') !== 'false';
 
-    // Query optimizat pentru sesiuni active
+    // Query optimizat cu sarcini reintegrate
     const activeSessionsQuery = `
       WITH active_sessions AS (
         SELECT 
@@ -33,23 +54,33 @@ export async function GET(request: NextRequest) {
           COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
           sl.proiect_id,
           COALESCE(p.Denumire, 'Proiect necunoscut') as proiect_nume,
-          sl.descriere_activitate as sarcina_titlu,
+          
+          -- Sarcină asociată (dacă există în descriere sau căutare directă)
+          CASE
+            WHEN sl.descriere_activitate IS NOT NULL AND sl.descriere_activitate != '' THEN
+              sl.descriere_activitate
+            ELSE
+              'Activitate generală'
+          END as sarcina_titlu,
+          
           'normala' as prioritate,
           sl.data_start,
           sl.data_stop,
           sl.status,
           sl.descriere_activitate as descriere_sesiune,
           
-          -- Calculez timpul elapsed în secunde
-          CASE
-            WHEN sl.status = 'activ' THEN
-              TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), sl.data_start, SECOND)
-            WHEN sl.status = 'pausat' AND sl.data_stop IS NOT NULL THEN
-              TIMESTAMP_DIFF(sl.data_stop, sl.data_start, SECOND)
-            WHEN sl.status = 'completat' AND sl.data_stop IS NOT NULL THEN
-              TIMESTAMP_DIFF(sl.data_stop, sl.data_start, SECOND)
-            ELSE 0
-          END as timp_elapsed_seconds,
+          -- Calculez timpul elapsed în secunde - FORȚAT ca NUMERIC
+          CAST(
+            CASE
+              WHEN sl.status = 'activ' THEN
+                TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), sl.data_start, SECOND)
+              WHEN sl.status = 'pausat' AND sl.data_stop IS NOT NULL THEN
+                TIMESTAMP_DIFF(sl.data_stop, sl.data_start, SECOND)
+              WHEN sl.status = 'completat' AND sl.data_stop IS NOT NULL THEN
+                TIMESTAMP_DIFF(sl.data_stop, sl.data_start, SECOND)
+              ELSE 0
+            END AS INT64
+          ) as elapsed_seconds,
 
           -- Ultima activitate
           COALESCE(sl.data_stop, sl.data_start) as ultima_activitate,
@@ -62,11 +93,13 @@ export async function GET(request: NextRequest) {
           END as productivity_score,
           
           -- Break time calculation
-          CASE
-            WHEN sl.status = 'pausat' THEN
-              TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), COALESCE(sl.data_stop, sl.data_start), SECOND)
-            ELSE 0
-          END as break_time_seconds
+          CAST(
+            CASE
+              WHEN sl.status = 'pausat' THEN
+                TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), COALESCE(sl.data_stop, sl.data_start), SECOND)
+              ELSE 0
+            END AS INT64
+          ) as break_time_seconds
           
         FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
@@ -91,10 +124,10 @@ export async function GET(request: NextRequest) {
         data_stop,
         status,
         descriere_sesiune,
-        timp_elapsed_seconds as elapsed_seconds,
+        elapsed_seconds,
         ultima_activitate,
         productivity_score,
-        break_time_seconds as break_time,
+        break_time_seconds,
         
         -- Format pentru frontend
         FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', data_start) as data_start_formatted,
@@ -108,16 +141,16 @@ export async function GET(request: NextRequest) {
           COALESCE(CONCAT(u2.nume, ' ', u2.prenume), 'Test User') as utilizator_nume, 
           sl2.proiect_id, 
           COALESCE(p2.Denumire, 'Proiect necunoscut') as proiect_nume,
-          sl2.descriere_activitate as sarcina_titlu, 
+          COALESCE(sl2.descriere_activitate, 'Activitate generală') as sarcina_titlu, 
           'normala' as prioritate, 
           sl2.data_start, 
           sl2.data_stop,
           'completat' as status, 
           sl2.descriere_activitate as descriere_sesiune,
-          TIMESTAMP_DIFF(sl2.data_stop, sl2.data_start, SECOND) as elapsed_seconds,
+          CAST(TIMESTAMP_DIFF(sl2.data_stop, sl2.data_start, SECOND) AS INT64) as elapsed_seconds,
           sl2.data_stop as ultima_activitate, 
           85 as productivity_score, 
-          0 as break_time,
+          0 as break_time_seconds,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_start) as data_start_formatted,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_stop) as ultima_activitate_formatted
         FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl2
@@ -136,38 +169,53 @@ export async function GET(request: NextRequest) {
       location: 'EU'
     };
 
-    // Adăug parametrii doar dacă userId există
     if (userId) {
       queryOptions.params = { userId: userId };
     }
 
-    const [sessionsRows] = await bigquery.query(queryOptions);
+    const [rawRows] = await bigquery.query(queryOptions);
+    
+    // IMPORTANT: Procesez rândurile pentru a extrage valorile din obiectele BigQuery
+    const sessionsRows = processBigQueryRows(rawRows);
 
-    // Calculez statistici pentru dashboard
+    // Calculez statistici pentru dashboard cu valori procesate
     const stats = {
       total_active_sessions: sessionsRows.filter((s: any) => s.status === 'activ').length,
       total_paused_sessions: sessionsRows.filter((s: any) => s.status === 'pausat').length,
       total_users_online: new Set(
         sessionsRows.filter((s: any) => s.status === 'activ').map((s: any) => s.utilizator_uid)
       ).size,
-      total_time_today: sessionsRows.reduce((sum: number, s: any) => sum + (s.elapsed_seconds || 0), 0),
-      total_hours_today: sessionsRows.reduce((sum: number, s: any) => sum + (s.elapsed_seconds || 0), 0) / 3600,
+      total_time_today: sessionsRows.reduce((sum: number, s: any) => {
+        const elapsedSeconds = typeof s.elapsed_seconds === 'number' ? s.elapsed_seconds : 0;
+        return sum + elapsedSeconds;
+      }, 0),
+      total_hours_today: sessionsRows.reduce((sum: number, s: any) => {
+        const elapsedSeconds = typeof s.elapsed_seconds === 'number' ? s.elapsed_seconds : 0;
+        return sum + elapsedSeconds;
+      }, 0) / 3600,
       avg_session_length: sessionsRows.length > 0 ? 
-        sessionsRows.reduce((sum: number, s: any) => sum + (s.elapsed_seconds || 0), 0) / sessionsRows.length : 0,
+        sessionsRows.reduce((sum: number, s: any) => {
+          const elapsedSeconds = typeof s.elapsed_seconds === 'number' ? s.elapsed_seconds : 0;
+          return sum + elapsedSeconds;
+        }, 0) / sessionsRows.length : 0,
       avg_session_duration: sessionsRows.length > 0 ? 
-        (sessionsRows.reduce((sum: number, s: any) => sum + (s.elapsed_seconds || 0), 0) / sessionsRows.length) / 60 : 0,
+        (sessionsRows.reduce((sum: number, s: any) => {
+          const elapsedSeconds = typeof s.elapsed_seconds === 'number' ? s.elapsed_seconds : 0;
+          return sum + elapsedSeconds;
+        }, 0) / sessionsRows.length) / 60 : 0,
       
-      // Utilizatorul cel mai activ
       most_active_user: sessionsRows.length > 0 ? 
-        sessionsRows.reduce((prev: any, current: any) => 
-          (prev.elapsed_seconds || 0) > (current.elapsed_seconds || 0) ? prev : current
-        ).utilizator_nume : '',
+        sessionsRows.reduce((prev: any, current: any) => {
+          const prevElapsed = typeof prev.elapsed_seconds === 'number' ? prev.elapsed_seconds : 0;
+          const currentElapsed = typeof current.elapsed_seconds === 'number' ? current.elapsed_seconds : 0;
+          return prevElapsed > currentElapsed ? prev : current;
+        }).utilizator_nume : '',
         
-      // Proiectul cel mai activ
       most_active_project: (() => {
         const projectTimes = sessionsRows.reduce((acc: any, session: any) => {
           const projectName = session.proiect_nume || 'Necunoscut';
-          acc[projectName] = (acc[projectName] || 0) + (session.elapsed_seconds || 0);
+          const elapsedSeconds = typeof session.elapsed_seconds === 'number' ? session.elapsed_seconds : 0;
+          acc[projectName] = (acc[projectName] || 0) + elapsedSeconds;
           return acc;
         }, {});
         
@@ -175,23 +223,28 @@ export async function GET(request: NextRequest) {
           Object.keys(projectTimes).reduce((a, b) => projectTimes[a] > projectTimes[b] ? a : b) : '';
       })(),
       
-      break_time_total: sessionsRows.reduce((sum: number, s: any) => sum + (s.break_time || 0), 0),
+      break_time_total: sessionsRows.reduce((sum: number, s: any) => {
+        const breakTime = typeof s.break_time_seconds === 'number' ? s.break_time_seconds : 0;
+        return sum + breakTime;
+      }, 0),
       productivity_avg: sessionsRows.length > 0 ? 
-        sessionsRows.reduce((sum: number, s: any) => sum + (s.productivity_score || 0), 0) / sessionsRows.length : 0,
+        sessionsRows.reduce((sum: number, s: any) => {
+          const productivity = typeof s.productivity_score === 'number' ? s.productivity_score : 0;
+          return sum + productivity;
+        }, 0) / sessionsRows.length : 0,
         
-      // Active users count
       active_users_count: new Set(
         sessionsRows.filter((s: any) => s.status === 'activ').map((s: any) => s.utilizator_uid)
       ).size,
       
-      // Longest session today
-      longest_session: sessionsRows.length > 0 ? Math.max(...sessionsRows.map((s: any) => s.elapsed_seconds || 0)) : 0
+      longest_session: sessionsRows.length > 0 ? Math.max(...sessionsRows.map((s: any) => {
+        return typeof s.elapsed_seconds === 'number' ? s.elapsed_seconds : 0;
+      })) : 0
     };
 
-    // IMPORTANT: Returnez "data" în loc de "active_sessions" pentru compatibilitatea cu frontend-ul
     return NextResponse.json({
       success: true,
-      data: sessionsRows, // Schimbat din active_sessions
+      data: sessionsRows,
       stats: stats,
       meta: {
         user_id: userId,
@@ -250,8 +303,32 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        // Creez sesiunea nouă
+        // Creez sesiunea nouă cu sarcina_id opțional
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Construiesc descrierea cu sarcina dacă există
+        let finalDescription = descriere_sesiune || 'Sesiune de lucru';
+        if (sarcina_id && sarcina_id !== 'general') {
+          // Încerc să obțin titlul sarcinii
+          try {
+            const sarcinaQuery = `
+              SELECT titlu FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+              WHERE id = @sarcina_id
+            `;
+            const [sarcinaRows] = await bigquery.query({
+              query: sarcinaQuery,
+              location: 'EU',
+              params: { sarcina_id: sarcina_id }
+            });
+            
+            if (sarcinaRows.length > 0) {
+              const sarcinaTitlu = extractBigQueryValue(sarcinaRows[0].titlu);
+              finalDescription = `${finalDescription} - ${sarcinaTitlu}`;
+            }
+          } catch (error) {
+            console.warn('Nu s-a putut obține titlul sarcinii:', error);
+          }
+        }
         
         const insertSessionQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
@@ -266,7 +343,7 @@ export async function POST(request: NextRequest) {
             sessionId: sessionId,
             utilizator_uid: utilizator_uid,
             proiect_id: proiect_id,
-            descriere_sesiune: descriere_sesiune || 'Sesiune de lucru'
+            descriere_sesiune: finalDescription
           }
         });
 
@@ -275,9 +352,11 @@ export async function POST(request: NextRequest) {
             id: sessionId,
             utilizator_uid: utilizator_uid,
             proiect_id: proiect_id,
+            sarcina_id: sarcina_id || null,
             status: 'activ',
             data_start: new Date().toISOString(),
-            elapsed_seconds: 0
+            elapsed_seconds: 0,
+            descriere_sesiune: finalDescription
           }
         };
         break;
@@ -287,7 +366,6 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'session_id este obligatoriu pentru stop' }, { status: 400 });
         }
 
-        // Opresc sesiunea
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET

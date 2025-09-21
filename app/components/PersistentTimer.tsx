@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/components/PersistentTimer.tsx
-// CREAT: 21.09.2025 21:40 (ora României)
-// DESCRIERE: Timer persistent minimalist pentru layout principal - CORECTAT
-// FUNCȚII: Start/Stop/Pause timer vizibil din orice pagină cu auto-stop la 8h
+// CREAT: 21.09.2025 21:55 (ora României)
+// DESCRIERE: Timer persistent minimalist pentru layout principal - CORECTAT cu BigQuery fix
+// FUNCȚII: Start/Stop/Pause timer vizibil din orice pagină cu auto-stop la 8h și validări robuste
 // ==================================================================
 
 'use client';
@@ -20,6 +20,7 @@ interface ActiveSession {
   elapsed_seconds: number;
   descriere_sesiune?: string;
   utilizator_uid: string;
+  sarcina_titlu?: string;
 }
 
 interface PersistentTimerProps {
@@ -32,18 +33,24 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [lastCheck, setLastCheck] = useState<number>(0);
+  const [hasWarned7h, setHasWarned7h] = useState(false);
+  const [hasWarned8h, setHasWarned8h] = useState(false);
 
   // Check for active session on component mount and every 30 seconds
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      setActiveSession(null);
+      setCurrentTime(0);
+      return;
+    }
 
     const checkActiveSession = async () => {
       try {
-        const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}&team_view=false`);
+        const response = await fetch(`/api/analytics/live-timer?user_id=${encodeURIComponent(user.uid)}&team_view=false`);
         const data = await response.json();
 
         if (data.success && data.data?.length > 0) {
-          // CORECTAT: folosesc data.data în loc de data.active_sessions
+          // Filtrez doar sesiunile utilizatorului curent care sunt active sau pausate
           const userSessions = data.data.filter((session: ActiveSession) => 
             session.utilizator_uid === user.uid && 
             (session.status === 'activ' || session.status === 'pausat')
@@ -51,20 +58,36 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
 
           if (userSessions.length > 0) {
             const session = userSessions[0];
+            
+            // Validez elapsed_seconds pentru a evita NaN
+            const elapsedSeconds = typeof session.elapsed_seconds === 'number' && !isNaN(session.elapsed_seconds) 
+              ? session.elapsed_seconds 
+              : 0;
+            
             setActiveSession(session);
-            setCurrentTime(session.elapsed_seconds || 0);
+            setCurrentTime(elapsedSeconds);
             setLastCheck(Date.now());
+            
+            // Reset warnings dacă sesiunea s-a schimbat
+            if (!activeSession || activeSession.id !== session.id) {
+              setHasWarned7h(false);
+              setHasWarned8h(false);
+            }
           } else {
             setActiveSession(null);
             setCurrentTime(0);
+            setLastCheck(0);
+            setHasWarned7h(false);
+            setHasWarned8h(false);
           }
         } else {
           setActiveSession(null);
           setCurrentTime(0);
+          setLastCheck(0);
         }
       } catch (error) {
         console.error('Error checking active session:', error);
-        // Nu setez null aici pentru a evita flickering-ul
+        // Nu resetez sesiunea la eroare pentru a evita flickering
       }
     };
 
@@ -73,21 +96,33 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
     const interval = setInterval(checkActiveSession, 30000);
 
     return () => clearInterval(interval);
-  }, [user?.uid]);
+  }, [user?.uid, activeSession?.id]);
 
   // Update current time every second when timer is active
   useEffect(() => {
-    if (!activeSession || activeSession.status !== 'activ') return;
+    if (!activeSession || activeSession.status !== 'activ' || !lastCheck) return;
 
     const updateTimer = () => {
       const now = Date.now();
       const timeSinceLastCheck = Math.floor((now - lastCheck) / 1000);
-      const newTime = (activeSession.elapsed_seconds || 0) + timeSinceLastCheck;
+      const baseElapsed = typeof activeSession.elapsed_seconds === 'number' && !isNaN(activeSession.elapsed_seconds) 
+        ? activeSession.elapsed_seconds 
+        : 0;
+      const newTime = baseElapsed + timeSinceLastCheck;
       
       setCurrentTime(newTime);
 
-      // Auto-stop at 8 hours (28800 seconds) cu confirmare
-      if (newTime >= 28800) {
+      // Warning la 7 ore (25200 secunde)
+      if (newTime >= 25200 && !hasWarned7h) {
+        setHasWarned7h(true);
+        if (typeof window !== 'undefined') {
+          console.warn('Timer aproape de limita de 8h');
+        }
+      }
+
+      // Auto-stop la 8 ore (28800 secunde) cu confirmare
+      if (newTime >= 28800 && !hasWarned8h) {
+        setHasWarned8h(true);
         handleStopTimer(true);
       }
     };
@@ -97,12 +132,17 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [activeSession, lastCheck]);
+  }, [activeSession, lastCheck, hasWarned7h, hasWarned8h]);
 
   const formatTime = (seconds: number): string => {
+    // Validare robustă pentru a evita NaN
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
+      return '00:00:00';
+    }
+    
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -161,12 +201,14 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
         setActiveSession(null);
         setCurrentTime(0);
         setLastCheck(0);
+        setHasWarned7h(false);
+        setHasWarned8h(false);
         
-        if (autoStop) {
-          // Afișez alertă doar pentru auto-stop
-          if (typeof window !== 'undefined') {
-            alert('Timer oprit automat după 8 ore pentru siguranță.');
-          }
+        if (autoStop && typeof window !== 'undefined') {
+          // Folosesc setTimeout pentru a evita blocarea UI-ului
+          setTimeout(() => {
+            alert('Timer oprit automat după 8 ore pentru siguranță și respectarea legislației muncii.');
+          }, 500);
         }
       } else {
         console.error('Stop timer failed:', result.error);
@@ -186,6 +228,7 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
   const isActive = activeSession.status === 'activ';
   const isNearLimit = currentTime >= 25200; // 7 hours warning
   const isCritical = currentTime >= 27000; // 7.5 hours critical
+  const isOvertime = currentTime >= 28800; // 8 hours overtime
 
   return (
     <div
@@ -193,14 +236,14 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
       style={{
         padding: '0.5rem 1rem',
         background: isActive 
-          ? (isCritical ? 'rgba(220, 38, 38, 0.15)' : 'rgba(239, 68, 68, 0.1)') 
+          ? (isOvertime ? 'rgba(220, 38, 38, 0.2)' : isCritical ? 'rgba(220, 38, 38, 0.15)' : 'rgba(239, 68, 68, 0.1)') 
           : 'rgba(245, 158, 11, 0.1)',
         border: `1px solid ${isActive 
-          ? (isCritical ? 'rgba(220, 38, 38, 0.3)' : 'rgba(239, 68, 68, 0.2)') 
+          ? (isOvertime ? 'rgba(220, 38, 38, 0.4)' : isCritical ? 'rgba(220, 38, 38, 0.3)' : 'rgba(239, 68, 68, 0.2)') 
           : 'rgba(245, 158, 11, 0.2)'}`,
         borderRadius: '8px',
         color: isActive 
-          ? (isCritical ? '#dc2626' : '#ef4444') 
+          ? (isOvertime ? '#b91c1c' : isCritical ? '#dc2626' : '#ef4444') 
           : '#f59e0b',
         fontSize: '0.8rem',
         fontWeight: '500',
@@ -208,8 +251,9 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
         alignItems: 'center',
         gap: '0.5rem',
         transition: 'all 0.2s ease',
-        minWidth: '160px',
-        boxShadow: isNearLimit ? '0 0 8px rgba(220, 38, 38, 0.3)' : 'none'
+        minWidth: '180px',
+        boxShadow: isNearLimit ? '0 0 8px rgba(220, 38, 38, 0.3)' : 'none',
+        position: 'relative'
       }}
     >
       {/* Status icon cu pulsare pentru active */}
@@ -223,8 +267,8 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
       {/* Timer display */}
       <span style={{
         fontFamily: 'monospace',
-        fontWeight: '600',
-        color: isCritical ? '#dc2626' : 'inherit',
+        fontWeight: '700',
+        color: isOvertime ? '#b91c1c' : isCritical ? '#dc2626' : 'inherit',
         fontSize: isCritical ? '0.85rem' : '0.8rem'
       }}>
         {formatTime(currentTime)}
@@ -237,12 +281,12 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
             fontSize: '0.7rem', 
             color: 'inherit',
             opacity: 0.8,
-            maxWidth: '80px',
+            maxWidth: '100px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
           }}
-          title={`Proiect: ${activeSession.proiect_nume}`}
+          title={`Proiect: ${activeSession.proiect_nume}${activeSession.sarcina_titlu ? ' • ' + activeSession.sarcina_titlu : ''}`}
         >
           📁 {activeSession.proiect_nume}
         </span>
@@ -252,20 +296,20 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
       <div style={{ display: 'flex', gap: '0.25rem', marginLeft: 'auto' }}>
         <button
           onClick={handlePauseResume}
-          disabled={isLoading}
+          disabled={isLoading || isOvertime}
           style={{
             background: 'transparent',
             border: 'none',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
+            cursor: (isLoading || isOvertime) ? 'not-allowed' : 'pointer',
             fontSize: '0.7rem',
-            opacity: isLoading ? 0.5 : 1,
+            opacity: (isLoading || isOvertime) ? 0.5 : 1,
             padding: '0.25rem',
             borderRadius: '4px',
             transition: 'background 0.2s'
           }}
-          title={isActive ? 'Pauză' : 'Continuă'}
+          title={isOvertime ? 'Timer depășit - doar stop disponibil' : (isActive ? 'Pauză' : 'Continuă')}
           onMouseEnter={(e) => {
-            if (!isLoading) {
+            if (!isLoading && !isOvertime) {
               e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
             }
           }}
@@ -289,7 +333,7 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
             borderRadius: '4px',
             transition: 'background 0.2s'
           }}
-          title="Stop"
+          title="Stop și salvează sesiunea"
           onMouseEnter={(e) => {
             if (!isLoading) {
               e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -303,17 +347,21 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
         </button>
       </div>
 
-      {/* Warning indicators */}
+      {/* Warning indicators cu animații diferite */}
       {isNearLimit && (
         <span 
           style={{ 
             fontSize: '0.6rem', 
-            color: '#dc2626',
-            animation: isCritical ? 'blink 1s infinite' : 'none'
+            color: isOvertime ? '#b91c1c' : '#dc2626',
+            animation: isOvertime ? 'blink 0.5s infinite' : isCritical ? 'blink 1s infinite' : 'none'
           }} 
-          title={isCritical ? 'CRITIC: Aproape de limita de 8h!' : 'ATENȚIE: Aproape de limita de 8h'}
+          title={
+            isOvertime ? 'STOP OBLIGATORIU: Depășit 8h!' : 
+            isCritical ? 'CRITIC: Aproape de limita de 8h!' : 
+            'ATENȚIE: Aproape de limita de 8h'
+          }
         >
-          {isCritical ? '🚨' : '⚠️'}
+          {isOvertime ? '🚨' : isCritical ? '🚨' : '⚠️'}
         </span>
       )}
 

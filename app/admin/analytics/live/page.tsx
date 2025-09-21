@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/analytics/live/page.tsx
-// DATA: 21.09.2025 21:35 (ora României)
-// DESCRIERE: Live Tracking system pentru monitorizare echipă în timp real - CORECTAT
-// FUNCȚIONALITATE: Timer live, sesiuni active, management echipă real-time
+// DATA: 21.09.2025 21:50 (ora României)
+// DESCRIERE: Live Tracking system pentru monitorizare echipă în timp real - CORECTAT cu sarcini reintegrate
+// FUNCȚIONALITATE: Timer live, sesiuni active, management echipă real-time cu sarcini
 // ==================================================================
 
 'use client';
@@ -46,6 +46,7 @@ interface TimerSession {
   pausedTime: number;
   elapsedTime: number;
   projectId: string;
+  sarcinaId: string;
   description: string;
   sessionId?: string;
 }
@@ -55,6 +56,15 @@ interface Project {
   Denumire: string;
   Adresa?: string;
   Status?: string;
+}
+
+interface Sarcina {
+  id: string;
+  titlu: string;
+  descriere?: string;
+  prioritate?: string;
+  status?: string;
+  proiect_id: string;
 }
 
 export default function LiveTracking() {
@@ -74,6 +84,7 @@ export default function LiveTracking() {
     pausedTime: 0,
     elapsedTime: 0,
     projectId: '',
+    sarcinaId: 'general',
     description: '',
     sessionId: ''
   });
@@ -84,6 +95,8 @@ export default function LiveTracking() {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [sarcini, setSarcini] = useState<Sarcina[]>([]);
+  const [loadingSarcini, setLoadingSarcini] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -161,7 +174,6 @@ export default function LiveTracking() {
       const result = await response.json();
 
       if (result.success) {
-        // CORECTAT: folosesc result.data în loc de result.active_sessions
         const sessions = result.data || [];
         setLiveSessions(sessions);
         setTimerStats(result.stats || null);
@@ -173,12 +185,20 @@ export default function LiveTracking() {
         );
 
         if (userSession && !personalTimer.sessionId) {
+          // Parsez sarcina_id din descrierea sesiunii dacă există
+          let sarcinaId = 'general';
+          if (userSession.descriere_sesiune && userSession.descriere_sesiune.includes(' - ')) {
+            // Încerc să extrag sarcina din descriere
+            sarcinaId = 'specific';
+          }
+
           setPersonalTimer({
             isActive: userSession.status === 'activ',
             startTime: new Date(userSession.data_start),
-            pausedTime: userSession.status === 'pausat' ? userSession.elapsed_seconds : 0,
-            elapsedTime: userSession.elapsed_seconds,
+            pausedTime: userSession.status === 'pausat' ? (userSession.elapsed_seconds || 0) : 0,
+            elapsedTime: userSession.elapsed_seconds || 0,
             projectId: userSession.proiect_id,
+            sarcinaId: sarcinaId,
             description: userSession.descriere_sesiune || '',
             sessionId: userSession.id
           });
@@ -213,6 +233,31 @@ export default function LiveTracking() {
       console.error('Eroare la încărcarea proiectelor:', error);
       setProjects([]);
       setFilteredProjects([]);
+    }
+  };
+
+  const loadSarcini = async (projectId: string) => {
+    if (!projectId) {
+      setSarcini([]);
+      return;
+    }
+
+    setLoadingSarcini(true);
+    try {
+      const response = await fetch(`/api/rapoarte/sarcini?proiect_id=${encodeURIComponent(projectId)}`);
+      const result = await response.json();
+      
+      if (result.success && Array.isArray(result.data)) {
+        setSarcini(result.data);
+      } else {
+        console.error('Invalid sarcini data:', result);
+        setSarcini([]);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea sarcinilor:', error);
+      setSarcini([]);
+    } finally {
+      setLoadingSarcini(false);
     }
   };
 
@@ -269,6 +314,7 @@ export default function LiveTracking() {
         body: JSON.stringify({
           action: 'start',
           proiect_id: personalTimer.projectId,
+          sarcina_id: personalTimer.sarcinaId !== 'general' ? personalTimer.sarcinaId : null,
           descriere_sesiune: personalTimer.description || 'Sesiune de lucru',
           utilizator_uid: user.uid
         })
@@ -392,6 +438,7 @@ export default function LiveTracking() {
           pausedTime: 0,
           elapsedTime: 0,
           projectId: '',
+          sarcinaId: 'general',
           description: '',
           sessionId: ''
         });
@@ -407,9 +454,14 @@ export default function LiveTracking() {
   };
 
   const formatTime = (seconds: number) => {
+    // Validez că seconds este un număr valid
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
+      return '00:00:00';
+    }
+    
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -428,6 +480,16 @@ export default function LiveTracking() {
       case 'pausat': return '🟡';
       case 'completat': return '⚪';
       default: return '⚫';
+    }
+  };
+
+  const getPriorityColor = (prioritate?: string) => {
+    switch (prioritate) {
+      case 'urgent': return '#ef4444';
+      case 'ridicata': return '#f59e0b';
+      case 'normala': return '#10b981';
+      case 'scazuta': return '#6b7280';
+      default: return '#6b7280';
     }
   };
 
@@ -775,9 +837,21 @@ export default function LiveTracking() {
 
                       <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.75rem' }}>
                         📁 {session.proiect_nume}
-                        {session.sarcina_titlu && (
+                        {session.sarcina_titlu && session.sarcina_titlu !== 'Activitate generală' && (
                           <div style={{ marginTop: '0.25rem' }}>
                             📋 {session.sarcina_titlu}
+                            {session.prioritate && (
+                              <span style={{
+                                marginLeft: '0.5rem',
+                                padding: '0.125rem 0.375rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                background: getPriorityColor(session.prioritate),
+                                color: 'white'
+                              }}>
+                                {session.prioritate}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -861,7 +935,9 @@ export default function LiveTracking() {
               borderRadius: '16px',
               width: '100%',
               maxWidth: '500px',
-              margin: '1rem'
+              margin: '1rem',
+              maxHeight: '90vh',
+              overflowY: 'auto'
             }}>
               <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.5rem', fontWeight: '700' }}>
                 ▶️ Începe Sesiune Nouă
@@ -913,9 +989,14 @@ export default function LiveTracking() {
                           <div
                             key={project.ID_Proiect}
                             onClick={() => {
-                              setPersonalTimer(prev => ({ ...prev, projectId: project.ID_Proiect }));
+                              setPersonalTimer(prev => ({ 
+                                ...prev, 
+                                projectId: project.ID_Proiect,
+                                sarcinaId: 'general' // Reset la general când se schimbă proiectul
+                              }));
                               setProjectSearchTerm(`${project.ID_Proiect} - ${project.Denumire}`);
                               setShowProjectDropdown(false);
+                              loadSarcini(project.ID_Proiect);
                             }}
                             style={{
                               padding: '0.75rem',
@@ -940,6 +1021,46 @@ export default function LiveTracking() {
                     )}
                   </div>
                 </div>
+
+                {/* Selector sarcini - REINTEGRAT */}
+                {personalTimer.projectId && (
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
+                      Sarcină (opțional)
+                    </label>
+                    {loadingSarcini ? (
+                      <div style={{
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        color: '#6b7280',
+                        textAlign: 'center'
+                      }}>
+                        Se încarcă sarcinile...
+                      </div>
+                    ) : (
+                      <select
+                        value={personalTimer.sarcinaId}
+                        onChange={(e) => setPersonalTimer(prev => ({ ...prev, sarcinaId: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.875rem',
+                          background: 'white'
+                        }}
+                      >
+                        <option value="general">Activitate generală</option>
+                        {sarcini.map((sarcina) => (
+                          <option key={sarcina.id} value={sarcina.id}>
+                            {sarcina.titlu} {sarcina.prioritate && `(${sarcina.prioritate})`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
@@ -966,6 +1087,13 @@ export default function LiveTracking() {
                       setShowStartModal(false);
                       setProjectSearchTerm('');
                       setShowProjectDropdown(false);
+                      setSarcini([]);
+                      setPersonalTimer(prev => ({ 
+                        ...prev, 
+                        projectId: '', 
+                        sarcinaId: 'general', 
+                        description: '' 
+                      }));
                     }}
                     style={{
                       padding: '0.5rem 1rem',
