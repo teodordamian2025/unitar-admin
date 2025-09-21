@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
           ON sl.proiect_id = s.proiect_id
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
-          ${userId ? 'AND sl.utilizator_uid = @userId' : ''}
+          ${userId ? `AND sl.utilizator_uid = '${userId}'` : ''}
         ORDER BY sl.data_start DESC
       )
       
@@ -123,28 +123,14 @@ export async function GET(request: NextRequest) {
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s2 
           ON sl2.proiect_id = s2.proiect_id
         WHERE sl2.status = 'completat'
-          AND sl2.data_start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 8 HOUR)
-          ${userId ? 'AND sl2.utilizator_uid = @userId' : ''}
+          AND sl2.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 HOUR)
+          ${userId ? `AND sl2.utilizator_uid = '${userId}'` : ''}
       ` : ''}
     `;
 
-    const queryParams: Array<{
-	  name: string;
-	  parameterType: any;
-	  parameterValue: any;
-	}> = [];
-    if (userId) {
-      queryParams.push({ 
-        name: 'userId', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: userId } 
-      });
-    }
-
     const [sessionsRows] = await bigquery.query({
       query: activeSessionsQuery,
-      location: 'EU',
-      params: queryParams,
+      location: 'EU'
     });
 
     // Calculez statistici pentru dashboard
@@ -230,18 +216,13 @@ export async function POST(request: NextRequest) {
         // Verific dacă utilizatorul are deja o sesiune activă
         const checkActiveQuery = `
           SELECT id FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          WHERE utilizator_uid = @utilizatorUid 
+          WHERE utilizator_uid = '${utilizator_uid}'
             AND status IN ('activ', 'pausat')
         `;
 
         const [activeCheck] = await bigquery.query({
           query: checkActiveQuery,
-          location: 'EU',
-          params: [{ 
-            name: 'utilizatorUid', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: utilizator_uid } 
-          }]
+          location: 'EU'
         });
 
         if (activeCheck.length > 0) {
@@ -256,18 +237,12 @@ export async function POST(request: NextRequest) {
         const insertSessionQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
-          VALUES (@sessionId, @utilizatorUid, @proiectId, CURRENT_TIMESTAMP(), 'activ', @descriere, CURRENT_TIMESTAMP())
+          VALUES ('${sessionId}', '${utilizator_uid}', '${proiect_id}', CURRENT_TIMESTAMP(), 'activ', '${(descriere_sesiune || '').replace(/'/g, "''")}', CURRENT_TIMESTAMP())
         `;
 
         await bigquery.query({
           query: insertSessionQuery,
-          location: 'EU',
-          params: [
-            { name: 'sessionId', parameterType: { type: 'STRING' }, parameterValue: { value: sessionId } },
-            { name: 'utilizatorUid', parameterType: { type: 'STRING' }, parameterValue: { value: utilizator_uid } },
-            { name: 'proiectId', parameterType: { type: 'STRING' }, parameterValue: { value: proiect_id } },
-            { name: 'descriere', parameterType: { type: 'STRING' }, parameterValue: { value: descriere_sesiune || '' } }
-          ]
+          location: 'EU'
         });
 
         result = {
@@ -294,48 +269,39 @@ export async function POST(request: NextRequest) {
           SET
             status = 'completat',
             data_stop = CURRENT_TIMESTAMP(),
-            ore_lucrate = TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0
-          WHERE id = @sessionId
+            ore_lucrate = TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND)
+          WHERE id = '${session_id}'
         `;
 
         await bigquery.query({
           query: stopSessionQuery,
-          location: 'EU',
-          params: [{ 
-            name: 'sessionId', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: session_id } 
-          }]
+          location: 'EU'
         });
 
         // Adaug automat în TimeTracking pentru consistență
         const addToTimeTrackingQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
           (id, sarcina_id, utilizator_uid, utilizator_nume, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, proiect_id, created_at)
-          SELECT 
+          SELECT
             CONCAT('tt_', sl.id) as id,
-            @sarcinaId as sarcina_id,
+            '${sarcina_id || ''}' as sarcina_id,
             sl.utilizator_uid,
-            CONCAT(u.nume, ' ', u.prenume) as utilizator_nume,
+            COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
             DATE(sl.data_start) as data_lucru,
-            sl.ore_lucrate,
+            sl.ore_lucrate / 3600,
             sl.descriere_activitate,
             'live_timer' as tip_inregistrare,
             sl.proiect_id,
             CURRENT_TIMESTAMP()
           FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
+          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
             ON sl.utilizator_uid = u.uid
-          WHERE sl.id = @sessionId
+          WHERE sl.id = '${session_id}'
         `;
 
         await bigquery.query({
           query: addToTimeTrackingQuery,
-          location: 'EU',
-          params: [
-            { name: 'sessionId', parameterType: { type: 'STRING' }, parameterValue: { value: session_id } },
-            { name: 'sarcinaId', parameterType: { type: 'STRING' }, parameterValue: { value: sarcina_id || '' } }
-          ]
+          location: 'EU'
         });
 
         result = { message: 'Sesiune oprită și timp înregistrat cu succes' };
@@ -351,17 +317,12 @@ export async function POST(request: NextRequest) {
           SET
             status = 'pausat',
             data_stop = CURRENT_TIMESTAMP()
-          WHERE id = @sessionId AND status = 'activ'
+          WHERE id = '${session_id}' AND status = 'activ'
         `;
 
         await bigquery.query({
           query: pauseSessionQuery,
-          location: 'EU',
-          params: [{ 
-            name: 'sessionId', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: session_id } 
-          }]
+          location: 'EU'
         });
 
         result = { message: 'Sesiune pusă în pauză' };
@@ -374,20 +335,15 @@ export async function POST(request: NextRequest) {
 
         const resumeSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          SET 
+          SET
             status = 'activ',
             data_stop = NULL
-          WHERE id = @sessionId AND status = 'pausat'
+          WHERE id = '${session_id}' AND status = 'pausat'
         `;
 
         await bigquery.query({
           query: resumeSessionQuery,
-          location: 'EU',
-          params: [{ 
-            name: 'sessionId', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: session_id } 
-          }]
+          location: 'EU'
         });
 
         result = { message: 'Sesiune reluată' };
@@ -402,17 +358,13 @@ export async function POST(request: NextRequest) {
 
         const updateDescriptionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-          SET descriere_activitate = @descriere
-          WHERE id = @sessionId
+          SET descriere_activitate = '${(descriere_sesiune || '').replace(/'/g, "''")}'
+          WHERE id = '${session_id}'
         `;
 
         await bigquery.query({
           query: updateDescriptionQuery,
-          location: 'EU',
-          params: [
-            { name: 'sessionId', parameterType: { type: 'STRING' }, parameterValue: { value: session_id } },
-            { name: 'descriere', parameterType: { type: 'STRING' }, parameterValue: { value: descriere_sesiune } }
-          ]
+          location: 'EU'
         });
 
         result = { message: 'Descriere actualizată' };
@@ -450,17 +402,12 @@ export async function DELETE(request: NextRequest) {
 
     const deleteSessionQuery = `
       DELETE FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
-      WHERE id = @sessionId AND status IN ('activ', 'pausat')
+      WHERE id = '${sessionId}' AND status IN ('activ', 'pausat')
     `;
 
     const [result] = await bigquery.query({
       query: deleteSessionQuery,
-      location: 'EU',
-      params: [{ 
-        name: 'sessionId', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: sessionId } 
-      }]
+      location: 'EU'
     });
 
     return NextResponse.json({
