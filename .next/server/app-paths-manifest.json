@@ -1,1 +1,3 @@
-{}
+{
+  "/api/analytics/live-timer/route": "app/api/analytics/live-timer/route.js"
+}
