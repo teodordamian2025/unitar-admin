@@ -16,6 +16,7 @@ import { auth } from '@/lib/firebaseConfig';
 import ModernLayout from '@/app/components/ModernLayout';
 import ContractModal from '../components/ContractModal';
 import FacturaHibridModal from '../components/FacturaHibridModal';
+import ProiectEditModal from '../components/ProiectEditModal';
 
 interface ProiectDetails {
   ID_Proiect: string;
@@ -86,7 +87,6 @@ export default function ProiectDetailsPage() {
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('admin');
@@ -96,6 +96,7 @@ export default function ProiectDetailsPage() {
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (loadingAuth) return;
@@ -283,6 +284,24 @@ export default function ProiectDetailsPage() {
     // fetchProiectDetails();
   };
 
+  // Handler pentru succesul editării proiectului
+  const handleProiectUpdated = () => {
+    toast.success('Proiect actualizat cu succes!');
+    setShowEditModal(false);
+    // Refresh datele proiectului
+    fetchProiectDetails();
+    fetchContractInfo();
+    fetchInvoiceInfo();
+  };
+
+  // Handler pentru ștergerea proiectului
+  const handleProiectDeleted = () => {
+    toast.success('Proiect șters cu succes!');
+    setShowEditModal(false);
+    // Navigare înapoi la lista de proiecte
+    router.push('/admin/rapoarte/proiecte');
+  };
+
   const renderStatus = (status: string) => {
     const statusConfig = {
       'Activ': { color: '#28a745', icon: '🟢' },
@@ -449,7 +468,7 @@ export default function ProiectDetailsPage() {
         
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => setShowEditModal(true)}
             style={{
               padding: '0.75rem 1.5rem',
               background: '#007bff',
@@ -1502,6 +1521,17 @@ export default function ProiectDetailsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {showEditModal && proiect && (
+        <ProiectEditModal
+          proiect={proiect}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onProiectUpdated={handleProiectUpdated}
+          onProiectDeleted={handleProiectDeleted}
+        />
       )}
       </div>
     </ModernLayout>
