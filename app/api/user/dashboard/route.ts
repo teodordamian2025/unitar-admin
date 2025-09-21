@@ -90,11 +90,11 @@ async function getUserTimeTrackingStats() {
     const query = `
       SELECT
         COALESCE(SUM(CAST(ore_lucrate AS FLOAT64)), 0) as ore_saptamana_curenta,
-        COUNT(DISTINCT data_inregistrare) as zile_lucrate,
+        COUNT(DISTINCT data_lucru) as zile_lucrate,
         COUNT(*) as total_inregistrari
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
-      WHERE EXTRACT(WEEK FROM data_inregistrare) = EXTRACT(WEEK FROM CURRENT_DATE())
-        AND EXTRACT(YEAR FROM data_inregistrare) = EXTRACT(YEAR FROM CURRENT_DATE())
+      WHERE EXTRACT(WEEK FROM data_lucru) = EXTRACT(WEEK FROM CURRENT_DATE())
+        AND EXTRACT(YEAR FROM data_lucru) = EXTRACT(YEAR FROM CURRENT_DATE())
     `;
 
     const [rows] = await bigquery.query({

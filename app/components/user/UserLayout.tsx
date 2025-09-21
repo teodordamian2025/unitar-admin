@@ -43,7 +43,7 @@ const userNavStructure: NavItem[] = [
     icon: '📋'
   },
   {
-    href: '/timetracking',
+    href: '/time-tracking',
     label: 'Time Tracking',
     icon: '⏱️'
   },

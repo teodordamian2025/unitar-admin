@@ -89,16 +89,14 @@ export async function GET(request: NextRequest) {
     let baseQuery = `
       SELECT
         id,
-        user_id,
-        project_id,
-        task_description,
-        data_inregistrare,
-        ora_start,
-        ora_end,
+        utilizator_uid,
+        proiect_id,
+        descriere_lucru as task_description,
+        data_lucru,
         ore_lucrate,
-        status,
-        observatii,
-        data_creare
+        tip_inregistrare,
+        created_at,
+        sarcina_id
       FROM \`${PROJECT_ID}.${dataset}.${table}\`
     `;
 
@@ -108,27 +106,27 @@ export async function GET(request: NextRequest) {
 
     // Filtrare pe utilizator
     if (userId && userId !== 'utilizator_curent') {
-      conditions.push('user_id = @userId');
+      conditions.push('utilizator_uid = @userId');
       params.userId = userId;
       types.userId = 'STRING';
     }
 
     // Filtrare pe interval de date
     if (startDate) {
-      conditions.push('data_inregistrare >= @startDate');
+      conditions.push('data_lucru >= @startDate');
       params.startDate = startDate;
       types.startDate = 'DATE';
     }
 
     if (endDate) {
-      conditions.push('data_inregistrare <= @endDate');
+      conditions.push('data_lucru <= @endDate');
       params.endDate = endDate;
       types.endDate = 'DATE';
     }
 
     // Filtrare pe proiect
     if (projectId) {
-      conditions.push('project_id = @projectId');
+      conditions.push('proiect_id = @projectId');
       params.projectId = projectId;
       types.projectId = 'STRING';
     }
@@ -140,7 +138,7 @@ export async function GET(request: NextRequest) {
 
     // Sortare și paginare
     baseQuery += `
-      ORDER BY data_inregistrare DESC, ora_start DESC
+      ORDER BY data_lucru DESC, created_at DESC
       LIMIT @limit OFFSET @offset
     `;
 
@@ -190,16 +188,13 @@ export async function GET(request: NextRequest) {
     // Procesează rezultatele - EXCLUDE datele financiare
     const processedData = rows.map((row: any) => ({
       id: row.id,
-      user_id: row.user_id,
-      project_id: row.project_id,
+      user_id: row.utilizator_uid,
+      project_id: row.proiect_id,
       task_description: row.task_description,
-      data_inregistrare: row.data_inregistrare,
-      ora_start: row.ora_start,
-      ora_end: row.ora_end,
+      data_lucru: row.data_lucru,
       ore_lucrate: convertBigQueryNumeric(row.ore_lucrate),
-      status: row.status,
-      observatii: row.observatii,
-      data_creare: row.data_creare,
+      status: row.tip_inregistrare,
+      data_creare: row.created_at,
       // Pentru compatibilitate - exclude datele financiare
       rate_per_hour: 0,
       valoare_totala: 0
@@ -246,46 +241,40 @@ export async function POST(request: NextRequest) {
       user_id = 'utilizator_curent',
       project_id,
       task_description,
-      data_inregistrare,
-      ora_start,
-      ora_end,
-      ore_lucrate,
-      status = 'activ',
-      observatii
+      data_lucru,
+      duration_minutes,
+      start_time,
+      end_time
     } = body;
 
     // Validări
-    if (!project_id || !task_description || !data_inregistrare || !ore_lucrate) {
+    if (!task_description || !duration_minutes) {
       return NextResponse.json({
         success: false,
-        error: 'Câmpurile project_id, task_description, data_inregistrare și ore_lucrate sunt obligatorii'
+        error: 'Câmpurile task_description și duration_minutes sunt obligatorii'
       }, { status: 400 });
     }
 
-    const dataFormatted = formatDateLiteral(data_inregistrare);
+    const dataLucruFormatted = data_lucru ? formatDateLiteral(data_lucru) : 'CURRENT_DATE()';
+    const oreCalculate = duration_minutes / 60; // Convertește minutele în ore
 
     // Generare ID unic pentru înregistrare
     const recordId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Query pentru utilizatori normali - FĂRĂ valori financiare
+    // Query pentru utilizatori normali - conform schema BigQuery TimeTracking
     const insertQuery = `
       INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
-      (id, user_id, project_id, task_description, data_inregistrare,
-       ora_start, ora_end, ore_lucrate, status, observatii,
-       rate_per_hour, valoare_totala, data_creare)
+      (id, utilizator_uid, utilizator_nume, proiect_id, descriere_lucru,
+       data_lucru, ore_lucrate, tip_inregistrare, created_at)
       VALUES (
         '${escapeString(recordId)}',
         '${escapeString(user_id)}',
-        '${escapeString(project_id)}',
+        'Utilizator Normal',
+        ${project_id ? `'${escapeString(project_id)}'` : 'NULL'},
         '${escapeString(task_description)}',
-        ${dataFormatted},
-        ${ora_start ? `'${escapeString(ora_start)}'` : 'NULL'},
-        ${ora_end ? `'${escapeString(ora_end)}'` : 'NULL'},
-        ${ore_lucrate},
-        '${escapeString(status)}',
-        ${observatii ? `'${escapeString(observatii)}'` : 'NULL'},
-        0,
-        0,
+        ${dataLucruFormatted},
+        ${oreCalculate},
+        'manual',
         CURRENT_TIMESTAMP()
       )
     `;
@@ -349,13 +338,13 @@ export async function PUT(request: NextRequest) {
 
     // Câmpuri permise pentru utilizatori normali (fără valori financiare)
     const allowedFields = [
-      'project_id', 'task_description', 'data_inregistrare',
-      'ora_start', 'ora_end', 'ore_lucrate', 'status', 'observatii'
+      'proiect_id', 'descriere_lucru', 'data_lucru',
+      'ore_lucrate', 'tip_inregistrare'
     ];
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
-        if (key === 'data_inregistrare') {
+        if (key === 'data_lucru') {
           const formattedDate = formatDateLiteral(value as string);
           updateFields.push(`${key} = ${formattedDate}`);
         } else if (value === null || value === '') {
@@ -458,23 +447,20 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Helper pentru crearea tabelei TimeTracking dacă nu există
+// Helper pentru crearea tabelei TimeTracking dacă nu există (conform schema BigQuery)
 async function createTimeTrackingTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS \`${PROJECT_ID}.${dataset}.${table}\` (
       id STRING NOT NULL,
-      user_id STRING,
-      project_id STRING,
-      task_description STRING,
-      data_inregistrare DATE,
-      ora_start STRING,
-      ora_end STRING,
-      ore_lucrate NUMERIC,
-      status STRING,
-      observatii STRING,
-      rate_per_hour NUMERIC,
-      valoare_totala NUMERIC,
-      data_creare TIMESTAMP
+      sarcina_id STRING,
+      utilizator_uid STRING NOT NULL,
+      utilizator_nume STRING,
+      data_lucru DATE NOT NULL,
+      ore_lucrate NUMERIC NOT NULL,
+      descriere_lucru STRING,
+      tip_inregistrare STRING,
+      created_at TIMESTAMP,
+      proiect_id STRING
     )
   `;
 
