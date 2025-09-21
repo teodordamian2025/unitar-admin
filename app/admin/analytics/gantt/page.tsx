@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/analytics/gantt/page.tsx
-// DATA: 21.09.2025 15:45 (ora României)
-// DESCRIERE: Gantt Chart pentru timeline proiecte cu dependencies și hierarhie - VERSIUNE CORECTATĂ
-// FUNCȚIONALITATE: Vizualizare timeline interactivă cu proiecte, subproiecte și sarcini - ALINIERE FIXATĂ
+// DATA: 21.09.2025 16:30 (ora României)
+// DESCRIERE: Gantt Chart cu DatePickerPopup în loc de drag & drop
+// FUNCȚIONALITATE: Click pe capetele barelor pentru editare dată precisă
 // ==================================================================
 
 'use client';
@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
 import { Card, Button, Alert, LoadingSpinner, Modal } from '@/app/components/ui';
 import { toast } from 'react-toastify';
+import DatePickerPopup from '@/app/admin/analytics/components/DatePickerPopup';
 
 interface GanttTask {
   id: string;
@@ -38,6 +39,15 @@ interface TimelineSettings {
   startDate: Date;
   endDate: Date;
   timelineUnit: number;
+}
+
+interface DateEditState {
+  isOpen: boolean;
+  taskId: string;
+  dateType: 'start' | 'end';
+  currentDate: string;
+  taskName: string;
+  position: { x: number; y: number };
 }
 
 // Constantă pentru înălțimea fiecărui rând - CHEIA PENTRU ALINIERE
@@ -65,21 +75,16 @@ export default function GanttView() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
 
-  // Resize state
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeInfo, setResizeInfo] = useState<{
-    taskId: string;
-    type: 'start' | 'end';
-    originalDate: string;
-    previewDate: string;
-  } | null>(null);
+  // Date edit state - ÎNLOCUIEȘTE LOGICA DE RESIZE
+  const [dateEditState, setDateEditState] = useState<DateEditState>({
+    isOpen: false,
+    taskId: '',
+    dateType: 'start',
+    currentDate: '',
+    taskName: '',
+    position: { x: 0, y: 0 }
+  });
   const [savingChanges, setSavingChanges] = useState(false);
-  const [tooltip, setTooltip] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    date: string;
-  }>({ visible: false, x: 0, y: 0, date: '' });
 
   // Filters
   const [filters, setFilters] = useState({
@@ -212,163 +217,74 @@ export default function GanttView() {
     }
   };
 
-  // Resize handlers for task bar edges - ÎMBUNĂTĂȚIT PENTRU ALINIERE
-  const handleResizeStart = (taskId: string, type: 'start' | 'end', e: React.MouseEvent) => {
-    e.stopPropagation();
+  // NOUA FUNCȚIE PENTRU CLICK PE CAPETELE BARELOR
+  const handleDateClick = (taskId: string, dateType: 'start' | 'end', event: React.MouseEvent) => {
+    event.stopPropagation();
 
     const task = ganttData.find(t => t.id === taskId);
     if (!task) return;
 
-    const originalDate = type === 'start' 
+    const currentDate = dateType === 'start' 
       ? normalizeDate(task.startDate) 
       : normalizeDate(task.endDate);
 
-    setIsResizing(true);
-    setResizeInfo({
+    setDateEditState({
+      isOpen: true,
       taskId,
-      type,
-      originalDate,
-      previewDate: originalDate
-    });
-
-    document.body.style.cursor = 'ew-resize';
-    document.addEventListener('mousemove', handleResizeMove);
-    document.addEventListener('mouseup', handleResizeEnd);
-  };
-
-  const handleResizeMove = (e: MouseEvent) => {
-    if (!resizeInfo || !ganttRef.current) return;
-
-    const timelineBody = ganttRef.current.querySelector('[data-timeline-body]') as HTMLElement;
-    if (!timelineBody) return;
-
-    const containerRect = timelineBody.getBoundingClientRect();
-    const relativeX = Math.max(0, Math.min(containerRect.width, e.clientX - containerRect.left));
-    
-    // CORECTARE: Calcul precis bazat pe timeline headers
-    const timelineStart = timelineSettings.startDate;
-    const timelineEnd = timelineSettings.endDate;
-    const totalDuration = timelineEnd.getTime() - timelineStart.getTime();
-    
-    // Calculez exact poziția în timeline bazat pe grid
-    const timelineHeaders = generateTimelineHeaders();
-    const headerWidth = containerRect.width / timelineHeaders.length;
-    const headerIndex = Math.floor(relativeX / headerWidth);
-    const offsetInHeader = relativeX - (headerIndex * headerWidth);
-    const percentageInHeader = offsetInHeader / headerWidth;
-    
-    // Calculez data exactă din header + offset
-    let targetDate: Date;
-    if (headerIndex >= timelineHeaders.length) {
-      // Dacă sunt la sfârșitul timeline-ului
-      targetDate = timelineEnd;
-    } else if (headerIndex < 0) {
-      // Dacă sunt la începutul timeline-ului
-      targetDate = timelineStart;
-    } else {
-      // Calculez data exactă în header-ul curent
-      const currentHeaderDate = timelineHeaders[headerIndex];
-      const nextHeaderDate = headerIndex + 1 < timelineHeaders.length 
-        ? timelineHeaders[headerIndex + 1] 
-        : timelineEnd;
-      
-      const headerDuration = nextHeaderDate.getTime() - currentHeaderDate.getTime();
-      const timeInHeader = headerDuration * percentageInHeader;
-      targetDate = new Date(currentHeaderDate.getTime() + timeInHeader);
-    }
-    
-    const newDateString = targetDate.toISOString().split('T')[0];
-
-    // Update preview date
-    setResizeInfo(prev => prev ? { ...prev, previewDate: newDateString } : null);
-
-    // Show tooltip with date
-    setTooltip({
-      visible: true,
-      x: e.clientX + 10,
-      y: e.clientY - 30,
-      date: targetDate.toLocaleDateString('ro-RO', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      })
+      dateType,
+      currentDate,
+      taskName: task.name,
+      position: { x: event.clientX, y: event.clientY }
     });
   };
 
-  const handleResizeEnd = async () => {
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-    document.body.style.cursor = '';
-
-    setTooltip({ visible: false, x: 0, y: 0, date: '' });
-
-    if (!resizeInfo) {
-      setIsResizing(false);
-      return;
-    }
-
-    const task = ganttData.find(t => t.id === resizeInfo.taskId);
+  // FUNCȚIA PENTRU SALVAREA DATEI NOI
+  const handleDateSave = async (newDate: string) => {
+    const task = ganttData.find(t => t.id === dateEditState.taskId);
     if (!task) {
-      setIsResizing(false);
-      setResizeInfo(null);
+      toast.error('Task nu a fost găsit!');
+      setDateEditState(prev => ({ ...prev, isOpen: false }));
       return;
     }
 
-    // Validate the new date
+    // Validare: start date < end date
     const currentStartDate = normalizeDate(task.startDate);
     const currentEndDate = normalizeDate(task.endDate);
-
+    
     let newStartDate = currentStartDate;
     let newEndDate = currentEndDate;
 
-    if (resizeInfo.type === 'start') {
-      newStartDate = resizeInfo.previewDate;
-      // Ensure start date is before end date
+    if (dateEditState.dateType === 'start') {
+      newStartDate = newDate;
       if (new Date(newStartDate) >= new Date(currentEndDate)) {
         toast.error('Data de început trebuie să fie înainte de data de sfârșit!');
-        setIsResizing(false);
-        setResizeInfo(null);
         return;
       }
     } else {
-      newEndDate = resizeInfo.previewDate;
-      // Ensure end date is after start date
+      newEndDate = newDate;
       if (new Date(newEndDate) <= new Date(currentStartDate)) {
         toast.error('Data de sfârșit trebuie să fie după data de început!');
-        setIsResizing(false);
-        setResizeInfo(null);
         return;
       }
     }
 
-    // Update task dates
-    await updateTaskDates(resizeInfo.taskId, newStartDate, newEndDate);
-
-    setIsResizing(false);
-    setResizeInfo(null);
-  };
-
-  const updateTaskDates = async (taskId: string, startDate: string, endDate: string) => {
     try {
       setSavingChanges(true);
 
-      // Find task to determine type for API call
-      const task = ganttData.find(t => t.id === taskId);
-      if (!task) {
-        toast.error('Task nu a fost găsit!');
-        return;
-      }
-
-      // Send direct taskId to API - API-ul va face parsing-ul
-      console.log('🔧 Sending API request:', { taskId, taskType: task.type, startDate, endDate });
+      console.log('🔧 Sending API request:', { 
+        taskId: dateEditState.taskId, 
+        taskType: task.type, 
+        startDate: newStartDate, 
+        endDate: newEndDate 
+      });
 
       const response = await fetch('/api/analytics/gantt-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId: taskId, // Trimitem ID-ul direct, fără prefix
-          startDate,
-          endDate
+          taskId: dateEditState.taskId,
+          startDate: newStartDate,
+          endDate: newEndDate
         })
       });
 
@@ -377,11 +293,14 @@ export default function GanttView() {
       if (result.success) {
         // Update local state
         setGanttData(prev => prev.map(task =>
-          task.id === taskId
-            ? { ...task, startDate, endDate }
+          task.id === dateEditState.taskId
+            ? { ...task, startDate: newStartDate, endDate: newEndDate }
             : task
         ));
-        toast.success('Datele au fost actualizate cu succes!');
+        toast.success('Data a fost actualizată cu succes!');
+        
+        // Închide popup-ul
+        setDateEditState(prev => ({ ...prev, isOpen: false }));
       } else {
         toast.error(result.error || 'Eroare la actualizarea datelor!');
       }
@@ -391,6 +310,11 @@ export default function GanttView() {
     } finally {
       setSavingChanges(false);
     }
+  };
+
+  // FUNCȚIA PENTRU ANULAREA EDITĂRII
+  const handleDateCancel = () => {
+    setDateEditState(prev => ({ ...prev, isOpen: false }));
   };
 
   const calculateTimelineRange = (tasks: GanttTask[]) => {
@@ -978,7 +902,7 @@ export default function GanttView() {
         </div>
       </Card>
 
-      {/* Gantt Chart - LAYOUT COMPLET REFACTORIZAT PENTRU ALINIERE PERFECTA */}
+      {/* Gantt Chart - LAYOUT CU CLICK HANDLERS PENTRU DATE EDITING */}
       <Card>
         {savingChanges && (
           <div style={{
@@ -1004,7 +928,7 @@ export default function GanttView() {
               overflow: 'hidden'
             }}
           >
-            {/* HEADER SINCRONIZAT - CHEIA PENTRU ALINIERE */}
+            {/* HEADER SINCRONIZAT */}
             <div style={{
               display: 'flex',
               position: 'sticky',
@@ -1064,7 +988,7 @@ export default function GanttView() {
               </div>
             </div>
 
-            {/* BODY CONTENT - SINCRONIZAT PERFECT CU HEADER-UL */}
+            {/* BODY CONTENT CU CLICK HANDLERS PENTRU EDITARE DATE */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {visibleTasks.map((task, index) => (
                 <div
@@ -1076,7 +1000,7 @@ export default function GanttView() {
                     background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.8)' : 'rgba(249, 250, 251, 0.5)'
                   }}
                 >
-                  {/* Task Info - SINCRONIZAT CU HEADER WIDTH */}
+                  {/* Task Info */}
                   <div
                     style={{
                       width: '350px',
@@ -1159,7 +1083,7 @@ export default function GanttView() {
                     </div>
                   </div>
 
-                  {/* Timeline Content - POZITIONARE ABSOLUTA SINCRONIZATA */}
+                  {/* Timeline Content cu CLICK HANDLERS */}
                   <div
                     data-timeline-body
                     style={{
@@ -1195,7 +1119,7 @@ export default function GanttView() {
                       );
                     })()}
 
-                    {/* Task Bar with Resize Handles - POZITIONARE PRECISĂ */}
+                    {/* Task Bar cu CLICK HANDLERS pe capete */}
                     {(() => {
                       const position = calculateTaskPosition(task);
                       return (
@@ -1215,65 +1139,92 @@ export default function GanttView() {
                             cursor: 'pointer',
                             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                             opacity: task.status === 'anulata' ? 0.5 : 1,
-                            border: resizeInfo?.taskId === task.id ? '2px solid #3b82f6' : 'none',
                             overflow: 'hidden'
                           }}
                           onClick={() => {
-                            if (!isResizing) {
-                              setSelectedTask(task);
-                              setShowTaskModal(true);
-                            }
+                            setSelectedTask(task);
+                            setShowTaskModal(true);
                           }}
                         >
-                          {/* Left Resize Handle */}
+                          {/* LEFT CLICK HANDLER - START DATE */}
                           <div
                             style={{
                               position: 'absolute',
-                              left: '-3px',
-                              top: '0',
-                              bottom: '0',
-                              width: '8px',
-                              cursor: 'ew-resize',
-                              background: 'rgba(59, 130, 246, 0.8)',
+                              left: '-4px',
+                              top: '-4px',
+                              bottom: '-4px',
+                              width: '12px',
+                              cursor: 'pointer',
+                              background: 'rgba(59, 130, 246, 0.1)',
                               borderRadius: '4px 0 0 4px',
-                              opacity: 0,
-                              transition: 'opacity 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease',
                               zIndex: 2
                             }}
-                            className="resize-handle-left"
-                            onMouseDown={(e) => handleResizeStart(task.id, 'start', e)}
+                            onClick={(e) => handleDateClick(task.id, 'start', e)}
                             onMouseEnter={(e) => {
-                              (e.target as HTMLElement).style.opacity = '1';
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.3)';
+                              target.style.width = '16px';
+                              target.style.left = '-6px';
                             }}
                             onMouseLeave={(e) => {
-                              (e.target as HTMLElement).style.opacity = '0';
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.1)';
+                              target.style.width = '12px';
+                              target.style.left = '-4px';
                             }}
-                          />
+                            title="Click pentru a edita data de început"
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '16px',
+                              background: 'rgba(59, 130, 246, 0.8)',
+                              borderRadius: '2px'
+                            }} />
+                          </div>
 
-                          {/* Right Resize Handle */}
+                          {/* RIGHT CLICK HANDLER - END DATE */}
                           <div
                             style={{
                               position: 'absolute',
-                              right: '-3px',
-                              top: '0',
-                              bottom: '0',
-                              width: '8px',
-                              cursor: 'ew-resize',
-                              background: 'rgba(59, 130, 246, 0.8)',
+                              right: '-4px',
+                              top: '-4px',
+                              bottom: '-4px',
+                              width: '12px',
+                              cursor: 'pointer',
+                              background: 'rgba(59, 130, 246, 0.1)',
                               borderRadius: '0 4px 4px 0',
-                              opacity: 0,
-                              transition: 'opacity 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease',
                               zIndex: 2
                             }}
-                            className="resize-handle-right"
-                            onMouseDown={(e) => handleResizeStart(task.id, 'end', e)}
+                            onClick={(e) => handleDateClick(task.id, 'end', e)}
                             onMouseEnter={(e) => {
-                              (e.target as HTMLElement).style.opacity = '1';
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.3)';
+                              target.style.width = '16px';
+                              target.style.right = '-6px';
                             }}
                             onMouseLeave={(e) => {
-                              (e.target as HTMLElement).style.opacity = '0';
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.1)';
+                              target.style.width = '12px';
+                              target.style.right = '-4px';
                             }}
-                          />
+                            title="Click pentru a edita data de sfârșit"
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '16px',
+                              background: 'rgba(59, 130, 246, 0.8)',
+                              borderRadius: '2px'
+                            }} />
+                          </div>
 
                           {/* Progress Bar */}
                           <div
@@ -1296,7 +1247,8 @@ export default function GanttView() {
                             fontWeight: '500',
                             position: 'relative',
                             zIndex: 1,
-                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                            pointerEvents: 'none'
                           }}>
                             {task.progress}%
                           </span>
@@ -1367,26 +1319,16 @@ export default function GanttView() {
         </div>
       </Card>
 
-      {/* Resize Tooltip */}
-      {tooltip.visible && (
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltip.x,
-            top: tooltip.y,
-            background: 'rgba(0, 0, 0, 0.8)',
-            color: 'white',
-            padding: '0.5rem',
-            borderRadius: '4px',
-            fontSize: '0.75rem',
-            zIndex: 1000,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {tooltip.date}
-        </div>
-      )}
+      {/* DatePickerPopup Integration */}
+      <DatePickerPopup
+        isOpen={dateEditState.isOpen}
+        position={dateEditState.position}
+        currentDate={dateEditState.currentDate}
+        dateType={dateEditState.dateType}
+        taskName={dateEditState.taskName}
+        onSave={handleDateSave}
+        onCancel={handleDateCancel}
+      />
 
       {/* Task Details Modal */}
       <Modal
