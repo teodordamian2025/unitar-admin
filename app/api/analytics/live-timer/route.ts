@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/analytics/live-timer/route.ts
-// CREAT: 21.09.2025 22:05 (ora României)
-// DESCRIERE: API pentru management live timer sessions cu salvare corectă timp în BD
+// CREAT: 21.09.2025 22:10 (ora României)
+// DESCRIERE: API pentru management live timer sessions cu fix NUMERIC pentru BigQuery
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -37,13 +37,14 @@ function processBigQueryRows(rows: any[]): any[] {
   });
 }
 
-// Helper function pentru a calcula ore lucrate
-function calculateWorkedHours(startTime: string, endTime: string): number {
+// Helper function pentru a calcula ore lucrate ca string pentru NUMERIC
+function calculateWorkedHoursAsString(startTime: string, endTime: string): string {
   const start = new Date(startTime);
   const end = new Date(endTime);
   const diffMs = end.getTime() - start.getTime();
   const diffHours = diffMs / (1000 * 60 * 60); // conversie la ore
-  return Math.round(diffHours * 100) / 100; // rotunjesc la 2 decimale
+  const roundedHours = Math.round(diffHours * 100) / 100; // rotunjesc la 2 decimale
+  return roundedHours.toString(); // returnez ca string pentru NUMERIC
 }
 
 // GET - Obținere sesiuni active și statistici
@@ -407,17 +408,17 @@ export async function POST(request: NextRequest) {
         const session = processBigQueryRows(sessionData)[0];
         const currentTimestamp = new Date();
         
-        // Calculez ore lucrate
+        // Calculez ore lucrate ca string pentru NUMERIC
         const startTime = new Date(session.data_start);
-        const workedHours = calculateWorkedHours(startTime.toISOString(), currentTimestamp.toISOString());
+        const workedHoursString = calculateWorkedHoursAsString(startTime.toISOString(), currentTimestamp.toISOString());
 
-        // Actualizez sesiunea cu timp calculat
+        // IMPORTANT: Folosesc CAST(PARSE_NUMERIC(@ore_lucrate)) pentru a converti corect la NUMERIC
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET
             status = 'completat',
             data_stop = CURRENT_TIMESTAMP(),
-            ore_lucrate = @ore_lucrate
+            ore_lucrate = CAST(@ore_lucrate AS NUMERIC)
           WHERE id = @session_id
         `;
 
@@ -426,11 +427,11 @@ export async function POST(request: NextRequest) {
           location: 'EU',
           params: { 
             session_id: session_id,
-            ore_lucrate: workedHours
+            ore_lucrate: workedHoursString
           }
         });
 
-        // Creez înregistrarea în TimeTracking
+        // Creez înregistrarea în TimeTracking cu CAST explicit
         const timeTrackingId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const insertTimeTrackingQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
@@ -441,7 +442,7 @@ export async function POST(request: NextRequest) {
             @utilizator_nume,
             @proiect_id,
             CURRENT_DATE(),
-            @ore_lucrate,
+            CAST(@ore_lucrate AS NUMERIC),
             @descriere_lucru,
             'live_timer',
             CURRENT_TIMESTAMP(),
@@ -457,14 +458,14 @@ export async function POST(request: NextRequest) {
             utilizator_uid: session.utilizator_uid,
             utilizator_nume: session.utilizator_nume,
             proiect_id: session.proiect_id,
-            ore_lucrate: workedHours,
+            ore_lucrate: workedHoursString,
             descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer'
           }
         });
 
         result = { 
           message: 'Sesiune oprită și timp înregistrat cu succes',
-          worked_hours: workedHours,
+          worked_hours: parseFloat(workedHoursString),
           time_tracking_id: timeTrackingId
         };
         break;
