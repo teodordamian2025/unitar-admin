@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           sl.id,
           sl.utilizator_uid,
-          u.nume || ' ' || u.prenume as utilizator_nume,
+          COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
           sl.proiect_id,
           p.Denumire as proiect_nume,
           s.id as sarcina_id_task,
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         ORDER BY sl.data_start DESC
       )
       
-      SELECT 
+      SELECT
         id,
         utilizator_uid,
         utilizator_nume,
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         UNION ALL
         SELECT 
           sl2.id, sl2.utilizator_uid, COALESCE(CONCAT(u2.nume, ' ', u2.prenume), 'Test User') as utilizator_nume, sl2.proiect_id, p2.Denumire as proiect_nume,
-          s2.id as sarcina_id, s2.titlu as sarcina_titlu, s2.prioritate, sl2.data_start, sl2.data_stop,
+          s2.id as sarcina_id_task, s2.titlu as sarcina_titlu, s2.prioritate, sl2.data_start, sl2.data_stop,
           'completed' as status, sl2.descriere_activitate as descriere_sesiune,
           TIMESTAMP_DIFF(sl2.data_stop, sl2.data_start, SECOND) as timp_elapsed,
           sl2.data_stop as ultima_activitate, 85 as productivity_score, 0 as break_time,
@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
           SET
             status = 'completat',
             data_stop = CURRENT_TIMESTAMP(),
-            ore_lucrate = TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND)
+            ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) AS BIGNUMERIC)
           WHERE id = '${session_id}'
         `;
 
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
             sl.utilizator_uid,
             COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
             DATE(sl.data_start) as data_lucru,
-            CAST(sl.ore_lucrate AS NUMERIC) / 3600,
+            sl.ore_lucrate / 3600,
             sl.descriere_activitate,
             'live_timer' as tip_inregistrare,
             sl.proiect_id,
