@@ -578,14 +578,14 @@ export default function CalendarView() {
         case 'deadline_proiect':
           apiEndpoint = '/api/rapoarte/proiecte';
           updateData = {
-            ID_Proiect: selectedEvent.proiect_id,
+            id: selectedEvent.proiect_id,
             Data_Final: tempDate
           };
           break;
         case 'deadline_subproiect':
           apiEndpoint = '/api/rapoarte/subproiecte';
           updateData = {
-            ID_Subproiect: selectedEvent.id.replace('subproj_', ''),
+            id: selectedEvent.id.replace('subproj_', ''),
             Data_Final: tempDate
           };
           break;
