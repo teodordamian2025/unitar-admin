@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"../app/test-page/page.tsx -> @/components/Chatbot":{"id":83904,"files":["static/chunks/8647-7b41b38fa51d1dc3.js","static/chunks/126.6e2f2be66b84b41d.js"]}}';
+self.__REACT_LOADABLE_MANIFEST="{}"

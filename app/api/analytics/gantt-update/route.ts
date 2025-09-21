@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/api/analytics/gantt-update/route.ts
-// DATA: 21.09.2025 14:45 (ora României)
-// DESCRIERE: API endpoint pentru actualizarea datelor timeline Gantt Chart
+// DATA: 21.09.2025 15:30 (ora României)
+// DESCRIERE: API endpoint pentru actualizarea datelor timeline Gantt Chart - VERSIUNE CORECTATĂ
 // FUNCȚIONALITATE: Update start_date și end_date pentru proiecte, subproiecte și sarcini
 // ==================================================================
 
@@ -22,6 +22,44 @@ interface UpdateRequest {
   taskId: string;
   startDate: string;
   endDate: string;
+}
+
+// Funcție pentru normalizarea și validarea ID-urilor
+function parseTaskId(taskId: string): { taskType: string; actualId: string } | null {
+  console.log('🔍 Parsing taskId:', taskId);
+  
+  // Verifică dacă taskId-ul începe cu prefix-ul tip_
+  const prefixMatch = taskId.match(/^(proiect|subproiect|sarcina)_(.+)$/);
+  if (prefixMatch) {
+    return {
+      taskType: prefixMatch[1],
+      actualId: prefixMatch[2]
+    };
+  }
+  
+  // Încearc să deduc tipul din structura ID-ului
+  if (taskId.includes('_SUB_')) {
+    return {
+      taskType: 'subproiect',
+      actualId: taskId
+    };
+  } else if (taskId.match(/^\d{4}-\d{2}-\d{2}[a-z]-/)) {
+    return {
+      taskType: 'proiect',
+      actualId: taskId
+    };
+  } else if (taskId.match(/^[a-f0-9-]{36}$/) || taskId.includes('sarcina')) {
+    return {
+      taskType: 'sarcina',
+      actualId: taskId
+    };
+  }
+  
+  // Default la proiect dacă nu pot să determin
+  return {
+    taskType: 'proiect',
+    actualId: taskId
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -57,19 +95,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Parse taskId to determine type and ID
-    // Expected format: "proiect_<ID>", "subproiect_<ID>", "sarcina_<ID>"
-    const [taskType, actualId] = taskId.split('_');
-
-    if (!['proiect', 'subproiect', 'sarcina'].includes(taskType) || !actualId) {
+    // Parse taskId pentru a determina tipul și ID-ul real
+    const parsedTask = parseTaskId(taskId);
+    if (!parsedTask) {
       return NextResponse.json({
         success: false,
-        error: 'Format taskId invalid! Așteptat: tip_id (ex: proiect_123)'
+        error: 'Format taskId invalid!'
       }, { status: 400 });
     }
 
+    const { taskType, actualId } = parsedTask;
+    console.log('🔧 Parsed task:', { taskType, actualId });
+
     let updateQuery = '';
-    let queryParams: any = {
+    const queryParams: any = {
       startDate: startDate,
       endDate: endDate,
       actualId: actualId
@@ -108,9 +147,15 @@ export async function POST(request: NextRequest) {
           WHERE id = @actualId
         `;
         break;
+
+      default:
+        return NextResponse.json({
+          success: false,
+          error: `Tip task nesuportat: ${taskType}`
+        }, { status: 400 });
     }
 
-    console.log('📊 Executing update query:', updateQuery);
+    console.log('📊 Executing update query pentru:', taskType);
     console.log('📊 Query params:', queryParams);
 
     // Execute the update query
@@ -125,48 +170,50 @@ export async function POST(request: NextRequest) {
 
     console.log('📊 Update query executed successfully');
 
-    // Verify the update by checking affected rows
+    // Verify the update by checking if any rows were affected
     let verifyQuery = '';
-    if (taskType === 'proiect') {
-      verifyQuery = `
-        SELECT COUNT(*) as updated_count
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
-        WHERE ID_Proiect = @actualId AND Data_Start = @startDate AND Data_Final = @endDate
-      `;
-    } else if (taskType === 'subproiect') {
-      verifyQuery = `
-        SELECT COUNT(*) as updated_count
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
-        WHERE ID_Subproiect = @actualId AND Data_Start = @startDate AND Data_Final = @endDate
-      `;
-    } else if (taskType === 'sarcina') {
-      verifyQuery = `
-        SELECT COUNT(*) as updated_count
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-        WHERE id = @actualId AND data_creare = @startDate AND data_scadenta = @endDate
-      `;
+    switch (taskType) {
+      case 'proiect':
+        verifyQuery = `
+          SELECT ID_Proiect, Data_Start, Data_Final
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+          WHERE ID_Proiect = @actualId
+        `;
+        break;
+      case 'subproiect':
+        verifyQuery = `
+          SELECT ID_Subproiect, Data_Start, Data_Final
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+          WHERE ID_Subproiect = @actualId
+        `;
+        break;
+      case 'sarcina':
+        verifyQuery = `
+          SELECT id, data_creare, data_scadenta
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+          WHERE id = @actualId
+        `;
+        break;
     }
 
     const verifyOptions = {
       query: verifyQuery,
-      params: queryParams,
+      params: { actualId: actualId },
       location: 'EU'
     };
 
     const [verifyJob] = await bigquery.createQueryJob(verifyOptions);
     const [verifyRows] = await verifyJob.getQueryResults();
 
-    const updatedCount = verifyRows[0]?.updated_count || 0;
-
-    if (updatedCount === 0) {
+    if (verifyRows.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'Nu s-au găsit înregistrări pentru actualizare!'
+        error: `Nu s-au găsit înregistrări pentru ${taskType} cu ID: ${actualId}`
       }, { status: 404 });
     }
 
-    // Log the successful update
-    console.log(`📊 Successfully updated ${taskType} ${actualId} with new dates: ${startDate} to ${endDate}`);
+    const updatedRecord = verifyRows[0];
+    console.log('📊 Verified update:', updatedRecord);
 
     return NextResponse.json({
       success: true,
@@ -177,7 +224,7 @@ export async function POST(request: NextRequest) {
         actualId,
         startDate,
         endDate,
-        updatedCount
+        updatedRecord
       }
     });
 
