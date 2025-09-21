@@ -91,6 +91,7 @@ export default function AdminPage() {
 
       if (data.success && data.role === 'admin') {
         setUserRole(data.role);
+        localStorage.setItem('userRole', data.role); // Fix: salvez rolul în localStorage
         setDisplayName(localStorage.getItem('displayName') || 'Admin');
         setIsAuthorized(true);
       } else {
