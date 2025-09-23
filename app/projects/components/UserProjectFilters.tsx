@@ -15,6 +15,9 @@ interface FilterValues {
   client: string;
   data_start_start: string;
   data_start_end: string;
+  status_predare: string;
+  status_contract: string;
+  responsabil: string;
 }
 
 interface UserProjectFiltersProps {
@@ -42,7 +45,10 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
       status: '',
       client: '',
       data_start_start: '',
-      data_start_end: ''
+      data_start_end: '',
+      status_predare: '',
+      status_contract: '',
+      responsabil: ''
     };
     setLocalFilters(clearedFilters);
     onFilterChange(clearedFilters);
@@ -266,6 +272,123 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
                 e.currentTarget.style.boxShadow = 'none';
               }}
             />
+          </div>
+
+          {/* Responsabil */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              👤 Responsabil
+            </label>
+            <input
+              type="text"
+              value={localFilters.responsabil}
+              onChange={(e) => handleInputChange('responsabil', e.target.value)}
+              placeholder="Numele responsabilului..."
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid rgba(209, 213, 219, 0.5)',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#3b82f6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(209, 213, 219, 0.5)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+          </div>
+
+          {/* Status predare */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              📦 Status predare
+            </label>
+            <select
+              value={localFilters.status_predare}
+              onChange={(e) => handleInputChange('status_predare', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid rgba(209, 213, 219, 0.5)',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#3b82f6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(209, 213, 219, 0.5)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <option value="">Toate statusurile</option>
+              <option value="Predat">📦 Predat</option>
+              <option value="Nepredat">⏳ Nepredat</option>
+            </select>
+          </div>
+
+          {/* Status contract */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              📋 Status contract
+            </label>
+            <select
+              value={localFilters.status_contract}
+              onChange={(e) => handleInputChange('status_contract', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid rgba(209, 213, 219, 0.5)',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#3b82f6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(209, 213, 219, 0.5)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <option value="">Toate statusurile</option>
+              <option value="Semnat">✅ Semnat</option>
+              <option value="Trimis la semnare">📋 Trimis la semnare</option>
+              <option value="În pregătire">🔄 În pregătire</option>
+              <option value="Nu e cazul">❌ Nu e cazul</option>
+            </select>
           </div>
 
           {/* Data start - de la */}

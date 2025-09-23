@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { toast } from 'react-toastify';
 
 interface Project {
@@ -30,14 +30,51 @@ interface Project {
   client_email?: string;
 }
 
+interface Subproject {
+  ID_Subproiect: string;
+  ID_Proiect: string;
+  Denumire: string;
+  Responsabil?: string;
+  Status: string;
+  Data_Start?: any;
+  Data_Final?: any;
+  status_predare?: string;
+  status_contract?: string;
+  Client?: string;
+  Proiect_Denumire?: string;
+}
+
 interface UserProjectsTableProps {
   searchParams: Record<string, string>;
 }
 
+// Helper functions pentru status styling (similare cu admin)
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case 'Activ': return '#27ae60';
+    case 'Finalizat': return '#3498db';
+    case 'Suspendat': return '#f39c12';
+    case 'Anulat': return '#e74c3c';
+    default: return '#95a5a6';
+  }
+};
+
+const getStatusIcon = (status: string): string => {
+  switch (status) {
+    case 'Activ': return '🟢';
+    case 'Finalizat': return '✅';
+    case 'Suspendat': return '⏸️';
+    case 'Anulat': return '❌';
+    default: return '❓';
+  }
+};
+
 export default function UserProjectsTable({ searchParams }: UserProjectsTableProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [subprojects, setSubprojects] = useState<Subproject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -76,8 +113,10 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
       }
 
       console.log('✅ User projects loaded:', result.data?.length || 0, 'items');
+      console.log('✅ User subprojects loaded:', result.subprojecte?.length || 0, 'items');
 
       setProjects(result.data || []);
+      setSubprojects(result.subprojecte || []);
       setPagination(prev => ({
         ...prev,
         total: result.pagination?.total || 0,
@@ -95,6 +134,23 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
 
   const handlePageChange = (newPage: number) => {
     setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  // Helper functions pentru gestionarea subproiectelor
+  const getSubprojectsForProject = (projectId: string): Subproject[] => {
+    return subprojects.filter(sub => sub.ID_Proiect === projectId);
+  };
+
+  const toggleProjectExpansion = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
   };
 
   const formatDate = (dateValue: any): string => {
@@ -298,6 +354,7 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
             margin: 0
           }}>
             {pagination.total} {pagination.total === 1 ? 'proiect găsit' : 'proiecte găsite'}
+            {subprojects.length > 0 && ` (+ ${subprojects.length} subproiecte)`}
           </p>
         </div>
         <div style={{
@@ -323,98 +380,293 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
         }}>
           <thead>
             <tr style={{ background: 'rgba(249, 250, 251, 0.8)' }}>
-              <th style={thStyle}>ID Proiect</th>
+              <th style={thStyle}>Proiect / Subproiect</th>
               <th style={thStyle}>Denumire</th>
-              <th style={thStyle}>Client</th>
+              <th style={thStyle}>Client & Responsabil</th>
               <th style={thStyle}>Data Început</th>
               <th style={thStyle}>Data Final</th>
               <th style={thStyle}>Status</th>
               <th style={thStyle}>Predare</th>
-              <th style={thStyle}>Responsabil</th>
+              <th style={thStyle}>Acțiuni</th>
             </tr>
           </thead>
           <tbody>
-            {projects.map((project, index) => (
-              <tr
-                key={project.ID_Proiect}
-                style={{
-                  borderBottom: '1px solid rgba(229, 231, 235, 0.3)',
-                  transition: 'background-color 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <td style={tdStyle}>
-                  <span style={{
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: '#3b82f6'
-                  }}>
-                    {project.ID_Proiect}
-                  </span>
-                </td>
-                <td style={tdStyle}>
-                  <div>
-                    <div style={{
-                      fontWeight: '600',
-                      color: '#1f2937',
-                      marginBottom: '0.25rem'
-                    }}>
-                      {project.Denumire}
-                    </div>
-                    {project.Descriere && (
-                      <div style={{
-                        fontSize: '0.75rem',
-                        color: '#6b7280',
-                        maxWidth: '200px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+            {projects.map((project, index) => {
+              const projectSubprojects = getSubprojectsForProject(project.ID_Proiect);
+              const isExpanded = expandedProjects.has(project.ID_Proiect);
+              const hasSubprojects = projectSubprojects.length > 0;
+
+              return (
+                <Fragment key={project.ID_Proiect}>
+                  {/* Rândul proiectului principal */}
+                  <tr
+                    style={{
+                      borderBottom: '1px solid rgba(229, 231, 235, 0.3)',
+                      background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(248, 249, 250, 0.5)';
+                    }}
+                  >
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        {hasSubprojects && (
+                          <button
+                            onClick={() => toggleProjectExpansion(project.ID_Proiect)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              fontSize: '12px',
+                              color: '#3498db',
+                              borderRadius: '4px'
+                            }}
+                          >
+                            {isExpanded ? '📂' : '📁'}
+                          </button>
+                        )}
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 'bold',
+                            fontSize: '12px',
+                            color: '#2c3e50',
+                            marginBottom: '0.25rem'
+                          }}>
+                            🗃️ {project.ID_Proiect}
+                          </div>
+                          {hasSubprojects && (
+                            <div style={{
+                              fontSize: '11px',
+                              color: '#3498db',
+                              marginTop: '0.5rem',
+                              padding: '0.25rem 0.5rem',
+                              background: 'rgba(52, 152, 219, 0.1)',
+                              borderRadius: '6px',
+                              display: 'inline-block'
+                            }}>
+                              📋 {projectSubprojects.length} subproiect{projectSubprojects.length !== 1 ? 'e' : ''}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div>
+                        <div style={{
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {project.Denumire}
+                        </div>
+                        {project.Descriere && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            maxWidth: '200px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {project.Descriere}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                          {project.Client}
+                        </div>
+                        {project.client_cui && (
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            CUI: {project.client_cui}
+                          </div>
+                        )}
+                        {project.Responsabil && (
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#7f8c8d',
+                            marginTop: '0.25rem'
+                          }}>
+                            👤 {project.Responsabil}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      {formatDate(project.Data_Start)}
+                    </td>
+                    <td style={tdStyle}>
+                      {formatDate(project.Data_Final)}
+                    </td>
+                    <td style={tdStyle}>
+                      {getStatusBadge(project.Status)}
+                    </td>
+                    <td style={tdStyle}>
+                      {getStatusPredare(project.status_predare || 'Nepredat')}
+                    </td>
+                    <td style={tdStyle}>
+                      <button
+                        style={{
+                          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.5rem 0.75rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                        }}
+                        onClick={() => {
+                          // TODO: Implementează pagina de detalii
+                          console.log('Detalii pentru proiectul:', project.ID_Proiect);
+                        }}
+                      >
+                        📋 Detalii
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Rândurile subproiectelor */}
+                  {isExpanded && projectSubprojects.map((subproject) => (
+                    <tr
+                      key={subproject.ID_Subproiect}
+                      style={{
+                        background: 'rgba(52, 152, 219, 0.05)',
+                        borderLeft: '4px solid #3498db',
+                        borderBottom: '1px solid rgba(52, 152, 219, 0.1)'
+                      }}
+                    >
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        paddingLeft: '3rem',
+                        color: '#2c3e50'
                       }}>
-                        {project.Descriere}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td style={tdStyle}>
-                  <div>
-                    <div style={{ fontWeight: '600', color: '#1f2937' }}>
-                      {project.Client}
-                    </div>
-                    {project.client_cui && (
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                        CUI: {project.client_cui}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td style={tdStyle}>
-                  {formatDate(project.Data_Start)}
-                </td>
-                <td style={tdStyle}>
-                  {formatDate(project.Data_Final)}
-                </td>
-                <td style={tdStyle}>
-                  {getStatusBadge(project.Status)}
-                </td>
-                <td style={tdStyle}>
-                  {getStatusPredare(project.status_predare || 'Nepredat')}
-                </td>
-                <td style={tdStyle}>
-                  <span style={{
-                    fontSize: '0.875rem',
-                    color: '#374151'
-                  }}>
-                    {project.Responsabil || '-'}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                        <div style={{
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          fontSize: '11px',
+                          color: '#3498db',
+                          marginBottom: '0.25rem'
+                        }}>
+                          └─ 📋 {subproject.ID_Subproiect}
+                        </div>
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        color: '#2c3e50'
+                      }}>
+                        <div style={{
+                          color: '#2c3e50',
+                          fontStyle: 'italic',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}>
+                          {subproject.Denumire}
+                        </div>
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        color: '#2c3e50'
+                      }}>
+                        <div style={{ fontSize: '13px', fontWeight: '500' }}>
+                          {subproject.Client || project.Client}
+                        </div>
+                        {subproject.Responsabil && (
+                          <div style={{
+                            fontSize: '11px',
+                            color: '#7f8c8d',
+                            marginTop: '0.25rem'
+                          }}>
+                            👤 {subproject.Responsabil}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        fontFamily: 'monospace',
+                        fontSize: '12px'
+                      }}>
+                        {formatDate(subproject.Data_Start)}
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        fontFamily: 'monospace',
+                        fontSize: '12px'
+                      }}>
+                        {formatDate(subproject.Data_Final)}
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem'
+                      }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: 'white',
+                          background: `linear-gradient(135deg, ${getStatusColor(subproject.Status)} 0%, ${getStatusColor(subproject.Status)}dd 100%)`
+                        }}>
+                          {getStatusIcon(subproject.Status)} {subproject.Status}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem'
+                      }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          color: subproject.status_predare === 'Predat' ? '#047857' : '#92400e',
+                          background: subproject.status_predare === 'Predat' ? '#dcfce7' : '#fef3c7'
+                        }}>
+                          {subproject.status_predare === 'Predat' ? '📦' : '⏳'} {subproject.status_predare || 'Nepredat'}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '0.5rem 0.75rem'
+                      }}>
+                        <button
+                          style={{
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.4rem 0.6rem',
+                            fontSize: '0.7rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                          }}
+                          onClick={() => {
+                            // TODO: Implementează pagina de detalii pentru subproiect
+                            console.log('Detalii pentru subproiectul:', subproject.ID_Subproiect);
+                          }}
+                        >
+                          📋 Detalii
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

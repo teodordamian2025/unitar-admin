@@ -22,6 +22,9 @@ interface FilterValues {
   client: string;
   data_start_start: string;
   data_start_end: string;
+  status_predare: string;
+  status_contract: string;
+  responsabil: string;
   // Excludem filtrele financiare pentru utilizatori normali
 }
 
@@ -39,7 +42,10 @@ function UserProjectsPage() {
     status: searchParams?.get('status') || '',
     client: searchParams?.get('client') || '',
     data_start_start: searchParams?.get('data_start_start') || '',
-    data_start_end: searchParams?.get('data_start_end') || ''
+    data_start_end: searchParams?.get('data_start_end') || '',
+    status_predare: searchParams?.get('status_predare') || '',
+    status_contract: searchParams?.get('status_contract') || '',
+    responsabil: searchParams?.get('responsabil') || ''
   });
 
   // Convertește filtrele în searchParams pentru UserProjectsTable

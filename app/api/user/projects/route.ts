@@ -175,6 +175,14 @@ export async function GET(request: NextRequest) {
       types.statusContract = 'STRING';
     }
 
+    // Filtrare pe responsabil
+    const responsabil = searchParams.get('responsabil');
+    if (responsabil) {
+      conditions.push('LOWER(COALESCE(p.Responsabil, "")) LIKE LOWER(@responsabil)');
+      params.responsabil = `%${responsabil}%`;
+      types.responsabil = 'STRING';
+    }
+
     // Adaugă condiții la query
     if (conditions.length > 0) {
       baseQuery += ' WHERE ' + conditions.join(' AND ');
@@ -193,7 +201,7 @@ export async function GET(request: NextRequest) {
 
     console.log('📋 USER QUERY PARAMS:', params);
 
-    // Execută query-ul principal
+    // Execută query-ul principal pentru proiecte
     const [rows] = await bigquery.query({
       query: baseQuery,
       params: params,
@@ -203,7 +211,76 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ USER PROJECTS LOADED: ${rows.length} results`);
 
-    // Query pentru total count
+    // Query pentru subproiecte - FĂRĂ date financiare, similar cu admin
+    let subproiecteQuery = `
+      SELECT
+        s.ID_Subproiect,
+        s.ID_Proiect,
+        s.Denumire,
+        s.Responsabil,
+        s.Status,
+        s.Data_Start,
+        s.Data_Final,
+        s.status_predare,
+        s.status_contract,
+        p.Client,
+        p.Denumire as Proiect_Denumire
+      FROM \`${PROJECT_ID}.${dataset}.Subproiecte\` s
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.${table}\` p
+        ON s.ID_Proiect = p.ID_Proiect
+      WHERE (s.activ IS NULL OR s.activ = true)
+    `;
+
+    // Aplicare aceleași filtre la subproiecte
+    const subConditions: string[] = [];
+    if (search) {
+      subConditions.push(`(
+        LOWER(s.ID_Subproiect) LIKE LOWER(@search) OR
+        LOWER(s.Denumire) LIKE LOWER(@search) OR
+        LOWER(COALESCE(s.Responsabil, '')) LIKE LOWER(@search) OR
+        LOWER(COALESCE(p.Client, '')) LIKE LOWER(@search)
+      )`);
+    }
+
+    if (status) {
+      subConditions.push('s.Status = @status');
+    }
+
+    if (client) {
+      subConditions.push('LOWER(COALESCE(p.Client, "")) LIKE LOWER(@client)');
+    }
+
+    if (statusPredare) {
+      subConditions.push('COALESCE(s.status_predare, "Nepredat") = @statusPredare');
+    }
+
+    if (statusContract) {
+      subConditions.push('COALESCE(s.status_contract, "Nu e cazul") = @statusContract');
+    }
+
+    if (responsabil) {
+      subConditions.push('LOWER(COALESCE(s.Responsabil, "")) LIKE LOWER(@responsabil)');
+    }
+
+    if (subConditions.length > 0) {
+      subproiecteQuery += ' AND ' + subConditions.join(' AND ');
+    }
+
+    subproiecteQuery += ' ORDER BY s.ID_Proiect, s.Data_Start DESC';
+
+    console.log('📋 USER SUBPROJECTS QUERY:', subproiecteQuery);
+
+    // Execută query-ul pentru subproiecte
+    const [subproiecteRows] = await bigquery.query({
+      query: subproiecteQuery,
+      params: params,
+      types: types,
+      location: 'EU',
+    });
+
+    console.log(`✅ USER SUBPROJECTS LOADED: ${subproiecteRows.length} results`);
+
+    // Query pentru total count (doar proiecte principale)
     let countQuery = `
       SELECT COUNT(*) as total
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
@@ -231,8 +308,8 @@ export async function GET(request: NextRequest) {
 
     const total = convertBigQueryNumeric(countRows[0]?.total) || 0;
 
-    // Procesează rezultatele - EXCLUDE datele financiare
-    const processedData = rows.map((row: any) => ({
+    // Procesează rezultatele pentru proiecte - EXCLUDE datele financiare
+    const processedProjects = rows.map((row: any) => ({
       ID_Proiect: row.ID_Proiect,
       Denumire: row.Denumire,
       Client: row.Client,
@@ -261,11 +338,34 @@ export async function GET(request: NextRequest) {
       status_achitare: 'Nu se aplică'
     }));
 
-    console.log('💼 Procesare proiecte user completă - date financiare excluse');
+    // Procesează rezultatele pentru subproiecte - EXCLUDE datele financiare
+    const processedSubprojects = subproiecteRows.map((row: any) => ({
+      ID_Subproiect: row.ID_Subproiect,
+      ID_Proiect: row.ID_Proiect,
+      Denumire: row.Denumire,
+      Responsabil: row.Responsabil,
+      Status: row.Status,
+      Data_Start: row.Data_Start,
+      Data_Final: row.Data_Final,
+      status_predare: row.status_predare,
+      status_contract: row.status_contract,
+      Client: row.Client,
+      Proiect_Denumire: row.Proiect_Denumire,
+      // Pentru compatibilitate UI - setează implicit 0 RON
+      Valoare_Estimata: 0,
+      valoare_ron: 0,
+      moneda: 'RON',
+      curs_valutar: 1,
+      status_facturare: 'Nu se aplică',
+      status_achitare: 'Nu se aplică'
+    }));
+
+    console.log('💼 Procesare proiecte și subproiecte user completă - date financiare excluse');
 
     return NextResponse.json({
       success: true,
-      data: processedData,
+      data: processedProjects,
+      subprojecte: processedSubprojects,
       pagination: {
         page,
         limit,
