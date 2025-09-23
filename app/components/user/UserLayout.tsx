@@ -48,9 +48,19 @@ const userNavStructure: NavItem[] = [
     icon: '⏱️'
   },
   {
+    href: '/calendar',
+    label: 'Calendar Evenimente',
+    icon: '📅'
+  },
+  {
+    href: '/gantt',
+    label: 'Timeline Proiecte',
+    icon: '📊'
+  },
+  {
     href: '/reports',
     label: 'Rapoartele Mele',
-    icon: '📊'
+    icon: '📈'
   },
   {
     href: '/profile',
