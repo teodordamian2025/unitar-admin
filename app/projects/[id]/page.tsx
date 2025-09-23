@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/app/firebase-config';
+import { auth } from '@/lib/firebaseConfig';
 import UserLayout from '@/app/components/user/UserLayout';
 import { LoadingSpinner } from '@/app/components/ui';
 import UserSarciniProiectModal from '../components/UserSarciniProiectModal';
@@ -54,7 +54,7 @@ interface FacturaInfo {
 
 export default function UserProiectDetailsPage() {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = params?.id as string;
   const [user, loading] = useAuthState(auth);
 
   const [proiect, setProiect] = useState<ProiectDetails | null>(null);

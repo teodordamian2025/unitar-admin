@@ -10,7 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/app/firebase-config';
+import { auth } from '@/lib/firebaseConfig';
 import UserSarcinaNouaModal from './UserSarcinaNouaModal';
 import UserTimeTrackingNouModal from './UserTimeTrackingNouModal';
 
@@ -19,7 +19,7 @@ interface ProiectData {
   Denumire: string;
   Client: string;
   Status: string;
-  tip?: string;
+  tip?: 'proiect' | 'subproiect';
 }
 
 interface Sarcina {

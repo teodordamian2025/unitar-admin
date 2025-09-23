@@ -100,7 +100,7 @@ export async function GET(
       ORDER BY c.Data_Semnare DESC
     `;
 
-    let contracteRows = [];
+    let contracteRows: any[] = [];
     try {
       [contracteRows] = await bigquery.query({
         query: contracteQuery,
@@ -126,7 +126,7 @@ export async function GET(
       ORDER BY f.Data_Emitere DESC
     `;
 
-    let facturiRows = [];
+    let facturiRows: any[] = [];
     try {
       [facturiRows] = await bigquery.query({
         query: facturiQuery,
