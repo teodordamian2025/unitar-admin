@@ -265,25 +265,22 @@ export default function GanttView() {
               .reduce((sum: number, t: any) => sum + (t.ore || 0), 0);
           }
 
-          // Calculate progress based on status or dates
+          // Calculate progress based on real data or status - FIXED: Read from database
           let progress = 0;
-          if (p.Status === 'Finalizat') {
+          if (p.Progres !== undefined && p.Progres !== null) {
+            // Use real progress from database
+            progress = Math.max(0, Math.min(100, Math.round(p.Progres)));
+          } else if (p.Status === 'Finalizat') {
             progress = 100;
           } else if (p.Status === 'In Progres' || p.Status === 'Activ') {
-            // Calculate progress based on timeline
-            const now = new Date();
-            const start = new Date(dataStart || now);
-            const end = new Date(dataFinal || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000));
-
-            if (now >= start && now <= end) {
-              const total = end.getTime() - start.getTime();
-              const elapsed = now.getTime() - start.getTime();
-              progress = Math.min(Math.max(Math.round((elapsed / total) * 100), 10), 90);
-            } else if (now > end) {
-              progress = 95; // Almost complete but not marked as finished
+            // Only fall back to calculation if no real data
+            if (workedHours > 0 && p.Ore_Estimate > 0) {
+              progress = Math.min(100, Math.round((workedHours / p.Ore_Estimate) * 100));
             } else {
-              progress = 5; // Not started yet
+              progress = 25; // Default for active projects
             }
+          } else {
+            progress = 0; // Not started
           }
 
           return {
@@ -343,7 +340,7 @@ export default function GanttView() {
             name: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`,
             startDate: dataStart || new Date().toISOString().split('T')[0],
             endDate: dataFinal || new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: s.Status === 'Finalizat' ? 100 : (s.Status === 'Activ' ? 60 : 30),
+            progress: s.Progres !== undefined && s.Progres !== null ? Math.max(0, Math.min(100, Math.round(s.Progres))) : (s.Status === 'Finalizat' ? 100 : (s.Status === 'Activ' ? 50 : 0)),
             type: 'subproiect' as const,
             parentId: `proj_${s.ID_Proiect}`,
             dependencies: [],
@@ -396,9 +393,9 @@ export default function GanttView() {
             name: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`,
             startDate: dataCreare || new Date().toISOString().split('T')[0],
             endDate: dataScadenta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: s.status === 'finalizata' ? 100 : (s.status === 'in_progress' ? 50 : 10),
+            progress: s.progres !== undefined && s.progres !== null ? Math.max(0, Math.min(100, Math.round(s.progres))) : (s.status === 'finalizata' ? 100 : (s.status === 'in_progress' ? 50 : 0)),
             type: 'sarcina' as const,
-            parentId: `proj_${s.proiect_id}`,
+            parentId: s.subproiect_id ? `subproj_${s.subproiect_id}` : `proj_${s.proiect_id}`,
             dependencies: [],
             resources: s.responsabili && s.responsabili[0] ? [s.responsabili[0].responsabil_nume] : [displayName],
             priority: s.prioritate?.toLowerCase() || 'normala' as any,
@@ -778,7 +775,46 @@ export default function GanttView() {
       }
     });
 
-    return visible;
+    // FIXED: Sort tasks hierarchically - projects first, then their subprojects, then their tasks
+    const sortTasksHierarchically = (tasks: GanttTask[]) => {
+      const sorted: GanttTask[] = [];
+      const taskMap = new Map<string, GanttTask>();
+
+      // Build a map for quick lookup
+      tasks.forEach(task => taskMap.set(task.id, task));
+
+      // First, add all projects (level 0)
+      const projects = tasks.filter(task => task.type === 'proiect');
+      projects.sort((a, b) => a.name.localeCompare(b.name));
+
+      projects.forEach(project => {
+        sorted.push(project);
+
+        // Then add subprojects for this project (level 1)
+        const subprojects = tasks.filter(task => task.parentId === project.id);
+        subprojects.sort((a, b) => a.name.localeCompare(b.name));
+
+        subprojects.forEach(subproject => {
+          sorted.push(subproject);
+
+          // Then add tasks for this subproject (level 2)
+          const subprojectTasks = tasks.filter(task => task.parentId === subproject.id);
+          subprojectTasks.sort((a, b) => a.name.localeCompare(b.name));
+          sorted.push(...subprojectTasks);
+        });
+
+        // Also add direct tasks for this project (not under subprojects)
+        const directTasks = tasks.filter(task =>
+          task.parentId === project.id && task.type === 'sarcina'
+        );
+        directTasks.sort((a, b) => a.name.localeCompare(b.name));
+        sorted.push(...directTasks);
+      });
+
+      return sorted;
+    };
+
+    return sortTasksHierarchically(visible);
   };
 
   const formatDate = (date: Date) => {
