@@ -8,7 +8,9 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import UserSarciniProiectModal from './UserSarciniProiectModal';
 
 interface Project {
   ID_Proiect: string;
@@ -70,11 +72,14 @@ const getStatusIcon = (status: string): string => {
 };
 
 export default function UserProjectsTable({ searchParams }: UserProjectsTableProps) {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [subprojects, setSubprojects] = useState<Subproject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [showSarciniModal, setShowSarciniModal] = useState(false);
+  const [selectedProiectForSarcini, setSelectedProiectForSarcini] = useState<any>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -151,6 +156,15 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
       }
       return newSet;
     });
+  };
+
+  const handleOpenSarcini = (proiectData: any) => {
+    setSelectedProiectForSarcini(proiectData);
+    setShowSarciniModal(true);
+  };
+
+  const handleNavigateToDetails = (projectId: string) => {
+    router.push(`/projects/${projectId}`);
   };
 
   const formatDate = (dateValue: any): string => {
@@ -526,12 +540,32 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                           cursor: 'pointer',
                           boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
                         }}
-                        onClick={() => {
-                          // TODO: Implementează pagina de detalii
-                          console.log('Detalii pentru proiectul:', project.ID_Proiect);
-                        }}
+                        onClick={() => handleNavigateToDetails(project.ID_Proiect)}
                       >
                         📋 Detalii
+                      </button>
+                      <button
+                        style={{
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)',
+                          marginLeft: '0.5rem'
+                        }}
+                        onClick={() => handleOpenSarcini({
+                          ID_Proiect: project.ID_Proiect,
+                          Denumire: project.Denumire,
+                          Client: project.Client,
+                          Status: project.Status,
+                          tip: 'proiect'
+                        })}
+                      >
+                        📋 Sarcini
                       </button>
                     </td>
                   </tr>
@@ -654,13 +688,35 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                             cursor: 'pointer',
                             boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
                           }}
-                          onClick={() => {
-                            // TODO: Implementează pagina de detalii pentru subproiect
-                            console.log('Detalii pentru subproiectul:', subproject.ID_Subproiect);
-                          }}
+                          onClick={() => handleNavigateToDetails(subproject.ID_Subproiect)}
                         >
                           📋 Detalii
                         </button>
+                        {subproject.Status === 'Activ' && (
+                          <button
+                            style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)',
+                              marginLeft: '0.5rem'
+                            }}
+                            onClick={() => handleOpenSarcini({
+                              ID_Proiect: subproject.ID_Subproiect,
+                              Denumire: subproject.Denumire,
+                              Client: subproject.Client || project.Client,
+                              Status: subproject.Status,
+                              tip: 'subproiect'
+                            })}
+                          >
+                            📋 Sarcini
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -713,6 +769,18 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal pentru sarcini */}
+      {showSarciniModal && selectedProiectForSarcini && (
+        <UserSarciniProiectModal
+          isOpen={showSarciniModal}
+          onClose={() => {
+            setShowSarciniModal(false);
+            setSelectedProiectForSarcini(null);
+          }}
+          proiect={selectedProiectForSarcini}
+        />
       )}
     </div>
   );
