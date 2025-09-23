@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/gantt/page.tsx
-// DATA: 23.09.2025 17:30 (ora României)
-// DESCRIERE: Gantt Chart pentru utilizatori normali - vizualizarea timeline proiectelor personale
-// FUNCȚIONALITATE: Timeline interactiv doar cu datele proiectelor utilizatorului curent, fără editare financiară
+// DATA: 23.09.2025 18:30 (ora României)
+// DESCRIERE: Gantt Chart COMPLET pentru utilizatori normali - IDENTIC CU ADMIN
+// FUNCȚIONALITATE: Click pe capetele barelor pentru editare dată precisă cu DatePickerPopup
 // ==================================================================
 
 'use client';
@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import UserLayout from '@/app/components/user/UserLayout';
 import { Card, Button, Alert, LoadingSpinner, Modal } from '@/app/components/ui';
 import { toast } from 'react-toastify';
+import DatePickerPopup from '@/app/components/user/DatePickerPopup';
 
 interface GanttTask {
   id: string;
@@ -38,6 +39,15 @@ interface TimelineSettings {
   startDate: Date;
   endDate: Date;
   timelineUnit: number;
+}
+
+interface DateEditState {
+  isOpen: boolean;
+  taskId: string;
+  dateType: 'start' | 'end';
+  currentDate: string;
+  taskName: string;
+  position: { x: number; y: number };
 }
 
 // Constantă pentru înălțimea fiecărui rând - CHEIA PENTRU ALINIERE
@@ -65,10 +75,23 @@ export default function GanttView() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const ganttRef = useRef<HTMLDivElement>(null);
 
+  // Date edit state - ÎNLOCUIEȘTE LOGICA DE RESIZE
+  const [dateEditState, setDateEditState] = useState<DateEditState>({
+    isOpen: false,
+    taskId: '',
+    dateType: 'start',
+    currentDate: '',
+    taskName: '',
+    position: { x: 0, y: 0 }
+  });
+  const [savingChanges, setSavingChanges] = useState(false);
+
   // Filters
   const [filters, setFilters] = useState({
     proiect_id: '',
+    responsabil_nume: '',
     proiect_nume: '',
+    client_nume: '',
     tip_task: '', // 'proiect', 'subproiect', 'sarcina'
     status: '', // 'to_do', 'in_progress', 'finalizata', 'anulata'
     prioritate: '', // 'normala', 'ridicata', 'urgent'
@@ -77,6 +100,7 @@ export default function GanttView() {
   });
 
   // Data for filter options
+  const [utilizatori, setUtilizatori] = useState<any[]>([]);
   const [proiecte, setProiecte] = useState<any[]>([]);
 
   // Funcție centralizată pentru normalizarea datelor BigQuery
@@ -108,8 +132,17 @@ export default function GanttView() {
 
   const loadFilterData = async () => {
     try {
-      // Load proiecte for project filter - only user's projects
-      const proiecteResponse = await fetch('/api/user/projects');
+      // Load utilizatori for user filter
+      const utilizatoriResponse = await fetch('/api/rapoarte/utilizatori');
+      if (utilizatoriResponse.ok) {
+        const utilizatoriData = await utilizatoriResponse.json();
+        if (utilizatoriData.success) {
+          setUtilizatori(utilizatoriData.data);
+        }
+      }
+
+      // Load proiecte for project filter
+      const proiecteResponse = await fetch('/api/rapoarte/proiecte');
       if (proiecteResponse.ok) {
         const proiecteData = await proiecteResponse.json();
         if (proiecteData.success) {
@@ -161,31 +194,42 @@ export default function GanttView() {
 
       console.log('[USER GANTT DEBUG] Starting gantt data load...');
 
-      // For normal users, load only their own projects and build Gantt tasks
-      const [proiecteResponse, timeTrackingResponse] = await Promise.all([
-        fetch('/api/user/projects'),
-        fetch('/api/user/timetracking')
+      // For normal users, build Gantt tasks from all data sources - IDENTICAL TO ADMIN
+      const [proiecteResponse, subproiecteResponse, sarciniResponse, timeTrackingResponse] = await Promise.all([
+        fetch('/api/rapoarte/proiecte'),
+        fetch('/api/rapoarte/subproiecte'),
+        fetch('/api/rapoarte/sarcini'),
+        fetch('/api/rapoarte/timetracking')
       ]);
 
       console.log('[USER GANTT DEBUG] API responses:', {
         proiecteStatus: proiecteResponse.status,
+        subproiecteStatus: subproiecteResponse.status,
+        sarciniStatus: sarciniResponse.status,
         timeTrackingStatus: timeTrackingResponse.status
       });
 
       const proiecteData = await proiecteResponse.json();
+      const subproiecteData = await subproiecteResponse.json();
+      const sarciniData = await sarciniResponse.json();
       const timeTrackingData = await timeTrackingResponse.json();
 
       console.log('[USER GANTT DEBUG] API data:', {
         proiecteSuccess: proiecteData.success,
         proiecteDataLength: Array.isArray(proiecteData.data) ? proiecteData.data.length : 'not_array',
+        subproiecteSuccess: subproiecteData.success,
+        subproiecteDataLength: Array.isArray(subproiecteData.data) ? subproiecteData.data.length : 'not_array',
+        sarciniSuccess: sarciniData.success,
+        sarciniDataLength: Array.isArray(sarciniData.data) ? sarciniData.data.length : 'not_array',
         timeTrackingSuccess: timeTrackingData.success
       });
 
-      // Build Gantt tasks from user projects
+      // Build Gantt tasks from all sources - IDENTICAL TO ADMIN
       let tasks: GanttTask[] = [];
 
+      // 1. PROIECTE - PARENT TASKS
       if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
-        console.log('[USER GANTT DEBUG] Processing user projects for Gantt:', proiecteData.data.length);
+        console.log('[USER GANTT DEBUG] Processing proiecte for Gantt:', proiecteData.data.length);
 
         let filteredProiecte = proiecteData.data;
 
@@ -198,12 +242,17 @@ export default function GanttView() {
           filteredProiecte = filteredProiecte.filter((p: any) =>
             p.ID_Proiect?.toLowerCase().includes(searchTerm) ||
             p.Denumire?.toLowerCase().includes(searchTerm) ||
-            p.Adresa?.toLowerCase().includes(searchTerm)
+            p.Adresa?.toLowerCase().includes(searchTerm) ||
+            p.Client_Nume?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
           );
         }
 
-        // Create Gantt tasks from projects
-        const ganttTasks = filteredProiecte.map((p: any, index: number) => {
+        const ganttProiecte = filteredProiecte.map((p: any, index: number) => {
           // Handle BigQuery DATE fields with .value property
           const dataStart = p.Data_Start?.value || p.Data_Start;
           const dataFinal = p.Data_Final?.value || p.Data_Final;
@@ -255,9 +304,117 @@ export default function GanttView() {
           };
         });
 
-        tasks.push(...ganttTasks);
-        console.log('[USER GANTT DEBUG] Added user Gantt tasks:', ganttTasks.length);
+        tasks.push(...ganttProiecte);
+        console.log('[USER GANTT DEBUG] Added proiecte Gantt tasks:', ganttProiecte.length);
       }
+
+      // 2. SUBPROIECTE - CHILD TASKS
+      if (subproiecteData.success && Array.isArray(subproiecteData.data) && subproiecteData.data.length > 0) {
+        console.log('[USER GANTT DEBUG] Processing subproiecte for Gantt:', subproiecteData.data.length);
+
+        let filteredSubproiecte = subproiecteData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) => s.ID_Proiect === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.ID_Proiect?.toLowerCase().includes(searchTerm) ||
+            s.Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Proiect_Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Adresa?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+          );
+        }
+
+        const ganttSubproiecte = filteredSubproiecte.map((s: any, index: number) => {
+          // Handle BigQuery DATE fields with .value property
+          const dataStart = s.Data_Start?.value || s.Data_Start;
+          const dataFinal = s.Data_Final?.value || s.Data_Final;
+
+          return {
+            id: `subproj_${s.ID_Subproiect || index}`,
+            name: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`,
+            startDate: dataStart || new Date().toISOString().split('T')[0],
+            endDate: dataFinal || new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            progress: s.Status === 'Finalizat' ? 100 : (s.Status === 'Activ' ? 60 : 30),
+            type: 'subproiect' as const,
+            parentId: `proj_${s.ID_Proiect}`,
+            dependencies: [],
+            resources: s.Responsabil ? [s.Responsabil] : [displayName],
+            priority: s.Status === 'Activ' ? 'urgent' : 'normala' as any,
+            status: s.Status === 'Finalizat' ? 'finalizata' : (s.Status === 'Activ' ? 'in_progress' : 'to_do') as any,
+            estimatedHours: 0,
+            workedHours: 0,
+            isCollapsed: false,
+            level: 1
+          };
+        });
+
+        tasks.push(...ganttSubproiecte);
+        console.log('[USER GANTT DEBUG] Added subproiecte Gantt tasks:', ganttSubproiecte.length);
+      }
+
+      // 3. SARCINI - LEAF TASKS
+      if (sarciniData.success && Array.isArray(sarciniData.data) && sarciniData.data.length > 0) {
+        console.log('[USER GANTT DEBUG] Processing sarcini for Gantt:', sarciniData.data.length);
+
+        let filteredSarcini = sarciniData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSarcini = filteredSarcini.filter((s: any) => s.proiect_id === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
+          filteredSarcini = filteredSarcini.filter((s: any) =>
+            s.proiect_id?.toLowerCase().includes(searchTerm) ||
+            s.titlu?.toLowerCase().includes(searchTerm) ||
+            s.descriere?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSarcini = filteredSarcini.filter((s: any) => {
+            const responsabil = s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : '';
+            return responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase());
+          });
+        }
+
+        const ganttSarcini = filteredSarcini.map((s: any, index: number) => {
+          // Handle BigQuery DATE fields with .value property
+          const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
+          const dataCreare = s.data_creare?.value || s.data_creare;
+
+          return {
+            id: `task_${s.id || index}`,
+            name: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`,
+            startDate: dataCreare || new Date().toISOString().split('T')[0],
+            endDate: dataScadenta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            progress: s.status === 'finalizata' ? 100 : (s.status === 'in_progress' ? 50 : 10),
+            type: 'sarcina' as const,
+            parentId: `proj_${s.proiect_id}`,
+            dependencies: [],
+            resources: s.responsabili && s.responsabili[0] ? [s.responsabili[0].responsabil_nume] : [displayName],
+            priority: s.prioritate?.toLowerCase() || 'normala' as any,
+            status: s.status || 'to_do' as any,
+            estimatedHours: 0,
+            workedHours: 0,
+            isCollapsed: false,
+            level: 2
+          };
+        });
+
+        tasks.push(...ganttSarcini);
+        console.log('[USER GANTT DEBUG] Added sarcini Gantt tasks:', ganttSarcini.length);
+      }
+
+      console.log('[USER GANTT DEBUG] Total Gantt tasks created:', tasks.length);
 
       // Add mock tasks if no real data for demonstration
       if (tasks.length === 0) {
@@ -269,41 +426,59 @@ export default function GanttView() {
 
         tasks = [
           {
-            id: 'mock_1',
-            name: 'Primul meu proiect',
+            id: 'mock_proj_1',
+            name: 'proj_alpha - Primul meu proiect',
             startDate: today.toISOString().split('T')[0],
-            endDate: nextWeek.toISOString().split('T')[0],
+            endDate: nextMonth.toISOString().split('T')[0],
             progress: 45,
             type: 'proiect',
             dependencies: [],
             resources: [displayName],
             priority: 'urgent',
             status: 'in_progress',
-            estimatedHours: 40,
-            workedHours: 18,
+            estimatedHours: 120,
+            workedHours: 54,
             isCollapsed: false,
             level: 0
           },
           {
-            id: 'mock_2',
-            name: 'Proiect de testare',
-            startDate: nextWeek.toISOString().split('T')[0],
-            endDate: nextMonth.toISOString().split('T')[0],
-            progress: 10,
-            type: 'proiect',
+            id: 'mock_subproj_1',
+            name: 'Faza 1 (proj_alpha)',
+            startDate: today.toISOString().split('T')[0],
+            endDate: nextWeek.toISOString().split('T')[0],
+            progress: 80,
+            type: 'subproiect',
+            parentId: 'mock_proj_1',
+            dependencies: [],
+            resources: [displayName],
+            priority: 'ridicata',
+            status: 'in_progress',
+            estimatedHours: 40,
+            workedHours: 32,
+            isCollapsed: false,
+            level: 1
+          },
+          {
+            id: 'mock_task_1',
+            name: 'Analiza cerințe (proj_alpha)',
+            startDate: today.toISOString().split('T')[0],
+            endDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            progress: 100,
+            type: 'sarcina',
+            parentId: 'mock_subproj_1',
             dependencies: [],
             resources: [displayName],
             priority: 'normala',
-            status: 'to_do',
-            estimatedHours: 60,
-            workedHours: 6,
+            status: 'finalizata',
+            estimatedHours: 8,
+            workedHours: 8,
             isCollapsed: false,
-            level: 0
+            level: 2
           }
         ];
       }
 
-      console.log('[USER GANTT DEBUG] Final tasks:', tasks.length, tasks);
+      console.log('[USER GANTT DEBUG] Final Gantt tasks:', tasks.length, tasks);
 
       setGanttData(tasks);
       calculateTimelineRange(tasks);
@@ -314,6 +489,131 @@ export default function GanttView() {
     } finally {
       setLoadingData(false);
     }
+  };
+
+  // NOUA FUNCȚIE PENTRU CLICK PE CAPETELE BARELOR
+  const handleDateClick = (taskId: string, dateType: 'start' | 'end', event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    const task = ganttData.find(t => t.id === taskId);
+    if (!task) return;
+
+    const currentDate = dateType === 'start'
+      ? normalizeDate(task.startDate)
+      : normalizeDate(task.endDate);
+
+    setDateEditState({
+      isOpen: true,
+      taskId,
+      dateType,
+      currentDate,
+      taskName: task.name,
+      position: { x: event.clientX, y: event.clientY }
+    });
+  };
+
+  // FUNCȚIA PENTRU SALVAREA DATEI NOI - IDENTICAL TO ADMIN
+  const handleDateSave = async (newDate: string) => {
+    const task = ganttData.find(t => t.id === dateEditState.taskId);
+    if (!task) {
+      toast.error('Task nu a fost găsit!');
+      setDateEditState(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    // Validare: start date < end date
+    const currentStartDate = normalizeDate(task.startDate);
+    const currentEndDate = normalizeDate(task.endDate);
+
+    let newStartDate = currentStartDate;
+    let newEndDate = currentEndDate;
+
+    if (dateEditState.dateType === 'start') {
+      newStartDate = newDate;
+      if (new Date(newStartDate) >= new Date(currentEndDate)) {
+        toast.error('Data de început trebuie să fie înainte de data de sfârșit!');
+        return;
+      }
+    } else {
+      newEndDate = newDate;
+      if (new Date(newEndDate) <= new Date(currentStartDate)) {
+        toast.error('Data de sfârșit trebuie să fie după data de început!');
+        return;
+      }
+    }
+
+    try {
+      setSavingChanges(true);
+
+      console.log('[USER GANTT] Sending API request:', {
+        taskId: dateEditState.taskId,
+        taskType: task.type,
+        startDate: newStartDate,
+        endDate: newEndDate
+      });
+
+      // Determine the API endpoint based on task type - SAME AS ADMIN
+      let apiEndpoint = '';
+      let updateData = {};
+
+      if (task.id.startsWith('proj_')) {
+        apiEndpoint = '/api/rapoarte/proiecte';
+        updateData = {
+          id: task.id.replace('proj_', ''),
+          Data_Start: newStartDate,
+          Data_Final: newEndDate
+        };
+      } else if (task.id.startsWith('subproj_')) {
+        apiEndpoint = '/api/rapoarte/subproiecte';
+        updateData = {
+          id: task.id.replace('subproj_', ''),
+          Data_Start: newStartDate,
+          Data_Final: newEndDate
+        };
+      } else if (task.id.startsWith('task_')) {
+        apiEndpoint = '/api/rapoarte/sarcini';
+        updateData = {
+          id: task.id.replace('task_', ''),
+          data_creare: newStartDate,
+          data_scadenta: newEndDate
+        };
+      } else {
+        throw new Error('Tip task nesuportat pentru editare');
+      }
+
+      const response = await fetch(apiEndpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update local state
+        setGanttData(prev => prev.map(task =>
+          task.id === dateEditState.taskId
+            ? { ...task, startDate: newStartDate, endDate: newEndDate }
+            : task
+        ));
+        toast.success('Data a fost actualizată cu succes!');
+
+        // Închide popup-ul
+        setDateEditState(prev => ({ ...prev, isOpen: false }));
+      } else {
+        toast.error(result.error || 'Eroare la actualizarea datelor!');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea task-ului:', error);
+      toast.error('Eroare la salvarea modificărilor!');
+    } finally {
+      setSavingChanges(false);
+    }
+  };
+
+  // FUNCȚIA PENTRU ANULAREA EDITĂRII
+  const handleDateCancel = () => {
+    setDateEditState(prev => ({ ...prev, isOpen: false }));
   };
 
   const calculateTimelineRange = (tasks: GanttTask[]) => {
@@ -420,6 +720,7 @@ export default function GanttView() {
     // Apply filters
     if (filters.proiect_id) {
       filteredTasks = filteredTasks.filter(task => {
+        // For tasks, look for proiect_id in the ID or name
         return task.id.includes(filters.proiect_id) || task.name.includes(filters.proiect_id);
       });
     }
@@ -427,7 +728,17 @@ export default function GanttView() {
       const searchTerm = filters.proiect_nume.toLowerCase();
       filteredTasks = filteredTasks.filter(task =>
         task.id.toLowerCase().includes(searchTerm) ||
-        task.name.toLowerCase().includes(searchTerm)
+        task.name.toLowerCase().includes(searchTerm) ||
+        (task as any).proiect_id?.toLowerCase().includes(searchTerm) ||
+        (task as any).Adresa?.toLowerCase().includes(searchTerm) ||
+        (task as any).client_nume?.toLowerCase().includes(searchTerm)
+      );
+    }
+    if (filters.responsabil_nume) {
+      filteredTasks = filteredTasks.filter(task =>
+        task.resources.some(resource =>
+          resource.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+        )
       );
     }
     if (filters.tip_task) {
@@ -452,7 +763,22 @@ export default function GanttView() {
       });
     }
 
-    return filteredTasks;
+    const visible: GanttTask[] = [];
+    const collapsedParents = new Set<string>();
+
+    filteredTasks.forEach(task => {
+      if (task.isCollapsed) {
+        collapsedParents.add(task.id);
+      }
+
+      // Show task if it's not hidden under a collapsed parent
+      const isHidden = task.parentId && collapsedParents.has(task.parentId);
+      if (!isHidden) {
+        visible.push(task);
+      }
+    });
+
+    return visible;
   };
 
   const formatDate = (date: Date) => {
@@ -483,7 +809,7 @@ export default function GanttView() {
 
   return (
     <UserLayout user={user} displayName={displayName} userRole={userRole}>
-      {/* Controls */}
+      {/* Controls - IDENTICAL TO ADMIN */}
       <Card style={{ marginBottom: '2rem' }}>
         <div style={{
           display: 'flex',
@@ -537,7 +863,7 @@ export default function GanttView() {
           </div>
         </div>
 
-        {/* Period Filter */}
+        {/* Period Filter - IDENTICAL TO ADMIN */}
         <div style={{
           display: 'flex',
           gap: '1rem',
@@ -612,7 +938,7 @@ export default function GanttView() {
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* Stats - IDENTICAL TO ADMIN */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
@@ -628,26 +954,26 @@ export default function GanttView() {
             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Proiectele Mele</div>
           </div>
           <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#8b5cf6' }}>
+              {ganttData.filter(t => t.type === 'subproiect').length}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Subproiectele Mele</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#06b6d4' }}>
+              {ganttData.filter(t => t.type === 'sarcina').length}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Sarcinile Mele</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
               {Math.round(ganttData.reduce((acc, t) => acc + t.progress, 0) / ganttData.length) || 0}%
             </div>
             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Progres Mediu</div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
-              {ganttData.reduce((acc, t) => acc + (t.workedHours || 0), 0)}h
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Ore Lucrate</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#8b5cf6' }}>
-              {ganttData.filter(t => t.status === 'finalizata').length}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Finalizate</div>
-          </div>
         </div>
 
-        {/* Simplified Filters for Normal Users */}
+        {/* Filters - IDENTICAL TO ADMIN */}
         <div style={{
           padding: '1rem',
           background: 'rgba(249, 250, 251, 0.5)',
@@ -660,7 +986,7 @@ export default function GanttView() {
             fontWeight: '600',
             color: '#374151'
           }}>
-            🔍 Filtrare Proiecte
+            🔍 Filtrare Date
           </h3>
 
           <div style={{
@@ -669,6 +995,38 @@ export default function GanttView() {
             gap: '1rem',
             alignItems: 'end'
           }}>
+            {/* User Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                👤 Responsabil
+              </label>
+              <select
+                value={filters.responsabil_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, responsabil_nume: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toți responsabilii</option>
+                {utilizatori.map((user) => (
+                  <option key={user.uid} value={user.nume_complet}>
+                    {user.nume_complet}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Project Filter */}
             <div>
               <label style={{
@@ -692,7 +1050,7 @@ export default function GanttView() {
                   background: 'white'
                 }}
               >
-                <option value="">Toate proiectele mele</option>
+                <option value="">Toate proiectele</option>
                 {proiecte.map((project) => (
                   <option key={project.ID_Proiect} value={project.ID_Proiect}>
                     {project.ID_Proiect} - {project.Denumire}
@@ -710,13 +1068,13 @@ export default function GanttView() {
                 color: '#6b7280',
                 marginBottom: '0.25rem'
               }}>
-                🔍 Căutare
+                🔍 Căutare generală
               </label>
               <input
                 type="text"
                 value={filters.proiect_nume}
                 onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
-                placeholder="ID proiect, nume..."
+                placeholder="ID proiect, nume, adresă..."
                 style={{
                   width: '100%',
                   padding: '0.5rem',
@@ -725,6 +1083,36 @@ export default function GanttView() {
                   fontSize: '0.875rem'
                 }}
               />
+            </div>
+
+            {/* Task Type Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                📋 Tip Task
+              </label>
+              <select
+                value={filters.tip_task}
+                onChange={(e) => setFilters(prev => ({ ...prev, tip_task: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toate tipurile</option>
+                <option value="proiect">📁 Proiect</option>
+                <option value="subproiect">📂 Subproiect</option>
+                <option value="sarcina">📋 Sarcina</option>
+              </select>
             </div>
 
             {/* Status Filter */}
@@ -754,6 +1142,7 @@ export default function GanttView() {
                 <option value="to_do">⏳ De facut</option>
                 <option value="in_progress">📄 In progres</option>
                 <option value="finalizata">✅ Finalizata</option>
+                <option value="anulata">❌ Anulata</option>
               </select>
             </div>
 
@@ -794,7 +1183,9 @@ export default function GanttView() {
                 size="sm"
                 onClick={() => setFilters({
                   proiect_id: '',
+                  responsabil_nume: '',
                   proiect_nume: '',
+                  client_nume: '',
                   tip_task: '',
                   status: '',
                   prioritate: '',
@@ -810,8 +1201,21 @@ export default function GanttView() {
         </div>
       </Card>
 
-      {/* Gantt Chart - READ-ONLY for Normal Users */}
+      {/* Gantt Chart - LAYOUT CU CLICK HANDLERS PENTRU DATE EDITING - IDENTICAL TO ADMIN */}
       <Card>
+        {savingChanges && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: '8px',
+            color: '#92400e',
+            marginBottom: '1rem'
+          }}>
+            🔄 Se salveaza modificarile...
+          </div>
+        )}
+
         <div style={{ overflow: 'auto', position: 'relative' }}>
           <div
             ref={ganttRef}
@@ -823,7 +1227,7 @@ export default function GanttView() {
               overflow: 'hidden'
             }}
           >
-            {/* HEADER SINCRONIZAT */}
+            {/* HEADER SINCRONIZAT - IDENTICAL TO ADMIN */}
             <div style={{
               display: 'flex',
               position: 'sticky',
@@ -846,7 +1250,7 @@ export default function GanttView() {
                 alignItems: 'center',
                 borderRight: '2px solid #e5e7eb'
               }}>
-                Proiectele Mele
+                Proiectele și Sarcinile Mele
               </div>
 
               {/* Timeline Header */}
@@ -883,7 +1287,7 @@ export default function GanttView() {
               </div>
             </div>
 
-            {/* BODY CONTENT - READ-ONLY */}
+            {/* BODY CONTENT CU CLICK HANDLERS PENTRU EDITARE DATE - IDENTICAL TO ADMIN */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {visibleTasks.map((task, index) => (
                 <div
@@ -914,6 +1318,25 @@ export default function GanttView() {
                       setShowTaskModal(true);
                     }}
                   >
+                    {task.type !== 'sarcina' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTaskCollapse(task.id);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          color: '#6b7280'
+                        }}
+                      >
+                        {task.isCollapsed ? '▶' : '▼'}
+                      </button>
+                    )}
+
                     <span style={{ fontSize: '1rem' }}>
                       {getTaskIcon(task.type)}
                     </span>
@@ -939,7 +1362,7 @@ export default function GanttView() {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
                         }}>
-                          👤 {task.resources.slice(0, 2).join(', ')}
+                          👥 {task.resources.slice(0, 2).join(', ')}
                           {task.resources.length > 2 && ` +${task.resources.length - 2}`}
                         </div>
                       )}
@@ -959,8 +1382,9 @@ export default function GanttView() {
                     </div>
                   </div>
 
-                  {/* Timeline Content - READ-ONLY */}
+                  {/* Timeline Content cu CLICK HANDLERS - IDENTICAL TO ADMIN */}
                   <div
+                    data-timeline-body
                     style={{
                       flex: 1,
                       position: 'relative',
@@ -994,7 +1418,7 @@ export default function GanttView() {
                       );
                     })()}
 
-                    {/* Task Bar - READ-ONLY */}
+                    {/* Task Bar cu CLICK HANDLERS pe capete - IDENTICAL TO ADMIN */}
                     {(() => {
                       const position = calculateTaskPosition(task);
                       return (
@@ -1021,6 +1445,86 @@ export default function GanttView() {
                             setShowTaskModal(true);
                           }}
                         >
+                          {/* LEFT CLICK HANDLER - START DATE - IDENTICAL TO ADMIN */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '-4px',
+                              top: '-4px',
+                              bottom: '-4px',
+                              width: '12px',
+                              cursor: 'pointer',
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              borderRadius: '4px 0 0 4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease',
+                              zIndex: 2
+                            }}
+                            onClick={(e) => handleDateClick(task.id, 'start', e)}
+                            onMouseEnter={(e) => {
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.3)';
+                              target.style.width = '16px';
+                              target.style.left = '-6px';
+                            }}
+                            onMouseLeave={(e) => {
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.1)';
+                              target.style.width = '12px';
+                              target.style.left = '-4px';
+                            }}
+                            title="Click pentru a edita data de început"
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '16px',
+                              background: 'rgba(59, 130, 246, 0.8)',
+                              borderRadius: '2px'
+                            }} />
+                          </div>
+
+                          {/* RIGHT CLICK HANDLER - END DATE - IDENTICAL TO ADMIN */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              right: '-4px',
+                              top: '-4px',
+                              bottom: '-4px',
+                              width: '12px',
+                              cursor: 'pointer',
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              borderRadius: '0 4px 4px 0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease',
+                              zIndex: 2
+                            }}
+                            onClick={(e) => handleDateClick(task.id, 'end', e)}
+                            onMouseEnter={(e) => {
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.3)';
+                              target.style.width = '16px';
+                              target.style.right = '-6px';
+                            }}
+                            onMouseLeave={(e) => {
+                              const target = e.target as HTMLElement;
+                              target.style.background = 'rgba(59, 130, 246, 0.1)';
+                              target.style.width = '12px';
+                              target.style.right = '-4px';
+                            }}
+                            title="Click pentru a edita data de sfârșit"
+                          >
+                            <div style={{
+                              width: '4px',
+                              height: '16px',
+                              background: 'rgba(59, 130, 246, 0.8)',
+                              borderRadius: '2px'
+                            }} />
+                          </div>
+
                           {/* Progress Bar */}
                           <div
                             style={{
@@ -1114,11 +1618,22 @@ export default function GanttView() {
         </div>
       </Card>
 
-      {/* Task Details Modal */}
+      {/* DatePickerPopup Integration - IDENTICAL TO ADMIN */}
+      <DatePickerPopup
+        isOpen={dateEditState.isOpen}
+        position={dateEditState.position}
+        currentDate={dateEditState.currentDate}
+        dateType={dateEditState.dateType}
+        taskName={dateEditState.taskName}
+        onSave={handleDateSave}
+        onCancel={handleDateCancel}
+      />
+
+      {/* Task Details Modal - IDENTICAL TO ADMIN */}
       <Modal
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
-        title="Detalii Proiect"
+        title="Detalii Sarcina"
         size="lg"
       >
         {selectedTask && (
@@ -1193,8 +1708,8 @@ export default function GanttView() {
                     {selectedTask.workedHours || 0}h
                   </div>
                   <div>
-                    <strong>Progres:</strong><br />
-                    {selectedTask.progress}%
+                    <strong>Rămâne:</strong><br />
+                    {Math.max(0, (selectedTask.estimatedHours || 0) - (selectedTask.workedHours || 0))}h
                   </div>
                 </div>
               </div>

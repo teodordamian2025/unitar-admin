@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/calendar/page.tsx
-// DATA: 23.09.2025 17:15 (ora României)
-// DESCRIERE: Calendar View pentru utilizatori normali - vizualizarea sarcinilor și deadline-urilor personale
-// FUNCȚIONALITATE: Calendar interactiv cu filtrare pe proiectele utilizatorului curent
+// DATA: 23.09.2025 18:00 (ora României)
+// DESCRIERE: Calendar View COMPLET pentru utilizatori normali - identic cu admin
+// FUNCȚIONALITATE: Calendar interactiv cu filtrare completă, editare date și management evenimente
 // ==================================================================
 
 'use client';
@@ -71,16 +71,25 @@ export default function CalendarView() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
 
+  // Date editing state
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [tempDate, setTempDate] = useState('');
+  const [savingDate, setSavingDate] = useState(false);
+
   // Filters
   const [filters, setFilters] = useState({
     include_proiecte: true,
     include_sarcini: true,
     include_timetracking: false,
+    user_id: '',
     proiect_id: '',
-    proiect_nume: ''
+    responsabil_nume: '',
+    proiect_nume: '',
+    client_nume: ''
   });
 
   // Data for filter options
+  const [utilizatori, setUtilizatori] = useState<any[]>([]);
   const [proiecte, setProiecte] = useState<any[]>([]);
 
   useEffect(() => {
@@ -101,8 +110,17 @@ export default function CalendarView() {
 
   const loadFilterData = async () => {
     try {
-      // Load proiecte for project filter - only user's projects
-      const proiecteResponse = await fetch('/api/user/projects');
+      // Load utilizatori for user filter
+      const utilizatoriResponse = await fetch('/api/rapoarte/utilizatori');
+      if (utilizatoriResponse.ok) {
+        const utilizatoriData = await utilizatoriResponse.json();
+        if (utilizatoriData.success) {
+          setUtilizatori(utilizatoriData.data);
+        }
+      }
+
+      // Load proiecte for project filter
+      const proiecteResponse = await fetch('/api/rapoarte/proiecte');
       if (proiecteResponse.ok) {
         const proiecteData = await proiecteResponse.json();
         if (proiecteData.success) {
@@ -152,34 +170,59 @@ export default function CalendarView() {
     try {
       setLoadingData(true);
 
+      // Calculate date range based on view mode
+      const startDate = getStartDate();
+      const endDate = getEndDate();
+
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        include_proiecte: filters.include_proiecte.toString(),
+        include_sarcini: filters.include_sarcini.toString(),
+        include_timetracking: filters.include_timetracking.toString()
+      });
+
+      if (filters.user_id) params.append('user_id', filters.user_id);
+      if (filters.proiect_id) params.append('proiect_id', filters.proiect_id);
+
+      // Use same API structure as admin but data will be filtered by backend for normal users
       console.log('[USER CALENDAR DEBUG] Starting calendar data load...');
 
-      // For normal users, load only their own projects and time tracking
-      const [proiecteResponse, timeTrackingResponse] = await Promise.all([
-        fetch('/api/user/projects'),
-        filters.include_timetracking ? fetch('/api/user/timetracking') : Promise.resolve({json: () => ({success: false})})
+      const [proiecteResponse, subproiecteResponse, sarciniResponse, timeTrackingResponse] = await Promise.all([
+        fetch('/api/rapoarte/proiecte'),
+        filters.include_proiecte ? fetch('/api/rapoarte/subproiecte') : Promise.resolve({json: () => ({success: false})}),
+        filters.include_sarcini ? fetch('/api/rapoarte/sarcini') : Promise.resolve({json: () => ({success: false})}),
+        filters.include_timetracking ? fetch('/api/rapoarte/timetracking') : Promise.resolve({json: () => ({success: false})})
       ]);
 
       console.log('[USER CALENDAR DEBUG] API responses:', {
         proiecteStatus: proiecteResponse.status,
+        subproiecteStatus: 'status' in subproiecteResponse ? subproiecteResponse.status : 'mock',
+        sarciniStatus: 'status' in sarciniResponse ? sarciniResponse.status : 'mock',
         timeTrackingStatus: 'status' in timeTrackingResponse ? timeTrackingResponse.status : 'mock'
       });
 
       const proiecteData = await proiecteResponse.json();
+      const subproiecteData = filters.include_proiecte ? await subproiecteResponse.json() : {success: false};
+      const sarciniData = filters.include_sarcini ? await sarciniResponse.json() : {success: false};
       const timeTrackingData = filters.include_timetracking ? await timeTrackingResponse.json() : {success: false};
 
       console.log('[USER CALENDAR DEBUG] API data:', {
         proiecteSuccess: proiecteData.success,
         proiecteDataLength: Array.isArray(proiecteData.data) ? proiecteData.data.length : 'not_array',
+        subproiecteSuccess: subproiecteData.success,
+        subproiecteDataLength: Array.isArray(subproiecteData.data) ? subproiecteData.data.length : 'not_array',
+        sarciniSuccess: sarciniData.success,
+        sarciniDataLength: Array.isArray(sarciniData.data) ? sarciniData.data.length : 'not_array',
         timeTrackingSuccess: timeTrackingData.success
       });
 
-      // Process events
+      // Process all event types - IDENTICAL TO ADMIN
       let events: CalendarEvent[] = [];
 
-      // 1. USER PROJECTS - show only user's projects without financial data
+      // 1. PROIECTE - display project_id instead of name
       if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
-        console.log('[USER CALENDAR DEBUG] Processing user projects:', proiecteData.data.length);
+        console.log('[USER CALENDAR DEBUG] Processing proiecte:', proiecteData.data.length);
 
         let filteredProiecte = proiecteData.data;
 
@@ -192,7 +235,18 @@ export default function CalendarView() {
           filteredProiecte = filteredProiecte.filter((p: any) =>
             p.ID_Proiect?.toLowerCase().includes(searchTerm) ||
             p.Denumire?.toLowerCase().includes(searchTerm) ||
-            p.Adresa?.toLowerCase().includes(searchTerm)
+            p.Adresa?.toLowerCase().includes(searchTerm) ||
+            p.Client_Nume?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.client_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Client_Nume?.toLowerCase().includes(filters.client_nume.toLowerCase())
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredProiecte = filteredProiecte.filter((p: any) =>
+            p.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
           );
         }
 
@@ -216,46 +270,120 @@ export default function CalendarView() {
           };
         });
         events.push(...proiecteEvents);
-        console.log('[USER CALENDAR DEBUG] Added filtered user projects events:', proiecteEvents.length);
+        console.log('[USER CALENDAR DEBUG] Added filtered proiecte events:', proiecteEvents.length);
       }
 
-      // 2. TIME TRACKING EVENTS for user
-      if (timeTrackingData.success && Array.isArray(timeTrackingData.data) && timeTrackingData.data.length > 0) {
-        console.log('[USER CALENDAR DEBUG] Processing time tracking:', timeTrackingData.data.length);
+      // 2. SUBPROIECTE - display Name + project_id
+      if (subproiecteData.success && Array.isArray(subproiecteData.data) && subproiecteData.data.length > 0) {
+        console.log('[USER CALENDAR DEBUG] Processing subproiecte:', subproiecteData.data.length);
 
-        const timeTrackingEvents = timeTrackingData.data.map((t: any, index: number) => {
+        let filteredSubproiecte = subproiecteData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) => s.ID_Proiect === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.ID_Proiect?.toLowerCase().includes(searchTerm) ||
+            s.Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Proiect_Denumire?.toLowerCase().includes(searchTerm) ||
+            s.Adresa?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
+            s.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
+          );
+        }
+
+        const subproiecteEvents = filteredSubproiecte.map((s: any, index: number) => {
           // Handle BigQuery DATE fields with .value property
-          const data = t.data?.value || t.data;
+          const dataFinal = s.Data_Final?.value || s.Data_Final;
+          const dataStart = s.Data_Start?.value || s.Data_Start;
 
           return {
-            id: `time_${t.id || index}`,
-            titlu: `Timp înregistrat: ${t.ore || 0}h`,
-            proiect_nume: t.proiect_id || 'Necunoscut',
-            proiect_id: t.proiect_id,
-            data_scadenta: data || new Date().toISOString().split('T')[0],
-            prioritate: 'normala',
-            status: 'completed',
-            responsabil_nume: displayName,
-            tip_eveniment: 'time_tracking',
-            ore_lucrate: t.ore || 0,
-            urgency_status: 'completed'
+            id: `subproj_${s.ID_Subproiect || index}`,
+            titlu: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`, // Name + project_id
+            proiect_nume: s.Proiect_Denumire || s.Denumire,
+            proiect_id: s.ID_Proiect,
+            data_scadenta: dataFinal || new Date(Date.now() + index * 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: dataStart,
+            prioritate: s.Status === 'Activ' ? 'urgent' : 'normala',
+            status: s.Status || 'planificat',
+            responsabil_nume: s.Responsabil,
+            tip_eveniment: 'deadline_subproiect',
+            urgency_status: s.Status === 'Activ' ? 'urgent' : 'normal'
           };
         });
-        events.push(...timeTrackingEvents);
-        console.log('[USER CALENDAR DEBUG] Added time tracking events:', timeTrackingEvents.length);
+        events.push(...subproiecteEvents);
+        console.log('[USER CALENDAR DEBUG] Added filtered subproiecte events:', subproiecteEvents.length);
+      }
+
+      // 3. SARCINI - display title + project_id
+      if (sarciniData.success && Array.isArray(sarciniData.data) && sarciniData.data.length > 0) {
+        console.log('[USER CALENDAR DEBUG] Processing sarcini:', sarciniData.data.length);
+
+        let filteredSarcini = sarciniData.data;
+
+        // Apply filters
+        if (filters.proiect_id) {
+          filteredSarcini = filteredSarcini.filter((s: any) => s.proiect_id === filters.proiect_id);
+        }
+        if (filters.proiect_nume) {
+          const searchTerm = filters.proiect_nume.toLowerCase();
+          filteredSarcini = filteredSarcini.filter((s: any) =>
+            s.proiect_id?.toLowerCase().includes(searchTerm) ||
+            s.titlu?.toLowerCase().includes(searchTerm) ||
+            s.descriere?.toLowerCase().includes(searchTerm)
+          );
+        }
+        if (filters.responsabil_nume) {
+          filteredSarcini = filteredSarcini.filter((s: any) => {
+            const responsabil = s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : '';
+            return responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase());
+          });
+        }
+
+        const sarciniEvents = filteredSarcini.map((s: any, index: number) => {
+          // Handle BigQuery DATE fields with .value property
+          const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
+          const dataCreare = s.data_creare?.value || s.data_creare;
+
+          return {
+            id: `task_${s.id || index}`,
+            titlu: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`, // Title + project_id
+            proiect_nume: s.titlu,
+            proiect_id: s.proiect_id,
+            data_scadenta: dataScadenta || new Date(Date.now() + index * 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            data_start: dataCreare,
+            prioritate: s.prioritate?.toLowerCase() || 'normala',
+            status: s.status || 'de_facut',
+            responsabil_nume: s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : 'Neatribuit',
+            tip_eveniment: 'deadline_sarcina',
+            urgency_status: s.prioritate === 'Ridicată' ? 'urgent' : 'normal'
+          };
+        });
+        events.push(...sarciniEvents);
+        console.log('[USER CALENDAR DEBUG] Added filtered sarcini events:', sarciniEvents.length);
       }
 
       console.log('[USER CALENDAR DEBUG] Total events created:', events.length);
 
       // Add mock events if no real data for demonstration
-      if (events.length === 0) {
+      if (events.length === 0 &&
+          (!proiecteData.success || !Array.isArray(proiecteData.data) || proiecteData.data.length === 0) &&
+          (!subproiecteData.success || !Array.isArray(subproiecteData.data) || subproiecteData.data.length === 0) &&
+          (!sarciniData.success || !Array.isArray(sarciniData.data) || sarciniData.data.length === 0)) {
+
         console.log('[USER CALENDAR DEBUG] No real data available, using mock data');
         events = [
           {
             id: '1',
-            titlu: 'Proiectul meu',
-            proiect_nume: 'Primul proiect',
-            proiect_id: 'proj_1',
+            titlu: 'Deadline Proiect Alpha',
+            proiect_nume: 'Proiect Alpha',
+            proiect_id: 'alpha',
             data_scadenta: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             prioritate: 'urgent',
             status: 'in_progress',
@@ -265,16 +393,15 @@ export default function CalendarView() {
           },
           {
             id: '2',
-            titlu: 'Timp lucrat azi: 4h',
-            proiect_nume: 'Primul proiect',
-            proiect_id: 'proj_1',
-            data_scadenta: new Date().toISOString().split('T')[0],
+            titlu: 'Review cod Beta (beta)',
+            proiect_nume: 'Proiect Beta',
+            proiect_id: 'beta',
+            data_scadenta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             prioritate: 'normala',
-            status: 'completed',
+            status: 'to_do',
             responsabil_nume: displayName,
-            tip_eveniment: 'time_tracking',
-            ore_lucrate: 4,
-            urgency_status: 'completed'
+            tip_eveniment: 'sarcina',
+            urgency_status: 'normal'
           }
         ];
       }
@@ -290,9 +417,9 @@ export default function CalendarView() {
         sarcini_count: events.filter(e => e.tip_eveniment === 'sarcina').length,
         proiecte_count: events.filter(e => e.tip_eveniment === 'deadline_proiect').length,
         milestones_count: 0,
-        timetracking_count: events.filter(e => e.tip_eveniment === 'time_tracking').length,
+        timetracking_count: 0,
         total_estimated_hours: 0,
-        total_worked_hours: events.reduce((sum, e) => sum + (e.ore_lucrate || 0), 0)
+        total_worked_hours: 0
       };
 
       console.log('[USER CALENDAR DEBUG] Final stats:', stats);
@@ -412,6 +539,105 @@ export default function CalendarView() {
 
   const dayNames = ['Dum', 'Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm'];
 
+  // Date editing functions - IDENTICAL TO ADMIN
+  const startEditingDate = () => {
+    if (selectedEvent) {
+      setTempDate(selectedEvent.data_scadenta);
+      setIsEditingDate(true);
+    }
+  };
+
+  const cancelEditingDate = () => {
+    setIsEditingDate(false);
+    setTempDate('');
+  };
+
+  const adjustDate = (days: number) => {
+    if (selectedEvent) {
+      const currentDate = new Date(selectedEvent.data_scadenta);
+      currentDate.setDate(currentDate.getDate() + days);
+      const newDate = currentDate.toISOString().split('T')[0];
+      setTempDate(newDate);
+    }
+  };
+
+  const setToToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setTempDate(today);
+  };
+
+  const saveDate = async () => {
+    if (!selectedEvent || !tempDate) return;
+
+    setSavingDate(true);
+    try {
+      // Determine the API endpoint based on event type
+      let apiEndpoint = '';
+      let updateData = {};
+
+      switch (selectedEvent.tip_eveniment) {
+        case 'deadline_proiect':
+          apiEndpoint = '/api/rapoarte/proiecte';
+          updateData = {
+            id: selectedEvent.proiect_id,
+            Data_Final: tempDate
+          };
+          break;
+        case 'deadline_subproiect':
+          apiEndpoint = '/api/rapoarte/subproiecte';
+          updateData = {
+            id: selectedEvent.id.replace('subproj_', ''),
+            Data_Final: tempDate
+          };
+          break;
+        case 'deadline_sarcina':
+          apiEndpoint = '/api/rapoarte/sarcini';
+          updateData = {
+            id: selectedEvent.id.replace('task_', ''),
+            data_scadenta: tempDate
+          };
+          break;
+        default:
+          throw new Error('Tip eveniment nesuportat pentru editare');
+      }
+
+      const response = await fetch(apiEndpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Eroare la actualizarea datei');
+      }
+
+      // Update local state
+      setSelectedEvent(prev => prev ? { ...prev, data_scadenta: tempDate } : null);
+      setIsEditingDate(false);
+      setTempDate('');
+
+      // Show success message
+      toast.success('Data a fost actualizată cu succes!');
+
+      // Refresh calendar data
+      await loadCalendarData();
+
+    } catch (error) {
+      console.error('Eroare la salvarea datei:', error);
+      toast.error(`Eroare la actualizarea datei: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
   if (loading || !isAuthorized) {
     return <LoadingSpinner overlay message="Se încarcă Calendar View..." />;
   }
@@ -451,26 +677,26 @@ export default function CalendarView() {
           </div>
         </Card>
 
-        <Card variant="success" size="sm">
+        <Card variant="danger" size="sm">
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏱️</div>
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🚨</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-              {stats?.total_worked_hours || 0}h
+              {stats?.overdue_count || 0}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-              Ore Lucrate
+              Întârziate
             </div>
           </div>
         </Card>
 
-        <Card variant="info" size="sm">
+        <Card variant="success" size="sm">
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🎯</div>
+            <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>✅</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-              {stats?.proiecte_count || 0}
+              {stats?.completed_count || 0}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-              Proiectele Mele
+              Completate
             </div>
           </div>
         </Card>
@@ -531,7 +757,7 @@ export default function CalendarView() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters - IDENTICAL TO ADMIN */}
         <div style={{
           padding: '1rem',
           background: 'rgba(249, 250, 251, 0.5)',
@@ -548,10 +774,18 @@ export default function CalendarView() {
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
               <input
                 type="checkbox"
+                checked={filters.include_sarcini}
+                onChange={(e) => setFilters(prev => ({ ...prev, include_sarcini: e.target.checked }))}
+              />
+              📋 Sarcini
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <input
+                type="checkbox"
                 checked={filters.include_proiecte}
                 onChange={(e) => setFilters(prev => ({ ...prev, include_proiecte: e.target.checked }))}
               />
-              🎯 Proiectele Mele
+              🎯 Deadline Proiecte
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
               <input
@@ -570,6 +804,38 @@ export default function CalendarView() {
             gap: '1rem',
             alignItems: 'end'
           }}>
+            {/* User Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                👤 Responsabil
+              </label>
+              <select
+                value={filters.responsabil_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, responsabil_nume: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  background: 'white'
+                }}
+              >
+                <option value="">Toți responsabilii</option>
+                {utilizatori.map((user) => (
+                  <option key={user.uid} value={user.nume_complet}>
+                    {user.nume_complet}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Project Filter */}
             <div>
               <label style={{
@@ -593,7 +859,7 @@ export default function CalendarView() {
                   background: 'white'
                 }}
               >
-                <option value="">Toate proiectele mele</option>
+                <option value="">Toate proiectele</option>
                 {proiecte.map((project) => (
                   <option key={project.ID_Proiect} value={project.ID_Proiect}>
                     {project.ID_Proiect} - {project.Denumire}
@@ -611,13 +877,39 @@ export default function CalendarView() {
                 color: '#6b7280',
                 marginBottom: '0.25rem'
               }}>
-                🔍 Căutare
+                🔍 Căutare generală
               </label>
               <input
                 type="text"
                 value={filters.proiect_nume}
                 onChange={(e) => setFilters(prev => ({ ...prev, proiect_nume: e.target.value }))}
                 placeholder="ID proiect, nume, adresă..."
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            {/* Client Search */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginBottom: '0.25rem'
+              }}>
+                🏢 Client
+              </label>
+              <input
+                type="text"
+                value={filters.client_nume}
+                onChange={(e) => setFilters(prev => ({ ...prev, client_nume: e.target.value }))}
+                placeholder="Căută după nume client..."
                 style={{
                   width: '100%',
                   padding: '0.5rem',
@@ -637,8 +929,11 @@ export default function CalendarView() {
                   include_proiecte: true,
                   include_sarcini: true,
                   include_timetracking: false,
+                  user_id: '',
                   proiect_id: '',
-                  proiect_nume: ''
+                  responsabil_nume: '',
+                  proiect_nume: '',
+                  client_nume: ''
                 })}
                 style={{ width: '100%' }}
               >
@@ -649,7 +944,7 @@ export default function CalendarView() {
         </div>
       </Card>
 
-      {/* Calendar Grid */}
+      {/* Calendar Grid - IDENTICAL TO ADMIN */}
       <Card>
         {/* Day Headers */}
         <div style={{
@@ -751,11 +1046,13 @@ export default function CalendarView() {
         </div>
       </Card>
 
-      {/* Event Details Modal */}
+      {/* Event Details Modal - IDENTICAL TO ADMIN WITH DATE EDITING */}
       <Modal
         isOpen={showEventModal}
         onClose={() => {
           setShowEventModal(false);
+          setIsEditingDate(false);
+          setTempDate('');
         }}
         title="Detalii Eveniment"
         size="md"
@@ -783,30 +1080,218 @@ export default function CalendarView() {
               </div>
             </div>
 
+            {/* Modern Date Editor Section - IDENTICAL TO ADMIN */}
             <div style={{
-              padding: '1rem',
+              padding: '1.5rem',
               background: 'rgba(59, 130, 246, 0.05)',
-              borderRadius: '8px'
+              borderRadius: '12px',
+              border: '1px solid rgba(59, 130, 246, 0.1)',
+              marginBottom: '1rem'
             }}>
-              <strong style={{ color: '#1f2937', fontSize: '1rem' }}>
-                📅 Data Eveniment
-              </strong>
               <div style={{
-                padding: '0.75rem 1rem',
-                background: 'white',
-                borderRadius: '8px',
-                marginTop: '0.5rem',
-                fontSize: '1.1rem',
-                fontWeight: '600',
-                color: '#1f2937'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1rem'
               }}>
-                📅 {new Date(selectedEvent.data_scadenta).toLocaleDateString('ro-RO', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                <strong style={{ color: '#1f2937', fontSize: '1rem' }}>
+                  📅 Data Eveniment
+                </strong>
+                {!isEditingDate && (
+                  <button
+                    onClick={startEditingDate}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#3b82f6',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    ✏️ Editează
+                  </button>
+                )}
               </div>
+
+              {!isEditingDate ? (
+                // Display mode
+                <div
+                  onClick={startEditingDate}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'white',
+                    borderRadius: '8px',
+                    border: '2px dashed #d1d5db',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    color: '#1f2937'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                    e.currentTarget.style.background = 'white';
+                  }}
+                >
+                  📅 {new Date(selectedEvent.data_scadenta).toLocaleDateString('ro-RO', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+              ) : (
+                // Edit mode
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Quick Actions */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap'
+                  }}>
+                    <button
+                      onClick={() => adjustDate(-1)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.borderColor = '#9ca3af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                      }}
+                    >
+                      ← Zi anterioară
+                    </button>
+                    <button
+                      onClick={setToToday}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #3b82f6',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#3b82f6',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#3b82f6';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.color = '#3b82f6';
+                      }}
+                    >
+                      Astăzi
+                    </button>
+                    <button
+                      onClick={() => adjustDate(1)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.borderColor = '#9ca3af';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                      }}
+                    >
+                      Zi următoare →
+                    </button>
+                  </div>
+
+                  {/* Date Input */}
+                  <input
+                    type="date"
+                    value={tempDate}
+                    onChange={(e) => setTempDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #3b82f6',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      textAlign: 'center',
+                      outline: 'none'
+                    }}
+                  />
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                    <button
+                      onClick={saveDate}
+                      disabled={savingDate}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: savingDate ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: savingDate ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {savingDate ? '⏳' : '💾'} {savingDate ? 'Se salvează...' : 'Salvează'}
+                    </button>
+                    <button
+                      onClick={cancelEditingDate}
+                      disabled={savingDate}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'white',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        cursor: savingDate ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      ✕ Anulează
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
