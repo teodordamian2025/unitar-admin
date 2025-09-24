@@ -59,22 +59,19 @@ export async function GET(
 
     const proiect = proiectRows[0];
 
-    // Query pentru subproiecte - EXCLUDE câmpurile financiare
+    // Query pentru subproiecte - din tabela Subproiecte
     const subproiecteQuery = `
       SELECT
-        ID_Proiect,
+        ID_Subproiect,
         Denumire,
-        Client,
         Status,
         Data_Start,
         Data_Final,
-        Descriere,
         Responsabil,
-        status_predare,
-        Observatii
-        -- Exclude: Prioritate (not in Proiecte), financial fields
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
-      WHERE Proiect_Parinte = @projectId
+        status_predare
+        -- Exclude: financial fields (Valoare_Estimata, valoare_ron, moneda)
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      WHERE ID_Proiect = @projectId AND activ = true
       ORDER BY Data_Start DESC
     `;
 

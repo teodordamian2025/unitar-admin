@@ -75,6 +75,20 @@ export async function PUT(
         timp_estimat_zile: zile,
         timp_estimat_ore: ore,
         timp_estimat_total_ore: timpTotalOre
+      },
+      types: {
+        sarcina_id: 'STRING',
+        titlu: 'STRING',
+        descriere: 'STRING',
+        status: 'STRING',
+        prioritate: 'STRING',
+        progres_procent: 'INT64',
+        progres_descriere: 'STRING',
+        data_scadenta: 'DATE',
+        observatii: 'STRING',
+        timp_estimat_zile: 'INT64',
+        timp_estimat_ore: 'NUMERIC',
+        timp_estimat_total_ore: 'NUMERIC'
       }
     });
 

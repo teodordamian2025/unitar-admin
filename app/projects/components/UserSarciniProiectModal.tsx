@@ -145,11 +145,14 @@ export default function UserSarciniProiectModal({ isOpen, onClose, proiect }: Us
   const loadUtilizatorCurent = async () => {
     setLoadingUtilizator(true);
     try {
-      const response = await fetch('/api/rapoarte/utilizatori/current');
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setUtilizatorCurent(data.utilizator);
+      // For normal users, use Firebase user data directly instead of admin API
+      if (user) {
+        setUtilizatorCurent({
+          uid: user.uid,
+          email: user.email || '',
+          nume_complet: user.displayName || user.email || 'Utilizator',
+          rol: 'normal'
+        });
       }
     } catch (error) {
       console.error('Eroare la încărcarea utilizatorului curent:', error);
