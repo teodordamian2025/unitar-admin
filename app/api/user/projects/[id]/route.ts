@@ -40,16 +40,10 @@ export async function GET(
         Data_Start,
         Data_Final,
         Descriere,
-        Prioritate,
-        Tip_Proiect,
-        Status_Predare,
-        Responsabil_Principal,
-        Responsabil_Secundar,
-        Client_CUI,
-        Client_Adresa,
-        Client_Telefon,
-        Client_Email
-        -- Exclude: Valoare_Estimata, valoare_ron, moneda, buget_*, cost_*
+        Responsabil,
+        status_predare,
+        Observatii
+        -- Exclude: Prioritate (not in Proiecte table), Valoare_Estimata, valoare_ron, moneda, buget_*, cost_*
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
       WHERE ID_Proiect = @projectId
     `;
@@ -75,12 +69,10 @@ export async function GET(
         Data_Start,
         Data_Final,
         Descriere,
-        Prioritate,
-        Tip_Proiect,
-        Status_Predare,
-        Responsabil_Principal,
-        Responsabil_Secundar
-        -- Exclude: financial fields
+        Responsabil,
+        status_predare,
+        Observatii
+        -- Exclude: Prioritate (not in Proiecte), financial fields
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
       WHERE Proiect_Parinte = @projectId
       ORDER BY Data_Start DESC

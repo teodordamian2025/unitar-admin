@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         autor_uid,
         autor_nume,
         data_comentariu
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ComentariiProiecte\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiectComentarii\`
       WHERE proiect_id = @proiect_id
       ORDER BY data_comentariu DESC
     `;
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Inserare comentariu în BigQuery - IDENTIC cu admin
     const insertComentariuQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ComentariiProiecte\`
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiectComentarii\`
       (
         id, proiect_id, tip_comentariu, comentariu, autor_uid, autor_nume, data_comentariu
       )
