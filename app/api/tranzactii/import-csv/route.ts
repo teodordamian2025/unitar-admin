@@ -11,12 +11,11 @@ import crypto from 'crypto';
 // Configurare BigQuery
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_CLOUD_KEY_FILE,
-  credentials: process.env.GOOGLE_CLOUD_PRIVATE_KEY ? {
+  credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    project_id: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  } : undefined,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
+  },
 });
 
 const dataset = bigquery.dataset('PanouControlUnitar');
