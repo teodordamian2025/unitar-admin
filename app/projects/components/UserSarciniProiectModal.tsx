@@ -1327,6 +1327,7 @@ export default function UserSarciniProiectModal({ isOpen, onClose, proiect }: Us
           isOpen={showTimeModal}
           onClose={() => setShowTimeModal(false)}
           onTimeAdded={handleTimeAdded}
+          proiect={proiect}
           utilizatorCurent={utilizatorCurent}
         />
       )}

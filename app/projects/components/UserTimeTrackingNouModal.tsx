@@ -21,10 +21,19 @@ interface SelectedObjective {
   sarcina_nume?: string;
 }
 
+interface ProiectData {
+  ID_Proiect: string;
+  Denumire: string;
+  Client: string;
+  Status: string;
+  tip?: 'proiect' | 'subproiect';
+}
+
 interface UserTimeTrackingNouModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTimeAdded: () => void;
+  proiect: ProiectData; // Proiectul curent din care s-a deschis modalul
   utilizatorCurent: {
     uid: string;
     nume_complet: string;
@@ -78,10 +87,14 @@ export default function UserTimeTrackingNouModal({
   isOpen,
   onClose,
   onTimeAdded,
+  proiect,
   utilizatorCurent
 }: UserTimeTrackingNouModalProps) {
   const [loading, setLoading] = useState(false);
   const [selectedObjective, setSelectedObjective] = useState<SelectedObjective | null>(null);
+  const [availableSubprojecte, setAvailableSubprojecte] = useState<any[]>([]);
+  const [availableSarcini, setAvailableSarcini] = useState<any[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<'proiect' | 'subproiect' | 'sarcina'>('proiect');
   const [loadingValidari, setLoadingValidari] = useState(false);
   const [timpTotalZiua, setTimpTotalZiua] = useState(0);
 
@@ -104,11 +117,48 @@ export default function UserTimeTrackingNouModal({
   };
 
   // Verifică total ore pe zi când se schimbă data
+  // Pre-setează obiectivul cu proiectul curent la deschidere
+  useEffect(() => {
+    if (proiect && isOpen) {
+      const initialObjective: SelectedObjective = {
+        tip: proiect.tip || 'proiect',
+        proiect_id: proiect.ID_Proiect,
+        proiect_nume: proiect.Denumire
+      };
+      setSelectedObjective(initialObjective);
+      loadSubproiecteAndSarcini();
+    }
+  }, [proiect, isOpen]);
+
+  // Verifică total ore pe zi când se schimbă data
   useEffect(() => {
     if (formData.data_lucru && utilizatorCurent) {
       verificaTotalOreZiua();
     }
   }, [formData.data_lucru, utilizatorCurent]);
+
+  const loadSubproiecteAndSarcini = async () => {
+    if (!utilizatorCurent || !proiect) return;
+
+    try {
+      // Încarcă obiectivele pentru proiectul curent
+      const response = await fetch(`/api/user/objectives?user_id=${utilizatorCurent.uid}`);
+      const data = await response.json();
+
+      if (data.success) {
+        const objectives = data.objectives;
+
+        // Filtrează doar obiectivele pentru proiectul curent
+        const currentProjectSubproiecte = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect)?.subproiecte || [];
+        const currentProjectSarcini = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect)?.sarcini || [];
+
+        setAvailableSubprojecte(currentProjectSubproiecte);
+        setAvailableSarcini(currentProjectSarcini);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea subproiectelor și sarcinilor:', error);
+    }
+  };
 
   const verificaTotalOreZiua = async () => {
     if (!utilizatorCurent || !formData.data_lucru) return;
@@ -379,16 +429,163 @@ export default function UserTimeTrackingNouModal({
             </div>
           )}
 
-          {/* Selector Obiectiv Ierarhic */}
+          {/* Context Proiect + Selector Nivel */}
           <div style={{ marginBottom: '1rem' }}>
-            {utilizatorCurent && (
-              <ObjectiveSelector
-                userId={utilizatorCurent.uid}
-                onSelectionChange={setSelectedObjective}
-                className="mb-6"
-              />
+            {/* Afișare Proiect Curent */}
+            <div style={{
+              padding: '1rem',
+              background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+              borderRadius: '12px',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ color: 'white', fontSize: '14px', opacity: 0.9 }}>Înregistrezi timp pentru:</div>
+              <div style={{ color: 'white', fontSize: '18px', fontWeight: 'bold' }}>
+                📂 {proiect.Denumire}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>
+                {proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'} • {proiect.Status}
+              </div>
+            </div>
+
+            {/* Selector Nivel */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                Nivel înregistrare:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLevel('proiect');
+                    setSelectedObjective({
+                      tip: 'proiect',
+                      proiect_id: proiect.ID_Proiect,
+                      proiect_nume: proiect.Denumire
+                    });
+                  }}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: selectedLevel === 'proiect' ? '2px solid #3498db' : '1px solid #dee2e6',
+                    background: selectedLevel === 'proiect' ? '#3498db' : 'white',
+                    color: selectedLevel === 'proiect' ? 'white' : '#2c3e50',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📂 Direct pe Proiect
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('subproiect')}
+                  disabled={availableSubprojecte.length === 0}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: selectedLevel === 'subproiect' ? '2px solid #3498db' : '1px solid #dee2e6',
+                    background: selectedLevel === 'subproiect' ? '#3498db' : (availableSubprojecte.length === 0 ? '#f8f9fa' : 'white'),
+                    color: selectedLevel === 'subproiect' ? 'white' : (availableSubprojecte.length === 0 ? '#6c757d' : '#2c3e50'),
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: availableSubprojecte.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  📋 Pe Subproiect ({availableSubprojecte.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('sarcina')}
+                  disabled={availableSarcini.length === 0}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: selectedLevel === 'sarcina' ? '2px solid #3498db' : '1px solid #dee2e6',
+                    background: selectedLevel === 'sarcina' ? '#3498db' : (availableSarcini.length === 0 ? '#f8f9fa' : 'white'),
+                    color: selectedLevel === 'sarcina' ? 'white' : (availableSarcini.length === 0 ? '#6c757d' : '#2c3e50'),
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: availableSarcini.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  ✅ Pe Sarcină ({availableSarcini.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Selector Subproiect dacă este cazul */}
+            {selectedLevel === 'subproiect' && availableSubprojecte.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Subproiect:
+                </label>
+                <select
+                  onChange={(e) => {
+                    const subproiect = availableSubprojecte.find(sp => sp.id === e.target.value);
+                    if (subproiect) {
+                      setSelectedObjective({
+                        tip: 'subproiect',
+                        proiect_id: proiect.ID_Proiect,
+                        proiect_nume: proiect.Denumire,
+                        subproiect_id: subproiect.id,
+                        subproiect_nume: subproiect.nume
+                      });
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="">Alege subproiectul...</option>
+                  {availableSubprojecte.map((subproiect) => (
+                    <option key={subproiect.id} value={subproiect.id}>
+                      📋 {subproiect.nume} ({subproiect.status || 'Activ'})
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
-            {/* Eroarea pentru obiectiv nu se afișează până la submit */}
+
+            {/* Selector Sarcină dacă este cazul */}
+            {selectedLevel === 'sarcina' && availableSarcini.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
+                  Sarcină:
+                </label>
+                <select
+                  onChange={(e) => {
+                    const sarcina = availableSarcini.find(s => s.id === e.target.value);
+                    if (sarcina) {
+                      setSelectedObjective({
+                        tip: 'sarcina',
+                        proiect_id: proiect.ID_Proiect,
+                        proiect_nume: proiect.Denumire,
+                        sarcina_id: sarcina.id,
+                        sarcina_nume: sarcina.nume
+                      });
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="">Alege sarcina...</option>
+                  {availableSarcini.map((sarcina) => (
+                    <option key={sarcina.id} value={sarcina.id}>
+                      ✅ {sarcina.nume} ({sarcina.prioritate || 'Normal'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Data lucru */}
