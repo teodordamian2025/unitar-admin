@@ -461,7 +461,9 @@ export default function UserTimeTrackingNouModal({
                   onClick={() => {
                     setSelectedLevel('proiect');
                     setSelectedSubproiect(null);
-                    setAvailableSarcini([]);
+                    // Încarcă sarcinile de la nivel de proiect pentru a le afișa ca opțiuni
+                    const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+                    setAvailableSarcini(currentProject?.sarcini || []);
                     setSelectedObjective({
                       tip: 'proiect',
                       proiect_id: proiect.ID_Proiect,
@@ -486,7 +488,9 @@ export default function UserTimeTrackingNouModal({
                   onClick={() => {
                     setSelectedLevel('subproiect');
                     setSelectedSubproiect(null);
-                    setAvailableSarcini([]);
+                    // Păstrează sarcinile de la nivel de proiect pentru ca să fie disponibile și pentru subproiecte
+                    const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+                    setAvailableSarcini(currentProject?.sarcini || []);
                     setSelectedObjective(null);
                   }}
                   disabled={availableSubprojecte.length === 0}
@@ -517,8 +521,9 @@ export default function UserTimeTrackingNouModal({
                     const subproiect = availableSubprojecte.find(sp => sp.id === e.target.value);
                     if (subproiect) {
                       setSelectedSubproiect(subproiect);
-                      // Încarcă sarcinile pentru acest subproiect
-                      setAvailableSarcini(subproiect.sarcini || []);
+                      // Păstrează sarcinile de la nivel de proiect - sarcinile sunt la nivel de proiect, nu subproiect
+                      const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+                      setAvailableSarcini(currentProject?.sarcini || []);
                       setSelectedObjective({
                         tip: 'subproiect',
                         proiect_id: proiect.ID_Proiect,
@@ -528,7 +533,9 @@ export default function UserTimeTrackingNouModal({
                       });
                     } else {
                       setSelectedSubproiect(null);
-                      setAvailableSarcini([]);
+                      // Păstrează sarcinile disponibile pentru selecție
+                      const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+                      setAvailableSarcini(currentProject?.sarcini || []);
                     }
                   }}
                   style={{
@@ -549,8 +556,8 @@ export default function UserTimeTrackingNouModal({
               </div>
             )}
 
-            {/* Opțiune pentru sarcini - doar după selectarea subproiectului */}
-            {selectedLevel === 'subproiect' && selectedSubproiect && availableSarcini.length > 0 && (
+            {/* Opțiune pentru sarcini - disponibilă atât pentru proiect cât și pentru subproiect */}
+            {((selectedLevel === 'proiect' && selectedObjective) || (selectedLevel === 'subproiect' && selectedSubproiect)) && availableSarcini.length > 0 && (
               <div style={{ marginBottom: '1rem' }}>
                 <button
                   type="button"
@@ -567,7 +574,7 @@ export default function UserTimeTrackingNouModal({
                     cursor: 'pointer'
                   }}
                 >
-                  ✅ Sau pe Sarcină din "{selectedSubproiect.nume}" ({availableSarcini.length} sarcini)
+                  ✅ Sau pe Sarcină din "{selectedLevel === 'proiect' ? proiect.Denumire : selectedSubproiect?.nume}" ({availableSarcini.length} sarcini)
                 </button>
               </div>
             )}
