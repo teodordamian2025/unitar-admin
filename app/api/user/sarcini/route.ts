@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const ore = Number(sarcinaData.timp_estimat_ore) || 0;
     const timpTotalOre = (zile * 8) + ore;
 
-    // Inserare sarcină în BigQuery - IDENTIC cu admin
+    // Inserare sarcină în BigQuery cu gestionare NULL-uri
     const insertSarcinaQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
       (
@@ -107,31 +107,40 @@ export async function POST(request: NextRequest) {
       VALUES
       (
         @id, @proiect_id, @tip_proiect, @titlu, @descriere, @status, @prioritate,
-        @progres_procent, @progres_descriere, @data_scadenta, @observatii,
+        @progres_procent, @progres_descriere,
+        ${sarcinaData.data_scadenta ? '@data_scadenta' : 'NULL'},
+        @observatii,
         @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore,
         @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
       )
     `;
 
+    // Construim parametrii, excludând data_scadenta dacă e null
+    const queryParams: any = {
+      id: sarcinaData.id,
+      proiect_id: sarcinaData.proiect_id,
+      tip_proiect: sarcinaData.tip_proiect || 'proiect',
+      titlu: sarcinaData.titlu,
+      descriere: sarcinaData.descriere || '',
+      status: sarcinaData.status || 'De făcut',
+      prioritate: sarcinaData.prioritate || 'Medie',
+      progres_procent: sarcinaData.progres_procent || 0,
+      progres_descriere: sarcinaData.progres_descriere || '',
+      observatii: sarcinaData.observatii || '',
+      timp_estimat_zile: zile,
+      timp_estimat_ore: ore,
+      timp_estimat_total_ore: timpTotalOre,
+      created_by: sarcinaData.created_by
+    };
+
+    // Adăugăm data_scadenta doar dacă nu e null
+    if (sarcinaData.data_scadenta) {
+      queryParams.data_scadenta = sarcinaData.data_scadenta;
+    }
+
     await bigquery.query({
       query: insertSarcinaQuery,
-      params: {
-        id: sarcinaData.id,
-        proiect_id: sarcinaData.proiect_id,
-        tip_proiect: sarcinaData.tip_proiect || 'proiect',
-        titlu: sarcinaData.titlu,
-        descriere: sarcinaData.descriere,
-        status: sarcinaData.status || 'De făcut',
-        prioritate: sarcinaData.prioritate || 'Medie',
-        progres_procent: sarcinaData.progres_procent || 0,
-        progres_descriere: sarcinaData.progres_descriere,
-        data_scadenta: sarcinaData.data_scadenta,
-        observatii: sarcinaData.observatii,
-        timp_estimat_zile: zile,
-        timp_estimat_ore: ore,
-        timp_estimat_total_ore: timpTotalOre,
-        created_by: sarcinaData.created_by
-      }
+      params: queryParams
     });
 
     // Inserare responsabili - IDENTIC cu admin
