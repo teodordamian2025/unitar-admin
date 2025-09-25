@@ -85,19 +85,31 @@ export async function GET(request: NextRequest) {
 
     console.log('⏱️ USER TIME TRACKING API PARAMS:', { userId, startDate, endDate, projectId, page, limit });
 
-    // Query pentru time tracking utilizatori normali - FĂRĂ date financiare
+    // Query pentru time tracking utilizatori normali cu obiective multiple
     let baseQuery = `
       SELECT
-        id,
-        utilizator_uid,
-        proiect_id,
-        descriere_lucru as task_description,
-        data_lucru,
-        ore_lucrate,
-        tip_inregistrare,
-        created_at,
-        sarcina_id
-      FROM \`${PROJECT_ID}.${dataset}.${table}\`
+        tt.id,
+        tt.utilizator_uid,
+        tt.proiect_id,
+        tt.subproiect_id,
+        tt.sarcina_id,
+        tt.descriere_lucru as task_description,
+        tt.data_lucru,
+        tt.ore_lucrate,
+        tt.tip_inregistrare,
+        tt.created_at,
+        p.Denumire as proiect_nume,
+        sp.Denumire as subproiect_nume,
+        s.titlu as sarcina_nume,
+        CASE
+          WHEN tt.sarcina_id IS NOT NULL THEN 'sarcina'
+          WHEN tt.subproiect_id IS NOT NULL THEN 'subproiect'
+          ELSE 'proiect'
+        END as tip_obiectiv
+      FROM \`${PROJECT_ID}.${dataset}.${table}\` tt
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.Proiecte\` p ON tt.proiect_id = p.ID_Proiect
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.Subproiecte\` sp ON tt.subproiect_id = sp.ID_Subproiect
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.Sarcini\` s ON tt.sarcina_id = s.id
     `;
 
     const conditions: string[] = [];
@@ -185,16 +197,29 @@ export async function GET(request: NextRequest) {
 
     const total = convertBigQueryNumeric(countRows[0]?.total) || 0;
 
-    // Procesează rezultatele - EXCLUDE datele financiare
+    // Procesează rezultatele cu context complet - EXCLUDE datele financiare
     const processedData = rows.map((row: any) => ({
       id: row.id,
       user_id: row.utilizator_uid,
       project_id: row.proiect_id,
+      subproject_id: row.subproiect_id,
+      task_id: row.sarcina_id,
       task_description: row.task_description,
       data_lucru: row.data_lucru,
       ore_lucrate: convertBigQueryNumeric(row.ore_lucrate),
       status: row.tip_inregistrare,
       data_creare: row.created_at,
+      // Context pentru UI
+      tip_obiectiv: row.tip_obiectiv,
+      proiect_nume: row.proiect_nume,
+      subproiect_nume: row.subproiect_nume,
+      sarcina_nume: row.sarcina_nume,
+      // Context complet pentru display
+      context_display: [
+        row.proiect_nume,
+        row.subproiect_nume,
+        row.sarcina_nume
+      ].filter(Boolean).join(' → '),
       // Pentru compatibilitate - exclude datele financiare
       rate_per_hour: 0,
       valoare_totala: 0
@@ -232,14 +257,74 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Helper pentru validarea și auto-populate obiective
+async function validateAndPopulateObjective(objectiveData: any) {
+  const { proiect_id, subproiect_id, sarcina_id } = objectiveData;
+
+  // Validare: cel puțin unul din obiective trebuie specificat
+  if (!proiect_id && !subproiect_id && !sarcina_id) {
+    throw new Error('Trebuie să specifici cel puțin un obiectiv: proiect, subproiect sau sarcină');
+  }
+
+  // Auto-populate logica ierarhică
+  let finalProiectId = proiect_id;
+  let finalSubproiectId = subproiect_id;
+  let finalSarcinaId = sarcina_id;
+
+  // Dacă e specificată sarcina, găsesc proiectul și subproiectul
+  if (sarcina_id && !finalProiectId) {
+    const sarcinaQuery = `
+      SELECT proiect_id, subproiect_id
+      FROM \`${PROJECT_ID}.${dataset}.Sarcini\`
+      WHERE id = @sarcina_id
+    `;
+
+    const [sarcinaRows] = await bigquery.query({
+      query: sarcinaQuery,
+      params: { sarcina_id }
+    });
+
+    if (sarcinaRows.length > 0) {
+      finalProiectId = sarcinaRows[0].proiect_id;
+      finalSubproiectId = sarcinaRows[0].subproiect_id;
+    }
+  }
+
+  // Dacă e specificat subproiectul, găsesc proiectul
+  if (subproiect_id && !finalProiectId) {
+    const subproiectQuery = `
+      SELECT ID_Proiect as proiect_id
+      FROM \`${PROJECT_ID}.${dataset}.Subproiecte\`
+      WHERE ID_Subproiect = @subproiect_id
+    `;
+
+    const [subproiectRows] = await bigquery.query({
+      query: subproiectQuery,
+      params: { subproiect_id }
+    });
+
+    if (subproiectRows.length > 0) {
+      finalProiectId = subproiectRows[0].proiect_id;
+    }
+  }
+
+  return {
+    proiect_id: finalProiectId,
+    subproiect_id: finalSubproiectId,
+    sarcina_id: finalSarcinaId
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('POST time tracking request pentru user:', body);
+    console.log('POST time tracking request pentru user cu obiective multiple:', body);
 
     const {
       user_id = 'utilizator_curent',
-      project_id,
+      proiect_id,
+      subproiect_id,
+      sarcina_id,
       task_description,
       data_lucru,
       duration_minutes,
@@ -247,7 +332,7 @@ export async function POST(request: NextRequest) {
       end_time
     } = body;
 
-    // Validări
+    // Validări de bază
     if (!task_description || !duration_minutes) {
       return NextResponse.json({
         success: false,
@@ -255,22 +340,31 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validare și auto-populate obiective
+    const objectives = await validateAndPopulateObjective({
+      proiect_id,
+      subproiect_id,
+      sarcina_id
+    });
+
     const dataLucruFormatted = data_lucru ? formatDateLiteral(data_lucru) : 'CURRENT_DATE()';
     const oreCalculate = duration_minutes / 60; // Convertește minutele în ore
 
     // Generare ID unic pentru înregistrare
     const recordId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Query pentru utilizatori normali - conform schema BigQuery TimeTracking
+    // Query cu toate tipurile de obiective
     const insertQuery = `
       INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
-      (id, utilizator_uid, utilizator_nume, proiect_id, descriere_lucru,
-       data_lucru, ore_lucrate, tip_inregistrare, created_at)
+      (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, sarcina_id,
+       descriere_lucru, data_lucru, ore_lucrate, tip_inregistrare, created_at)
       VALUES (
         '${escapeString(recordId)}',
         '${escapeString(user_id)}',
         'Utilizator Normal',
-        ${project_id ? `'${escapeString(project_id)}'` : 'NULL'},
+        ${objectives.proiect_id ? `'${escapeString(objectives.proiect_id)}'` : 'NULL'},
+        ${objectives.subproiect_id ? `'${escapeString(objectives.subproiect_id)}'` : 'NULL'},
+        ${objectives.sarcina_id ? `'${escapeString(objectives.sarcina_id)}'` : 'NULL'},
         '${escapeString(task_description)}',
         ${dataLucruFormatted},
         ${oreCalculate},
