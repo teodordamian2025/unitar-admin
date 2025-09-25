@@ -149,8 +149,9 @@ export default function UserTimeTrackingNouModal({
         const objectives = data.objectives;
 
         // Filtrează doar obiectivele pentru proiectul curent
-        const currentProjectSubproiecte = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect)?.subproiecte || [];
-        const currentProjectSarcini = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect)?.sarcini || [];
+        const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+        const currentProjectSubproiecte = currentProject?.subproiecte || [];
+        const currentProjectSarcini = currentProject?.sarcini || [];
 
         setAvailableSubprojecte(currentProjectSubproiecte);
         setAvailableSarcini(currentProjectSarcini);

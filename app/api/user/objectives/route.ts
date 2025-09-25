@@ -33,8 +33,7 @@ export async function GET(request: NextRequest) {
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
         LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteResponsabili\` pr
           ON p.ID_Proiect = pr.proiect_id
-        WHERE pr.responsabil_uid = @user_id
-          AND (p.Status != 'Inchis' OR p.Status IS NULL)
+        WHERE (p.Status != 'Inchis' OR p.Status IS NULL)
       ),
       ProjectSubprojects AS (
         SELECT
@@ -61,7 +60,7 @@ export async function GET(request: NextRequest) {
         INNER JOIN UserProjects up ON s.proiect_id = up.ID_Proiect
         LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
           ON s.id = sr.sarcina_id
-        WHERE (sr.responsabil_uid = @user_id OR s.created_by = @user_id)
+        WHERE (sr.responsabil_uid = @user_id OR sr.responsabil_uid IS NULL)
           AND (s.status != 'Finalizata' OR s.status IS NULL)
       )
 
@@ -116,6 +115,8 @@ export async function GET(request: NextRequest) {
       params: { user_id }
     });
 
+    console.log(`[Objectives API] User: ${user_id} - BigQuery returned: ${rows.length} rows`);
+
     // Organizează rezultatele în structură ierarhică
     const objectives = {
       proiecte: [] as any[]
@@ -168,6 +169,8 @@ export async function GET(request: NextRequest) {
         }
       }
     });
+
+    console.log(`[Objectives API] Final structure: ${objectives.proiecte.length} proiecte, ${objectives.proiecte.reduce((acc, p) => acc + p.subproiecte.length, 0)} subproiecte total`);
 
     return NextResponse.json({
       success: true,
