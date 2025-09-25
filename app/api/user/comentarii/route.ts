@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       SELECT
         id,
         proiect_id,
+        tip_proiect,
         tip_comentariu,
         comentariu,
         autor_uid,
@@ -76,15 +77,15 @@ export async function POST(request: NextRequest) {
     // Generează ID pentru comentariu
     const comentariuId = `COMMENT_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // Inserare comentariu în BigQuery - IDENTIC cu admin
+    // Inserare comentariu în BigQuery cu tip_proiect obligatoriu
     const insertComentariuQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiectComentarii\`
       (
-        id, proiect_id, tip_comentariu, comentariu, autor_uid, autor_nume, data_comentariu
+        id, proiect_id, tip_proiect, autor_uid, autor_nume, comentariu, data_comentariu, tip_comentariu
       )
       VALUES
       (
-        @id, @proiect_id, @tip_comentariu, @comentariu, @autor_uid, @autor_nume, CURRENT_TIMESTAMP()
+        @id, @proiect_id, @tip_proiect, @autor_uid, @autor_nume, @comentariu, CURRENT_TIMESTAMP(), @tip_comentariu
       )
     `;
 
@@ -93,10 +94,11 @@ export async function POST(request: NextRequest) {
       params: {
         id: comentariuId,
         proiect_id: comentariuData.proiect_id,
-        tip_comentariu: comentariuData.tip_comentariu || 'General',
-        comentariu: comentariuData.comentariu.trim(),
+        tip_proiect: comentariuData.tip_proiect || 'proiect',
         autor_uid: comentariuData.autor_uid,
-        autor_nume: comentariuData.autor_nume || 'Utilizator necunoscut'
+        autor_nume: comentariuData.autor_nume || 'Utilizator necunoscut',
+        comentariu: comentariuData.comentariu.trim(),
+        tip_comentariu: comentariuData.tip_comentariu || 'General'
       }
     });
 
