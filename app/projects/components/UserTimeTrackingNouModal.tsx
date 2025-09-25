@@ -98,6 +98,7 @@ export default function UserTimeTrackingNouModal({
   const [selectedSubproiect, setSelectedSubproiect] = useState<any>(null);
   const [loadingValidari, setLoadingValidari] = useState(false);
   const [timpTotalZiua, setTimpTotalZiua] = useState(0);
+  const [objectives, setObjectives] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     data_lucru: new Date().toISOString().split('T')[0],
@@ -147,10 +148,11 @@ export default function UserTimeTrackingNouModal({
       const data = await response.json();
 
       if (data.success) {
-        const objectives = data.objectives;
+        const objectivesData = data.objectives;
+        setObjectives(objectivesData);
 
         // Filtrează doar obiectivele pentru proiectul curent
-        const currentProject = objectives.proiecte?.find(p => p.id === proiect.ID_Proiect);
+        const currentProject = objectivesData.proiecte?.find(p => p.id === proiect.ID_Proiect);
         const currentProjectSubproiecte = currentProject?.subproiecte || [];
         const currentProjectSarcini = currentProject?.sarcini || [];
 
