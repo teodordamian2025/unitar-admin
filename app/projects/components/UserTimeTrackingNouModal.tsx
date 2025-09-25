@@ -95,6 +95,7 @@ export default function UserTimeTrackingNouModal({
   const [availableSubprojecte, setAvailableSubprojecte] = useState<any[]>([]);
   const [availableSarcini, setAvailableSarcini] = useState<any[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<'proiect' | 'subproiect' | 'sarcina'>('proiect');
+  const [selectedSubproiect, setSelectedSubproiect] = useState<any>(null);
   const [loadingValidari, setLoadingValidari] = useState(false);
   const [timpTotalZiua, setTimpTotalZiua] = useState(0);
 
@@ -154,6 +155,7 @@ export default function UserTimeTrackingNouModal({
         const currentProjectSarcini = currentProject?.sarcini || [];
 
         setAvailableSubprojecte(currentProjectSubproiecte);
+        // Sarcinile inițiale sunt cele de la nivel de proiect (fără subproiect)
         setAvailableSarcini(currentProjectSarcini);
       }
     } catch (error) {
@@ -453,11 +455,13 @@ export default function UserTimeTrackingNouModal({
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
                 Nivel înregistrare:
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedLevel('proiect');
+                    setSelectedSubproiect(null);
+                    setAvailableSarcini([]);
                     setSelectedObjective({
                       tip: 'proiect',
                       proiect_id: proiect.ID_Proiect,
@@ -479,7 +483,12 @@ export default function UserTimeTrackingNouModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedLevel('subproiect')}
+                  onClick={() => {
+                    setSelectedLevel('subproiect');
+                    setSelectedSubproiect(null);
+                    setAvailableSarcini([]);
+                    setSelectedObjective(null);
+                  }}
                   disabled={availableSubprojecte.length === 0}
                   style={{
                     padding: '0.75rem',
@@ -494,23 +503,6 @@ export default function UserTimeTrackingNouModal({
                 >
                   📋 Pe Subproiect ({availableSubprojecte.length})
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('sarcina')}
-                  disabled={availableSarcini.length === 0}
-                  style={{
-                    padding: '0.75rem',
-                    borderRadius: '8px',
-                    border: selectedLevel === 'sarcina' ? '2px solid #3498db' : '1px solid #dee2e6',
-                    background: selectedLevel === 'sarcina' ? '#3498db' : (availableSarcini.length === 0 ? '#f8f9fa' : 'white'),
-                    color: selectedLevel === 'sarcina' ? 'white' : (availableSarcini.length === 0 ? '#6c757d' : '#2c3e50'),
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    cursor: availableSarcini.length === 0 ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  ✅ Pe Sarcină ({availableSarcini.length})
-                </button>
               </div>
             </div>
 
@@ -524,6 +516,9 @@ export default function UserTimeTrackingNouModal({
                   onChange={(e) => {
                     const subproiect = availableSubprojecte.find(sp => sp.id === e.target.value);
                     if (subproiect) {
+                      setSelectedSubproiect(subproiect);
+                      // Încarcă sarcinile pentru acest subproiect
+                      setAvailableSarcini(subproiect.sarcini || []);
                       setSelectedObjective({
                         tip: 'subproiect',
                         proiect_id: proiect.ID_Proiect,
@@ -531,6 +526,9 @@ export default function UserTimeTrackingNouModal({
                         subproiect_id: subproiect.id,
                         subproiect_nume: subproiect.nume
                       });
+                    } else {
+                      setSelectedSubproiect(null);
+                      setAvailableSarcini([]);
                     }
                   }}
                   style={{
@@ -551,6 +549,29 @@ export default function UserTimeTrackingNouModal({
               </div>
             )}
 
+            {/* Opțiune pentru sarcini - doar după selectarea subproiectului */}
+            {selectedLevel === 'subproiect' && selectedSubproiect && availableSarcini.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('sarcina')}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    background: '#f8f9fa',
+                    color: '#495057',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✅ Sau pe Sarcină din "{selectedSubproiect.nume}" ({availableSarcini.length} sarcini)
+                </button>
+              </div>
+            )}
+
             {/* Selector Sarcină dacă este cazul */}
             {selectedLevel === 'sarcina' && availableSarcini.length > 0 && (
               <div style={{ marginBottom: '1rem' }}>
@@ -565,6 +586,8 @@ export default function UserTimeTrackingNouModal({
                         tip: 'sarcina',
                         proiect_id: proiect.ID_Proiect,
                         proiect_nume: proiect.Denumire,
+                        subproiect_id: selectedSubproiect?.id || null,
+                        subproiect_nume: selectedSubproiect?.nume || null,
                         sarcina_id: sarcina.id,
                         sarcina_nume: sarcina.nume
                       });
