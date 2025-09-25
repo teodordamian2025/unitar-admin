@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         id, proiect_id, tip_proiect, titlu, descriere, status, prioritate,
         progres_procent, progres_descriere, data_scadenta, observatii,
         timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore,
-        created_by, data_creare, data_modificare
+        created_by, data_creare, updated_at
       )
       VALUES
       (

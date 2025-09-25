@@ -1,29 +1,30 @@
 // ==================================================================
 // CALEA: app/projects/components/UserTimeTrackingNouModal.tsx
-// DATA: 23.09.2025 18:40 (ora României)
-// DESCRIERE: Modal pentru înregistrare timp utilizatori normali - IDENTIC cu admin
-// FUNCȚIONALITATE: Înregistrare timp pe sarcini cu validări limită zilnică
+// DATA: 25.09.2025 18:30 (ora României) - ACTUALIZAT CU OBJECTIVESELECTOR
+// DESCRIERE: Modal pentru înregistrare timp cu selector ierarhic obiective
+// FUNCȚIONALITATE: Permite înregistrarea pe Proiect/Subproiect/Sarcină
 // ==================================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import ObjectiveSelector from '@/app/components/user/ObjectiveSelector';
+
+interface SelectedObjective {
+  tip: 'proiect' | 'subproiect' | 'sarcina';
+  proiect_id: string;
+  proiect_nume: string;
+  subproiect_id?: string;
+  subproiect_nume?: string;
+  sarcina_id?: string;
+  sarcina_nume?: string;
+}
 
 interface UserTimeTrackingNouModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTimeAdded: () => void;
-  proiect: {
-    ID_Proiect: string;
-    Denumire: string;
-    tip?: 'proiect' | 'subproiect';
-  };
-  sarcini: Array<{
-    id: string;
-    titlu: string;
-    status: string;
-  }>;
   utilizatorCurent: {
     uid: string;
     nume_complet: string;
@@ -77,17 +78,15 @@ export default function UserTimeTrackingNouModal({
   isOpen,
   onClose,
   onTimeAdded,
-  proiect,
-  sarcini,
   utilizatorCurent
 }: UserTimeTrackingNouModalProps) {
   const [loading, setLoading] = useState(false);
+  const [selectedObjective, setSelectedObjective] = useState<SelectedObjective | null>(null);
   const [loadingValidari, setLoadingValidari] = useState(false);
   const [timpTotalZiua, setTimpTotalZiua] = useState(0);
 
   const [formData, setFormData] = useState({
-    sarcina_id: '',
-    data_lucru: new Date().toISOString().split('T')[0], // Data curentă
+    data_lucru: new Date().toISOString().split('T')[0],
     ore_lucrate: '',
     descriere_lucru: ''
   });
@@ -96,13 +95,12 @@ export default function UserTimeTrackingNouModal({
 
   const resetForm = () => {
     setFormData({
-      sarcina_id: '',
       data_lucru: new Date().toISOString().split('T')[0],
       ore_lucrate: '',
       descriere_lucru: ''
     });
+    setSelectedObjective(null);
     setErrors({});
-    setTimpTotalZiua(0);
   };
 
   // Verifică total ore pe zi când se schimbă data
@@ -117,11 +115,11 @@ export default function UserTimeTrackingNouModal({
 
     setLoadingValidari(true);
     try {
-      const response = await fetch(`/api/user/timetracking?utilizator_uid=${utilizatorCurent.uid}&data_lucru=${formData.data_lucru}&validare_limita=true`);
+      const response = await fetch(`/api/user/timetracking?user_id=${utilizatorCurent.uid}&start_date=${formData.data_lucru}&end_date=${formData.data_lucru}`);
       const data = await response.json();
 
       if (data.success) {
-        const totalOre = data.total_ore_ziua || 0;
+        const totalOre = data.data?.reduce((sum: number, record: any) => sum + (record.ore_lucrate || 0), 0) || 0;
         setTimpTotalZiua(totalOre);
 
         if (totalOre >= 8) {
@@ -207,8 +205,8 @@ export default function UserTimeTrackingNouModal({
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
 
-    if (!formData.sarcina_id) {
-      newErrors.sarcina_id = 'Selectează o sarcină';
+    if (!selectedObjective) {
+      newErrors.selectedObjective = 'Selectează un obiectiv (proiect, subproiect sau sarcină)';
     }
 
     if (!formData.data_lucru) {
@@ -254,22 +252,20 @@ export default function UserTimeTrackingNouModal({
     setLoading(true);
 
     try {
-      // Găsește titlul sarcinii
-      const sarcinaSelectata = sarcini.find(s => s.id === formData.sarcina_id);
+      // Convertesc ore în minute pentru API
+      const durationMinutes = parseFloat(formData.ore_lucrate) * 60;
 
       const timeData = {
-        id: `TIME_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        sarcina_id: formData.sarcina_id,
-        utilizator_uid: utilizatorCurent.uid,
-        utilizator_nume: utilizatorCurent.nume_complet,
+        user_id: utilizatorCurent.uid,
+        proiect_id: selectedObjective!.proiect_id,
+        subproiect_id: selectedObjective!.subproiect_id || null,
+        sarcina_id: selectedObjective!.sarcina_id || null,
+        task_description: formData.descriere_lucru.trim(),
         data_lucru: formData.data_lucru,
-        ore_lucrate: parseFloat(formData.ore_lucrate),
-        descriere_lucru: formData.descriere_lucru.trim(),
-        tip_inregistrare: 'manual',
-        sarcina_titlu: sarcinaSelectata?.titlu || 'Sarcină necunoscută'
+        duration_minutes: durationMinutes
       };
 
-      console.log('Înregistrez timp:', timeData);
+      console.log('Înregistrez timp cu obiectiv ierarhic:', timeData);
 
       const response = await fetch('/api/user/timetracking', {
         method: 'POST',
@@ -283,6 +279,7 @@ export default function UserTimeTrackingNouModal({
         showToast('Timp înregistrat cu succes!', 'success');
         onTimeAdded();
         resetForm();
+        onClose();
       } else {
         showToast(result.error || 'Eroare la înregistrarea timpului', 'error');
       }
@@ -291,16 +288,6 @@ export default function UserTimeTrackingNouModal({
       showToast('Eroare la înregistrarea timpului', 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getSarcinaStatus = (status: string) => {
-    switch (status) {
-      case 'În lucru': return { color: '#f39c12', icon: '🔄' };
-      case 'De făcut': return { color: '#95a5a6', icon: '📋' };
-      case 'În verificare': return { color: '#9b59b6', icon: '🔍' };
-      case 'Finalizată': return { color: '#27ae60', icon: '✅' };
-      default: return { color: '#7f8c8d', icon: '❓' };
     }
   };
 
@@ -324,7 +311,7 @@ export default function UserTimeTrackingNouModal({
         background: 'white',
         borderRadius: '16px',
         boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-        maxWidth: '600px',
+        maxWidth: '700px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto'
@@ -333,16 +320,16 @@ export default function UserTimeTrackingNouModal({
         <div style={{
           padding: '1.5rem',
           borderBottom: '1px solid #dee2e6',
-          background: 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
+          background: 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
           borderRadius: '16px 16px 0 0'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ margin: 0, color: 'white', fontSize: '1.5rem', fontWeight: '700' }}>
-                ⏱️ Înregistrare Timp
+                ⏱️ Înregistrare Timp Ierarhic
               </h2>
               <p style={{ margin: '0.5rem 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '14px' }}>
-                {proiect.tip === 'subproiect' ? 'Subproiect' : 'Proiect'}: {proiect.ID_Proiect} - {proiect.Denumire}
+                Alege nivelul și obiectivul pentru înregistrarea timpului
               </p>
               {utilizatorCurent && (
                 <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px' }}>
@@ -387,36 +374,18 @@ export default function UserTimeTrackingNouModal({
             </div>
           )}
 
-          {/* Sarcină */}
+          {/* Selector Obiectiv Ierarhic */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Sarcină *
-            </label>
-            <select
-              value={formData.sarcina_id}
-              onChange={(e) => handleInputChange('sarcina_id', e.target.value)}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: errors.sarcina_id ? '2px solid #e74c3c' : '1px solid #dee2e6',
-                borderRadius: '6px',
-                fontSize: '14px'
-              }}
-            >
-              <option value="">Selectează sarcina...</option>
-              {sarcini.map(sarcina => {
-                const statusInfo = getSarcinaStatus(sarcina.status);
-                return (
-                  <option key={sarcina.id} value={sarcina.id}>
-                    {statusInfo.icon} {sarcina.titlu} ({sarcina.status})
-                  </option>
-                );
-              })}
-            </select>
-            {errors.sarcina_id && (
+            {utilizatorCurent && (
+              <ObjectiveSelector
+                userId={utilizatorCurent.uid}
+                onSelectionChange={setSelectedObjective}
+                className="mb-6"
+              />
+            )}
+            {errors.selectedObjective && (
               <p style={{ margin: '0.25rem 0 0 0', color: '#e74c3c', fontSize: '12px' }}>
-                {errors.sarcina_id}
+                {errors.selectedObjective}
               </p>
             )}
           </div>
@@ -532,14 +501,14 @@ export default function UserTimeTrackingNouModal({
 
             <button
               type="submit"
-              disabled={loading || Object.keys(errors).length > 0 || loadingValidari}
+              disabled={loading || Object.keys(errors).length > 0 || loadingValidari || !selectedObjective}
               style={{
                 padding: '0.75rem 1.5rem',
-                background: loading || Object.keys(errors).length > 0 || loadingValidari ? '#bdc3c7' : '#f39c12',
+                background: loading || Object.keys(errors).length > 0 || loadingValidari || !selectedObjective ? '#bdc3c7' : '#3498db',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: loading || Object.keys(errors).length > 0 || loadingValidari ? 'not-allowed' : 'pointer',
+                cursor: loading || Object.keys(errors).length > 0 || loadingValidari || !selectedObjective ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: 'bold'
               }}

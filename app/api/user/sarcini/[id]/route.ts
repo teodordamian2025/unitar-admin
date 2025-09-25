@@ -56,7 +56,7 @@ export async function PUT(
         timp_estimat_zile = @timp_estimat_zile,
         timp_estimat_ore = @timp_estimat_ore,
         timp_estimat_total_ore = @timp_estimat_total_ore,
-        data_modificare = CURRENT_TIMESTAMP()
+        updated_at = CURRENT_TIMESTAMP()
       WHERE id = @sarcina_id
     `;
 
