@@ -60,8 +60,7 @@ export async function GET(request: NextRequest) {
         INNER JOIN UserProjects up ON s.proiect_id = up.ID_Proiect
         LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
           ON s.id = sr.sarcina_id
-        WHERE (sr.responsabil_uid = @user_id OR sr.responsabil_uid IS NULL)
-          AND (s.status != 'Finalizata' OR s.status IS NULL)
+        WHERE (s.status != 'Finalizata' OR s.status IS NULL)
       )
 
       SELECT
@@ -116,6 +115,11 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(`[Objectives API] User: ${user_id} - BigQuery returned: ${rows.length} rows`);
+
+    // Debug: Verifică ce tipuri de obiective returnează
+    const tipuriObiective = rows.map(r => r.tip_obiectiv);
+    const sarcinCount = tipuriObiective.filter(tip => tip === 'sarcina').length;
+    console.log(`[Objectives API] Breakdown: ${tipuriObiective.filter(tip => tip === 'proiect').length} proiecte, ${tipuriObiective.filter(tip => tip === 'subproiect').length} subproiecte, ${sarcinCount} sarcini`);
 
     // Organizează rezultatele în structură ierarhică
     const objectives = {
