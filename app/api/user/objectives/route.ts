@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
         LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteResponsabili\` pr
           ON p.ID_Proiect = pr.proiect_id
-        WHERE pr.responsabil_uid = @user_id OR p.created_by = @user_id
+        WHERE pr.responsabil_uid = @user_id
           AND (p.Status != 'Inchis' OR p.Status IS NULL)
       ),
       ProjectSubprojects AS (

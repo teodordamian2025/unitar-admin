@@ -164,6 +164,11 @@ export default function UserTimeTrackingNouModal({
   };
 
   const validateOre = (value: string) => {
+    // Nu validez dacă câmpul este gol - să permită utilizatorului să înceapă să tasteze
+    if (!value || value.trim() === '') {
+      return true; // Permitem câmpuri goale în timpul editării
+    }
+
     const ore = parseFloat(value);
 
     if (isNaN(ore) || ore <= 0) {
@@ -383,11 +388,7 @@ export default function UserTimeTrackingNouModal({
                 className="mb-6"
               />
             )}
-            {errors.selectedObjective && (
-              <p style={{ margin: '0.25rem 0 0 0', color: '#e74c3c', fontSize: '12px' }}>
-                {errors.selectedObjective}
-              </p>
-            )}
+            {/* Eroarea pentru obiectiv nu se afișează până la submit */}
           </div>
 
           {/* Data lucru */}
