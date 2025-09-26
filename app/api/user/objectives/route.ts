@@ -51,16 +51,31 @@ export async function GET(request: NextRequest) {
         SELECT
           s.id,
           s.proiect_id,
-          s.subproiect_id,
+          s.tip_proiect,
+          CASE
+            WHEN s.tip_proiect = 'proiect' THEN NULL
+            WHEN s.tip_proiect = 'subproiect' THEN s.proiect_id
+            ELSE NULL
+          END as subproiect_id,
+          CASE
+            WHEN s.tip_proiect = 'proiect' THEN s.proiect_id
+            WHEN s.tip_proiect = 'subproiect' THEN
+              (SELECT sp.ID_Proiect FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` sp WHERE sp.ID_Subproiect = s.proiect_id)
+            ELSE s.proiect_id
+          END as actual_proiect_id,
           s.titlu,
           s.status,
           s.prioritate,
           s.data_scadenta
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-        INNER JOIN UserProjects up ON s.proiect_id = up.ID_Proiect
         LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
           ON s.id = sr.sarcina_id
         WHERE (s.status != 'Finalizata' OR s.status IS NULL)
+      ),
+      FilteredProjectTasks AS (
+        SELECT pt.*
+        FROM ProjectTasks pt
+        INNER JOIN UserProjects up ON pt.actual_proiect_id = up.ID_Proiect
       )
 
       SELECT
@@ -95,7 +110,7 @@ export async function GET(request: NextRequest) {
 
       SELECT
         'sarcina' as tip_obiectiv,
-        pt.proiect_id,
+        pt.actual_proiect_id as proiect_id,
         pt.subproiect_id,
         pt.id as sarcina_id,
         pt.titlu as nume,
@@ -104,7 +119,7 @@ export async function GET(request: NextRequest) {
         NULL as data_final,
         pt.prioritate,
         pt.data_scadenta
-      FROM ProjectTasks pt
+      FROM FilteredProjectTasks pt
 
       ORDER BY tip_obiectiv, proiect_id, subproiect_id, nume
     `;
