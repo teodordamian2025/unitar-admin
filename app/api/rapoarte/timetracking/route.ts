@@ -70,12 +70,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ACTUALIZAT: Query pentru înregistrări time tracking cu detalii sarcină + proiect_id
+    // ACTUALIZAT: Query pentru înregistrări time tracking cu detalii sarcină + proiect_id + subproiect_id
     let query = `
-      SELECT 
+      SELECT
         tt.id,
         tt.sarcina_id,
         tt.proiect_id,
+        tt.subproiect_id,
         tt.utilizator_uid,
         tt.utilizator_nume,
         tt.data_lucru,
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
         s.proiect_id as sarcina_proiect_id,
         s.tip_proiect
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` tt
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\` s 
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\` s
         ON tt.sarcina_id = s.id
       WHERE 1=1
     `;
@@ -115,9 +116,10 @@ export async function GET(request: NextRequest) {
       types.dataLucru = 'DATE';
     }
 
-    // ADĂUGAT: Filtrare după proiect_id pentru raportare facilă
+    // ACTUALIZAT: Filtrare după proiect_id pentru raportare facilă
+    // Include atât înregistrările cu proiect_id cât și cu subproiect_id
     if (proiectId) {
-      conditions.push('tt.proiect_id = @proiectId');
+      conditions.push('(tt.proiect_id = @proiectId OR tt.subproiect_id = @proiectId)');
       params.proiectId = proiectId;
       types.proiectId = 'STRING';
     }

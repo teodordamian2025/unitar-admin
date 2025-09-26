@@ -1496,7 +1496,10 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
                               </div>
                               
                               <div style={{ fontSize: '14px', color: '#3498db', marginBottom: '0.5rem' }}>
-                                Sarcina: {entry.sarcina_titlu}
+                                {entry.sarcina_titlu ?
+                                  `Sarcina: ${entry.sarcina_titlu}` :
+                                  `Timp direct pe ${proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'}`
+                                }
                               </div>
                               
                               {entry.descriere_lucru && (
