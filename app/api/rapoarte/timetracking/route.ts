@@ -285,17 +285,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ACTUALIZAT: Insert înregistrare timp cu proiect_id
+    // ACTUALIZAT: Insert înregistrare timp cu proiect_id și subproiect_id
     const dataLucruLiteral = formatDateLiteral(data_lucru);
+
+    // Încearcă să adauge coloana subproiect_id dacă nu există
+    try {
+      const alterQuery = `
+        ALTER TABLE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        ADD COLUMN IF NOT EXISTS subproiect_id STRING
+      `;
+      await bigquery.query({ query: alterQuery, location: 'EU' });
+      console.log('Coloana subproiect_id verificată/adăugată cu succes');
+    } catch (alterError) {
+      console.log('Coloana subproiect_id există deja sau eroare minora:', alterError.message);
+    }
 
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (id, sarcina_id, proiect_id, utilizator_uid, utilizator_nume, data_lucru,
+      (id, sarcina_id, proiect_id, subproiect_id, utilizator_uid, utilizator_nume, data_lucru,
        ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
       VALUES (
         '${escapeString(id)}',
-        ${sarcina_id ? `'${escapeString(sarcina_id)}'` : 'NULL'},
-        ${proiect_id_for_storage ? `'${escapeString(proiect_id_for_storage)}'` : 'NULL'},
+        ${sarcina_id ? `'${escapeString(String(sarcina_id))}'` : 'NULL'},
+        ${proiect_id_for_storage ? `'${escapeString(String(proiect_id_for_storage))}'` : 'NULL'},
+        ${subproiect_id ? `'${escapeString(String(subproiect_id))}'` : 'NULL'},
         '${escapeString(utilizator_uid)}',
         '${escapeString(utilizator_nume)}',
         ${dataLucruLiteral},
