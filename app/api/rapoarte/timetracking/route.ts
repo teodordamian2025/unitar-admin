@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('POST time tracking request body:', body);
     
-    const { 
+    const {
       id,
       sarcina_id,
       utilizator_uid,
@@ -176,14 +176,16 @@ export async function POST(request: NextRequest) {
       data_lucru,
       ore_lucrate,
       descriere_lucru,
-      tip_inregistrare = 'manual'
+      tip_inregistrare = 'manual',
+      proiect_id,
+      subproiect_id
     } = body;
 
     // Validări - PĂSTRATE
-    if (!id || !sarcina_id || !utilizator_uid || !utilizator_nume || !data_lucru || !ore_lucrate) {
-      return NextResponse.json({ 
+    if (!id || !utilizator_uid || !utilizator_nume || !data_lucru || !ore_lucrate) {
+      return NextResponse.json({
         success: false,
-        error: 'ID, sarcina_id, utilizator_uid, utilizator_nume, data_lucru și ore_lucrate sunt obligatorii' 
+        error: 'ID, utilizator_uid, utilizator_nume, data_lucru și ore_lucrate sunt obligatorii. sarcina_id este opțională pentru timp direct pe proiect/subproiect.'
       }, { status: 400 });
     }
 
@@ -207,28 +209,41 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ADĂUGAT: Extrage proiect_id din sarcină pentru denormalizare
-    const sarcinaQuery = `
-      SELECT proiect_id 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\`
-      WHERE id = @sarcina_id
-    `;
+    // ADĂUGAT: Obține proiect_id din sarcină sau din request direct
+    let proiect_id_for_storage = proiect_id; // Pentru când se înregistrează direct pe proiect/subproiect
 
-    const [sarcinaRows] = await bigquery.query({
-      query: sarcinaQuery,
-      params: { sarcina_id },
-      types: { sarcina_id: 'STRING' },
-      location: 'EU',
-    });
+    if (sarcina_id) {
+      // Dacă avem sarcină, verifică că există și obține proiect_id din ea
+      const sarcinaQuery = `
+        SELECT proiect_id
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\`
+        WHERE id = @sarcina_id
+      `;
 
-    if (sarcinaRows.length === 0) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'Sarcina specificată nu există' 
-      }, { status: 404 });
+      const [sarcinaRows] = await bigquery.query({
+        query: sarcinaQuery,
+        params: { sarcina_id },
+        types: { sarcina_id: 'STRING' },
+        location: 'EU',
+      });
+
+      if (sarcinaRows.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'Sarcina specificată nu există'
+        }, { status: 404 });
+      }
+
+      proiect_id_for_storage = sarcinaRows[0].proiect_id;
+    } else {
+      // Fără sarcină - verifică că avem cel puțin proiect_id sau subproiect_id
+      if (!proiect_id && !subproiect_id) {
+        return NextResponse.json({
+          success: false,
+          error: 'Pentru înregistrare fără sarcină, trebuie specificat proiect_id sau subproiect_id'
+        }, { status: 400 });
+      }
     }
-
-    const proiect_id = sarcinaRows[0].proiect_id;
 
     // Verificare total ore pe ziua respectivă pentru utilizator - PĂSTRAT
     const checkTotalQuery = `
@@ -275,12 +290,12 @@ export async function POST(request: NextRequest) {
 
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (id, sarcina_id, proiect_id, utilizator_uid, utilizator_nume, data_lucru, 
+      (id, sarcina_id, proiect_id, utilizator_uid, utilizator_nume, data_lucru,
        ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
       VALUES (
         '${escapeString(id)}',
-        '${escapeString(sarcina_id)}',
-        '${escapeString(proiect_id)}',
+        ${sarcina_id ? `'${escapeString(sarcina_id)}'` : 'NULL'},
+        ${proiect_id_for_storage ? `'${escapeString(proiect_id_for_storage)}'` : 'NULL'},
         '${escapeString(utilizator_uid)}',
         '${escapeString(utilizator_nume)}',
         ${dataLucruLiteral},

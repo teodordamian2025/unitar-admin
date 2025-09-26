@@ -207,9 +207,7 @@ export default function TimeTrackingNouModal({
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
 
-    if (!formData.sarcina_id) {
-      newErrors.sarcina_id = 'Selectează o sarcină';
-    }
+    // Sarcina este opțională - se poate înregistra timp direct pe proiect/subproiect
 
     if (!formData.data_lucru) {
       newErrors.data_lucru = 'Data lucrului este obligatorie';
@@ -254,19 +252,24 @@ export default function TimeTrackingNouModal({
     setLoading(true);
 
     try {
-      // Găsește titlul sarcinii
-      const sarcinaSelectata = sarcini.find(s => s.id === formData.sarcina_id);
-      
+      // Găsește titlul sarcinii dacă este selectată
+      const sarcinaSelectata = formData.sarcina_id ? sarcini.find(s => s.id === formData.sarcina_id) : null;
+
       const timeData = {
         id: `TIME_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        sarcina_id: formData.sarcina_id,
+        sarcina_id: formData.sarcina_id || null, // Poate fi null pentru timp direct pe proiect
         utilizator_uid: utilizatorCurent.uid,
         utilizator_nume: utilizatorCurent.nume_complet,
         data_lucru: formData.data_lucru,
         ore_lucrate: parseFloat(formData.ore_lucrate),
         descriere_lucru: formData.descriere_lucru.trim(),
         tip_inregistrare: 'manual',
-        sarcina_titlu: sarcinaSelectata?.titlu || 'Sarcină necunoscută'
+        // Pentru API TimeTracking trebuie să adăugăm proiect_id
+        proiect_id: proiect.tip === 'subproiect' ? null : proiect.ID_Proiect,
+        subproiect_id: proiect.tip === 'subproiect' ? proiect.ID_Proiect : null,
+        sarcina_titlu: sarcinaSelectata?.titlu || (proiect.tip === 'subproiect' ?
+          `Direct pe subproiect: ${proiect.Denumire}` :
+          `Direct pe proiect: ${proiect.Denumire}`)
       };
 
       console.log('Înregistrez timp:', timeData);
@@ -402,7 +405,7 @@ export default function TimeTrackingNouModal({
           {/* Selectare sarcină */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-              Sarcină *
+              Sarcină (opțională)
             </label>
             {sarcini.length === 0 ? (
               <div style={{
@@ -433,7 +436,7 @@ export default function TimeTrackingNouModal({
                   backgroundColor: loading ? '#f8f9fa' : 'white'
                 }}
               >
-                <option value="">Selectează o sarcină...</option>
+                <option value="">📂 Direct pe {proiect.tip === 'subproiect' ? 'subproiect' : 'proiect'} (fără sarcină specifică)</option>
                 {sarcini.map(sarcina => {
                   const statusInfo = getSarcinaStatus(sarcina.status);
                   return (
@@ -580,15 +583,15 @@ export default function TimeTrackingNouModal({
 
             <button
               type="submit"
-              disabled={loading || sarcini.length === 0 || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment'))}
+              disabled={loading || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment'))}
               style={{
                 padding: '0.75rem 1.5rem',
-                background: loading || sarcini.length === 0 || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment')) ? 
+                background: loading || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment')) ?
                   '#bdc3c7' : 'linear-gradient(135deg, #f39c12 0%, #f1c40f 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: loading || sarcini.length === 0 || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment')) ? 
+                cursor: loading || !utilizatorCurent || Object.keys(errors).some(key => !errors[key].includes('Avertisment')) ?
                   'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: 'bold'
