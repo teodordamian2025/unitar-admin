@@ -6,6 +6,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
+import { useRouter } from 'next/navigation';
+import ModernLayout from '@/app/components/ModernLayout';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // ✅ Interfaces pentru data types
@@ -108,6 +112,12 @@ const formatDate = (dateString: string) => {
 };
 
 export default function ANAFMonitoringDashboard() {
+  const [user, loadingAuth] = useAuthState(auth);
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState('Utilizator');
+  const [userRole, setUserRole] = useState('user');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('24h');
   const [loading, setLoading] = useState(true);
@@ -123,13 +133,51 @@ export default function ANAFMonitoringDashboard() {
   const [statusDistribution, setStatusDistribution] = useState<any[]>([]);
 
   useEffect(() => {
-    loadDashboardData();
-    
-    if (autoRefresh) {
-      const interval = setInterval(loadDashboardData, 30000); // 30 seconds
-      return () => clearInterval(interval);
+    if (loadingAuth) return;
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [timeRange, autoRefresh]);
+    checkUserRole();
+  }, [user, loadingAuth, router]);
+
+  useEffect(() => {
+    if (isAuthorized) {
+      loadDashboardData();
+
+      if (autoRefresh) {
+        const interval = setInterval(loadDashboardData, 30000); // 30 seconds
+        return () => clearInterval(interval);
+      }
+    }
+  }, [timeRange, autoRefresh, isAuthorized]);
+
+  const checkUserRole = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/user-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, email: user.email })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.role === 'admin') {
+        setUserRole(data.role);
+        setDisplayName(localStorage.getItem('displayName') || 'Admin');
+        setIsAuthorized(true);
+      } else {
+        showToast('Nu ai permisiunea să accesezi ANAF Monitoring!', 'error');
+        router.push('/admin');
+      }
+    } catch (error) {
+      console.error('Eroare la verificarea rolului:', error);
+      showToast('Eroare de conectare!', 'error');
+      router.push('/admin');
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -235,92 +283,196 @@ export default function ANAFMonitoringDashboard() {
     }, 4000);
   };
 
+  if (loadingAuth || !isAuthorized) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px)',
+          padding: '2rem',
+          borderRadius: '16px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <div>Se încarcă ANAF Monitoring...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ModernLayout user={user} displayName={displayName} userRole={userRole}>
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">📊 ANAF e-Factura Monitoring</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Last update: {formatDate(lastUpdate.toISOString())} 
-                {loading && <span className="ml-2">🔄 Updating...</span>}
-              </p>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Time Range Selector */}
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-              >
-                <option value="1h">Last Hour</option>
-                <option value="6h">Last 6 Hours</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-              </select>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        padding: '1.5rem',
+        marginBottom: '2rem',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
+              📊 ANAF e-Factura Monitoring
+            </h1>
+            <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+              Last update: {formatDate(lastUpdate.toISOString())}
+              {loading && <span style={{ marginLeft: '0.5rem' }}>🔄 Updating...</span>}
+            </p>
+          </div>
 
-              {/* Auto Refresh Toggle */}
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 shadow-sm"
-                />
-                <span className="ml-2 text-sm text-gray-700">Auto-refresh</span>
-              </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Time Range Selector */}
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              style={{
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.875rem',
+                background: 'white'
+              }}
+            >
+              <option value="1h">Last Hour</option>
+              <option value="6h">Last 6 Hours</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
 
-              {/* Manual Refresh */}
-              <button
-                onClick={loadDashboardData}
-                disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-              >
-                🔄 Refresh
-              </button>
-            </div>
+            {/* Auto Refresh Toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#374151' }}>
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                style={{ marginRight: '0.5rem' }}
+              />
+              Auto-refresh
+            </label>
+
+            {/* Manual Refresh */}
+            <button
+              onClick={loadDashboardData}
+              disabled={loading}
+              style={{
+                background: loading ? '#9ca3af' : '#3b82f6',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '0.875rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              🔄 Refresh
+            </button>
           </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', label: '📊 Overview', icon: '📊' },
-              { id: 'health', label: '🏥 System Health', icon: '🏥' },
-              { id: 'performance', label: '📈 Performance', icon: '📈' },
-              { id: 'errors', label: '❌ Errors', icon: '❌' },
-              { id: 'flow', label: '🔄 Invoice Flow', icon: '🔄' },
-              { id: 'alerts', label: '🚨 Alerts', icon: '🚨' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        padding: '1rem',
+        marginBottom: '2rem',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+      }}>
+        <nav style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {[
+            { id: 'overview', label: '📊 Overview', icon: '📊' },
+            { id: 'health', label: '🏥 System Health', icon: '🏥' },
+            { id: 'performance', label: '📈 Performance', icon: '📈' },
+            { id: 'errors', label: '❌ Errors', icon: '❌' },
+            { id: 'flow', label: '🔄 Invoice Flow', icon: '🔄' },
+            { id: 'alerts', label: '🚨 Alerts', icon: '🚨' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                background: activeTab === tab.id
+                  ? 'rgba(59, 130, 246, 0.1)'
+                  : 'transparent',
+                color: activeTab === tab.id
+                  ? '#3b82f6'
+                  : '#6b7280',
+                ...(activeTab !== tab.id && {
+                  ':hover': {
+                    background: 'rgba(107, 114, 128, 0.1)',
+                    color: '#374151'
+                  }
+                })
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.background = 'rgba(107, 114, 128, 0.1)';
+                  e.currentTarget.style.color = '#374151';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-lg text-gray-600">Loading dashboard data...</span>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '3rem',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              width: '3rem',
+              height: '3rem',
+              border: '3px solid #e5e7eb',
+              borderTop: '3px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}></div>
+            <span style={{ marginLeft: '1rem', fontSize: '1.125rem', color: '#6b7280' }}>
+              Loading dashboard data...
+            </span>
           </div>
         )}
 
@@ -732,7 +884,7 @@ export default function ANAFMonitoringDashboard() {
           </>
         )}
       </div>
-    </div>
+    </ModernLayout>
   );
 }
 
