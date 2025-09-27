@@ -24,7 +24,7 @@ interface TimerSession {
   pausedTime: number;
   elapsedTime: number;
   projectId: string;
-  sarcinaId: string;
+  sarcinaId: string | null; // FIX: Permite null pentru activitate generală
   description: string;
   sessionId: string;
 }
@@ -94,7 +94,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     pausedTime: 0,
     elapsedTime: 0,
     projectId: '',
-    sarcinaId: 'general',
+    sarcinaId: null, // FIX: Null în loc de 'general'
     description: '',
     sessionId: ''
   });
@@ -383,7 +383,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
           pausedTime: 0,
           elapsedTime: 0,
           projectId: '',
-          sarcinaId: 'general',
+          sarcinaId: null, // FIX: Null în loc de 'general'
           description: '',
           sessionId: ''
         };
