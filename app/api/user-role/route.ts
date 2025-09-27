@@ -12,6 +12,40 @@ const bigquery = new BigQuery({
   },
 });
 
+// Handler pentru verificarea rolului cu autentificarea din header
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Token de autentificare lipsă' }, { status: 401 });
+    }
+
+    // Pentru demo - extragi informații din token
+    // În producție trebuie să validezi tokenul Firebase
+    const token = authHeader.replace('Bearer ', '');
+
+    // Temporar - returnează rol normal pentru test
+    return NextResponse.json({
+      success: true,
+      role: 'normal',
+      displayName: 'Utilizator Normal',
+      permissions: {
+        proiecte: { read: true, write: true },
+        timp: { read: true, write: true },
+        rapoarte: { read: true },
+        financiar: { read: false, write: false }
+      }
+    });
+
+  } catch (error) {
+    console.error('Eroare la verificarea rolului (GET):', error);
+    return NextResponse.json({
+      error: 'Eroare la verificarea rolului utilizatorului',
+      details: error instanceof Error ? error.message : 'Eroare necunoscută'
+    }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { uid, email } = await request.json();

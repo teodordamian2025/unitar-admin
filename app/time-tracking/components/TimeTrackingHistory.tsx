@@ -15,12 +15,16 @@ interface TimeEntry {
   id: string;
   project_id?: string;
   project_name?: string;
+  proiect_nume?: string;  // Din API
   task_description: string;
   start_time: any;
   end_time?: any;
-  duration_minutes: number;
+  duration_minutes?: number;  // Pentru backward compatibility
+  ore_lucrate?: number;      // Din API real - ore nu minute
   data_creare: any;
+  data_lucru?: any;          // Din API real
   status: string;
+  context_display?: string;  // Din API real
 }
 
 interface TimeTrackingHistoryProps {
@@ -126,6 +130,14 @@ export default function TimeTrackingHistory({
     }
   };
 
+  // Helper pentru a extrage durata în minute din formatul API
+  const getDurationMinutes = (entry: TimeEntry): number => {
+    if (entry.ore_lucrate) {
+      return Math.round(entry.ore_lucrate * 60); // Convertește ore la minute
+    }
+    return entry.duration_minutes || 0;
+  };
+
   const handleFilterChange = (field: keyof FilterOptions, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
@@ -153,7 +165,7 @@ export default function TimeTrackingHistory({
     if (filters.projectFilter) {
       filtered = filtered.filter(entry =>
         entry.project_id?.includes(filters.projectFilter) ||
-        entry.project_name?.toLowerCase().includes(filters.projectFilter.toLowerCase())
+        (entry.project_name || entry.proiect_nume || entry.context_display || '')?.toLowerCase().includes(filters.projectFilter.toLowerCase())
       );
     }
 
@@ -167,12 +179,12 @@ export default function TimeTrackingHistory({
           bValue = new Date(b.start_time?.value || b.start_time).getTime();
           break;
         case 'duration':
-          aValue = a.duration_minutes;
-          bValue = b.duration_minutes;
+          aValue = getDurationMinutes(a);
+          bValue = getDurationMinutes(b);
           break;
         case 'project':
-          aValue = a.project_name || a.project_id || '';
-          bValue = b.project_name || b.project_id || '';
+          aValue = a.project_name || a.proiect_nume || a.context_display || a.project_id || '';
+          bValue = b.project_name || b.proiect_nume || b.context_display || b.project_id || '';
           break;
         default:
           return 0;
@@ -192,7 +204,7 @@ export default function TimeTrackingHistory({
     setEditingEntry(entry.id);
     setEditForm({
       task_description: entry.task_description,
-      duration_minutes: entry.duration_minutes
+      duration_minutes: getDurationMinutes(entry)
     });
   };
 
@@ -275,13 +287,13 @@ export default function TimeTrackingHistory({
 
   const getTotalHours = () => {
     const filtered = filteredAndSortedEntries();
-    const totalMinutes = filtered.reduce((sum, entry) => {
-      // Fix pentru DATE fields din BigQuery - valori pot fi null/undefined/NaN
-      const duration = entry.duration_minutes || 0;
-      const validDuration = isNaN(duration) ? 0 : Number(duration);
-      return sum + validDuration;
+    const totalHours = filtered.reduce((sum, entry) => {
+      // API returnează ore_lucrate (ore) nu duration_minutes (minute)
+      const hours = entry.ore_lucrate || (entry.duration_minutes ? entry.duration_minutes / 60 : 0) || 0;
+      const validHours = isNaN(hours) ? 0 : Number(hours);
+      return sum + validHours;
     }, 0);
-    return (totalMinutes / 60).toFixed(1);
+    return totalHours.toFixed(1);
   };
 
   const exportToCSV = () => {
@@ -289,12 +301,12 @@ export default function TimeTrackingHistory({
 
     const headers = ['Data Start', 'Data Final', 'Proiect', 'Descriere', 'Durată (min)', 'Durată (ore)'];
     const csvData = filtered.map(entry => [
-      formatDateTime(entry.start_time),
+      formatDateTime(entry.start_time || entry.data_lucru),
       formatDateTime(entry.end_time),
-      entry.project_name || entry.project_id || 'Fără proiect',
+      entry.project_name || entry.proiect_nume || entry.project_id || 'Fără proiect',
       entry.task_description,
-      entry.duration_minutes.toString(),
-      (entry.duration_minutes / 60).toFixed(2)
+      entry.ore_lucrate ? (entry.ore_lucrate * 60).toString() : (entry.duration_minutes || 0).toString(),
+      (entry.ore_lucrate || (entry.duration_minutes ? entry.duration_minutes / 60 : 0) || 0).toFixed(2)
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -615,20 +627,20 @@ export default function TimeTrackingHistory({
                         }}>
                           {entry.task_description}
                         </div>
-                        {entry.project_name && (
+                        {(entry.project_name || entry.proiect_nume || entry.context_display) && (
                           <div style={{
                             fontSize: '0.75rem',
                             color: '#6b7280',
                             marginBottom: '0.25rem'
                           }}>
-                            📁 {entry.project_id} - {entry.project_name}
+                            📁 {entry.context_display || `${entry.project_id} - ${entry.project_name || entry.proiect_nume}`}
                           </div>
                         )}
                         <div style={{
                           fontSize: '0.75rem',
                           color: '#6b7280'
                         }}>
-                          {formatDateTime(entry.start_time)} → {formatDateTime(entry.end_time)}
+                          {formatDateTime(entry.start_time || entry.data_lucru)} → {formatDateTime(entry.end_time)}
                         </div>
                       </div>
                       <div style={{
@@ -644,7 +656,7 @@ export default function TimeTrackingHistory({
                           fontSize: '0.75rem',
                           fontWeight: '600'
                         }}>
-                          {formatDuration(entry.duration_minutes)}
+                          {formatDuration(getDurationMinutes(entry))}
                         </span>
                         <div style={{ display: 'flex', gap: '0.25rem' }}>
                           <button

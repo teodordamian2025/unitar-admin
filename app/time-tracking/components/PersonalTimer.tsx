@@ -108,7 +108,9 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
       const response = await fetch('/api/user/projects');
       const data = await response.json();
       if (data.success) {
-        setProjects(data.proiecte || []);
+        // API returnează data.data nu data.proiecte
+        setProjects(data.data || []);
+        console.log('🎯 PersonalTimer - Proiecte încărcate:', data.data?.length || 0);
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
