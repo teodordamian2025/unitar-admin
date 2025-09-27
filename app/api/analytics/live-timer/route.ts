@@ -375,20 +375,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Action este obligatoriu' }, { status: 400 });
     }
 
+    // Declară processedSarcinaId pentru toate case-urile
+    let processedSarcinaId = sarcina_id;
+    if (!sarcina_id || sarcina_id === 'general' || sarcina_id === 'default_task') {
+      processedSarcinaId = 'activitate_generala';
+    }
+
     let result: any = {};
 
     switch (action) {
       case 'start':
         if (!proiect_id || !utilizator_uid) {
-          return NextResponse.json({ 
-            error: 'proiect_id și utilizator_uid sunt obligatorii pentru start' 
+          return NextResponse.json({
+            error: 'proiect_id și utilizator_uid sunt obligatorii pentru start'
           }, { status: 400 });
         }
-      // Normalizare sarcina_id pentru BigQuery compatibility
-	let processedSarcinaId = sarcina_id;
-	if (!sarcina_id || sarcina_id === 'general' || sarcina_id === 'default_task') {
-	  processedSarcinaId = 'activitate_generala'; // String în loc de NULL
-	}
 
         // Verific dacă utilizatorul are deja o sesiune activă
         const checkActiveQuery = `
@@ -552,52 +553,74 @@ export async function POST(request: NextRequest) {
 
         // Creez înregistrarea în TimeTracking cu logica corectă pentru proiect_id și subproiect_id
         const timeTrackingId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const insertTimeTrackingQuery = `
-          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
-          (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
-          VALUES (
-            @id,
-            @utilizator_uid,
-            @utilizator_nume,
-            @proiect_id,
-            @subproiect_id,
-            CURRENT_DATE(),
-            CAST(@ore_lucrate AS NUMERIC),
-            @descriere_lucru,
-            'live_timer',
-            CURRENT_TIMESTAMP(),
-            'live_session'
-          )
-        `;
 
         // Construiește params și types pentru a gestiona NULL values
-	const queryParams: any = {
-	  id: timeTrackingId,
-	  utilizator_uid: session.utilizator_uid,
-	  utilizator_nume: session.utilizator_nume,
-	  proiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
-	    ? sessionProjectContext.proiect_principal_id 
-	    : session.proiect_id,
-	  ore_lucrate: workedHoursString,
-	  descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer',
-	  sarcina_id: processedSarcinaId || 'activitate_generala'
-	};
+        const queryParams: any = {
+          id: timeTrackingId,
+          utilizator_uid: session.utilizator_uid,
+          utilizator_nume: session.utilizator_nume,
+          proiect_id: sessionProjectContext.tip_proiect === 'subproiect'
+            ? sessionProjectContext.proiect_principal_id
+            : session.proiect_id,
+          ore_lucrate: workedHoursString,
+          descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer',
+          sarcina_id: processedSarcinaId || 'activitate_generala'
+        };
 
-	const queryTypes: any = {
-	  id: 'STRING',
-	  utilizator_uid: 'STRING',
-	  utilizator_nume: 'STRING',
-	  proiect_id: 'STRING',
-	  ore_lucrate: 'STRING',
-	  descriere_lucru: 'STRING',
-	  sarcina_id: 'STRING'
-	};
+        const queryTypes: any = {
+          id: 'STRING',
+          utilizator_uid: 'STRING',
+          utilizator_nume: 'STRING',
+          proiect_id: 'STRING',
+          ore_lucrate: 'STRING',
+          descriere_lucru: 'STRING',
+          sarcina_id: 'STRING'
+        };
 
-	// Gestionează subproiect_id care poate fi NULL
-	if (sessionProjectContext.tip_proiect === 'subproiect') {
-	  queryParams.subproiect_id = session.proiect_id;
-	  queryTypes.subproiect_id = 'STRING';
-	}
+        // Construiește query condiționat bazat pe tip_proiect
+        let insertTimeTrackingQuery: string;
+
+        if (sessionProjectContext.tip_proiect === 'subproiect') {
+          // Pentru subproiecte - include subproiect_id
+          queryParams.subproiect_id = session.proiect_id;
+          queryTypes.subproiect_id = 'STRING';
+
+          insertTimeTrackingQuery = `
+            INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+            (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
+            VALUES (
+              @id,
+              @utilizator_uid,
+              @utilizator_nume,
+              @proiect_id,
+              @subproiect_id,
+              CURRENT_DATE(),
+              CAST(@ore_lucrate AS NUMERIC),
+              @descriere_lucru,
+              'live_timer',
+              CURRENT_TIMESTAMP(),
+              @sarcina_id
+            )
+          `;
+        } else {
+          // Pentru proiecte principale - fără subproiect_id
+          insertTimeTrackingQuery = `
+            INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+            (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
+            VALUES (
+              @id,
+              @utilizator_uid,
+              @utilizator_nume,
+              @proiect_id,
+              CURRENT_DATE(),
+              CAST(@ore_lucrate AS NUMERIC),
+              @descriere_lucru,
+              'live_timer',
+              CURRENT_TIMESTAMP(),
+              @sarcina_id
+            )
+          `;
+        }
 
 	await bigquery.query({
 	  query: insertTimeTrackingQuery,
