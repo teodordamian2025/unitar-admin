@@ -677,7 +677,7 @@ export default function LiveTracking() {
           <div>
             {personalTimer.projectId && (
               <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                📁 {projects.find(p => p.ID_Proiect === personalTimer.projectId)?.Denumire || 'Proiect necunoscut'}
+                📁 {personalTimer.projectId}
                 {personalTimer.description && (
                   <span> • {personalTimer.description}</span>
                 )}
@@ -914,7 +914,7 @@ export default function LiveTracking() {
                     </div>
 
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                      📁 {session.proiect_nume}
+                      📁 {session.proiect_id}
                       {session.sarcina_titlu && session.sarcina_titlu !== 'Activitate generală' && (
                         <div style={{ marginTop: '0.25rem' }}>
                           📋 {session.sarcina_titlu}

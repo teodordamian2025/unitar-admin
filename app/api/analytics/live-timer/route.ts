@@ -134,9 +134,9 @@ export async function GET(request: NextRequest) {
           -- Determinare nume proiect bazat pe context (proiect sau subproiect)
           CASE
             WHEN sub.ID_Subproiect IS NOT NULL THEN
-              CONCAT(p_parent.Denumire, ' → ', sub.Denumire)
+              CONCAT(p_parent.ID_Proiect, ' → ', sub.ID_Subproiect)
             ELSE
-              COALESCE(p.Denumire, 'Proiect necunoscut')
+              COALESCE(p.ID_Proiect, sl.proiect_id)
           END as proiect_nume,
           
           -- Titlu sarcină sau activitate generală
@@ -235,9 +235,9 @@ export async function GET(request: NextRequest) {
           sl2.proiect_id, 
           CASE
             WHEN sub2.ID_Subproiect IS NOT NULL THEN
-              CONCAT(p2_parent.Denumire, ' → ', sub2.Denumire)
+              CONCAT(p2_parent.ID_Proiect, ' → ', sub2.ID_Subproiect)
             ELSE
-              COALESCE(p2.Denumire, 'Proiect necunoscut')
+              COALESCE(p2.ID_Proiect, sl2.proiect_id)
           END as proiect_nume,
           COALESCE(sl2.descriere_activitate, 'Activitate generală') as sarcina_titlu, 
           'normala' as prioritate, 
