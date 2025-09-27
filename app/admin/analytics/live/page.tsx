@@ -624,7 +624,7 @@ export default function LiveTracking() {
       }}>
         <div>
           <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
-            🔴 Live Tracking
+            🔴 Cronometru
           </h1>
           <p style={{ margin: 0, color: '#6b7280' }}>
             Monitorizează activitatea echipei în timp real cu ierarhie completă proiecte → subproiecte → sarcini
@@ -672,7 +672,7 @@ export default function LiveTracking() {
             fontWeight: '700',
             color: '#1f2937'
           }}>
-            ⏱️ Timer Personal
+            ⏱️ Cronometru Personal
           </h3>
 
           <div style={{
@@ -955,9 +955,7 @@ export default function LiveTracking() {
                         color: '#374151',
                         marginBottom: '0.75rem'
                       }}>
-                        💬 {session.utilizator_uid === user?.uid && session.descriere_sesiune !== 'Sesiune de lucru'
-                          ? session.descriere_sesiune.replace('Sesiune de lucru - ', '')
-                          : session.descriere_sesiune}
+                        💬 {session.descriere_sesiune}
                       </div>
                     )}
 

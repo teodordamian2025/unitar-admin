@@ -181,7 +181,7 @@ function TimeTrackingPage() {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}>
-                ⏱️ Time Tracking Personal
+                ⏱️ Cronometru Personal
               </h1>
               <p style={{
                 fontSize: '1rem',
