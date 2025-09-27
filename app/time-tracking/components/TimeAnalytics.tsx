@@ -3,7 +3,7 @@
 // DATA: 27.09.2025 15:30 (ora României)
 // DESCRIERE: Analytics personal pentru time tracking fără date financiare - FIX ReferenceError
 // FUNCȚIONALITATE: Grafice, statistici săptămânale/lunare, productivitate
-// MODIFICĂRI: Rezolvat conflict variabilă 'm' în formatDuration
+// MODIFICĂRI: Rezolvat conflict variabilă 'm' în formatTimeDuration
 // ==================================================================
 
 'use client';
@@ -181,11 +181,11 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
   };
 
   // FIX: Redenumit variabila pentru a evita conflictul
-  const formatDuration = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60; // Schimbat din 'mins' în 'remainingMinutes'
-    return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`;
-  };
+  const formatTimeDuration = (minutes: number): string => {
+	  const hours = Math.floor(minutes / 60);
+	  const mins = minutes % 60;
+	  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+	};
 
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('ro-RO', {
@@ -358,7 +358,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏱️</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {formatDuration(overviewStats.totalMinutes)}
+                  {formatTimeDuration(overviewStats.totalMinutes)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                   Total timp înregistrat
@@ -403,7 +403,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📊</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {formatDuration(overviewStats.averagePerDay)}
+                  {formatTimeDuration(overviewStats.averagePerDay)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                   Medie pe zi activă
@@ -456,7 +456,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: day.totalMinutes > 0 ? '#1f2937' : '#9ca3af'
                     }}>
-                      {day.totalMinutes > 0 ? formatDuration(day.totalMinutes) : '0m'}
+                      {day.totalMinutes > 0 ? formatTimeDuration(day.totalMinutes) : '0m'}
                     </div>
                     <div style={{
                       fontSize: '0.625rem',
@@ -521,7 +521,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                         fontWeight: '600',
                         color: '#1f2937'
                       }}>
-                        {formatDuration(project.totalMinutes)}
+                        {formatTimeDuration(project.totalMinutes)}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
@@ -598,7 +598,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatDuration(week.totalMinutes)}
+                      {formatTimeDuration(week.totalMinutes)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
@@ -613,7 +613,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatDuration(week.averagePerDay)}
+                      {formatTimeDuration(week.averagePerDay)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
