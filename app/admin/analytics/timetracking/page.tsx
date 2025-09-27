@@ -434,17 +434,17 @@ export default function EnhancedTimeTrackingDashboard() {
                     fontWeight: '700',
                     color: '#1f2937'
                   }}>
-                    👤 {member.utilizator_nume}
+                    👤 {member.utilizator_nume || 'Utilizator necunoscut'}
                   </h3>
                   <div style={{
-                    background: member.eficienta_procent >= 90
+                    background: (member.eficienta_procent || 0) >= 90
                       ? 'rgba(16, 185, 129, 0.1)'
-                      : member.eficienta_procent >= 80
+                      : (member.eficienta_procent || 0) >= 80
                         ? 'rgba(245, 158, 11, 0.1)'
                         : 'rgba(239, 68, 68, 0.1)',
-                    color: member.eficienta_procent >= 90
+                    color: (member.eficienta_procent || 0) >= 90
                       ? '#10b981'
-                      : member.eficienta_procent >= 80
+                      : (member.eficienta_procent || 0) >= 80
                         ? '#f59e0b'
                         : '#ef4444',
                     padding: '0.375rem 0.75rem',
@@ -452,7 +452,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     fontSize: '0.75rem',
                     fontWeight: '600'
                   }}>
-                    {member.eficienta_procent}% eficiență
+                    {member.eficienta_procent || 0}% eficiență
                   </div>
                 </div>
 
@@ -464,7 +464,7 @@ export default function EnhancedTimeTrackingDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.total_ore}h
+                      {member.total_ore || 0}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Total ore
@@ -472,7 +472,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.media_ore_zilnic}h
+                      {member.media_ore_zilnic || 0}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Media zilnică
@@ -480,7 +480,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.proiecte_lucrate}
+                      {member.proiecte_lucrate || 0}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Proiecte
@@ -488,7 +488,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.sarcini_lucrate}
+                      {member.sarcini_lucrate || 0}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Sarcini
@@ -499,10 +499,10 @@ export default function EnhancedTimeTrackingDashboard() {
                 {/* Individual Priority Chart */}
                 <AdvancedPieChart
                   data={[
-                    { x: 'Urgent', y: member.ore_urgent, fill: '#ef4444' },
-                    { x: 'Ridicată', y: member.ore_ridicata, fill: '#f59e0b' },
-                    { x: 'Normală', y: member.ore_normala, fill: '#10b981' },
-                    { x: 'Scăzută', y: member.ore_scazuta, fill: '#3b82f6' }
+                    { x: 'Urgent', y: member.ore_urgent || 0, fill: '#ef4444' },
+                    { x: 'Ridicată', y: member.ore_ridicata || 0, fill: '#f59e0b' },
+                    { x: 'Normală', y: member.ore_normala || 0, fill: '#10b981' },
+                    { x: 'Scăzută', y: member.ore_scazuta || 0, fill: '#3b82f6' }
                   ]}
                   width={280}
                   height={200}
@@ -544,13 +544,13 @@ export default function EnhancedTimeTrackingDashboard() {
                     fontWeight: '700',
                     color: '#1f2937'
                   }}>
-                    📋 {project.proiect_nume}
+                    📋 {project.proiect_nume || 'Proiect necunoscut'}
                   </h3>
                   <div style={{
-                    background: project.proiect_status === 'Activ'
+                    background: (project.proiect_status || 'Necunoscut') === 'Activ'
                       ? 'rgba(16, 185, 129, 0.1)'
                       : 'rgba(245, 158, 11, 0.1)',
-                    color: project.proiect_status === 'Activ'
+                    color: (project.proiect_status || 'Necunoscut') === 'Activ'
                       ? '#10b981'
                       : '#f59e0b',
                     padding: '0.375rem 0.75rem',
@@ -558,7 +558,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     fontSize: '0.75rem',
                     fontWeight: '600'
                   }}>
-                    {project.proiect_status}
+                    {project.proiect_status || 'Necunoscut'}
                   </div>
                 </div>
 
@@ -570,7 +570,7 @@ export default function EnhancedTimeTrackingDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.total_ore}h
+                      {project.total_ore || 0}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Total ore
@@ -578,7 +578,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.progres_procent}%
+                      {project.progres_procent || 0}%
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Progres
@@ -586,7 +586,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.utilizatori_implicati}
+                      {project.utilizatori_implicati || 0}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Echipă
@@ -594,7 +594,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.valoare_estimata.toLocaleString()}€
+                      {(project.valoare_estimata || 0).toLocaleString()} {project.moneda || 'EUR'}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Valoare
@@ -611,13 +611,13 @@ export default function EnhancedTimeTrackingDashboard() {
                   marginTop: '1rem'
                 }}>
                   <div style={{
-                    background: project.progres_procent >= 80
+                    background: (project.progres_procent || 0) >= 80
                       ? '#10b981'
-                      : project.progres_procent >= 50
+                      : (project.progres_procent || 0) >= 50
                         ? '#f59e0b'
                         : '#ef4444',
                     height: '100%',
-                    width: `${project.progres_procent}%`,
+                    width: `${project.progres_procent || 0}%`,
                     borderRadius: '8px',
                     transition: 'width 0.5s ease'
                   }} />
@@ -633,20 +633,20 @@ export default function EnhancedTimeTrackingDashboard() {
                 {
                   name: 'Ore Lucrate',
                   data: projectData.map(project => ({
-                    x: project.proiect_nume.length > 15
-                      ? project.proiect_nume.substring(0, 15) + '...'
-                      : project.proiect_nume,
-                    y: project.total_ore
+                    x: (project.proiect_nume || 'Proiect necunoscut').length > 15
+                      ? (project.proiect_nume || 'Proiect necunoscut').substring(0, 15) + '...'
+                      : (project.proiect_nume || 'Proiect necunoscut'),
+                    y: project.total_ore || 0
                   })),
                   color: '#3b82f6'
                 },
                 {
                   name: 'Progres %',
                   data: projectData.map(project => ({
-                    x: project.proiect_nume.length > 15
-                      ? project.proiect_nume.substring(0, 15) + '...'
-                      : project.proiect_nume,
-                    y: project.progres_procent
+                    x: (project.proiect_nume || 'Proiect necunoscut').length > 15
+                      ? (project.proiect_nume || 'Proiect necunoscut').substring(0, 15) + '...'
+                      : (project.proiect_nume || 'Proiect necunoscut'),
+                    y: project.progres_procent || 0
                   })),
                   color: '#10b981'
                 }

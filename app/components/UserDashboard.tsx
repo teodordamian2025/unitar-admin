@@ -282,7 +282,7 @@ export default function UserDashboard() {
           e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
         }}
-        onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+        onClick={() => router.push('/projects')}
         >
           <div style={{
             display: 'flex',
@@ -350,7 +350,7 @@ export default function UserDashboard() {
           e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
         }}
-        onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+        onClick={() => router.push('/time-tracking')}
         >
           <div style={{
             display: 'flex',
@@ -423,7 +423,7 @@ export default function UserDashboard() {
           e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
         }}
-        onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+        onClick={() => router.push('/reports')}
         >
           <div style={{
             display: 'flex',
@@ -451,7 +451,7 @@ export default function UserDashboard() {
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>
-            Task-urile Mele
+            Sarcinile Mele
           </h3>
           <div style={{
             fontSize: '2rem',
@@ -506,7 +506,7 @@ export default function UserDashboard() {
           gap: '1rem'
         }}>
           <button
-            onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+            onClick={() => router.push('/projects?new=true')}
             style={{
               padding: '1rem',
               background: 'rgba(59, 130, 246, 0.1)',
@@ -527,7 +527,7 @@ export default function UserDashboard() {
           </button>
 
           <button
-            onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+            onClick={() => router.push('/time-tracking?tab=timer')}
             style={{
               padding: '1rem',
               background: 'rgba(16, 185, 129, 0.1)',
@@ -548,7 +548,7 @@ export default function UserDashboard() {
           </button>
 
           <button
-            onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+            onClick={() => router.push('/reports?type=weekly')}
             style={{
               padding: '1rem',
               background: 'rgba(245, 158, 11, 0.1)',
@@ -569,7 +569,7 @@ export default function UserDashboard() {
           </button>
 
           <button
-            onClick={() => toast.info('Funcționalitatea va fi implementată în curând!')}
+            onClick={() => router.push('/profile')}
             style={{
               padding: '1rem',
               background: 'rgba(168, 85, 247, 0.1)',
