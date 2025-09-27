@@ -147,8 +147,8 @@ export default function LiveTracking() {
       loadLiveData();
       loadProjects();
 
-      // Refresh every 10 seconds
-      const interval = setInterval(loadLiveData, 10000);
+      // Refresh every 60 seconds (1 minute) to reduce server load
+      const interval = setInterval(loadLiveData, 60000);
       return () => clearInterval(interval);
     }
   }, [isAuthorized]);
@@ -158,6 +158,18 @@ export default function LiveTracking() {
       intervalRef.current = setInterval(() => {
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - personalTimer.startTime!.getTime()) / 1000) + personalTimer.pausedTime;
+
+        // 8-hour limit check (28800 seconds) with 30-minute warning (27000 seconds)
+        if (elapsed >= 27000 && elapsed < 28800 && elapsed % 300 === 0) { // Warning every 5 minutes after 7.5h
+          toast(`⚠️ Atenție! Ai lucrat ${formatTime(elapsed)}. Limita de 8 ore se apropie!`, {
+            style: { background: '#f59e0b', color: 'white' }
+          });
+        } else if (elapsed >= 28800) { // 8 hours reached
+          toast.error('⏰ Limita de 8 ore a fost atinsă! Timer-ul va fi oprit automat.');
+          stopTimer();
+          return;
+        }
+
         setPersonalTimer(prev => ({ ...prev, elapsedTime: elapsed }));
       }, 1000);
     } else {
@@ -943,7 +955,9 @@ export default function LiveTracking() {
                         color: '#374151',
                         marginBottom: '0.75rem'
                       }}>
-                        💬 {session.descriere_sesiune}
+                        💬 {session.utilizator_uid === user?.uid && session.descriere_sesiune !== 'Sesiune de lucru'
+                          ? session.descriere_sesiune.replace('Sesiune de lucru - ', '')
+                          : session.descriere_sesiune}
                       </div>
                     )}
 

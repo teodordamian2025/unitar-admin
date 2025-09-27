@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
+import UserPersistentTimer from './UserPersistentTimer';
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -44,7 +45,7 @@ const userNavStructure: NavItem[] = [
   },
   {
     href: '/time-tracking',
-    label: 'Time Tracking',
+    label: 'Cronometru',
     icon: '⏱️'
   },
   {
@@ -270,6 +271,9 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
           </div>
         ))}
       </nav>
+
+      {/* Persistent Timer Widget */}
+      {user && <UserPersistentTimer user={user} />}
 
       {/* Footer Actions */}
       <div style={{

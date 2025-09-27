@@ -216,6 +216,16 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
 
         const now = Date.now();
         const elapsed = now - prev.startTime.getTime() + prev.pausedTime;
+        const elapsedSeconds = Math.floor(elapsed / 1000);
+
+        // 8-hour limit check (28800 seconds) with 30-minute warning (27000 seconds)
+        if (elapsedSeconds >= 27000 && elapsedSeconds < 28800 && elapsedSeconds % 300 === 0) {
+          toast.warn(`⚠️ Atenție! Ai lucrat ${formatTime(elapsed)}. Limita de 8 ore se apropie!`);
+        } else if (elapsedSeconds >= 28800) {
+          toast.error('⏰ Limita de 8 ore a fost atinsă! Timer-ul va fi oprit automat.');
+          stopTimer();
+          return prev;
+        }
 
         return { ...prev, elapsedTime: elapsed };
       });
@@ -437,8 +447,8 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   };
 
   const getProjectName = (projectId: string): string => {
-    const project = projects.find(p => p.ID_Proiect === projectId);
-    return project?.Denumire || projectId;
+    // Return project ID instead of project name as requested
+    return projectId;
   };
 
   return (
