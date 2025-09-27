@@ -267,7 +267,7 @@ export default function LiveTimerSystem({
 
     // Determinare proiect_id și sarcina_id bazat pe selecție
     let finalProiectId = selectedProiect;
-    let finalSarcinaId = null;
+    let finalSarcinaId: string | null = null;
     let finalDescription = descriereSesiune || 'Sesiune de lucru';
 
     if (selectedLevel === 'subproiect' && selectedSubproiect) {
