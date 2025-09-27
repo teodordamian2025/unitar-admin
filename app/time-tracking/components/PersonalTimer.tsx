@@ -472,7 +472,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
           fontWeight: '700',
           color: '#1f2937'
         }}>
-          ⏱️ Timer Personal
+          ⏱️ Cronometru Personal
         </h3>
 
         <div style={{

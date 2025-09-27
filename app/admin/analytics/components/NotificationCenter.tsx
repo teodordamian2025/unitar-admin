@@ -210,7 +210,7 @@ export default function NotificationCenter({
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 30000); // 30 seconds
+    }, 180000); // 3 minutes instead of 30s
   };
 
   const handleNewNotification = (notification: Notification) => {

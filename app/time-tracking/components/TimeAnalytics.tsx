@@ -482,9 +482,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               📁 Timp pe Proiecte
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {projectStats.slice(0, 10).map((project, index) => (
+              {projectStats.slice(0, 10).map((projectItem, projectIndex) => (
                 <div
-                  key={project.projectId}
+                  key={projectItem.projectId}
                   style={{
                     background: 'rgba(255, 255, 255, 0.7)',
                     borderRadius: '8px',
@@ -504,13 +504,13 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                         fontWeight: '600',
                         color: '#1f2937'
                       }}>
-                        {project.projectName}
+                        {projectItem.projectName}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
                         color: '#6b7280'
                       }}>
-                        {project.sessionsCount} sesiuni
+                        {projectItem.sessionsCount} sesiuni
                       </div>
                     </div>
                     <div style={{
@@ -521,13 +521,13 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                         fontWeight: '600',
                         color: '#1f2937'
                       }}>
-                        {formatTimeDuration(project.totalMinutes)}
+                        {formatTimeDuration(projectItem.totalMinutes)}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
                         color: '#6b7280'
                       }}>
-                        {project.percentage.toFixed(1)}%
+                        {projectItem.percentage.toFixed(1)}%
                       </div>
                     </div>
                   </div>
@@ -540,9 +540,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                     overflow: 'hidden'
                   }}>
                     <div style={{
-                      width: `${project.percentage}%`,
+                      width: `${projectItem.percentage}%`,
                       height: '100%',
-                      background: `hsl(${200 + index * 30}, 70%, 50%)`,
+                      background: `hsl(${200 + projectIndex * 30}, 70%, 50%)`,
                       transition: 'width 0.3s ease'
                     }}></div>
                   </div>
@@ -563,9 +563,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               📈 Tendințe Săptămânale
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {weeklyStats.slice(-8).map((week) => (
+              {weeklyStats.slice(-8).map((weekItem) => (
                 <div
-                  key={week.weekStart}
+                  key={weekItem.weekStart}
                   style={{
                     background: 'rgba(255, 255, 255, 0.7)',
                     borderRadius: '8px',
@@ -583,13 +583,13 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      Săptămâna {formatDate(week.weekStart)}
+                      Săptămâna {formatDate(weekItem.weekStart)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
                       color: '#6b7280'
                     }}>
-                      {week.workingDays} zile active
+                      {weekItem.workingDays} zile active
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
@@ -598,7 +598,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatTimeDuration(week.totalMinutes)}
+                      {formatTimeDuration(weekItem.totalMinutes)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
@@ -613,7 +613,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatTimeDuration(week.averagePerDay)}
+                      {formatTimeDuration(weekItem.averagePerDay)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',

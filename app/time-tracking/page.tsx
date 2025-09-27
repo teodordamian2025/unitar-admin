@@ -188,7 +188,7 @@ function TimeTrackingPage() {
                 color: '#6b7280',
                 margin: 0
               }}>
-                Urmărește-ți timpul petrecut pe proiecte și task-uri
+                Urmărește-ți timpul petrecut pe proiecte și sarcini
               </p>
             </div>
           </div>

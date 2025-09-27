@@ -91,9 +91,9 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
       }
     };
 
-    // Check imediat și apoi la fiecare 30s
+    // Check imediat și apoi la fiecare 2 minute
     checkActiveSession();
-    const interval = setInterval(checkActiveSession, 30000);
+    const interval = setInterval(checkActiveSession, 120000); // 2 minutes instead of 30s
 
     return () => clearInterval(interval);
   }, [user?.uid, activeSession?.id]);
