@@ -231,7 +231,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
 
   const startTimer = async () => {
     const finalProiectId = selectedLevel === 'subproiect' ? selectedSubproiect : selectedProject;
-    let finalSarcinaId = null;
+    let finalSarcinaId: string | null = null; // FIX: Declară tipul corect
 
     if (selectedSarcinaType === 'specific' && selectedSarcina) {
       finalSarcinaId = selectedSarcina;
