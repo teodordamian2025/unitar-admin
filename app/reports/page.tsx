@@ -139,7 +139,7 @@ function UserReportsPage() {
           {/* Tab Navigation */}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {[
-              { id: 'overview', label: '📋 Översikt', icon: '📋' },
+              { id: 'overview', label: '📋 Sumar', icon: '📋' },
               { id: 'projects', label: '📁 Proiecte', icon: '📁' },
               { id: 'time', label: '⏱️ Timp', icon: '⏱️' }
             ].map((tab) => (
