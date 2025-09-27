@@ -360,6 +360,7 @@ Sarcini,timp_estimat_ore,NUMERIC,YES,15
 Sarcini,timp_estimat_total_ore,NUMERIC,YES,16
 Sarcini,progres_procent,INT64,YES,17
 Sarcini,progres_descriere,STRING,YES,18
+Sarcini,subproiect_id,STRING,YES,19
 SarciniResponsabili,id,STRING,NO,1
 SarciniResponsabili,sarcina_id,STRING,NO,2
 SarciniResponsabili,responsabil_uid,STRING,NO,3
@@ -492,7 +493,7 @@ SubproiecteResponsabili,rol_in_subproiect,STRING,YES,5
 SubproiecteResponsabili,data_atribuire,TIMESTAMP,YES,6
 SubproiecteResponsabili,atribuit_de,STRING,YES,7
 TimeTracking,id,STRING,NO,1
-TimeTracking,sarcina_id,STRING,NO,2
+TimeTracking,sarcina_id,STRING,YES,2
 TimeTracking,utilizator_uid,STRING,NO,3
 TimeTracking,utilizator_nume,STRING,NO,4
 TimeTracking,data_lucru,DATE,NO,5
@@ -501,6 +502,7 @@ TimeTracking,descriere_lucru,STRING,YES,7
 TimeTracking,tip_inregistrare,STRING,YES,8
 TimeTracking,created_at,TIMESTAMP,YES,9
 TimeTracking,proiect_id,STRING,YES,10
+TimeTracking,subproiect_id,STRING,YES,11
 TranzactiiAccounts,id,STRING,NO,1
 TranzactiiAccounts,iban,STRING,NO,2
 TranzactiiAccounts,nume_banca,STRING,NO,3

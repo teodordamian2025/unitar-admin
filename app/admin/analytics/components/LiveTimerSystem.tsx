@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 
 // ==================================================================
 // CALEA: app/admin/analytics/components/LiveTimerSystem.tsx
-// CREAT: 14.09.2025 18:30 (ora României)
-// DESCRIERE: Sistem live timer cu management echipă și sesiuni active
+// DATA: 27.09.2025 23:50 (ora României)
+// DESCRIERE: Sistem live timer cu ierarhie corectă proiecte → subproiecte → sarcini
+// MODIFICAT: Implementată logica ierarhică bazată pe tip_proiect din BigQuery
 // ==================================================================
 
 interface ActiveSession {
@@ -33,6 +34,49 @@ interface TimerStats {
   productivity_avg: number;
 }
 
+interface Project {
+  ID_Proiect: string;
+  Denumire: string;
+  Status: string;
+  Adresa?: string;
+  Client?: string;
+}
+
+interface Subproject {
+  ID_Subproiect: string;
+  Denumire: string;
+  Status: string;
+  Responsabil?: string;
+  sarcini: Task[];
+  total_sarcini: number;
+}
+
+interface Task {
+  id: string;
+  titlu: string;
+  descriere?: string;
+  prioritate?: string;
+  status?: string;
+  data_scadenta?: string;
+  timp_estimat_total_ore?: number;
+  progres_procent?: number;
+}
+
+interface ProjectHierarchy {
+  proiect: Project & {
+    sarcini_generale: Task[];
+    total_sarcini_generale: number;
+  };
+  subproiecte: Subproject[];
+  has_subproiecte: boolean;
+  summary: {
+    total_subproiecte: number;
+    total_sarcini_proiect: number;
+    total_sarcini_subproiecte: number;
+    total_sarcini_global: number;
+  };
+}
+
 interface LiveTimerSystemProps {
   showTeamView?: boolean;
   allowTimerManagement?: boolean;
@@ -43,7 +87,7 @@ interface LiveTimerSystemProps {
 export default function LiveTimerSystem({
   showTeamView = true,
   allowTimerManagement = true,
-  refreshInterval = 30000, // 30 secunde
+  refreshInterval = 30000,
   onSessionUpdate
 }: LiveTimerSystemProps) {
   // Mock user pentru demo (în implementarea reală va fi din context sau props)
@@ -60,11 +104,18 @@ export default function LiveTimerSystem({
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [breakStartTime, setBreakStartTime] = useState<Date | null>(null);
   
-  // Form states pentru start timer
-  const [proiecte, setProiecte] = useState<{id: string, nume: string}[]>([]);
-  const [sarcini, setSarcini] = useState<{id: string, titlu: string}[]>([]);
+  // Form states pentru start timer - IERARHIE NOUĂ
+  const [proiecte, setProiecte] = useState<Project[]>([]);
   const [selectedProiect, setSelectedProiect] = useState('');
+  const [projectHierarchy, setProjectHierarchy] = useState<ProjectHierarchy | null>(null);
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+  
+  // Selectare nivel ierarhic
+  const [selectedLevel, setSelectedLevel] = useState<'proiect' | 'subproiect' | ''>('');
+  const [selectedSubproiect, setSelectedSubproiect] = useState('');
   const [selectedSarcina, setSelectedSarcina] = useState('');
+  const [selectedSarcinaType, setSelectedSarcinaType] = useState<'general' | 'specific'>('general');
+  
   const [descriereSesiune, setDescriereSesiune] = useState('');
   
   const intervalRef = useRef<NodeJS.Timeout>();
@@ -75,7 +126,6 @@ export default function LiveTimerSystem({
     const notification = `${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${message}`;
     setNotifications(prev => [...prev, notification]);
     
-    // Elimină notificarea după 3 secunde
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n !== notification));
     }, 3000);
@@ -86,7 +136,6 @@ export default function LiveTimerSystem({
       fetchActiveSessions();
       fetchProiecte();
       
-      // Setup polling pentru sesiuni active
       const interval = setInterval(fetchActiveSessions, refreshInterval);
       intervalRef.current = interval;
       
@@ -98,7 +147,6 @@ export default function LiveTimerSystem({
   }, [user, refreshInterval]);
 
   useEffect(() => {
-    // Setup local timer pentru sesiunea activă
     if (myActiveSession && myActiveSession.status === 'active' && !isOnBreak) {
       const timer = setInterval(() => {
         setLocalElapsed(prev => prev + 1);
@@ -119,6 +167,16 @@ export default function LiveTimerSystem({
     }
   }, [activeSessions, onSessionUpdate]);
 
+  // Încărcare ierarhie când se schimbă proiectul
+  useEffect(() => {
+    if (selectedProiect) {
+      fetchProjectHierarchy(selectedProiect);
+    } else {
+      setProjectHierarchy(null);
+      resetSelections();
+    }
+  }, [selectedProiect]);
+
   const fetchActiveSessions = async () => {
     try {
       const response = await fetch('/api/analytics/live-timer');
@@ -127,7 +185,6 @@ export default function LiveTimerSystem({
         setActiveSessions(data.active_sessions || []);
         setTimerStats(data.stats || null);
         
-        // Găsesc sesiunea mea activă
         const mySession = data.active_sessions.find((s: ActiveSession) => 
           s.utilizator_uid === user?.uid && s.status === 'active'
         );
@@ -153,41 +210,92 @@ export default function LiveTimerSystem({
       if (response.ok) {
         const data = await response.json();
         const proiecteActive = data.data.filter((p: any) => p.Status === 'Activ');
-        setProiecte(proiecteActive.map((p: any) => ({ id: p.ID_Proiect, nume: p.Denumire })));
+        setProiecte(proiecteActive.map((p: any) => ({
+          ID_Proiect: p.ID_Proiect,
+          Denumire: p.Denumire,
+          Status: p.Status,
+          Adresa: p.Adresa,
+          Client: p.Client
+        })));
       }
     } catch (error) {
       console.error('Eroare la încărcarea proiectelor:', error);
     }
   };
 
-  const fetchSarcini = async (proiectId: string) => {
+  const fetchProjectHierarchy = async (proiectId: string) => {
+    setLoadingHierarchy(true);
     try {
-      const response = await fetch(`/api/rapoarte/sarcini?proiect_id=${proiectId}`);
+      const response = await fetch(`/api/analytics/live-timer/hierarchy?proiect_id=${proiectId}`);
       if (response.ok) {
         const data = await response.json();
-        const sarciniActive = data.data.filter((s: any) => 
-          s.status === 'in_progress' || s.status === 'to_do'
-        );
-        setSarcini(sarciniActive.map((s: any) => ({ id: s.id, titlu: s.titlu })));
+        if (data.success) {
+          setProjectHierarchy(data.data);
+          resetSelections();
+        } else {
+          showNotification('Eroare la încărcarea ierarhiei proiectului', 'error');
+        }
+      } else {
+        showNotification('Proiectul nu a fost găsit sau nu are permisiuni', 'error');
       }
     } catch (error) {
-      console.error('Eroare la încărcarea sarcinilor:', error);
+      console.error('Eroare la încărcarea ierarhiei:', error);
+      showNotification('Eroare de conexiune la încărcarea ierarhiei', 'error');
+    } finally {
+      setLoadingHierarchy(false);
     }
   };
 
-  useEffect(() => {
-    if (selectedProiect) {
-      fetchSarcini(selectedProiect);
-    } else {
-      setSarcini([]);
-      setSelectedSarcina('');
-    }
-  }, [selectedProiect]);
+  const resetSelections = () => {
+    setSelectedLevel('');
+    setSelectedSubproiect('');
+    setSelectedSarcina('');
+    setSelectedSarcinaType('general');
+  };
 
   const startTimer = async () => {
-    if (!selectedProiect || !selectedSarcina) {
-      showNotification('Selectează proiectul și sarcina!', 'error');
+    if (!selectedProiect) {
+      showNotification('Selectează un proiect pentru a începe timer-ul!', 'error');
       return;
+    }
+
+    // Validare ierarhie
+    if (!projectHierarchy) {
+      showNotification('Ierarhia proiectului nu este încărcată!', 'error');
+      return;
+    }
+
+    // Determinare proiect_id și sarcina_id bazat pe selecție
+    let finalProiectId = selectedProiect;
+    let finalSarcinaId = null;
+    let finalDescription = descriereSesiune || 'Sesiune de lucru';
+
+    if (selectedLevel === 'subproiect' && selectedSubproiect) {
+      finalProiectId = selectedSubproiect; // Pentru BigQuery, proiect_id va conține subproiect_id
+      
+      if (selectedSarcinaType === 'specific' && selectedSarcina) {
+        finalSarcinaId = selectedSarcina;
+        const selectedTask = projectHierarchy.subproiecte
+          .find(s => s.ID_Subproiect === selectedSubproiect)?.sarcini
+          .find(t => t.id === selectedSarcina);
+        if (selectedTask) {
+          finalDescription = `${finalDescription} - ${selectedTask.titlu}`;
+        }
+      } else {
+        finalDescription = `${finalDescription} - Lucru general la subproiect`;
+      }
+    } else {
+      // Lucru la nivel de proiect principal
+      if (selectedSarcinaType === 'specific' && selectedSarcina) {
+        finalSarcinaId = selectedSarcina;
+        const selectedTask = projectHierarchy.proiect.sarcini_generale
+          .find(t => t.id === selectedSarcina);
+        if (selectedTask) {
+          finalDescription = `${finalDescription} - ${selectedTask.titlu}`;
+        }
+      } else {
+        finalDescription = `${finalDescription} - Lucru general la proiect`;
+      }
     }
 
     try {
@@ -196,9 +304,9 @@ export default function LiveTimerSystem({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'start',
-          proiect_id: selectedProiect,
-          sarcina_id: selectedSarcina,
-          descriere_sesiune: descriereSesiune
+          proiect_id: finalProiectId,
+          sarcina_id: finalSarcinaId,
+          descriere_sesiune: finalDescription
         })
       });
 
@@ -207,7 +315,7 @@ export default function LiveTimerSystem({
         setMyActiveSession(data.session);
         setLocalElapsed(0);
         showNotification('Timer pornit! 🚀', 'success');
-        fetchActiveSessions(); // Refresh lista
+        fetchActiveSessions();
       } else {
         showNotification('Eroare la pornirea timer-ului', 'error');
       }
@@ -231,7 +339,6 @@ export default function LiveTimerSystem({
       });
 
       if (response.ok) {
-        const data = await response.json();
         showNotification(`Timer oprit! ${formatTime(localElapsed)} înregistrate.`, 'success');
         setMyActiveSession(null);
         setLocalElapsed(0);
@@ -294,12 +401,10 @@ export default function LiveTimerSystem({
 
   const toggleBreak = () => {
     if (isOnBreak) {
-      // Termină pauza
       setIsOnBreak(false);
       setBreakStartTime(null);
       showNotification('Pauza terminată - înapoi la lucru! 💪', 'success');
     } else {
-      // Începe pauza
       setIsOnBreak(true);
       setBreakStartTime(new Date());
       showNotification('Pauză începută ☕', 'info');
@@ -375,6 +480,7 @@ export default function LiveTimerSystem({
           ))}
         </div>
       )}
+
       {/* Header cu statistici */}
       <div style={{ 
         display: 'flex', 
@@ -537,71 +643,262 @@ export default function LiveTimerSystem({
           </div>
         ) : (
           <div>
-            {/* Start Timer Form */}
+            {/* Start Timer Form - IERARHIE NOUĂ */}
             <div style={{ 
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              display: 'flex',
+              flexDirection: 'column',
               gap: '1rem',
               marginBottom: '1rem'
             }}>
-              <select
-                value={selectedProiect}
-                onChange={(e) => setSelectedProiect(e.target.value)}
-                style={{
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="">Selectează proiectul...</option>
-                {proiecte.map(p => (
-                  <option key={p.id} value={p.id}>{p.nume}</option>
-                ))}
-              </select>
+              {/* Selectare Proiect */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  1. Selectează Proiectul *
+                </label>
+                <select
+                  value={selectedProiect}
+                  onChange={(e) => setSelectedProiect(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="">Selectează proiectul...</option>
+                  {proiecte.map(p => (
+                    <option key={p.ID_Proiect} value={p.ID_Proiect}>
+                      {p.ID_Proiect} - {p.Denumire}
+                      {p.Client && ` (${p.Client})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                value={selectedSarcina}
-                onChange={(e) => setSelectedSarcina(e.target.value)}
-                disabled={!selectedProiect}
-                style={{
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  opacity: selectedProiect ? 1 : 0.5
-                }}
-              >
-                <option value="">Selectează sarcina...</option>
-                {sarcini.map(s => (
-                  <option key={s.id} value={s.id}>{s.titlu}</option>
-                ))}
-              </select>
+              {/* Afișare ierarhie dacă proiectul este selectat */}
+              {selectedProiect && (
+                <>
+                  {loadingHierarchy ? (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      padding: '1rem',
+                      color: '#666',
+                      fontStyle: 'italic'
+                    }}>
+                      Se încarcă ierarhia proiectului...
+                    </div>
+                  ) : projectHierarchy ? (
+                    <>
+                      {/* Selectare Nivel (Proiect sau Subproiect) */}
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                          2. Selectează Nivelul de Lucru *
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                              type="radio"
+                              name="level"
+                              value="proiect"
+                              checked={selectedLevel === 'proiect'}
+                              onChange={(e) => {
+                                setSelectedLevel('proiect');
+                                setSelectedSubproiect('');
+                                setSelectedSarcina('');
+                                setSelectedSarcinaType('general');
+                              }}
+                            />
+                            <span>🏗️ Lucru la nivel de proiect principal</span>
+                            <small style={{ color: '#666' }}>
+                              ({projectHierarchy.proiect.total_sarcini_generale} sarcini disponibile)
+                            </small>
+                          </label>
 
-              <input
-                type="text"
-                placeholder="Descriere opțională..."
-                value={descriereSesiune}
-                onChange={(e) => setDescriereSesiune(e.target.value)}
-                style={{
-                  padding: '0.5rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              />
+                          {projectHierarchy.has_subproiecte && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input
+                                type="radio"
+                                name="level"
+                                value="subproiect"
+                                checked={selectedLevel === 'subproiect'}
+                                onChange={(e) => {
+                                  setSelectedLevel('subproiect');
+                                  setSelectedSarcina('');
+                                  setSelectedSarcinaType('general');
+                                }}
+                              />
+                              <span>📂 Lucru la nivel de subproiect</span>
+                              <small style={{ color: '#666' }}>
+                                ({projectHierarchy.summary.total_subproiecte} subproiecte disponibile)
+                              </small>
+                            </label>
+                          )}
+                        </div>
+                      </div>
 
+                      {/* Selectare Subproiect dacă nivelul este subproiect */}
+                      {selectedLevel === 'subproiect' && projectHierarchy.has_subproiecte && (
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                            3. Selectează Subproiectul *
+                          </label>
+                          <select
+                            value={selectedSubproiect}
+                            onChange={(e) => {
+                              setSelectedSubproiect(e.target.value);
+                              setSelectedSarcina('');
+                              setSelectedSarcinaType('general');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value="">Selectează subproiectul...</option>
+                            {projectHierarchy.subproiecte.map(sub => (
+                              <option key={sub.ID_Subproiect} value={sub.ID_Subproiect}>
+                                {sub.Denumire} ({sub.total_sarcini} sarcini)
+                                {sub.Responsabil && ` - ${sub.Responsabil}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Selectare Tip Activitate */}
+                      {((selectedLevel === 'proiect' && projectHierarchy.proiect.total_sarcini_generale > 0) ||
+                        (selectedLevel === 'subproiect' && selectedSubproiect && 
+                         projectHierarchy.subproiecte.find(s => s.ID_Subproiect === selectedSubproiect)?.total_sarcini > 0)) && (
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                            Tip Activitate
+                          </label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input
+                                type="radio"
+                                name="sarcinaType"
+                                value="general"
+                                checked={selectedSarcinaType === 'general'}
+                                onChange={(e) => {
+                                  setSelectedSarcinaType('general');
+                                  setSelectedSarcina('');
+                                }}
+                              />
+                              <span>🎯 Activitate generală</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <input
+                                type="radio"
+                                name="sarcinaType"
+                                value="specific"
+                                checked={selectedSarcinaType === 'specific'}
+                                onChange={(e) => {
+                                  setSelectedSarcinaType('specific');
+                                  setSelectedSarcina('');
+                                }}
+                              />
+                              <span>📋 Sarcină specifică</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Selectare Sarcină Specifică */}
+                      {selectedSarcinaType === 'specific' && (
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                            Selectează Sarcina *
+                          </label>
+                          <select
+                            value={selectedSarcina}
+                            onChange={(e) => setSelectedSarcina(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value="">Selectează sarcina...</option>
+                            {selectedLevel === 'proiect' && 
+                             projectHierarchy.proiect.sarcini_generale.map(task => (
+                              <option key={task.id} value={task.id}>
+                                {task.titlu} 
+                                {task.prioritate && ` (${task.prioritate})`}
+                                {task.progres_procent !== undefined && ` - ${task.progres_procent}%`}
+                              </option>
+                            ))}
+                            {selectedLevel === 'subproiect' && selectedSubproiect &&
+                             projectHierarchy.subproiecte
+                               .find(s => s.ID_Subproiect === selectedSubproiect)?.sarcini
+                               .map(task => (
+                                <option key={task.id} value={task.id}>
+                                  {task.titlu}
+                                  {task.prioritate && ` (${task.prioritate})`}
+                                  {task.progres_procent !== undefined && ` - ${task.progres_procent}%`}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      padding: '1rem',
+                      color: '#e74c3c',
+                      fontStyle: 'italic'
+                    }}>
+                      Eroare la încărcarea ierarhiei proiectului
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Descriere Opțională */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Descriere Activitate (opțional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="La ce lucrezi acum..."
+                  value={descriereSesiune}
+                  onChange={(e) => setDescriereSesiune(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              {/* Buton Start */}
               <button
                 onClick={startTimer}
-                disabled={!selectedProiect || !selectedSarcina}
+                disabled={!selectedProiect || !selectedLevel || 
+                         (selectedLevel === 'subproiect' && !selectedSubproiect) ||
+                         (selectedSarcinaType === 'specific' && !selectedSarcina)}
                 style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: selectedProiect && selectedSarcina ? '#27ae60' : '#95a5a6',
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  backgroundColor: (selectedProiect && selectedLevel && 
+                                   (selectedLevel === 'proiect' || selectedSubproiect) &&
+                                   (selectedSarcinaType === 'general' || selectedSarcina)) 
+                                   ? '#27ae60' : '#95a5a6',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: selectedProiect && selectedSarcina ? 'pointer' : 'not-allowed',
-                  fontSize: '14px',
+                  cursor: (selectedProiect && selectedLevel) ? 'pointer' : 'not-allowed',
+                  fontSize: '16px',
                   fontWeight: 'bold'
                 }}
               >

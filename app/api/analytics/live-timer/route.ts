@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/analytics/live-timer/route.ts
-// CREAT: 21.09.2025 22:10 (ora României)
-// DESCRIERE: API pentru management live timer sessions cu fix NUMERIC pentru BigQuery
+// DATA: 28.09.2025 00:15 (ora României)
+// DESCRIERE: API pentru management live timer sessions cu suport pentru ierarhie proiecte/subproiecte
+// MODIFICAT: Adăugată logica pentru tip_proiect și gestionarea corectă a proiect_id
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,9 +43,75 @@ function calculateWorkedHoursAsString(startTime: string, endTime: string): strin
   const start = new Date(startTime);
   const end = new Date(endTime);
   const diffMs = end.getTime() - start.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60); // conversie la ore
-  const roundedHours = Math.round(diffHours * 100) / 100; // rotunjesc la 2 decimale
-  return roundedHours.toString(); // returnez ca string pentru NUMERIC
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const roundedHours = Math.round(diffHours * 100) / 100;
+  return roundedHours.toString();
+}
+
+// Helper function pentru a determina contextul proiectului/subproiectului
+async function getProjectContext(proiectId: string): Promise<{
+  tip_proiect: 'proiect' | 'subproiect';
+  proiect_principal_id?: string;
+  nume_complet: string;
+}> {
+  try {
+    // Verific dacă este subproiect
+    const subproiectQuery = `
+      SELECT 
+        s.ID_Subproiect,
+        s.ID_Proiect as proiect_principal_id,
+        s.Denumire as subproiect_nume,
+        p.Denumire as proiect_nume
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` s
+      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        ON s.ID_Proiect = p.ID_Proiect
+      WHERE s.ID_Subproiect = @proiect_id
+    `;
+
+    const [subproiectRows] = await bigquery.query({
+      query: subproiectQuery,
+      location: 'EU',
+      params: { proiect_id: proiectId }
+    });
+
+    if (subproiectRows.length > 0) {
+      const subproiect = processBigQueryRows(subproiectRows)[0];
+      return {
+        tip_proiect: 'subproiect',
+        proiect_principal_id: subproiect.proiect_principal_id,
+        nume_complet: `${subproiect.proiect_nume} → ${subproiect.subproiect_nume}`
+      };
+    }
+
+    // Dacă nu este subproiect, verific dacă este proiect principal
+    const proiectQuery = `
+      SELECT 
+        ID_Proiect,
+        Denumire
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
+      WHERE ID_Proiect = @proiect_id
+    `;
+
+    const [proiectRows] = await bigquery.query({
+      query: proiectQuery,
+      location: 'EU',
+      params: { proiect_id: proiectId }
+    });
+
+    if (proiectRows.length > 0) {
+      const proiect = processBigQueryRows(proiectRows)[0];
+      return {
+        tip_proiect: 'proiect',
+        nume_complet: proiect.Denumire
+      };
+    }
+
+    throw new Error(`Proiectul/Subproiectul cu ID ${proiectId} nu a fost găsit`);
+
+  } catch (error) {
+    console.error('Eroare la determinarea contextului proiectului:', error);
+    throw error;
+  }
 }
 
 // GET - Obținere sesiuni active și statistici
@@ -55,7 +122,7 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('include_completed') === 'true';
     const teamView = searchParams.get('team_view') !== 'false';
 
-    // Query optimizat cu sarcini reintegrate
+    // Query optimizat cu ierarhie corectă
     const activeSessionsQuery = `
       WITH active_sessions AS (
         SELECT 
@@ -63,9 +130,16 @@ export async function GET(request: NextRequest) {
           sl.utilizator_uid,
           COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
           sl.proiect_id,
-          COALESCE(p.Denumire, 'Proiect necunoscut') as proiect_nume,
           
-          -- Sarcină asociată (dacă există în descriere sau căutare directă)
+          -- Determinare nume proiect bazat pe context (proiect sau subproiect)
+          CASE
+            WHEN sub.ID_Subproiect IS NOT NULL THEN
+              CONCAT(p.Denumire, ' → ', sub.Denumire)
+            ELSE
+              COALESCE(p.Denumire, 'Proiect necunoscut')
+          END as proiect_nume,
+          
+          -- Titlu sarcină sau activitate generală
           CASE
             WHEN sl.descriere_activitate IS NOT NULL AND sl.descriere_activitate != '' THEN
               sl.descriere_activitate
@@ -80,7 +154,7 @@ export async function GET(request: NextRequest) {
           sl.descriere_activitate as descriere_sesiune,
           sl.ore_lucrate,
           
-          -- Calculez timpul elapsed în secunde - FORȚAT ca NUMERIC
+          -- Calculez timpul elapsed în secunde
           CAST(
             CASE
               WHEN sl.status = 'activ' THEN
@@ -115,8 +189,15 @@ export async function GET(request: NextRequest) {
         FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
           ON sl.utilizator_uid = u.uid
+        -- Join cu proiecte principale
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
           ON sl.proiect_id = p.ID_Proiect
+        -- Join cu subproiecte (dacă proiect_id este de fapt un subproiect)
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub 
+          ON sl.proiect_id = sub.ID_Subproiect
+        -- Join pentru numele proiectului principal al subproiectului
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p_parent 
+          ON sub.ID_Proiect = p_parent.ID_Proiect
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
           ${userId ? `AND sl.utilizator_uid = @userId` : ''}
@@ -152,7 +233,12 @@ export async function GET(request: NextRequest) {
           sl2.id, sl2.utilizator_uid, 
           COALESCE(CONCAT(u2.nume, ' ', u2.prenume), 'Test User') as utilizator_nume, 
           sl2.proiect_id, 
-          COALESCE(p2.Denumire, 'Proiect necunoscut') as proiect_nume,
+          CASE
+            WHEN sub2.ID_Subproiect IS NOT NULL THEN
+              CONCAT(p2_parent.Denumire, ' → ', sub2.Denumire)
+            ELSE
+              COALESCE(p2.Denumire, 'Proiect necunoscut')
+          END as proiect_nume,
           COALESCE(sl2.descriere_activitate, 'Activitate generală') as sarcina_titlu, 
           'normala' as prioritate, 
           sl2.data_start, 
@@ -171,6 +257,10 @@ export async function GET(request: NextRequest) {
           ON sl2.utilizator_uid = u2.uid
         LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2 
           ON sl2.proiect_id = p2.ID_Proiect
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub2 
+          ON sl2.proiect_id = sub2.ID_Subproiect
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2_parent 
+          ON sub2.ID_Proiect = p2_parent.ID_Proiect
         WHERE sl2.status = 'completat'
           AND sl2.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 HOUR)
           ${userId ? `AND sl2.utilizator_uid = @userId` : ''}
@@ -187,8 +277,6 @@ export async function GET(request: NextRequest) {
     }
 
     const [rawRows] = await bigquery.query(queryOptions);
-    
-    // IMPORTANT: Procesez rândurile pentru a extrage valorile din obiectele BigQuery
     const sessionsRows = processBigQueryRows(rawRows);
 
     // Calculez statistici pentru dashboard cu valori procesate
@@ -316,14 +404,24 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        // Creez sesiunea nouă cu sarcina_id opțional
+        // Obțin contextul proiectului pentru a determina tipul
+        let projectContext;
+        try {
+          projectContext = await getProjectContext(proiect_id);
+        } catch (error) {
+          return NextResponse.json({ 
+            error: `Proiectul/Subproiectul specificat nu există: ${proiect_id}` 
+          }, { status: 400 });
+        }
+
+        // Creez sesiunea nouă
         const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Construiesc descrierea cu sarcina dacă există
+        // Construiesc descrierea completă
         let finalDescription = descriere_sesiune || 'Sesiune de lucru';
         if (sarcina_id && sarcina_id !== 'general') {
-          // Încerc să obțin titlul sarcinii
           try {
+            // Încerc să obțin titlul sarcinii
             const sarcinaQuery = `
               SELECT titlu FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
               WHERE id = @sarcina_id
@@ -355,7 +453,7 @@ export async function POST(request: NextRequest) {
           params: {
             sessionId: sessionId,
             utilizator_uid: utilizator_uid,
-            proiect_id: proiect_id,
+            proiect_id: proiect_id, // Poate fi fie ID_Proiect fie ID_Subproiect
             descriere_sesiune: finalDescription
           }
         });
@@ -369,7 +467,8 @@ export async function POST(request: NextRequest) {
             status: 'activ',
             data_start: new Date().toISOString(),
             elapsed_seconds: 0,
-            descriere_sesiune: finalDescription
+            descriere_sesiune: finalDescription,
+            project_context: projectContext
           }
         };
         break;
@@ -412,7 +511,7 @@ export async function POST(request: NextRequest) {
         const startTime = new Date(session.data_start);
         const workedHoursString = calculateWorkedHoursAsString(startTime.toISOString(), currentTimestamp.toISOString());
 
-        // IMPORTANT: Folosesc CAST(PARSE_NUMERIC(@ore_lucrate)) pentru a converti corect la NUMERIC
+        // Opresc sesiunea
         const stopSessionQuery = `
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
           SET
@@ -431,16 +530,26 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        // Creez înregistrarea în TimeTracking cu CAST explicit
+        // Determin contextul pentru TimeTracking
+        let sessionProjectContext;
+        try {
+          sessionProjectContext = await getProjectContext(session.proiect_id);
+        } catch (error) {
+          console.warn('Nu s-a putut determina contextul proiectului pentru TimeTracking:', error);
+          sessionProjectContext = { tip_proiect: 'proiect', nume_complet: 'Proiect necunoscut' };
+        }
+
+        // Creez înregistrarea în TimeTracking cu logica corectă pentru proiect_id și subproiect_id
         const timeTrackingId = `tt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const insertTimeTrackingQuery = `
           INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
-          (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
+          (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
           VALUES (
             @id,
             @utilizator_uid,
             @utilizator_nume,
             @proiect_id,
+            @subproiect_id,
             CURRENT_DATE(),
             CAST(@ore_lucrate AS NUMERIC),
             @descriere_lucru,
@@ -457,7 +566,13 @@ export async function POST(request: NextRequest) {
             id: timeTrackingId,
             utilizator_uid: session.utilizator_uid,
             utilizator_nume: session.utilizator_nume,
-            proiect_id: session.proiect_id,
+            // Logica corectă: dacă este subproiect, proiect_id = proiect_principal, subproiect_id = session.proiect_id
+            proiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
+              ? sessionProjectContext.proiect_principal_id 
+              : session.proiect_id,
+            subproiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
+              ? session.proiect_id 
+              : null,
             ore_lucrate: workedHoursString,
             descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer'
           }
@@ -466,7 +581,8 @@ export async function POST(request: NextRequest) {
         result = { 
           message: 'Sesiune oprită și timp înregistrat cu succes',
           worked_hours: parseFloat(workedHoursString),
-          time_tracking_id: timeTrackingId
+          time_tracking_id: timeTrackingId,
+          project_context: sessionProjectContext
         };
         break;
 
