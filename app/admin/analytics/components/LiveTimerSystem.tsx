@@ -772,7 +772,7 @@ export default function LiveTimerSystem({
                       {/* Selectare Tip Activitate */}
                       {((selectedLevel === 'proiect' && projectHierarchy.proiect.total_sarcini_generale > 0) ||
                         (selectedLevel === 'subproiect' && selectedSubproiect && 
-                         projectHierarchy.subproiecte.find(s => s.ID_Subproiect === selectedSubproiect)?.total_sarcini > 0)) && (
+                         (projectHierarchy.subproiecte.find(s => s.ID_Subproiect === selectedSubproiect)?.total_sarcini || 0) > 0)) && (
                         <div>
                           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
                             Tip Activitate
@@ -835,8 +835,8 @@ export default function LiveTimerSystem({
                               </option>
                             ))}
                             {selectedLevel === 'subproiect' && selectedSubproiect &&
-                             projectHierarchy.subproiecte
-                               .find(s => s.ID_Subproiect === selectedSubproiect)?.sarcini
+                             (projectHierarchy.subproiecte
+                               .find(s => s.ID_Subproiect === selectedSubproiect)?.sarcini || [])
                                .map(task => (
                                 <option key={task.id} value={task.id}>
                                   {task.titlu}
