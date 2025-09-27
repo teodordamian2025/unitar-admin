@@ -630,7 +630,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                     overflow: 'hidden'
                   }}>
                     <div style={{
-                      width: `${Math.min((week.totalMinutes / 2400) * 100, 100)}%`, // 40h as max
+                      width: `${Math.min((weekItem.totalMinutes / 2400) * 100, 100)}%`, // 40h as max
                       height: '100%',
                       background: 'linear-gradient(90deg, #10b981, #059669)',
                       transition: 'width 0.3s ease'
