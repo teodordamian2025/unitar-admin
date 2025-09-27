@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/PersonalTimer.tsx
-// DATA: 27.09.2025 14:20 (ora României) - ACTUALIZAT CU LIVE TIMER DIN ADMIN
-// DESCRIERE: Timer personal identic cu cel din admin/analytics/live
-// FUNCȚIONALITATE: Timer live cu API /api/analytics/live-timer și persistență BigQuery
+// DATA: 27.09.2025 16:00 (ora României) - REFACTORIZARE COMPLETĂ
+// DESCRIERE: Timer personal identic funcțional cu admin - Modal ierarhic complet
+// FUNCȚIONALITATE: Sistem ierarhic proiecte → subproiecte → sarcini + API live-timer
+// ELIMINAT: localStorage în favoarea API-ului exclusiv
 // ==================================================================
 
 'use client';
@@ -31,22 +32,62 @@ interface TimerSession {
 interface Project {
   ID_Proiect: string;
   Denumire: string;
+  Status?: string;
+  Client?: string;
 }
 
 interface Subproiect {
   ID_Subproiect: string;
   Denumire: string;
-  ID_Proiect_Parent: string;
+  ID_Proiect: string;
+  Status?: string;
+  Responsabil?: string;
 }
 
 interface Sarcina {
   id: string;
-  titel: string;
-  subproiect_id: string;
+  titlu: string;
+  descriere?: string;
+  prioritate?: string;
+  status?: string;
+  data_scadenta?: string;
+  timp_estimat_total_ore?: number;
+  progres_procent?: number;
+}
+
+interface HierarchyData {
+  proiect: {
+    ID_Proiect: string;
+    Denumire: string;
+    Status: string;
+    Client: string;
+    Adresa?: string;
+    sarcini_generale: Sarcina[];
+    total_sarcini_generale: number;
+  };
+  subproiecte: Array<{
+    ID_Subproiect: string;
+    Denumire: string;
+    Status: string;
+    Responsabil: string;
+    Data_Start?: string;
+    Data_Final?: string;
+    Valoare_Estimata?: number;
+    moneda?: string;
+    sarcini: Sarcina[];
+    total_sarcini: number;
+  }>;
+  has_subproiecte: boolean;
+  summary: {
+    total_subproiecte: number;
+    total_sarcini_proiect: number;
+    total_sarcini_subproiecte: number;
+    total_sarcini_global: number;
+  };
 }
 
 export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
-  // State identic cu admin live timer
+  // State identic cu admin live timer - FĂRĂ localStorage
   const [personalTimer, setPersonalTimer] = useState<TimerSession>({
     isActive: false,
     startTime: null,
@@ -59,31 +100,24 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   });
 
   const [projects, setProjects] = useState<Project[]>([]);
-  const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
-  const [sarcini, setSarcini] = useState<Sarcina[]>([]);
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // State pentru modal ierarhic identic cu admin
+  const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedLevel, setSelectedLevel] = useState<'proiect' | 'subproiect'>('proiect');
-  const [selectedSubproiect, setSelectedSubproiect] = useState('');
+  const [selectedSubproiect, setSelectedSubproiect] = useState<string>('');
   const [selectedSarcinaType, setSelectedSarcinaType] = useState<'general' | 'specific'>('general');
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [selectedSarcina, setSelectedSarcina] = useState<string>('');
+  const [newSessionDescription, setNewSessionDescription] = useState<string>('');
+  const [hierarchyData, setHierarchyData] = useState<HierarchyData | null>(null);
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchProjects();
-
-    // Load active session
-    const stored = localStorage.getItem('personalTimer');
-    if (stored) {
-      try {
-        const parsedTimer = JSON.parse(stored);
-        setPersonalTimer(parsedTimer);
-
-        if (parsedTimer.isActive && parsedTimer.startTime) {
-          startInterval();
-        }
-      } catch (error) {
-        console.error('Error parsing stored timer:', error);
-      }
-    }
+    checkActiveSession();
   }, []);
 
   useEffect(() => {
@@ -96,50 +130,80 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     return () => stopInterval();
   }, [personalTimer.isActive]);
 
-  useEffect(() => {
-    // Close dropdown when clicking outside
-    const handleClickOutside = () => setShowProjectDropdown(false);
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showProjectDropdown]);
-
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/user/projects');
+      setLoadingProjects(true);
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/user/projects', {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+      
       const data = await response.json();
       if (data.success) {
-        // API returnează data.data nu data.proiecte
         setProjects(data.data || []);
         console.log('🎯 PersonalTimer - Proiecte încărcate:', data.data?.length || 0);
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
+      toast.error('Eroare la încărcarea proiectelor');
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
-  const fetchSubproiecte = async (projectId: string) => {
+  const checkActiveSession = async () => {
     try {
-      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${projectId}`);
+      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`);
       const data = await response.json();
-      if (data.success) {
-        setSubproiecte(data.subproiecte || []);
+      
+      if (data.success && data.data && data.data.length > 0) {
+        const activeSession = data.data.find((session: any) => 
+          session.utilizator_uid === user.uid && 
+          (session.status === 'activ' || session.status === 'pausat')
+        );
+        
+        if (activeSession) {
+          setPersonalTimer({
+            isActive: activeSession.status === 'activ',
+            startTime: new Date(activeSession.data_start),
+            pausedTime: 0,
+            elapsedTime: activeSession.elapsed_seconds * 1000,
+            projectId: activeSession.proiect_id,
+            sarcinaId: activeSession.sarcina_id || 'general',
+            description: activeSession.descriere_sesiune || '',
+            sessionId: activeSession.id
+          });
+          
+          if (activeSession.status === 'activ') {
+            startInterval();
+          }
+        }
       }
     } catch (error) {
-      console.error('Error fetching subproiecte:', error);
-      setSubproiecte([]);
+      console.error('Error checking active session:', error);
     }
   };
 
-  const fetchSarcini = async (subproiectId: string) => {
+  const fetchHierarchy = async (proiectId: string) => {
     try {
-      const response = await fetch(`/api/rapoarte/sarcini?subproiect_id=${subproiectId}`);
+      setLoadingHierarchy(true);
+      const response = await fetch(`/api/analytics/live-timer/hierarchy?proiect_id=${proiectId}`);
       const data = await response.json();
+      
       if (data.success) {
-        setSarcini(data.sarcini || []);
+        setHierarchyData(data.data);
+      } else {
+        throw new Error(data.error || 'Failed to fetch hierarchy');
       }
     } catch (error) {
-      console.error('Error fetching sarcini:', error);
-      setSarcini([]);
+      console.error('Error fetching hierarchy:', error);
+      toast.error('Eroare la încărcarea structurii proiectului');
+      setHierarchyData(null);
+    } finally {
+      setLoadingHierarchy(false);
     }
   };
 
@@ -153,9 +217,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         const now = Date.now();
         const elapsed = now - prev.startTime.getTime() + prev.pausedTime;
 
-        const updated = { ...prev, elapsedTime: elapsed };
-        localStorage.setItem('personalTimer', JSON.stringify(updated));
-        return updated;
+        return { ...prev, elapsedTime: elapsed };
       });
     }, 1000);
   };
@@ -168,13 +230,15 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   };
 
   const startTimer = async () => {
-    if (!personalTimer.projectId) {
-      toast.error('Selectează un proiect pentru a începe timer-ul!');
-      return;
+    const finalProiectId = selectedLevel === 'subproiect' ? selectedSubproiect : selectedProject;
+    let finalSarcinaId = 'general';
+
+    if (selectedSarcinaType === 'specific' && selectedSarcina) {
+      finalSarcinaId = selectedSarcina;
     }
 
-    if (!user?.uid) {
-      toast.error('Eroare de autentificare. Te rog să te reconectezi!');
+    if (!finalProiectId) {
+      toast.error('Selectează un proiect pentru a începe timer-ul!');
       return;
     }
 
@@ -185,9 +249,10 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         body: JSON.stringify({
           action: 'start',
           user_id: user.uid,
-          proiect_id: personalTimer.projectId,
-          sarcina_id: personalTimer.sarcinaId,
-          descriere_activitate: personalTimer.description
+          utilizator_uid: user.uid,
+          proiect_id: finalProiectId,
+          sarcina_id: finalSarcinaId,
+          descriere_activitate: newSessionDescription || 'Sesiune de lucru'
         })
       });
 
@@ -195,16 +260,19 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
 
       if (data.success) {
         const newTimer = {
-          ...personalTimer,
           isActive: true,
           startTime: new Date(),
-          sessionId: data.session_id,
+          sessionId: data.session?.id || `session_${Date.now()}`,
           elapsedTime: 0,
-          pausedTime: 0
+          pausedTime: 0,
+          projectId: finalProiectId,
+          sarcinaId: finalSarcinaId,
+          description: newSessionDescription || 'Sesiune de lucru'
         };
 
         setPersonalTimer(newTimer);
-        localStorage.setItem('personalTimer', JSON.stringify(newTimer));
+        setShowNewSessionModal(false);
+        resetModalState();
         toast.success('Timer pornit! 🚀');
       } else {
         toast.error(data.error || 'Eroare la pornirea timer-ului');
@@ -242,7 +310,6 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(pausedTimer);
-        localStorage.setItem('personalTimer', JSON.stringify(pausedTimer));
         toast.info('Timer pus în pauză ⏸️');
       } else {
         toast.error(data.error || 'Eroare la pausarea timer-ului');
@@ -280,7 +347,6 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(resumedTimer);
-        localStorage.setItem('personalTimer', JSON.stringify(resumedTimer));
         toast.success('Timer reluat! ▶️');
       } else {
         toast.error(data.error || 'Eroare la reluarea timer-ului');
@@ -311,7 +377,6 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
       const data = await response.json();
 
       if (data.success) {
-        // Reset timer state
         const resetTimer = {
           isActive: false,
           startTime: null,
@@ -324,9 +389,8 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(resetTimer);
-        localStorage.removeItem('personalTimer');
         toast.success('Timer oprit și salvat! 💾');
-        onUpdate(); // Trigger refresh în parent
+        onUpdate();
       } else {
         toast.error(data.error || 'Eroare la oprirea timer-ului');
       }
@@ -336,7 +400,6 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     }
   };
 
-  // Helper functions identice cu admin
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -350,27 +413,32 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     }
   };
 
-  const handleProjectChange = (projectId: string) => {
-    setPersonalTimer(prev => ({ ...prev, projectId, sarcinaId: 'general' }));
+  const resetModalState = () => {
+    setSelectedProject('');
+    setSelectedLevel('proiect');
     setSelectedSubproiect('');
     setSelectedSarcinaType('general');
+    setSelectedSarcina('');
+    setNewSessionDescription('');
+    setHierarchyData(null);
+  };
+
+  const handleProjectSelect = async (projectId: string) => {
+    setSelectedProject(projectId);
+    setSelectedSubproiect('');
+    setSelectedSarcina('');
+    setSelectedSarcinaType('general');
+    
     if (projectId) {
-      fetchSubproiecte(projectId);
+      await fetchHierarchy(projectId);
     } else {
-      setSubproiecte([]);
-      setSarcini([]);
+      setHierarchyData(null);
     }
   };
 
-  const handleSubproiectChange = (subproiectId: string) => {
-    setSelectedSubproiect(subproiectId);
-    setSelectedSarcinaType('general');
-    setPersonalTimer(prev => ({ ...prev, sarcinaId: 'general' }));
-    if (subproiectId) {
-      fetchSarcini(subproiectId);
-    } else {
-      setSarcini([]);
-    }
+  const getProjectName = (projectId: string): string => {
+    const project = projects.find(p => p.ID_Proiect === projectId);
+    return project?.Denumire || projectId;
   };
 
   return (
@@ -411,7 +479,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         <div>
           {personalTimer.projectId && (
             <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-              📁 {personalTimer.projectId}
+              📁 {getProjectName(personalTimer.projectId)}
               {personalTimer.description && (
                 <span> • {personalTimer.description}</span>
               )}
@@ -489,146 +557,287 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
           </div>
         </div>
       ) : (
-        <div>
-          {/* Project Selection UI */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
-              Selectează Proiect *
-            </label>
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowProjectDropdown(!showProjectDropdown);
-                }}
+        <div style={{ textAlign: 'center' }}>
+          <button
+            onClick={() => setShowNewSessionModal(true)}
+            disabled={loadingProjects}
+            style={{
+              padding: '1rem 2rem',
+              background: loadingProjects ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: loadingProjects ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              margin: '0 auto'
+            }}
+          >
+            {loadingProjects ? '⏳' : '🚀'} {loadingProjects ? 'Se încarcă...' : 'Începe Sesiune Nouă'}
+          </button>
+        </div>
+      )}
+
+      {/* Modal Ierarhic Identic cu Admin */}
+      {showNewSessionModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '90vw',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', fontWeight: '700' }}>
+              🚀 Începe Sesiune Nouă
+            </h3>
+
+            {/* Selectare Proiect */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Selectează Proiect *
+              </label>
+              <select
+                value={selectedProject}
+                onChange={(e) => handleProjectSelect(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.5rem',
-                  background: 'white',
+                  padding: '0.75rem',
                   border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  borderRadius: '8px',
+                  fontSize: '0.875rem'
                 }}
               >
-                <span>
-                  {personalTimer.projectId
-                    ? projects.find(p => p.ID_Proiect === personalTimer.projectId)?.Denumire || personalTimer.projectId
-                    : 'Alege un proiect...'}
-                </span>
-                <span>{showProjectDropdown ? '⏶' : '⏷'}</span>
-              </button>
+                <option value="">-- Alege un proiect --</option>
+                {projects.map((project) => (
+                  <option key={project.ID_Proiect} value={project.ID_Proiect}>
+                    {project.ID_Proiect} - {project.Denumire}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              {showProjectDropdown && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  background: 'white',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  marginTop: '0.25rem',
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  zIndex: 50,
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}>
-                  {projects.map((project) => (
-                    <button
-                      key={project.ID_Proiect}
-                      onClick={() => {
-                        handleProjectChange(project.ID_Proiect);
-                        setShowProjectDropdown(false);
-                      }}
+            {/* Ierarhie Dinamică */}
+            {selectedProject && hierarchyData && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                  Nivel de lucru *
+                </label>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="radio"
+                      name="level"
+                      value="proiect"
+                      checked={selectedLevel === 'proiect'}
+                      onChange={(e) => setSelectedLevel(e.target.value as any)}
+                    />
+                    📋 Proiect General
+                  </label>
+                  {hierarchyData.has_subproiecte && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="radio"
+                        name="level"
+                        value="subproiect"
+                        checked={selectedLevel === 'subproiect'}
+                        onChange={(e) => setSelectedLevel(e.target.value as any)}
+                      />
+                      📂 Subproiect Specific
+                    </label>
+                  )}
+                </div>
+
+                {selectedLevel === 'subproiect' && hierarchyData.has_subproiecte && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Selectează Subproiect *
+                    </label>
+                    <select
+                      value={selectedSubproiect}
+                      onChange={(e) => setSelectedSubproiect(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '0.5rem',
-                        textAlign: 'left',
-                        border: 'none',
-                        background: personalTimer.projectId === project.ID_Proiect ? '#f3f4f6' : 'white',
-                        cursor: 'pointer'
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem'
                       }}
                     >
-                      {project.Denumire}
-                    </button>
-                  ))}
+                      <option value="">-- Alege un subproiect --</option>
+                      {hierarchyData.subproiecte.map((sub) => (
+                        <option key={sub.ID_Subproiect} value={sub.ID_Subproiect}>
+                          {sub.ID_Subproiect} - {sub.Denumire}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Selectare Tip Activitate */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                    Tip activitate
+                  </label>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="radio"
+                        name="sarcinaType"
+                        value="general"
+                        checked={selectedSarcinaType === 'general'}
+                        onChange={(e) => setSelectedSarcinaType(e.target.value as any)}
+                      />
+                      🔄 Activitate Generală
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        type="radio"
+                        name="sarcinaType"
+                        value="specific"
+                        checked={selectedSarcinaType === 'specific'}
+                        onChange={(e) => setSelectedSarcinaType(e.target.value as any)}
+                      />
+                      🎯 Sarcină Specifică
+                    </label>
+                  </div>
                 </div>
-              )}
+
+                {selectedSarcinaType === 'specific' && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                      Selectează Sarcina
+                    </label>
+                    <select
+                      value={selectedSarcina}
+                      onChange={(e) => setSelectedSarcina(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <option value="">-- Alege o sarcină --</option>
+                      {selectedLevel === 'proiect' 
+                        ? hierarchyData.proiect.sarcini_generale.map((sarcina) => (
+                            <option key={sarcina.id} value={sarcina.id}>
+                              {sarcina.titlu}
+                            </option>
+                          ))
+                        : selectedSubproiect && hierarchyData.subproiecte
+                            .find(sub => sub.ID_Subproiect === selectedSubproiect)
+                            ?.sarcini.map((sarcina) => (
+                              <option key={sarcina.id} value={sarcina.id}>
+                                {sarcina.titlu}
+                              </option>
+                            ))
+                      }
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Descriere */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+                Descriere activitate
+              </label>
+              <textarea
+                value={newSessionDescription}
+                onChange={(e) => setNewSessionDescription(e.target.value)}
+                placeholder="Ce lucrezi acum..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  resize: 'vertical'
+                }}
+              />
             </div>
-          </div>
 
-          {/* Description Input */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
-              Descriere activitate
-            </label>
-            <textarea
-              value={personalTimer.description}
-              onChange={(e) => setPersonalTimer(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Ce lucrezi acum..."
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                resize: 'vertical'
-              }}
-            />
-          </div>
+            {/* Butoane */}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowNewSessionModal(false);
+                  resetModalState();
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                ❌ Anulează
+              </button>
+              <button
+                onClick={startTimer}
+                disabled={!selectedProject || (selectedLevel === 'subproiect' && !selectedSubproiect)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect)) 
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                    : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect)) 
+                    ? 'pointer' 
+                    : 'not-allowed',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                🚀 Începe Timer
+              </button>
+            </div>
 
-          {/* Start Button */}
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={() => {
-                // Reset selection
-                setPersonalTimer({
-                  isActive: false,
-                  startTime: null,
-                  pausedTime: 0,
-                  elapsedTime: 0,
-                  projectId: '',
-                  sarcinaId: 'general',
-                  description: '',
-                  sessionId: ''
-                });
-                setSelectedSubproiect('');
-                setSelectedSarcinaType('general');
-              }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}
-            >
-              🔄 Reset
-            </button>
-            <button
-              onClick={startTimer}
-              disabled={!personalTimer.projectId}
-              style={{
-                padding: '0.5rem 1rem',
-                background: personalTimer.projectId ? '#10b981' : '#9ca3af',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: personalTimer.projectId ? 'pointer' : 'not-allowed',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                flex: 1
-              }}
-            >
-              🚀 Start Timer
-            </button>
+            {loadingHierarchy && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255, 255, 255, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  Se încarcă structura...
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

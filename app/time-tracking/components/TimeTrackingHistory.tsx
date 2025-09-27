@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/TimeTrackingHistory.tsx
-// DATA: 21.09.2025 17:55 (ora României)
-// DESCRIERE: Istoric înregistrări timp cu filtrare și export
+// DATA: 27.09.2025 15:45 (ora României)
+// DESCRIERE: Istoric înregistrări timp cu filtrare și export - FIX Display Issues
 // FUNCȚIONALITATE: View/edit/delete cu gestionare BigQuery DATE objects
+// MODIFICĂRI: Fix afișare ID proiect, fix end_time null, îmbunătățit display
 // ==================================================================
 
 'use client';
@@ -138,6 +139,46 @@ export default function TimeTrackingHistory({
     return entry.duration_minutes || 0;
   };
 
+  // FIX: Helper pentru afișarea corectă a proiectului (ID în loc de denumire)
+  const getProjectDisplay = (entry: TimeEntry): string => {
+    if (entry.context_display) {
+      return entry.context_display;
+    }
+
+    // MODIFICARE PRINCIPALĂ: Afișează ID_Proiect primul, apoi denumirea
+    if (entry.project_id && (entry.project_name || entry.proiect_nume)) {
+      return `${entry.project_id} - ${entry.project_name || entry.proiect_nume}`;
+    }
+    
+    if (entry.project_id) {
+      return entry.project_id;
+    }
+
+    if (entry.project_name || entry.proiect_nume) {
+      return entry.project_name || entry.proiect_nume || 'Fără proiect';
+    }
+
+    return 'Fără proiect';
+  };
+
+  // FIX: Helper pentru afișarea timpului (start → end cu status)
+  const getTimeDisplay = (entry: TimeEntry): string => {
+    const startTime = formatDateTime(entry.start_time || entry.data_lucru);
+    
+    if (entry.end_time) {
+      const endTime = formatDateTime(entry.end_time);
+      return `${startTime} → ${endTime}`;
+    } else {
+      // Dacă nu avem end_time, afișăm durata în loc de "-"
+      const duration = getDurationMinutes(entry);
+      if (duration > 0) {
+        return `${startTime} → ${formatDuration(duration)}`;
+      } else {
+        return `${startTime} → în desfășurare`;
+      }
+    }
+  };
+
   const handleFilterChange = (field: keyof FilterOptions, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
@@ -164,7 +205,7 @@ export default function TimeTrackingHistory({
 
     if (filters.projectFilter) {
       filtered = filtered.filter(entry =>
-        entry.project_id?.includes(filters.projectFilter) ||
+        entry.project_id?.toLowerCase().includes(filters.projectFilter.toLowerCase()) ||
         (entry.project_name || entry.proiect_nume || entry.context_display || '')?.toLowerCase().includes(filters.projectFilter.toLowerCase())
       );
     }
@@ -183,8 +224,8 @@ export default function TimeTrackingHistory({
           bValue = getDurationMinutes(b);
           break;
         case 'project':
-          aValue = a.project_name || a.proiect_nume || a.context_display || a.project_id || '';
-          bValue = b.project_name || b.proiect_nume || b.context_display || b.project_id || '';
+          aValue = getProjectDisplay(a);
+          bValue = getProjectDisplay(b);
           break;
         default:
           return 0;
@@ -303,7 +344,7 @@ export default function TimeTrackingHistory({
     const csvData = filtered.map(entry => [
       formatDateTime(entry.start_time || entry.data_lucru),
       formatDateTime(entry.end_time),
-      entry.project_name || entry.proiect_nume || entry.project_id || 'Fără proiect',
+      getProjectDisplay(entry),
       entry.task_description,
       entry.ore_lucrate ? (entry.ore_lucrate * 60).toString() : (entry.duration_minutes || 0).toString(),
       (entry.ore_lucrate || (entry.duration_minutes ? entry.duration_minutes / 60 : 0) || 0).toFixed(2)
@@ -627,20 +668,18 @@ export default function TimeTrackingHistory({
                         }}>
                           {entry.task_description}
                         </div>
-                        {(entry.project_name || entry.proiect_nume || entry.context_display) && (
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#6b7280',
-                            marginBottom: '0.25rem'
-                          }}>
-                            📁 {entry.context_display || `${entry.project_id} - ${entry.project_name || entry.proiect_nume}`}
-                          </div>
-                        )}
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginBottom: '0.25rem'
+                        }}>
+                          📁 {getProjectDisplay(entry)}
+                        </div>
                         <div style={{
                           fontSize: '0.75rem',
                           color: '#6b7280'
                         }}>
-                          {formatDateTime(entry.start_time || entry.data_lucru)} → {formatDateTime(entry.end_time)}
+                          {getTimeDisplay(entry)}
                         </div>
                       </div>
                       <div style={{

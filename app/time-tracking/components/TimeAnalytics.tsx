@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/TimeAnalytics.tsx
-// DATA: 21.09.2025 18:00 (ora României)
-// DESCRIERE: Analytics personal pentru time tracking fără date financiare
+// DATA: 27.09.2025 15:30 (ora României)
+// DESCRIERE: Analytics personal pentru time tracking fără date financiare - FIX ReferenceError
 // FUNCȚIONALITATE: Grafice, statistici săptămânale/lunare, productivitate
+// MODIFICĂRI: Rezolvat conflict variabilă 'm' în formatDuration
 // ==================================================================
 
 'use client';
@@ -179,10 +180,11 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     return result;
   };
 
+  // FIX: Redenumit variabila pentru a evita conflictul
   const formatDuration = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+    const remainingMinutes = minutes % 60; // Schimbat din 'mins' în 'remainingMinutes'
+    return hours > 0 ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`;
   };
 
   const formatDate = (dateString: string): string => {
