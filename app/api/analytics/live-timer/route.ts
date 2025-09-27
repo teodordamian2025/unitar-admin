@@ -384,6 +384,11 @@ export async function POST(request: NextRequest) {
             error: 'proiect_id și utilizator_uid sunt obligatorii pentru start' 
           }, { status: 400 });
         }
+      // Normalizare sarcina_id pentru BigQuery compatibility
+	let processedSarcinaId = sarcina_id;
+	if (!sarcina_id || sarcina_id === 'general' || sarcina_id === 'default_task') {
+	  processedSarcinaId = 'activitate_generala'; // String în loc de NULL
+	}
 
         // Verific dacă utilizatorul are deja o sesiune activă
         const checkActiveQuery = `
@@ -448,15 +453,21 @@ export async function POST(request: NextRequest) {
         `;
 
         await bigquery.query({
-          query: insertSessionQuery,
-          location: 'EU',
-          params: {
-            sessionId: sessionId,
-            utilizator_uid: utilizator_uid,
-            proiect_id: proiect_id, // Poate fi fie ID_Proiect fie ID_Subproiect
-            descriere_sesiune: finalDescription
-          }
-        });
+	  query: insertSessionQuery,
+	  location: 'EU',
+	  params: {
+	    sessionId: sessionId,
+	    utilizator_uid: utilizator_uid,
+	    proiect_id: proiect_id,
+	    descriere_sesiune: finalDescription
+	  },
+	  types: {
+	    sessionId: 'STRING',
+	    utilizator_uid: 'STRING',
+	    proiect_id: 'STRING',
+	    descriere_sesiune: 'STRING'
+	  }
+	});
 
         result = {
           session: {
@@ -559,24 +570,41 @@ export async function POST(request: NextRequest) {
           )
         `;
 
-        await bigquery.query({
-          query: insertTimeTrackingQuery,
-          location: 'EU',
-          params: {
-            id: timeTrackingId,
-            utilizator_uid: session.utilizator_uid,
-            utilizator_nume: session.utilizator_nume,
-            // Logica corectă: dacă este subproiect, proiect_id = proiect_principal, subproiect_id = session.proiect_id
-            proiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
-              ? sessionProjectContext.proiect_principal_id 
-              : session.proiect_id,
-            subproiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
-              ? session.proiect_id 
-              : null,
-            ore_lucrate: workedHoursString,
-            descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer'
-          }
-        });
+        // Construiește params și types pentru a gestiona NULL values
+	const queryParams: any = {
+	  id: timeTrackingId,
+	  utilizator_uid: session.utilizator_uid,
+	  utilizator_nume: session.utilizator_nume,
+	  proiect_id: sessionProjectContext.tip_proiect === 'subproiect' 
+	    ? sessionProjectContext.proiect_principal_id 
+	    : session.proiect_id,
+	  ore_lucrate: workedHoursString,
+	  descriere_lucru: session.descriere_activitate || 'Sesiune Live Timer',
+	  sarcina_id: processedSarcinaId || 'activitate_generala'
+	};
+
+	const queryTypes: any = {
+	  id: 'STRING',
+	  utilizator_uid: 'STRING',
+	  utilizator_nume: 'STRING',
+	  proiect_id: 'STRING',
+	  ore_lucrate: 'STRING',
+	  descriere_lucru: 'STRING',
+	  sarcina_id: 'STRING'
+	};
+
+	// Gestionează subproiect_id care poate fi NULL
+	if (sessionProjectContext.tip_proiect === 'subproiect') {
+	  queryParams.subproiect_id = session.proiect_id;
+	  queryTypes.subproiect_id = 'STRING';
+	}
+
+	await bigquery.query({
+	  query: insertTimeTrackingQuery,
+	  location: 'EU',
+	  params: queryParams,
+	  types: queryTypes
+	});
 
         result = { 
           message: 'Sesiune oprită și timp înregistrat cu succes',
