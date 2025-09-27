@@ -1,0 +1,91 @@
+// ==================================================================
+// CALEA: app/api/planificator/items/[id]/comentariu/route.ts
+// DATA: 27.09.2025 16:33 (ora României)
+// DESCRIERE: API pentru update comentariu personal în planificator
+// FUNCȚIONALITATE: POST pentru actualizare comentariu cu debounce
+// ==================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+// Simple authentication pattern consistent with existing APIs
+import { BigQuery } from '@google-cloud/bigquery';
+
+const bigquery = new BigQuery({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+});
+
+const DATASET_ID = 'PanouControlUnitar';
+const TABLE_ID = 'PlanificatorPersonal';
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    // For development - in production this should verify Firebase token
+    const userId = 'demo_user_id';
+    const itemId = params.id;
+
+    const body = await request.json();
+    const { comentariu_personal } = body;
+
+    if (!itemId) {
+      return NextResponse.json({ error: 'Missing item ID' }, { status: 400 });
+    }
+
+    // Verifică dacă item-ul aparține utilizatorului curent
+    const checkQuery = `
+      SELECT utilizator_uid
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      WHERE id = @itemId AND activ = TRUE
+    `;
+
+    const [checkRows] = await bigquery.query({
+      query: checkQuery,
+      params: { itemId }
+    });
+
+    if (checkRows.length === 0) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+
+    if (checkRows[0].utilizator_uid !== userId) {
+      return NextResponse.json({ error: 'Unauthorized to modify this item' }, { status: 403 });
+    }
+
+    // Update comentariu personal
+    const updateQuery = `
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      SET comentariu_personal = @comentariu_personal, data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = @itemId AND utilizator_uid = @userId
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: {
+        itemId,
+        userId,
+        comentariu_personal: comentariu_personal || null
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      comentariu_personal,
+      message: 'Personal comment updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating personal comment:', error);
+    return NextResponse.json(
+      { error: 'Failed to update personal comment' },
+      { status: 500 }
+    );
+  }
+}

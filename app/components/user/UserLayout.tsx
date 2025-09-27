@@ -49,6 +49,11 @@ const userNavStructure: NavItem[] = [
     icon: '⏱️'
   },
   {
+    href: '/planificator',
+    label: 'Planificator',
+    icon: '🎯'
+  },
+  {
     href: '/calendar',
     label: 'Calendar Evenimente',
     icon: '📅'
