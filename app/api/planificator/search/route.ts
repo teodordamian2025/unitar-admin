@@ -11,7 +11,11 @@ import { BigQuery } from '@google-cloud/bigquery';
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
+  },
 });
 
 const DATASET_ID = 'PanouControlUnitar';
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
           CAST(NULL AS STRING) as proiect_nume,
           1 as priority_order
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\`
-        WHERE LOWER(Denumire) LIKE @searchPattern
+        WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
           AND Status != 'Anulat'
           AND ID_Proiect NOT IN (
             SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
