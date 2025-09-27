@@ -112,8 +112,12 @@ export default function TimeTrackingHistory({
   };
 
   const formatDuration = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    // Fix pentru BigQuery values care pot fi null/undefined/NaN
+    const validMinutes = minutes || 0;
+    const safeMinutes = isNaN(validMinutes) ? 0 : Number(validMinutes);
+
+    const hours = Math.floor(safeMinutes / 60);
+    const mins = safeMinutes % 60;
 
     if (hours > 0) {
       return `${hours}h ${mins}m`;
@@ -271,7 +275,12 @@ export default function TimeTrackingHistory({
 
   const getTotalHours = () => {
     const filtered = filteredAndSortedEntries();
-    const totalMinutes = filtered.reduce((sum, entry) => sum + entry.duration_minutes, 0);
+    const totalMinutes = filtered.reduce((sum, entry) => {
+      // Fix pentru DATE fields din BigQuery - valori pot fi null/undefined/NaN
+      const duration = entry.duration_minutes || 0;
+      const validDuration = isNaN(duration) ? 0 : Number(duration);
+      return sum + validDuration;
+    }, 0);
     return (totalMinutes / 60).toFixed(1);
   };
 

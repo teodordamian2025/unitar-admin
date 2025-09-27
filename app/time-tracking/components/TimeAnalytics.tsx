@@ -58,7 +58,18 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     const dateString = typeof dateValue === 'object' && dateValue.value
       ? dateValue.value
       : dateValue;
-    return new Date(dateString);
+
+    // Fix pentru RangeError: invalid date
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      return new Date(); // Returnează data curentă ca fallback
+    }
+
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return new Date(); // Returnează data curentă pentru date invalide
+    }
+
+    return date;
   };
 
   // Calcularea statisticilor zilnice
@@ -79,7 +90,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }
 
       const dayStats = statsMap.get(dateKey)!;
-      dayStats.totalMinutes += entry.duration_minutes;
+      const safeDuration = entry.duration_minutes || 0;
+      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
+      dayStats.totalMinutes += validDuration;
       dayStats.sessionsCount += 1;
       if (entry.project_id) {
         dayStats.projects.add(entry.project_id);
@@ -95,7 +108,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     let totalMinutes = 0;
 
     timeEntries.forEach(entry => {
-      totalMinutes += entry.duration_minutes;
+      const safeDuration = entry.duration_minutes || 0;
+      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
+      totalMinutes += validDuration;
       const projectKey = entry.project_id || 'no-project';
       const projectName = entry.project_name || entry.project_id || 'Fără proiect';
 
@@ -109,7 +124,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }
 
       const projectStat = statsMap.get(projectKey)!;
-      projectStat.totalMinutes += entry.duration_minutes;
+      projectStat.totalMinutes += validDuration;
       projectStat.sessionsCount += 1;
     });
 
@@ -139,7 +154,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }
 
       const weekStat = weekMap.get(weekKey)! as any;
-      weekStat.totalMinutes += entry.duration_minutes;
+      const safeDuration = entry.duration_minutes || 0;
+      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
+      weekStat.totalMinutes += validDuration;
       weekStat.workingDays.add(date.toISOString().split('T')[0]);
     });
 

@@ -197,7 +197,7 @@ function TimeTrackingPage() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {[
               { id: 'timer', label: '⏰ Timer', icon: '▶️' },
-              { id: 'history', label: '📋 Istoric', icon: '📋' },
+              { id: 'history', label: 'Istoric', icon: '📋' },
               { id: 'analytics', label: '📊 Analytics', icon: '📈' }
             ].map((tab) => (
               <button

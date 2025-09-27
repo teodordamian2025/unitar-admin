@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/PersonalTimer.tsx
-// DATA: 25.09.2025 18:40 (ora României) - ACTUALIZAT CU OBJECTIVESELECTOR
-// DESCRIERE: Timer personal cu start/stop/pause și persistență BigQuery
-// FUNCȚIONALITATE: Timer real-time cu salvare automată și manual cu obiective ierarhice
+// DATA: 27.09.2025 14:20 (ora României) - ACTUALIZAT CU LIVE TIMER DIN ADMIN
+// DESCRIERE: Timer personal identic cu cel din admin/analytics/live
+// FUNCȚIONALITATE: Timer live cu API /api/analytics/live-timer și persistență BigQuery
 // ==================================================================
 
 'use client';
@@ -10,365 +10,624 @@
 import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { toast } from 'react-toastify';
-import ObjectiveSelector from '@/app/components/user/ObjectiveSelector';
 
 interface PersonalTimerProps {
   user: User;
   onUpdate: () => void;
 }
 
-interface SelectedObjective {
-  tip: 'proiect' | 'subproiect' | 'sarcina';
-  proiect_id: string;
-  proiect_nume: string;
-  subproiect_id?: string;
-  subproiect_nume?: string;
-  sarcina_id?: string;
-  sarcina_nume?: string;
+// Interfaces identice cu admin live timer
+interface TimerSession {
+  isActive: boolean;
+  startTime: Date | null;
+  pausedTime: number;
+  elapsedTime: number;
+  projectId: string;
+  sarcinaId: string;
+  description: string;
+  sessionId: string;
 }
 
-interface TimerSession {
-  objective?: SelectedObjective;
-  task_description: string;
-  start_time: string;
-  isRunning: boolean;
-  elapsed: number; // milliseconds
+interface Project {
+  ID_Proiect: string;
+  Denumire: string;
+}
+
+interface Subproiect {
+  ID_Subproiect: string;
+  Denumire: string;
+  ID_Proiect_Parent: string;
+}
+
+interface Sarcina {
+  id: string;
+  titel: string;
+  subproiect_id: string;
 }
 
 export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
-  const [session, setSession] = useState<TimerSession | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [taskDescription, setTaskDescription] = useState('');
-  const [selectedObjective, setSelectedObjective] = useState<SelectedObjective | null>(null);
-  const [saving, setSaving] = useState(false);
+  // State identic cu admin live timer
+  const [personalTimer, setPersonalTimer] = useState<TimerSession>({
+    isActive: false,
+    startTime: null,
+    pausedTime: 0,
+    elapsedTime: 0,
+    projectId: '',
+    sarcinaId: 'general',
+    description: '',
+    sessionId: ''
+  });
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
+  const [sarcini, setSarcini] = useState<Sarcina[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<'proiect' | 'subproiect'>('proiect');
+  const [selectedSubproiect, setSelectedSubproiect] = useState('');
+  const [selectedSarcinaType, setSelectedSarcinaType] = useState<'general' | 'specific'>('general');
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    loadActiveSession();
+    fetchProjects();
+
+    // Load active session
+    const stored = localStorage.getItem('personalTimer');
+    if (stored) {
+      try {
+        const parsedTimer = JSON.parse(stored);
+        setPersonalTimer(parsedTimer);
+
+        if (parsedTimer.isActive && parsedTimer.startTime) {
+          startInterval();
+        }
+      } catch (error) {
+        console.error('Error parsing stored timer:', error);
+      }
+    }
   }, []);
 
   useEffect(() => {
-    if (session?.isRunning) {
-      intervalRef.current = setInterval(() => {
-        const now = Date.now();
-        const startTime = new Date(session.start_time).getTime();
-        const currentElapsed = now - startTime;
-        setElapsed(currentElapsed);
-      }, 1000);
+    if (personalTimer.isActive && personalTimer.startTime) {
+      startInterval();
     } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      stopInterval();
     }
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [session]);
+    return () => stopInterval();
+  }, [personalTimer.isActive]);
 
-  const loadActiveSession = () => {
-    // Load from localStorage if exists
-    const stored = localStorage.getItem('activeTimerSession');
-    if (stored) {
-      try {
-        const parsedSession = JSON.parse(stored);
-        setSession(parsedSession);
-        setTaskDescription(parsedSession.task_description || '');
-        setSelectedObjective(parsedSession.objective || null);
+  useEffect(() => {
+    // Close dropdown when clicking outside
+    const handleClickOutside = () => setShowProjectDropdown(false);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showProjectDropdown]);
 
-        if (parsedSession.isRunning) {
-          const now = Date.now();
-          const startTime = new Date(parsedSession.start_time).getTime();
-          setElapsed(now - startTime);
-        } else {
-          setElapsed(parsedSession.elapsed || 0);
-        }
-      } catch (error) {
-        console.error('Error parsing stored session:', error);
-        localStorage.removeItem('activeTimerSession');
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/user/projects');
+      const data = await response.json();
+      if (data.success) {
+        setProjects(data.proiecte || []);
       }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
     }
   };
 
-  const startTimer = () => {
-    if (!taskDescription.trim()) {
-      toast.error('Te rog să introduci o descriere pentru task!');
+  const fetchSubproiecte = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${projectId}`);
+      const data = await response.json();
+      if (data.success) {
+        setSubproiecte(data.subproiecte || []);
+      }
+    } catch (error) {
+      console.error('Error fetching subproiecte:', error);
+      setSubproiecte([]);
+    }
+  };
+
+  const fetchSarcini = async (subproiectId: string) => {
+    try {
+      const response = await fetch(`/api/rapoarte/sarcini?subproiect_id=${subproiectId}`);
+      const data = await response.json();
+      if (data.success) {
+        setSarcini(data.sarcini || []);
+      }
+    } catch (error) {
+      console.error('Error fetching sarcini:', error);
+      setSarcini([]);
+    }
+  };
+
+  const startInterval = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    intervalRef.current = setInterval(() => {
+      setPersonalTimer(prev => {
+        if (!prev.isActive || !prev.startTime) return prev;
+
+        const now = Date.now();
+        const elapsed = now - prev.startTime.getTime() + prev.pausedTime;
+
+        const updated = { ...prev, elapsedTime: elapsed };
+        localStorage.setItem('personalTimer', JSON.stringify(updated));
+        return updated;
+      });
+    }, 1000);
+  };
+
+  const stopInterval = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const startTimer = async () => {
+    if (!personalTimer.projectId) {
+      toast.error('Selectează un proiect pentru a începe timer-ul!');
       return;
     }
 
-    if (!selectedObjective) {
-      toast.error('Te rog să alegi un obiectiv (proiect, subproiect sau sarcină)!');
+    if (!user?.uid) {
+      toast.error('Eroare de autentificare. Te rog să te reconectezi!');
       return;
     }
 
-    const now = new Date().toISOString();
+    try {
+      const response = await fetch('/api/analytics/live-timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          user_id: user.uid,
+          proiect_id: personalTimer.projectId,
+          sarcina_id: personalTimer.sarcinaId,
+          descriere_activitate: personalTimer.description
+        })
+      });
 
-    const newSession: TimerSession = {
-      objective: selectedObjective,
-      task_description: taskDescription.trim(),
-      start_time: now,
-      isRunning: true,
-      elapsed: 0
-    };
+      const data = await response.json();
 
-    setSession(newSession);
-    setElapsed(0);
-    localStorage.setItem('activeTimerSession', JSON.stringify(newSession));
+      if (data.success) {
+        const newTimer = {
+          ...personalTimer,
+          isActive: true,
+          startTime: new Date(),
+          sessionId: data.session_id,
+          elapsedTime: 0,
+          pausedTime: 0
+        };
 
-    toast.success('Timer pornit! 🚀');
-  };
-
-  const pauseTimer = () => {
-    if (session) {
-      const now = Date.now();
-      const startTime = new Date(session.start_time).getTime();
-      const totalElapsed = now - startTime;
-
-      const pausedSession = {
-        ...session,
-        isRunning: false,
-        elapsed: totalElapsed
-      };
-
-      setSession(pausedSession);
-      setElapsed(totalElapsed);
-      localStorage.setItem('activeTimerSession', JSON.stringify(pausedSession));
-
-      toast.info('Timer pus în pauză ⏸️');
+        setPersonalTimer(newTimer);
+        localStorage.setItem('personalTimer', JSON.stringify(newTimer));
+        toast.success('Timer pornit! 🚀');
+      } else {
+        toast.error(data.error || 'Eroare la pornirea timer-ului');
+      }
+    } catch (error) {
+      console.error('Error starting timer:', error);
+      toast.error('Eroare la pornirea timer-ului');
     }
   };
 
-  const resumeTimer = () => {
-    if (session) {
-      const now = new Date().toISOString();
-      const resumedSession = {
-        ...session,
-        start_time: now,
-        isRunning: true
-      };
+  const pauseTimer = async () => {
+    if (!personalTimer.sessionId) {
+      toast.error('Nu există o sesiune activă pentru a fi pausată!');
+      return;
+    }
 
-      setSession(resumedSession);
-      localStorage.setItem('activeTimerSession', JSON.stringify(resumedSession));
+    try {
+      const response = await fetch('/api/analytics/live-timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pause',
+          session_id: personalTimer.sessionId,
+          user_id: user.uid
+        })
+      });
 
-      toast.success('Timer reluat! ▶️');
+      const data = await response.json();
+
+      if (data.success) {
+        const pausedTimer = {
+          ...personalTimer,
+          isActive: false,
+          pausedTime: personalTimer.elapsedTime
+        };
+
+        setPersonalTimer(pausedTimer);
+        localStorage.setItem('personalTimer', JSON.stringify(pausedTimer));
+        toast.info('Timer pus în pauză ⏸️');
+      } else {
+        toast.error(data.error || 'Eroare la pausarea timer-ului');
+      }
+    } catch (error) {
+      console.error('Error pausing timer:', error);
+      toast.error('Eroare la pausarea timer-ului');
+    }
+  };
+
+  const resumeTimer = async () => {
+    if (!personalTimer.sessionId) {
+      toast.error('Nu există o sesiune pentru a fi reluată!');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/analytics/live-timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resume',
+          session_id: personalTimer.sessionId,
+          user_id: user.uid
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const resumedTimer = {
+          ...personalTimer,
+          isActive: true,
+          startTime: new Date()
+        };
+
+        setPersonalTimer(resumedTimer);
+        localStorage.setItem('personalTimer', JSON.stringify(resumedTimer));
+        toast.success('Timer reluat! ▶️');
+      } else {
+        toast.error(data.error || 'Eroare la reluarea timer-ului');
+      }
+    } catch (error) {
+      console.error('Error resuming timer:', error);
+      toast.error('Eroare la reluarea timer-ului');
     }
   };
 
   const stopTimer = async () => {
-    if (!session) return;
-
-    setSaving(true);
+    if (!personalTimer.sessionId) {
+      toast.error('Nu există o sesiune activă pentru a fi oprită!');
+      return;
+    }
 
     try {
-      const now = Date.now();
-      const startTime = new Date(session.start_time).getTime();
-      const finalElapsed = session.isRunning ? (now - startTime + (session.elapsed || 0)) : (session.elapsed || 0);
-      const durationMinutes = finalElapsed / 60000;
-
-      if (durationMinutes < 1) {
-        toast.error('Timp prea scurt! Minim 1 minut pentru a salva.');
-        setSaving(false);
-        return;
-      }
-
-      const timeData = {
-        user_id: user.uid,
-        proiect_id: session.objective?.proiect_id,
-        subproiect_id: session.objective?.subproiect_id || null,
-        sarcina_id: session.objective?.sarcina_id || null,
-        task_description: session.task_description,
-        data_lucru: new Date().toISOString().split('T')[0],
-        duration_minutes: Math.round(durationMinutes * 10) / 10 // Round la o zecimală
-      };
-
-      const response = await fetch('/api/user/timetracking', {
+      const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(timeData)
+        body: JSON.stringify({
+          action: 'stop',
+          session_id: personalTimer.sessionId,
+          user_id: user.uid
+        })
       });
 
-      const result = await response.json();
+      const data = await response.json();
 
-      if (result.success) {
-        toast.success(`Timp salvat: ${Math.round(durationMinutes * 10) / 10} minute! 💾`);
+      if (data.success) {
+        // Reset timer state
+        const resetTimer = {
+          isActive: false,
+          startTime: null,
+          pausedTime: 0,
+          elapsedTime: 0,
+          projectId: '',
+          sarcinaId: 'general',
+          description: '',
+          sessionId: ''
+        };
 
-        // Reset everything
-        setSession(null);
-        setElapsed(0);
-        setTaskDescription('');
-        setSelectedObjective(null);
-        localStorage.removeItem('activeTimerSession');
-
-        // Trigger update for parent component
-        onUpdate();
+        setPersonalTimer(resetTimer);
+        localStorage.removeItem('personalTimer');
+        toast.success('Timer oprit și salvat! 💾');
+        onUpdate(); // Trigger refresh în parent
       } else {
-        toast.error(result.error || 'Eroare la salvarea timpului');
+        toast.error(data.error || 'Eroare la oprirea timer-ului');
       }
     } catch (error) {
-      console.error('Error saving time:', error);
-      toast.error('Eroare la salvarea timpului');
-    } finally {
-      setSaving(false);
+      console.error('Error stopping timer:', error);
+      toast.error('Eroare la oprirea timer-ului');
     }
   };
 
-  const cancelTimer = () => {
-    if (confirm('Ești sigur că vrei să anulezi sesiunea de timp curentă? Modificările nu vor fi salvate.')) {
-      setSession(null);
-      setElapsed(0);
-      setTaskDescription('');
-      setSelectedObjective(null);
-      localStorage.removeItem('activeTimerSession');
-
-      toast.info('Sesiune anulată ❌');
-    }
-  };
-
+  // Helper functions identice cu admin
   const formatTime = (milliseconds: number) => {
-    const seconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
     if (hours > 0) {
-      return `${hours}:${String(minutes % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     } else {
-      return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
   };
 
-  const getObjectiveDisplay = () => {
-    if (!session?.objective) return '';
-
-    const parts = [
-      `📂 ${session.objective.proiect_nume}`
-    ];
-
-    if (session.objective.subproiect_nume) {
-      parts.push(`📋 ${session.objective.subproiect_nume}`);
+  const handleProjectChange = (projectId: string) => {
+    setPersonalTimer(prev => ({ ...prev, projectId, sarcinaId: 'general' }));
+    setSelectedSubproiect('');
+    setSelectedSarcinaType('general');
+    if (projectId) {
+      fetchSubproiecte(projectId);
+    } else {
+      setSubproiecte([]);
+      setSarcini([]);
     }
+  };
 
-    if (session.objective.sarcina_nume) {
-      parts.push(`✅ ${session.objective.sarcina_nume}`);
+  const handleSubproiectChange = (subproiectId: string) => {
+    setSelectedSubproiect(subproiectId);
+    setSelectedSarcinaType('general');
+    setPersonalTimer(prev => ({ ...prev, sarcinaId: 'general' }));
+    if (subproiectId) {
+      fetchSarcini(subproiectId);
+    } else {
+      setSarcini([]);
     }
-
-    return parts.join(' → ');
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-md rounded-xl border border-white/20 p-6 shadow-lg space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-blue-500/20 rounded-lg">
-          ⏱️
-        </div>
-        <div>
-          <h3 className="font-semibold text-gray-900">Timer Personal</h3>
-          <p className="text-sm text-gray-600">
-            {session?.isRunning ? 'Rulează acum' : 'Start nou timer'}
-          </p>
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.9)',
+      backdropFilter: 'blur(20px)',
+      borderRadius: '16px',
+      padding: '1.5rem',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '1.5rem'
+      }}>
+        <h3 style={{
+          margin: 0,
+          fontSize: '1.25rem',
+          fontWeight: '700',
+          color: '#1f2937'
+        }}>
+          ⏱️ Timer Personal
+        </h3>
+
+        <div style={{
+          fontSize: '2rem',
+          fontWeight: '700',
+          fontFamily: 'monospace',
+          color: personalTimer.isActive ? '#10b981' : '#6b7280'
+        }}>
+          {formatTime(personalTimer.elapsedTime)}
         </div>
       </div>
 
-      {/* Current Session Display */}
-      {session && (
-        <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200/50">
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-medium text-blue-900">Sesiune Activă</span>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${session.isRunning ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-              <span className={`text-sm ${session.isRunning ? 'text-green-700' : 'text-yellow-700'}`}>
-                {session.isRunning ? 'Rulează' : 'În pauză'}
-              </span>
-            </div>
-          </div>
-
-          <div className="text-2xl font-bold text-blue-900 mb-2">
-            {formatTime(elapsed + (session.elapsed || 0))}
-          </div>
-
-          {getObjectiveDisplay() && (
-            <div className="text-sm text-blue-800 mb-2">
-              {getObjectiveDisplay()}
+      {personalTimer.sessionId ? (
+        <div>
+          {personalTimer.projectId && (
+            <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+              📁 {personalTimer.projectId}
+              {personalTimer.description && (
+                <span> • {personalTimer.description}</span>
+              )}
             </div>
           )}
 
-          <div className="text-sm text-blue-700">
-            {session.task_description}
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            {personalTimer.isActive ? (
+              <>
+                <button
+                  onClick={pauseTimer}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  ⏸️ Pauză
+                </button>
+                <button
+                  onClick={stopTimer}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  ⏹️ Stop
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={resumeTimer}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  ▶️ Continuă
+                </button>
+                <button
+                  onClick={stopTimer}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  ⏹️ Stop
+                </button>
+              </>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Timer Controls */}
-      {session ? (
-        <div className="flex gap-2">
-          {session.isRunning ? (
-            <button
-              onClick={pauseTimer}
-              className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
-            >
-              ⏸️ Pauză
-            </button>
-          ) : (
-            <button
-              onClick={resumeTimer}
-              className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-            >
-              ▶️ Resume
-            </button>
-          )}
-
-          <button
-            onClick={stopTimer}
-            disabled={saving}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400"
-          >
-            {saving ? '💾 Salvează...' : '🔴 Stop & Salvează'}
-          </button>
-
-          <button
-            onClick={cancelTimer}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-          >
-            ❌
-          </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Objective Selector */}
-          <ObjectiveSelector
-            userId={user.uid}
-            onSelectionChange={setSelectedObjective}
-          />
+        <div>
+          {/* Project Selection UI */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+              Selectează Proiect *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProjectDropdown(!showProjectDropdown);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  background: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <span>
+                  {personalTimer.projectId
+                    ? projects.find(p => p.ID_Proiect === personalTimer.projectId)?.Denumire || personalTimer.projectId
+                    : 'Alege un proiect...'}
+                </span>
+                <span>{showProjectDropdown ? '⏶' : '⏷'}</span>
+              </button>
 
-          {/* Task Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descriere task *
+              {showProjectDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'white',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  marginTop: '0.25rem',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 50,
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}>
+                  {projects.map((project) => (
+                    <button
+                      key={project.ID_Proiect}
+                      onClick={() => {
+                        handleProjectChange(project.ID_Proiect);
+                        setShowProjectDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        textAlign: 'left',
+                        border: 'none',
+                        background: personalTimer.projectId === project.ID_Proiect ? '#f3f4f6' : 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {project.Denumire}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Description Input */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+              Descriere activitate
             </label>
             <textarea
-              value={taskDescription}
-              onChange={(e) => setTaskDescription(e.target.value)}
+              value={personalTimer.description}
+              onChange={(e) => setPersonalTimer(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Ce lucrezi acum..."
               rows={3}
-              className="w-full px-3 py-2 bg-white/60 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                resize: 'vertical'
+              }}
             />
           </div>
 
           {/* Start Button */}
-          <button
-            onClick={startTimer}
-            disabled={!selectedObjective || !taskDescription.trim()}
-            className={`w-full px-4 py-3 rounded-lg font-semibold transition-all ${
-              selectedObjective && taskDescription.trim()
-                ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg hover:shadow-xl'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            🚀 Start Timer
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={() => {
+                // Reset selection
+                setPersonalTimer({
+                  isActive: false,
+                  startTime: null,
+                  pausedTime: 0,
+                  elapsedTime: 0,
+                  projectId: '',
+                  sarcinaId: 'general',
+                  description: '',
+                  sessionId: ''
+                });
+                setSelectedSubproiect('');
+                setSelectedSarcinaType('general');
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
+            >
+              🔄 Reset
+            </button>
+            <button
+              onClick={startTimer}
+              disabled={!personalTimer.projectId}
+              style={{
+                padding: '0.5rem 1rem',
+                background: personalTimer.projectId ? '#10b981' : '#9ca3af',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: personalTimer.projectId ? 'pointer' : 'not-allowed',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                flex: 1
+              }}
+            >
+              🚀 Start Timer
+            </button>
+          </div>
         </div>
       )}
     </div>
