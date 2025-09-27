@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
           -- Determinare nume proiect bazat pe context (proiect sau subproiect)
           CASE
             WHEN sub.ID_Subproiect IS NOT NULL THEN
-              CONCAT(p.Denumire, ' → ', sub.Denumire)
+              CONCAT(p_parent.Denumire, ' → ', sub.Denumire)
             ELSE
               COALESCE(p.Denumire, 'Proiect necunoscut')
           END as proiect_nume,
