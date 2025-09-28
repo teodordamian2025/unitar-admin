@@ -58,10 +58,11 @@ export async function GET(
         sp.Status,
         sp.Responsabil,
         -- Contorizare sarcini pentru acest subproiect
+        -- IMPORTANT: Sarcini de subproiect au proiect_id = ID_Subproiect, nu subproiect_id
         (
           SELECT COUNT(*)
           FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
-          WHERE subproiect_id = sp.ID_Subproiect AND status NOT IN ('Finalizată', 'Anulată')
+          WHERE proiect_id = sp.ID_Subproiect AND status NOT IN ('Finalizată', 'Anulată')
         ) as sarcini_count,
         -- Verificare dacă este deja în planificator
         CASE

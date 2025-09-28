@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
     }
 
-    // Query simplificat pentru testare pin-uri active
+    // Query cu JOIN către tabelul Utilizatori pentru nume reale
     const livePinsQuery = `
       SELECT
         p.id as planificator_id,
@@ -44,9 +44,16 @@ export async function GET(request: NextRequest) {
         p.data_actualizare,
         p.is_pinned,
         p.activ,
+        -- Date utilizator din tabelul Utilizatori
+        u.nume,
+        u.prenume,
+        u.email,
+        u.rol,
         -- Calculare timp de la pin simplificat
         TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), p.data_actualizare, MINUTE) as minute_de_la_pin
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` p
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Utilizatori\` u
+        ON p.utilizator_uid = u.uid
       WHERE p.is_pinned = TRUE
         AND p.activ = TRUE
       ORDER BY p.data_actualizare DESC
@@ -96,11 +103,13 @@ export async function GET(request: NextRequest) {
         urgenta: 'scazuta',
         urgenta_color: '#10b981',
 
-        // Date utilizator
+        // Date utilizator din BigQuery
         utilizator_uid: row.utilizator_uid,
-        user_display: 'Demo User',
-        user_email: 'demo@test.com',
-        user_rol: 'user',
+        user_display: row.nume && row.prenume
+          ? `${row.prenume} ${row.nume}`
+          : (row.email ? row.email.split('@')[0] : 'Utilizator Necunoscut'),
+        user_email: row.email || 'unknown@domain.com',
+        user_rol: row.rol || 'user',
 
         // Timing
         data_pin: row.data_actualizare,
