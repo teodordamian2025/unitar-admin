@@ -10,18 +10,29 @@ import * as admin from 'firebase-admin';
 // Inițializare Firebase Admin SDK (singleton pattern)
 if (!admin.apps.length) {
   try {
-    // IMPORTANT: Folosește același project ID ca și client-ul Firebase
-    // Client Firebase folosește NEXT_PUBLIC_FIREBASE_PROJECT_ID=unitarproiect
-    // Admin SDK trebuie să folosească același ID pentru verificarea token-urilor
+    // Detectează automat project ID-ul corect pentru production
+    // În production token-urile vin cu audience "unitar-admin"
+    // În development folosim "unitarproiect"
+    // IMPORTANT: Trebuie să fie sincronizat cu NEXT_PUBLIC_FIREBASE_PROJECT_ID din client
+    const projectId = process.env.NODE_ENV === 'production'
+      ? 'unitar-admin'
+      : (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'unitarproiect');
+
+    // Pentru production, verifică dacă e setat explicit un project ID Firebase
+    const finalProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID || projectId;
+
+    console.log(`🔧 Firebase Admin SDK initializing with project ID: ${finalProjectId}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV}, Auto-detected: ${projectId}, Final: ${finalProjectId}`);
+
     const serviceAccount = {
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID, // "unitarproiect"
+      projectId: finalProjectId,
       clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
       privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     };
 
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID // "unitarproiect"
+      projectId: finalProjectId
     });
 
     console.log('✅ Firebase Admin SDK initialized successfully');
@@ -52,6 +63,7 @@ export async function verifyFirebaseToken(token: string): Promise<admin.auth.Dec
  */
 export async function getUserIdFromToken(authHeader: string | null): Promise<string | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('🔍 getUserIdFromToken: Missing or invalid Authorization header');
     return null;
   }
 
@@ -61,13 +73,21 @@ export async function getUserIdFromToken(authHeader: string | null): Promise<str
     const decodedToken = await verifyFirebaseToken(token);
 
     if (decodedToken?.uid) {
+      console.log(`✅ Firebase token verified successfully for user: ${decodedToken.uid}`);
       return decodedToken.uid;
     } else {
       // Token verificat cu succes dar fără UID - folosește fallback
+      console.log('⚠️ Token verified but no UID found, using fallback');
       return 'demo_user_id';
     }
   } catch (error) {
     // Token invalid sau alt error - folosește fallback pentru development
+    console.log('❌ Firebase token verification failed, using fallback for development');
+    if (process.env.NODE_ENV === 'production') {
+      // În production nu returnăm fallback pentru securitate
+      console.error('🚨 Production: Firebase token invalid, rejecting request');
+      return null;
+    }
     return 'demo_user_id';
   }
 }
