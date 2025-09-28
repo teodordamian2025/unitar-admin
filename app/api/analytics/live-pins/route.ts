@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
     }
 
-    // Query cu JOIN către tabelul Utilizatori pentru nume reale
+    // Query cu JOIN-uri multiple pentru afișare corectă items
     const livePinsQuery = `
       SELECT
         p.id as planificator_id,
@@ -49,11 +49,58 @@ export async function GET(request: NextRequest) {
         u.prenume,
         u.email,
         u.rol,
-        -- Calculare timp de la pin simplificat
+
+        -- Date proiecte
+        pr.Denumire as proiect_denumire,
+        pr.ID_Proiect as proiect_id,
+
+        -- Date subproiecte cu proiectul părinte
+        sp.Denumire as subproiect_denumire,
+        sp.ID_Subproiect as subproiect_id,
+        sp_pr.ID_Proiect as subproiect_proiect_id,
+        sp_pr.Denumire as subproiect_proiect_denumire,
+
+        -- Date sarcini cu context proiect/subproiect
+        s.titlu as sarcina_titlu,
+        s.tip_proiect as sarcina_tip_proiect,
+        -- Pentru sarcini de subproiect: proiect_id = ID_Subproiect
+        CASE
+          WHEN s.tip_proiect = 'subproiect' THEN s.proiect_id
+          ELSE NULL
+        END as sarcina_subproiect_id,
+
+        -- Date pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
+        s_sp.Denumire as sarcina_subproiect_nume,
+        s_sp_pr.ID_Proiect as sarcina_proiect_parinte_id,
+        s_sp_pr.Denumire as sarcina_proiect_parinte_nume,
+
+        -- Calculare timp de la pin
         TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), p.data_actualizare, MINUTE) as minute_de_la_pin
+
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` p
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Utilizatori\` u
         ON p.utilizator_uid = u.uid
+
+      -- JOIN pentru proiecte directe
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr
+        ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
+
+      -- JOIN pentru subproiecte
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+        ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` sp_pr
+        ON sp.ID_Proiect = sp_pr.ID_Proiect
+
+      -- JOIN pentru sarcini
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
+        ON p.tip_item = 'sarcina' AND p.item_id = s.id
+
+      -- JOIN pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` s_sp
+        ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` s_sp_pr
+        ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
+
       WHERE p.is_pinned = TRUE
         AND p.activ = TRUE
       ORDER BY p.data_actualizare DESC
@@ -72,8 +119,34 @@ export async function GET(request: NextRequest) {
       const realizatMarker = '[REALIZAT]';
       const comentariu_curat = comentariuComplet.replace(realizatMarker, '').trim();
 
-      // Display name simplu pentru test
-      const display_name = `${row.tip_item} - ${row.item_id}`;
+      // Construire display name inteligent bazat pe tip item
+      let display_name = '';
+      let context_proiect = '';
+
+      if (row.tip_item === 'proiect') {
+        // Proiect: ID_Proiect + Denumire
+        display_name = `${row.proiect_id} - ${row.proiect_denumire || 'Proiect fără nume'}`;
+        context_proiect = `Proiect ${row.proiect_id}`;
+      } else if (row.tip_item === 'subproiect') {
+        // Subproiect: ID_Proiect părinte + Denumire subproiect
+        display_name = `${row.subproiect_proiect_id} - ${row.subproiect_denumire || 'Subproiect fără nume'}`;
+        context_proiect = `Subproiect din ${row.subproiect_proiect_id}`;
+      } else if (row.tip_item === 'sarcina') {
+        // Sarcină: verifică dacă e de subproiect sau proiect direct
+        if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
+          // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină
+          display_name = `${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume || 'Subproiect'} - ${row.sarcina_titlu || 'Sarcină'}`;
+          context_proiect = `📁 ${row.sarcina_proiect_parinte_id} > ${row.sarcina_subproiect_nume}`;
+        } else {
+          // Sarcină de proiect direct
+          display_name = `${row.sarcina_titlu || 'Sarcină fără titlu'}`;
+          context_proiect = `Sarcină din proiect direct`;
+        }
+      } else {
+        // Fallback pentru tipuri necunoscute
+        display_name = `${row.tip_item} - ${row.item_id}`;
+        context_proiect = `${row.tip_item} ${row.item_id}`;
+      }
 
       // Formatare timp de la pin
       const minute = row.minute_de_la_pin || 0;
@@ -116,8 +189,8 @@ export async function GET(request: NextRequest) {
         minute_de_la_pin: minute,
         timp_pin_text,
 
-        // Context proiect
-        context_proiect: `Proiect ${row.item_id}`,
+        // Context proiect dinamic
+        context_proiect,
 
         // Informații specifice tip
         detalii_specifice: { test: true }

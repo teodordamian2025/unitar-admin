@@ -68,7 +68,15 @@ export async function GET(request: NextRequest) {
         s.status as sarcina_status,
         s.data_scadenta as sarcina_data_scadenta,
         s.progres_procent as sarcina_progres,
+        s.tip_proiect as sarcina_tip_proiect,
+
+        -- Pentru sarcini de proiect direct
         pr3.Denumire as sarcina_proiect_nume,
+
+        -- Pentru sarcini de subproiect
+        s_sp.Denumire as sarcina_subproiect_nume,
+        s_sp_pr.ID_Proiect as sarcina_proiect_parinte_id,
+        s_sp_pr.Denumire as sarcina_proiect_parinte_nume,
 
         -- Calculare urgență pentru sortare automată
         CASE
@@ -96,8 +104,16 @@ export async function GET(request: NextRequest) {
       -- Join sarcini
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
+
+      -- Join pentru sarcini de proiect direct
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr3
-        ON s.proiect_id = pr3.ID_Proiect
+        ON s.tip_proiect = 'proiect' AND s.proiect_id = pr3.ID_Proiect
+
+      -- Join pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` s_sp
+        ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` s_sp_pr
+        ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
 
       WHERE p.utilizator_uid = @userId AND p.activ = TRUE
       ORDER BY p.ordine_pozitie ASC
@@ -123,7 +139,20 @@ export async function GET(request: NextRequest) {
         display_name = `📂 ${row.item_id} - ${row.subproiect_denumire} (${row.subproiect_proiect_nume})`;
         data_scadenta = row.subproiect_data_final?.value || row.subproiect_data_final;
       } else if (row.tip_item === 'sarcina') {
-        display_name = `✅ ${row.sarcina_titlu} (${row.sarcina_proiect_nume})`;
+        // Logic uniformă pentru sarcini de proiect direct vs subproiect
+        let context_nume = '';
+        if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
+          // Sarcină de subproiect: Proiect părinte + Subproiect
+          context_nume = `${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume}`;
+        } else if (row.sarcina_proiect_nume) {
+          // Sarcină de proiect direct
+          context_nume = row.sarcina_proiect_nume;
+        } else {
+          // Fallback
+          context_nume = 'Proiect necunoscut';
+        }
+
+        display_name = `✅ ${row.sarcina_titlu} (${context_nume})`;
         data_scadenta = row.sarcina_data_scadenta?.value || row.sarcina_data_scadenta;
         comentariu_original = row.sarcina_descriere;
       }

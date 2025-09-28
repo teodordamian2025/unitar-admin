@@ -478,7 +478,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '1fr 300px',
+      gridTemplateColumns: '350px 1fr',
       gap: '1.5rem',
       minHeight: '400px'
     }}>
