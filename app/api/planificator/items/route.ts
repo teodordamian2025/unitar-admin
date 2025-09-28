@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         sp.Data_Final as subproiect_data_final,
         sp.Status as subproiect_status,
         sp.Responsabil as subproiect_responsabil,
+        pr2.ID_Proiect as subproiect_proiect_id,
         pr2.Denumire as subproiect_proiect_nume,
 
         -- Date sarcini
@@ -136,23 +137,21 @@ export async function GET(request: NextRequest) {
         display_name = `📁 ${row.item_id} - ${row.proiect_denumire}`;
         data_scadenta = row.proiect_data_final?.value || row.proiect_data_final;
       } else if (row.tip_item === 'subproiect') {
-        display_name = `📂 ${row.item_id} - ${row.subproiect_denumire} (${row.subproiect_proiect_nume})`;
+        // Subproiect: ID_Proiect părinte + Denumire subproiect (ca la analytics/live)
+        display_name = `📂 ${row.subproiect_proiect_id} - ${row.subproiect_denumire}`;
         data_scadenta = row.subproiect_data_final?.value || row.subproiect_data_final;
       } else if (row.tip_item === 'sarcina') {
-        // Logic uniformă pentru sarcini de proiect direct vs subproiect
-        let context_nume = '';
+        // Logic uniformă pentru sarcini ca la analytics/live
         if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
-          // Sarcină de subproiect: Proiect părinte + Subproiect
-          context_nume = `${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume}`;
+          // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină (ca la analytics/live)
+          display_name = `✅ ${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume} - ${row.sarcina_titlu}`;
         } else if (row.sarcina_proiect_nume) {
           // Sarcină de proiect direct
-          context_nume = row.sarcina_proiect_nume;
+          display_name = `✅ ${row.sarcina_titlu} (${row.sarcina_proiect_nume})`;
         } else {
           // Fallback
-          context_nume = 'Proiect necunoscut';
+          display_name = `✅ ${row.sarcina_titlu} (Proiect necunoscut)`;
         }
-
-        display_name = `✅ ${row.sarcina_titlu} (${context_nume})`;
         data_scadenta = row.sarcina_data_scadenta?.value || row.sarcina_data_scadenta;
         comentariu_original = row.sarcina_descriere;
       }
