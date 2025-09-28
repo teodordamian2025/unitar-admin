@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
+import { getUserIdFromToken } from '@/lib/firebase-admin';
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -24,6 +25,12 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
+    }
+
+    // Verifică autentificarea - API pentru admin
+    const userId = await getUserIdFromToken(authHeader);
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
     }
 
     // Query simplificat pentru testare pin-uri active
