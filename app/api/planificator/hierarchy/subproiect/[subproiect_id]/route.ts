@@ -79,7 +79,7 @@ export async function GET(
         ON s.proiect_id = p.ID_Proiect
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
         ON s.subproiect_id = sp.ID_Subproiect
-      WHERE s.subproiect_id = @subproiect_id
+      WHERE s.proiect_id = @subproiect_id
         AND s.status NOT IN ('Finalizată', 'Anulată')
       ORDER BY
         -- Prioritate + urgență pentru sortare inteligentă
