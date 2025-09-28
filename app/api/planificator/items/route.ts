@@ -115,10 +115,10 @@ export async function GET(request: NextRequest) {
       let comentariu_original = '';
 
       if (row.tip_item === 'proiect') {
-        display_name = `📁 ${row.proiect_denumire}`;
+        display_name = `📁 ${row.item_id} - ${row.proiect_denumire}`;
         data_scadenta = row.proiect_data_final?.value || row.proiect_data_final;
       } else if (row.tip_item === 'subproiect') {
-        display_name = `📂 ${row.subproiect_denumire} (${row.subproiect_proiect_nume})`;
+        display_name = `📂 ${row.item_id} - ${row.subproiect_denumire} (${row.subproiect_proiect_nume})`;
         data_scadenta = row.subproiect_data_final?.value || row.subproiect_data_final;
       } else if (row.tip_item === 'sarcina') {
         display_name = `✅ ${row.sarcina_titlu} (${row.sarcina_proiect_nume})`;
@@ -133,14 +133,21 @@ export async function GET(request: NextRequest) {
       else if (zile <= 3) urgenta = 'ridicata';
       else if (zile <= 7) urgenta = 'medie';
 
+      // Detectare marker realizat în comentariu
+      const comentariuComplet = row.comentariu_personal || '';
+      const realizatMarker = '[REALIZAT]';
+      const is_realizat = comentariuComplet.includes(realizatMarker);
+      const comentariu_curat = comentariuComplet.replace(realizatMarker, '').trim();
+
       return {
         id: row.id,
         utilizator_uid: row.utilizator_uid,
         tip_item: row.tip_item,
         item_id: row.item_id,
         ordine_pozitie: row.ordine_pozitie,
-        comentariu_personal: row.comentariu_personal || '',
+        comentariu_personal: comentariu_curat,
         is_pinned: row.is_pinned,
+        is_realizat,
         display_name,
         data_scadenta,
         zile_pana_scadenta: zile,

@@ -40,78 +40,38 @@ export async function GET(request: NextRequest) {
 
     const searchPattern = `%${searchTerm.toLowerCase()}%`;
 
-    // Query unificată pentru toate tipurile de items
+    // Query pentru căutarea doar a proiectelor (primul nivel al ierarhiei)
     const searchQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
         WHERE utilizator_uid = @userId AND activ = TRUE
-      ),
-
-      ProiecteSearch AS (
-        SELECT
-          'proiect' as tip,
-          ID_Proiect as id,
-          Denumire as nume,
-          CAST(NULL AS STRING) as proiect_nume,
-          1 as priority_order
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\`
-        WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
-          AND Status != 'Anulat'
-          AND ID_Proiect NOT IN (
-            SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
-          )
-      ),
-
-      SubproiecteSearch AS (
-        SELECT
-          'subproiect' as tip,
-          sp.ID_Subproiect as id,
-          sp.Denumire as nume,
-          p.Denumire as proiect_nume,
-          2 as priority_order
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
-          ON sp.ID_Proiect = p.ID_Proiect
-        WHERE LOWER(sp.Denumire) LIKE @searchPattern
-          AND sp.Status != 'Anulat'
-          AND sp.activ = TRUE
-          AND sp.ID_Subproiect NOT IN (
-            SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'subproiect'
-          )
-      ),
-
-      SarciniSearch AS (
-        SELECT
-          'sarcina' as tip,
-          s.id as id,
-          s.titlu as nume,
-          p.Denumire as proiect_nume,
-          CASE
-            WHEN s.prioritate = 'Critică' THEN 1
-            WHEN s.prioritate = 'Ridicată' THEN 2
-            WHEN s.prioritate = 'Medie' THEN 3
-            ELSE 4
-          END as priority_order
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
-          ON s.proiect_id = p.ID_Proiect
-        WHERE (LOWER(s.titlu) LIKE @searchPattern OR LOWER(s.descriere) LIKE @searchPattern)
-          AND s.status NOT IN ('Finalizată', 'Anulată')
-          AND s.id NOT IN (
-            SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'sarcina'
-          )
       )
 
-      SELECT tip, id, nume, proiect_nume, priority_order
-      FROM (
-        SELECT * FROM ProiecteSearch
-        UNION ALL
-        SELECT * FROM SubproiecteSearch
-        UNION ALL
-        SELECT * FROM SarciniSearch
-      )
-      ORDER BY priority_order ASC, nume ASC
+      SELECT
+        'proiect' as tip,
+        ID_Proiect as id,
+        CONCAT(ID_Proiect, ' - ', Denumire) as nume,
+        CAST(NULL AS STRING) as proiect_nume,
+        1 as priority_order,
+        -- Contorizare subproiecte și sarcini pentru feedback
+        (
+          SELECT COUNT(*)
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\`
+          WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
+        ) as subproiecte_count,
+        (
+          SELECT COUNT(*)
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
+          WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
+        ) as sarcini_count
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
+      WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
+        AND Status != 'Anulat'
+        AND ID_Proiect NOT IN (
+          SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
+        )
+      ORDER BY Denumire ASC
       LIMIT 20
     `;
 
@@ -124,7 +84,9 @@ export async function GET(request: NextRequest) {
       id: row.id,
       tip: row.tip,
       nume: row.nume,
-      proiect_nume: row.proiect_nume
+      proiect_nume: row.proiect_nume,
+      subproiecte_count: row.subproiecte_count || 0,
+      sarcini_count: row.sarcini_count || 0
     }));
 
     return NextResponse.json({ results });

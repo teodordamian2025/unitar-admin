@@ -63,6 +63,27 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized to modify this item' }, { status: 403 });
     }
 
+    // Verifică dacă comentariul curent are marker-ul [REALIZAT]
+    const currentItemQuery = `
+      SELECT comentariu_personal
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      WHERE id = @itemId AND utilizator_uid = @userId
+    `;
+
+    const [currentRows] = await bigquery.query({
+      query: currentItemQuery,
+      params: { itemId, userId }
+    });
+
+    const currentComentariu = currentRows[0]?.comentariu_personal || '';
+    const realizatMarker = '[REALIZAT]';
+    const hasRealizatMarker = currentComentariu.includes(realizatMarker);
+
+    // Păstrează marker-ul de realizat dacă există
+    const finalComentariu = hasRealizatMarker
+      ? `${realizatMarker} ${comentariu_personal || ''}`.trim()
+      : comentariu_personal || '';
+
     // Update comentariu personal
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
@@ -75,7 +96,7 @@ export async function POST(
       params: {
         itemId,
         userId,
-        comentariu_personal: comentariu_personal || null
+        comentariu_personal: finalComentariu
       }
     });
 

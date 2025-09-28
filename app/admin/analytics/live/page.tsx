@@ -41,6 +41,27 @@ interface TimerStats {
   active_users_count: number;
 }
 
+interface LivePin {
+  id: string;
+  tip_item: 'proiect' | 'subproiect' | 'sarcina';
+  item_id: string;
+  display_name: string;
+  comentariu_personal: string;
+  deadline: string | null;
+  zile_pana_deadline: number;
+  urgenta: string;
+  urgenta_color: string;
+  utilizator_uid: string;
+  user_display: string;
+  user_email: string;
+  user_rol: string;
+  data_pin: string;
+  minute_de_la_pin: number;
+  timp_pin_text: string;
+  context_proiect: string;
+  detalii_specifice: any;
+}
+
 interface TimerSession {
   isActive: boolean;
   startTime: Date | null;
@@ -99,6 +120,7 @@ export default function LiveTracking() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const [livePins, setLivePins] = useState<LivePin[]>([]);
   const [timerStats, setTimerStats] = useState<TimerStats | null>(null);
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('user');
@@ -215,13 +237,18 @@ export default function LiveTracking() {
 
   const loadLiveData = async () => {
     try {
-      const response = await fetch('/api/analytics/live-timer?team_view=true');
-      const result = await response.json();
+      // Încarcă sesiunile live (existent)
+      const sessionResponse = await fetch('/api/analytics/live-timer?team_view=true');
+      const sessionResult = await sessionResponse.json();
 
-      if (result.success) {
-        const sessions = result.data || [];
+      // Încarcă pin-urile active (nou)
+      const pinsResponse = await fetch('/api/analytics/live-pins');
+      const pinsResult = await pinsResponse.json();
+
+      if (sessionResult.success) {
+        const sessions = sessionResult.data || [];
         setLiveSessions(sessions);
-        setTimerStats(result.stats || null);
+        setTimerStats(sessionResult.stats || null);
 
         // Check if user has active session
         const userSession = sessions.find((session: LiveSession) =>
@@ -247,13 +274,23 @@ export default function LiveTracking() {
           });
         }
       } else {
-        console.error('API Error:', result.error);
+        console.error('Sessions API Error:', sessionResult.error);
         setLiveSessions([]);
         setTimerStats(null);
       }
+
+      // Procesare pin-uri active
+      if (pinsResponse.ok && pinsResult.pins) {
+        setLivePins(pinsResult.pins);
+      } else {
+        console.error('Pins API Error:', pinsResult.error);
+        setLivePins([]);
+      }
+
     } catch (error) {
       console.error('Eroare la încărcarea datelor live:', error);
       setLiveSessions([]);
+      setLivePins([]);
       setTimerStats(null);
     } finally {
       setLoadingData(false);
@@ -590,6 +627,108 @@ export default function LiveTracking() {
     }
   };
 
+  // Generare card pentru pin activ
+  const renderPinCard = (pin: LivePin) => (
+    <div
+      key={`pin-${pin.id}`}
+      style={{
+        border: `2px solid ${pin.urgenta_color}40`,
+        background: `${pin.urgenta_color}05`,
+        padding: '1.5rem',
+        borderRadius: '12px'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: `${pin.urgenta_color}20`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.5rem'
+        }}>
+          📌
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '0.5rem'
+          }}>
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#1f2937' }}>
+              {pin.user_display}
+            </h4>
+            <div style={{
+              fontSize: '0.75rem',
+              color: pin.urgenta_color,
+              fontWeight: '600',
+              textTransform: 'uppercase'
+            }}>
+              📌 ACTIV
+            </div>
+          </div>
+
+          <div style={{
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: '#1f2937',
+            marginBottom: '0.5rem'
+          }}>
+            {pin.display_name}
+          </div>
+
+          {pin.comentariu_personal && (
+            <div style={{
+              fontSize: '0.875rem',
+              color: '#4b5563',
+              marginBottom: '0.75rem',
+              fontStyle: 'italic',
+              background: 'rgba(255, 255, 255, 0.5)',
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              💭 "{pin.comentariu_personal}"
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.75rem',
+            color: '#6b7280'
+          }}>
+            <span>🕐 {pin.timp_pin_text}</span>
+            {pin.deadline && (
+              <span style={{
+                color: pin.zile_pana_deadline <= 3 ? '#dc2626' : '#6b7280'
+              }}>
+                📅 {pin.zile_pana_deadline > 0
+                  ? `${pin.zile_pana_deadline} zile rămase`
+                  : 'EXPIRAT'}
+              </span>
+            )}
+          </div>
+
+          {pin.context_proiect && (
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              marginTop: '0.25rem'
+            }}>
+              📁 {pin.context_proiect}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading || !isAuthorized) {
     return (
       <div style={{
@@ -872,15 +1011,19 @@ export default function LiveTracking() {
           fontWeight: '700',
           color: '#1f2937'
         }}>
-          🔴 Sesiuni Live ({liveSessions.length})
+          ⚡ Activitate Live ({liveSessions.length + livePins.length})
         </h3>
 
-        {liveSessions.length > 0 ? (
+        {(liveSessions.length > 0 || livePins.length > 0) ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
             gap: '1.5rem'
           }}>
+            {/* Pin-uri active */}
+            {livePins.map((pin) => renderPinCard(pin))}
+
+            {/* Sesiuni live timer */}
             {liveSessions.map((session) => (
               <div
                 key={session.id}
@@ -996,10 +1139,10 @@ export default function LiveTracking() {
           }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>😴</div>
             <div style={{ fontSize: '1.125rem', fontWeight: '500' }}>
-              Nu există sesiuni active momentan
+              Nu există activitate live momentan
             </div>
             <div style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-              Echipa ta este în pauză sau sesiunile au fost finalizate
+              Nicio sesiune de timp sau item pin-at activ în echipă
             </div>
           </div>
         )}
