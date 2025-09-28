@@ -237,12 +237,28 @@ export default function LiveTracking() {
 
   const loadLiveData = async () => {
     try {
+      if (!user) {
+        console.error('No authenticated user for live data');
+        return;
+      }
+
+      // Obține token-ul Firebase pentru autentificare
+      const idToken = await user.getIdToken();
+
       // Încarcă sesiunile live (existent)
-      const sessionResponse = await fetch('/api/analytics/live-timer?team_view=true');
+      const sessionResponse = await fetch('/api/analytics/live-timer?team_view=true', {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       const sessionResult = await sessionResponse.json();
 
-      // Încarcă pin-urile active (nou)
-      const pinsResponse = await fetch('/api/analytics/live-pins');
+      // Încarcă pin-urile active (nou) - FIXAT cu autentificare
+      const pinsResponse = await fetch('/api/analytics/live-pins', {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       const pinsResult = await pinsResponse.json();
 
       if (sessionResult.success) {
