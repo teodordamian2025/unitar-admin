@@ -6,8 +6,8 @@
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-// Simple authentication pattern consistent with existing APIs
 import { BigQuery } from '@google-cloud/bigquery';
+import { getUserIdFromToken } from '@/lib/firebase-admin';
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -28,9 +28,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
-    const token = authHeader.split('Bearer ')[1];
-    // For development - in production this should verify Firebase token
-    const userId = 'demo_user_id';
+    // Decodează token-ul Firebase și obține UID-ul real al utilizatorului
+    const userId = await getUserIdFromToken(authHeader);
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
+    }
 
     // Query pentru a aduce toate items din planificator cu date complete
     const query = `
@@ -174,9 +176,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing authorization token' }, { status: 401 });
     }
 
-    const token = authHeader.split('Bearer ')[1];
-    // For development - in production this should verify Firebase token
-    const userId = 'demo_user_id';
+    // Decodează token-ul Firebase și obține UID-ul real al utilizatorului
+    const userId = await getUserIdFromToken(authHeader);
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
+    }
 
     const body = await request.json();
     const { tip_item, item_id, ordine_pozitie } = body;
