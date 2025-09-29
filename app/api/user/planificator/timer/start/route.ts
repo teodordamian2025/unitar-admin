@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă există deja o sesiune activă pentru acest utilizator
     const checkActiveQuery = `
       SELECT id
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
       WHERE utilizator_uid = @userId
         AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       LIMIT 1
@@ -101,12 +101,10 @@ export async function POST(request: NextRequest) {
 
     // Creează sesiunea de timer
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
-      (id, utilizator_uid, proiect_id, data_start, status, descriere_sesiune,
-       rate_per_hour, valoare_totala, data_creare)
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
       VALUES
-      (@sessionId, @userId, @proiect_id, CURRENT_TIMESTAMP(), 'activ', @descriere_activitate,
-       0, 0, CURRENT_TIMESTAMP())
+      (@sessionId, @userId, @proiect_id, CURRENT_TIMESTAMP(), 'activ', @descriere_activitate, CURRENT_TIMESTAMP())
     `;
 
     await bigquery.query({
