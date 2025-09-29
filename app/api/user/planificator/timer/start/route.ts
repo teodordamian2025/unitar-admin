@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Verifică că item-ul aparține utilizatorului
     const validateQuery = `
-      SELECT id, display_name, tip_item, item_id
+      SELECT id, tip_item, item_id
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
       WHERE id = @planificator_item_id AND utilizator_uid = @userId
     `;
