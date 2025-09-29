@@ -542,18 +542,40 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
           setHasActiveSession(!!activeSession);
 
           if (activeSession) {
-            // Găsește item-ul din planificator care corespunde proiectului activ
-            const activeItem = items.find(item => {
-              if (item.tip_item === 'proiect') {
-                return item.item_id === activeSession.proiect_id;
-              } else if (item.tip_item === 'subproiect') {
-                return item.item_id === activeSession.proiect_id;
-              } else if (item.tip_item === 'sarcina') {
-                // Pentru sarcini ar trebui să verificăm proiectul sau subproiectul părinte
-                return false; // Pentru moment, nu suportăm identificarea sarcinilor
-              }
-              return false;
-            });
+            // Găsește item-ul din planificator care a pornit timer-ul
+            // API-ul timer/start trimite înapoi titlu_ierarhic care conține informații despre item
+            let activeItem: PlanificatorItem | null = null;
+
+            // Încearcă să găsească item-ul bazat pe descrierea activității
+            if (activeSession.descriere_activitate || activeSession.descriere_sesiune) {
+              const descriere = activeSession.descriere_activitate || activeSession.descriere_sesiune;
+
+              // Caută în toate item-urile din planificator
+              const foundItem = items.find(item => {
+                // Verifică dacă descrierea conține numele display-ului item-ului
+                const displayName = item.display_name || '';
+                return descriere.includes(displayName) ||
+                       descriere.includes(item.item_id) ||
+                       (item.tip_item === 'proiect' && activeSession.proiect_id === item.item_id) ||
+                       (item.tip_item === 'subproiect' && activeSession.proiect_id === item.item_id);
+              });
+
+              activeItem = foundItem || null;
+            }
+
+            // Fallback: caută doar pe baza proiect_id
+            if (!activeItem) {
+              const fallbackItem = items.find(item => {
+                if (item.tip_item === 'proiect') {
+                  return item.item_id === activeSession.proiect_id;
+                } else if (item.tip_item === 'subproiect') {
+                  return item.item_id === activeSession.proiect_id;
+                }
+                return false;
+              });
+
+              activeItem = fallbackItem || null;
+            }
 
             setActiveTimerItemId(activeItem ? activeItem.id : null);
           } else {

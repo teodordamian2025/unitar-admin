@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
         -- Date sarcini cu context proiect/subproiect
         s.titlu as sarcina_titlu,
         s.tip_proiect as sarcina_tip_proiect,
+        s.proiect_id as sarcina_proiect_original_id,
+
         -- Pentru sarcini de subproiect: proiect_id = ID_Subproiect
         CASE
           WHEN s.tip_proiect = 'subproiect' THEN s.proiect_id
@@ -73,6 +75,10 @@ export async function GET(request: NextRequest) {
         s_sp.Denumire as sarcina_subproiect_nume,
         s_sp_pr.ID_Proiect as sarcina_proiect_parinte_id,
         s_sp_pr.Denumire as sarcina_proiect_parinte_nume,
+
+        -- Date pentru sarcini de proiect direct
+        s_pr_direct.ID_Proiect as sarcina_proiect_direct_id,
+        s_pr_direct.Denumire as sarcina_proiect_direct_nume,
 
         -- Calculare timp de la pin
         TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), p.data_actualizare, MINUTE) as minute_de_la_pin
@@ -101,6 +107,10 @@ export async function GET(request: NextRequest) {
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` s_sp_pr
         ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
 
+      -- JOIN pentru sarcini de proiect direct
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` s_pr_direct
+        ON s.tip_proiect = 'proiect' AND s.proiect_id = s_pr_direct.ID_Proiect
+
       WHERE p.is_pinned = TRUE
         AND p.activ = TRUE
       ORDER BY p.data_actualizare DESC
@@ -124,24 +134,31 @@ export async function GET(request: NextRequest) {
       let context_proiect = '';
 
       if (row.tip_item === 'proiect') {
-        // Proiect: ID_Proiect + Denumire
-        display_name = `${row.proiect_id} - ${row.proiect_denumire || 'Proiect fără nume'}`;
-        context_proiect = `Proiect ${row.proiect_id}`;
+        // Proiect simplu: proiect_id + denumire proiect
+        display_name = `${row.proiect_id || row.item_id} - ${row.proiect_denumire || 'Proiect fără nume'}`;
+        context_proiect = `📁 Proiect ${row.proiect_id || row.item_id}`;
       } else if (row.tip_item === 'subproiect') {
-        // Subproiect: ID_Proiect părinte + Denumire subproiect
-        display_name = `${row.subproiect_proiect_id} - ${row.subproiect_denumire || 'Subproiect fără nume'}`;
-        context_proiect = `Subproiect din ${row.subproiect_proiect_id}`;
+        // Proiect cu subproiect: proiect_id + denumire subproiect
+        display_name = `${row.subproiect_proiect_id || 'ProiectID'} - ${row.subproiect_denumire || 'Subproiect fără nume'}`;
+        context_proiect = `📁 ${row.subproiect_proiect_id || 'ProiectID'} > ${row.subproiect_denumire || 'Subproiect'}`;
       } else if (row.tip_item === 'sarcina') {
         // Sarcină: verifică dacă e de subproiect sau proiect direct
         if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
-          // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină
+          // Proiect cu subproiect+sarcina: proiect_id + titlu subproiect + descriere sarcina
           display_name = `${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume || 'Subproiect'} - ${row.sarcina_titlu || 'Sarcină'}`;
           context_proiect = `📁 ${row.sarcina_proiect_parinte_id} > ${row.sarcina_subproiect_nume}`;
         } else {
-          // Sarcină de proiect direct: verifică dacă avem un proiect ID pentru uniformitate
-          const proiectId = row.proiect_id || 'Proiect-ID-necunoscut';
-          display_name = `${proiectId} - ${row.sarcina_titlu || 'Sarcină fără titlu'}`;
-          context_proiect = `📁 Sarcină din proiect ${proiectId}`;
+          // Sarcină de proiect direct: folosește datele din JOIN-ul nou adăugat
+          if (row.sarcina_tip_proiect === 'proiect' && row.sarcina_proiect_direct_id) {
+            // Avem date complete din JOIN pentru proiect direct
+            display_name = `${row.sarcina_proiect_direct_id} - ${row.sarcina_titlu || 'Sarcină'}`;
+            context_proiect = `📁 Sarcină din proiect ${row.sarcina_proiect_direct_id}`;
+          } else {
+            // Fallback dacă nu găsim informații complete
+            const fallbackId = row.sarcina_proiect_original_id || row.item_id || 'Sarcină';
+            display_name = `${fallbackId} - ${row.sarcina_titlu || 'Sarcină fără titlu'}`;
+            context_proiect = `📁 Sarcină (${row.sarcina_tip_proiect || 'necunoscut'})`;
+          }
         }
       } else {
         // Fallback pentru tipuri necunoscute
