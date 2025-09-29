@@ -58,12 +58,13 @@ export async function POST(request: NextRequest) {
 
     const planificatorItem = validateRows[0];
 
-    // Verifică dacă există deja o sesiune activă pentru acest utilizator
+    // Verifică dacă există deja o sesiune activă pentru acest utilizator prin TimeTracking recent
     const checkActiveQuery = `
       SELECT id
-      FROM \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
+      FROM \`hale-mode-464009-i6.${DATASET_ID}.TimeTracking\`
       WHERE utilizator_uid = @userId
-        AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
+        AND data_lucru = CURRENT_DATE()
+        AND tip_inregistrare = 'timer_activ'
       LIMIT 1
     `;
 
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (activeRows.length > 0) {
-      return NextResponse.json({ error: 'You already have an active timer session' }, { status: 400 });
+      return NextResponse.json({ error: 'You already have an active timer session today' }, { status: 400 });
     }
 
     // Generează session ID unic
@@ -102,12 +103,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Creează sesiunea de timer
+    // Creează sesiunea de timer direct în TimeTracking cu status special
     const insertQuery = `
-      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
-      (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
+      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.TimeTracking\`
+      (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
       VALUES
-      (@sessionId, @userId, @proiect_id, CURRENT_TIMESTAMP(), 'activ', @descriere_activitate, CURRENT_TIMESTAMP())
+      (@sessionId, @userId, 'Utilizator Normal', @proiect_id, CURRENT_DATE(), 0, @descriere_activitate, 'timer_activ', CURRENT_TIMESTAMP())
     `;
 
     await bigquery.query({
