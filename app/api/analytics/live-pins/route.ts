@@ -138,9 +138,10 @@ export async function GET(request: NextRequest) {
           display_name = `${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume || 'Subproiect'} - ${row.sarcina_titlu || 'Sarcină'}`;
           context_proiect = `📁 ${row.sarcina_proiect_parinte_id} > ${row.sarcina_subproiect_nume}`;
         } else {
-          // Sarcină de proiect direct
-          display_name = `${row.sarcina_titlu || 'Sarcină fără titlu'}`;
-          context_proiect = `Sarcină din proiect direct`;
+          // Sarcină de proiect direct: verifică dacă avem un proiect ID pentru uniformitate
+          const proiectId = row.proiect_id || 'Proiect-ID-necunoscut';
+          display_name = `${proiectId} - ${row.sarcina_titlu || 'Sarcină fără titlu'}`;
+          context_proiect = `📁 Sarcină din proiect ${proiectId}`;
         }
       } else {
         // Fallback pentru tipuri necunoscute

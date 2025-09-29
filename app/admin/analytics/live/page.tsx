@@ -1086,26 +1086,13 @@ export default function LiveTracking() {
 
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.75rem' }}>
                       📁 {session.proiect_id}
-                      {session.sarcina_titlu && session.sarcina_titlu !== 'Activitate generală' && (
-                        <div style={{ marginTop: '0.25rem' }}>
-                          📋 {session.sarcina_titlu}
-                          {session.prioritate && (
-                            <span style={{
-                              marginLeft: '0.5rem',
-                              padding: '0.125rem 0.375rem',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              background: getPriorityColor(session.prioritate),
-                              color: 'white'
-                            }}>
-                              {session.prioritate}
-                            </span>
-                          )}
-                        </div>
+                      {session.proiect_nume && session.proiect_nume !== session.proiect_id && (
+                        <span> - {session.proiect_nume}</span>
                       )}
                     </div>
 
-                    {session.descriere_sesiune && (
+                    {session.descriere_sesiune && session.descriere_sesiune.trim() !== '' &&
+                     !session.descriere_sesiune.includes(session.proiect_id) && (
                       <div style={{
                         padding: '0.5rem',
                         background: 'rgba(249, 250, 251, 0.8)',
@@ -1114,7 +1101,7 @@ export default function LiveTracking() {
                         color: '#374151',
                         marginBottom: '0.75rem'
                       }}>
-                        💬 {session.descriere_sesiune}
+                        💬 Lucrez la: {session.descriere_sesiune}
                       </div>
                     )}
 

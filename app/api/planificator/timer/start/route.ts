@@ -127,9 +127,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Dacă nu s-a trimis descriere din planificator, folosește titlul ierarhic
+    // Dacă nu s-a trimis descriere din planificator, folosește doar titlul ierarhic
+    // Dacă s-a trimis descriere, combină: titlu_ierarhic + " / Lucrez la: " + descriere
     if (!finalDescriereActivitate) {
       finalDescriereActivitate = titluIerarhic;
+    } else if (finalDescriereActivitate !== titluIerarhic) {
+      // Combină titlul ierarhic cu descrierea personalăstrator
+      finalDescriereActivitate = `${titluIerarhic} / Lucrez la: ${finalDescriereActivitate}`;
     }
 
     if (!finalProiectId) {
