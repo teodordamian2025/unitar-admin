@@ -62,6 +62,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const [showSearch, setShowSearch] = useState(false);
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [activeTimerItemId, setActiveTimerItemId] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Map<string, ExpandedItem>>(new Map());
 
   // Load items din BigQuery
@@ -359,6 +360,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       if (response.ok) {
         const data = await response.json();
         setActiveTimer(item.id);
+        setActiveTimerItemId(item.id);
+        setHasActiveSession(true);
 
         // Reload planificator pentru a reflecta pin-ul automat
         await loadPlanificatorItems();
@@ -389,6 +392,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       if (response.ok) {
         const data = await response.json();
         setActiveTimer(null);
+        setActiveTimerItemId(null);
+        setHasActiveSession(false);
         await loadPlanificatorItems();
         toast.success(`⏹️ Timer oprit! Timp înregistrat: ${Math.round((data.worked_hours || 0) * 60)} minute`);
       } else {
@@ -468,7 +473,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
-  // Verifică sesiunea activă de timer
+  // Verifică sesiunea activă de timer și determină care item are timer
   const checkActiveSession = useCallback(async () => {
     try {
       const idToken = await user.getIdToken();
@@ -483,23 +488,56 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         if (data.success && data.data && data.data.length > 0) {
           const activeSession = data.data.find((session: any) =>
             session.utilizator_uid === user.uid &&
-            (session.status === 'activ' || session.status === 'pausat')
+            (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
           );
+
           setHasActiveSession(!!activeSession);
+
+          if (activeSession) {
+            // Găsește item-ul din planificator care corespunde proiectului activ
+            const activeItem = items.find(item => {
+              if (item.tip_item === 'proiect') {
+                return item.item_id === activeSession.proiect_id;
+              } else if (item.tip_item === 'subproiect') {
+                return item.item_id === activeSession.proiect_id;
+              } else if (item.tip_item === 'sarcina') {
+                // Pentru sarcini ar trebui să verificăm proiectul sau subproiectul părinte
+                return false; // Pentru moment, nu suportăm identificarea sarcinilor
+              }
+              return false;
+            });
+
+            setActiveTimerItemId(activeItem ? activeItem.id : null);
+          } else {
+            setActiveTimerItemId(null);
+          }
         } else {
           setHasActiveSession(false);
+          setActiveTimerItemId(null);
         }
       }
     } catch (error) {
       console.error('Error checking active session:', error);
       setHasActiveSession(false);
+      setActiveTimerItemId(null);
     }
-  }, [user]);
+  }, [user, items]);
 
   // Load data on mount
   useEffect(() => {
     loadPlanificatorItems();
     checkActiveSession();
+
+    // Verifică timer-ul la fiecare 10 secunde
+    const timerCheckInterval = setInterval(checkActiveSession, 10000);
+
+    // Reîncarcă lista la fiecare 30 secunde pentru sincronizare
+    const listRefreshInterval = setInterval(loadPlanificatorItems, 30000);
+
+    return () => {
+      clearInterval(timerCheckInterval);
+      clearInterval(listRefreshInterval);
+    };
   }, [loadPlanificatorItems, checkActiveSession]);
 
   // Search debounce
@@ -766,7 +804,19 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       padding: '0.25rem 0.5rem',
                                       borderRadius: '6px'
                                     }}>
-                                      📌 ACTIV
+                                      📌 PINNED
+                                    </span>
+                                  )}
+                                  {activeTimerItemId === item.id && (
+                                    <span style={{
+                                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                      color: 'white',
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '6px',
+                                      marginLeft: '0.5rem'
+                                    }}>
+                                      ⏱️ TIMER ACTIV
                                     </span>
                                   )}
                                   {item.is_realizat && (
@@ -790,19 +840,29 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                 }}>
                                   {/* Timer button */}
                                   <button
-                                    onClick={() => startTimer(item)}
+                                    onClick={() => activeTimerItemId === item.id ? stopTimer() : startTimer(item)}
                                     style={{
-                                      background: 'rgba(16, 185, 129, 0.1)',
-                                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                                      background: activeTimerItemId === item.id
+                                        ? 'rgba(239, 68, 68, 0.1)'
+                                        : 'rgba(16, 185, 129, 0.1)',
+                                      border: `1px solid ${activeTimerItemId === item.id
+                                        ? 'rgba(239, 68, 68, 0.2)'
+                                        : 'rgba(16, 185, 129, 0.2)'}`,
                                       borderRadius: '6px',
                                       padding: '0.25rem 0.5rem',
                                       fontSize: '0.75rem',
-                                      color: '#065f46',
-                                      cursor: 'pointer'
+                                      color: activeTimerItemId === item.id ? '#dc2626' : '#065f46',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
                                     }}
-                                    title="Pornește timer"
+                                    title={activeTimerItemId === item.id ? "Oprește timer" : "Pornește timer"}
                                   >
-                                    ⏱️
+                                    {activeTimerItemId === item.id ? '⏹️' : '⏱️'}
+                                    <span style={{ fontSize: '0.7rem' }}>
+                                      {activeTimerItemId === item.id ? 'Stop' : 'Start'}
+                                    </span>
                                   </button>
 
                                   {/* Realizat button */}

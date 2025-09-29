@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         SET
           data_stop = CURRENT_TIMESTAMP(),
           ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0 AS NUMERIC),
-          status = 'finalizata'
+          status = 'completat'
         WHERE id = @sessionId
       `;
 
@@ -171,11 +171,11 @@ export async function POST(request: NextRequest) {
     // Generare ID pentru noua sesiune
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Creează o nouă sesiune de lucru
+    // Creează o nouă sesiune de lucru compatibilă cu live-timer
     const createSessionQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
       (id, utilizator_uid, proiect_id, data_start, descriere_activitate, status, created_at)
-      VALUES (@sessionId, @userId, @proiectId, CURRENT_TIMESTAMP(), @descriereActivitate, 'activa', CURRENT_TIMESTAMP())
+      VALUES (@sessionId, @userId, @proiectId, CURRENT_TIMESTAMP(), @descriereActivitate, 'activ', CURRENT_TIMESTAMP())
     `;
 
     await bigquery.query({

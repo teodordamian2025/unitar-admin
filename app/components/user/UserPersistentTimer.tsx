@@ -40,6 +40,11 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
 
   useEffect(() => {
     checkActiveSession();
+
+    // Verifică sesiuni noi la fiecare 10 secunde
+    const sessionCheckInterval = setInterval(checkActiveSession, 10000);
+
+    return () => clearInterval(sessionCheckInterval);
   }, []);
 
   useEffect(() => {
@@ -54,29 +59,47 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
 
   const checkActiveSession = async () => {
     try {
-      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`);
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       const data = await response.json();
 
       if (data.success && data.data && data.data.length > 0) {
         const activeSession = data.data.find((session: any) =>
           session.utilizator_uid === user.uid &&
-          (session.status === 'activ' || session.status === 'pausat')
+          (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
         );
 
         if (activeSession) {
+          const sessionStatus = activeSession.status === 'activa' ? 'activ' : activeSession.status;
+
           setPersonalTimer({
-            isActive: activeSession.status === 'activ',
+            isActive: sessionStatus === 'activ',
             startTime: new Date(activeSession.data_start),
-            pausedTime: 0,
+            pausedTime: sessionStatus === 'pausat' ? activeSession.elapsed_seconds * 1000 : 0,
             elapsedTime: activeSession.elapsed_seconds * 1000,
             projectId: activeSession.proiect_id,
             sessionId: activeSession.id,
-            description: activeSession.descriere_sesiune || ''
+            description: activeSession.descriere_sesiune || activeSession.descriere_activitate || ''
           });
 
-          if (activeSession.status === 'activ') {
+          if (sessionStatus === 'activ') {
             startInterval();
           }
+        } else {
+          // Reset timer dacă nu există sesiune activă
+          setPersonalTimer({
+            isActive: false,
+            startTime: null,
+            pausedTime: 0,
+            elapsedTime: 0,
+            projectId: '',
+            sessionId: '',
+            description: ''
+          });
         }
       }
     } catch (error) {
@@ -220,20 +243,20 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
     }
   };
 
-  if (!personalTimer.sessionId) {
-    return null; // No timer active
-  }
-
   return (
     <div style={{
       padding: '0.75rem 1.5rem',
       margin: '0.5rem 0',
-      background: personalTimer.isActive
-        ? 'rgba(16, 185, 129, 0.1)'
-        : 'rgba(245, 158, 11, 0.1)',
-      border: `1px solid ${personalTimer.isActive
-        ? 'rgba(16, 185, 129, 0.2)'
-        : 'rgba(245, 158, 11, 0.2)'}`,
+      background: personalTimer.sessionId
+        ? (personalTimer.isActive
+          ? 'rgba(16, 185, 129, 0.1)'
+          : 'rgba(245, 158, 11, 0.1)')
+        : 'rgba(107, 114, 128, 0.05)',
+      border: `1px solid ${personalTimer.sessionId
+        ? (personalTimer.isActive
+          ? 'rgba(16, 185, 129, 0.2)'
+          : 'rgba(245, 158, 11, 0.2)')
+        : 'rgba(107, 114, 128, 0.1)'}`,
       borderRadius: '8px'
     }}>
       {/* Timer display */}
@@ -248,13 +271,17 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
           color: '#6b7280',
           fontWeight: '500'
         }}>
-          ⏱️ Timer Activ
+          ⏱️ {personalTimer.sessionId
+            ? (personalTimer.isActive ? 'Timer Activ' : 'Timer Pausat')
+            : 'Timer Inactiv'}
         </div>
         <div style={{
           fontSize: '0.875rem',
           fontWeight: '700',
           fontFamily: 'monospace',
-          color: personalTimer.isActive ? '#10b981' : '#f59e0b'
+          color: personalTimer.sessionId
+            ? (personalTimer.isActive ? '#10b981' : '#f59e0b')
+            : '#6b7280'
         }}>
           {formatTime(personalTimer.elapsedTime)}
         </div>
