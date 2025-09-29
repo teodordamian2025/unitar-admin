@@ -41,8 +41,8 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
   useEffect(() => {
     checkActiveSession();
 
-    // Verifică sesiuni noi la fiecare 10 secunde
-    const sessionCheckInterval = setInterval(checkActiveSession, 10000);
+    // Verifică sesiuni noi la fiecare 5 secunde pentru sync mai rapid cu planificator
+    const sessionCheckInterval = setInterval(checkActiveSession, 5000);
 
     return () => clearInterval(sessionCheckInterval);
   }, []);
@@ -59,12 +59,41 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
 
   const checkActiveSession = async () => {
     try {
+      if (!user?.uid) {
+        console.log('No user UID available for session check');
+        return;
+      }
+
       const idToken = await user.getIdToken();
+      if (!idToken) {
+        console.log('Failed to get Firebase ID token');
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
       const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error(`Live timer API failed with status: ${response.status}`);
+        if (response.status >= 500) {
+          console.error('Server error occurred');
+        } else if (response.status === 401) {
+          console.error('Authentication failed');
+        }
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success && data.data && data.data.length > 0) {
@@ -76,21 +105,46 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
         if (activeSession) {
           const sessionStatus = activeSession.status === 'activa' ? 'activ' : activeSession.status;
 
-          setPersonalTimer({
-            isActive: sessionStatus === 'activ',
-            startTime: new Date(activeSession.data_start),
-            pausedTime: sessionStatus === 'pausat' ? activeSession.elapsed_seconds * 1000 : 0,
-            elapsedTime: activeSession.elapsed_seconds * 1000,
-            projectId: activeSession.proiect_id,
-            sessionId: activeSession.id,
-            description: activeSession.descriere_sesiune || activeSession.descriere_activitate || ''
-          });
+          // Doar update dacă session ID s-a schimbat sau status s-a schimbat
+          const currentSessionId = personalTimer.sessionId;
+          const currentIsActive = personalTimer.isActive;
+
+          if (currentSessionId !== activeSession.id || currentIsActive !== (sessionStatus === 'activ')) {
+            console.log(`🔄 UserPersistentTimer: Updating session ${activeSession.id}, status: ${sessionStatus}`);
+
+            setPersonalTimer({
+              isActive: sessionStatus === 'activ',
+              startTime: new Date(activeSession.data_start),
+              pausedTime: sessionStatus === 'pausat' ? activeSession.elapsed_seconds * 1000 : 0,
+              elapsedTime: activeSession.elapsed_seconds * 1000,
+              projectId: activeSession.proiect_id,
+              sessionId: activeSession.id,
+              description: activeSession.descriere_sesiune || activeSession.descriere_activitate || ''
+            });
+          }
 
           if (sessionStatus === 'activ') {
             startInterval();
           }
         } else {
-          // Reset timer dacă nu există sesiune activă
+          // Reset timer dacă nu există sesiune activă - doar dacă nu e deja resetat
+          if (personalTimer.sessionId) {
+            console.log('🔄 UserPersistentTimer: No active session found, resetting timer');
+            setPersonalTimer({
+              isActive: false,
+              startTime: null,
+              pausedTime: 0,
+              elapsedTime: 0,
+              projectId: '',
+              sessionId: '',
+              description: ''
+            });
+          }
+        }
+      } else {
+        // Nu există date active - reset doar dacă nu e deja resetat
+        if (personalTimer.sessionId) {
+          console.log('🔄 UserPersistentTimer: No timer data found, resetting timer');
           setPersonalTimer({
             isActive: false,
             startTime: null,
@@ -102,8 +156,17 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
           });
         }
       }
-    } catch (error) {
-      console.error('Error checking active session:', error);
+    } catch (error: any) {
+      // Enhanced error handling similar to PlanificatorInteligent
+      if (error.name === 'AbortError') {
+        console.error('Request timeout checking active session in UserPersistentTimer');
+      } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+        console.error('Network error checking active session in UserPersistentTimer - API might be down');
+      } else {
+        console.error('Error checking active session in UserPersistentTimer:', error.message || error);
+      }
+
+      // Don't reset timer on network errors to prevent false stops
     }
   };
 

@@ -54,6 +54,13 @@ interface PlanificatorInteligentProps {
   user: User;
 }
 
+interface UserRoleResponse {
+  success: boolean;
+  role: string;
+  displayName?: string;
+  permissions?: any;
+}
+
 const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user }) => {
   const [items, setItems] = useState<PlanificatorItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +71,51 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [activeTimerItemId, setActiveTimerItemId] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Map<string, ExpandedItem>>(new Map());
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
+
+  // Detect user role
+  const detectUserRole = useCallback(async () => {
+    try {
+      if (!user?.uid) {
+        console.log('No user UID available for role detection');
+        return;
+      }
+
+      const idToken = await user.getIdToken();
+      if (!idToken) {
+        console.log('Failed to get Firebase ID token for role detection');
+        return;
+      }
+
+      const response = await fetch('/api/user-role', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data: UserRoleResponse = await response.json();
+        setUserRole(data.role || 'normal');
+        console.log('🔐 User role detected:', data.role);
+      } else {
+        console.warn('Failed to detect user role, defaulting to normal');
+        setUserRole('normal');
+      }
+    } catch (error) {
+      console.error('Error detecting user role:', error);
+      setUserRole('normal'); // Default to normal on error
+    } finally {
+      setRoleLoading(false);
+    }
+  }, [user]);
+
+  // Get API base path based on user role
+  const getApiBasePath = () => {
+    return userRole === 'admin' ? '/api/planificator' : '/api/user/planificator';
+  };
 
   // Load items din BigQuery
   const loadPlanificatorItems = useCallback(async () => {
@@ -82,7 +134,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      const response = await fetch('/api/planificator/items', {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -129,7 +182,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/search?q=${encodeURIComponent(term)}`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/search?q=${encodeURIComponent(term)}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
@@ -154,7 +208,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       });
 
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/hierarchy/${proiect_id}`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/hierarchy/${proiect_id}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
@@ -194,7 +249,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       });
 
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/hierarchy/subproiect/${subproiect_id}`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/hierarchy/subproiect/${subproiect_id}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
@@ -248,7 +304,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const addItemToPlanificator = async (searchItem: SearchItem) => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/planificator/items', {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -283,7 +340,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const removeItem = async (itemId: string) => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/items/${itemId}`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items/${itemId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${idToken}`
@@ -311,7 +369,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/items/${itemId}/pin`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items/${itemId}/pin`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -335,7 +394,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const toggleRealizat = async (itemId: string, currentRealizat: boolean) => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/items/${itemId}/realizat`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items/${itemId}/realizat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -359,7 +419,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const updateComentariu = async (itemId: string, comentariu: string) => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/items/${itemId}/comentariu`, {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/items/${itemId}/comentariu`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -511,7 +572,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     // Save la server
     try {
       const idToken = await user.getIdToken();
-      await fetch('/api/planificator/reorder', {
+      const apiPath = getApiBasePath();
+      await fetch(`${apiPath}/reorder`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -663,20 +725,27 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
   // Load data on mount
   useEffect(() => {
-    loadPlanificatorItems();
-    checkActiveSession();
+    detectUserRole();
+  }, [detectUserRole]);
 
-    // Verifică timer-ul la fiecare 10 secunde
-    const timerCheckInterval = setInterval(checkActiveSession, 10000);
+  // Load planificator data after role is detected
+  useEffect(() => {
+    if (!roleLoading && userRole) {
+      loadPlanificatorItems();
+      checkActiveSession();
 
-    // Reîncarcă lista la fiecare 30 secunde pentru sincronizare
-    const listRefreshInterval = setInterval(loadPlanificatorItems, 30000);
+      // Verifică timer-ul la fiecare 10 secunde
+      const timerCheckInterval = setInterval(checkActiveSession, 10000);
 
-    return () => {
-      clearInterval(timerCheckInterval);
-      clearInterval(listRefreshInterval);
-    };
-  }, [loadPlanificatorItems, checkActiveSession]);
+      // Reîncarcă lista la fiecare 30 secunde pentru sincronizare
+      const listRefreshInterval = setInterval(loadPlanificatorItems, 30000);
+
+      return () => {
+        clearInterval(timerCheckInterval);
+        clearInterval(listRefreshInterval);
+      };
+    }
+  }, [roleLoading, userRole, loadPlanificatorItems, checkActiveSession]);
 
   // Search debounce
   useEffect(() => {
@@ -691,7 +760,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     return () => clearTimeout(timeoutId);
   }, [searchTerm, showSearch, searchItems]);
 
-  if (loading) {
+  if (roleLoading || loading) {
     return (
       <div style={{
         background: 'rgba(255, 255, 255, 0.9)',
@@ -703,7 +772,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         color: '#6b7280'
       }}>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-        Se încarcă planificatorul...
+        {roleLoading ? 'Se detectează rolul utilizatorului...' : 'Se încarcă planificatorul...'}
       </div>
     );
   }
