@@ -61,6 +61,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
+  const [hasActiveSession, setHasActiveSession] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Map<string, ExpandedItem>>(new Map());
 
   // Load items din BigQuery
@@ -373,6 +374,33 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
+  // Stop timer curent
+  const stopTimer = async () => {
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/planificator/timer/stop', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setActiveTimer(null);
+        await loadPlanificatorItems();
+        toast.success(`⏹️ Timer oprit! Timp înregistrat: ${Math.round((data.worked_hours || 0) * 60)} minute`);
+      } else {
+        const errorData = await response.json();
+        toast.error(`❌ ${errorData.error || 'Eroare la oprirea timer-ului'}`);
+      }
+    } catch (error) {
+      console.error('Error stopping timer:', error);
+      toast.error('❌ Eroare la oprirea timer-ului!');
+    }
+  };
+
   // Drag & Drop handler
   const handleDragEnd = async (result: any) => {
     if (!result.destination) return;
@@ -440,10 +468,39 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
+  // Verifică sesiunea activă de timer
+  const checkActiveSession = useCallback(async () => {
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const activeSession = data.data.find((session: any) =>
+            session.utilizator_uid === user.uid &&
+            (session.status === 'activ' || session.status === 'pausat')
+          );
+          setHasActiveSession(!!activeSession);
+        } else {
+          setHasActiveSession(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking active session:', error);
+      setHasActiveSession(false);
+    }
+  }, [user]);
+
   // Load data on mount
   useEffect(() => {
     loadPlanificatorItems();
-  }, [loadPlanificatorItems]);
+    checkActiveSession();
+  }, [loadPlanificatorItems, checkActiveSession]);
 
   // Search debounce
   useEffect(() => {
@@ -476,12 +533,86 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   }
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: '1.5rem',
-      minHeight: '400px'
-    }}>
+    <div>
+      {/* Timer Status Banner - Minimal și Modern */}
+      {hasActiveSession && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          borderRadius: '12px',
+          padding: '1rem 1.5rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              background: '#10b981',
+              animation: 'pulse 2s infinite',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+            }}></div>
+            <div>
+              <span style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#047857'
+              }}>
+                ⏱️ Timer Activ
+              </span>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                marginTop: '0.125rem'
+              }}>
+                Cronometrul rulează în sidebar
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={stopTimer}
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              color: '#dc2626',
+              borderRadius: '8px',
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ⏹️ Stop Timer
+          </button>
+        </div>
+      )}
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '1.5rem',
+        minHeight: '400px'
+      }}>
       {/* Lista principală */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.9)',
@@ -1253,6 +1384,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
