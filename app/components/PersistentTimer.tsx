@@ -46,28 +46,50 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
 
     const checkActiveSession = async () => {
       try {
-        const response = await fetch(`/api/analytics/live-timer?user_id=${encodeURIComponent(user.uid)}&team_view=false`);
+        if (!user?.uid) {
+          console.log('PersistentTimer: No user UID available');
+          return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+        const response = await fetch(`/api/analytics/live-timer?user_id=${encodeURIComponent(user.uid)}&team_view=false`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          console.error(`PersistentTimer: Live timer API failed with status: ${response.status}`);
+          return;
+        }
+
         const data = await response.json();
 
         if (data.success && data.data?.length > 0) {
           // Filtrez doar sesiunile utilizatorului curent care sunt active sau pausate
-          const userSessions = data.data.filter((session: ActiveSession) => 
-            session.utilizator_uid === user.uid && 
+          const userSessions = data.data.filter((session: ActiveSession) =>
+            session.utilizator_uid === user.uid &&
             (session.status === 'activ' || session.status === 'pausat')
           );
 
           if (userSessions.length > 0) {
             const session = userSessions[0];
-            
+
             // Validez elapsed_seconds pentru a evita NaN
-            const elapsedSeconds = typeof session.elapsed_seconds === 'number' && !isNaN(session.elapsed_seconds) 
-              ? session.elapsed_seconds 
+            const elapsedSeconds = typeof session.elapsed_seconds === 'number' && !isNaN(session.elapsed_seconds)
+              ? session.elapsed_seconds
               : 0;
-            
+
             setActiveSession(session);
             setCurrentTime(elapsedSeconds);
             setLastCheck(Date.now());
-            
+
             // Reset warnings dacă sesiunea s-a schimbat
             if (!activeSession || activeSession.id !== session.id) {
               setHasWarned7h(false);
@@ -85,15 +107,22 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
           setCurrentTime(0);
           setLastCheck(0);
         }
-      } catch (error) {
-        console.error('Error checking active session:', error);
+      } catch (error: any) {
+        // Enhanced error handling to prevent NetworkError
+        if (error.name === 'AbortError') {
+          console.error('PersistentTimer: Request timeout checking session');
+        } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+          console.error('PersistentTimer: Network error - API might be down');
+        } else {
+          console.error('PersistentTimer: Error checking active session:', error.message || error);
+        }
         // Nu resetez sesiunea la eroare pentru a evita flickering
       }
     };
 
-    // Check imediat și apoi la fiecare 2 minute
+    // Check imediat și apoi la fiecare 10 secunde pentru sync rapid cu planificator
     checkActiveSession();
-    const interval = setInterval(checkActiveSession, 120000); // 2 minutes instead of 30s
+    const interval = setInterval(checkActiveSession, 10000); // 10 seconds for fast sync with planificator
 
     return () => clearInterval(interval);
   }, [user?.uid, activeSession?.id]);

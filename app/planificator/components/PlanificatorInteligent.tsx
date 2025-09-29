@@ -68,21 +68,53 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   // Load items din BigQuery
   const loadPlanificatorItems = useCallback(async () => {
     try {
+      if (!user?.uid) {
+        console.log('No user UID available for loading items');
+        return;
+      }
+
       const idToken = await user.getIdToken();
+      if (!idToken) {
+        console.log('Failed to get Firebase ID token');
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch('/api/planificator/items', {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setItems(data.items || []);
-      } else {
-        console.error('Failed to load planificator items');
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error(`Planificator items API failed with status: ${response.status}`);
+        if (response.status >= 500) {
+          console.error('Server error occurred');
+        } else if (response.status === 401) {
+          console.error('Authentication failed');
+        }
+        return;
       }
-    } catch (error) {
-      console.error('Error loading planificator items:', error);
+
+      const data = await response.json();
+      setItems(data.items || []);
+    } catch (error: any) {
+      // Enhanced error handling to prevent NetworkError
+      if (error.name === 'AbortError') {
+        console.error('Request timeout loading planificator items');
+      } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+        console.error('Network error loading planificator items - API might be down');
+      } else {
+        console.error('Error loading planificator items:', error.message || error);
+      }
+      // Don't reset items on error to keep current state
     } finally {
       setLoading(false);
     }
@@ -524,70 +556,106 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   // Verifică sesiunea activă de timer și determină care item are timer
   const checkActiveSession = useCallback(async () => {
     try {
+      if (!user?.uid) {
+        console.log('No user UID available for session check');
+        return;
+      }
+
       const idToken = await user.getIdToken();
+      if (!idToken) {
+        console.log('Failed to get Firebase ID token');
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data && data.data.length > 0) {
-          const activeSession = data.data.find((session: any) =>
-            session.utilizator_uid === user.uid &&
-            (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
-          );
+      clearTimeout(timeoutId);
 
-          setHasActiveSession(!!activeSession);
+      if (!response.ok) {
+        console.error(`Live timer API failed with status: ${response.status}`);
+        if (response.status >= 500) {
+          console.error('Server error occurred');
+        } else if (response.status === 401) {
+          console.error('Authentication failed');
+        }
+        return;
+      }
 
-          if (activeSession) {
-            // Găsește item-ul din planificator care a pornit timer-ul
-            // API-ul timer/start trimite înapoi titlu_ierarhic care conține informații despre item
-            let activeItem: PlanificatorItem | null = null;
+      const data = await response.json();
 
-            // Încearcă să găsească item-ul bazat pe descrierea activității
-            if (activeSession.descriere_activitate || activeSession.descriere_sesiune) {
-              const descriere = activeSession.descriere_activitate || activeSession.descriere_sesiune;
+      if (data.success && data.data && data.data.length > 0) {
+        const activeSession = data.data.find((session: any) =>
+          session.utilizator_uid === user.uid &&
+          (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
+        );
 
-              // Caută în toate item-urile din planificator
-              const foundItem = items.find(item => {
-                // Verifică dacă descrierea conține numele display-ului item-ului
-                const displayName = item.display_name || '';
-                return descriere.includes(displayName) ||
-                       descriere.includes(item.item_id) ||
-                       (item.tip_item === 'proiect' && activeSession.proiect_id === item.item_id) ||
-                       (item.tip_item === 'subproiect' && activeSession.proiect_id === item.item_id);
-              });
+        setHasActiveSession(!!activeSession);
 
-              activeItem = foundItem || null;
-            }
+        if (activeSession) {
+          // Găsește item-ul din planificator care a pornit timer-ul
+          // API-ul timer/start trimite înapoi titlu_ierarhic care conține informații despre item
+          let activeItem: PlanificatorItem | null = null;
 
-            // Fallback: caută doar pe baza proiect_id
-            if (!activeItem) {
-              const fallbackItem = items.find(item => {
-                if (item.tip_item === 'proiect') {
-                  return item.item_id === activeSession.proiect_id;
-                } else if (item.tip_item === 'subproiect') {
-                  return item.item_id === activeSession.proiect_id;
-                }
-                return false;
-              });
+          // Încearcă să găsească item-ul bazat pe descrierea activității
+          if (activeSession.descriere_activitate || activeSession.descriere_sesiune) {
+            const descriere = activeSession.descriere_activitate || activeSession.descriere_sesiune;
 
-              activeItem = fallbackItem || null;
-            }
+            // Caută în toate item-urile din planificator
+            const foundItem = items.find(item => {
+              // Verifică dacă descrierea conține numele display-ului item-ului
+              const displayName = item.display_name || '';
+              return descriere.includes(displayName) ||
+                     descriere.includes(item.item_id) ||
+                     (item.tip_item === 'proiect' && activeSession.proiect_id === item.item_id) ||
+                     (item.tip_item === 'subproiect' && activeSession.proiect_id === item.item_id);
+            });
 
-            setActiveTimerItemId(activeItem ? activeItem.id : null);
-          } else {
-            setActiveTimerItemId(null);
+            activeItem = foundItem || null;
           }
+
+          // Fallback: caută doar pe baza proiect_id
+          if (!activeItem) {
+            const fallbackItem = items.find(item => {
+              if (item.tip_item === 'proiect') {
+                return item.item_id === activeSession.proiect_id;
+              } else if (item.tip_item === 'subproiect') {
+                return item.item_id === activeSession.proiect_id;
+              }
+              return false;
+            });
+
+            activeItem = fallbackItem || null;
+          }
+
+          setActiveTimerItemId(activeItem ? activeItem.id : null);
         } else {
-          setHasActiveSession(false);
           setActiveTimerItemId(null);
         }
+      } else {
+        setHasActiveSession(false);
+        setActiveTimerItemId(null);
       }
-    } catch (error) {
-      console.error('Error checking active session:', error);
+    } catch (error: any) {
+      // Enhanced error handling to prevent NetworkError
+      if (error.name === 'AbortError') {
+        console.error('Request timeout checking active session');
+      } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+        console.error('Network error checking active session - API might be down');
+      } else {
+        console.error('Error checking active session:', error.message || error);
+      }
+
+      // Reset state on error to prevent UI inconsistencies
       setHasActiveSession(false);
       setActiveTimerItemId(null);
     }
