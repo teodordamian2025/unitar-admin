@@ -104,26 +104,32 @@ export async function POST(request: NextRequest) {
 
     const item = planificatorRows[0];
 
-    // Determină proiect_id și descrierea pentru sesiunea de lucru
+    // Determină proiect_id și construiește titlul ierarhic standard
     let finalProiectId = null;
     let finalDescriereActivitate = descriere_activitate || '';
+    let titluIerarhic = '';
 
     if (item.tip_item === 'proiect') {
       finalProiectId = item.proiect_id;
-      finalDescriereActivitate = finalDescriereActivitate || `${item.proiect_id} - ${item.proiect_nume}`;
+      titluIerarhic = `${item.proiect_id} - ${item.proiect_nume}`;
     } else if (item.tip_item === 'subproiect') {
       finalProiectId = item.subproiect_proiect_id;
-      finalDescriereActivitate = finalDescriereActivitate || `${item.subproiect_proiect_id} → ${item.subproiect_nume}`;
+      titluIerarhic = `${item.subproiect_proiect_id} → ${item.subproiect_nume}`;
     } else if (item.tip_item === 'sarcina') {
       finalProiectId = item.sarcina_proiect_id;
       // Construiește titlul cu hierarhia completă pentru sarcină
       if (item.sarcina_subproiect_id && item.sarcina_subproiect_nume) {
         // Sarcină la nivel de subproiect: proiect_id → subproiect_denumire → sarcina_titlu
-        finalDescriereActivitate = finalDescriereActivitate || `${item.sarcina_proiect_id} → ${item.sarcina_subproiect_nume} → ${item.sarcina_nume}`;
+        titluIerarhic = `${item.sarcina_proiect_id} → ${item.sarcina_subproiect_nume} → ${item.sarcina_nume}`;
       } else {
         // Sarcină la nivel de proiect: proiect_id → sarcina_titlu
-        finalDescriereActivitate = finalDescriereActivitate || `${item.sarcina_proiect_id} → ${item.sarcina_nume}`;
+        titluIerarhic = `${item.sarcina_proiect_id} → ${item.sarcina_nume}`;
       }
+    }
+
+    // Dacă nu s-a trimis descriere din planificator, folosește titlul ierarhic
+    if (!finalDescriereActivitate) {
+      finalDescriereActivitate = titluIerarhic;
     }
 
     if (!finalProiectId) {
@@ -188,39 +194,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Dacă item-ul nu este deja pin-at, îl pin-ează automat
-    if (!item.is_pinned) {
-      // Elimină pin-ul de la toate celelalte items
-      const unpinAllQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
-        SET is_pinned = FALSE, data_actualizare = CURRENT_TIMESTAMP()
-        WHERE utilizator_uid = @userId AND is_pinned = TRUE AND activ = TRUE
-      `;
-
-      await bigquery.query({
-        query: unpinAllQuery,
-        params: { userId }
-      });
-
-      // Pin-ează item-ul curent
-      const pinCurrentQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
-        SET is_pinned = TRUE, data_actualizare = CURRENT_TIMESTAMP()
-        WHERE id = @planificator_item_id AND utilizator_uid = @userId
-      `;
-
-      await bigquery.query({
-        query: pinCurrentQuery,
-        params: { planificator_item_id, userId }
-      });
-    }
+    // Timer și Pin sunt acum independente - nu mai se dă pin automat
 
     return NextResponse.json({
       success: true,
       session_id: sessionId,
       proiect_id: finalProiectId,
       descriere_activitate: finalDescriereActivitate,
-      item_pinned: true,
+      titlu_ierarhic: titluIerarhic, // Titlu standardizat pentru afișare
+      item_pinned: item.is_pinned, // Returnează starea reală de pin
       previous_session_stopped: activeSessionRows.length > 0,
       message: 'Timer started successfully'
     });

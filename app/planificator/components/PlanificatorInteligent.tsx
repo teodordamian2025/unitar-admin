@@ -271,6 +271,12 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
   // Pin/Unpin item
   const togglePin = async (itemId: string, currentPinned: boolean) => {
+    // Dacă vrea să pin-eze (nu e pin-at acum), verifică dacă nu are timer activ
+    if (!currentPinned && !canTogglePin(itemId)) {
+      toast.error('❌ Nu poți pin-a un item care are timer activ! Oprește timer-ul mai întâi.');
+      return;
+    }
+
     try {
       const idToken = await user.getIdToken();
       const response = await fetch(`/api/planificator/items/${itemId}/pin`, {
@@ -341,8 +347,50 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
+  // Verifică dacă un item poate fi pin-at (nu poate fi pin-at dacă are timer activ)
+  const canTogglePin = (itemId: string) => {
+    return activeTimerItemId !== itemId;
+  };
+
+  // Verifică dacă un item poate avea timer (nu poate dacă este pin-at)
+  const canStartTimer = (item: PlanificatorItem) => {
+    return !item.is_pinned;
+  };
+
   // Start timer pentru item
   const startTimer = async (item: PlanificatorItem) => {
+    // Verifică dacă item-ul poate avea timer (nu e pin-at)
+    if (!canStartTimer(item)) {
+      toast.error('❌ Nu poți porni timer-ul pentru un item pin-at! Elimină pin-ul mai întâi.');
+      return;
+    }
+
+    // Verifică dacă nu depășește limita de 8h pe zi
+    try {
+      const idToken = await user.getIdToken();
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}&date=${today}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const totalSecondsToday = data.stats?.total_time_today || 0;
+
+        // 8 ore = 28800 secunde
+        if (totalSecondsToday >= 28800) {
+          toast.error('⏰ Ai atins limita de 8 ore pe zi! Nu poți porni alt timer.');
+          return;
+        } else if (totalSecondsToday >= 27000) { // 7.5 ore
+          toast.warn('⚠️ Atenție! Ai lucrat peste 7.5 ore astăzi. Te apropii de limita de 8 ore!');
+        }
+      }
+    } catch (error) {
+      console.warn('Nu s-a putut verifica limita de timp:', error);
+      // Continuă cu pornirea timer-ului chiar dacă verificarea a eșuat
+    }
     try {
       const idToken = await user.getIdToken();
       const response = await fetch('/api/planificator/timer/start', {
@@ -363,10 +411,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         setActiveTimerItemId(item.id);
         setHasActiveSession(true);
 
-        // Reload planificator pentru a reflecta pin-ul automat
+        // Reload planificator pentru a reflecta modificările
         await loadPlanificatorItems();
 
-        toast.success('⏱️ Timer pornit și item pin-at!');
+        toast.success('⏱️ Timer pornit cu succes!');
       } else {
         const errorData = await response.json();
         toast.error(`❌ ${errorData.error || 'Eroare la pornirea timer-ului'}`);
@@ -572,78 +620,6 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
   return (
     <div>
-      {/* Timer Status Banner - Minimal și Modern */}
-      {hasActiveSession && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          borderRadius: '12px',
-          padding: '1rem 1.5rem',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <div style={{
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              background: '#10b981',
-              animation: 'pulse 2s infinite',
-              boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
-            }}></div>
-            <div>
-              <span style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#047857'
-              }}>
-                ⏱️ Timer Activ
-              </span>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                marginTop: '0.125rem'
-              }}>
-                Cronometrul rulează în sidebar
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={stopTimer}
-            style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              color: '#dc2626',
-              borderRadius: '8px',
-              padding: '0.5rem 1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            ⏹️ Stop Timer
-          </button>
-        </div>
-      )}
 
       <div style={{
         display: 'grid',
@@ -804,7 +780,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       padding: '0.25rem 0.5rem',
                                       borderRadius: '6px'
                                     }}>
-                                      📌 PINNED
+                                      📌 ACTIV
                                     </span>
                                   )}
                                   {activeTimerItemId === item.id && (
@@ -841,23 +817,29 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                   {/* Timer button */}
                                   <button
                                     onClick={() => activeTimerItemId === item.id ? stopTimer() : startTimer(item)}
+                                    disabled={item.is_pinned && activeTimerItemId !== item.id}
                                     style={{
                                       background: activeTimerItemId === item.id
                                         ? 'rgba(239, 68, 68, 0.1)'
-                                        : 'rgba(16, 185, 129, 0.1)',
+                                        : (item.is_pinned ? 'rgba(107, 114, 128, 0.1)' : 'rgba(16, 185, 129, 0.1)'),
                                       border: `1px solid ${activeTimerItemId === item.id
                                         ? 'rgba(239, 68, 68, 0.2)'
-                                        : 'rgba(16, 185, 129, 0.2)'}`,
+                                        : (item.is_pinned ? 'rgba(107, 114, 128, 0.2)' : 'rgba(16, 185, 129, 0.2)')}`,
                                       borderRadius: '6px',
                                       padding: '0.25rem 0.5rem',
                                       fontSize: '0.75rem',
-                                      color: activeTimerItemId === item.id ? '#dc2626' : '#065f46',
-                                      cursor: 'pointer',
+                                      color: activeTimerItemId === item.id
+                                        ? '#dc2626'
+                                        : (item.is_pinned ? '#9ca3af' : '#065f46'),
+                                      cursor: (item.is_pinned && activeTimerItemId !== item.id) ? 'not-allowed' : 'pointer',
+                                      opacity: (item.is_pinned && activeTimerItemId !== item.id) ? 0.6 : 1,
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '0.25rem'
                                     }}
-                                    title={activeTimerItemId === item.id ? "Oprește timer" : "Pornește timer"}
+                                    title={activeTimerItemId === item.id
+                                      ? "Oprește timer"
+                                      : (item.is_pinned ? "Nu poți porni timer-ul pentru un item pin-at" : "Pornește timer")}
                                   >
                                     {activeTimerItemId === item.id ? '⏹️' : '⏱️'}
                                     <span style={{ fontSize: '0.7rem' }}>
