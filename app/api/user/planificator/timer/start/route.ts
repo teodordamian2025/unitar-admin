@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
 
     const [validateRows] = await bigquery.query({
       query: validateQuery,
+      location: 'EU',
       params: { planificator_item_id, userId }
     });
 
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
 
     const [activeRows] = await bigquery.query({
       query: checkActiveQuery,
+      location: 'EU',
       params: { userId }
     });
 
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
 
       const [taskRows] = await bigquery.query({
         query: taskQuery,
+        location: 'EU',
         params: { item_id: planificatorItem.item_id, userId }
       });
 
@@ -109,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     await bigquery.query({
       query: insertQuery,
+      location: 'EU',
       params: {
         sessionId,
         userId,
