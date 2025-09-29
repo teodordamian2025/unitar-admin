@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Verifică că item-ul aparține utilizatorului
     const validateQuery = `
       SELECT id, tip_item, item_id
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+      FROM \`hale-mode-464009-i6.${DATASET_ID}.PlanificatorPersonal\`
       WHERE id = @planificator_item_id AND utilizator_uid = @userId
     `;
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă există deja o sesiune activă pentru acest utilizator
     const checkActiveQuery = `
       SELECT id
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      FROM \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
       WHERE utilizator_uid = @userId
         AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       LIMIT 1
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       // Pentru sarcini, obține proiect_id din tabela Sarcini
       const taskQuery = `
         SELECT Proiect_ID
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
+        FROM \`hale-mode-464009-i6.${DATASET_ID}.Sarcini\`
         WHERE id = @item_id AND utilizator_uid = @userId
       `;
 
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Creează sesiunea de timer
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
       (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
       VALUES
       (@sessionId, @userId, @proiect_id, CURRENT_TIMESTAMP(), 'activ', @descriere_activitate, CURRENT_TIMESTAMP())
