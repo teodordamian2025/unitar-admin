@@ -486,7 +486,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/planificator/timer/start', {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/timer/start`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -522,7 +523,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const stopTimer = async () => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/planificator/timer/stop', {
+      const apiPath = getApiBasePath();
+      const response = await fetch(`${apiPath}/timer/stop`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
