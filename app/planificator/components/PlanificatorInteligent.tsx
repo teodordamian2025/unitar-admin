@@ -734,11 +734,11 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       loadPlanificatorItems();
       checkActiveSession();
 
-      // Verifică timer-ul la fiecare 10 secunde
-      const timerCheckInterval = setInterval(checkActiveSession, 10000);
+      // Verifică timer-ul la fiecare 30 secunde (redus pentru eficiență)
+      const timerCheckInterval = setInterval(checkActiveSession, 30000);
 
-      // Reîncarcă lista la fiecare 30 secunde pentru sincronizare
-      const listRefreshInterval = setInterval(loadPlanificatorItems, 30000);
+      // Reîncarcă lista la fiecare 60 secunde pentru sincronizare (redus din 30s)
+      const listRefreshInterval = setInterval(loadPlanificatorItems, 60000);
 
       return () => {
         clearInterval(timerCheckInterval);

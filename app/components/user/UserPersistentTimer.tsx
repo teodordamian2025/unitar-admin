@@ -41,8 +41,8 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
   useEffect(() => {
     checkActiveSession();
 
-    // Verifică sesiuni noi la fiecare 5 secunde pentru sync mai rapid cu planificator
-    const sessionCheckInterval = setInterval(checkActiveSession, 5000);
+    // Verifică sesiuni noi la fiecare 20 secunde (redus pentru eficiență)
+    const sessionCheckInterval = setInterval(checkActiveSession, 20000);
 
     return () => clearInterval(sessionCheckInterval);
   }, []);
@@ -105,12 +105,22 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
         if (activeSession) {
           const sessionStatus = activeSession.status === 'activa' ? 'activ' : activeSession.status;
 
-          // Doar update dacă session ID s-a schimbat sau status s-a schimbat
+          // Doar update dacă session ID s-a schimbat, status s-a schimbat sau elapsed time e diferit semnificativ
           const currentSessionId = personalTimer.sessionId;
           const currentIsActive = personalTimer.isActive;
+          const currentElapsed = Math.floor(personalTimer.elapsedTime / 1000);
+          const newElapsed = activeSession.elapsed_seconds;
+          const elapsedDiff = Math.abs(currentElapsed - newElapsed);
 
-          if (currentSessionId !== activeSession.id || currentIsActive !== (sessionStatus === 'activ')) {
-            console.log(`🔄 UserPersistentTimer: Updating session ${activeSession.id}, status: ${sessionStatus}`);
+          // Update doar dacă: sesiune nouă, status schimbat, sau diferență de timp > 10 secunde
+          if (currentSessionId !== activeSession.id ||
+              currentIsActive !== (sessionStatus === 'activ') ||
+              elapsedDiff > 10) {
+
+            // Log doar dacă e o schimbare reală (nu minor elapsed time update)
+            if (currentSessionId !== activeSession.id || currentIsActive !== (sessionStatus === 'activ')) {
+              console.log(`🔄 UserPersistentTimer: Session ${activeSession.id}, status: ${sessionStatus}`);
+            }
 
             setPersonalTimer({
               isActive: sessionStatus === 'activ',
@@ -192,7 +202,7 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
 
         return { ...prev, elapsedTime: elapsed };
       });
-    }, 1000);
+    }, 2000); // Redus de la 1000ms la 2000ms pentru eficiență
   };
 
   const stopInterval = () => {
