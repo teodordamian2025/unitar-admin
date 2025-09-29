@@ -43,13 +43,13 @@ export async function POST(request: NextRequest) {
     const validateQuery = `
       SELECT id, tip_item, item_id
       FROM \`hale-mode-464009-i6.${DATASET_ID}.PlanificatorPersonal\`
-      WHERE id = @planificator_item_id AND utilizator_uid = @userId
+      WHERE id = ? AND utilizator_uid = ?
     `;
 
     const [validateRows] = await bigquery.query({
       query: validateQuery,
       location: 'EU',
-      params: { planificator_item_id, userId }
+      params: [planificator_item_id, userId]
     });
 
     if (validateRows.length === 0) {
@@ -58,20 +58,19 @@ export async function POST(request: NextRequest) {
 
     const planificatorItem = validateRows[0];
 
-    // Verifică dacă există deja o sesiune activă pentru acest utilizator prin TimeTracking recent
+    // Verifică dacă există deja o sesiune activă pentru acest utilizator
     const checkActiveQuery = `
       SELECT id
-      FROM \`hale-mode-464009-i6.${DATASET_ID}.TimeTracking\`
-      WHERE utilizator_uid = @userId
-        AND data_lucru = CURRENT_DATE()
-        AND tip_inregistrare = 'timer_activ'
+      FROM \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
+      WHERE utilizator_uid = ?
+        AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       LIMIT 1
     `;
 
     const [activeRows] = await bigquery.query({
       query: checkActiveQuery,
       location: 'EU',
-      params: { userId }
+      params: [userId]
     });
 
     if (activeRows.length > 0) {
@@ -89,13 +88,13 @@ export async function POST(request: NextRequest) {
       const taskQuery = `
         SELECT Proiect_ID
         FROM \`hale-mode-464009-i6.${DATASET_ID}.Sarcini\`
-        WHERE id = @item_id AND utilizator_uid = @userId
+        WHERE id = ? AND utilizator_uid = ?
       `;
 
       const [taskRows] = await bigquery.query({
         query: taskQuery,
         location: 'EU',
-        params: { item_id: planificatorItem.item_id, userId }
+        params: [planificatorItem.item_id, userId]
       });
 
       if (taskRows.length > 0) {
@@ -103,23 +102,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Creează sesiunea de timer direct în TimeTracking cu status special
+    // Creează sesiunea de timer în SesiuniLucru
     const insertQuery = `
-      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.TimeTracking\`
-      (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
+      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
+      (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
       VALUES
-      (@sessionId, @userId, 'Utilizator Normal', @proiect_id, CURRENT_DATE(), 0, @descriere_activitate, 'timer_activ', CURRENT_TIMESTAMP())
+      (?, ?, ?, CURRENT_TIMESTAMP(), 'activ', ?, CURRENT_TIMESTAMP())
     `;
 
     await bigquery.query({
       query: insertQuery,
       location: 'EU',
-      params: {
-        sessionId,
-        userId,
-        proiect_id,
-        descriere_activitate
-      }
+      params: [sessionId, userId, proiect_id, descriere_activitate]
     });
 
     return NextResponse.json({
