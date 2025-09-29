@@ -2,11 +2,23 @@
 // CALEA: app/api/planificator/timer/stop/route.ts
 // DATA: 29.09.2025 18:00 (ora României)
 // DESCRIERE: API pentru oprirea timer-ului din planificator
-// FUNCȚIONALITATE: Wrapper pentru API-ul live-timer existent cu autentificare
+// FUNCȚIONALITATE: Direct BigQuery operations pentru evitarea HTTP internal calls
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
+
+const bigquery = new BigQuery({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
+  },
+});
+
+const DATASET_ID = 'PanouControlUnitar';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,61 +33,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
     }
 
-    // Obține sesiunea activă pentru utilizatorul curent
-    const liveTimerResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics/live-timer?user_id=${userId}`, {
-      headers: {
-        'Authorization': authHeader
-      }
+    // Găsește sesiunea activă direct din BigQuery
+    const activeSessionQuery = `
+      SELECT id, proiect_id, data_start, descriere_activitate, status
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      WHERE utilizator_uid = @userId
+        AND data_stop IS NULL
+        AND status IN ('activa', 'activ', 'pausat')
+      ORDER BY data_start DESC
+      LIMIT 1
+    `;
+
+    const [activeSessionRows] = await bigquery.query({
+      query: activeSessionQuery,
+      params: { userId }
     });
 
-    if (!liveTimerResponse.ok) {
-      return NextResponse.json({ error: 'Failed to get active sessions' }, { status: 500 });
-    }
-
-    const liveTimerData = await liveTimerResponse.json();
-
-    if (!liveTimerData.success || !liveTimerData.data || liveTimerData.data.length === 0) {
+    if (activeSessionRows.length === 0) {
       return NextResponse.json({ error: 'No active timer session found' }, { status: 404 });
     }
 
-    // Găsește sesiunea activă pentru utilizatorul curent
-    const activeSession = liveTimerData.data.find((session: any) =>
-      session.utilizator_uid === userId &&
-      (session.status === 'activ' || session.status === 'pausat')
-    );
+    const activeSession = activeSessionRows[0];
 
-    if (!activeSession) {
-      return NextResponse.json({ error: 'No active timer session found for user' }, { status: 404 });
-    }
+    // Oprește sesiunea direct în BigQuery
+    const stopSessionQuery = `
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      SET
+        data_stop = CURRENT_TIMESTAMP(),
+        ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0 AS NUMERIC),
+        status = 'completat'
+      WHERE id = @sessionId
+    `;
 
-    // Oprește timer-ul folosind API-ul live-timer existent
-    const stopResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/analytics/live-timer`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader
-      },
-      body: JSON.stringify({
-        action: 'stop',
-        session_id: activeSession.id
-      })
+    await bigquery.query({
+      query: stopSessionQuery,
+      params: { sessionId: activeSession.id }
     });
 
-    const stopResult = await stopResponse.json();
+    // Calculează orele lucrate pentru răspuns
+    const workedSeconds = Math.floor((new Date().getTime() - new Date(activeSession.data_start.value || activeSession.data_start).getTime()) / 1000);
+    const workedHours = workedSeconds / 3600;
 
-    if (stopResult.success) {
-      return NextResponse.json({
-        success: true,
-        message: 'Timer stopped successfully from planificator',
-        session_id: activeSession.id,
-        worked_hours: stopResult.worked_hours || 0,
-        project_context: stopResult.project_context || null
-      });
-    } else {
-      return NextResponse.json({
-        error: stopResult.error || 'Failed to stop timer'
-      }, { status: 500 });
-    }
+    return NextResponse.json({
+      success: true,
+      message: 'Timer stopped successfully from planificator',
+      session_id: activeSession.id,
+      worked_hours: workedHours,
+      project_context: {
+        proiect_id: activeSession.proiect_id,
+        descriere_activitate: activeSession.descriere_activitate
+      }
+    });
 
   } catch (error) {
     console.error('Error stopping timer from planificator:', error);
