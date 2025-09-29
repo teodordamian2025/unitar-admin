@@ -64,7 +64,9 @@ export async function POST(request: NextRequest) {
         s.id as sarcina_id,
         s.titlu as sarcina_nume,
         s.proiect_id as sarcina_proiect_id,
-        pr3.Denumire as sarcina_proiect_nume
+        pr3.Denumire as sarcina_proiect_nume,
+        s.subproiect_id as sarcina_subproiect_id,
+        s_sub.Denumire as sarcina_subproiect_nume
 
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` p
 
@@ -80,6 +82,8 @@ export async function POST(request: NextRequest) {
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr3
         ON s.proiect_id = pr3.ID_Proiect
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` s_sub
+        ON s.subproiect_id = s_sub.ID_Subproiect
 
       WHERE p.id = @planificator_item_id
         AND p.utilizator_uid = @userId
@@ -106,13 +110,20 @@ export async function POST(request: NextRequest) {
 
     if (item.tip_item === 'proiect') {
       finalProiectId = item.proiect_id;
-      finalDescriereActivitate = finalDescriereActivitate || `Lucrez la proiectul: ${item.proiect_nume}`;
+      finalDescriereActivitate = finalDescriereActivitate || `${item.proiect_id} - ${item.proiect_nume}`;
     } else if (item.tip_item === 'subproiect') {
       finalProiectId = item.subproiect_proiect_id;
-      finalDescriereActivitate = finalDescriereActivitate || `Lucrez la subproiectul: ${item.subproiect_nume} (${item.subproiect_proiect_nume})`;
+      finalDescriereActivitate = finalDescriereActivitate || `${item.subproiect_proiect_id} → ${item.subproiect_nume}`;
     } else if (item.tip_item === 'sarcina') {
       finalProiectId = item.sarcina_proiect_id;
-      finalDescriereActivitate = finalDescriereActivitate || `Lucrez la sarcina: ${item.sarcina_nume} (${item.sarcina_proiect_nume})`;
+      // Construiește titlul cu hierarhia completă pentru sarcină
+      if (item.sarcina_subproiect_id && item.sarcina_subproiect_nume) {
+        // Sarcină la nivel de subproiect: proiect_id → subproiect_denumire → sarcina_titlu
+        finalDescriereActivitate = finalDescriereActivitate || `${item.sarcina_proiect_id} → ${item.sarcina_subproiect_nume} → ${item.sarcina_nume}`;
+      } else {
+        // Sarcină la nivel de proiect: proiect_id → sarcina_titlu
+        finalDescriereActivitate = finalDescriereActivitate || `${item.sarcina_proiect_id} → ${item.sarcina_nume}`;
+      }
     }
 
     if (!finalProiectId) {
@@ -146,7 +157,7 @@ export async function POST(request: NextRequest) {
         UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
         SET
           data_stop = CURRENT_TIMESTAMP(),
-          ore_lucrate = TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0,
+          ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0 AS NUMERIC),
           status = 'finalizata'
         WHERE id = @sessionId
       `;
