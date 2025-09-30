@@ -366,8 +366,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       if (response.ok) {
         console.log('✅ Item removed successfully from API');
         toast.success('🗑️ Item eliminat din planificator!');
-        // Reîncarcă lista pentru a sincroniza cu server-ul
-        await loadPlanificatorItems();
+        // NU reîncărcăm lista - optimistic update-ul e deja corect
+        // Item-ul a fost eliminat din state la linia 346
       } else {
         console.error('❌ API returned error:', response.status);
         // Restore item dacă API-ul eșuează
