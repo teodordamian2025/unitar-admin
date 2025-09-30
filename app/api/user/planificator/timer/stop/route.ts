@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     const endTime = new Date();
     const workedMilliseconds = endTime.getTime() - startTime.getTime();
     const workedHours = workedMilliseconds / (1000 * 60 * 60); // Convert to hours
+    const workedHoursString = (Math.round(workedHours * 100) / 100).toString(); // String for NUMERIC
 
     // Minimum 1 minute requirement
     if (workedHours < (1/60)) { // Less than 1 minute
@@ -65,20 +66,85 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Update sesiunea ca finalizată în SesiuniLucru
-    const updateQuery = `
+    // 1. Update sesiunea ca finalizată în SesiuniLucru
+    const updateSessionQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
       SET
         status = 'completat',
         data_stop = CURRENT_TIMESTAMP(),
-        ore_lucrate = ?
-      WHERE id = ? AND utilizator_uid = ?
+        ore_lucrate = CAST(@ore_lucrate AS NUMERIC)
+      WHERE id = @session_id AND utilizator_uid = @userId
     `;
 
     await bigquery.query({
-      query: updateQuery,
+      query: updateSessionQuery,
       location: 'EU',
-      params: [workedHours, activeSession.id, userId]
+      params: {
+        session_id: activeSession.id,
+        userId: userId,
+        ore_lucrate: workedHoursString
+      }
+    });
+
+    // 2. Obține numele utilizatorului pentru TimeTracking
+    let utilizatorNume = 'User';
+    try {
+      const userQuery = `
+        SELECT CONCAT(nume, ' ', prenume) as nume_complet
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Utilizatori\`
+        WHERE uid = ?
+      `;
+      const [userRows] = await bigquery.query({
+        query: userQuery,
+        location: 'EU',
+        params: [userId]
+      });
+      if (userRows.length > 0) {
+        utilizatorNume = userRows[0].nume_complet || 'User';
+      }
+    } catch (error) {
+      console.warn('Could not fetch user name:', error);
+    }
+
+    // 3. Creează înregistrarea în TimeTracking (ca la celelalte cronometrele)
+    const timeTrackingId = `tt_planificator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const insertTimeTrackingQuery = `
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
+      (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
+      VALUES (
+        @id,
+        @utilizator_uid,
+        @utilizator_nume,
+        @proiect_id,
+        CURRENT_DATE(),
+        CAST(@ore_lucrate AS NUMERIC),
+        @descriere_lucru,
+        'planificator_timer',
+        CURRENT_TIMESTAMP(),
+        'activitate_generala'
+      )
+    `;
+
+    await bigquery.query({
+      query: insertTimeTrackingQuery,
+      location: 'EU',
+      params: {
+        id: timeTrackingId,
+        utilizator_uid: userId,
+        utilizator_nume: utilizatorNume,
+        proiect_id: activeSession.proiect_id,
+        ore_lucrate: workedHoursString,
+        descriere_lucru: activeSession.descriere_activitate || 'Sesiune Planificator'
+      },
+      types: {
+        id: 'STRING',
+        utilizator_uid: 'STRING',
+        utilizator_nume: 'STRING',
+        proiect_id: 'STRING',
+        ore_lucrate: 'STRING',
+        descriere_lucru: 'STRING'
+      }
     });
 
     // Obține numele proiectului pentru răspuns
@@ -105,9 +171,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Timer stopped successfully',
+      message: 'Timer stopped and saved to both tables successfully',
       session_id: activeSession.id,
-      worked_hours: Math.round(workedHours * 100) / 100, // Round to 2 decimal places
+      time_tracking_id: timeTrackingId,
+      worked_hours: Math.round(workedHours * 100) / 100,
       project_id: activeSession.proiect_id,
       project_name: projectName,
       start_time: startTime.toISOString(),
