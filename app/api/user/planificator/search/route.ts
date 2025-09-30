@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/search/route.ts
-// DATA: 30.09.2025 00:35 (ora României)
-// DESCRIERE: API search pentru utilizatori normali cu restricții
-// FUNCȚIONALITATE: Căutare proiecte/subproiecte/sarcini pentru utilizatori normali
+// DATA: 30.09.2025 23:45 (ora României) - FIX schema BigQuery reală
+// DESCRIERE: API search pentru utilizatori cu schema corectă BigQuery
+// FUNCȚIONALITATE: Căutare în ID_Proiect, Denumire, Adresa din tabelele reale
+// FIX: Eliminat utilizator_uid (proiecte sunt company-wide, nu per-user)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,65 +43,64 @@ export async function GET(request: NextRequest) {
     const searchQuery = `
       WITH ProiecteSearch AS (
         SELECT DISTINCT
-          p.id,
+          p.ID_Proiect as id,
           'proiect' as tip,
-          p.Nume as nume,
+          p.Denumire as nume,
           NULL as proiect_nume,
-          (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` sub
-           WHERE sub.ProiectParinte_ID = p.id AND sub.utilizator_uid = @userId) as subproiecte_count,
+          (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sub
+           WHERE sub.ID_Proiect = p.ID_Proiect) as subproiecte_count,
           (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-           WHERE s.Proiect_ID = p.id AND s.utilizator_uid = @userId) as sarcini_count,
+           WHERE s.proiect_id = p.ID_Proiect) as sarcini_count,
           EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-                 WHERE pp.item_id = p.id AND pp.tip_item = 'proiect' AND pp.utilizator_uid = @userId) as in_planificator,
+                 WHERE pp.item_id = p.ID_Proiect AND pp.tip_item = 'proiect' AND pp.utilizator_uid = @userId) as in_planificator,
           TRUE as can_open_details,
           NULL as urgenta,
           NULL as data_scadenta,
           NULL as progres_procent
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
-        WHERE p.utilizator_uid = @userId
-          AND UPPER(p.Nume) LIKE UPPER(@searchPattern)
-          AND (p.ProiectParinte_ID IS NULL OR p.ProiectParinte_ID = '')
+        WHERE (
+          UPPER(p.ID_Proiect) LIKE UPPER(@searchPattern)
+          OR UPPER(p.Denumire) LIKE UPPER(@searchPattern)
+          OR UPPER(p.Adresa) LIKE UPPER(@searchPattern)
+        )
       ),
       SubproiecteSearch AS (
         SELECT DISTINCT
-          sp.id,
+          sp.ID_Subproiect as id,
           'subproiect' as tip,
-          sp.Nume as nume,
-          p.Nume as proiect_nume,
+          sp.Denumire as nume,
+          p.Denumire as proiect_nume,
           0 as subproiecte_count,
           (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-           WHERE s.Proiect_ID = sp.id AND s.utilizator_uid = @userId) as sarcini_count,
+           WHERE s.subproiect_id = sp.ID_Subproiect) as sarcini_count,
           EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-                 WHERE pp.item_id = sp.id AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator,
+                 WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator,
           TRUE as can_open_details,
           NULL as urgenta,
           NULL as data_scadenta,
           NULL as progres_procent
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` sp
-        JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON sp.ProiectParinte_ID = p.id
-        WHERE sp.utilizator_uid = @userId
-          AND sp.ProiectParinte_ID IS NOT NULL
-          AND sp.ProiectParinte_ID != ''
-          AND UPPER(sp.Nume) LIKE UPPER(@searchPattern)
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sp
+        JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON sp.ID_Proiect = p.ID_Proiect
+        WHERE UPPER(sp.Denumire) LIKE UPPER(@searchPattern)
       ),
       SarciniSearch AS (
         SELECT DISTINCT
           s.id,
           'sarcina' as tip,
-          s.Nume as nume,
-          p.Nume as proiect_nume,
+          s.titlu as nume,
+          COALESCE(sp.Denumire, p.Denumire) as proiect_nume,
           0 as subproiecte_count,
           0 as sarcini_count,
           EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
                  WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
           TRUE as can_open_details,
-          s.Urgenta as urgenta,
-          s.Data_Scadenta as data_scadenta,
-          s.Progres_Procent as progres_procent
+          s.urgenta,
+          s.data_scadenta,
+          s.progres_procent
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-        JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON s.Proiect_ID = p.id
-        WHERE s.utilizator_uid = @userId
-          AND UPPER(s.Nume) LIKE UPPER(@searchPattern)
+        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sp ON s.subproiect_id = sp.ID_Subproiect
+        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON s.proiect_id = p.ID_Proiect
+        WHERE UPPER(s.titlu) LIKE UPPER(@searchPattern)
       )
       SELECT * FROM ProiecteSearch
       UNION ALL
