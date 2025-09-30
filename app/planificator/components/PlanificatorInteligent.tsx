@@ -1047,7 +1047,9 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                 <div style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '0.5rem'
+                                  gap: '0.5rem',
+                                  position: 'relative',
+                                  zIndex: 10
                                 }}>
                                   {/* Timer button */}
                                   <button
@@ -1134,7 +1136,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       padding: '0.25rem 0.5rem',
                                       fontSize: '0.75rem',
                                       color: '#991b1b',
-                                      cursor: 'pointer'
+                                      cursor: 'pointer',
+                                      position: 'relative',
+                                      zIndex: 10,
+                                      pointerEvents: 'auto'
                                     }}
                                     title="Elimină din listă"
                                   >
