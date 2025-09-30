@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
           // Sarcină de proiect direct: folosește datele din JOIN-ul nou adăugat
           if (row.sarcina_tip_proiect === 'proiect' && row.sarcina_proiect_direct_id) {
             // Avem date complete din JOIN pentru proiect direct
-            display_name = `${row.sarcina_proiect_direct_id} - ${row.sarcina_titlu || 'Sarcină'}`;
+            display_name = `${row.sarcina_proiect_direct_id} - ${row.sarcina_titlu || 'Sarcină'}${row.sarcina_descriere ? ' - ' + row.sarcina_descriere : ''}`;
             context_proiect = `📁 Sarcină din proiect ${row.sarcina_proiect_direct_id}`;
           } else {
             // Fallback dacă nu găsim informații complete

@@ -134,13 +134,15 @@ export async function GET(request: NextRequest) {
           -- Determinare nume proiect bazat pe context (proiect sau subproiect)
           CASE
             WHEN sub.ID_Subproiect IS NOT NULL THEN
-              CONCAT(p_parent.ID_Proiect, ' → ', sub.ID_Subproiect)
+              CONCAT(p_parent.ID_Proiect, ' → ', sub.Denumire)
             ELSE
               COALESCE(p.ID_Proiect, sl.proiect_id)
           END as proiect_nume,
-          
-          -- Titlu sarcină sau activitate generală
+
+          -- Titlu sarcină din tabelul Sarcini sau activitate generală
           CASE
+            WHEN s.id IS NOT NULL AND s.titlu IS NOT NULL THEN
+              CONCAT(s.titlu, CASE WHEN s.descriere IS NOT NULL THEN CONCAT(' - ', s.descriere) ELSE '' END)
             WHEN sl.descriere_activitate IS NOT NULL AND sl.descriere_activitate != '' THEN
               sl.descriere_activitate
             ELSE
@@ -187,17 +189,20 @@ export async function GET(request: NextRequest) {
           ) as break_time_seconds
           
         FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
           ON sl.utilizator_uid = u.uid
         -- Join cu proiecte principale
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
           ON sl.proiect_id = p.ID_Proiect
         -- Join cu subproiecte (dacă proiect_id este de fapt un subproiect)
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub
           ON sl.proiect_id = sub.ID_Subproiect
         -- Join pentru numele proiectului principal al subproiectului
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p_parent 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p_parent
           ON sub.ID_Proiect = p_parent.ID_Proiect
+        -- Join cu Sarcini pentru a obține detalii sarcină reală
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+          ON (sl.proiect_id = s.proiect_id OR sl.proiect_id = s.subproiect_id)
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
           ${userId ? `AND sl.utilizator_uid = @userId` : ''}
@@ -229,17 +234,24 @@ export async function GET(request: NextRequest) {
       FROM active_sessions
       ${includeCompleted ? `
         UNION ALL
-        SELECT 
-          sl2.id, sl2.utilizator_uid, 
-          COALESCE(CONCAT(u2.nume, ' ', u2.prenume), 'Test User') as utilizator_nume, 
-          sl2.proiect_id, 
+        SELECT
+          sl2.id, sl2.utilizator_uid,
+          COALESCE(CONCAT(u2.nume, ' ', u2.prenume), 'Test User') as utilizator_nume,
+          sl2.proiect_id,
           CASE
             WHEN sub2.ID_Subproiect IS NOT NULL THEN
-              CONCAT(p2_parent.ID_Proiect, ' → ', sub2.ID_Subproiect)
+              CONCAT(p2_parent.ID_Proiect, ' → ', sub2.Denumire)
             ELSE
               COALESCE(p2.ID_Proiect, sl2.proiect_id)
           END as proiect_nume,
-          COALESCE(sl2.descriere_activitate, 'Activitate generală') as sarcina_titlu, 
+          CASE
+            WHEN s2.id IS NOT NULL AND s2.titlu IS NOT NULL THEN
+              CONCAT(s2.titlu, CASE WHEN s2.descriere IS NOT NULL THEN CONCAT(' - ', s2.descriere) ELSE '' END)
+            WHEN sl2.descriere_activitate IS NOT NULL AND sl2.descriere_activitate != '' THEN
+              sl2.descriere_activitate
+            ELSE
+              'Activitate generală'
+          END as sarcina_titlu, 
           'normala' as prioritate, 
           sl2.data_start, 
           sl2.data_stop,
@@ -253,14 +265,16 @@ export async function GET(request: NextRequest) {
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_start) as data_start_formatted,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_stop) as ultima_activitate_formatted
         FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl2
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u2 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u2
           ON sl2.utilizator_uid = u2.uid
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2
           ON sl2.proiect_id = p2.ID_Proiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub2 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub2
           ON sl2.proiect_id = sub2.ID_Subproiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2_parent 
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2_parent
           ON sub2.ID_Proiect = p2_parent.ID_Proiect
+        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s2
+          ON (sl2.proiect_id = s2.proiect_id OR sl2.proiect_id = s2.subproiect_id)
         WHERE sl2.status = 'completat'
           AND sl2.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 HOUR)
           ${userId ? `AND sl2.utilizator_uid = @userId` : ''}

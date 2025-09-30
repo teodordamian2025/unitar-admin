@@ -146,8 +146,8 @@ export async function GET(request: NextRequest) {
           // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină (ca la analytics/live)
           display_name = `✅ ${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume} - ${row.sarcina_titlu}`;
         } else if (row.sarcina_proiect_nume) {
-          // Sarcină de proiect direct: proiect_id - titlu_sarcina
-          display_name = `✅ ${row.sarcina_proiect_id || row.item_id} - ${row.sarcina_titlu}`;
+          // Sarcină de proiect direct: proiect_id - titlu_sarcina - descriere
+          display_name = `✅ ${row.sarcina_proiect_id || row.item_id} - ${row.sarcina_titlu}${row.sarcina_descriere ? ' - ' + row.sarcina_descriere : ''}`;
         } else {
           // Fallback
           display_name = `✅ ${row.sarcina_titlu} (Proiect necunoscut)`;
