@@ -841,21 +841,26 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       loadPlanificatorItems();
       checkActiveSession();
 
-      // OPTIMIZARE: Intervale crescute + condiționare pe tab visibility
+      // OPTIMIZARE: Intervale crescute + condiționare pe tab visibility + pagină activă
       // Timer check: 10s → 30s (timer-ul nu se schimbă des)
       // Lista: 60s păstrat (deja optimizat)
+      // Polling DOAR când ești pe pagina /planificator
 
-      // Tab visibility detection pentru a opri polling când tab-ul nu e vizibil
+      // Tab visibility + page active detection
       const isTabVisible = () => !document.hidden;
+      const isOnPlanificatorPage = () => {
+        if (typeof window === 'undefined') return false;
+        return window.location.pathname.includes('/planificator');
+      };
 
       const timerCheckInterval = setInterval(() => {
-        if (isTabVisible()) {
+        if (isTabVisible() && isOnPlanificatorPage()) {
           checkActiveSession();
         }
       }, 30000); // 30s (3x mai rar decât înainte)
 
       const listRefreshInterval = setInterval(() => {
-        if (isTabVisible()) {
+        if (isTabVisible() && isOnPlanificatorPage()) {
           loadPlanificatorItems();
         }
       }, 60000); // Păstrat 60s
