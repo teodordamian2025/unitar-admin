@@ -114,11 +114,12 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
       }
     };
 
-    // Check imediat și apoi la fiecare 10 secunde pentru sync rapid cu Planificator
+    // Check imediat (polling mutat în PlanificatorInteligent pentru a evita duplicate)
     checkActiveSession();
-    const interval = setInterval(checkActiveSession, 10000);
 
-    return () => clearInterval(interval);
+    // OPTIMIZARE: Interval eliminat - PlanificatorInteligent gestionează polling-ul global
+    // const interval = setInterval(checkActiveSession, 10000);
+    // return () => clearInterval(interval);
   }, [user?.uid, activeSession?.id]);
 
   // Update current time every second when timer is active

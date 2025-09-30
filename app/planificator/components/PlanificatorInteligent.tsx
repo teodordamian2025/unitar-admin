@@ -841,11 +841,24 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       loadPlanificatorItems();
       checkActiveSession();
 
-      // Verifică timer-ul la fiecare 10 secunde pentru sincronizare rapidă cu Layout
-      const timerCheckInterval = setInterval(checkActiveSession, 10000);
+      // OPTIMIZARE: Intervale crescute + condiționare pe tab visibility
+      // Timer check: 10s → 30s (timer-ul nu se schimbă des)
+      // Lista: 60s păstrat (deja optimizat)
 
-      // Reîncarcă lista la fiecare 60 secunde pentru sincronizare (redus din 30s)
-      const listRefreshInterval = setInterval(loadPlanificatorItems, 60000);
+      // Tab visibility detection pentru a opri polling când tab-ul nu e vizibil
+      const isTabVisible = () => !document.hidden;
+
+      const timerCheckInterval = setInterval(() => {
+        if (isTabVisible()) {
+          checkActiveSession();
+        }
+      }, 30000); // 30s (3x mai rar decât înainte)
+
+      const listRefreshInterval = setInterval(() => {
+        if (isTabVisible()) {
+          loadPlanificatorItems();
+        }
+      }, 60000); // Păstrat 60s
 
       return () => {
         clearInterval(timerCheckInterval);
