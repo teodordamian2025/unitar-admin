@@ -610,6 +610,15 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         setActiveTimer(null);
         setActiveTimerItemId(null);
         setHasActiveSession(false);
+
+        // Emit custom event pentru a notifica UserPersistentTimer să se reseteze instant
+        window.dispatchEvent(new CustomEvent('timer-stopped', {
+          detail: {
+            sessionId: activeSession.id,
+            source: 'planificator'
+          }
+        }));
+
         await loadPlanificatorItems();
         toast.success(`⏹️ Timer oprit! Timp înregistrat: ${Math.round((data.worked_hours || 0) * 60)} minute`);
       } else {

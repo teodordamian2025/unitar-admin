@@ -41,10 +41,21 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
   useEffect(() => {
     checkActiveSession();
 
+    // Listen for timer-stopped event from Planificator for instant sync
+    const handleTimerStopped = (event: any) => {
+      console.log('🔄 UserPersistentTimer: Timer stopped event received from', event.detail?.source);
+      checkActiveSession(); // Immediate check instead of waiting 20s
+    };
+
+    window.addEventListener('timer-stopped', handleTimerStopped);
+
     // Verifică sesiuni noi la fiecare 20 secunde (redus pentru eficiență)
     const sessionCheckInterval = setInterval(checkActiveSession, 20000);
 
-    return () => clearInterval(sessionCheckInterval);
+    return () => {
+      window.removeEventListener('timer-stopped', handleTimerStopped);
+      clearInterval(sessionCheckInterval);
+    };
   }, []);
 
   useEffect(() => {
