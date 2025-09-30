@@ -485,6 +485,52 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       // Continuă cu pornirea timer-ului chiar dacă verificarea a eșuat
     }
     try {
+      // Determină proiect_id corect bazat pe tip_item
+      let finalProiectId = item.item_id;
+      let finalSarcinaId = 'activitate_generala';
+
+      if (item.tip_item === 'sarcina') {
+        // Pentru sarcini, obține proiect_id din tabela Sarcini
+        try {
+          const idToken = await user.getIdToken();
+          const sarcinaResponse = await fetch(`/api/planificator/sarcina-details?sarcina_id=${item.item_id}`, {
+            headers: {
+              'Authorization': `Bearer ${idToken}`
+            }
+          });
+
+          if (sarcinaResponse.ok) {
+            const sarcinaData = await sarcinaResponse.json();
+            // Dacă sarcina are subproiect_id, folosește-l, altfel folosește proiect_id
+            finalProiectId = sarcinaData.subproiect_id || sarcinaData.proiect_id;
+            finalSarcinaId = item.item_id;
+          } else {
+            // Fallback: folosește API simplu pentru a obține proiect_id
+            const response = await fetch('/api/analytics/sarcina-proiect', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+              },
+              body: JSON.stringify({ sarcina_id: item.item_id })
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              finalProiectId = data.proiect_id;
+              finalSarcinaId = item.item_id;
+            } else {
+              toast.error('Nu s-a putut găsi proiectul pentru această sarcină');
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching sarcina details:', error);
+          toast.error('Eroare la obținerea detaliilor sarcinii');
+          return;
+        }
+      }
+
       // Folosește /api/analytics/live-timer pentru a fi sincronizat cu UserPersistentTimer
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
@@ -493,10 +539,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         },
         body: JSON.stringify({
           action: 'start',
-          proiect_id: item.item_id,
+          proiect_id: finalProiectId,
           utilizator_uid: user.uid,
           user_id: user.uid,
-          sarcina_id: item.tip_item === 'sarcina' ? item.item_id : 'activitate_generala',
+          sarcina_id: finalSarcinaId,
           descriere_sesiune: `Lucrez la: ${item.display_name}`,
           descriere_activitate: `Lucrez la: ${item.display_name}`
         })
