@@ -339,23 +339,54 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   // Remove item din planificator
   const removeItem = async (itemId: string) => {
     try {
+      console.log('🗑️ Starting removal of item:', itemId);
+
+      // Optimistic update - elimină item-ul imediat din UI
+      const itemToRemove = items.find(i => i.id === itemId);
+      setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+      toast.info('⏳ Se elimină item-ul...');
+
       const idToken = await user.getIdToken();
       const apiPath = getApiBasePath();
+
+      // Timeout mai mare pentru API
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secunde
+
       const response = await fetch(`${apiPath}/items/${itemId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${idToken}`
-        }
+        },
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (response.ok) {
+        console.log('✅ Item removed successfully from API');
+        toast.success('🗑️ Item eliminat din planificator!');
+        // Reîncarcă lista pentru a sincroniza cu server-ul
         await loadPlanificatorItems();
-        toast.success('🗑️ Item eliminat din planificator');
+      } else {
+        console.error('❌ API returned error:', response.status);
+        // Restore item dacă API-ul eșuează
+        if (itemToRemove) {
+          setItems(prevItems => [...prevItems, itemToRemove].sort((a, b) => a.ordine_pozitie - b.ordine_pozitie));
+        }
+        toast.error('❌ Eroare la eliminarea item-ului din server');
+      }
+    } catch (error: any) {
+      console.error('❌ Error removing item:', error);
+
+      if (error.name === 'AbortError') {
+        toast.error('⏱️ Timeout la ștergere - încearcă din nou');
       } else {
         toast.error('❌ Eroare la eliminarea item-ului');
       }
-    } catch (error) {
-      console.error('Error removing item:', error);
+
+      // Reload pentru a restabili starea corectă
+      await loadPlanificatorItems();
     }
   };
 
@@ -935,6 +966,13 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
+                          onClick={(e) => {
+                            // Previne click-uri accidentale pe card
+                            const target = e.target as HTMLElement;
+                            if (target.tagName === 'BUTTON' || target.closest('button')) {
+                              return;
+                            }
+                          }}
                           style={{
                             ...provided.draggableProps.style,
                             background: item.is_realizat
@@ -957,7 +995,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                               ? 'rotate(2deg) scale(1.02)'
                               : 'none',
                             transition: 'all 0.2s ease',
-                            opacity: item.is_realizat ? 0.7 : 1
+                            opacity: item.is_realizat ? 0.7 : 1,
+                            position: 'relative'
                           }}
                         >
                           <div style={{
@@ -1044,13 +1083,17 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                 </div>
 
                                 {/* Actions */}
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                  position: 'relative',
-                                  zIndex: 50
-                                }}>
+                                <div
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    position: 'relative',
+                                    zIndex: 9999,
+                                    isolation: 'isolate'
+                                  }}>
                                   {/* Timer button */}
                                   <button
                                     onClick={(e) => {
@@ -1137,24 +1180,40 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                   {/* Remove button */}
                                   <button
+                                    onMouseDown={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      console.log('🔴 Remove button clicked for item:', item.id);
+                                      removeItem(item.id);
+                                    }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       e.preventDefault();
-                                      removeItem(item.id);
                                     }}
                                     style={{
                                       background: 'rgba(239, 68, 68, 0.1)',
-                                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                                      border: '2px solid rgba(239, 68, 68, 0.5)',
                                       borderRadius: '6px',
                                       padding: '0.25rem 0.5rem',
-                                      fontSize: '0.75rem',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '700',
                                       color: '#991b1b',
                                       cursor: 'pointer',
                                       position: 'relative',
-                                      zIndex: 100,
-                                      pointerEvents: 'auto'
+                                      zIndex: 9999,
+                                      pointerEvents: 'auto',
+                                      isolation: 'isolate',
+                                      touchAction: 'auto',
+                                      userSelect: 'none',
+                                      WebkitUserSelect: 'none',
+                                      minWidth: '32px',
+                                      minHeight: '32px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
                                     }}
                                     title="Elimină din listă"
+                                    type="button"
                                   >
                                     ✕
                                   </button>
