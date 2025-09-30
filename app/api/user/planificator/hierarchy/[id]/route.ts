@@ -35,14 +35,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const { id } = params;
 
-    // Subproiecte din tabelul Subproiecte
+    // Subproiecte din tabelul Subproiecte (doar Denumire, fără ID)
     const subproiecteQuery = `
       SELECT
         sp.ID_Subproiect as id,
         'subproiect' as tip,
-        CONCAT(sp.ID_Subproiect, ' - ', sp.Denumire) as nume,
+        sp.Denumire as nume,
         (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-         WHERE s.subproiect_id = sp.ID_Subproiect) as sarcini_count,
+         WHERE s.subproiect_id = sp.ID_Subproiect AND s.status NOT IN ('Finalizată', 'Anulată')) as sarcini_count,
         EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
                WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
