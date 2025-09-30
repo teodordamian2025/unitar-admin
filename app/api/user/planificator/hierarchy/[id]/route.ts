@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         'subproiect' as tip,
         sp.Denumire as nume,
         (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-         WHERE s.subproiect_id = sp.ID_Subproiect AND s.status NOT IN ('Finalizată', 'Anulată')) as sarcini_count,
+         WHERE s.proiect_id = sp.ID_Subproiect AND s.status NOT IN ('Finalizată', 'Anulată')) as sarcini_count,
         EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
                WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp

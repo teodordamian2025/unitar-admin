@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const { id } = params;
 
-    // Sarcini care aparțin acestui subproiect
+    // Sarcini de subproiect - IMPORTANT: folosesc proiect_id = ID_Subproiect!
     const sarciniQuery = `
       SELECT
         s.id,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         s.data_scadenta,
         s.progres_procent
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-      WHERE s.subproiect_id = @subproiectId
+      WHERE s.proiect_id = @subproiectId
         AND s.status NOT IN ('Finalizată', 'Anulată')
       ORDER BY s.titlu
     `;
