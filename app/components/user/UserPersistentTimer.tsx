@@ -223,96 +223,9 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
     }
   };
 
-  const pauseTimer = async () => {
-    if (!personalTimer.sessionId) return;
-
-    try {
-      const response = await fetch('/api/analytics/live-timer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'pause',
-          session_id: personalTimer.sessionId,
-          user_id: user.uid
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setPersonalTimer(prev => ({
-          ...prev,
-          isActive: false,
-          pausedTime: prev.elapsedTime
-        }));
-        toast.info('⏸️ Timer în pauză');
-      }
-    } catch (error) {
-      console.error('Error pausing timer:', error);
-    }
-  };
-
-  const resumeTimer = async () => {
-    if (!personalTimer.sessionId) return;
-
-    try {
-      const response = await fetch('/api/analytics/live-timer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'resume',
-          session_id: personalTimer.sessionId,
-          user_id: user.uid
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setPersonalTimer(prev => ({
-          ...prev,
-          isActive: true,
-          startTime: new Date()
-        }));
-        toast.success('▶️ Timer reluat');
-      }
-    } catch (error) {
-      console.error('Error resuming timer:', error);
-    }
-  };
-
-  const stopTimer = async () => {
-    if (!personalTimer.sessionId) return;
-
-    try {
-      const response = await fetch('/api/analytics/live-timer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'stop',
-          session_id: personalTimer.sessionId,
-          user_id: user.uid
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setPersonalTimer({
-          isActive: false,
-          startTime: null,
-          pausedTime: 0,
-          elapsedTime: 0,
-          projectId: '',
-          sessionId: '',
-          description: ''
-        });
-        toast.success('💾 Timer salvat');
-      }
-    } catch (error) {
-      console.error('Error stopping timer:', error);
-    }
-  };
+  // IMPORTANT: UserPersistentTimer este DOAR AFIȘARE, nu are acțiuni proprii
+  // Toate acțiunile (start/pause/stop) se fac din Planificator
+  // Astfel se evită double-save în TimeTracking
 
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -385,80 +298,18 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
         </div>
       )}
 
-      {/* Control buttons */}
-      <div style={{
-        display: 'flex',
-        gap: '0.25rem',
-        justifyContent: 'center'
-      }}>
-        {personalTimer.isActive ? (
-          <>
-            <button
-              onClick={pauseTimer}
-              style={{
-                padding: '0.25rem 0.5rem',
-                background: '#f59e0b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontWeight: '500'
-              }}
-            >
-              ⏸️
-            </button>
-            <button
-              onClick={stopTimer}
-              style={{
-                padding: '0.25rem 0.5rem',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontWeight: '500'
-              }}
-            >
-              ⏹️
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={resumeTimer}
-              style={{
-                padding: '0.25rem 0.5rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontWeight: '500'
-              }}
-            >
-              ▶️
-            </button>
-            <button
-              onClick={stopTimer}
-              style={{
-                padding: '0.25rem 0.5rem',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontWeight: '500'
-              }}
-            >
-              ⏹️
-            </button>
-          </>
-        )}
-      </div>
+      {/* Info message - Timer controlat din Planificator */}
+      {personalTimer.sessionId && (
+        <div style={{
+          fontSize: '0.65rem',
+          color: '#6b7280',
+          textAlign: 'center',
+          marginTop: '0.5rem',
+          fontStyle: 'italic'
+        }}>
+          ℹ️ Controlează timer-ul din Planificator
+        </div>
+      )}
     </div>
   );
 }
