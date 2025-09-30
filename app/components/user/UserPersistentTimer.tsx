@@ -1,300 +1,263 @@
 // ==================================================================
 // CALEA: app/components/user/UserPersistentTimer.tsx
-// DATA: 27.09.2025 20:00 (ora României)
-// DESCRIERE: Timer persistent în sidebar pentru utilizatori normali - widget compact
-// FUNCȚIONALITATE: Afișare timp curent, butoane start/pause/stop compact
+// DATA: 30.09.2025 16:30 (ora României) - REFACTORIZARE MODEL ADMIN
+// DESCRIERE: Timer persistent pentru utilizatori - MODEL IDENTIC cu PersistentTimer.tsx (admin)
+// FUNCȚII: Polling natural, zero CustomEvents, zero double-save garantat
 // ==================================================================
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { toast } from 'react-toastify';
+
+interface ActiveSession {
+  id: string;
+  proiect_id: string;
+  proiect_nume?: string;
+  status: 'activ' | 'pausat' | 'completat';
+  data_start: string;
+  elapsed_seconds: number;
+  descriere_sesiune?: string;
+  utilizator_uid: string;
+  sarcina_titlu?: string;
+}
 
 interface UserPersistentTimerProps {
   user: User;
 }
 
-interface TimerSession {
-  isActive: boolean;
-  startTime: Date | null;
-  pausedTime: number;
-  elapsedTime: number;
-  projectId: string;
-  sessionId: string;
-  description: string;
-}
-
 export default function UserPersistentTimer({ user }: UserPersistentTimerProps) {
-  const [personalTimer, setPersonalTimer] = useState<TimerSession>({
-    isActive: false,
-    startTime: null,
-    pausedTime: 0,
-    elapsedTime: 0,
-    projectId: '',
-    sessionId: '',
-    description: ''
-  });
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [lastCheck, setLastCheck] = useState<number>(0);
+  const [hasWarned7h, setHasWarned7h] = useState(false);
+  const [hasWarned8h, setHasWarned8h] = useState(false);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
+  // Check for active session on component mount and every 10 seconds (fast sync)
   useEffect(() => {
-    checkActiveSession();
-
-    // Listen for timer-stopped event from Planificator for instant sync
-    const handleTimerStopped = (event: any) => {
-      console.log('🔄 UserPersistentTimer: Timer stopped event received from', event.detail?.source);
-      checkActiveSession(); // Immediate check instead of waiting 20s
-    };
-
-    window.addEventListener('timer-stopped', handleTimerStopped);
-
-    // Verifică sesiuni noi la fiecare 20 secunde (redus pentru eficiență)
-    const sessionCheckInterval = setInterval(checkActiveSession, 20000);
-
-    return () => {
-      window.removeEventListener('timer-stopped', handleTimerStopped);
-      clearInterval(sessionCheckInterval);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (personalTimer.isActive && personalTimer.startTime) {
-      startInterval();
-    } else {
-      stopInterval();
+    if (!user?.uid) {
+      setActiveSession(null);
+      setCurrentTime(0);
+      return;
     }
 
-    return () => stopInterval();
-  }, [personalTimer.isActive]);
-
-  const checkActiveSession = async () => {
-    try {
-      if (!user?.uid) {
-        console.log('No user UID available for session check');
-        return;
-      }
-
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        console.log('Failed to get Firebase ID token');
-        return;
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.error(`Live timer API failed with status: ${response.status}`);
-        if (response.status >= 500) {
-          console.error('Server error occurred');
-        } else if (response.status === 401) {
-          console.error('Authentication failed');
+    const checkActiveSession = async () => {
+      try {
+        if (!user?.uid) {
+          console.log('UserPersistentTimer: No user UID available');
+          return;
         }
-        return;
-      }
 
-      const data = await response.json();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      if (data.success && data.data && data.data.length > 0) {
-        const activeSession = data.data.find((session: any) =>
-          session.utilizator_uid === user.uid &&
-          (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
-        );
+        const response = await fetch(`/api/analytics/live-timer?user_id=${encodeURIComponent(user.uid)}&team_view=false`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
 
-        if (activeSession) {
-          const sessionStatus = activeSession.status === 'activa' ? 'activ' : activeSession.status;
+        clearTimeout(timeoutId);
 
-          // Doar update dacă session ID s-a schimbat, status s-a schimbat sau elapsed time e diferit semnificativ
-          const currentSessionId = personalTimer.sessionId;
-          const currentIsActive = personalTimer.isActive;
-          const currentElapsed = Math.floor(personalTimer.elapsedTime / 1000);
-          const newElapsed = activeSession.elapsed_seconds;
-          const elapsedDiff = Math.abs(currentElapsed - newElapsed);
+        if (!response.ok) {
+          console.error(`UserPersistentTimer: API failed with status: ${response.status}`);
+          return;
+        }
 
-          // Update doar dacă: sesiune nouă, status schimbat, sau diferență de timp > 10 secunde
-          if (currentSessionId !== activeSession.id ||
-              currentIsActive !== (sessionStatus === 'activ') ||
-              elapsedDiff > 10) {
+        const data = await response.json();
 
-            // Log doar dacă e o schimbare reală (nu minor elapsed time update)
-            if (currentSessionId !== activeSession.id || currentIsActive !== (sessionStatus === 'activ')) {
-              console.log(`🔄 UserPersistentTimer: Session ${activeSession.id}, status: ${sessionStatus}`);
+        if (data.success && data.data?.length > 0) {
+          const userSessions = data.data.filter((session: ActiveSession) =>
+            session.utilizator_uid === user.uid &&
+            (session.status === 'activ' || session.status === 'pausat')
+          );
+
+          if (userSessions.length > 0) {
+            const session = userSessions[0];
+
+            const elapsedSeconds = typeof session.elapsed_seconds === 'number' && !isNaN(session.elapsed_seconds)
+              ? session.elapsed_seconds
+              : 0;
+
+            setActiveSession(session);
+            setCurrentTime(elapsedSeconds);
+            setLastCheck(Date.now());
+
+            // Reset warnings dacă sesiunea s-a schimbat
+            if (!activeSession || activeSession.id !== session.id) {
+              setHasWarned7h(false);
+              setHasWarned8h(false);
             }
-
-            setPersonalTimer({
-              isActive: sessionStatus === 'activ',
-              startTime: new Date(activeSession.data_start),
-              pausedTime: sessionStatus === 'pausat' ? activeSession.elapsed_seconds * 1000 : 0,
-              elapsedTime: activeSession.elapsed_seconds * 1000,
-              projectId: activeSession.proiect_id,
-              sessionId: activeSession.id,
-              description: activeSession.descriere_sesiune || activeSession.descriere_activitate || ''
-            });
-          }
-
-          if (sessionStatus === 'activ') {
-            startInterval();
+          } else {
+            setActiveSession(null);
+            setCurrentTime(0);
+            setLastCheck(0);
+            setHasWarned7h(false);
+            setHasWarned8h(false);
           }
         } else {
-          // Reset timer dacă nu există sesiune activă - doar dacă nu e deja resetat
-          if (personalTimer.sessionId) {
-            console.log('🔄 UserPersistentTimer: No active session found, resetting timer');
-            setPersonalTimer({
-              isActive: false,
-              startTime: null,
-              pausedTime: 0,
-              elapsedTime: 0,
-              projectId: '',
-              sessionId: '',
-              description: ''
-            });
-          }
+          setActiveSession(null);
+          setCurrentTime(0);
+          setLastCheck(0);
         }
-      } else {
-        // Nu există date active - reset doar dacă nu e deja resetat
-        if (personalTimer.sessionId) {
-          console.log('🔄 UserPersistentTimer: No timer data found, resetting timer');
-          setPersonalTimer({
-            isActive: false,
-            startTime: null,
-            pausedTime: 0,
-            elapsedTime: 0,
-            projectId: '',
-            sessionId: '',
-            description: ''
-          });
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('UserPersistentTimer: Request timeout');
+        } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+          console.error('UserPersistentTimer: Network error - API might be down');
+        } else {
+          console.error('UserPersistentTimer: Error checking session:', error.message || error);
         }
       }
-    } catch (error: any) {
-      // Enhanced error handling similar to PlanificatorInteligent
-      if (error.name === 'AbortError') {
-        console.error('Request timeout checking active session in UserPersistentTimer');
-      } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
-        console.error('Network error checking active session in UserPersistentTimer - API might be down');
-      } else {
-        console.error('Error checking active session in UserPersistentTimer:', error.message || error);
+    };
+
+    // Check imediat și apoi la fiecare 10 secunde pentru sync rapid cu Planificator
+    checkActiveSession();
+    const interval = setInterval(checkActiveSession, 10000);
+
+    return () => clearInterval(interval);
+  }, [user?.uid, activeSession?.id]);
+
+  // Update current time every second when timer is active
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== 'activ' || !lastCheck) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const timeSinceLastCheck = Math.floor((now - lastCheck) / 1000);
+      const baseElapsed = typeof activeSession.elapsed_seconds === 'number' && !isNaN(activeSession.elapsed_seconds)
+        ? activeSession.elapsed_seconds
+        : 0;
+      const newTime = baseElapsed + timeSinceLastCheck;
+
+      setCurrentTime(newTime);
+
+      // Warning la 7 ore
+      if (newTime >= 25200 && !hasWarned7h) {
+        setHasWarned7h(true);
       }
 
-      // Don't reset timer on network errors to prevent false stops
+      // Auto-stop la 8 ore
+      if (newTime >= 28800 && !hasWarned8h) {
+        setHasWarned8h(true);
+        handleStopTimer(true);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession, lastCheck, hasWarned7h, hasWarned8h]);
+
+  const formatTime = (seconds: number): string => {
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
+      return '00:00:00';
     }
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startInterval = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+  const handlePauseResume = async () => {
+    if (!activeSession || isLoading) return;
 
-    intervalRef.current = setInterval(() => {
-      setPersonalTimer(prev => {
-        if (!prev.isActive || !prev.startTime) return prev;
-
-        const now = Date.now();
-        const elapsed = now - prev.startTime.getTime() + prev.pausedTime;
-        const elapsedSeconds = Math.floor(elapsed / 1000);
-
-        // 8-hour limit check (28800 seconds) with warning
-        if (elapsedSeconds >= 27000 && elapsedSeconds < 28800 && elapsedSeconds % 300 === 0) {
-          toast.warn(`⚠️ Atenție! Ai lucrat peste 7.5 ore. Limita de 8 ore se apropie!`);
-        } else if (elapsedSeconds >= 28800) {
-          toast.error('⏰ Limita de 8 ore a fost atinsă!');
-          stopTimer();
-          return prev;
-        }
-
-        return { ...prev, elapsedTime: elapsed };
+    setIsLoading(true);
+    try {
+      const action = activeSession.status === 'activ' ? 'pause' : 'resume';
+      const response = await fetch('/api/analytics/live-timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          session_id: activeSession.id
+        })
       });
-    }, 2000); // Redus de la 1000ms la 2000ms pentru eficiență
-  };
 
-  const stopInterval = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+      const result = await response.json();
+
+      if (result.success) {
+        setActiveSession(prev => prev ? {
+          ...prev,
+          status: prev.status === 'activ' ? 'pausat' : 'activ'
+        } : null);
+
+        setLastCheck(Date.now());
+      } else {
+        console.error('Timer action failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error toggling timer:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // stopTimer funcționează cu aceeași sesiune ca și Planificatorul
-  // Emit CustomEvent pentru sincronizare bidirectională
-  const stopTimer = async () => {
-    if (!personalTimer.sessionId) return;
+  const handleStopTimer = async (autoStop = false) => {
+    if (!activeSession || isLoading) return;
 
+    setIsLoading(true);
     try {
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'stop',
-          session_id: personalTimer.sessionId,
-          user_id: user.uid
+          session_id: activeSession.id
         })
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (data.success) {
-        setPersonalTimer({
-          isActive: false,
-          startTime: null,
-          pausedTime: 0,
-          elapsedTime: 0,
-          projectId: '',
-          sessionId: '',
-          description: ''
-        });
+      if (result.success) {
+        setActiveSession(null);
+        setCurrentTime(0);
+        setLastCheck(0);
+        setHasWarned7h(false);
+        setHasWarned8h(false);
 
-        // Emit event pentru a notifica Planificator-ul să se actualizeze
-        window.dispatchEvent(new CustomEvent('timer-stopped', {
-          detail: {
-            sessionId: personalTimer.sessionId,
-            source: 'layout'
-          }
-        }));
-
-        toast.success('💾 Timer salvat');
+        if (autoStop && typeof window !== 'undefined') {
+          setTimeout(() => {
+            alert('Timer oprit automat după 8 ore pentru siguranță și respectarea legislației muncii.');
+          }, 500);
+        }
+      } else {
+        console.error('Stop timer failed:', result.error);
       }
     } catch (error) {
       console.error('Error stopping timer:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+  // Nu afișez componenta dacă nu am sesiune activă
+  if (!activeSession) {
+    return null;
+  }
 
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-  };
+  const isActive = activeSession.status === 'activ';
+  const isNearLimit = currentTime >= 25200;
+  const isCritical = currentTime >= 27000;
+  const isOvertime = currentTime >= 28800;
 
   return (
     <div style={{
       padding: '0.75rem 1.5rem',
       margin: '0.5rem 0',
-      background: personalTimer.sessionId
-        ? (personalTimer.isActive
-          ? 'rgba(16, 185, 129, 0.1)'
-          : 'rgba(245, 158, 11, 0.1)')
-        : 'rgba(107, 114, 128, 0.05)',
-      border: `1px solid ${personalTimer.sessionId
-        ? (personalTimer.isActive
-          ? 'rgba(16, 185, 129, 0.2)'
-          : 'rgba(245, 158, 11, 0.2)')
-        : 'rgba(107, 114, 128, 0.1)'}`,
-      borderRadius: '8px'
+      background: isActive
+        ? (isOvertime ? 'rgba(220, 38, 38, 0.15)' : isCritical ? 'rgba(220, 38, 38, 0.12)' : 'rgba(16, 185, 129, 0.1)')
+        : 'rgba(245, 158, 11, 0.1)',
+      border: `1px solid ${isActive
+        ? (isOvertime ? 'rgba(220, 38, 38, 0.3)' : isCritical ? 'rgba(220, 38, 38, 0.25)' : 'rgba(16, 185, 129, 0.2)')
+        : 'rgba(245, 158, 11, 0.2)'}`,
+      borderRadius: '8px',
+      boxShadow: isNearLimit ? '0 0 8px rgba(220, 38, 38, 0.3)' : 'none'
     }}>
       {/* Timer display */}
       <div style={{
@@ -308,24 +271,20 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
           color: '#6b7280',
           fontWeight: '500'
         }}>
-          ⏱️ {personalTimer.sessionId
-            ? (personalTimer.isActive ? 'Timer Activ' : 'Timer Pausat')
-            : 'Timer Inactiv'}
+          ⏱️ {isActive ? 'Timer Activ' : 'Timer Pausat'}
         </div>
         <div style={{
           fontSize: '0.875rem',
           fontWeight: '700',
           fontFamily: 'monospace',
-          color: personalTimer.sessionId
-            ? (personalTimer.isActive ? '#10b981' : '#f59e0b')
-            : '#6b7280'
+          color: isOvertime ? '#b91c1c' : isCritical ? '#dc2626' : (isActive ? '#10b981' : '#f59e0b')
         }}>
-          {formatTime(personalTimer.elapsedTime)}
+          {formatTime(currentTime)}
         </div>
       </div>
 
       {/* Project info */}
-      {personalTimer.projectId && (
+      {activeSession.proiect_id && (
         <div style={{
           fontSize: '0.7rem',
           color: '#6b7280',
@@ -334,41 +293,64 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
         }}>
-          📁 {personalTimer.projectId}
+          📁 {activeSession.proiect_nume || activeSession.proiect_id}
         </div>
       )}
 
-      {/* Stop button - funcționează cu aceeași sesiune */}
-      {personalTimer.sessionId && (
+      {/* Control buttons */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        justifyContent: 'center'
+      }}>
+        <button
+          onClick={handlePauseResume}
+          disabled={isLoading || isOvertime}
+          style={{
+            padding: '0.35rem 0.75rem',
+            background: isActive ? '#f59e0b' : '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: (isLoading || isOvertime) ? 'not-allowed' : 'pointer',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            opacity: (isLoading || isOvertime) ? 0.5 : 1,
+            transition: 'all 0.2s'
+          }}
+        >
+          {isActive ? '⏸️ Pauză' : '▶️ Continuă'}
+        </button>
+        <button
+          onClick={() => handleStopTimer(false)}
+          disabled={isLoading}
+          style={{
+            padding: '0.35rem 0.75rem',
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            opacity: isLoading ? 0.5 : 1,
+            transition: 'all 0.2s'
+          }}
+        >
+          ⏹️ Stop
+        </button>
+      </div>
+
+      {/* Warning indicator */}
+      {isNearLimit && (
         <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginTop: '0.5rem'
+          fontSize: '0.65rem',
+          color: isOvertime ? '#b91c1c' : '#dc2626',
+          textAlign: 'center',
+          marginTop: '0.5rem',
+          fontWeight: '600'
         }}>
-          <button
-            onClick={stopTimer}
-            style={{
-              padding: '0.35rem 0.75rem',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#dc2626';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#ef4444';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            ⏹️ Stop
-          </button>
+          {isOvertime ? '🚨 STOP OBLIGATORIU: Depășit 8h!' : isCritical ? '🚨 CRITIC: Aproape de 8h!' : '⚠️ ATENȚIE: Aproape de 8h'}
         </div>
       )}
     </div>

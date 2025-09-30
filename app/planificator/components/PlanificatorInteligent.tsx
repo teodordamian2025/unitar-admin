@@ -611,14 +611,6 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         setActiveTimerItemId(null);
         setHasActiveSession(false);
 
-        // Emit custom event pentru a notifica UserPersistentTimer să se reseteze instant
-        window.dispatchEvent(new CustomEvent('timer-stopped', {
-          detail: {
-            sessionId: activeSession.id,
-            source: 'planificator'
-          }
-        }));
-
         await loadPlanificatorItems();
         toast.success(`⏹️ Timer oprit! Timp înregistrat: ${Math.round((data.worked_hours || 0) * 60)} minute`);
       } else {
@@ -818,28 +810,13 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       loadPlanificatorItems();
       checkActiveSession();
 
-      // Listen for timer-stopped event from UserPersistentTimer (Layout)
-      const handleTimerStopped = (event: any) => {
-        console.log('🔄 Planificator: Timer stopped event received from', event.detail?.source);
-        if (event.detail?.source === 'layout') {
-          // Reset local timer state când se oprește din Layout
-          setActiveTimer(null);
-          setActiveTimerItemId(null);
-          setHasActiveSession(false);
-          loadPlanificatorItems(); // Reload pentru a actualiza UI
-        }
-      };
-
-      window.addEventListener('timer-stopped', handleTimerStopped);
-
-      // Verifică timer-ul la fiecare 30 secunde (redus pentru eficiență)
-      const timerCheckInterval = setInterval(checkActiveSession, 30000);
+      // Verifică timer-ul la fiecare 10 secunde pentru sincronizare rapidă cu Layout
+      const timerCheckInterval = setInterval(checkActiveSession, 10000);
 
       // Reîncarcă lista la fiecare 60 secunde pentru sincronizare (redus din 30s)
       const listRefreshInterval = setInterval(loadPlanificatorItems, 60000);
 
       return () => {
-        window.removeEventListener('timer-stopped', handleTimerStopped);
         clearInterval(timerCheckInterval);
         clearInterval(listRefreshInterval);
       };
