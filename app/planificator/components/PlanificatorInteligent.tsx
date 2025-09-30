@@ -1240,22 +1240,25 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
               🔍 Adaugă Element
             </h4>
             <button
-              onClick={() => {
-                setShowSearch(false);
-                setSearchTerm('');
-                setSearchResults([]);
-              }}
-              style={{
-                background: 'rgba(107, 114, 128, 0.1)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '0.25rem',
-                cursor: 'pointer',
-                color: '#6b7280'
-              }}
-            >
-              ✕
-            </button>
+	  onClick={() => {
+	    setShowSearch(false);
+	    setSearchTerm('');
+	    setSearchResults([]);
+	  }}
+	  style={{
+	    background: 'rgba(107, 114, 128, 0.1)',
+	    border: 'none',
+	    borderRadius: '6px',
+	    padding: '0.25rem',
+	    cursor: 'pointer',
+	    color: '#6b7280',
+	    position: 'relative',
+	    zIndex: 100,
+	    pointerEvents: 'auto'
+	  }}
+	>
+	  ✕
+	</button>
           </div>
 
           <input
