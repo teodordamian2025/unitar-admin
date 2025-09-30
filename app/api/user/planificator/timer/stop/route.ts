@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired authentication token' }, { status: 401 });
     }
 
-    // Găsește sesiunea activă pentru utilizator
+    // Găsește sesiunea activă pentru utilizator din SesiuniLucru (nu TimeTracking!)
     const findActiveQuery = `
-      SELECT id, data_start, proiect_id, descriere_sesiune
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
-      WHERE utilizator_uid = @userId
+      SELECT id, data_start, proiect_id, descriere_activitate
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      WHERE utilizator_uid = ?
         AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       ORDER BY data_start DESC
       LIMIT 1
@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
 
     const [activeRows] = await bigquery.query({
       query: findActiveQuery,
-      params: { userId }
+      location: 'EU',
+      params: [userId]
     });
 
     if (activeRows.length === 0) {
@@ -64,44 +65,39 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Update sesiunea ca finalizată
+    // Update sesiunea ca finalizată în SesiuniLucru
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
       SET
-        status = 'finalizat',
-        data_end = CURRENT_TIMESTAMP(),
-        ore_lucrate = @workedHours,
-        rate_per_hour = 0,
-        valoare_totala = 0,
-        data_actualizare = CURRENT_TIMESTAMP()
-      WHERE id = @sessionId AND utilizator_uid = @userId
+        status = 'completat',
+        data_stop = CURRENT_TIMESTAMP(),
+        ore_lucrate = ?
+      WHERE id = ? AND utilizator_uid = ?
     `;
 
     await bigquery.query({
       query: updateQuery,
-      params: {
-        sessionId: activeSession.id,
-        userId,
-        workedHours
-      }
+      location: 'EU',
+      params: [workedHours, activeSession.id, userId]
     });
 
     // Obține numele proiectului pentru răspuns
     let projectName = 'Unknown Project';
     try {
       const projectQuery = `
-        SELECT Nume
+        SELECT Denumire
         FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\`
-        WHERE id = @projectId AND utilizator_uid = @userId
+        WHERE ID_Proiect = ?
       `;
 
       const [projectRows] = await bigquery.query({
         query: projectQuery,
-        params: { projectId: activeSession.proiect_id, userId }
+        location: 'EU',
+        params: [activeSession.proiect_id]
       });
 
       if (projectRows.length > 0) {
-        projectName = projectRows[0].Nume;
+        projectName = projectRows[0].Denumire;
       }
     } catch (error) {
       console.warn('Could not fetch project name:', error);

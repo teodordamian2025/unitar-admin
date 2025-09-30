@@ -86,19 +86,19 @@ export async function POST(request: NextRequest) {
     if (planificatorItem.tip_item === 'sarcina') {
       // Pentru sarcini, obține proiect_id din tabela Sarcini
       const taskQuery = `
-        SELECT Proiect_ID
+        SELECT proiect_id
         FROM \`hale-mode-464009-i6.${DATASET_ID}.Sarcini\`
-        WHERE id = ? AND utilizator_uid = ?
+        WHERE id = ?
       `;
 
       const [taskRows] = await bigquery.query({
         query: taskQuery,
         location: 'EU',
-        params: [planificatorItem.item_id, userId]
+        params: [planificatorItem.item_id]
       });
 
       if (taskRows.length > 0) {
-        proiect_id = taskRows[0].Proiect_ID;
+        proiect_id = taskRows[0].proiect_id;
       }
     }
 
