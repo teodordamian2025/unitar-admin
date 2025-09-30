@@ -223,9 +223,49 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
     }
   };
 
-  // IMPORTANT: UserPersistentTimer este DOAR AFIȘARE, nu are acțiuni proprii
-  // Toate acțiunile (start/pause/stop) se fac din Planificator
-  // Astfel se evită double-save în TimeTracking
+  // stopTimer funcționează cu aceeași sesiune ca și Planificatorul
+  // Emit CustomEvent pentru sincronizare bidirectională
+  const stopTimer = async () => {
+    if (!personalTimer.sessionId) return;
+
+    try {
+      const response = await fetch('/api/analytics/live-timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'stop',
+          session_id: personalTimer.sessionId,
+          user_id: user.uid
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setPersonalTimer({
+          isActive: false,
+          startTime: null,
+          pausedTime: 0,
+          elapsedTime: 0,
+          projectId: '',
+          sessionId: '',
+          description: ''
+        });
+
+        // Emit event pentru a notifica Planificator-ul să se actualizeze
+        window.dispatchEvent(new CustomEvent('timer-stopped', {
+          detail: {
+            sessionId: personalTimer.sessionId,
+            source: 'layout'
+          }
+        }));
+
+        toast.success('💾 Timer salvat');
+      }
+    } catch (error) {
+      console.error('Error stopping timer:', error);
+    }
+  };
 
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -298,16 +338,37 @@ export default function UserPersistentTimer({ user }: UserPersistentTimerProps) 
         </div>
       )}
 
-      {/* Info message - Timer controlat din Planificator */}
+      {/* Stop button - funcționează cu aceeași sesiune */}
       {personalTimer.sessionId && (
         <div style={{
-          fontSize: '0.65rem',
-          color: '#6b7280',
-          textAlign: 'center',
-          marginTop: '0.5rem',
-          fontStyle: 'italic'
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: '0.5rem'
         }}>
-          ℹ️ Controlează timer-ul din Planificator
+          <button
+            onClick={stopTimer}
+            style={{
+              padding: '0.35rem 0.75rem',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#dc2626';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ef4444';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ⏹️ Stop
+          </button>
         </div>
       )}
     </div>

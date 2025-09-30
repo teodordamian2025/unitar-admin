@@ -818,6 +818,20 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       loadPlanificatorItems();
       checkActiveSession();
 
+      // Listen for timer-stopped event from UserPersistentTimer (Layout)
+      const handleTimerStopped = (event: any) => {
+        console.log('🔄 Planificator: Timer stopped event received from', event.detail?.source);
+        if (event.detail?.source === 'layout') {
+          // Reset local timer state când se oprește din Layout
+          setActiveTimer(null);
+          setActiveTimerItemId(null);
+          setHasActiveSession(false);
+          loadPlanificatorItems(); // Reload pentru a actualiza UI
+        }
+      };
+
+      window.addEventListener('timer-stopped', handleTimerStopped);
+
       // Verifică timer-ul la fiecare 30 secunde (redus pentru eficiență)
       const timerCheckInterval = setInterval(checkActiveSession, 30000);
 
@@ -825,6 +839,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       const listRefreshInterval = setInterval(loadPlanificatorItems, 60000);
 
       return () => {
+        window.removeEventListener('timer-stopped', handleTimerStopped);
         clearInterval(timerCheckInterval);
         clearInterval(listRefreshInterval);
       };
