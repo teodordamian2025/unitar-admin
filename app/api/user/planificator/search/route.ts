@@ -1,9 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/search/route.ts
-// DATA: 30.09.2025 23:45 (ora României) - FIX schema BigQuery reală
-// DESCRIERE: API search pentru utilizatori cu schema corectă BigQuery
-// FUNCȚIONALITATE: Căutare în ID_Proiect, Denumire, Adresa din tabelele reale
-// FIX: Eliminat utilizator_uid (proiecte sunt company-wide, nu per-user)
+// DATA: 01.10.2025 00:00 (ora României) - RESTAURAT din versiunea funcțională
+// DESCRIERE: API pentru căutare proiecte în planificator (doar proiecte, nu subproiecte/sarcini)
+// FUNCȚIONALITATE: GET cu query pentru adăugarea în planificator
+// IMPORTANTE: Folosește tabel Subproiecte (nu SubProiecte) și exclude proiecte deja în planificator
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -40,89 +40,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ results: [] });
     }
 
+    const searchPattern = `%${searchTerm.toLowerCase()}%`;
+
+    // Query pentru căutarea doar a proiectelor (primul nivel al ierarhiei)
     const searchQuery = `
-      WITH ProiecteSearch AS (
-        SELECT DISTINCT
-          p.ID_Proiect as id,
-          'proiect' as tip,
-          p.Denumire as nume,
-          NULL as proiect_nume,
-          (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sub
-           WHERE sub.ID_Proiect = p.ID_Proiect) as subproiecte_count,
-          (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-           WHERE s.proiect_id = p.ID_Proiect) as sarcini_count,
-          EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-                 WHERE pp.item_id = p.ID_Proiect AND pp.tip_item = 'proiect' AND pp.utilizator_uid = @userId) as in_planificator,
-          TRUE as can_open_details,
-          NULL as urgenta,
-          NULL as data_scadenta,
-          NULL as progres_procent
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
-        WHERE (
-          UPPER(p.ID_Proiect) LIKE UPPER(@searchPattern)
-          OR UPPER(p.Denumire) LIKE UPPER(@searchPattern)
-          OR UPPER(p.Adresa) LIKE UPPER(@searchPattern)
-        )
-      ),
-      SubproiecteSearch AS (
-        SELECT DISTINCT
-          sp.ID_Subproiect as id,
-          'subproiect' as tip,
-          sp.Denumire as nume,
-          p.Denumire as proiect_nume,
-          0 as subproiecte_count,
-          (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-           WHERE s.subproiect_id = sp.ID_Subproiect) as sarcini_count,
-          EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-                 WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator,
-          TRUE as can_open_details,
-          NULL as urgenta,
-          NULL as data_scadenta,
-          NULL as progres_procent
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sp
-        JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON sp.ID_Proiect = p.ID_Proiect
-        WHERE UPPER(sp.Denumire) LIKE UPPER(@searchPattern)
-      ),
-      SarciniSearch AS (
-        SELECT DISTINCT
-          s.id,
-          'sarcina' as tip,
-          s.titlu as nume,
-          COALESCE(sp.Denumire, p.Denumire) as proiect_nume,
-          0 as subproiecte_count,
-          0 as sarcini_count,
-          EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-                 WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
-          TRUE as can_open_details,
-          s.urgenta,
-          s.data_scadenta,
-          s.progres_procent
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SubProiecte\` sp ON s.subproiect_id = sp.ID_Subproiect
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p ON s.proiect_id = p.ID_Proiect
-        WHERE UPPER(s.titlu) LIKE UPPER(@searchPattern)
+      WITH PlanificatorExistent AS (
+        SELECT tip_item, item_id
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        WHERE utilizator_uid = @userId AND activ = TRUE
       )
-      SELECT * FROM ProiecteSearch
-      UNION ALL
-      SELECT * FROM SubproiecteSearch
-      UNION ALL
-      SELECT * FROM SarciniSearch
-      ORDER BY
-        CASE tip
-          WHEN 'proiect' THEN 1
-          WHEN 'subproiect' THEN 2
-          WHEN 'sarcina' THEN 3
-        END,
-        nume
-      LIMIT 50
+
+      SELECT
+        'proiect' as tip,
+        ID_Proiect as id,
+        CONCAT(ID_Proiect, ' - ', Denumire) as nume,
+        CAST(NULL AS STRING) as proiect_nume,
+        1 as priority_order,
+        -- Contorizare subproiecte și sarcini pentru feedback
+        (
+          SELECT COUNT(*)
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\`
+          WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
+        ) as subproiecte_count,
+        (
+          SELECT COUNT(*)
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
+          WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
+        ) as sarcini_count
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
+      WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
+        AND Status != 'Anulat'
+        AND ID_Proiect NOT IN (
+          SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
+        )
+      ORDER BY Denumire ASC
+      LIMIT 20
     `;
 
     const [rows] = await bigquery.query({
       query: searchQuery,
-      params: {
-        userId,
-        searchPattern: `%${searchTerm}%`
-      }
+      params: { userId, searchPattern }
     });
 
     const results = rows.map((row: any) => ({
@@ -130,19 +87,14 @@ export async function GET(request: NextRequest) {
       tip: row.tip,
       nume: row.nume,
       proiect_nume: row.proiect_nume,
-      subproiecte_count: parseInt(row.subproiecte_count) || 0,
-      sarcini_count: parseInt(row.sarcini_count) || 0,
-      in_planificator: row.in_planificator,
-      can_open_details: row.can_open_details,
-      urgenta: row.urgenta,
-      data_scadenta: row.data_scadenta?.value || row.data_scadenta,
-      progres_procent: row.progres_procent
+      subproiecte_count: row.subproiecte_count || 0,
+      sarcini_count: row.sarcini_count || 0
     }));
 
     return NextResponse.json({ results });
 
   } catch (error) {
-    console.error('Error searching items for normal user:', error);
+    console.error('Error searching items:', error);
     return NextResponse.json(
       { error: 'Failed to search items' },
       { status: 500 }
