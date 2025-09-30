@@ -1049,11 +1049,14 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                   alignItems: 'center',
                                   gap: '0.5rem',
                                   position: 'relative',
-                                  zIndex: 10
+                                  zIndex: 50
                                 }}>
                                   {/* Timer button */}
                                   <button
-                                    onClick={() => activeTimerItemId === item.id ? stopTimer() : startTimer(item)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      activeTimerItemId === item.id ? stopTimer() : startTimer(item);
+                                    }}
                                     disabled={item.is_pinned && activeTimerItemId !== item.id}
                                     style={{
                                       background: activeTimerItemId === item.id
@@ -1086,7 +1089,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                   {/* Realizat button */}
                                   <button
-                                    onClick={() => toggleRealizat(item.id, item.is_realizat || false)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleRealizat(item.id, item.is_realizat || false);
+                                    }}
                                     style={{
                                       background: item.is_realizat
                                         ? 'rgba(34, 197, 94, 0.1)'
@@ -1107,7 +1113,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                   {/* Pin button */}
                                   <button
-                                    onClick={() => togglePin(item.id, item.is_pinned)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePin(item.id, item.is_pinned);
+                                    }}
                                     style={{
                                       background: item.is_pinned
                                         ? 'rgba(59, 130, 246, 0.1)'
@@ -1128,7 +1137,11 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                   {/* Remove button */}
                                   <button
-                                    onClick={() => removeItem(item.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      removeItem(item.id);
+                                    }}
                                     style={{
                                       background: 'rgba(239, 68, 68, 0.1)',
                                       border: '1px solid rgba(239, 68, 68, 0.2)',
@@ -1138,7 +1151,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       color: '#991b1b',
                                       cursor: 'pointer',
                                       position: 'relative',
-                                      zIndex: 10,
+                                      zIndex: 100,
                                       pointerEvents: 'auto'
                                     }}
                                     title="Elimină din listă"
@@ -1240,7 +1253,9 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
               🔍 Adaugă Element
             </h4>
             <button
-	  onClick={() => {
+	  onClick={(e) => {
+	    e.stopPropagation();
+	    e.preventDefault();
 	    setShowSearch(false);
 	    setSearchTerm('');
 	    setSearchResults([]);
@@ -1344,7 +1359,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                         }}>
                           {/* Adaugă proiect */}
                           <button
-                            onClick={() => addItemToPlanificator(result)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addItemToPlanificator(result);
+                            }}
                             style={{
                               background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                               color: 'white',
@@ -1361,7 +1379,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                           {/* Toggle expand */}
                           {hasChildren && (
                             <button
-                              onClick={() => toggleExpanded(result.id, 'proiect')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpanded(result.id, 'proiect');
+                              }}
                               style={{
                                 background: 'rgba(107, 114, 128, 0.1)',
                                 border: '1px solid rgba(107, 114, 128, 0.2)',
@@ -1439,7 +1460,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       gap: '0.5rem'
                                     }}>
                                       <button
-                                        onClick={() => addItemToPlanificator(subproiect)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          addItemToPlanificator(subproiect);
+                                        }}
                                         style={{
                                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                           color: 'white',
@@ -1455,7 +1479,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                       {subHasTasks && (
                                         <button
-                                          onClick={() => toggleExpanded(subproiect.id, 'subproiect')}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleExpanded(subproiect.id, 'subproiect');
+                                          }}
                                           style={{
                                             background: 'rgba(107, 114, 128, 0.1)',
                                             border: '1px solid rgba(107, 114, 128, 0.2)',
@@ -1524,7 +1551,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                             gap: '0.5rem'
                                           }}>
                                             <button
-                                              onClick={() => addItemToPlanificator(sarcina)}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                addItemToPlanificator(sarcina);
+                                              }}
                                               style={{
                                                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                                                 color: 'white',
@@ -1540,7 +1570,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                             {sarcina.can_open_details && (
                                               <button
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
                                                   // TODO: Link către pagina de management sarcini
                                                   toast.info('🔗 Funcționalitate în dezvoltare');
                                                 }}
@@ -1622,7 +1653,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                   gap: '0.5rem'
                                 }}>
                                   <button
-                                    onClick={() => addItemToPlanificator(sarcina)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addItemToPlanificator(sarcina);
+                                    }}
                                     style={{
                                       background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                                       color: 'white',
@@ -1638,7 +1672,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
                                   {sarcina.can_open_details && (
                                     <button
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         // TODO: Link către pagina de management sarcini
                                         toast.info('🔗 Funcționalitate în dezvoltare');
                                       }}
