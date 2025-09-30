@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/hierarchy/subproiect/[id]/route.ts
-// DATA: 30.09.2025 00:38 (ora României)
-// DESCRIERE: API hierarchy subproiect pentru utilizatori normali
-// FUNCȚIONALITATE: Sarcini subproiect pentru utilizatori normali cu restricții
+// DATA: 01.10.2025 00:12 (ora României) - FIX schema reală BigQuery
+// DESCRIERE: API pentru încărcarea sarcinilor unui subproiect
+// FUNCȚIONALITATE: Returnează sarcini care aparțin unui subproiect specific
+// FIX: Folosește s.subproiect_id, s.titlu, s.prioritate (nu s.Proiect_ID, s.Nume, s.Urgenta)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -34,23 +35,22 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const { id } = params;
 
-    // Sarcini ale subproiectului
+    // Sarcini care aparțin acestui subproiect
     const sarciniQuery = `
-      SELECT DISTINCT
+      SELECT
         s.id,
         'sarcina' as tip,
-        s.Nume as nume,
+        s.titlu as nume,
         0 as sarcini_count,
         EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
                WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
-        TRUE as can_open_details,
-        s.Urgenta as urgenta,
-        s.Data_Scadenta as data_scadenta,
-        s.Progres_Procent as progres_procent
+        s.prioritate as urgenta,
+        s.data_scadenta,
+        s.progres_procent
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-      WHERE s.Proiect_ID = @subproiectId
-        AND s.utilizator_uid = @userId
-      ORDER BY s.Nume
+      WHERE s.subproiect_id = @subproiectId
+        AND s.status NOT IN ('Finalizată', 'Anulată')
+      ORDER BY s.titlu
     `;
 
     const [sarciniRows] = await bigquery.query({
@@ -62,9 +62,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       id: row.id,
       tip: row.tip,
       nume: row.nume,
-      sarcini_count: parseInt(row.sarcini_count) || 0,
+      sarcini_count: row.sarcini_count || 0,
       in_planificator: row.in_planificator,
-      can_open_details: row.can_open_details,
       urgenta: row.urgenta,
       data_scadenta: row.data_scadenta?.value || row.data_scadenta,
       progres_procent: row.progres_procent

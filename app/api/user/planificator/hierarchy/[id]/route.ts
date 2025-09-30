@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/hierarchy/[id]/route.ts
-// DATA: 30.09.2025 00:37 (ora României)
-// DESCRIERE: API hierarchy pentru utilizatori normali
-// FUNCȚIONALITATE: Ierarhie proiect pentru utilizatori normali cu restricții
+// DATA: 01.10.2025 00:10 (ora României) - FIX schema reală BigQuery
+// DESCRIERE: API hierarchy pentru încărcarea subproiectelor și sarcinilor unui proiect
+// FUNCȚIONALITATE: Returnează subproiecte din tabel Subproiecte și sarcini directe
+// FIX: Folosește ID_Subproiect, ID_Proiect, Denumire (nu id, ProiectParinte_ID, Nume)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -34,43 +35,40 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const { id } = params;
 
-    // Subproiecte
+    // Subproiecte din tabelul Subproiecte
     const subproiecteQuery = `
-      SELECT DISTINCT
-        sp.id,
+      SELECT
+        sp.ID_Subproiect as id,
         'subproiect' as tip,
-        sp.Nume as nume,
+        CONCAT(sp.ID_Subproiect, ' - ', sp.Denumire) as nume,
         (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-         WHERE s.Proiect_ID = sp.id AND s.utilizator_uid = @userId) as sarcini_count,
+         WHERE s.subproiect_id = sp.ID_Subproiect) as sarcini_count,
         EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
-               WHERE pp.item_id = sp.id AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator,
-        TRUE as can_open_details,
-        NULL as urgenta,
-        NULL as data_scadenta,
-        NULL as progres_procent
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` sp
-      WHERE sp.ProiectParinte_ID = @proiectId
-        AND sp.utilizator_uid = @userId
-      ORDER BY sp.Nume
+               WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      WHERE sp.ID_Proiect = @proiectId
+        AND sp.activ = TRUE
+        AND sp.Status != 'Anulat'
+      ORDER BY sp.Denumire
     `;
 
-    // Sarcini directe ale proiectului
+    // Sarcini directe ale proiectului (fără subproiect)
     const sarciniQuery = `
-      SELECT DISTINCT
+      SELECT
         s.id,
         'sarcina' as tip,
-        s.Nume as nume,
+        s.titlu as nume,
         0 as sarcini_count,
         EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` pp
                WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
-        TRUE as can_open_details,
-        s.Urgenta as urgenta,
-        s.Data_Scadenta as data_scadenta,
-        s.Progres_Procent as progres_procent
+        s.prioritate as urgenta,
+        s.data_scadenta,
+        s.progres_procent
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-      WHERE s.Proiect_ID = @proiectId
-        AND s.utilizator_uid = @userId
-      ORDER BY s.Nume
+      WHERE s.proiect_id = @proiectId
+        AND (s.subproiect_id IS NULL OR s.subproiect_id = '')
+        AND s.status NOT IN ('Finalizată', 'Anulată')
+      ORDER BY s.titlu
     `;
 
     const [subproiecteRows] = await bigquery.query({
@@ -87,21 +85,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       id: row.id,
       tip: row.tip,
       nume: row.nume,
-      sarcini_count: parseInt(row.sarcini_count) || 0,
-      in_planificator: row.in_planificator,
-      can_open_details: row.can_open_details,
-      urgenta: row.urgenta,
-      data_scadenta: row.data_scadenta?.value || row.data_scadenta,
-      progres_procent: row.progres_procent
+      sarcini_count: row.sarcini_count || 0,
+      in_planificator: row.in_planificator
     }));
 
     const sarcini_directe = sarciniRows.map((row: any) => ({
       id: row.id,
       tip: row.tip,
       nume: row.nume,
-      sarcini_count: parseInt(row.sarcini_count) || 0,
+      sarcini_count: row.sarcini_count || 0,
       in_planificator: row.in_planificator,
-      can_open_details: row.can_open_details,
       urgenta: row.urgenta,
       data_scadenta: row.data_scadenta?.value || row.data_scadenta,
       progres_procent: row.progres_procent
