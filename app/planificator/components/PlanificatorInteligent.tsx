@@ -485,16 +485,19 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       // Continuă cu pornirea timer-ului chiar dacă verificarea a eșuat
     }
     try {
-      const idToken = await user.getIdToken();
-      const apiPath = getApiBasePath();
-      const response = await fetch(`${apiPath}/timer/start`, {
+      // Folosește /api/analytics/live-timer pentru a fi sincronizat cu UserPersistentTimer
+      const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          planificator_item_id: item.id,
+          action: 'start',
+          proiect_id: item.item_id,
+          utilizator_uid: user.uid,
+          user_id: user.uid,
+          sarcina_id: item.tip_item === 'sarcina' ? item.item_id : 'activitate_generala',
+          descriere_sesiune: `Lucrez la: ${item.display_name}`,
           descriere_activitate: `Lucrez la: ${item.display_name}`
         })
       });
@@ -522,14 +525,38 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   // Stop timer curent
   const stopTimer = async () => {
     try {
-      const idToken = await user.getIdToken();
-      const apiPath = getApiBasePath();
-      const response = await fetch(`${apiPath}/timer/stop`, {
+      // Găsește sesiunea activă pentru acest utilizator
+      const sessionsResponse = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`);
+      if (!sessionsResponse.ok) {
+        toast.error('❌ Nu s-a putut găsi sesiunea activă');
+        return;
+      }
+
+      const sessionsData = await sessionsResponse.json();
+      const activeSession = sessionsData.data?.find((session: any) =>
+        session.utilizator_uid === user.uid &&
+        (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
+      );
+
+      if (!activeSession) {
+        toast.error('❌ Nu există o sesiune activă de oprit');
+        setActiveTimer(null);
+        setActiveTimerItemId(null);
+        setHasActiveSession(false);
+        return;
+      }
+
+      // Folosește /api/analytics/live-timer pentru a fi sincronizat cu UserPersistentTimer
+      const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          action: 'stop',
+          session_id: activeSession.id,
+          user_id: user.uid
+        })
       });
 
       if (response.ok) {
