@@ -77,6 +77,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   const [userRole, setUserRole] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
+  // ✅ NEW: Track editing state to prevent polling overwrites
+  const [editingItemIds, setEditingItemIds] = useState<Set<string>>(new Set());
+  const [saveTimeouts, setSaveTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+
   // Detect user role
   const detectUserRole = useCallback(async () => {
     try {
@@ -449,9 +453,16 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
-  // Update comentariu personal
+  // ✅ OPTIMIZED: Debounced save pentru comentariu (2 secunde după ultima tastare)
   const updateComentariu = async (itemId: string, comentariu: string) => {
     try {
+      // Mark item as no longer being edited
+      setEditingItemIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+
       const idToken = await user.getIdToken();
       const apiPath = getApiBasePath();
       const response = await fetch(`${apiPath}/items/${itemId}/comentariu`, {
@@ -468,10 +479,50 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         setItems(prev => prev.map(item =>
           item.id === itemId ? { ...item, comentariu_personal: comentariu } : item
         ));
+        console.log('✅ Comentariu salvat cu succes');
+      } else {
+        console.error('❌ Eroare la salvare comentariu:', response.status);
       }
     } catch (error) {
       console.error('Error updating comentariu:', error);
+      // Re-mark as editing on error
+      setEditingItemIds(prev => new Set(prev).add(itemId));
     }
+  };
+
+  // ✅ NEW: Debounced handler pentru textarea onChange
+  const handleComentariuChange = (itemId: string, newValue: string) => {
+    // Mark item as being edited
+    setEditingItemIds(prev => new Set(prev).add(itemId));
+
+    // Update local state IMMEDIATELY (optimistic UI)
+    setItems(prev => prev.map(prevItem =>
+      prevItem.id === itemId
+        ? { ...prevItem, comentariu_personal: newValue }
+        : prevItem
+    ));
+
+    // Clear existing timeout for this item
+    const existingTimeout = saveTimeouts.get(itemId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Set new debounced save (2 seconds after last keystroke)
+    const newTimeout = setTimeout(() => {
+      console.log(`💾 Auto-save comentariu pentru item ${itemId}`);
+      updateComentariu(itemId, newValue);
+
+      // Clean up timeout from map
+      setSaveTimeouts(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(itemId);
+        return newMap;
+      });
+    }, 2000); // 2 seconds debounce
+
+    // Store timeout
+    setSaveTimeouts(prev => new Map(prev).set(itemId, newTimeout));
   };
 
   // Verifică dacă un item poate fi pin-at (nu poate fi pin-at dacă are timer activ)
@@ -779,31 +830,18 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     detectUserRole();
   }, [detectUserRole]);
 
-  // Load planificator data after role is detected
+  // ✅ OPTIMIZED: Load planificator data DOAR la mount - FĂRĂ polling
   useEffect(() => {
     if (!roleLoading && userRole) {
       loadPlanificatorItems();
-
-      // ✅ OPTIMIZARE: ELIMINAT polling pentru timer (gestionat de TimerContext)
-      // Păstrat DOAR polling pentru lista de items (60s)
-
-      // Tab visibility + page active detection
-      const isTabVisible = () => !document.hidden;
-      const isOnPlanificatorPage = () => {
-        if (typeof window === 'undefined') return false;
-        return window.location.pathname.includes('/planificator');
-      };
-
-      const listRefreshInterval = setInterval(() => {
-        if (isTabVisible() && isOnPlanificatorPage()) {
-          loadPlanificatorItems();
-        }
-      }, 60000); // 60s pentru items list
-
-      return () => {
-        clearInterval(listRefreshInterval);
-      };
+      console.log('✅ Planificator items loaded - NO POLLING (refresh doar la acțiuni explicite)');
     }
+
+    // Cleanup: Clear toate timeout-urile de save la unmount
+    return () => {
+      saveTimeouts.forEach(timeout => clearTimeout(timeout));
+      console.log('🧹 Cleanup: Cleared all pending save timeouts');
+    };
   }, [roleLoading, userRole, loadPlanificatorItems]);
 
   // Search debounce
@@ -1184,31 +1222,38 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                 </div>
                               )}
 
-                              {/* Comentariu personal editable */}
+                              {/* Comentariu personal editable cu debounced auto-save */}
                               <textarea
                                 value={item.comentariu_personal || ''}
-                                onChange={(e) => {
-                                  const newValue = e.target.value;
-                                  setItems(prev => prev.map(prevItem =>
-                                    prevItem.id === item.id
-                                      ? { ...prevItem, comentariu_personal: newValue }
-                                      : prevItem
-                                  ));
-                                }}
-                                onBlur={(e) => updateComentariu(item.id, e.target.value)}
-                                placeholder="Adaugă comentarii personale..."
+                                onChange={(e) => handleComentariuChange(item.id, e.target.value)}
+                                placeholder="Adaugă comentarii personale... (se salvează automat)"
                                 style={{
                                   width: '100%',
-                                  background: 'rgba(255, 255, 255, 0.5)',
-                                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                                  background: editingItemIds.has(item.id)
+                                    ? 'rgba(255, 250, 205, 0.6)' // Yellow tint când se editează
+                                    : 'rgba(255, 255, 255, 0.5)',
+                                  border: editingItemIds.has(item.id)
+                                    ? '1px solid rgba(251, 191, 36, 0.5)' // Orange border când se editează
+                                    : '1px solid rgba(255, 255, 255, 0.3)',
                                   borderRadius: '8px',
                                   padding: '0.5rem',
                                   fontSize: '0.875rem',
                                   color: '#374151',
                                   resize: 'none',
-                                  minHeight: '60px'
+                                  minHeight: '60px',
+                                  transition: 'all 0.2s ease'
                                 }}
                               />
+                              {editingItemIds.has(item.id) && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#f59e0b',
+                                  marginTop: '0.25rem',
+                                  fontStyle: 'italic'
+                                }}>
+                                  ⏳ Se salvează automat în 2s...
+                                </div>
+                              )}
 
                               {/* Deadline info */}
                               {item.data_scadenta && (
