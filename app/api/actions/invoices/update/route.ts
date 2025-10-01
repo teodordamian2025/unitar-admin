@@ -8,8 +8,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+
+console.log(`🔧 Invoice Update API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -78,7 +94,7 @@ async function handleSimpleStatusUpdate(body: any) {
   console.log(`📝 Simple update factură ${facturaId}: status=${status}`);
 
   const updateQuery = `
-    UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+    UPDATE ${TABLE_FACTURI_GENERATE}
     SET 
       status = @status,
       data_actualizare = CURRENT_TIMESTAMP()
@@ -119,7 +135,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
     // PASUL 1: Verifică dacă etapele sunt deja în EtapeFacturi pentru această factură
     const checkQuery = `
       SELECT etapa_id, anexa_id, tip_etapa 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+      FROM ${TABLE_ETAPE_FACTURI}
       WHERE factura_id = @facturaId AND activ = true
     `;
 
@@ -147,7 +163,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
       
       // Dezactivează din EtapeFacturi
       const deactivateQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        UPDATE ${TABLE_ETAPE_FACTURI}
         SET 
           activ = false,
           data_actualizare = CURRENT_TIMESTAMP(),
@@ -166,7 +182,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
       // Resetează status în tabelele principale
       if (etapa.tip_etapa === 'contract') {
         const resetContractQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          UPDATE ${TABLE_ETAPE_CONTRACT}
           SET 
             status_facturare = 'Nefacturat',
             factura_id = NULL,
@@ -183,7 +199,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
         });
       } else {
         const resetAnexaQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+          UPDATE ${TABLE_ANEXE_CONTRACT}
           SET 
             status_facturare = 'Nefacturat',
             factura_id = NULL,
@@ -210,7 +226,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
       const etapaFacturaId = `EF_EDIT_${facturaId}_${etapa.id}_${Date.now()}`;
       
       const insertQuery = `
-        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        INSERT INTO ${TABLE_ETAPE_FACTURI}
         (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
          valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
          data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
@@ -292,7 +308,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
       // Actualizează statusul în tabelele principale
       if (etapa.tip === 'etapa_contract') {
         const updateContractQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+          UPDATE ${TABLE_ETAPE_CONTRACT}
           SET 
             status_facturare = 'Facturat',
             factura_id = @facturaId,
@@ -317,7 +333,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
         });
       } else {
         const updateAnexaQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+          UPDATE ${TABLE_ANEXE_CONTRACT}
           SET 
             status_facturare = 'Facturat',
             factura_id = @facturaId,
@@ -464,7 +480,7 @@ async function handleCompleteEditUpdate(body: any) {
   
   // ✅ UPDATE COMPLET în BigQuery cu toate câmpurile
   const updateCompleteQuery = `
-    UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+    UPDATE ${TABLE_FACTURI_GENERATE}
     SET 
       client_nume = @client_nume,
       client_cui = @client_cui,

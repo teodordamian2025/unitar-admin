@@ -23,6 +23,23 @@ const bigquery = new BigQuery({
   },
 });
 
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+
+console.log(`🔧 Invoice Generation - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, SetariBanca${tableSuffix}, FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
+
 // ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
   tip: 'etapa_contract' | 'etapa_anexa';
@@ -134,8 +151,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       console.log('🔄 [EDIT-MODE] Dezactivez etapele existente pentru această factură...');
       
       const deactivateQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
-        SET 
+        UPDATE ${TABLE_ETAPE_FACTURI}
+        SET
           activ = false,
           data_actualizare = CURRENT_TIMESTAMP(),
           actualizat_de = 'System_Edit_Cleanup'
@@ -169,7 +186,7 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
 
       // ✅ FIX CRUCIAL: Query simplificat cu parametri corecți
       const insertQuery = `
-        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeFacturi\`
+        INSERT INTO ${TABLE_ETAPE_FACTURI}
         (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
          valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
          data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
@@ -261,8 +278,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       .filter(etapa => etapa.tip === 'etapa_contract')
       .map(async (etapa) => {
         const updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\`
-          SET 
+          UPDATE ${TABLE_ETAPE_CONTRACT}
+          SET
             status_facturare = 'Facturat',
             factura_id = @facturaId,
             data_facturare = DATE(@dataFacturare),
@@ -290,8 +307,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       .filter(etapa => etapa.tip === 'etapa_anexa')
       .map(async (etapa) => {
         const updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnexeContract\`
-          SET 
+          UPDATE ${TABLE_ANEXE_CONTRACT}
+          SET
             status_facturare = 'Facturat',
             factura_id = @facturaId,
             data_facturare = DATE(@dataFacturare),
@@ -364,8 +381,8 @@ const formatDate = (date?: string | { value: string }): string => {
 async function loadContariBancare() {
   try {
     const query = `
-      SELECT nume_banca, iban, cont_principal, observatii 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SetariBanca\`
+      SELECT nume_banca, iban, cont_principal, observatii
+      FROM ${TABLE_SETARI_BANCA}
       ORDER BY cont_principal DESC, nume_banca ASC
     `;
 
@@ -1138,8 +1155,8 @@ export async function POST(request: NextRequest) {
 
     // ✅ MODIFICAT: Salvare în BigQuery cu suport pentru Edit și types corecte + DATE EXACTE DIN FRONTEND
     try {
-      const dataset = bigquery.dataset('PanouControlUnitar');
-      const table = dataset.table('FacturiGenerate');
+      const dataset = bigquery.dataset(DATASET);
+      const table = dataset.table(`FacturiGenerate${tableSuffix}`);
 
       if (isEdit && facturaId) {
         console.log('📝 EDIT MODE: Actualizez factură existentă în BigQuery cu date exacte din frontend...');
@@ -1164,7 +1181,7 @@ export async function POST(request: NextRequest) {
 
         // ✅ IMPORTANT: Update complet pentru Edit cu toate câmpurile + date exacte din frontend + FIX serie/numar
         const updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+          UPDATE ${TABLE_FACTURI_GENERATE}
           SET
             serie = @serie,
             numar = @numar,
@@ -1490,10 +1507,10 @@ export async function POST(request: NextRequest) {
 // ✅ PĂSTRATĂ: FUNCȚIE MOCK pentru salvare test e-factura cu Edit Mode support
 async function saveMockEfacturaRecord(data: any) {
   try {
-    const dataset = bigquery.dataset('PanouControlUnitar');
-    
+    const dataset = bigquery.dataset(DATASET);
+
     // ✅ FOLOSEȘTE tabelul AnafEFactura existent
-    const table = dataset.table('AnafEFactura');
+    const table = dataset.table(`AnafEFactura${tableSuffix}`);
 
     const mockXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
@@ -1562,8 +1579,8 @@ async function saveMockEfacturaRecord(data: any) {
     // ✅ BONUS: Actualizează și FacturiGenerate cu informații mock
     try {
       const updateQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
-        SET 
+        UPDATE ${TABLE_FACTURI_GENERATE}
+        SET
           efactura_enabled = true,
           efactura_status = @efacturaStatus,
           anaf_upload_id = @xmlId,

@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,9 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-
-export async function POST(request: NextRequest) {
+console.log(`🔧 [Start] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -42,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Verifică că item-ul aparține utilizatorului
     const validateQuery = `
       SELECT id, tip_item, item_id
-      FROM \`hale-mode-464009-i6.${DATASET_ID}.PlanificatorPersonal\`
+      FROM \`hale-mode-464009-i6.${DATASET}.PlanificatorPersonal\`
       WHERE id = ? AND utilizator_uid = ?
     `;
 
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă există deja o sesiune activă pentru acest utilizator
     const checkActiveQuery = `
       SELECT id
-      FROM \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
+      FROM \`hale-mode-464009-i6.${DATASET}.SesiuniLucru\`
       WHERE utilizator_uid = ?
         AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       LIMIT 1
@@ -87,7 +92,7 @@ export async function POST(request: NextRequest) {
       // Pentru sarcini, obține proiect_id din tabela Sarcini
       const taskQuery = `
         SELECT proiect_id
-        FROM \`hale-mode-464009-i6.${DATASET_ID}.Sarcini\`
+        FROM \`hale-mode-464009-i6.${DATASET}.Sarcini\`
         WHERE id = ?
       `;
 
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Creează sesiunea de timer în SesiuniLucru
     const insertQuery = `
-      INSERT INTO \`hale-mode-464009-i6.${DATASET_ID}.SesiuniLucru\`
+      INSERT INTO \`hale-mode-464009-i6.${DATASET}.SesiuniLucru\`
       (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at)
       VALUES
       (?, ?, ?, CURRENT_TIMESTAMP(), 'activ', ?, CURRENT_TIMESTAMP())

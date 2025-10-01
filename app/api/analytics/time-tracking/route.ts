@@ -16,6 +16,20 @@ const bigquery = new BigQuery({
   },
 });
 
+// Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// Tabele cu suffix dinamic
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 Time Tracking Analytics - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Sarcini${tableSuffix}`);
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -45,10 +59,10 @@ export async function GET(request: NextRequest) {
               s.timp_estimat_total_ore,
               EXTRACT(DAYOFWEEK FROM tt.data_lucru) as day_of_week,
               EXTRACT(WEEK FROM tt.data_lucru) as week_number
-            FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+            FROM ${TABLE_TIME_TRACKING} tt
+            LEFT JOIN ${TABLE_PROIECTE} p
               ON tt.proiect_id = p.ID_Proiect
-            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+            LEFT JOIN ${TABLE_SARCINI} s
               ON tt.sarcina_id = s.id
             WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
               AND tt.ore_lucrate > 0
@@ -85,13 +99,13 @@ export async function GET(request: NextRequest) {
 
       case 'daily-trend':
         query = `
-          SELECT 
+          SELECT
             tt.data_lucru,
             ROUND(SUM(tt.ore_lucrate), 2) as total_ore,
             COUNT(DISTINCT tt.utilizator_uid) as utilizatori_activi,
             COUNT(DISTINCT tt.proiect_id) as proiecte_active,
             ROUND(AVG(tt.ore_lucrate), 2) as media_ore_per_utilizator
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+          FROM ${TABLE_TIME_TRACKING} tt
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
             AND tt.ore_lucrate > 0
           GROUP BY tt.data_lucru
@@ -102,7 +116,7 @@ export async function GET(request: NextRequest) {
 
       case 'team-performance':
         query = `
-          SELECT 
+          SELECT
             tt.utilizator_uid,
             tt.utilizator_nume,
             ROUND(SUM(tt.ore_lucrate), 2) as total_ore,
@@ -110,7 +124,7 @@ export async function GET(request: NextRequest) {
             COUNT(DISTINCT tt.data_lucru) as zile_active,
             COUNT(DISTINCT tt.proiect_id) as proiecte_lucrate,
             COUNT(DISTINCT tt.sarcina_id) as sarcini_lucrate,
-            
+
             -- Calculez eficiența
             ROUND(
               SAFE_DIVIDE(
@@ -119,15 +133,15 @@ export async function GET(request: NextRequest) {
               ) * 100,
               1
             ) as eficienta_procent,
-            
+
             -- Distribuție pe priorități
             ROUND(SUM(CASE WHEN s.prioritate = 'urgent' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_urgent,
             ROUND(SUM(CASE WHEN s.prioritate = 'ridicata' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_ridicata,
             ROUND(SUM(CASE WHEN s.prioritate = 'normala' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_normala,
             ROUND(SUM(CASE WHEN s.prioritate = 'scazuta' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_scazuta
-            
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+
+          FROM ${TABLE_TIME_TRACKING} tt
+          LEFT JOIN ${TABLE_SARCINI} s
             ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
             AND tt.ore_lucrate > 0
@@ -139,7 +153,7 @@ export async function GET(request: NextRequest) {
 
       case 'project-breakdown':
         query = `
-          SELECT 
+          SELECT
             tt.proiect_id,
             p.Denumire as proiect_nume,
             p.Status as proiect_status,
@@ -149,7 +163,7 @@ export async function GET(request: NextRequest) {
             COUNT(DISTINCT tt.utilizator_uid) as utilizatori_implicati,
             COUNT(DISTINCT tt.sarcina_id) as sarcini_lucrate,
             ROUND(AVG(tt.ore_lucrate), 2) as media_ore_pe_sesiune,
-            
+
             -- Progres (ore lucrate vs estimate din sarcini)
             ROUND(
               SAFE_DIVIDE(
@@ -158,11 +172,11 @@ export async function GET(request: NextRequest) {
               ) * 100,
               1
             ) as progres_procent
-            
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+
+          FROM ${TABLE_TIME_TRACKING} tt
+          LEFT JOIN ${TABLE_PROIECTE} p
             ON tt.proiect_id = p.ID_Proiect
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+          LEFT JOIN ${TABLE_SARCINI} s
             ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
             AND tt.ore_lucrate > 0
@@ -176,10 +190,10 @@ export async function GET(request: NextRequest) {
         if (!userId) {
           return NextResponse.json({ error: 'userId este necesar pentru tipul individual' }, { status: 400 });
         }
-        
+
         query = `
           WITH user_stats AS (
-            SELECT 
+            SELECT
               tt.data_lucru,
               tt.ore_lucrate,
               tt.proiect_id,
@@ -189,10 +203,10 @@ export async function GET(request: NextRequest) {
               s.timp_estimat_total_ore,
               s.status as sarcina_status,
               EXTRACT(DAYOFWEEK FROM tt.data_lucru) as day_of_week
-            FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+            FROM ${TABLE_TIME_TRACKING} tt
+            LEFT JOIN ${TABLE_PROIECTE} p
               ON tt.proiect_id = p.ID_Proiect
-            LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+            LEFT JOIN ${TABLE_SARCINI} s
               ON tt.sarcina_id = s.id
             WHERE tt.utilizator_uid = '${userId}'
               AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)

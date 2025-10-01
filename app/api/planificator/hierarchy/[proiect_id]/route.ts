@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,7 +25,11 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
+const PLANIFICATOR_TABLE = `\`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\``;
+const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 [Planificator Hierarchy] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +57,7 @@ export async function GET(
     const subproiecteQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        FROM ${PLANIFICATOR_TABLE}
         WHERE utilizator_uid = @userId AND activ = TRUE
       )
 
@@ -61,7 +72,7 @@ export async function GET(
         -- IMPORTANT: Sarcini de subproiect au proiect_id = ID_Subproiect, nu subproiect_id
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
+          FROM ${SARCINI_TABLE}
           WHERE proiect_id = sp.ID_Subproiect AND status NOT IN ('Finalizată', 'Anulată')
         ) as sarcini_count,
         -- Verificare dacă este deja în planificator
@@ -70,7 +81,7 @@ export async function GET(
           THEN TRUE
           ELSE FALSE
         END as in_planificator
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      FROM ${SUBPROIECTE_TABLE} sp
       WHERE sp.ID_Proiect = @proiect_id
         AND sp.activ = TRUE
         AND sp.Status != 'Anulat'
@@ -81,7 +92,7 @@ export async function GET(
     const sarciniDirecteQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        FROM ${PLANIFICATOR_TABLE}
         WHERE utilizator_uid = @userId AND activ = TRUE
       )
 
@@ -99,7 +110,7 @@ export async function GET(
           THEN TRUE
           ELSE FALSE
         END as in_planificator
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
+      FROM ${SARCINI_TABLE} s
       WHERE s.proiect_id = @proiect_id
         AND (s.subproiect_id IS NULL OR s.subproiect_id = '')
         AND s.status NOT IN ('Finalizată', 'Anulată')

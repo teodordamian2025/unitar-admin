@@ -7,6 +7,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+console.log(`🔧 Resource Optimization API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Utilizatori${tableSuffix}, TimeTracking${tableSuffix}, Sarcini${tableSuffix}, Proiecte${tableSuffix}`);
+
 // Tipuri pentru siguranță TypeScript
 interface OptimizationInsight {
   type: 'danger' | 'warning' | 'success' | 'info';
@@ -42,7 +58,7 @@ interface OptimizationStats {
 }
 
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -103,18 +119,18 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        FROM ${TABLE_UTILIZATORI} u
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_inner.utilizator_uid,
             DATE(tt_inner.data_lucru) as data,
             SUM(tt_inner.ore_lucrate) as ore_zilnice
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt_inner
+          FROM ${TABLE_TIME_TRACKING} tt_inner
           WHERE tt_inner.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_inner.utilizator_uid, DATE(tt_inner.data_lucru)
         ) daily_hours ON u.uid = daily_hours.utilizator_uid
@@ -198,8 +214,8 @@ export async function GET(request: NextRequest) {
             COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                        AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
             
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-          JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON tt.sarcina_id = s.id
+          FROM ${TABLE_TIME_TRACKING} tt
+          JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY skill_name, skill_category
         ) skill_analysis
@@ -244,18 +260,18 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN s.prioritate IN ('Critică', 'Înaltă') 
                      AND s.status != 'Finalizată' THEN 1 END) as sarcini_prioritare_active
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        FROM ${TABLE_PROIECTE} p
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON p.ID_Proiect = tt.proiect_id 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON tt.sarcina_id = s.id
         LEFT JOIN (
           SELECT 
             tt_proj.proiect_id,
             DATE(tt_proj.data_lucru) as data,
             SUM(tt_proj.ore_lucrate) as ore_zilnice
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt_proj
+          FROM ${TABLE_TIME_TRACKING} tt_proj
           WHERE tt_proj.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt_proj.proiect_id, DATE(tt_proj.data_lucru)
         ) daily_project_hours ON p.ID_Proiect = daily_project_hours.proiect_id

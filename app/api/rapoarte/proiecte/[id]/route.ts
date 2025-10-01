@@ -8,17 +8,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+const dataset = 'PanouControlUnitar';
+const table = `Proiecte${tableSuffix}`;
+const tableClienti = `Clienti${tableSuffix}`;
+
+console.log(`🔧 Proiecte [ID] API - Tables Mode: ${useV2Tables ? 'V2 (Optimized)' : 'V1 (Standard)'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
-
-const dataset = 'PanouControlUnitar';
-const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
 
 // FIX PRINCIPAL: Helper pentru conversie BigQuery NUMERIC îmbunătățit
 const convertBigQueryNumeric = (value: any): number => {

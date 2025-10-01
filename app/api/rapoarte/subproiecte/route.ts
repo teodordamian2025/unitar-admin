@@ -7,8 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// ✅ V2 Configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+console.log(`🔧 Subproiecte API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +24,10 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'Subproiecte';
+const dataset = DATASET;
+const table = `Subproiecte${tableSuffix}`;
+const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.${table}\``;
+const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 
 // ADĂUGAT: Helper functions ca la Proiecte
 const escapeString = (value: string): string => {
@@ -47,8 +57,8 @@ export async function GET(request: NextRequest) {
         s.*,
         p.Client,
         p.Denumire as Proiect_Denumire
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` s
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
+      FROM ${SUBPROIECTE_TABLE} s
+      LEFT JOIN ${PROIECTE_TABLE} p 
         ON s.ID_Proiect = p.ID_Proiect
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
@@ -167,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     // FIX PRINCIPAL: Query cu DATE literale în loc de parameters
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${SUBPROIECTE_TABLE}
       (ID_Subproiect, ID_Proiect, Denumire, Responsabil, Data_Start, Data_Final, 
        Status, Valoare_Estimata, activ, data_creare,
        moneda, curs_valutar, data_curs_valutar, valoare_ron,
@@ -278,7 +288,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${SUBPROIECTE_TABLE}
       SET ${updateFields.join(', ')}
       WHERE ID_Subproiect = '${escapeString(id)}'
     `;
@@ -324,7 +334,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete cu câmpul activ
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${SUBPROIECTE_TABLE}
       SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
       WHERE ID_Subproiect = '${escapeString(id)}'
     `;

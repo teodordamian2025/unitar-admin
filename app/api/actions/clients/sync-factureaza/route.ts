@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+
+console.log(`🔧 Sync Factureaza API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: Clienti${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -232,9 +245,9 @@ async function addClientToFactureaza(clientData: any) {
 
 async function syncClientToBigQuery(factureazaClient: any) {
   const clientId = `client_factureaza_${factureazaClient.id || Date.now()}`;
-  
+
   const insertQuery = `
-    INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+    INSERT INTO ${TABLE_CLIENTI}
     (id, nume, tip_client, cui, nr_reg_com, adresa, judet, oras, cod_postal, tara,
      telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la,
      data_creare, data_actualizare, activ, id_factureaza, sincronizat_factureaza, observatii)
@@ -306,9 +319,9 @@ async function syncClientToBigQuery(factureazaClient: any) {
 async function addClientToBigQuery(clientData: any) {
   try {
     const clientId = `client_${Date.now()}`;
-    
+
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+      INSERT INTO ${TABLE_CLIENTI}
       (id, nume, tip_client, cui, nr_reg_com, adresa, judet, oras, cod_postal, tara,
        telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la,
        data_creare, data_actualizare, activ, id_factureaza, sincronizat_factureaza, observatii)

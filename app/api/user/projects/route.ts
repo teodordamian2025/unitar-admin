@@ -17,9 +17,20 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'Proiecte';
 const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
+console.log(`🔧 User Projects API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, Subproiecte${tableSuffix}`);
 
 // Helper function pentru validare și escape SQL
 const escapeString = (value: string): string => {
@@ -106,8 +117,8 @@ export async function GET(request: NextRequest) {
         c.adresa as client_adresa,
         c.telefon as client_telefon,
         c.email as client_email
-      FROM \`${PROJECT_ID}.${dataset}.${table}\` p
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+      FROM ${TABLE_PROIECTE} p
+      LEFT JOIN ${TABLE_CLIENTI} c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
     `;
 
@@ -225,8 +236,8 @@ export async function GET(request: NextRequest) {
         s.status_contract,
         p.Client,
         p.Denumire as Proiect_Denumire
-      FROM \`${PROJECT_ID}.${dataset}.Subproiecte\` s
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.${table}\` p
+      FROM ${TABLE_SUBPROIECTE} s
+      LEFT JOIN ${TABLE_PROIECTE} p
         ON s.ID_Proiect = p.ID_Proiect
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
@@ -283,8 +294,8 @@ export async function GET(request: NextRequest) {
     // Query pentru total count (doar proiecte principale)
     let countQuery = `
       SELECT COUNT(*) as total
-      FROM \`${PROJECT_ID}.${dataset}.${table}\` p
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+      FROM ${TABLE_PROIECTE} p
+      LEFT JOIN ${TABLE_CLIENTI} c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
     `;
 
@@ -422,7 +433,7 @@ export async function POST(request: NextRequest) {
 
     // Query pentru utilizatori normali - AUTOMAT zero RON pentru toate valorile financiare
     const insertQuery = `
-      INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${TABLE_PROIECTE}
       (ID_Proiect, Denumire, Client, Adresa, Descriere, Data_Start, Data_Final,
        Status, Valoare_Estimata, moneda, curs_valutar, valoare_ron,
        status_predare, status_contract, status_facturare, status_achitare,
@@ -537,7 +548,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_PROIECTE}
       SET ${updateFields.join(', ')}
       WHERE ID_Proiect = '${escapeString(id)}'
     `;
@@ -582,7 +593,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteQuery = `
-      DELETE FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      DELETE FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = '${escapeString(id)}'
     `;
 

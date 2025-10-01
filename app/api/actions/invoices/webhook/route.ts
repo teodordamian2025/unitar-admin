@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+console.log(`🔧 Invoice Webhook API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, Proiecte${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -87,7 +101,7 @@ async function handleInvoiceCreated(invoiceId: string, data: any) {
   try {
     // Actualizează statusul facturii în baza de date
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      UPDATE ${TABLE_FACTURI_GENERATE}
       SET status = 'creata_confirmat',
           data_confirmare = @dataConfirmare,
           webhook_data = @webhookData
@@ -117,7 +131,7 @@ async function handleInvoicePaid(invoiceId: string, data: any) {
   try {
     // Actualizează statusul facturii ca plătită
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      UPDATE ${TABLE_FACTURI_GENERATE}
       SET status = 'platita',
           data_plata = @dataPlata,
           suma_platita = @sumaPlata,
@@ -154,7 +168,7 @@ async function handleInvoiceCancelled(invoiceId: string, data: any) {
   try {
     // Actualizează statusul facturii ca anulată
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      UPDATE ${TABLE_FACTURI_GENERATE}
       SET status = 'anulata',
           data_anulare = @dataAnulare,
           motiv_anulare = @motivAnulare,
@@ -186,7 +200,7 @@ async function handleInvoiceUpdated(invoiceId: string, data: any) {
   try {
     // Actualizează datele facturii
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      UPDATE ${TABLE_FACTURI_GENERATE}
       SET data_actualizare = @dataActualizare,
           webhook_data = @webhookData
       WHERE id_factura_externa = @invoiceId
@@ -215,7 +229,7 @@ async function updateProjectPaymentStatus(proiectId: string, status: string) {
   try {
     // Actualizează statusul de plată al proiectului
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      UPDATE ${TABLE_PROIECTE}
       SET Status_Plata = @statusPlata,
           Data_Actualizare_Plata = @dataActualizare
       WHERE ID_Proiect = @proiectId

@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,8 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-const TABLE_ID = 'PlanificatorPersonal';
+console.log(`🔧 [Items] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,30 +96,30 @@ export async function GET(request: NextRequest) {
           ELSE 999
         END as zile_pana_scadenta
 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\` p
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` p
 
       -- Join proiecte direct
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
       -- Join subproiecte
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr2
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr2
         ON sp.ID_Proiect = pr2.ID_Proiect
 
       -- Join sarcini
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
 
       -- Join pentru sarcini de proiect direct
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr3
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr3
         ON s.tip_proiect = 'proiect' AND s.proiect_id = pr3.ID_Proiect
 
       -- Join pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` s_sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` s_sp
         ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` s_sp_pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` s_sp_pr
         ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
 
       WHERE p.utilizator_uid = @userId AND p.activ = TRUE
@@ -231,7 +237,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă item-ul nu este deja în planificator pentru acest utilizator
     const checkQuery = `
       SELECT COUNT(*) as count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
       WHERE utilizator_uid = @userId
         AND tip_item = @tip_item
         AND item_id = @item_id
@@ -255,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     // Insert în BigQuery - doar pentru utilizatorul curent
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
       (id, utilizator_uid, tip_item, item_id, ordine_pozitie, is_pinned, activ, data_adaugare, data_actualizare)
       VALUES (@id, @userId, @tip_item, @item_id, @ordine_pozitie, FALSE, TRUE, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())
     `;

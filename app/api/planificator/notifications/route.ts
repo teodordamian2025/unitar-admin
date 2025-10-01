@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,9 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-
-interface NotificationItem {
+console.log(`🔧 [Notifications] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);interface NotificationItem {
   id: string;
   tip: 'deadline_warning' | 'deadline_critical' | 'suggestion_add';
   titlu: string;
@@ -85,19 +90,19 @@ export async function GET(request: NextRequest) {
           ELSE NULL
         END as zile_ramase
 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` p
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\` p
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr2
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr2
         ON sp.ID_Proiect = pr2.ID_Proiect
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr3
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr3
         ON s.proiect_id = pr3.ID_Proiect
 
       WHERE p.utilizator_uid = @userId
@@ -166,7 +171,7 @@ export async function GET(request: NextRequest) {
     const suggestionsQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\`
         WHERE utilizator_uid = @userId AND activ = TRUE
       ),
 
@@ -179,8 +184,8 @@ export async function GET(request: NextRequest) {
           s.data_scadenta as data_scadenta,
           DATE_DIFF(s.data_scadenta, CURRENT_DATE(), DAY) as zile_ramase,
           s.prioritate
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
+        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` p
           ON s.proiect_id = p.ID_Proiect
         WHERE s.data_scadenta IS NOT NULL
           AND DATE_DIFF(s.data_scadenta, CURRENT_DATE(), DAY) BETWEEN 0 AND 5

@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,8 +25,9 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-const TABLE_ID = 'PlanificatorPersonal';
+const PLANIFICATOR_TABLE = `\`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\``;
+
+console.log(`🔧 [Planificator Comentariu] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 export async function POST(
   request: NextRequest,
@@ -48,7 +56,7 @@ export async function POST(
     // Verifică dacă item-ul aparține utilizatorului curent
     const checkQuery = `
       SELECT utilizator_uid
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      FROM ${PLANIFICATOR_TABLE}
       WHERE id = @itemId AND activ = TRUE
     `;
 
@@ -68,7 +76,7 @@ export async function POST(
     // Verifică dacă comentariul curent are marker-ul [REALIZAT]
     const currentItemQuery = `
       SELECT comentariu_personal
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      FROM ${PLANIFICATOR_TABLE}
       WHERE id = @itemId AND utilizator_uid = @userId
     `;
 
@@ -88,7 +96,7 @@ export async function POST(
 
     // Update comentariu personal
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      UPDATE ${PLANIFICATOR_TABLE}
       SET comentariu_personal = @comentariu_personal, data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = @itemId AND utilizator_uid = @userId
     `;

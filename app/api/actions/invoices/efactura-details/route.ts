@@ -5,8 +5,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+
+console.log(`🔧 EFactura Details API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: AnafEFactura${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -33,7 +46,7 @@ export async function GET(request: NextRequest) {
     
     // Query pentru detalii e-factura din AnafEFactura
     const query = `
-      SELECT 
+      SELECT
         anaf_upload_id,
         anaf_status,
         error_message,
@@ -44,7 +57,7 @@ export async function GET(request: NextRequest) {
         anaf_response,
         data_creare,
         data_actualizare
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafEFactura\`
+      FROM ${TABLE_ANAF_EFACTURA}
       WHERE factura_id = @facturaId
       ORDER BY data_creare DESC
       LIMIT 1

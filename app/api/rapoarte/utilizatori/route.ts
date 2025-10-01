@@ -7,8 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// ✅ V2 Configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+console.log(`🔧 Utilizatori API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +24,9 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'Utilizatori';
+const dataset = DATASET;
+const table = `Utilizatori${tableSuffix}`;
+const TABLE_NAME = `\`${PROJECT_ID}.${DATASET}.${table}\``;
 
 // Helper function pentru escape SQL
 const escapeString = (value: string): string => {
@@ -38,7 +47,7 @@ export async function GET(request: NextRequest) {
       activ,
       data_creare,
       data_ultima_conectare
-    FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+    FROM ${TABLE_NAME}
     WHERE activ = true`;
     
     const conditions: string[] = [];
@@ -150,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     // Verifică dacă utilizatorul există deja
     const checkQuery = `
-      SELECT uid FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SELECT uid FROM ${TABLE_NAME}
       WHERE uid = @uid
     `;
 
@@ -170,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     // Query INSERT cu escape pentru securitate
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${TABLE_NAME}
       (uid, email, nume, prenume, rol, permisiuni, activ, data_creare)
       VALUES (
         '${escapeString(uid)}',
@@ -250,7 +259,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('updated_at = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_NAME}
       SET ${updateFields.join(', ')}
       WHERE uid = '${escapeString(uid)}'
     `;
@@ -291,7 +300,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - setează activ = false
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_NAME}
       SET activ = false, updated_at = CURRENT_TIMESTAMP()
       WHERE uid = '${escapeString(uid)}'
     `;

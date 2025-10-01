@@ -8,8 +8,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import ExcelJS from 'exceljs';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabelă cu suffix dinamic
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+
+console.log(`🔧 Contracte Export API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: Contracte${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -78,7 +88,7 @@ export async function GET(request: NextRequest) {
         c.valoare_ron,
         c.data_creare,
         c.Observatii
-      FROM \`${PROJECT_ID}.${DATASET}.Contracte\` c
+      FROM ${TABLE_CONTRACTE} c
       ${whereClause}
       ORDER BY c.data_creare DESC
     `;

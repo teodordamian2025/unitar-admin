@@ -7,8 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// ✅ V2 Configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+console.log(`🔧 Subcontractanti API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +24,9 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'Subcontractanti';
+const dataset = DATASET;
+const table = `Subcontractanti${tableSuffix}`;
+const TABLE_NAME = `\`${PROJECT_ID}.${DATASET}.${table}\``;
 
 // Helper function pentru escape SQL
 const escapeString = (value: string): string => {
@@ -70,7 +79,7 @@ export async function GET(request: NextRequest) {
       observatii,
       id_factureaza,
       data_ultima_sincronizare
-    FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+    FROM ${TABLE_NAME}
     WHERE (activ IS NULL OR activ = true)`;
     
     const conditions: string[] = [];
@@ -209,7 +218,7 @@ export async function POST(request: NextRequest) {
 
     // Verifică dacă subcontractantul există deja
     const checkQuery = `
-      SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SELECT id FROM ${TABLE_NAME}
       WHERE id = @id OR (cui IS NOT NULL AND cui = @cui)
     `;
 
@@ -234,7 +243,7 @@ export async function POST(request: NextRequest) {
 
     // Query INSERT cu escape pentru securitate
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${TABLE_NAME}
       (id, nume, tip_client, cui, nr_reg_com, adresa, judet, oras, cod_postal, tara,
        telefon, email, banca, iban, cnp, ci_serie, ci_numar, ci_eliberata_de, ci_eliberata_la,
        data_creare, data_actualizare, activ, observatii, id_factureaza, data_ultima_sincronizare)
@@ -343,7 +352,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_NAME}
       SET ${updateFields.join(', ')}
       WHERE id = '${escapeString(id)}'
     `;
@@ -386,7 +395,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - setează activ = false
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_NAME}
       SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = '${escapeString(id)}'
     `;

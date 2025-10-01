@@ -677,6 +677,72 @@ return (
 
 ---
 
+# 📊 PLAN MIGRARE BIGQUERY - PARTITIONING + CLUSTERING (01.10.2025)
+
+**STATUS**: 🔴 NEÎNCEPUT - Gata pentru implementare
+**OBIECTIV**: Reducere 90-95% costuri BigQuery prin partitioning pe date + clustering pe coloane filtrate
+**ECONOMIE ESTIMATĂ**: $200-300/an
+
+## 📁 DOCUMENTE PLAN MIGRARE
+
+### **PLAN COMPLET DETALIAT**
+📄 `/BIGQUERY-MIGRATION-PLAN.md` - Plan complet cu:
+- Clasificare 42 tabele (TIME-SERIES, LOOKUP, CONFIG, VIEWS)
+- Strategia de migrare (tabele v2 → testare → redenumire)
+- DDL pentru toate tabelele optimizate
+- Lista API routes de modificat (15-20 fișiere)
+- Estimări costuri și economii
+- Timeline implementare (7 zile)
+
+### **SCRIPTURI AUTOMATIZARE**
+📄 `/scripts/bigquery-create-tables.sql` - DDL pentru toate cele 32 tabele optimizate
+📄 `/scripts/bigquery-copy-data.sh` - Script bash copiere automată date vechi → noi
+📄 `/scripts/README-BIGQUERY-MIGRATION.md` - Ghid pas cu pas implementare
+
+## 🎯 STRATEGIE IMPLEMENTARE
+
+### **Tabele optimizate (32 total)**
+- **19 TIME-SERIES**: PARTITION BY date + CLUSTER BY filtered columns
+  - Exemple: Proiecte (Data_Start), FacturiGenerate (data_factura), TimeTracking (data_lucru)
+- **13 LOOKUP**: Doar CLUSTER BY (fără partitioning)
+  - Exemple: Clienti (cui), Utilizatori (rol), Produse (categorie)
+- **6 CONFIG**: Fără modificări (tabele mici, config)
+- **3 VIEWS**: Nu se migrează (query-uri stocate)
+
+### **Beneficii cheie**
+- 🚀 **Performance**: 5-10x mai rapid pe query-uri cu filtre pe date
+- 💰 **Costuri**: Reducere 90-95% bytes scanned în BigQuery
+- 📊 **Scalabilitate**: Pregătit pentru 100K+ înregistrări per tabel
+- 🔄 **Zero downtime**: Migrare cu tabele v2, testare, apoi switch
+
+### **Timeline**
+- **Zi 1-2**: Crearea tabelelor noi cu partitioning/clustering
+- **Zi 3**: Copierea datelor din tabele vechi → noi
+- **Zi 4-5**: Modificare 8 API routes HIGH PRIORITY
+- **Zi 6**: Testare completă localhost + performance testing
+- **Zi 7**: Deploy production + monitorizare 24h
+- **După 1 săptămână OK**: Ștergere tabele vechi, redenumire v2 → original
+
+### **Siguranță**
+- ✅ Toate datele sunt doar de testare (zero risc pierdere date critice)
+- ✅ Tabele vechi rămân neatinse până la confirmare funcționare v2
+- ✅ Toggle env variable pentru switch instant între v1/v2
+- ✅ Rollback plan instant fără downtime
+
+## 📝 NEXT STEPS CÂND ÎNCEPI IMPLEMENTAREA
+
+1. **Citește**: `/BIGQUERY-MIGRATION-PLAN.md` (plan complet 712 linii)
+2. **Citește**: `/scripts/README-BIGQUERY-MIGRATION.md` (ghid pas cu pas)
+3. **Rulează**: DDL din `/scripts/bigquery-create-tables.sql` în BigQuery Console
+4. **Rulează**: `/scripts/bigquery-copy-data.sh` pentru copiere date
+5. **Modifică**: API routes conform pattern-ului din plan
+6. **Testează**: Localhost cu `BIGQUERY_USE_V2_TABLES=true`
+7. **Deploy**: Production după testare completă
+
+**IMPORTANT**: Acest plan este persistent în repository și va rămâne disponibil chiar și după resetarea memoriei Claude.
+
+---
+
 # 🚀 PLAN IMPLEMENTARE UTILIZATORI ROL "NORMAL" - 21.09.2025
 
 **DATA START**: 21.09.2025 16:00 (ora României)

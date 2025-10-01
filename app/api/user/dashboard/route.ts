@@ -8,8 +8,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 User Dashboard API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, TimeTracking${tableSuffix}, Sarcini${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -58,7 +73,7 @@ async function getUserProiecteStats() {
         COUNTIF(Status = 'Suspendat') as suspendate,
         COUNTIF(status_predare = 'Predat') as predate,
         COUNTIF(status_predare = 'Nepredat') as nepredate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      FROM ${TABLE_PROIECTE}
     `;
 
     const [rows] = await bigquery.query({
@@ -92,7 +107,7 @@ async function getUserTimeTrackingStats() {
         COALESCE(SUM(CAST(ore_lucrate AS FLOAT64)), 0) as ore_saptamana_curenta,
         COUNT(DISTINCT data_lucru) as zile_lucrate,
         COUNT(*) as total_inregistrari
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
+      FROM ${TABLE_TIME_TRACKING}
       WHERE EXTRACT(WEEK FROM data_lucru) = EXTRACT(WEEK FROM CURRENT_DATE())
         AND EXTRACT(YEAR FROM data_lucru) = EXTRACT(YEAR FROM CURRENT_DATE())
     `;
@@ -127,7 +142,7 @@ async function getUserSarciniiStats() {
         COUNTIF(status = 'In Progress') as in_progress,
         COUNTIF(status = 'Finalizat') as finalizate,
         COUNTIF(prioritate = 'Urgent') as urgente
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      FROM ${TABLE_SARCINI}
     `;
 
     const [rows] = await bigquery.query({

@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_EMAIL_LOG = `\`${PROJECT_ID}.${DATASET}.EmailLog${tableSuffix}\``;
+
+console.log(`🔧 Email Send Client API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, EmailLog${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -22,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Obține datele proiectului din BigQuery
     const projectQuery = `
-      SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      SELECT * FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiectId
     `;
 
@@ -44,7 +59,7 @@ export async function POST(request: NextRequest) {
     let clientEmail = null;
     try {
       const clientQuery = `
-        SELECT email FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+        SELECT email FROM ${TABLE_CLIENTI}
         WHERE nume = @clientNume
         LIMIT 1
       `;
@@ -248,7 +263,7 @@ async function sendEmail(recipient: string, emailData: any) {
 async function saveEmailLog(proiectId: string, recipient: string, emailType: string, success: boolean) {
   try {
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EmailLog\`
+      INSERT INTO ${TABLE_EMAIL_LOG}
       (id, proiect_id, recipient, email_type, status, data_trimitere)
       VALUES (@id, @proiectId, @recipient, @emailType, @status, @dataTrimitere)
     `;

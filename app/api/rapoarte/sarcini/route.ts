@@ -8,8 +8,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+
+console.log(`🔧 Sarcini API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -66,8 +79,8 @@ export async function GET(request: NextRequest) {
         s.progres_procent,
         s.progres_descriere,
         COALESCE(SUM(t.ore_lucrate), 0) as total_ore_lucrate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` t 
+      FROM ${TABLE_SARCINI} s
+      LEFT JOIN ${TABLE_TIME_TRACKING} t 
         ON s.id = t.sarcina_id
       WHERE 1=1
     `;
@@ -115,7 +128,7 @@ export async function GET(request: NextRequest) {
         sr.rol_in_sarcina,
         sr.data_atribuire,
         sr.atribuit_de
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
+      FROM ${TABLE_SARCINI_RESPONSABILI} sr
       ${rows.length > 0 ? `WHERE sr.sarcina_id IN (${rows.map(r => `'${r.id}'`).join(',')})` : 'WHERE 1=0'}
       ORDER BY sr.data_atribuire ASC
     `;
@@ -458,7 +471,7 @@ export async function PUT(request: NextRequest) {
     // Actualizează responsabilii dacă sunt specificați
     if (data.responsabili && Array.isArray(data.responsabili)) {
       const deleteResponsabiliQuery = `
-        DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
+        DELETE FROM ${TABLE_SARCINI_RESPONSABILI}
         WHERE sarcina_id = '${escapeString(data.id)}'
       `;
 
@@ -516,7 +529,7 @@ export async function DELETE(request: NextRequest) {
 
     // Șterge responsabilii sarcinii
     const deleteResponsabiliQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
+      DELETE FROM ${TABLE_SARCINI_RESPONSABILI}
       WHERE sarcina_id = '${escapeString(id)}'
     `;
 
@@ -538,7 +551,7 @@ export async function DELETE(request: NextRequest) {
 
     // Șterge sarcina
     const deleteSarcinaQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      DELETE FROM ${TABLE_SARCINI}
       WHERE id = '${escapeString(id)}'
     `;
 

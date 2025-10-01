@@ -10,8 +10,12 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -21,6 +25,10 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+const CONTRACTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+
+console.log(`🔧 [Test Contract Data] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 // CONVERTOR INSPIRAT DIN CHATBOT - care funcționează corect
 function convertBigQueryValueImproved(value: any): any {

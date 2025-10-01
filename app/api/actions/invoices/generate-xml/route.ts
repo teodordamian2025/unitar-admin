@@ -9,9 +9,24 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { create } from 'xmlbuilder2';
 import { v4 as uuidv4 } from 'uuid';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+console.log(`🔧 Generate XML API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: AnafEFactura${tableSuffix}, FacturiGenerate${tableSuffix}, Proiecte${tableSuffix}`);
+
 // Inițializare BigQuery
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -124,14 +139,14 @@ export async function GET(request: NextRequest) {
     if (xmlId) {
       query = `
         SELECT xml_content, anaf_status, data_creare, factura_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafEFactura\`
+        FROM ${TABLE_ANAF_EFACTURA}
         WHERE id = @xmlId
       `;
       params.xmlId = xmlId;
     } else {
       query = `
         SELECT xml_content, anaf_status, data_creare, id as xmlId
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafEFactura\`
+        FROM ${TABLE_ANAF_EFACTURA}
         WHERE factura_id = @facturaId
         ORDER BY data_creare DESC
         LIMIT 1
@@ -179,7 +194,7 @@ async function checkExistingXml(facturaId: string) {
   try {
     const query = `
       SELECT id, anaf_status
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafEFactura\`
+      FROM ${TABLE_ANAF_EFACTURA}
       WHERE factura_id = @facturaId
       ORDER BY data_creare DESC
       LIMIT 1
@@ -214,8 +229,8 @@ async function getFacturaData(facturaId: string) {
         fg.*,
         p.Denumire as proiect_denumire,
         p.Adresa as proiect_adresa
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\` fg
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p 
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      LEFT JOIN ${TABLE_PROIECTE} p 
         ON fg.proiect_id = p.ID_Proiect
       WHERE fg.id = @facturaId
     `;
@@ -474,7 +489,7 @@ async function saveXmlToDatabase(facturaId: string, xmlContent: string) {
 
     // Update FacturiGenerate cu status e-factura
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      UPDATE ${TABLE_FACTURI_GENERATE}
       SET 
         efactura_status = 'draft',
         data_actualizare = CURRENT_TIMESTAMP()

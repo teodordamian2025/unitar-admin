@@ -7,6 +7,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+const TABLE_PROIECTE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+
+console.log(`🔧 ROI Analysis API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, TimeTracking${tableSuffix}, Sarcini${tableSuffix}, FacturiGenerate${tableSuffix}, Contracte${tableSuffix}, ProiecteCheltuieli${tableSuffix}`);
+
 // Tipuri pentru siguranță TypeScript
 interface ROIInsight {
   type: 'success' | 'warning' | 'info' | 'danger';
@@ -30,7 +48,7 @@ interface SummaryStats {
 }
 
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -73,7 +91,7 @@ export async function GET(request: NextRequest) {
           COALESCE(p.status_facturare, 'Nefacturat') as status_facturare,
           COALESCE(p.status_achitare, 'Neachitat') as status_achitare
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        FROM ${TABLE_PROIECTE} p
         WHERE p.Data_Start >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
       ),
       
@@ -105,8 +123,8 @@ export async function GET(request: NextRequest) {
             ELSE 0
           END as efficiency_factor
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        FROM ${TABLE_TIME_TRACKING} tt
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY tt.proiect_id
@@ -134,7 +152,7 @@ export async function GET(request: NextRequest) {
             ELSE 0
           END) as status_mediu_facturi
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate\` fg
+        FROM ${TABLE_FACTURI_GENERATE} fg
         WHERE fg.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY fg.proiect_id
       ),
@@ -163,7 +181,7 @@ export async function GET(request: NextRequest) {
           -- Priority distribution
           COUNT(CASE WHEN s.prioritate = 'Critică' THEN 1 END) as sarcini_critice
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+        FROM ${TABLE_SARCINI} s
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY s.proiect_id
       ),
@@ -181,7 +199,7 @@ export async function GET(request: NextRequest) {
             ELSE 10
           END) as maturitate_contractuala
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Contracte\` c
+        FROM ${TABLE_CONTRACTE} c
         WHERE c.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY c.proiect_id
       ),
@@ -196,7 +214,7 @@ export async function GET(request: NextRequest) {
           SUM(CASE WHEN pc.tip_cheltuiala LIKE '%subcontract%' THEN COALESCE(pc.valoare_ron, pc.valoare, 0) ELSE 0 END) as cheltuieli_subcontractare,
           SUM(CASE WHEN pc.tip_cheltuiala LIKE '%material%' THEN COALESCE(pc.valoare_ron, pc.valoare, 0) ELSE 0 END) as cheltuieli_materiale
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\` pc
+        FROM ${TABLE_PROIECTE_CHELTUIELI} pc
         WHERE pc.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY pc.proiect_id
       )

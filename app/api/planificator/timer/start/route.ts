@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,9 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-
-export async function POST(request: NextRequest) {
+console.log(`🔧 [Start] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -68,21 +73,21 @@ export async function POST(request: NextRequest) {
         s.subproiect_id as sarcina_subproiect_id,
         s_sub.Denumire as sarcina_subproiect_nume
 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\` p
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\` p
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr2
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr2
         ON sp.ID_Proiect = pr2.ID_Proiect
 
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` pr3
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr3
         ON s.proiect_id = pr3.ID_Proiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` s_sub
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` s_sub
         ON s.subproiect_id = s_sub.ID_Subproiect
 
       WHERE p.id = @planificator_item_id
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă utilizatorul are deja o sesiune activă
     const activeSessionQuery = `
       SELECT id, proiect_id, data_start, descriere_activitate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.SesiuniLucru\`
       WHERE utilizator_uid = @userId
         AND data_stop IS NULL
         AND status = 'activa'
@@ -164,7 +169,7 @@ export async function POST(request: NextRequest) {
       const activeSession = activeSessionRows[0];
 
       const stopSessionQuery = `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.SesiuniLucru\`
         SET
           data_stop = CURRENT_TIMESTAMP(),
           ore_lucrate = CAST(TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), data_start, SECOND) / 3600.0 AS NUMERIC),
@@ -183,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     // Creează o nouă sesiune de lucru compatibilă cu live-timer
     const createSessionQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.SesiuniLucru\`
       (id, utilizator_uid, proiect_id, data_start, descriere_activitate, status, created_at)
       VALUES (@sessionId, @userId, @proiectId, CURRENT_TIMESTAMP(), @descriereActivitate, 'activ', CURRENT_TIMESTAMP())
     `;

@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,8 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-const TABLE_ID = 'PlanificatorPersonal';
+console.log(`🔧 [[id]] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 export async function DELETE(
   request: NextRequest,
@@ -45,7 +51,7 @@ export async function DELETE(
     // Verifică dacă item-ul aparține utilizatorului curent
     const checkQuery = `
       SELECT utilizator_uid
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
       WHERE id = @itemId AND activ = TRUE
     `;
 
@@ -64,7 +70,7 @@ export async function DELETE(
 
     // Soft delete - marchează ca inactiv
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.${TABLE_ID}\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
       SET activ = FALSE, data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = @itemId AND utilizator_uid = @userId
     `;

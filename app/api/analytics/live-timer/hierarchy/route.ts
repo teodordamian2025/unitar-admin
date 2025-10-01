@@ -8,8 +8,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 Live Timer Hierarchy API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -53,13 +68,13 @@ export async function GET(request: NextRequest) {
 
     // 1. Obțin informații despre proiectul principal
     const proiectQuery = `
-      SELECT 
+      SELECT
         ID_Proiect,
         Denumire,
         Status,
         Adresa,
         Client
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
+      FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiect_id
     `;
 
@@ -80,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Obțin subproiectele active ale proiectului
     const subproiecteQuery = `
-      SELECT 
+      SELECT
         ID_Subproiect,
         Denumire,
         Status,
@@ -89,7 +104,7 @@ export async function GET(request: NextRequest) {
         Data_Final,
         Valoare_Estimata,
         moneda
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\`
+      FROM ${TABLE_SUBPROIECTE}
       WHERE ID_Proiect = @proiect_id
         AND Status = 'Activ'
         AND (activ IS NULL OR activ = true)
@@ -106,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Obțin sarcinile generale ale proiectului (tip_proiect = 'proiect')
     const sarciniProiectQuery = `
-      SELECT 
+      SELECT
         id,
         titlu,
         descriere,
@@ -115,14 +130,14 @@ export async function GET(request: NextRequest) {
         data_scadenta,
         timp_estimat_total_ore,
         progres_procent
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+      FROM ${TABLE_SARCINI}
       WHERE proiect_id = @proiect_id
         AND tip_proiect = 'proiect'
         AND status IN ('De făcut', 'În lucru')
-      ORDER BY 
-        CASE prioritate 
+      ORDER BY
+        CASE prioritate
           WHEN 'Urgent' THEN 1
-          WHEN 'Ridicată' THEN 2  
+          WHEN 'Ridicată' THEN 2
           WHEN 'Medie' THEN 3
           WHEN 'Scăzută' THEN 4
           ELSE 5
@@ -143,7 +158,7 @@ export async function GET(request: NextRequest) {
     const subproiecteComplete = await Promise.all(
       subproiecteData.map(async (subproiect) => {
         const sarciniSubproiectQuery = `
-          SELECT 
+          SELECT
             id,
             titlu,
             descriere,
@@ -152,14 +167,14 @@ export async function GET(request: NextRequest) {
             data_scadenta,
             timp_estimat_total_ore,
             progres_procent
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+          FROM ${TABLE_SARCINI}
           WHERE proiect_id = @subproiect_id
             AND tip_proiect = 'subproiect'
             AND status IN ('De făcut', 'În lucru')
-          ORDER BY 
-            CASE prioritate 
+          ORDER BY
+            CASE prioritate
               WHEN 'Urgent' THEN 1
-              WHEN 'Ridicată' THEN 2  
+              WHEN 'Ridicată' THEN 2
               WHEN 'Medie' THEN 3
               WHEN 'Scăzută' THEN 4
               ELSE 5

@@ -7,8 +7,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\``;
+const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+
+console.log(`🔧 Gantt Data API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -64,14 +84,14 @@ export async function GET(request: NextRequest) {
           -- Responsabili (agregat)
           STRING_AGG(DISTINCT COALESCE(pr.responsabil_nume, p.Responsabil), ', ') as all_responsabili
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp 
+        FROM ${TABLE_PROIECTE} p
+        LEFT JOIN ${TABLE_SUBPROIECTE} sp 
           ON p.ID_Proiect = sp.ID_Proiect AND sp.activ = true
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON p.ID_Proiect = s.proiect_id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili\` pr 
+        LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr 
           ON p.ID_Proiect = pr.proiect_id
         WHERE p.Data_Start IS NOT NULL 
           AND p.Data_Final IS NOT NULL
@@ -170,12 +190,12 @@ export async function GET(request: NextRequest) {
           -- Responsabili
           STRING_AGG(DISTINCT COALESCE(spr.responsabil_nume, sp.Responsabil), ', ') as all_responsabili
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        FROM ${TABLE_SUBPROIECTE} sp
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON sp.ID_Subproiect = s.proiect_id AND s.tip_proiect = 'subproiect'
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SubproiecteResponsabili\` spr 
+        LEFT JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} spr 
           ON sp.ID_Subproiect = spr.subproiect_id
         WHERE sp.Data_Start IS NOT NULL 
           AND sp.Data_Final IS NOT NULL
@@ -255,12 +275,12 @@ export async function GET(request: NextRequest) {
           -- Dependencies (din alte sarcini cu deadline mai mic)
           ARRAY_AGG(DISTINCT dep.id IGNORE NULLS) as task_dependencies
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        FROM ${TABLE_SARCINI} s
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON s.id = tt.sarcina_id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr 
+        LEFT JOIN ${TABLE_SARCINI_RESPONSABILI} sr 
           ON s.id = sr.sarcina_id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` dep 
+        LEFT JOIN ${TABLE_SARCINI} dep 
           ON s.proiect_id = dep.proiect_id 
           AND dep.data_scadenta < s.data_scadenta 
           AND dep.status = 'finalizata'
@@ -340,7 +360,7 @@ export async function GET(request: NextRequest) {
         NULL as workedHours,
         false as isCollapsed,
         1 as level
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\` ec
+      FROM ${TABLE_ETAPE_CONTRACT} ec
       WHERE ec.data_scadenta IS NOT NULL
         AND ec.activ = true
         ${projectIds ? 'AND ec.proiect_id IN UNNEST(@projectIds)' : ''}
@@ -495,7 +515,7 @@ export async function PUT(request: NextRequest) {
         }
 
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
+          UPDATE ${TABLE_PROIECTE}
           SET ${setClausesProiect.join(', ')}
           WHERE ID_Proiect = @taskId
         `;
@@ -521,7 +541,7 @@ export async function PUT(request: NextRequest) {
         }
 
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\`
+          UPDATE ${TABLE_SUBPROIECTE}
           SET ${setClausesSubproiect.join(', ')}
           WHERE ID_Subproiect = @taskId
         `;
@@ -535,7 +555,7 @@ export async function PUT(request: NextRequest) {
         if (updates.priority) setClausesSarcina.push('prioritate = @priority');
 
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+          UPDATE ${TABLE_SARCINI}
           SET ${setClausesSarcina.join(', ')}
           WHERE id = @taskId
         `;
@@ -544,7 +564,7 @@ export async function PUT(request: NextRequest) {
       case 'milestone':
         const milestoneId = task_id.replace('milestone_', '');
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
+          UPDATE ${TABLE_ETAPE_CONTRACT}
           SET data_scadenta = @endDate
           WHERE ID_Etapa = @taskId
         `;

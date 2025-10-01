@@ -7,8 +7,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// ✅ V2 Configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+console.log(`🔧 SubproiecteResponsabili API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +24,10 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'SubproiecteResponsabili';
+const dataset = DATASET;
+const table = `SubproiecteResponsabili${tableSuffix}`;
+const SUBPROIECTE_RESPONSABILI_TABLE = `\`${PROJECT_ID}.${DATASET}.${table}\``;
+const UTILIZATORI_TABLE = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
 
 // Helper function pentru escape SQL
 const escapeString = (value: string): string => {
@@ -43,8 +53,8 @@ export async function GET(request: NextRequest) {
         u.prenume,
         u.nume,
         u.rol as rol_sistem
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` sr
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Utilizatori\` u 
+      FROM ${SUBPROIECTE_RESPONSABILI_TABLE} sr
+      LEFT JOIN ${UTILIZATORI_TABLE} u 
         ON sr.responsabil_uid = u.uid
       WHERE sr.subproiect_id = @subproiectId
       ORDER BY 
@@ -105,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // Verifică dacă responsabilul este deja atribuit la acest subproiect
     const checkQuery = `
-      SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SELECT id FROM ${SUBPROIECTE_RESPONSABILI_TABLE}
       WHERE subproiect_id = @subproiectId AND responsabil_uid = @responsabilUid
     `;
 
@@ -131,7 +141,7 @@ export async function POST(request: NextRequest) {
 
     // Insert nou responsabil
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${SUBPROIECTE_RESPONSABILI_TABLE}
       (id, subproiect_id, responsabil_uid, responsabil_nume, rol_in_subproiect, data_atribuire, atribuit_de)
       VALUES (
         '${escapeString(id)}',
@@ -187,12 +197,12 @@ export async function DELETE(request: NextRequest) {
     
     if (id) {
       deleteQuery = `
-        DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        DELETE FROM ${SUBPROIECTE_RESPONSABILI_TABLE}
         WHERE id = '${escapeString(id)}'
       `;
     } else {
       deleteQuery = `
-        DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        DELETE FROM ${SUBPROIECTE_RESPONSABILI_TABLE}
         WHERE subproiect_id = '${escapeString(subproiectId!)}' 
           AND responsabil_uid = '${escapeString(responsabilUid!)}'
       `;

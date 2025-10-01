@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,7 +25,12 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
+const PLANIFICATOR_TABLE = `\`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\``;
+const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
+console.log(`🔧 [Planificator Subproiect] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +58,7 @@ export async function GET(
     const sarciniQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        FROM ${PLANIFICATOR_TABLE}
         WHERE utilizator_uid = @userId AND activ = TRUE
       )
 
@@ -74,10 +86,10 @@ export async function GET(
             DATE_DIFF(s.data_scadenta, CURRENT_DATE(), DAY)
           ELSE 999
         END as zile_pana_scadenta
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\` s
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
+      FROM ${SARCINI_TABLE} s
+      LEFT JOIN ${PROIECTE_TABLE} p
         ON s.proiect_id = p.ID_Proiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\` sp
+      LEFT JOIN ${SUBPROIECTE_TABLE} sp
         ON s.subproiect_id = sp.ID_Subproiect
       WHERE s.proiect_id = @subproiect_id
         AND s.status NOT IN ('Finalizată', 'Anulată')

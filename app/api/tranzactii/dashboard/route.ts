@@ -7,9 +7,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_TRANZACTII_BANCARE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
+const TABLE_TRANZACTII_MATCHING = `\`${PROJECT_ID}.${DATASET}.TranzactiiMatching${tableSuffix}\``;
+
+console.log(`🔧 Tranzactii Dashboard API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: TranzactiiBancare${tableSuffix}, TranzactiiMatching${tableSuffix}`);
+
 // Configurare BigQuery
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -17,7 +31,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = bigquery.dataset('PanouControlUnitar');
+const dataset = bigquery.dataset(DATASET);
 
 // =================================================================
 // TIPURI TYPESCRIPT
@@ -180,7 +194,7 @@ async function getDashboardStats(filters: FilterParams): Promise<DashboardStats>
     
     const query = `
       WITH TransactionStats AS (
-        SELECT 
+        SELECT
           COUNT(*) as total_transactions,
           SUM(CASE WHEN t.directie = 'in' THEN 1 ELSE 0 END) as total_incasari,
           SUM(CASE WHEN t.directie = 'out' THEN 1 ELSE 0 END) as total_plati,
@@ -191,14 +205,14 @@ async function getDashboardStats(filters: FilterParams): Promise<DashboardStats>
           AVG(CASE WHEN t.matching_confidence > 0 THEN t.matching_confidence ELSE NULL END) as avg_confidence,
           SUM(CASE WHEN t.status = 'nou' AND t.matching_confidence >= 60 THEN 1 ELSE 0 END) as pending_matches,
           SUM(CASE WHEN t.needs_review = TRUE THEN 1 ELSE 0 END) as needs_review
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\` t
+        FROM ${TABLE_TRANZACTII_BANCARE} t
         ${whereClause}
       )
-      SELECT 
+      SELECT
         *,
-        CASE 
+        CASE
           WHEN total_transactions > 0 THEN ROUND((matched_count * 100.0) / total_transactions, 2)
-          ELSE 0 
+          ELSE 0
         END as matching_rate
       FROM TransactionStats
     `;
@@ -267,13 +281,13 @@ async function getTransactionsList(filters: FilterParams): Promise<{
     // Query pentru count total
     const countQuery = `
       SELECT COUNT(*) as total_count
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\` t
+      FROM ${TABLE_TRANZACTII_BANCARE} t
       ${whereClause}
     `;
 
     // Query pentru date
     const dataQuery = `
-      SELECT 
+      SELECT
         t.id,
         t.data_procesare,
         t.suma,
@@ -285,15 +299,15 @@ async function getTransactionsList(filters: FilterParams): Promise<{
         t.status,
         t.matching_tip,
         t.matching_confidence,
-        
+
         -- Matching details din join
         m.target_type as matched_target_type,
         m.target_id as matched_target_id,
         m.confidence_score as matched_confidence,
         m.matching_details as matched_details
-        
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\` t
-      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiMatching\` m
+
+      FROM ${TABLE_TRANZACTII_BANCARE} t
+      LEFT JOIN ${TABLE_TRANZACTII_MATCHING} m
         ON t.id = m.tranzactie_id AND m.status = 'active'
       ${whereClause}
       ${orderClause}
@@ -353,14 +367,14 @@ async function getDailyActivityData(filters: FilterParams): Promise<any[]> {
     const whereClause = buildWhereClause(filters);
     
     const query = `
-      SELECT 
+      SELECT
         DATE(t.data_procesare) as data,
         COUNT(*) as total_tranzactii,
         SUM(CASE WHEN t.directie = 'in' THEN t.suma ELSE 0 END) as incasari,
         SUM(CASE WHEN t.directie = 'out' THEN ABS(t.suma) ELSE 0 END) as plati,
         SUM(CASE WHEN t.matching_tip IS NOT NULL AND t.matching_tip != 'none' THEN 1 ELSE 0 END) as matched_count,
         AVG(CASE WHEN t.matching_confidence > 0 THEN t.matching_confidence ELSE NULL END) as avg_confidence
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\` t
+      FROM ${TABLE_TRANZACTII_BANCARE} t
       ${whereClause}
       GROUP BY DATE(t.data_procesare)
       ORDER BY data DESC
@@ -395,13 +409,13 @@ async function getCategoryDistribution(filters: FilterParams): Promise<any[]> {
     const whereClause = buildWhereClause(filters);
     
     const query = `
-      SELECT 
+      SELECT
         t.tip_categorie,
         t.directie,
         COUNT(*) as count,
         SUM(ABS(t.suma)) as total_suma,
         AVG(CASE WHEN t.matching_confidence > 0 THEN t.matching_confidence ELSE NULL END) as avg_confidence
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\` t
+      FROM ${TABLE_TRANZACTII_BANCARE} t
       ${whereClause}
       GROUP BY t.tip_categorie, t.directie
       ORDER BY total_suma DESC
@@ -538,51 +552,51 @@ export async function POST(request: NextRequest) {
         }
 
         await bigquery.query(`
-	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-	  SET 
-	    status = '${new_status}',
-	    data_actualizare = CURRENT_TIMESTAMP()
-	  WHERE id IN (${idsString})
-	`);
+          UPDATE ${TABLE_TRANZACTII_BANCARE}
+          SET
+            status = '${new_status}',
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id IN (${idsString})
+        `);
 
-	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
+        updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       case 'remove_matches':
         // Marchează matching-urile ca 'removed'
         await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiMatching\`
-          SET 
+          UPDATE ${TABLE_TRANZACTII_MATCHING}
+          SET
             status = 'removed',
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE tranzactie_id IN (${idsString}) AND status = 'active'
         `);
 
         // Reset tranzacțiile
-	await bigquery.query(`
-	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-	  SET 
-	    matching_tip = 'none',
-	    matching_confidence = 0,
-	    status = 'nou',
-	    processed = FALSE,
-	    data_actualizare = CURRENT_TIMESTAMP()
-	  WHERE id IN (${idsString})
-	`);
+        await bigquery.query(`
+          UPDATE ${TABLE_TRANZACTII_BANCARE}
+          SET
+            matching_tip = 'none',
+            matching_confidence = 0,
+            status = 'nou',
+            processed = FALSE,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id IN (${idsString})
+        `);
 
-	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
+        updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       case 'mark_review':
         await bigquery.query(`
-	  UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-	  SET 
-	    needs_review = TRUE,
-	    data_actualizare = CURRENT_TIMESTAMP()
-	  WHERE id IN (${idsString})
-	`);
+          UPDATE ${TABLE_TRANZACTII_BANCARE}
+          SET
+            needs_review = TRUE,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id IN (${idsString})
+        `);
 
-	updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
+        updatedCount = transaction_ids.length; // Presupunem că toate au fost actualizate
         break;
 
       default:

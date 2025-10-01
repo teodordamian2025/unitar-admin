@@ -7,8 +7,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+console.log(`🔧 Burnout Analysis API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Utilizatori${tableSuffix}, TimeTracking${tableSuffix}, SarciniResponsabili${tableSuffix}, Sarcini${tableSuffix}, ProiecteResponsabili${tableSuffix}, Proiecte${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -49,8 +67,8 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN tt.ore_lucrate > 8 THEN 1 END) as sesiuni_overtime,
           SUM(CASE WHEN tt.ore_lucrate > 8 THEN tt.ore_lucrate - 8 ELSE 0 END) as ore_overtime_total
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+        FROM ${TABLE_UTILIZATORI} u
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
           ON u.uid = tt.utilizator_uid 
           AND tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         WHERE u.activ = true
@@ -82,8 +100,8 @@ export async function GET(request: NextRequest) {
           
           COUNT(DISTINCT CASE WHEN s.prioritate = 'Critică' AND s.status != 'Finalizată' THEN s.id END) as sarcini_critice_active
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr
-        JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON sr.sarcina_id = s.id
+        FROM ${TABLE_SARCINI_RESPONSABILI} sr
+        JOIN ${TABLE_SARCINI} s ON sr.sarcina_id = s.id
         WHERE s.data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
         GROUP BY sr.responsabil_uid
       ),
@@ -108,8 +126,8 @@ export async function GET(request: NextRequest) {
             AND p.Status = 'Activ' THEN pr.proiect_id 
           END) as proiecte_neachitate
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteResponsabili\` pr
-        JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p ON pr.proiect_id = p.ID_Proiect
+        FROM ${TABLE_PROIECTE_RESPONSABILI} pr
+        JOIN ${TABLE_PROIECTE} p ON pr.proiect_id = p.ID_Proiect
         GROUP BY pr.responsabil_uid
       ),
       
@@ -126,13 +144,13 @@ export async function GET(request: NextRequest) {
           
           AVG(CASE WHEN EXTRACT(HOUR FROM tt.created_at) > 20 THEN 1.0 ELSE 0.0 END) * 100 as frecventa_lucru_noapte
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
+        FROM ${TABLE_TIME_TRACKING} tt
         JOIN (
           SELECT 
             utilizator_uid,
             DATE(data_lucru) as data,
             SUM(ore_lucrate) as ore_zilnice
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+          FROM ${TABLE_TIME_TRACKING}
           WHERE data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY utilizator_uid, DATE(data_lucru)
         ) daily_hours ON tt.utilizator_uid = daily_hours.utilizator_uid AND DATE(tt.data_lucru) = daily_hours.data
@@ -142,9 +160,9 @@ export async function GET(request: NextRequest) {
             u.uid as user_uid
           FROM 
             UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY), CURRENT_DATE(), INTERVAL 1 DAY)) as dates(data_calendar)
-          CROSS JOIN (SELECT DISTINCT uid FROM \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` WHERE activ = true) u
+          CROSS JOIN (SELECT DISTINCT uid FROM ${TABLE_UTILIZATORI} WHERE activ = true) u
           WHERE NOT EXISTS (
-            SELECT 1 FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt2
+            SELECT 1 FROM ${TABLE_TIME_TRACKING} tt2
             WHERE DATE(tt2.data_lucru) = dates.data_calendar 
             AND tt2.utilizator_uid = u.uid
           )
@@ -178,8 +196,8 @@ export async function GET(request: NextRequest) {
               ELSE 0
             END as weekly_efficiency
             
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s ON tt.sarcina_id = s.id
+          FROM ${TABLE_TIME_TRACKING} tt
+          LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           GROUP BY tt.utilizator_uid, EXTRACT(WEEK FROM tt.data_lucru)
         ) weekly_stats

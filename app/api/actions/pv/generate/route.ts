@@ -11,7 +11,25 @@ import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import path from 'path';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_PROCES_VERBALE = `\`${PROJECT_ID}.${DATASET}.ProcesVerbale${tableSuffix}\``;
+
+console.log(`🔧 PV Generate API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Contracte${tableSuffix}, Proiecte${tableSuffix}, Clienti${tableSuffix}, Subproiecte${tableSuffix}, AnexeContract${tableSuffix}, EtapeContract${tableSuffix}, ProcesVerbale${tableSuffix}`);
+
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
 
 const bigquery = new BigQuery({
@@ -168,7 +186,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
     // 1. CĂUTARE CONTRACT PRINCIPAL
     const contractQuery = `
       SELECT numar_contract, Data_Semnare, Status, ID_Contract, continut_json
-      FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+      FROM ${TABLE_CONTRACTE}
       WHERE proiect_id = @proiectId 
         AND Status != 'Anulat'
       ORDER BY data_creare DESC 
@@ -249,7 +267,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
           subproiect_id,
           data_start,
           data_final
-        FROM \`${PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+        FROM ${TABLE_ANEXE_CONTRACT}
         WHERE subproiect_id IN (${subproiecteList})
           AND activ = true
         ORDER BY anexa_numar DESC
@@ -292,7 +310,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
       // Verifică ce subproiecte sunt în EtapeContract (contractul principal)
       const etapeContractQuery = `
         SELECT DISTINCT subproiect_id
-        FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+        FROM ${TABLE_ETAPE_CONTRACT}
         WHERE contract_id = '${contractData.id_contract}'
           AND subproiect_id IS NOT NULL
           AND activ = true
@@ -342,7 +360,7 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
   try {
     // PĂSTRAT: Încărcarea proiectului
     const proiectQuery = `
-      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      SELECT * FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiectId
       LIMIT 1
     `;
@@ -363,7 +381,7 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
     let clientData: any = null;
     if (proiectRaw.Client) {
       const clientQuery = `
-        SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Clienti\`
+        SELECT * FROM ${TABLE_CLIENTI}
         WHERE TRIM(LOWER(nume)) = TRIM(LOWER(@clientNume))
         AND activ = true
         LIMIT 1
@@ -382,7 +400,7 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
     
     // PĂSTRAT: Încarcă subproiecte
     const subproiecteQuery = `
-      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      SELECT * FROM ${TABLE_SUBPROIECTE}
       WHERE ID_Proiect = @proiectId
       AND activ = true
       ORDER BY Denumire ASC
@@ -781,7 +799,7 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
     const dataPredare = `DATE('${new Date().toISOString().split('T')[0]}')`;
     
     const insertQuery = `
-      INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.ProcesVerbale\`
+      INSERT INTO ${TABLE_PROCES_VERBALE}
       (ID_PV, numar_pv, serie_pv, tip_document, proiect_id, subproiecte_ids, 
        client_id, client_nume, denumire_pv, data_predare, status_predare, 
        valoare_totala, moneda, valoare_ron, observatii, 
@@ -831,7 +849,7 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
     if (subproiecteIds.length > 0) {
       subproiecteIds.forEach(subId => {
         const updateSubQuery = `
-          UPDATE \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+          UPDATE ${TABLE_SUBPROIECTE}
           SET status_predare = 'Predat', data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Subproiect = '${subId}'
         `;
@@ -839,7 +857,7 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
       });
     } else {
       const updateProiectQuery = `
-        UPDATE \`${PROJECT_ID}.PanouControlUnitar.Proiecte\`
+        UPDATE ${TABLE_PROIECTE}
         SET status_predare = 'Predat'
         WHERE ID_Proiect = '${proiectId}'
       `;

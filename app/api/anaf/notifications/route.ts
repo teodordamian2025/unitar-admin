@@ -7,8 +7,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import nodemailer from 'nodemailer';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ANAF_TOKENS = `\`${PROJECT_ID}.${DATASET}.AnafTokens${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_ANAF_NOTIFICATION_LOG = `AnafNotificationLog${tableSuffix}`;
+
+console.log(`🔧 ANAF Notifications API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: AnafTokens${tableSuffix}, FacturiGenerate${tableSuffix}, AnafNotificationLog${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -426,7 +441,7 @@ async function checkTokenExpiry() {
         id,
         expires_at,
         TIMESTAMP_DIFF(expires_at, CURRENT_TIMESTAMP(), MINUTE) as expires_in_minutes
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
+      FROM ${TABLE_ANAF_TOKENS}
       WHERE is_active = true
       ORDER BY data_creare DESC
       LIMIT 1
@@ -479,7 +494,7 @@ async function checkErrorRates() {
         COUNT(*) as total_invoices,
         COUNTIF(efactura_status IN ('error', 'anaf_error')) as failed_invoices,
         SAFE_DIVIDE(COUNTIF(efactura_status IN ('error', 'anaf_error')), COUNT(*)) * 100 as failure_rate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true 
         AND data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
     `;
@@ -681,8 +696,8 @@ function generateEmailHTML(context: NotificationContext): string {
 
 async function logNotificationToDatabase(context: NotificationContext, success: boolean) {
   try {
-    const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('AnafNotificationLog');
+    const dataset = bigquery.dataset(DATASET);
+    const table = dataset.table(TABLE_ANAF_NOTIFICATION_LOG);
 
     const record = [{
       id: crypto.randomUUID(),
@@ -712,7 +727,7 @@ async function getDailyStatistics() {
         COUNTIF(efactura_status = 'validated') as successful_invoices,
         COUNTIF(efactura_status IN ('error', 'anaf_error')) as failed_invoices,
         SAFE_DIVIDE(COUNTIF(efactura_status = 'validated'), COUNT(*)) * 100 as success_rate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true 
         AND data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
     `;

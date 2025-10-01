@@ -7,9 +7,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
-const TABLE = 'EtapeContract';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+const TABLE = `EtapeContract${tableSuffix}`;
+
+// ✅ Tabelă cu suffix dinamic
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+
+console.log(`🔧 EtapeContract API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: EtapeContract${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,

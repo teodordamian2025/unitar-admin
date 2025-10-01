@@ -6,8 +6,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+
+console.log(`🔧 Invoice Delete API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -29,14 +43,14 @@ export async function DELETE(request: NextRequest) {
 
     // ✅ CORECTAT: Nume complet tabel
     const checkQuery = `
-      SELECT 
+      SELECT
         id,
         numar,
         efactura_enabled,
         efactura_status,
         anaf_upload_id,
         status
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE id = @facturaId
     `;
 
@@ -75,7 +89,7 @@ export async function DELETE(request: NextRequest) {
 
     // ✅ CORECTAT: Șterge factura cu nume complet tabel
     const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      DELETE FROM ${TABLE_FACTURI_GENERATE}
       WHERE id = @facturaId
     `;
 
@@ -91,7 +105,7 @@ export async function DELETE(request: NextRequest) {
     if (factura.anaf_upload_id) {
       try {
         const deleteEfacturaQuery = `
-          DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafEFactura\`
+          DELETE FROM ${TABLE_ANAF_EFACTURA}
           WHERE factura_id = @facturaId
         `;
 

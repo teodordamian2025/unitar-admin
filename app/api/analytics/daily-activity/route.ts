@@ -7,8 +7,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+console.log(`🔧 Daily Activity API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: TimeTracking${tableSuffix}, Sarcini${tableSuffix}, Proiecte${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -83,10 +98,10 @@ export async function GET(request: NextRequest) {
             ELSE tt.sarcina_id 
           END) as task_switches
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        FROM ${TABLE_TIME_TRACKING} tt
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON tt.sarcina_id = s.id
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+        LEFT JOIN ${TABLE_PROIECTE} p 
           ON tt.proiect_id = p.ID_Proiect
         WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL @period DAY)
           AND tt.ore_lucrate > 0

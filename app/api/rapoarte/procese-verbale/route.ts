@@ -8,18 +8,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+const dataset = 'PanouControlUnitar';
+const table = `ProcesVerbale${tableSuffix}`;
+
+// ✅ Tabelă cu suffix dinamic
+const TABLE_PROCES_VERBALE = `\`${PROJECT_ID}.${DATASET}.ProcesVerbale${tableSuffix}\``;
+
+console.log(`🔧 ProcesVerbale API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: ProcesVerbale${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
-
-const PROJECT_ID = 'hale-mode-464009-i6';
-const dataset = 'PanouControlUnitar';
-const table = 'ProcesVerbale';
 
 // Helper functions PĂSTRATE din pattern-urile existente
 const escapeString = (value: string): string => {

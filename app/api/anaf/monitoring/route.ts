@@ -6,8 +6,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ANAF_TOKENS = `\`${PROJECT_ID}.${DATASET}.AnafTokens${tableSuffix}\``;
+const TABLE_ANAF_ERROR_LOG = `\`${PROJECT_ID}.${DATASET}.AnafErrorLog${tableSuffix}\``;
+const TABLE_ANAF_NOTIFICATION_LOG = `\`${PROJECT_ID}.${DATASET}.AnafNotificationLog${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+
+console.log(`🔧 ANAF Monitoring API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: AnafTokens${tableSuffix}, AnafErrorLog${tableSuffix}, AnafNotificationLog${tableSuffix}, FacturiGenerate${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -256,7 +272,7 @@ async function checkOAuthTokenHealth() {
         expires_at,
         data_creare as last_refresh,
         TIMESTAMP_DIFF(expires_at, CURRENT_TIMESTAMP(), DAY) as expires_in_days
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
+      FROM ${TABLE_ANAF_TOKENS}
       WHERE is_active = true
       ORDER BY data_creare DESC
       LIMIT 1
@@ -341,7 +357,7 @@ async function checkDatabaseHealth() {
     // Check pentru erori recente
     const errorQuery = `
       SELECT COUNT(*) as error_count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafErrorLog\`
+      FROM ${TABLE_ANAF_ERROR_LOG}
       WHERE category = 'database_error'
         AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
     `;
@@ -373,7 +389,7 @@ async function checkNotificationsHealth() {
         COUNT(*) as total_sent,
         COUNTIF(success = true) as successful_sent,
         MAX(timestamp) as last_sent
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafNotificationLog\`
+      FROM ${TABLE_ANAF_NOTIFICATION_LOG}
       WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
     `;
 
@@ -428,7 +444,7 @@ async function getPerformanceMetricsData(timeRange: string): Promise<Performance
         COUNTIF(efactura_status IN ('error', 'anaf_error')) as failed_invoices,
         SAFE_DIVIDE(COUNTIF(efactura_status = 'validated'), COUNT(*)) * 100 as success_rate,
         SAFE_DIVIDE(COUNTIF(efactura_status IN ('error', 'anaf_error')), COUNT(*)) * 100 as error_rate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true AND ${timeFilter}
     `;
 
@@ -437,7 +453,7 @@ async function getPerformanceMetricsData(timeRange: string): Promise<Performance
       SELECT 
         SAFE_DIVIDE(COUNTIF(efactura_status = 'validated'), COUNT(*)) * 100 as prev_success_rate,
         SAFE_DIVIDE(COUNTIF(efactura_status IN ('error', 'anaf_error')), COUNT(*)) * 100 as prev_error_rate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true AND ${previousTimeFilter}
     `;
 
@@ -512,7 +528,7 @@ async function getErrorAnalysisData(timeRange: string): Promise<ErrorAnalysis> {
         severity,
         COUNT(*) as count,
         MAX(timestamp) as last_occurrence
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafErrorLog\`
+      FROM ${TABLE_ANAF_ERROR_LOG}
       WHERE ${timeFilter.replace('data_creare', 'timestamp')}
       GROUP BY category, severity
       ORDER BY count DESC
@@ -525,7 +541,7 @@ async function getErrorAnalysisData(timeRange: string): Promise<ErrorAnalysis> {
         DATETIME_TRUNC(timestamp, HOUR) as hour,
         category,
         COUNT(*) as count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafErrorLog\`
+      FROM ${TABLE_ANAF_ERROR_LOG}
       WHERE ${timeFilter.replace('data_creare', 'timestamp')}
       GROUP BY hour, category
       ORDER BY hour DESC
@@ -596,7 +612,7 @@ async function getInvoiceFlowMetricsData(timeRange: string): Promise<InvoiceFlow
         COUNT(*) as total,
         COUNTIF(efactura_status = 'validated') as successful,
         COUNTIF(efactura_status IN ('error', 'anaf_error')) as failed
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true AND ${timeFilter}
       GROUP BY hour
       ORDER BY hour
@@ -607,7 +623,7 @@ async function getInvoiceFlowMetricsData(timeRange: string): Promise<InvoiceFlow
       SELECT 
         efactura_status as status,
         COUNT(*) as count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true AND ${timeFilter}
       GROUP BY efactura_status
       ORDER BY count DESC
@@ -737,7 +753,7 @@ async function getActiveAlerts() {
         message,
         timestamp,
         factura_id
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafErrorLog\`
+      FROM ${TABLE_ANAF_ERROR_LOG}
       WHERE severity IN ('critical', 'high')
         AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
       ORDER BY timestamp DESC
@@ -779,7 +795,7 @@ async function getRealTimeStatus() {
       SELECT 
         COUNT(*) as recent_invoices,
         COUNTIF(efactura_status = 'validated') as recent_successful
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE efactura_enabled = true 
         AND data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 MINUTE)
     `;

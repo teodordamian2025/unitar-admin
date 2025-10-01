@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,9 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-
-export async function GET(request: NextRequest) {
+console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
     const searchQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.PlanificatorPersonal\`
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\`
         WHERE utilizator_uid = @userId AND activ = TRUE
       )
 
@@ -59,15 +64,15 @@ export async function GET(request: NextRequest) {
         -- Contorizare subproiecte și sarcini pentru feedback
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Subproiecte\`
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\`
           WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
         ) as subproiecte_count,
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Sarcini\`
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\`
           WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
         ) as sarcini_count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\` p
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` p
       WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
         AND Status != 'Anulat'
         AND ID_Proiect NOT IN (

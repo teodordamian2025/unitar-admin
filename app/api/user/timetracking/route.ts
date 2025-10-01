@@ -8,18 +8,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 User TimeTracking API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
-
-const dataset = 'PanouControlUnitar';
-const table = 'TimeTracking';
-const PROJECT_ID = 'hale-mode-464009-i6';
 
 // Helper function pentru validare și escape SQL
 const escapeString = (value: string): string => {
@@ -106,10 +118,10 @@ export async function GET(request: NextRequest) {
           WHEN tt.subproiect_id IS NOT NULL THEN 'subproiect'
           ELSE 'proiect'
         END as tip_obiectiv
-      FROM \`${PROJECT_ID}.${dataset}.${table}\` tt
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Proiecte\` p ON tt.proiect_id = p.ID_Proiect
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Subproiecte\` sp ON tt.subproiect_id = sp.ID_Subproiect
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Sarcini\` s ON tt.sarcina_id = s.id
+      FROM ${TABLE_TIME_TRACKING} tt
+      LEFT JOIN ${TABLE_PROIECTE} p ON tt.proiect_id = p.ID_Proiect
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp ON tt.subproiect_id = sp.ID_Subproiect
+      LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
     `;
 
     const conditions: string[] = [];
@@ -174,7 +186,7 @@ export async function GET(request: NextRequest) {
     // Query pentru total count
     let countQuery = `
       SELECT COUNT(*) as total
-      FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      FROM ${TABLE_TIME_TRACKING}
     `;
 
     if (conditions.length > 0) {
@@ -275,7 +287,7 @@ async function validateAndPopulateObjective(objectiveData: any) {
   if (sarcina_id && !finalProiectId) {
     const sarcinaQuery = `
       SELECT proiect_id, subproiect_id
-      FROM \`${PROJECT_ID}.${dataset}.Sarcini\`
+      FROM ${TABLE_SARCINI}
       WHERE id = @sarcina_id
     `;
 
@@ -294,7 +306,7 @@ async function validateAndPopulateObjective(objectiveData: any) {
   if (subproiect_id && !finalProiectId) {
     const subproiectQuery = `
       SELECT ID_Proiect as proiect_id
-      FROM \`${PROJECT_ID}.${dataset}.Subproiecte\`
+      FROM ${TABLE_SUBPROIECTE}
       WHERE ID_Subproiect = @subproiect_id
     `;
 
@@ -355,7 +367,7 @@ export async function POST(request: NextRequest) {
 
     // Query cu toate tipurile de obiective
     const insertQuery = `
-      INSERT INTO \`${PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${TABLE_TIME_TRACKING}
       (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, sarcina_id,
        descriere_lucru, data_lucru, ore_lucrate, tip_inregistrare, created_at)
       VALUES (
@@ -465,7 +477,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_TIME_TRACKING}
       SET ${updateFields.join(', ')}
       WHERE id = '${escapeString(id)}'
     `;
@@ -510,7 +522,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteQuery = `
-      DELETE FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      DELETE FROM ${TABLE_TIME_TRACKING}
       WHERE id = '${escapeString(id)}'
     `;
 
@@ -544,7 +556,7 @@ export async function DELETE(request: NextRequest) {
 // Helper pentru crearea tabelei TimeTracking dacă nu există (conform schema BigQuery)
 async function createTimeTrackingTable() {
   const createTableQuery = `
-    CREATE TABLE IF NOT EXISTS \`${PROJECT_ID}.${dataset}.${table}\` (
+    CREATE TABLE IF NOT EXISTS ${TABLE_TIME_TRACKING} (
       id STRING NOT NULL,
       sarcina_id STRING,
       utilizator_uid STRING NOT NULL,

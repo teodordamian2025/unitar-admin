@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabelă cu suffix dinamic
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+
+console.log(`🔧 Clienti API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: Clienti${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -10,15 +23,12 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'Clienti';
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
     // Construire query cu filtre
-    let query = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
+    let query = `SELECT * FROM ${TABLE_CLIENTI}`;
     const conditions: string[] = ['activ = true']; // Doar clienții activi
     const params: any = {};
 
@@ -120,9 +130,9 @@ export async function POST(request: NextRequest) {
 
     // Verifică dacă clientul există deja
     const checkQuery = `
-      SELECT id FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      SELECT id FROM ${TABLE_CLIENTI}
       WHERE activ = true AND (
-        nume = @nume 
+        nume = @nume
         ${cui ? 'OR cui = @cui' : ''}
         ${cnp ? 'OR cnp = @cnp' : ''}
       )
@@ -176,7 +186,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Construiește query-ul
-    const insertQuery = generateInsertQuery('PanouControlUnitar', 'Clienti', insertData);
+    const insertQuery = generateInsertQuery(DATASET, `Clienti${tableSuffix}`, insertData);
     
     console.log('Executing insert query:', insertQuery);
 
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
 
 // Funcție helper pentru generarea query-urilor INSERT
 function generateInsertQuery(dataset: string, table: string, data: any): string {
-  const fullTableName = `\`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\``;
+  const fullTableName = `\`${PROJECT_ID}.${dataset}.${table}\``;
   
   const columns = Object.keys(data);
   const values = columns.map(col => {
@@ -257,7 +267,7 @@ export async function PUT(request: NextRequest) {
     params.data_actualizare = new Date().toISOString();
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_CLIENTI}
       SET ${updateFields.join(', ')}
       WHERE id = @id AND activ = true
     `;
@@ -298,7 +308,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - marchează ca inactiv
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TABLE_CLIENTI}
       SET activ = false, data_actualizare = @data_actualizare
       WHERE id = @id
     `;

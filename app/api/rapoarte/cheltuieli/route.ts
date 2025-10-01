@@ -7,8 +7,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
+console.log(`🔧 Cheltuieli API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: ProiecteCheltuieli${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +31,8 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'ProiecteCheltuieli';
+const dataset = DATASET;
+const table = `ProiecteCheltuieli${tableSuffix}`;
 
 // ADĂUGAT: Helper functions ca la Proiecte
 const escapeString = (value: string): string => {
@@ -49,10 +64,10 @@ export async function GET(request: NextRequest) {
         p.Denumire as proiect_denumire,
         p.Client as proiect_client,
         sp.Denumire as subproiect_denumire
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` pc
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p
+      FROM \`${TABLE_PROIECTE_CHELTUIELI}\` pc
+      LEFT JOIN \`${TABLE_PROIECTE}\` p
         ON pc.proiect_id = p.ID_Proiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Subproiecte\` sp
+      LEFT JOIN \`${TABLE_SUBPROIECTE}\` sp
         ON pc.subproiect_id = sp.ID_Subproiect
       WHERE pc.activ = true
     `;
@@ -210,7 +225,7 @@ export async function POST(request: NextRequest) {
 
     // FIX PRINCIPAL: Query cu DATE literale în loc de parameters
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO \`${TABLE_PROIECTE_CHELTUIELI}\`
       (id, proiect_id, subproiect_id, tip_cheltuiala, furnizor_nume, furnizor_cui, furnizor_contact,
        descriere, valoare, moneda, curs_valutar, data_curs_valutar, valoare_ron,
        status_predare, status_contract, status_facturare, status_achitare,
@@ -332,7 +347,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${TABLE_PROIECTE_CHELTUIELI}\`
       SET ${updateFields.join(', ')}
       WHERE id = '${escapeString(id)}'
     `;
@@ -378,7 +393,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - marchează ca inactiv
     const deleteQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE \`${TABLE_PROIECTE_CHELTUIELI}\`
       SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = '${escapeString(id)}'
     `;

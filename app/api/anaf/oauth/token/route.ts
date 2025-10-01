@@ -8,15 +8,26 @@ import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 // Inițializare BigQuery
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+const ANAF_OAUTH_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafOAuthTokens${tableSuffix}\``;
+
+console.log(`🔧 [ANAF OAuth Token] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 // Funcție pentru decriptarea token-urilor
 function decryptToken(encryptedToken: string): string {

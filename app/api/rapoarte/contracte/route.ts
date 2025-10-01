@@ -9,9 +9,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
-const TABLE = 'Contracte';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+
+console.log(`🔧 Contracte API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Contracte${tableSuffix}, Clienti${tableSuffix}, EtapeContract${tableSuffix}, Subproiecte${tableSuffix}, EtapeFacturi${tableSuffix}, FacturiGenerate${tableSuffix}, AnexeContract${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -216,7 +231,7 @@ const calculateFacturareStatus = (factureData: any[]): { status: string, display
 const loadEtapeContractCuFacturi = async (contractId: string) => {
   try {
     const etapeQuery = `
-      SELECT 
+      SELECT
         e.*,
         s.Denumire as subproiect_denumire,
         ef.factura_id,
@@ -229,14 +244,14 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
         fg.serie,
         fg.numar,
         fg.status as status_factura
-      FROM \`${PROJECT_ID}.${DATASET}.EtapeContract\` e
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte\` s 
+      FROM ${TABLE_ETAPE_CONTRACT} e
+      LEFT JOIN ${TABLE_SUBPROIECTE} s
         ON e.subproiect_id = s.ID_Subproiect
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.EtapeFacturi\` ef 
+      LEFT JOIN ${TABLE_ETAPE_FACTURI} ef
         ON e.ID_Etapa = ef.etapa_id AND ef.activ = true
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate\` fg 
+      LEFT JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
-      WHERE e.contract_id = '${contractId}' 
+      WHERE e.contract_id = '${contractId}'
         AND e.activ = true
       ORDER BY e.etapa_index ASC
     `;
@@ -315,7 +330,7 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
 const loadAnexeContractCuFacturi = async (contractId: string) => {
   try {
     const anexeQuery = `
-      SELECT 
+      SELECT
         a.*,
         s.Denumire as subproiect_denumire,
         ef.factura_id,
@@ -328,14 +343,14 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
         fg.serie,
         fg.numar,
         fg.status as status_factura
-      FROM \`${PROJECT_ID}.${DATASET}.AnexeContract\` a
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte\` s 
+      FROM ${TABLE_ANEXE_CONTRACT} a
+      LEFT JOIN ${TABLE_SUBPROIECTE} s
         ON a.subproiect_id = s.ID_Subproiect
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.EtapeFacturi\` ef 
+      LEFT JOIN ${TABLE_ETAPE_FACTURI} ef
         ON a.ID_Anexa = ef.anexa_id AND ef.activ = true
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate\` fg 
+      LEFT JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
-      WHERE a.contract_id = '${contractId}' 
+      WHERE a.contract_id = '${contractId}'
         AND a.activ = true
       ORDER BY a.anexa_numar ASC, a.etapa_index ASC
     `;
@@ -510,14 +525,14 @@ export async function GET(request: NextRequest) {
 
     // Query principal cu JOIN pentru date client complete - PĂSTRAT
     const query = `
-      SELECT 
+      SELECT
         c.*,
         cl.nume as client_nume_complet,
         cl.adresa as client_adresa_completa,
         cl.telefon as client_telefon,
         cl.email as client_email
-      FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\` c
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Clienti\` cl
+      FROM ${TABLE_CONTRACTE} c
+      LEFT JOIN ${TABLE_CLIENTI} cl
         ON c.client_id = cl.id
       ${whereClause}
       ORDER BY c.data_creare DESC
@@ -623,8 +638,8 @@ export async function GET(request: NextRequest) {
     // Query pentru totalul de contracte (fără filtrul de status facturare)
     let countQuery = `
       SELECT COUNT(*) as total
-      FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\` c
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Clienti\` cl
+      FROM ${TABLE_CONTRACTE} c
+      LEFT JOIN ${TABLE_CLIENTI} cl
         ON c.client_id = cl.id
       ${whereClause}
     `;
@@ -778,7 +793,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      UPDATE ${TABLE_CONTRACTE}
       SET ${updateFields.join(', ')}
       WHERE ID_Contract = '${escapeString(ID_Contract)}'
     `;
@@ -829,7 +844,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă există deja un contract pentru acest proiect
     const existingQuery = `
       SELECT ID_Contract, numar_contract, Status
-      FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      FROM ${TABLE_CONTRACTE}
       WHERE proiect_id = @proiect_id
       ORDER BY data_creare DESC
       LIMIT 1
@@ -891,8 +906,8 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete prin schimbarea status-ului + dezactivare etape și anexe
     const deleteQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
-      SET 
+      UPDATE ${TABLE_CONTRACTE}
+      SET
         Status = 'Anulat',
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE ID_Contract = @contractId
@@ -907,8 +922,8 @@ export async function DELETE(request: NextRequest) {
 
     // Dezactivează și etapele asociate
     const deleteEtapeQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.EtapeContract\`
-      SET 
+      UPDATE ${TABLE_ETAPE_CONTRACT}
+      SET
         activ = false,
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE contract_id = @contractId
@@ -923,8 +938,8 @@ export async function DELETE(request: NextRequest) {
 
     // NOU: Dezactivează și anexele asociate
     const deleteAnexeQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.AnexeContract\`
-      SET 
+      UPDATE ${TABLE_ANEXE_CONTRACT}
+      SET
         activ = false,
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE contract_id = @contractId

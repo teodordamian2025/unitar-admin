@@ -19,8 +19,16 @@ const bigquery = new BigQuery({
 });
 
 const dataset = 'PanouControlUnitar';
-const table = 'Proiecte';
-const PROJECT_ID = 'hale-mode-464009-i6'; // PROJECT ID CORECT
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6'; // PROJECT ID CORECT
+
+// Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+const table = `Proiecte${tableSuffix}`;
+const tableClienti = `Clienti${tableSuffix}`;
+
+console.log(`🔧 BigQuery Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: ${table}, ${tableClienti}`);
 
 // Helper function pentru validare și escape SQL (PĂSTRAT)
 const escapeString = (value: string): string => {
@@ -131,7 +139,7 @@ export async function GET(request: NextRequest) {
 
     // FIX CRITICAL: Query cu JOIN pentru datele clientului (ca în contracte)
     let baseQuery = `
-      SELECT 
+      SELECT
         p.*,
         c.id as client_id,
         c.nume as client_nume,
@@ -145,7 +153,7 @@ export async function GET(request: NextRequest) {
         c.banca as client_banca,
         c.iban as client_iban
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
     `;
 
@@ -307,7 +315,7 @@ export async function GET(request: NextRequest) {
     let countQuery = `
       SELECT COUNT(*) as total
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+      LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
     `;
 

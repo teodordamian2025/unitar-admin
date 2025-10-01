@@ -7,8 +7,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_ANAF_ERROR_LOG = `\`${PROJECT_ID}.${DATASET}.AnafErrorLog${tableSuffix}\``;
+
+console.log(`🔧 ANAF Error Handler API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: AnafErrorLog${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -356,8 +369,9 @@ function categorizeError(error: any, context: any): ErrorContext {
 
 async function logErrorToDatabase(errorContext: ErrorContext) {
   try {
-    const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('AnafErrorLog');
+    const tableName = `AnafErrorLog${tableSuffix}`;
+    const dataset = bigquery.dataset(DATASET);
+    const table = dataset.table(tableName);
 
     const errorRecord = [{
       id: crypto.randomUUID(),
@@ -440,7 +454,7 @@ async function getErrorStatistics(timeRange: string, category?: string, severity
         COUNT(DISTINCT factura_id) as affected_invoices,
         AVG(CASE WHEN should_retry THEN max_retries ELSE 0 END) as avg_retries,
         SUM(CASE WHEN requires_manual_intervention THEN 1 ELSE 0 END) as manual_interventions_needed
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafErrorLog\`
+      FROM ${TABLE_ANAF_ERROR_LOG}
       WHERE ${timeFilter}
         ${category ? `AND category = @category` : ''}
         ${severity ? `AND severity = @severity` : ''}

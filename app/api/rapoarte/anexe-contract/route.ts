@@ -7,9 +7,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
-const PROJECT_ID = 'hale-mode-464009-i6';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
-const TABLE = 'AnexeContract';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE = `AnexeContract${tableSuffix}`;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
+console.log(`🔧 Anexe Contract API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: AnexeContract${tableSuffix}, Contracte${tableSuffix}, Subproiecte${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -131,10 +143,10 @@ export async function GET(request: NextRequest) {
         c.numar_contract,
         c.client_nume,
         s.Denumire as subproiect_denumire
-      FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\` a
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Contracte\` c 
+      FROM \`${TABLE_ANEXE_CONTRACT}\` a
+      LEFT JOIN \`${TABLE_CONTRACTE}\` c 
         ON a.contract_id = c.ID_Contract
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte\` s 
+      LEFT JOIN \`${TABLE_SUBPROIECTE}\` s 
         ON a.subproiect_id = s.ID_Subproiect
       WHERE a.activ = true
     `;
@@ -242,7 +254,7 @@ export async function POST(request: NextRequest) {
 
     // Șterge etapele existente pentru această anexă
     const deleteQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      UPDATE \`${TABLE_ANEXE_CONTRACT}\`
       SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
       WHERE contract_id = '${escapeString(contract_id)}' AND anexa_numar = ${anexa_numar}
     `;
@@ -257,7 +269,7 @@ export async function POST(request: NextRequest) {
       const anexaId = `ANEXA_${contract_id}_${anexa_numar}_${index + 1}_${Date.now()}`;
       
       const insertQuery = `
-        INSERT INTO \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+        INSERT INTO \`${TABLE_ANEXE_CONTRACT}\`
         (ID_Anexa, contract_id, proiect_id, anexa_numar, etapa_index, denumire, valoare, moneda, 
          valoare_ron, termen_zile, subproiect_id, status_facturare, status_incasare,
          data_scadenta, curs_valutar, data_curs_valutar, procent_din_total, 
@@ -366,7 +378,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('data_actualizare = CURRENT_TIMESTAMP()');
 
     const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      UPDATE \`${TABLE_ANEXE_CONTRACT}\`
       SET ${updateFields.join(', ')}
       WHERE ID_Anexa = '${escapeString(ID_Anexa)}' AND activ = true
     `;
@@ -411,7 +423,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete prin marcarea ca inactiv
     const deleteQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.${TABLE}\`
+      UPDATE \`${TABLE_ANEXE_CONTRACT}\`
       SET 
         activ = false,
         data_actualizare = CURRENT_TIMESTAMP()

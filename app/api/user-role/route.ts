@@ -3,14 +3,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+const UTILIZATORI_TABLE = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
+
+console.log(`🔧 [User Role] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 // Handler pentru verificarea rolului cu autentificarea din header
 export async function GET(request: NextRequest) {

@@ -8,8 +8,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// ✅ V2 Configuration
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+console.log(`🔧 TimeTracking API - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -17,8 +25,10 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = 'PanouControlUnitar';
-const table = 'TimeTracking';
+const dataset = DATASET;
+const table = `TimeTracking${tableSuffix}`;
+const TIMETRACKING_TABLE = `\`${PROJECT_ID}.${DATASET}.${table}\``;
+const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
 
 // Helper function pentru escape SQL - PĂSTRAT
 const escapeString = (value: string): string => {
@@ -52,7 +62,7 @@ export async function GET(request: NextRequest) {
     if (validareLimita === 'true' && utilizatorUid && dataLucru) {
       const validareQuery = `
         SELECT COALESCE(SUM(ore_lucrate), 0) as total_ore_ziua
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        FROM ${TIMETRACKING_TABLE}
         WHERE utilizator_uid = @utilizator_uid 
         AND data_lucru = @data_lucru
       `;
@@ -88,8 +98,8 @@ export async function GET(request: NextRequest) {
         s.titlu as sarcina_titlu,
         s.proiect_id as sarcina_proiect_id,
         s.tip_proiect
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` tt
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\` s
+      FROM ${TIMETRACKING_TABLE} tt
+      LEFT JOIN ${SARCINI_TABLE} s
         ON tt.sarcina_id = s.id
       WHERE 1=1
     `;
@@ -218,7 +228,7 @@ export async function POST(request: NextRequest) {
       // Dacă avem sarcină, verifică că există și obține proiect_id din ea
       const sarcinaQuery = `
         SELECT proiect_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Sarcini\`
+        FROM ${SARCINI_TABLE}
         WHERE id = @sarcina_id
       `;
 
@@ -293,7 +303,7 @@ export async function POST(request: NextRequest) {
     // Încearcă să adauge coloana subproiect_id dacă nu există
     try {
       const alterQuery = `
-        ALTER TABLE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+        ALTER TABLE ${TIMETRACKING_TABLE}
         ADD COLUMN IF NOT EXISTS subproiect_id STRING
       `;
       await bigquery.query({ query: alterQuery, location: 'EU' });
@@ -303,7 +313,7 @@ export async function POST(request: NextRequest) {
     }
 
     const insertQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      INSERT INTO ${TIMETRACKING_TABLE}
       (id, sarcina_id, proiect_id, subproiect_id, utilizator_uid, utilizator_nume, data_lucru,
        ore_lucrate, descriere_lucru, tip_inregistrare, created_at)
       VALUES (
@@ -404,7 +414,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      UPDATE ${TIMETRACKING_TABLE}
       SET ${updateFields.join(', ')}
       WHERE id = '${escapeString(id)}'
     `;
@@ -447,7 +457,7 @@ export async function DELETE(request: NextRequest) {
 
     // Ștergere înregistrare timp - PĂSTRAT
     const deleteQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
+      DELETE FROM ${TIMETRACKING_TABLE}
       WHERE id = '${escapeString(id)}'
     `;
 

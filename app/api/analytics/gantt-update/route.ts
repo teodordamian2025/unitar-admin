@@ -8,9 +8,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+
+console.log(`🔧 Gantt Update API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}`);
+
 // Initialize BigQuery client
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -118,7 +133,7 @@ export async function POST(request: NextRequest) {
     switch (taskType) {
       case 'proiect':
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+          UPDATE \`${TABLE_PROIECTE}\`
           SET
             Data_Start = @startDate,
             Data_Final = @endDate
@@ -128,7 +143,7 @@ export async function POST(request: NextRequest) {
 
       case 'subproiect':
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+          UPDATE \`${TABLE_SUBPROIECTE}\`
           SET
             Data_Start = @startDate,
             Data_Final = @endDate,
@@ -139,7 +154,7 @@ export async function POST(request: NextRequest) {
 
       case 'sarcina':
         updateQuery = `
-          UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+          UPDATE \`${TABLE_SARCINI}\`
           SET
             data_creare = @startDate,
             data_scadenta = @endDate,
@@ -176,21 +191,21 @@ export async function POST(request: NextRequest) {
       case 'proiect':
         verifyQuery = `
           SELECT ID_Proiect, Data_Start, Data_Final
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+          FROM \`${TABLE_PROIECTE}\`
           WHERE ID_Proiect = @actualId
         `;
         break;
       case 'subproiect':
         verifyQuery = `
           SELECT ID_Subproiect, Data_Start, Data_Final
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+          FROM \`${TABLE_SUBPROIECTE}\`
           WHERE ID_Subproiect = @actualId
         `;
         break;
       case 'sarcina':
         verifyQuery = `
           SELECT id, data_creare, data_scadenta
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+          FROM \`${TABLE_SARCINI}\`
           WHERE id = @actualId
         `;
         break;

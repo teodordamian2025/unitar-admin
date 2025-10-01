@@ -6,9 +6,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+
+console.log(`🔧 ANAF Search Clients API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using table: Clienti${tableSuffix}`);
+
 // Configurare BigQuery
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -16,8 +29,8 @@ const bigquery = new BigQuery({
   },
 });
 
-const dataset = bigquery.dataset('PanouControlUnitar');
-const clientiTable = dataset.table('Clienti');
+const dataset = bigquery.dataset(DATASET);
+const clientiTable = dataset.table(`Clienti${tableSuffix}`);
 
 // ✅ GET: Căutare client în ANAF și import opțional în BD
 export async function GET(request: NextRequest) {
@@ -249,7 +262,7 @@ async function checkExistingClient(cui: string) {
   try {
     const query = `
       SELECT id, nume, cui, adresa, telefon, email, iban, activ
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+      FROM ${TABLE_CLIENTI}
       WHERE cui = @cui
       LIMIT 1
     `;
@@ -316,7 +329,7 @@ async function importClientToBD(anafData: any) {
 async function updateClientInBD(clientId: string, anafData: any) {
   try {
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+      UPDATE ${TABLE_CLIENTI}
       SET 
         nume = @nume,
         cui = @cui,

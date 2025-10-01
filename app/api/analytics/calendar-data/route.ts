@@ -7,8 +7,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+
+console.log(`🔧 Calendar Data API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Sarcini${tableSuffix}, Proiecte${tableSuffix}, SarciniResponsabili${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -66,12 +83,12 @@ export async function GET(request: NextRequest) {
               ELSE 0 
             END as progres_procent
             
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+          FROM ${TABLE_SARCINI} s
+          LEFT JOIN ${TABLE_PROIECTE} p 
             ON s.proiect_id = p.ID_Proiect
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.SarciniResponsabili\` sr 
+          LEFT JOIN ${TABLE_SARCINI_RESPONSABILI} sr 
             ON s.id = sr.sarcina_id
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt 
+          LEFT JOIN ${TABLE_TIME_TRACKING} tt 
             ON s.id = tt.sarcina_id
           WHERE s.data_scadenta IS NOT NULL
             AND s.data_scadenta >= '${startDate}'
@@ -154,7 +171,7 @@ export async function GET(request: NextRequest) {
             WHEN DATE_DIFF(p.Data_Final, CURRENT_DATE(), DAY) <= 7 AND p.Status != 'Finalizat' THEN 'urgent'
             ELSE 'normal'
           END as urgency_status
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        FROM ${TABLE_PROIECTE} p
         WHERE p.Data_Final IS NOT NULL
           AND p.Data_Final >= '${startDate}'
           AND p.Data_Final <= '${endDate}'
@@ -198,10 +215,10 @@ export async function GET(request: NextRequest) {
           NULL as ore_estimate,
           SUM(tt.ore_lucrate) as ore_lucrate,
           'completed' as urgency_status
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\` tt
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+        FROM ${TABLE_TIME_TRACKING} tt
+        LEFT JOIN ${TABLE_PROIECTE} p 
           ON tt.proiect_id = p.ID_Proiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s 
+        LEFT JOIN ${TABLE_SARCINI} s 
           ON tt.sarcina_id = s.id
         WHERE tt.data_lucru >= '${startDate}'
           AND tt.data_lucru <= '${endDate}'
@@ -259,8 +276,8 @@ export async function GET(request: NextRequest) {
           WHEN DATE_DIFF(ec.data_scadenta, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
           ELSE 'normal'
         END as urgency_status
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\` ec
-      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p 
+      FROM ${TABLE_ETAPE_CONTRACT} ec
+      LEFT JOIN ${TABLE_PROIECTE} p 
         ON ec.proiect_id = p.ID_Proiect
       WHERE ec.data_scadenta IS NOT NULL
         AND ec.data_scadenta >= '${startDate}'
@@ -357,7 +374,7 @@ export async function POST(request: NextRequest) {
     switch (tip_eveniment) {
       case 'sarcina':
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+          UPDATE ${TABLE_SARCINI}
           SET data_scadenta = '${new_date}'
           WHERE id = '${event_id}'
         `;
@@ -365,7 +382,7 @@ export async function POST(request: NextRequest) {
 
       case 'deadline_proiect':
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
+          UPDATE ${TABLE_PROIECTE}
           SET Data_Final = '${new_date}'
           WHERE ID_Proiect = '${event_id}'
         `;
@@ -374,7 +391,7 @@ export async function POST(request: NextRequest) {
       case 'milestone':
         const milestoneId = event_id.replace('milestone_', '');
         updateQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
+          UPDATE ${TABLE_ETAPE_CONTRACT}
           SET data_scadenta = '${new_date}'
           WHERE ID_Etapa = '${milestoneId}'
         `;

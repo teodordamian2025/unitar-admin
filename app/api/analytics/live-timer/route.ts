@@ -8,8 +8,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_SESIUNI_LUCRU = `\`${PROJECT_ID}.${DATASET}.SesiuniLucru${tableSuffix}\``;
+const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+
+console.log(`🔧 Live Timer API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: SesiuniLucru${tableSuffix}, Utilizatori${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, TimeTracking${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -57,13 +75,13 @@ async function getProjectContext(proiectId: string): Promise<{
   try {
     // Verific dacă este subproiect
     const subproiectQuery = `
-      SELECT 
+      SELECT
         s.ID_Subproiect,
         s.ID_Proiect as proiect_principal_id,
         s.Denumire as subproiect_nume,
         p.Denumire as proiect_nume
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` s
-      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+      FROM ${TABLE_SUBPROIECTE} s
+      LEFT JOIN ${TABLE_PROIECTE} p
         ON s.ID_Proiect = p.ID_Proiect
       WHERE s.ID_Subproiect = @proiect_id
     `;
@@ -85,10 +103,10 @@ async function getProjectContext(proiectId: string): Promise<{
 
     // Dacă nu este subproiect, verific dacă este proiect principal
     const proiectQuery = `
-      SELECT 
+      SELECT
         ID_Proiect,
         Denumire
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\`
+      FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiect_id
     `;
 
@@ -188,20 +206,20 @@ export async function GET(request: NextRequest) {
             END AS INT64
           ) as break_time_seconds
           
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u
+        FROM ${TABLE_SESIUNI_LUCRU} sl
+        LEFT JOIN ${TABLE_UTILIZATORI} u
           ON sl.utilizator_uid = u.uid
         -- Join cu proiecte principale
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+        LEFT JOIN ${TABLE_PROIECTE} p
           ON sl.proiect_id = p.ID_Proiect
         -- Join cu subproiecte (dacă proiect_id este de fapt un subproiect)
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub
+        LEFT JOIN ${TABLE_SUBPROIECTE} sub
           ON sl.proiect_id = sub.ID_Subproiect
         -- Join pentru numele proiectului principal al subproiectului
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p_parent
+        LEFT JOIN ${TABLE_PROIECTE} p_parent
           ON sub.ID_Proiect = p_parent.ID_Proiect
         -- Join cu Sarcini pentru a obține detalii sarcină reală
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s
+        LEFT JOIN ${TABLE_SARCINI} s
           ON (sl.proiect_id = s.proiect_id OR sl.proiect_id = s.subproiect_id)
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
@@ -264,16 +282,16 @@ export async function GET(request: NextRequest) {
           0 as break_time_seconds,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_start) as data_start_formatted,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_stop) as ultima_activitate_formatted
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl2
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u2
+        FROM ${TABLE_SESIUNI_LUCRU} sl2
+        LEFT JOIN ${TABLE_UTILIZATORI} u2
           ON sl2.utilizator_uid = u2.uid
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2
+        LEFT JOIN ${TABLE_PROIECTE} p2
           ON sl2.proiect_id = p2.ID_Proiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sub2
+        LEFT JOIN ${TABLE_SUBPROIECTE} sub2
           ON sl2.proiect_id = sub2.ID_Subproiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p2_parent
+        LEFT JOIN ${TABLE_PROIECTE} p2_parent
           ON sub2.ID_Proiect = p2_parent.ID_Proiect
-        LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\` s2
+        LEFT JOIN ${TABLE_SARCINI} s2
           ON (sl2.proiect_id = s2.proiect_id OR sl2.proiect_id = s2.subproiect_id)
         WHERE sl2.status = 'completat'
           AND sl2.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 HOUR)
@@ -407,7 +425,7 @@ export async function POST(request: NextRequest) {
 
         // Verific dacă utilizatorul are deja o sesiune activă
         const checkActiveQuery = `
-          SELECT id FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          SELECT id FROM ${TABLE_SESIUNI_LUCRU}
           WHERE utilizator_uid = @utilizator_uid
             AND status IN ('activ', 'pausat')
         `;
@@ -443,7 +461,7 @@ export async function POST(request: NextRequest) {
           try {
             // Încerc să obțin titlul sarcinii
             const sarcinaQuery = `
-              SELECT titlu FROM \`hale-mode-464009-i6.PanouControlUnitar.Sarcini\`
+              SELECT titlu FROM ${TABLE_SARCINI}
               WHERE id = @sarcina_id
             `;
             const [sarcinaRows] = await bigquery.query({
@@ -462,7 +480,7 @@ export async function POST(request: NextRequest) {
         }
         
         const insertSessionQuery = `
-          INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          INSERT INTO ${TABLE_SESIUNI_LUCRU}
           (id, utilizator_uid, proiect_id, data_start, status, descriere_activitate, created_at, ore_lucrate)
           VALUES (@sessionId, @utilizator_uid, @proiect_id, CURRENT_TIMESTAMP(), 'activ', @descriere_sesiune, CURRENT_TIMESTAMP(), NULL)
         `;
@@ -506,7 +524,7 @@ export async function POST(request: NextRequest) {
 
         // Obțin datele sesiunii pentru calcule
         const getSessionQuery = `
-          SELECT 
+          SELECT
             sl.id,
             sl.utilizator_uid,
             sl.proiect_id,
@@ -514,8 +532,8 @@ export async function POST(request: NextRequest) {
             sl.data_stop,
             sl.descriere_activitate,
             COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\` sl
-          LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Utilizatori\` u 
+          FROM ${TABLE_SESIUNI_LUCRU} sl
+          LEFT JOIN ${TABLE_UTILIZATORI} u
             ON sl.utilizator_uid = u.uid
           WHERE sl.id = @session_id
         `;
@@ -539,7 +557,7 @@ export async function POST(request: NextRequest) {
 
         // Opresc sesiunea
         const stopSessionQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          UPDATE ${TABLE_SESIUNI_LUCRU}
           SET
             status = 'completat',
             data_stop = CURRENT_TIMESTAMP(),
@@ -600,7 +618,7 @@ export async function POST(request: NextRequest) {
           queryTypes.subproiect_id = 'STRING';
 
           insertTimeTrackingQuery = `
-            INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+            INSERT INTO ${TABLE_TIME_TRACKING}
             (id, utilizator_uid, utilizator_nume, proiect_id, subproiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
             VALUES (
               @id,
@@ -619,7 +637,7 @@ export async function POST(request: NextRequest) {
         } else {
           // Pentru proiecte principale - fără subproiect_id
           insertTimeTrackingQuery = `
-            INSERT INTO \`hale-mode-464009-i6.PanouControlUnitar.TimeTracking\`
+            INSERT INTO ${TABLE_TIME_TRACKING}
             (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
             VALUES (
               @id,
@@ -657,7 +675,7 @@ export async function POST(request: NextRequest) {
         }
 
         const pauseSessionQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          UPDATE ${TABLE_SESIUNI_LUCRU}
           SET
             status = 'pausat',
             data_stop = CURRENT_TIMESTAMP()
@@ -679,7 +697,7 @@ export async function POST(request: NextRequest) {
         }
 
         const resumeSessionQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          UPDATE ${TABLE_SESIUNI_LUCRU}
           SET
             status = 'activ',
             data_stop = NULL
@@ -703,7 +721,7 @@ export async function POST(request: NextRequest) {
         }
 
         const updateDescriptionQuery = `
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+          UPDATE ${TABLE_SESIUNI_LUCRU}
           SET descriere_activitate = @descriere_sesiune
           WHERE id = @session_id
         `;
@@ -751,7 +769,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const deleteSessionQuery = `
-      DELETE FROM \`hale-mode-464009-i6.PanouControlUnitar.SesiuniLucru\`
+      DELETE FROM ${TABLE_SESIUNI_LUCRU}
       WHERE id = @session_id AND status IN ('activ', 'pausat')
     `;
 

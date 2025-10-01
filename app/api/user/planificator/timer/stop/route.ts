@@ -9,8 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { getUserIdFromToken } from '@/lib/firebase-admin';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -18,9 +25,7 @@ const bigquery = new BigQuery({
   },
 });
 
-const DATASET_ID = 'PanouControlUnitar';
-
-export async function POST(request: NextRequest) {
+console.log(`🔧 [Stop] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -35,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Găsește sesiunea activă pentru utilizator din SesiuniLucru (nu TimeTracking!)
     const findActiveQuery = `
       SELECT id, data_start, proiect_id, descriere_activitate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.SesiuniLucru\`
       WHERE utilizator_uid = ?
         AND (status = 'activ' OR status = 'activa' OR status = 'pausat')
       ORDER BY data_start DESC
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Update sesiunea ca finalizată în SesiuniLucru
     const updateSessionQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.SesiuniLucru\`
+      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.SesiuniLucru\`
       SET
         status = 'completat',
         data_stop = CURRENT_TIMESTAMP(),
@@ -91,7 +96,7 @@ export async function POST(request: NextRequest) {
     try {
       const userQuery = `
         SELECT CONCAT(nume, ' ', prenume) as nume_complet
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Utilizatori\`
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Utilizatori\`
         WHERE uid = ?
       `;
       const [userRows] = await bigquery.query({
@@ -110,7 +115,7 @@ export async function POST(request: NextRequest) {
     const timeTrackingId = `tt_planificator_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const insertTimeTrackingQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.TimeTracking\`
+      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.TimeTracking\`
       (id, utilizator_uid, utilizator_nume, proiect_id, data_lucru, ore_lucrate, descriere_lucru, tip_inregistrare, created_at, sarcina_id)
       VALUES (
         @id,
@@ -152,7 +157,7 @@ export async function POST(request: NextRequest) {
     try {
       const projectQuery = `
         SELECT Denumire
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET_ID}.Proiecte\`
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\`
         WHERE ID_Proiect = ?
       `;
 

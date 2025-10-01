@@ -14,7 +14,23 @@ import path from 'path';
 import { getNextContractNumber } from '@/app/api/setari/contracte/route';
 
 const PROJECT_ID = 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'contracte', 'templates');
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+
+console.log(`🔧 Contract Generate API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Contracte${tableSuffix}, Proiecte${tableSuffix}, Clienti${tableSuffix}, Subproiecte${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}`);
 
 // Cursuri valutare pentru conversii - PĂSTRAT identic
 const CURSURI_VALUTAR: { [key: string]: number } = {
@@ -40,8 +56,8 @@ async function validateCustomContractNumber(numarCustom: string, contractIdExist
     
     // Verifică unicitatea în BigQuery
     let duplicateQuery = `
-      SELECT ID_Contract, numar_contract 
-      FROM \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+      SELECT ID_Contract, numar_contract
+      FROM ${TABLE_CONTRACTE}
       WHERE numar_contract = @numarCustom
     `;
 
@@ -601,7 +617,7 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
 async function loadProiectDataSimple(proiectId: string) {
   try {
     const proiectQuery = `
-      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      SELECT * FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiectId
       LIMIT 1
     `;
@@ -621,7 +637,7 @@ async function loadProiectDataSimple(proiectId: string) {
     let clientData: any = null;
     if (proiectRaw.Client) {
       const clientQuery = `
-        SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Clienti\`
+        SELECT * FROM ${TABLE_CLIENTI}
         WHERE TRIM(LOWER(nume)) = TRIM(LOWER(@clientNume))
         AND activ = true
         LIMIT 1
@@ -639,7 +655,7 @@ async function loadProiectDataSimple(proiectId: string) {
     }
     
     const subproiecteQuery = `
-      SELECT * FROM \`${PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      SELECT * FROM ${TABLE_SUBPROIECTE}
       WHERE ID_Proiect = @proiectId
       AND activ = true
       ORDER BY Denumire ASC
@@ -979,7 +995,7 @@ async function getNextAnexaNumber(contractId: string): Promise<number> {
   try {
     const query = `
       SELECT MAX(anexa_numar) as max_anexa
-      FROM \`${PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+      FROM ${TABLE_ANEXE_CONTRACT}
       WHERE contract_id = @contractId
     `;
     const [results] = await bigquery.query({
@@ -1172,7 +1188,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
     // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
 	  const updateQuery = `
-	    UPDATE \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+	    UPDATE ${TABLE_CONTRACTE}
 	    SET 
 	      Valoare = CAST(@valoare AS NUMERIC),
 	      Moneda = @moneda,
@@ -1224,7 +1240,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       
     } else {
       const insertQuery = `
-        INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.Contracte\`
+        INSERT INTO ${TABLE_CONTRACTE}
         (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
          client_id, client_nume, Denumire_Contract, Data_Semnare, Data_Expirare,
          Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
@@ -1306,7 +1322,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         SELECT ID_Etapa, subproiect_id, etapa_index, denumire, 
                status_facturare, status_incasare, factura_id, 
                data_facturare, data_incasare, data_scadenta
-        FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+        FROM ${TABLE_ETAPE_CONTRACT}
         WHERE contract_id = '${contractId}' AND activ = true
         ORDER BY etapa_index ASC
       `;
@@ -1348,7 +1364,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             console.log(`[CONTRACT-GENERATE] UPDATE etapă existentă: ${etapaExistenta.ID_Etapa} pentru subproiect ${termen.subproiect_id}`);
             
             const updateEtapaQuery = `
-              UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              UPDATE ${TABLE_ETAPE_CONTRACT}
               SET 
                 etapa_index = ${etapaIndex},
                 denumire = '${termen.denumire.replace(/'/g, "''")}',
@@ -1373,7 +1389,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             console.log(`[CONTRACT-GENERATE] INSERT etapă nouă din subproiect: ${etapaId}`);
             
             const insertEtapaQuery = `
-              INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              INSERT INTO ${TABLE_ETAPE_CONTRACT}
               (ID_Etapa, contract_id, proiect_id, etapa_index, denumire, valoare, moneda, 
                valoare_ron, termen_zile, subproiect_id, status_facturare, status_incasare,
                curs_valutar, data_curs_valutar, procent_din_total, 
@@ -1427,7 +1443,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             console.log(`[CONTRACT-GENERATE] UPDATE etapă manuală existentă: ${etapaExistentaManuala.ID_Etapa}`);
             
             const updateEtapaManualaQuery = `
-              UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              UPDATE ${TABLE_ETAPE_CONTRACT}
               SET 
                 etapa_index = ${etapaIndex},
                 denumire = '${termen.denumire.replace(/'/g, "''")}',
@@ -1452,7 +1468,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             console.log(`[CONTRACT-GENERATE] INSERT etapă manuală nouă: ${etapaId}`);
             
             const insertEtapaManualaQuery = `
-              INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+              INSERT INTO ${TABLE_ETAPE_CONTRACT}
               (ID_Etapa, contract_id, proiect_id, etapa_index, denumire, valoare, moneda, 
                valoare_ron, termen_zile, subproiect_id, status_facturare, status_incasare,
                curs_valutar, data_curs_valutar, procent_din_total, 
@@ -1494,7 +1510,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           console.log(`[CONTRACT-GENERATE] Marchează ca inactivă etapa facturată: ${etapa.ID_Etapa}`);
           
           const deactivateQuery = `
-            UPDATE \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+            UPDATE ${TABLE_ETAPE_CONTRACT}
             SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
             WHERE ID_Etapa = '${etapa.ID_Etapa}'
           `;
@@ -1506,7 +1522,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           console.log(`[CONTRACT-GENERATE] Șterge fizic etapa nefacturată: ${etapa.ID_Etapa}`);
           
           const deleteQuery = `
-            DELETE FROM \`${PROJECT_ID}.PanouControlUnitar.EtapeContract\`
+            DELETE FROM ${TABLE_ETAPE_CONTRACT}
             WHERE ID_Etapa = '${etapa.ID_Etapa}'
           `;
           
@@ -1548,7 +1564,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
         const dataCursEtapa = etapa.moneda !== 'RON' ? new Date().toISOString().split('T')[0] : null;
         
         const insertAnexaQuery = `
-          INSERT INTO \`${PROJECT_ID}.PanouControlUnitar.AnexeContract\`
+          INSERT INTO ${TABLE_ANEXE_CONTRACT}
           (ID_Anexa, contract_id, proiect_id, anexa_numar, etapa_index, denumire, 
            valoare, moneda, valoare_ron, termen_zile, subproiect_id, 
            status_facturare, status_incasare, curs_valutar, data_curs_valutar, 

@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+// ✅ Toggle pentru tabele optimizate cu partitioning + clustering
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+const tableSuffix = useV2Tables ? '_v2' : '';
+
+// ✅ Tabele cu suffix dinamic
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
+const TABLE_CONTRACTE_GENERATE = `\`${PROJECT_ID}.${DATASET}.ContracteGenerate${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+
+console.log(`🔧 Dashboard API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, ContracteGenerate${tableSuffix}, FacturiGenerate${tableSuffix}`);
+
 const bigquery = new BigQuery({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  projectId: PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -46,12 +62,12 @@ export async function GET(request: NextRequest) {
 async function getProiecteStats() {
   try {
     const query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNTIF(Status = 'Activ') as active,
         COUNTIF(Status = 'Finalizat') as finalizate,
         COUNTIF(Status = 'Suspendat') as suspendate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      FROM ${TABLE_PROIECTE}
     `;
 
     const [rows] = await bigquery.query({
@@ -78,11 +94,11 @@ async function getProiecteStats() {
 async function getClientiStats() {
   try {
     const query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNTIF(activ = true) as activi,
         COUNTIF(sincronizat_factureaza = true) as sincronizati
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Clienti\`
+      FROM ${TABLE_CLIENTI}
     `;
 
     const [rows] = await bigquery.query({
@@ -109,10 +125,10 @@ async function getContracteStats() {
   try {
     // Verifică dacă există tabela ContracteGenerate
     const query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNTIF(status = 'generat') as generate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ContracteGenerate\`
+      FROM ${TABLE_CONTRACTE_GENERATE}
     `;
 
     const [rows] = await bigquery.query({
@@ -138,11 +154,11 @@ async function getFacturiStats() {
   try {
     // Verifică dacă există tabela FacturiGenerate
     const query = `
-      SELECT 
+      SELECT
         COUNT(*) as total,
         SUM(valoare_platita) as valoare_incasata,
         SUM(total - valoare_platita) as valoare_de_incasat
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\`
+      FROM ${TABLE_FACTURI_GENERATE}
       WHERE status != 'anulata'
     `;
 
