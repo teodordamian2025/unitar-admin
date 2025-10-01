@@ -1,11 +1,12 @@
 // ==================================================================
 // CALEA: app/layout.tsx
-// DATA: 19.09.2025 22:20 (ora României)
-// DESCRIERE: Root layout cu PWA support și meta tags
-// FUNCȚIONALITATE: PWA manifest, viewport, theme-color, apple-touch-icon
+// DATA: 01.10.2025 11:00 (ora României) - Adăugat TimerProvider global
+// DESCRIERE: Root layout cu PWA support, meta tags și TimerProvider global
+// FUNCȚIONALITATE: PWA manifest, viewport, theme-color, apple-touch-icon, Timer sync global
 // ==================================================================
 
 import { Metadata } from 'next';
+import RootLayoutClient from './RootLayoutClient';
 
 export interface Viewport {
   themeColor?: Array<{ media: string; color: string }> | string;
@@ -140,7 +141,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body suppressHydrationWarning={true}>{children}</body>
+      <body suppressHydrationWarning={true}>
+        <RootLayoutClient>{children}</RootLayoutClient>
+      </body>
     </html>
   );
 }
