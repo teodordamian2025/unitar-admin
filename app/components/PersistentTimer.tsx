@@ -1,15 +1,14 @@
 // ==================================================================
 // CALEA: app/components/PersistentTimer.tsx
-// CREAT: 21.09.2025 21:55 (ora României)
-// DESCRIERE: Timer persistent minimalist pentru layout principal - CORECTAT cu BigQuery fix
+// DATA: 01.10.2025 09:50 (ora României) - Refactorizat cu TimerContext
+// DESCRIERE: Timer persistent minimalist - consumă date din TimerContext (ZERO duplicate requests)
 // FUNCȚII: Start/Stop/Pause timer vizibil din orice pagină cu auto-stop la 8h și validări robuste
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '@/lib/firebaseConfig';
+import { useTimer } from '@/app/contexts/TimerContext';
 
 interface ActiveSession {
   id: string;
@@ -28,115 +27,48 @@ interface PersistentTimerProps {
 }
 
 const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => {
-  const [user] = useAuthState(auth);
-  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
+  const { activeSession: contextSession, hasActiveSession, isLoading: contextLoading, forceRefresh } = useTimer();
+
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [lastCheck, setLastCheck] = useState<number>(0);
   const [hasWarned7h, setHasWarned7h] = useState(false);
   const [hasWarned8h, setHasWarned8h] = useState(false);
 
-  // Check for active session on component mount and every 30 seconds
+  // ✅ ACTUALIZARE DIN CONTEXT (nu mai face fetch propriu)
   useEffect(() => {
-    if (!user?.uid) {
-      setActiveSession(null);
+    if (contextSession) {
+      const elapsedSeconds = typeof contextSession.elapsed_seconds === 'number' && !isNaN(contextSession.elapsed_seconds)
+        ? contextSession.elapsed_seconds
+        : 0;
+
+      setCurrentTime(elapsedSeconds);
+      setLastCheck(Date.now());
+
+      console.log('PersistentTimer: Received session from context:', {
+        id: contextSession.id,
+        elapsed: elapsedSeconds,
+        status: contextSession.status
+      });
+    } else {
+      // Reset când nu mai există sesiune
       setCurrentTime(0);
-      return;
+      setLastCheck(0);
+      setHasWarned7h(false);
+      setHasWarned8h(false);
     }
-
-    const checkActiveSession = async () => {
-      try {
-        if (!user?.uid) {
-          console.log('PersistentTimer: No user UID available');
-          return;
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-        const response = await fetch(`/api/analytics/live-timer?user_id=${encodeURIComponent(user.uid)}&team_view=false`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          console.error(`PersistentTimer: Live timer API failed with status: ${response.status}`);
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.data?.length > 0) {
-          // Filtrez doar sesiunile utilizatorului curent care sunt active sau pausate
-          const userSessions = data.data.filter((session: ActiveSession) =>
-            session.utilizator_uid === user.uid &&
-            (session.status === 'activ' || session.status === 'pausat')
-          );
-
-          if (userSessions.length > 0) {
-            const session = userSessions[0];
-
-            // Validez elapsed_seconds pentru a evita NaN
-            const elapsedSeconds = typeof session.elapsed_seconds === 'number' && !isNaN(session.elapsed_seconds)
-              ? session.elapsed_seconds
-              : 0;
-
-            setActiveSession(session);
-            setCurrentTime(elapsedSeconds);
-            setLastCheck(Date.now());
-
-            // Reset warnings dacă sesiunea s-a schimbat
-            if (!activeSession || activeSession.id !== session.id) {
-              setHasWarned7h(false);
-              setHasWarned8h(false);
-            }
-          } else {
-            setActiveSession(null);
-            setCurrentTime(0);
-            setLastCheck(0);
-            setHasWarned7h(false);
-            setHasWarned8h(false);
-          }
-        } else {
-          setActiveSession(null);
-          setCurrentTime(0);
-          setLastCheck(0);
-        }
-      } catch (error: any) {
-        // Enhanced error handling to prevent NetworkError
-        if (error.name === 'AbortError') {
-          console.error('PersistentTimer: Request timeout checking session');
-        } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
-          console.error('PersistentTimer: Network error - API might be down');
-        } else {
-          console.error('PersistentTimer: Error checking active session:', error.message || error);
-        }
-        // Nu resetez sesiunea la eroare pentru a evita flickering
-      }
-    };
-
-    // Check imediat (polling mutat în PlanificatorInteligent pentru a evita duplicate)
-    checkActiveSession();
-
-    // OPTIMIZARE: Interval eliminat - PlanificatorInteligent gestionează polling-ul global
-    // const interval = setInterval(checkActiveSession, 10000);
-    // return () => clearInterval(interval);
-  }, [user?.uid, activeSession?.id]);
+  }, [contextSession?.id, contextSession?.elapsed_seconds, contextSession?.status]);
 
   // Update current time every second when timer is active
   useEffect(() => {
-    if (!activeSession || activeSession.status !== 'activ' || !lastCheck) return;
+    if (!contextSession || contextSession.status !== 'activ' || !lastCheck) return;
 
     const updateTimer = () => {
       const now = Date.now();
       const timeSinceLastCheck = Math.floor((now - lastCheck) / 1000);
-      const baseElapsed = typeof activeSession.elapsed_seconds === 'number' && !isNaN(activeSession.elapsed_seconds) 
-        ? activeSession.elapsed_seconds 
+      const baseElapsed = typeof contextSession.elapsed_seconds === 'number' && !isNaN(contextSession.elapsed_seconds)
+        ? contextSession.elapsed_seconds
         : 0;
       const newTime = baseElapsed + timeSinceLastCheck;
       
@@ -162,7 +94,7 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [activeSession, lastCheck, hasWarned7h, hasWarned8h]);
+  }, [contextSession, lastCheck, hasWarned7h, hasWarned8h]);
 
   const formatTime = (seconds: number): string => {
     // Validare robustă pentru a evita NaN
@@ -177,28 +109,26 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
   };
 
   const handlePauseResume = async () => {
-    if (!activeSession || isLoading) return;
+    if (!contextSession || isLoading) return;
 
     setIsLoading(true);
     try {
-      const action = activeSession.status === 'activ' ? 'pause' : 'resume';
+      const action = contextSession.status === 'activ' ? 'pause' : 'resume';
       const response = await fetch('/api/analytics/live-timer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          session_id: activeSession.id
+          session_id: contextSession.id
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        setActiveSession(prev => prev ? {
-          ...prev,
-          status: prev.status === 'activ' ? 'pausat' : 'activ'
-        } : null);
-        
+        // Force refresh din context pentru a reflecta modificările
+        await forceRefresh();
+
         // Reset timer pentru calcul corect
         setLastCheck(Date.now());
       } else {
@@ -212,7 +142,7 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
   };
 
   const handleStopTimer = async (autoStop = false) => {
-    if (!activeSession || isLoading) return;
+    if (!contextSession || isLoading) return;
 
     setIsLoading(true);
     try {
@@ -221,19 +151,21 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'stop',
-          session_id: activeSession.id
+          session_id: contextSession.id
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        setActiveSession(null);
+        // Force refresh din context pentru a reflecta modificările
+        await forceRefresh();
+
         setCurrentTime(0);
         setLastCheck(0);
         setHasWarned7h(false);
         setHasWarned8h(false);
-        
+
         if (autoStop && typeof window !== 'undefined') {
           // Folosesc setTimeout pentru a evita blocarea UI-ului
           setTimeout(() => {
@@ -250,12 +182,12 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
     }
   };
 
-  // Nu afișez componenta dacă nu am user sau sesiune activă
-  if (!user || !activeSession) {
+  // Nu afișez componenta dacă nu am sesiune activă
+  if (!contextSession) {
     return null;
   }
 
-  const isActive = activeSession.status === 'activ';
+  const isActive = contextSession.status === 'activ';
   const isNearLimit = currentTime >= 25200; // 7 hours warning
   const isCritical = currentTime >= 27000; // 7.5 hours critical
   const isOvertime = currentTime >= 28800; // 8 hours overtime
@@ -305,10 +237,10 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
       </span>
 
       {/* Project info (truncated) */}
-      {activeSession.proiect_nume && (
-        <span 
-          style={{ 
-            fontSize: '0.7rem', 
+      {contextSession.proiect_nume && (
+        <span
+          style={{
+            fontSize: '0.7rem',
             color: 'inherit',
             opacity: 0.8,
             maxWidth: '100px',
@@ -316,9 +248,9 @@ const PersistentTimer: React.FC<PersistentTimerProps> = ({ className = '' }) => 
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
           }}
-          title={`Proiect: ${activeSession.proiect_nume}${activeSession.sarcina_titlu ? ' • ' + activeSession.sarcina_titlu : ''}`}
+          title={`Proiect: ${contextSession.proiect_nume}${contextSession.sarcina_titlu ? ' • ' + contextSession.sarcina_titlu : ''}`}
         >
-          📁 {activeSession.proiect_nume}
+          📁 {contextSession.proiect_nume}
         </span>
       )}
 

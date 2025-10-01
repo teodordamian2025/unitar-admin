@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/planificator/components/PlanificatorInteligent.tsx
-// DATA: 27.09.2025 16:20 (ora României)
-// DESCRIERE: Componenta principală planificator inteligent
+// DATA: 01.10.2025 10:10 (ora României) - Refactorizat cu TimerContext
+// DESCRIERE: Componenta principală planificator inteligent - consumă timer din context (ZERO duplicate requests)
 // FUNCȚIONALITATE: Drag & drop, timer integration, pin activ, notificări
 // ==================================================================
 
@@ -11,6 +11,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { User } from 'firebase/auth';
 import { toast } from 'react-toastify';
+import { useTimer } from '@/app/contexts/TimerContext';
 
 interface PlanificatorItem {
   id: string;
@@ -62,13 +63,15 @@ interface UserRoleResponse {
 }
 
 const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user }) => {
+  // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
+  const { activeSession: contextSession, hasActiveSession: contextHasActiveSession, forceRefresh } = useTimer();
+
   const [items, setItems] = useState<PlanificatorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
-  const [hasActiveSession, setHasActiveSession] = useState(false);
   const [activeTimerItemId, setActiveTimerItemId] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Map<string, ExpandedItem>>(new Map());
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -583,7 +586,9 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         const data = await response.json();
         setActiveTimer(item.id);
         setActiveTimerItemId(item.id);
-        setHasActiveSession(true);
+
+        // Force refresh din context pentru a reflecta modificările
+        await forceRefresh();
 
         // Reload planificator pentru a reflecta modificările
         await loadPlanificatorItems();
@@ -640,7 +645,9 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         const data = await response.json();
         setActiveTimer(null);
         setActiveTimerItemId(null);
-        setHasActiveSession(false);
+
+        // Force refresh din context pentru a reflecta modificările
+        await forceRefresh();
 
         await loadPlanificatorItems();
         toast.success(`⏹️ Timer oprit! Timp înregistrat: ${Math.round((data.worked_hours || 0) * 60)} minute`);
@@ -722,113 +729,51 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
-  // Verifică sesiunea activă de timer și determină care item are timer
-  const checkActiveSession = useCallback(async () => {
-    try {
-      if (!user?.uid) {
-        console.log('No user UID available for session check');
-        return;
+  // ✅ DETECTEAZĂ ITEM-UL ACTIV DIN CONTEXT (nu mai face fetch propriu)
+  useEffect(() => {
+    if (contextSession && contextHasActiveSession) {
+      // Găsește item-ul din planificator care a pornit timer-ul
+      let activeItem: PlanificatorItem | null = null;
+
+      // Încearcă să găsească item-ul bazat pe descrierea activității
+      if (contextSession.descriere_sesiune) {
+        const descriere = contextSession.descriere_sesiune;
+
+        // Caută în toate item-urile din planificator
+        const foundItem = items.find(item => {
+          const displayName = item.display_name || '';
+          return descriere.includes(displayName) ||
+                 descriere.includes(item.item_id) ||
+                 (item.tip_item === 'proiect' && contextSession.proiect_id === item.item_id) ||
+                 (item.tip_item === 'subproiect' && contextSession.proiect_id === item.item_id);
+        });
+
+        activeItem = foundItem || null;
       }
 
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        console.log('Failed to get Firebase ID token');
-        return;
+      // Fallback: caută doar pe baza proiect_id
+      if (!activeItem) {
+        const fallbackItem = items.find(item => {
+          if (item.tip_item === 'proiect') {
+            return item.item_id === contextSession.proiect_id;
+          } else if (item.tip_item === 'subproiect') {
+            return item.item_id === contextSession.proiect_id;
+          }
+          return false;
+        });
+
+        activeItem = fallbackItem || null;
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json'
-        },
-        signal: controller.signal
+      setActiveTimerItemId(activeItem ? activeItem.id : null);
+      console.log('Planificator: Timer activ detectat din context:', {
+        sessionId: contextSession.id,
+        itemId: activeItem?.id
       });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.error(`Live timer API failed with status: ${response.status}`);
-        if (response.status >= 500) {
-          console.error('Server error occurred');
-        } else if (response.status === 401) {
-          console.error('Authentication failed');
-        }
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.data && data.data.length > 0) {
-        const activeSession = data.data.find((session: any) =>
-          session.utilizator_uid === user.uid &&
-          (session.status === 'activ' || session.status === 'pausat' || session.status === 'activa')
-        );
-
-        setHasActiveSession(!!activeSession);
-
-        if (activeSession) {
-          // Găsește item-ul din planificator care a pornit timer-ul
-          // API-ul timer/start trimite înapoi titlu_ierarhic care conține informații despre item
-          let activeItem: PlanificatorItem | null = null;
-
-          // Încearcă să găsească item-ul bazat pe descrierea activității
-          if (activeSession.descriere_activitate || activeSession.descriere_sesiune) {
-            const descriere = activeSession.descriere_activitate || activeSession.descriere_sesiune;
-
-            // Caută în toate item-urile din planificator
-            const foundItem = items.find(item => {
-              // Verifică dacă descrierea conține numele display-ului item-ului
-              const displayName = item.display_name || '';
-              return descriere.includes(displayName) ||
-                     descriere.includes(item.item_id) ||
-                     (item.tip_item === 'proiect' && activeSession.proiect_id === item.item_id) ||
-                     (item.tip_item === 'subproiect' && activeSession.proiect_id === item.item_id);
-            });
-
-            activeItem = foundItem || null;
-          }
-
-          // Fallback: caută doar pe baza proiect_id
-          if (!activeItem) {
-            const fallbackItem = items.find(item => {
-              if (item.tip_item === 'proiect') {
-                return item.item_id === activeSession.proiect_id;
-              } else if (item.tip_item === 'subproiect') {
-                return item.item_id === activeSession.proiect_id;
-              }
-              return false;
-            });
-
-            activeItem = fallbackItem || null;
-          }
-
-          setActiveTimerItemId(activeItem ? activeItem.id : null);
-        } else {
-          setActiveTimerItemId(null);
-        }
-      } else {
-        setHasActiveSession(false);
-        setActiveTimerItemId(null);
-      }
-    } catch (error: any) {
-      // Enhanced error handling to prevent NetworkError
-      if (error.name === 'AbortError') {
-        console.error('Request timeout checking active session');
-      } else if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
-        console.error('Network error checking active session - API might be down');
-      } else {
-        console.error('Error checking active session:', error.message || error);
-      }
-
-      // Reset state on error to prevent UI inconsistencies
-      setHasActiveSession(false);
+    } else {
       setActiveTimerItemId(null);
     }
-  }, [user, items]);
+  }, [contextSession, contextHasActiveSession, items]);
 
   // Load data on mount
   useEffect(() => {
@@ -839,12 +784,9 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
   useEffect(() => {
     if (!roleLoading && userRole) {
       loadPlanificatorItems();
-      checkActiveSession();
 
-      // OPTIMIZARE: Intervale crescute + condiționare pe tab visibility + pagină activă
-      // Timer check: 10s → 30s (timer-ul nu se schimbă des)
-      // Lista: 60s păstrat (deja optimizat)
-      // Polling DOAR când ești pe pagina /planificator
+      // ✅ OPTIMIZARE: ELIMINAT polling pentru timer (gestionat de TimerContext)
+      // Păstrat DOAR polling pentru lista de items (60s)
 
       // Tab visibility + page active detection
       const isTabVisible = () => !document.hidden;
@@ -853,24 +795,17 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         return window.location.pathname.includes('/planificator');
       };
 
-      const timerCheckInterval = setInterval(() => {
-        if (isTabVisible() && isOnPlanificatorPage()) {
-          checkActiveSession();
-        }
-      }, 30000); // 30s (3x mai rar decât înainte)
-
       const listRefreshInterval = setInterval(() => {
         if (isTabVisible() && isOnPlanificatorPage()) {
           loadPlanificatorItems();
         }
-      }, 60000); // Păstrat 60s
+      }, 60000); // 60s pentru items list
 
       return () => {
-        clearInterval(timerCheckInterval);
         clearInterval(listRefreshInterval);
       };
     }
-  }, [roleLoading, userRole, loadPlanificatorItems, checkActiveSession]);
+  }, [roleLoading, userRole, loadPlanificatorItems]);
 
   // Search debounce
   useEffect(() => {

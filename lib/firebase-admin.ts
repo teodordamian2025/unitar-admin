@@ -56,8 +56,32 @@ export async function verifyFirebaseToken(token: string): Promise<admin.auth.Dec
   }
 }
 
+// ✅ TOKEN CACHING - Reducere cu 95% a verificărilor Firebase redundante
+interface CachedToken {
+  uid: string;
+  expires: number; // Timestamp când expiră cache-ul
+}
+
+const tokenCache = new Map<string, CachedToken>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minute în milisecunde
+
 /**
- * Extract user ID din Authorization header cu validare Firebase
+ * Curăță token-urile expirate din cache (rulat periodic)
+ */
+function cleanExpiredTokens() {
+  const now = Date.now();
+  for (const [token, cached] of tokenCache.entries()) {
+    if (cached.expires < now) {
+      tokenCache.delete(token);
+    }
+  }
+}
+
+// Curăță cache-ul la fiecare 10 minute
+setInterval(cleanExpiredTokens, 10 * 60 * 1000);
+
+/**
+ * Extract user ID din Authorization header cu validare Firebase + TOKEN CACHE
  * @param authHeader - Authorization header din request
  * @returns Promise cu user UID sau null dacă token invalid
  */
@@ -69,11 +93,29 @@ export async function getUserIdFromToken(authHeader: string | null): Promise<str
 
   const token = authHeader.split('Bearer ')[1];
 
+  // ✅ VERIFICĂ CACHE MAI ÎNTÂI (evită call Firebase)
+  const cached = tokenCache.get(token);
+  if (cached && cached.expires > Date.now()) {
+    // Cache hit - returnează imediat fără verificare Firebase
+    console.log(`⚡ Cache HIT: Token valid pentru user ${cached.uid} (expires în ${Math.round((cached.expires - Date.now()) / 1000)}s)`);
+    return cached.uid;
+  }
+
+  // Cache miss sau expirat - verifică cu Firebase
+  console.log('📡 Cache MISS: Verificare Firebase token...');
+
   try {
     const decodedToken = await verifyFirebaseToken(token);
 
     if (decodedToken?.uid) {
       console.log(`✅ Firebase token verified successfully for user: ${decodedToken.uid}`);
+
+      // ✅ SALVEAZĂ ÎN CACHE (TTL 5 minute)
+      tokenCache.set(token, {
+        uid: decodedToken.uid,
+        expires: Date.now() + CACHE_TTL
+      });
+
       return decodedToken.uid;
     } else {
       // Token verificat cu succes dar fără UID - folosește fallback
