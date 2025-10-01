@@ -70,7 +70,8 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minute în milisecunde
  */
 function cleanExpiredTokens() {
   const now = Date.now();
-  for (const [token, cached] of tokenCache.entries()) {
+  const entries = Array.from(tokenCache.entries());
+  for (const [token, cached] of entries) {
     if (cached.expires < now) {
       tokenCache.delete(token);
     }

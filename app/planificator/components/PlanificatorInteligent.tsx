@@ -624,7 +624,6 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         toast.error('❌ Nu există o sesiune activă de oprit');
         setActiveTimer(null);
         setActiveTimerItemId(null);
-        setHasActiveSession(false);
         return;
       }
 
