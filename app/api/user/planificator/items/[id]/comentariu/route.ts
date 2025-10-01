@@ -41,10 +41,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const { id } = params;
     const body = await request.json();
-    const { comentariu } = body;
+    const { comentariu_personal } = body;
 
-    if (typeof comentariu !== 'string') {
-      return NextResponse.json({ error: 'comentariu must be string' }, { status: 400 });
+    if (typeof comentariu_personal !== 'string') {
+      return NextResponse.json({ error: 'comentariu_personal must be string' }, { status: 400 });
     }
 
     // Actualizează doar pentru utilizatorul curent
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     await bigquery.query({
       query: updateQuery,
-      params: { id, userId, comentariu }
+      params: { id, userId, comentariu: comentariu_personal }
     });
 
     return NextResponse.json({
