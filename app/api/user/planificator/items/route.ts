@@ -51,14 +51,12 @@ export async function GET(request: NextRequest) {
         p.comentariu_personal,
         p.is_pinned,
         p.data_actualizare,
-
         -- Date proiecte (fără informații financiare)
         pr.Denumire as proiect_denumire,
         pr.Data_Start as proiect_data_start,
         pr.Data_Final as proiect_data_final,
         pr.Status as proiect_status,
         pr.Responsabil as proiect_responsabil,
-
         -- Date subproiecte (fără informații financiare)
         sp.Denumire as subproiect_denumire,
         sp.Data_Start as subproiect_data_start,
@@ -67,7 +65,6 @@ export async function GET(request: NextRequest) {
         sp.Responsabil as subproiect_responsabil,
         pr2.ID_Proiect as subproiect_proiect_id,
         pr2.Denumire as subproiect_proiect_nume,
-
         -- Date sarcini (fără informații financiare/rate)
         s.titlu as sarcina_titlu,
         s.descriere as sarcina_descriere,
@@ -76,15 +73,12 @@ export async function GET(request: NextRequest) {
         s.data_scadenta as sarcina_data_scadenta,
         s.progres_procent as sarcina_progres,
         s.tip_proiect as sarcina_tip_proiect,
-
         -- Pentru sarcini de proiect direct
         pr3.Denumire as sarcina_proiect_nume,
-
         -- Pentru sarcini de subproiect
         s_sp.Denumire as sarcina_subproiect_nume,
         s_sp_pr.ID_Proiect as sarcina_proiect_parinte_id,
         s_sp_pr.Denumire as sarcina_proiect_parinte_nume,
-
         -- Calculare urgență pentru sortare automată
         CASE
           WHEN p.tip_item = 'sarcina' AND s.data_scadenta IS NOT NULL THEN
