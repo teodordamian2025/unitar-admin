@@ -16,6 +16,7 @@ interface ActiveSession {
   elapsed_seconds: number;
   descriere_sesiune?: string;
   utilizator_uid: string;
+  sarcina_id?: string | null;
   sarcina_titlu?: string;
 }
 
@@ -226,15 +227,15 @@ class TimerSyncManager {
       return;
     }
 
-    console.log('🚀 TimerSync: Starting polling (30s interval)');
+    console.log('🚀 TimerSync: Starting polling (60s interval - optimized)');
 
     // Check imediat
     this.checkTimer();
 
-    // Apoi la fiecare 30 secunde
+    // Apoi la fiecare 60 secunde (OPTIMIZED: reducere 50% requests)
     this.interval = setInterval(() => {
       this.checkTimer();
-    }, 30000); // 30 secunde (interval optimizat)
+    }, 60000); // 60 secunde - sweet spot între eficiență și responsiveness
   }
 
   // Oprește polling-ul

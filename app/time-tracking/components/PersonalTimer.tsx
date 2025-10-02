@@ -1,9 +1,9 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/PersonalTimer.tsx
-// DATA: 27.09.2025 16:00 (ora României) - REFACTORIZARE COMPLETĂ
+// DATA: 02.10.2025 22:45 (ora României) - FIXED: Eliminat duplicate subscribe
 // DESCRIERE: Timer personal identic funcțional cu admin - Modal ierarhic complet
-// FUNCȚIONALITATE: Sistem ierarhic proiecte → subproiecte → sarcini + API live-timer
-// ELIMINAT: localStorage în favoarea API-ului exclusiv
+// FUNCȚIONALITATE: Sistem ierarhic proiecte → subproiecte → sarcini + consumă timer din context (ZERO duplicate requests)
+// ELIMINAT: localStorage + duplicate API calls în favoarea TimerContext
 // ==================================================================
 
 'use client';
@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { toast } from 'react-toastify';
+import { useTimer } from '@/app/contexts/TimerContext';
 
 interface PersonalTimerProps {
   user: User;
@@ -87,6 +88,9 @@ interface HierarchyData {
 }
 
 export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
+  // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
+  const { activeSession: contextSession, hasActiveSession: contextHasActiveSession, forceRefresh } = useTimer();
+
   // State identic cu admin live timer - FĂRĂ localStorage
   const [personalTimer, setPersonalTimer] = useState<TimerSession>({
     isActive: false,
@@ -115,9 +119,9 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ✅ Load projects DOAR la mount (nu mai face checkActiveSession - vine din context)
   useEffect(() => {
     fetchProjects();
-    checkActiveSession();
   }, []);
 
   useEffect(() => {
@@ -154,38 +158,35 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     }
   };
 
-  const checkActiveSession = async () => {
-    try {
-      const response = await fetch(`/api/analytics/live-timer?user_id=${user.uid}`);
-      const data = await response.json();
-      
-      if (data.success && data.data && data.data.length > 0) {
-        const activeSession = data.data.find((session: any) => 
-          session.utilizator_uid === user.uid && 
-          (session.status === 'activ' || session.status === 'pausat')
-        );
-        
-        if (activeSession) {
-          setPersonalTimer({
-            isActive: activeSession.status === 'activ',
-            startTime: new Date(activeSession.data_start),
-            pausedTime: 0,
-            elapsedTime: activeSession.elapsed_seconds * 1000,
-            projectId: activeSession.proiect_id,
-            sarcinaId: activeSession.sarcina_id || 'general',
-            description: activeSession.descriere_sesiune || '',
-            sessionId: activeSession.id
-          });
-          
-          if (activeSession.status === 'activ') {
-            startInterval();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error checking active session:', error);
+  // ✅ ACTUALIZARE DIN CONTEXT (elimină duplicate API call)
+  useEffect(() => {
+    if (contextSession && contextHasActiveSession) {
+      setPersonalTimer({
+        isActive: contextSession.status === 'activ',
+        startTime: new Date(contextSession.data_start),
+        pausedTime: 0,
+        elapsedTime: contextSession.elapsed_seconds * 1000,
+        projectId: contextSession.proiect_id,
+        sarcinaId: contextSession.sarcina_id || 'general',
+        description: contextSession.descriere_sesiune || '',
+        sessionId: contextSession.id
+      });
+
+      console.log('✅ PersonalTimer: Session loaded from context (NO API call)');
+    } else if (!contextHasActiveSession) {
+      // Reset timer când nu există sesiune activă
+      setPersonalTimer({
+        isActive: false,
+        startTime: null,
+        pausedTime: 0,
+        elapsedTime: 0,
+        projectId: '',
+        sarcinaId: null,
+        description: '',
+        sessionId: ''
+      });
     }
-  };
+  }, [contextSession, contextHasActiveSession]);
 
   const fetchHierarchy = async (proiectId: string) => {
     try {
@@ -283,6 +284,10 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         setPersonalTimer(newTimer);
         setShowNewSessionModal(false);
         resetModalState();
+
+        // ✅ Force refresh context pentru update imediat
+        await forceRefresh();
+
         toast.success('Timer pornit! 🚀');
       } else {
         toast.error(data.error || 'Eroare la pornirea timer-ului');
@@ -320,6 +325,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(pausedTimer);
+        await forceRefresh(); // ✅ Force refresh context
         toast.info('Timer pus în pauză ⏸️');
       } else {
         toast.error(data.error || 'Eroare la pausarea timer-ului');
@@ -357,6 +363,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(resumedTimer);
+        await forceRefresh(); // ✅ Force refresh context
         toast.success('Timer reluat! ▶️');
       } else {
         toast.error(data.error || 'Eroare la reluarea timer-ului');
@@ -399,6 +406,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         };
 
         setPersonalTimer(resetTimer);
+        await forceRefresh(); // ✅ Force refresh context
         toast.success('Timer oprit și salvat! 💾');
         onUpdate();
       } else {

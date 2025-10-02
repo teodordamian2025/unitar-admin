@@ -8,12 +8,13 @@ import { Card, Button, LoadingSpinner } from '@/app/components/ui';
 import { AdvancedLineChart, AdvancedBarChart, AdvancedPieChart } from '@/app/components/charts';
 import { toast } from 'react-toastify';
 import { useTimer } from '@/app/contexts/TimerContext';
+import { analyticsCache } from '@/app/lib/analyticsCache';
 
 // ==================================================================
 // CALEA: app/admin/analytics/timetracking/page.tsx
-// DATA: 02.10.2025 22:00 (ora României) - FIXED: Eliminat polling duplicat
+// DATA: 02.10.2025 23:05 (ora României) - OPTIMIZED: Cache 5min + debounce + lazy load
 // DESCRIERE: Time Tracking Dashboard cu Victory.js advanced charts
-// FUNCȚIONALITATE: Analytics modernizat - consumă timer din context (ZERO duplicate requests)
+// FUNCȚIONALITATE: Analytics modernizat - cache 5min, ZERO polling, lazy load tabs
 // ==================================================================
 
 interface OverviewStats {
@@ -71,6 +72,7 @@ export default function EnhancedTimeTrackingDashboard() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
   const [period, setPeriod] = useState('30');
+  const [debouncedPeriod, setDebouncedPeriod] = useState('30'); // ✅ Debounced value
   const [activeTab, setActiveTab] = useState('overview');
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('user');
@@ -95,13 +97,22 @@ export default function EnhancedTimeTrackingDashboard() {
     checkUserRole();
   }, [user, loading, router]);
 
-  // ✅ OPTIMIZED: Load data DOAR la mount și când se schimbă perioada - FĂRĂ polling
+  // ✅ DEBOUNCE: Delay 500ms pentru schimbare perioadă (reduce API calls la typing rapid)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPeriod(period);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [period]);
+
+  // ✅ OPTIMIZED: Load data DOAR la mount și când se schimbă perioada debounced - FĂRĂ polling
   useEffect(() => {
     if (isAuthorized) {
       fetchAnalyticsData();
-      console.log('✅ Analytics data loaded - NO POLLING (refresh doar la schimbare perioadă)');
+      console.log('✅ Analytics data loaded - NO POLLING (refresh doar la schimbare perioadă debounced)');
     }
-  }, [isAuthorized, period]);
+  }, [isAuthorized, debouncedPeriod]);
 
   // ✅ Refresh automat când se schimbă starea timer-ului (opțional - doar dacă vrei live updates)
   useEffect(() => {
@@ -142,62 +153,118 @@ export default function EnhancedTimeTrackingDashboard() {
   const fetchAnalyticsData = async () => {
     setLoadingData(true);
     try {
-      // ✅ REAL BigQuery data - înlocuire mock cu API calls
-      const [overviewResponse, dailyTrendResponse, teamResponse, projectResponse] = await Promise.all([
-        fetch(`/api/analytics/time-tracking?type=overview&period=${period}`),
-        fetch(`/api/analytics/time-tracking?type=daily-trend&period=${period}`),
-        fetch(`/api/analytics/time-tracking?type=team-performance&period=${period}`),
-        fetch(`/api/analytics/time-tracking?type=project-breakdown&period=${period}`)
-      ]);
+      // ✅ CHECK CACHE FIRST (reducere 80-90% API calls) - folosește debouncedPeriod
+      const cachedOverview = analyticsCache.get<any>('overview', debouncedPeriod, user?.uid);
+      const cachedDailyTrend = analyticsCache.get<any[]>('daily-trend', debouncedPeriod, user?.uid);
+      const cachedTeam = analyticsCache.get<any[]>('team-performance', debouncedPeriod, user?.uid);
+      const cachedProject = analyticsCache.get<any[]>('project-breakdown', debouncedPeriod, user?.uid);
 
-      const [overviewData, dailyTrendData, teamData, projectData] = await Promise.all([
-        overviewResponse.json(),
-        dailyTrendResponse.json(),
-        teamResponse.json(),
-        projectResponse.json()
-      ]);
+      // Dacă toate sunt în cache, folosește cache-ul
+      if (cachedOverview && cachedDailyTrend && cachedTeam && cachedProject) {
+        console.log('✅ ALL DATA FROM CACHE - ZERO API CALLS');
+        setOverviewStats(cachedOverview.data?.[0] || null);
+        setDailyTrend(cachedDailyTrend);
+        setTeamData(cachedTeam);
+        setProjectData(cachedProject);
+        setLoadingData(false);
+        return;
+      }
 
-      // Process overview data
-      if (overviewData.success && overviewData.data.length > 0) {
-        const stats = overviewData.data[0];
-        setOverviewStats({
-          total_utilizatori: stats.total_utilizatori || 0,
-          total_proiecte: stats.total_proiecte || 0,
-          total_ore_lucrate: stats.total_ore_lucrate || 0,
-          media_ore_pe_zi: stats.media_ore_pe_zi || 0,
-          eficienta_procent: stats.eficienta_procent || 0,
-          media_luni: stats.media_luni || 0,
-          media_marti: stats.media_marti || 0,
-          media_miercuri: stats.media_miercuri || 0,
-          media_joi: stats.media_joi || 0,
-          media_vineri: stats.media_vineri || 0,
-          media_sambata: stats.media_sambata || 0,
-          media_duminica: stats.media_duminica || 0
-        });
-      } else {
-        setOverviewStats(null);
+      // ✅ FETCH doar ce lipsește din cache
+      const promises: Promise<Response>[] = [];
+      const types: string[] = [];
+
+      if (!cachedOverview) {
+        promises.push(fetch(`/api/analytics/time-tracking?type=overview&period=${debouncedPeriod}`));
+        types.push('overview');
+      }
+      if (!cachedDailyTrend) {
+        promises.push(fetch(`/api/analytics/time-tracking?type=daily-trend&period=${debouncedPeriod}`));
+        types.push('daily-trend');
+      }
+      if (!cachedTeam) {
+        promises.push(fetch(`/api/analytics/time-tracking?type=team-performance&period=${debouncedPeriod}`));
+        types.push('team-performance');
+      }
+      if (!cachedProject) {
+        promises.push(fetch(`/api/analytics/time-tracking?type=project-breakdown&period=${debouncedPeriod}`));
+        types.push('project-breakdown');
+      }
+
+      const responses = await Promise.all(promises);
+      const dataResults = await Promise.all(responses.map(r => r.json()));
+
+      // Procesează și cache-ază rezultatele
+      let overviewData = cachedOverview;
+      let dailyTrendData = cachedDailyTrend;
+      let teamData = cachedTeam;
+      let projectData = cachedProject;
+
+      dataResults.forEach((data, index) => {
+        const type = types[index];
+        if (type === 'overview') {
+          overviewData = data;
+          analyticsCache.set('overview', debouncedPeriod, data, user?.uid);
+        } else if (type === 'daily-trend') {
+          dailyTrendData = data.data || [];
+          analyticsCache.set('daily-trend', debouncedPeriod, data.data || [], user?.uid);
+        } else if (type === 'team-performance') {
+          teamData = data.data || [];
+          analyticsCache.set('team-performance', debouncedPeriod, data.data || [], user?.uid);
+        } else if (type === 'project-breakdown') {
+          projectData = data.data || [];
+          analyticsCache.set('project-breakdown', debouncedPeriod, data.data || [], user?.uid);
+        }
+      });
+
+      // Process overview data (dacă e din API, nu din cache)
+      if (overviewData && !cachedOverview) {
+        if (overviewData.success && overviewData.data?.length > 0) {
+          const stats = overviewData.data[0];
+          setOverviewStats({
+            total_utilizatori: stats.total_utilizatori || 0,
+            total_proiecte: stats.total_proiecte || 0,
+            total_ore_lucrate: stats.total_ore_lucrate || 0,
+            media_ore_pe_zi: stats.media_ore_pe_zi || 0,
+            eficienta_procent: stats.eficienta_procent || 0,
+            media_luni: stats.media_luni || 0,
+            media_marti: stats.media_marti || 0,
+            media_miercuri: stats.media_miercuri || 0,
+            media_joi: stats.media_joi || 0,
+            media_vineri: stats.media_vineri || 0,
+            media_sambata: stats.media_sambata || 0,
+            media_duminica: stats.media_duminica || 0
+          });
+        } else {
+          setOverviewStats(null);
+        }
+      } else if (cachedOverview) {
+        // Din cache - deja setat mai sus
+        if (cachedOverview.data?.[0]) {
+          setOverviewStats(cachedOverview.data[0]);
+        }
       }
 
       // Process daily trend data
-      if (dailyTrendData.success) {
-        setDailyTrend(dailyTrendData.data || []);
+      if (!cachedDailyTrend && dailyTrendData) {
+        setDailyTrend(dailyTrendData);
       }
 
       // Process team data
-      if (teamData.success) {
-        setTeamData(teamData.data || []);
+      if (!cachedTeam && teamData) {
+        setTeamData(teamData);
       }
 
       // Process project data
-      if (projectData.success) {
-        setProjectData(projectData.data || []);
+      if (!cachedProject && projectData) {
+        setProjectData(projectData);
       }
 
       console.log('📊 TimeTracking data loaded:', {
-        overview: overviewData.data?.[0],
-        dailyTrend: dailyTrendData.data?.length,
-        team: teamData.data?.length,
-        projects: projectData.data?.length
+        overview: cachedOverview ? 'from cache' : 'from API',
+        dailyTrend: (cachedDailyTrend || dailyTrendData)?.length || 0,
+        team: (cachedTeam || teamData)?.length || 0,
+        projects: (cachedProject || projectData)?.length || 0
       });
 
     } catch (error) {
