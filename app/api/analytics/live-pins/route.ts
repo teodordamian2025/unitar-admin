@@ -100,32 +100,32 @@ export async function GET(request: NextRequest) {
         -- Calculare timp de la pin
         TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), p.data_actualizare, MINUTE) as minute_de_la_pin
 
-      FROM \`${TABLE_PLANIFICATOR_PERSONAL}\` p
-      LEFT JOIN \`${TABLE_UTILIZATORI}\` u
+      FROM ${TABLE_PLANIFICATOR_PERSONAL} p
+      LEFT JOIN ${TABLE_UTILIZATORI} u
         ON p.utilizator_uid = u.uid
 
       -- JOIN pentru proiecte directe
-      LEFT JOIN \`${TABLE_PROIECTE}\` pr
+      LEFT JOIN ${TABLE_PROIECTE} pr
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
       -- JOIN pentru subproiecte
-      LEFT JOIN \`${TABLE_SUBPROIECTE}\` sp
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
-      LEFT JOIN \`${TABLE_PROIECTE}\` sp_pr
+      LEFT JOIN ${TABLE_PROIECTE} sp_pr
         ON sp.ID_Proiect = sp_pr.ID_Proiect
 
       -- JOIN pentru sarcini
-      LEFT JOIN \`${TABLE_SARCINI}\` s
+      LEFT JOIN ${TABLE_SARCINI} s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
 
       -- JOIN pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
-      LEFT JOIN \`${TABLE_SUBPROIECTE}\` s_sp
+      LEFT JOIN ${TABLE_SUBPROIECTE} s_sp
         ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
-      LEFT JOIN \`${TABLE_PROIECTE}\` s_sp_pr
+      LEFT JOIN ${TABLE_PROIECTE} s_sp_pr
         ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
 
       -- JOIN pentru sarcini de proiect direct
-      LEFT JOIN \`${TABLE_PROIECTE}\` s_pr_direct
+      LEFT JOIN ${TABLE_PROIECTE} s_pr_direct
         ON s.tip_proiect = 'proiect' AND s.proiect_id = s_pr_direct.ID_Proiect
 
       WHERE p.is_pinned = TRUE
