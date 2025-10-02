@@ -166,12 +166,13 @@ export default function LiveTracking() {
 
   useEffect(() => {
     if (isAuthorized) {
+      // ✅ Încarcă datele DOAR la mount, NU polling continuu
       loadLiveData();
       loadProjects();
 
-      // Refresh every 60 seconds (1 minute) to reduce server load
-      const interval = setInterval(loadLiveData, 60000);
-      return () => clearInterval(interval);
+      // ✅ ELIMINAT: setInterval pentru polling - live-pins este event-driven
+      // Live-timer polling se face acum prin timerSync singleton
+      console.log('✅ [Admin Live] - Date încărcate la mount - NO continuous polling');
     }
   }, [isAuthorized]);
 

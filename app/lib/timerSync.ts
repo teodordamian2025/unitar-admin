@@ -72,9 +72,12 @@ class TimerSyncManager {
     // Trimite imediat datele curente la noul subscriber
     callback(this.currentData);
 
-    // Pornește polling-ul dacă e primul subscriber
-    if (this.subscribers.size === 1) {
+    // ✅ Pornește polling DOAR dacă există sesiune activă
+    if (this.subscribers.size === 1 && this.hasActiveSession()) {
       this.startPolling();
+      console.log('✅ TimerSync: First subscriber + active session → START polling');
+    } else if (this.subscribers.size === 1) {
+      console.log('🛑 TimerSync: First subscriber but NO active session → NO polling');
     }
 
     // Returnează funcția de unsubscribe
@@ -210,7 +213,21 @@ class TimerSyncManager {
 
   // Notifică toți subscribers cu date noi
   private updateSubscribers(data: TimerData) {
+    const previousHasActiveSession = this.currentData.hasActiveSession;
     this.currentData = data;
+
+    // ✅ Oprește polling dacă sesiunea devine inactivă
+    if (previousHasActiveSession && !this.hasActiveSession() && this.interval) {
+      console.log('🛑 TimerSync: Session became inactive → STOP polling');
+      this.stopPolling();
+    }
+
+    // ✅ Pornește polling dacă sesiunea devine activă și sunt subscribers
+    if (!previousHasActiveSession && this.hasActiveSession() && this.subscribers.size > 0 && !this.interval) {
+      console.log('✅ TimerSync: Session became active → START polling');
+      this.startPolling();
+    }
+
     this.subscribers.forEach(callback => {
       try {
         callback(data);
@@ -251,6 +268,13 @@ class TimerSyncManager {
   async forceRefresh() {
     console.log('🔄 TimerSync: Force refresh requested');
     await this.checkTimer();
+  }
+
+  // Verifică dacă există sesiune activă (pentru a decide dacă să înceapă polling)
+  private hasActiveSession(): boolean {
+    return this.currentData.hasActiveSession &&
+           this.currentData.activeSession !== null &&
+           (this.currentData.activeSession.status === 'activ' || this.currentData.activeSession.status === 'pausat');
   }
 
   // Curăță toate datele (pentru logout)
