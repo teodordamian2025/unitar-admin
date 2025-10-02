@@ -73,7 +73,9 @@ export async function GET(request: NextRequest) {
         s.data_scadenta as sarcina_data_scadenta,
         s.progres_procent as sarcina_progres,
         s.tip_proiect as sarcina_tip_proiect,
+        s.proiect_id as sarcina_proiect_id,
         -- Pentru sarcini de proiect direct
+        pr3.ID_Proiect as sarcina_proiect_direct_id,
         pr3.Denumire as sarcina_proiect_nume,
         -- Pentru sarcini de subproiect
         s_sp.Denumire as sarcina_subproiect_nume,
@@ -141,15 +143,17 @@ export async function GET(request: NextRequest) {
         display_name = `📂 ${row.subproiect_proiect_id} - ${row.subproiect_denumire}`;
         data_scadenta = row.subproiect_data_final?.value || row.subproiect_data_final;
       } else if (row.tip_item === 'sarcina') {
-        // Logic uniformă pentru sarcini ca la analytics/live
+        // Logic uniformă pentru sarcini ca la analytics/live (IDENTIC cu Admin Live)
         if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
-          // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină (ca la analytics/live)
+          // Sarcină de subproiect: Proiect părinte + Denumire subproiect + Titlu sarcină
           display_name = `✅ ${row.sarcina_proiect_parinte_id} - ${row.sarcina_subproiect_nume} - ${row.sarcina_titlu}`;
         } else if (row.sarcina_proiect_nume) {
-          // Sarcină de proiect direct: proiect_id - titlu_sarcina - descriere
-          display_name = `✅ ${row.sarcina_proiect_id || row.item_id} - ${row.sarcina_titlu}${row.sarcina_descriere ? ' - ' + row.sarcina_descriere : ''}`;
+          // Sarcină de proiect direct: proiect_id - titlu_sarcina (FĂRĂ descriere, ca la Admin Live)
+          // Folosește s.proiect_id din query (returnat prin JOIN cu Proiecte pr3 la linia 110-111)
+          const proiectId = row.sarcina_proiect_id || row.item_id;
+          display_name = `✅ ${proiectId} - ${row.sarcina_titlu}`;
         } else {
-          // Fallback
+          // Fallback pentru cazuri fără proiect asociat
           display_name = `✅ ${row.sarcina_titlu} (Proiect necunoscut)`;
         }
         data_scadenta = row.sarcina_data_scadenta?.value || row.sarcina_data_scadenta;
