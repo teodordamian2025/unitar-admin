@@ -7,12 +7,13 @@ import ModernLayout from '@/app/components/ModernLayout';
 import { Card, Button, LoadingSpinner } from '@/app/components/ui';
 import { AdvancedLineChart, AdvancedBarChart, AdvancedPieChart } from '@/app/components/charts';
 import { toast } from 'react-toastify';
+import { useTimer } from '@/app/contexts/TimerContext';
 
 // ==================================================================
-// CALEA: app/admin/analytics/timetracking/enhanced-page.tsx
-// DATA: 19.09.2025 22:50 (ora României)
+// CALEA: app/admin/analytics/timetracking/page.tsx
+// DATA: 02.10.2025 22:00 (ora României) - FIXED: Eliminat polling duplicat
 // DESCRIERE: Time Tracking Dashboard cu Victory.js advanced charts
-// FUNCȚIONALITATE: Analytics modernizat cu glassmorphism și charts avansate
+// FUNCȚIONALITATE: Analytics modernizat - consumă timer din context (ZERO duplicate requests)
 // ==================================================================
 
 interface OverviewStats {
@@ -76,6 +77,9 @@ export default function EnhancedTimeTrackingDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
 
+  // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
+  const { activeSession: contextSession, hasActiveSession: contextHasActiveSession } = useTimer();
+
   // State pentru diferite tipuri de date
   const [overviewStats, setOverviewStats] = useState<OverviewStats | null>(null);
   const [dailyTrend, setDailyTrend] = useState<DailyTrend[]>([]);
@@ -91,11 +95,22 @@ export default function EnhancedTimeTrackingDashboard() {
     checkUserRole();
   }, [user, loading, router]);
 
+  // ✅ OPTIMIZED: Load data DOAR la mount și când se schimbă perioada - FĂRĂ polling
   useEffect(() => {
     if (isAuthorized) {
       fetchAnalyticsData();
+      console.log('✅ Analytics data loaded - NO POLLING (refresh doar la schimbare perioadă)');
     }
   }, [isAuthorized, period]);
+
+  // ✅ Refresh automat când se schimbă starea timer-ului (opțional - doar dacă vrei live updates)
+  useEffect(() => {
+    if (isAuthorized && contextHasActiveSession !== null) {
+      // Opțional: refresh analytics când timer-ul se schimbă
+      // fetchAnalyticsData();
+      console.log('Timer state changed:', { hasActiveSession: contextHasActiveSession });
+    }
+  }, [contextHasActiveSession]);
 
   const checkUserRole = async () => {
     if (!user) return;

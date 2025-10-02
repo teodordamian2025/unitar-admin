@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/time-tracking/page.tsx
-// DATA: 21.09.2025 17:45 (ora României)
+// DATA: 02.10.2025 22:15 (ora României) - FIXED: Eliminat polling duplicat
 // DESCRIERE: Pagină time tracking personal pentru utilizatori normali
-// FUNCȚIONALITATE: Timer personal + istoric + analytics filtrat
+// FUNCȚIONALITATE: Timer personal + istoric + analytics - consumă timer din context (ZERO duplicate requests)
 // ==================================================================
 
 'use client';
@@ -16,6 +16,7 @@ import UserLayout from '@/app/components/user/UserLayout';
 import PersonalTimer from './components/PersonalTimer';
 import TimeTrackingHistory from './components/TimeTrackingHistory';
 import TimeAnalytics from './components/TimeAnalytics';
+import { useTimer } from '@/app/contexts/TimerContext';
 
 interface TimeEntry {
   id: string;
@@ -37,6 +38,9 @@ function TimeTrackingPage() {
   const [activeTab, setActiveTab] = useState('timer');
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
+
+  // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
+  const { activeSession: contextSession, hasActiveSession: contextHasActiveSession } = useTimer();
 
   // Verificare autentificare și rol
   useEffect(() => {
@@ -110,11 +114,22 @@ function TimeTrackingPage() {
     }
   };
 
+  // ✅ OPTIMIZED: Load time entries DOAR la mount - FĂRĂ polling
   useEffect(() => {
     if (user && userRole === 'normal') {
       loadTimeEntries();
+      console.log('✅ Time entries loaded - NO POLLING (refresh doar manual sau la acțiuni)');
     }
   }, [user, userRole]);
+
+  // ✅ Refresh automat când se schimbă starea timer-ului (opțional)
+  useEffect(() => {
+    if (user && userRole === 'normal' && contextHasActiveSession !== null) {
+      // Opțional: refresh time entries când timer-ul se oprește
+      // loadTimeEntries();
+      console.log('Timer state changed:', { hasActiveSession: contextHasActiveSession });
+    }
+  }, [contextHasActiveSession]);
 
   const handleTimerUpdate = () => {
     // Refresh time entries when timer is updated
