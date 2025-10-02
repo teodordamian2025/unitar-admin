@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/items/[id]/pin/route.ts
-// DATA: 30.09.2025 00:20 (ora României)
+// DATA: 02.10.2025 (ora României) - FIXED: Adăugat unpinAll logic
 // DESCRIERE: API pentru pin/unpin items planificator utilizatori normali
-// FUNCȚIONALITATE: Toggle pin status cu validare că item aparține utilizatorului curent
+// FUNCȚIONALITATE: Toggle pin status cu validare că item aparține utilizatorului curent + unpinAll
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -47,9 +47,50 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'is_pinned must be boolean' }, { status: 400 });
     }
 
-    // Verifică că item-ul aparține utilizatorului curent
+    console.log(`📌 [User Pin API] - Request: userId=${userId}, itemId=${id}, is_pinned=${is_pinned}`);
+
+    // Verifică că item-ul există și aparține utilizatorului curent
+    const checkQuery = `
+      SELECT id, utilizator_uid
+      FROM \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+      WHERE id = @id AND activ = TRUE
+    `;
+
+    const [checkRows] = await bigquery.query({
+      query: checkQuery,
+      params: { id }
+    });
+
+    if (checkRows.length === 0) {
+      console.warn(`⚠️ [User Pin API] - Item not found: ${id}`);
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+
+    if (checkRows[0].utilizator_uid !== userId) {
+      console.warn(`⚠️ [User Pin API] - Unauthorized: userId=${userId}, owner=${checkRows[0].utilizator_uid}`);
+      return NextResponse.json({ error: 'Unauthorized to modify this item' }, { status: 403 });
+    }
+
+    // CRITICAL FIX: Dacă pinează, mai întâi elimină pin-ul de la toate celelalte items
+    // (identic cu logica din admin API)
+    if (is_pinned) {
+      const unpinAllQuery = `
+        UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+        SET is_pinned = FALSE, data_actualizare = CURRENT_TIMESTAMP()
+        WHERE utilizator_uid = @userId AND is_pinned = TRUE AND activ = TRUE AND id != @id
+      `;
+
+      const [unpinResult] = await bigquery.query({
+        query: unpinAllQuery,
+        params: { userId, id }
+      });
+
+      console.log(`🔧 [User Pin API] - Unpinned other items for user ${userId}`);
+    }
+
+    // Update pin pentru item-ul curent
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+      UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
       SET is_pinned = @is_pinned, data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = @id AND utilizator_uid = @userId
     `;
@@ -59,8 +100,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       params: { id, userId, is_pinned }
     });
 
+    console.log(`✅ [User Pin API] - Success: itemId=${id}, is_pinned=${is_pinned}`);
+
     return NextResponse.json({
       success: true,
+      is_pinned,
       message: is_pinned ? 'Item pinned successfully' : 'Item unpinned successfully'
     });
 

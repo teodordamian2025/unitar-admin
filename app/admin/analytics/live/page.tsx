@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/analytics/live/page.tsx
-// DATA: 28.09.2025 01:15 (ora României)
+// DATA: 02.10.2025 (ora României) - FIXED: Adăugat debugging pentru pins API
 // DESCRIERE: Live Tracking system COMPLET cu ierarhie - TOATE funcționalitățile păstrate
-// MODIFICAT: Adăugată logica ierarhică în modalul existent, păstrate toate funcționalitățile
+// MODIFICAT: Adăugată logica ierarhică în modalul existent + debugging pins API
 // ==================================================================
 
 'use client';
@@ -295,11 +295,20 @@ export default function LiveTracking() {
         setTimerStats(null);
       }
 
-      // Procesare pin-uri active
+      // Procesare pin-uri active cu debugging detaliat
       if (pinsResponse.ok && pinsResult.pins) {
+        console.log(`📌 [Admin Live] - Pins API Response: ${pinsResult.pins.length} pins received`, pinsResult.pins);
         setLivePins(pinsResult.pins);
+
+        if (pinsResult.pins.length === 0) {
+          console.warn('⚠️ [Admin Live] - Pins API returnat 0 pin-uri active');
+        } else {
+          console.log(`✅ [Admin Live] - ${pinsResult.pins.length} pin-uri active afișate în UI`);
+        }
       } else {
-        console.error('Pins API Error:', pinsResult.error);
+        console.error('❌ [Admin Live] - Pins API Error:', pinsResult.error || 'Unknown error');
+        console.error('Response status:', pinsResponse.status);
+        console.error('Response data:', pinsResult);
         setLivePins([]);
       }
 

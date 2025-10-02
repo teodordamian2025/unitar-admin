@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/planificator/items/[id]/pin/route.ts
-// DATA: 27.09.2025 16:32 (ora României)
+// DATA: 02.10.2025 (ora României) - Enhanced: Adăugat logs debugging
 // DESCRIERE: API pentru pin/unpin item în planificator
-// FUNCȚIONALITATE: POST pentru toggle pin (doar unul activ pe utilizator)
+// FUNCȚIONALITATE: POST pentru toggle pin (doar unul activ pe utilizator) + logs
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -58,6 +58,8 @@ export async function POST(
       return NextResponse.json({ error: 'is_pinned must be boolean' }, { status: 400 });
     }
 
+    console.log(`📌 [Admin Pin API] - Request: userId=${userId}, itemId=${itemId}, is_pinned=${is_pinned}`);
+
     // Verifică dacă item-ul aparține utilizatorului curent
     const checkQuery = `
       SELECT utilizator_uid
@@ -75,6 +77,7 @@ export async function POST(
     }
 
     if (checkRows[0].utilizator_uid !== userId) {
+      console.warn(`⚠️ [Admin Pin API] - Unauthorized: userId=${userId}, owner=${checkRows[0].utilizator_uid}`);
       return NextResponse.json({ error: 'Unauthorized to modify this item' }, { status: 403 });
     }
 
@@ -90,6 +93,8 @@ export async function POST(
         query: unpinAllQuery,
         params: { userId }
       });
+
+      console.log(`🔧 [Admin Pin API] - Unpinned other items for user ${userId}`);
     }
 
     // Update pin pentru item-ul curent
@@ -103,6 +108,8 @@ export async function POST(
       query: updatePinQuery,
       params: { itemId, userId, is_pinned }
     });
+
+    console.log(`✅ [Admin Pin API] - Success: itemId=${itemId}, is_pinned=${is_pinned}`);
 
     return NextResponse.json({
       success: true,

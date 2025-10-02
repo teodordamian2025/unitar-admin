@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/planificator/components/PlanificatorInteligent.tsx
-// DATA: 01.10.2025 10:10 (ora României) - Refactorizat cu TimerContext
+// DATA: 02.10.2025 (ora României) - FIXED: Force refresh după pin
 // DESCRIERE: Componenta principală planificator inteligent - consumă timer din context (ZERO duplicate requests)
-// FUNCȚIONALITATE: Drag & drop, timer integration, pin activ, notificări
+// FUNCȚIONALITATE: Drag & drop, timer integration, pin activ, notificări + force refresh după pin
 // ==================================================================
 
 'use client';
@@ -419,6 +419,13 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
       if (response.ok) {
         await loadPlanificatorItems();
+
+        // CRITICAL FIX: Force refresh context pentru a actualiza live analytics în admin
+        // (identic cu logica din startTimer - linia 642)
+        await forceRefresh();
+
+        console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
+
         toast.success(currentPinned ? '📌 Pin eliminat' : '📌 Item pin-at!');
       } else {
         toast.error('❌ Eroare la pin/unpin');

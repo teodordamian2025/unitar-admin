@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/analytics/live-pins/route.ts
-// DATA: 28.09.2025 15:30 (ora României)
+// DATA: 02.10.2025 (ora României) - FIXED: Adăugat logs debugging detaliate
 // DESCRIERE: API pentru afișarea pin-urilor active în Live Analytics
-// FUNCȚIONALITATE: GET pentru items pin-ate cu detalii utilizatori
+// FUNCȚIONALITATE: GET pentru items pin-ate cu detalii utilizatori + logs debugging
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -139,6 +139,17 @@ export async function GET(request: NextRequest) {
       params: {}
     });
 
+    console.log(`🔍 [Live Pins API] - Query Results: ${rows.length} raw rows found`);
+
+    // Log detaliat pentru fiecare rând raw
+    if (rows.length > 0) {
+      rows.forEach((row: any, index: number) => {
+        console.log(`  [${index + 1}] ${row.tip_item} - ${row.item_id} (user: ${row.utilizator_uid}, pinned: ${row.is_pinned}, active: ${row.activ})`);
+      });
+    } else {
+      console.warn(`⚠️ [Live Pins API] - No pinned items found in BigQuery`);
+    }
+
     // Procesare rezultate simplificată pentru testare
     const livePins = rows.map((row: any) => {
       // Procesarea comentariului (elimină marker-ul [REALIZAT])
@@ -231,6 +242,15 @@ export async function GET(request: NextRequest) {
         detalii_specifice: { test: true }
       };
     });
+
+    console.log(`✅ [Live Pins API] - Processed: ${livePins.length} pins returned to frontend`);
+
+    // Log detaliat pentru pin-uri procesate
+    if (livePins.length > 0) {
+      livePins.forEach((pin: any, index: number) => {
+        console.log(`  [${index + 1}] ${pin.display_name} (user: ${pin.user_display}, pinned: ${pin.timp_pin_text})`);
+      });
+    }
 
     return NextResponse.json({
       pins: livePins,
