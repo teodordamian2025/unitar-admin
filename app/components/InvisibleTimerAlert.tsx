@@ -50,19 +50,30 @@ const InvisibleTimerAlert: React.FC<InvisibleTimerAlertProps> = ({
     }
   }, [user]);
 
-  // Verificare periodică pentru sesiuni invizibile (la fiecare 2 minute)
+  // ✅ FIX: Check la mount + polling DOAR când există cronometru activ în context
   useEffect(() => {
     if (!userId || !idToken) return;
 
-    // Check imediat la mount
+    // ✅ Check imediat la mount pentru detectare rapidă
     checkForInvisibleSessions();
 
-    // Apoi la fiecare 2 minute
-    const interval = setInterval(() => {
-      checkForInvisibleSessions();
-    }, 120000); // 2 minute
+    // ✅ Pornește polling DOAR dacă există sesiune activă în context
+    if (contextHasSession) {
+      console.log('✅ InvisibleTimerAlert: Active session detected → START polling (2min interval)');
 
-    return () => clearInterval(interval);
+      const interval = setInterval(() => {
+        checkForInvisibleSessions();
+      }, 120000); // 2 minute
+
+      return () => {
+        console.log('🛑 InvisibleTimerAlert: Clearing polling interval');
+        clearInterval(interval);
+      };
+    } else {
+      console.log('🛑 InvisibleTimerAlert: NO active session → NO polling');
+      // ✅ ZERO polling când cronometru oprit
+      return undefined;
+    }
   }, [userId, idToken, contextHasSession]);
 
   const checkForInvisibleSessions = async () => {
