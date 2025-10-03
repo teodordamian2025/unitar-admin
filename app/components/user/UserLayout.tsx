@@ -14,6 +14,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
 import UserPersistentTimer from './UserPersistentTimer';
+import InvisibleTimerAlert from '../InvisibleTimerAlert';
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -276,6 +277,16 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
           </div>
         ))}
       </nav>
+
+      {/* Invisible Timer Alert - PRIORITATE MAXIMĂ */}
+      {user?.uid && (
+        <div style={{ padding: '0 1.5rem 1rem 1.5rem' }}>
+          <InvisibleTimerAlert
+            userId={user.uid}
+            user={user}
+          />
+        </div>
+      )}
 
       {/* Persistent Timer Widget */}
       {user && <UserPersistentTimer user={user} />}

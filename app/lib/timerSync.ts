@@ -72,12 +72,22 @@ class TimerSyncManager {
     // Trimite imediat datele curente la noul subscriber
     callback(this.currentData);
 
-    // ✅ Pornește polling DOAR dacă există sesiune activă
-    if (this.subscribers.size === 1 && this.hasActiveSession()) {
-      this.startPolling();
-      console.log('✅ TimerSync: First subscriber + active session → START polling');
-    } else if (this.subscribers.size === 1) {
-      console.log('🛑 TimerSync: First subscriber but NO active session → NO polling');
+    // ✅ FIX: La primul subscriber, face check imediat pentru a detecta sesiuni active
+    if (this.subscribers.size === 1) {
+      console.log('🔍 TimerSync: First subscriber → checking for active sessions immediately');
+
+      // Check imediat pentru a detecta sesiuni active existente
+      this.checkTimer().then(() => {
+        // După check, pornește polling DOAR dacă există sesiune activă
+        if (this.hasActiveSession() && !this.interval) {
+          this.startPolling();
+          console.log('✅ TimerSync: Active session detected → START polling');
+        } else {
+          console.log('🛑 TimerSync: NO active session detected → NO polling');
+        }
+      }).catch((error) => {
+        console.error('❌ TimerSync: Error checking for active sessions:', error);
+      });
     }
 
     // Returnează funcția de unsubscribe
@@ -93,9 +103,16 @@ class TimerSyncManager {
 
   // Verifică timer-ul activ (API call central)
   private async checkTimer() {
+    // ✅ PROTECȚIE: Oprește polling dacă nu există sesiune activă
+    if (!this.hasActiveSession() && this.interval) {
+      console.log('🛑 TimerSync: NO active session but polling is running → STOP polling');
+      this.stopPolling();
+      return;
+    }
+
     // Verifică dacă tab-ul e vizibil
     if (typeof document !== 'undefined' && document.hidden) {
-      console.log('TimerSync: Tab hidden, skipping check');
+      console.log('⏭️ TimerSync: Tab hidden, skipping check');
       return;
     }
 
@@ -107,13 +124,13 @@ class TimerSyncManager {
     // }
 
     if (!this.userId || !this.idToken) {
-      console.log('TimerSync: No user or token available');
+      console.log('⚠️ TimerSync: No user or token available');
       return;
     }
 
     // Previne multiple calls simultane
     if (this.isPolling) {
-      console.log('TimerSync: Already polling, skipping');
+      console.log('⏭️ TimerSync: Already polling, skipping');
       return;
     }
 
