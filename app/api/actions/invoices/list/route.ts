@@ -1,7 +1,9 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/list/route.ts
-// DATA: 04.10.2025 20:00 (ora României)
-// MODIFICAT: Adăugat JOIN cu EtapeFacturi și Subproiecte pentru corespondențe
+// DATA: 05.10.2025 00:15 (ora României)
+// MODIFICAT: Fix CRITICAL - Folosire corectă tabele _v2 cu suffix dinamic
+// CAUZA: Query-urile foloseau hard-coded tabele fără _v2, citind din tabele vechi
+// FIX: Înlocuit toate referințele cu variabilele TABLE_* definite cu tableSuffix
 // PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
@@ -97,12 +99,12 @@ export async function GET(request: NextRequest) {
           ELSE 'În regulă'
         END as status_scadenta
 
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\` fg
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      LEFT JOIN ${TABLE_PROIECTE} p
         ON fg.proiect_id = p.ID_Proiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.EtapeFacturi\` ef
+      LEFT JOIN ${TABLE_ETAPE_FACTURI} ef
         ON fg.id = ef.factura_id AND ef.activ = true
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Subproiecte\` s
+      LEFT JOIN ${TABLE_SUBPROIECTE} s
         ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
       WHERE 1=1
     `;
@@ -160,7 +162,7 @@ export async function GET(request: NextRequest) {
     // Query pentru total count (pentru paginare)
     let countQuery = `
       SELECT COUNT(*) as total_count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\` fg
+      FROM ${TABLE_FACTURI_GENERATE} fg
       WHERE 1=1
     `;
     
@@ -227,50 +229,50 @@ export async function POST(request: NextRequest) {
     
     const statsQuery = `
       WITH facturi_stats AS (
-        SELECT 
+        SELECT
           COUNT(*) as total_facturi,
           COUNTIF(status = 'pdf_generated') as facturi_pdf,
           COUNTIF(status = 'anaf_success') as facturi_anaf,
           COUNTIF(status = 'anaf_error') as facturi_eroare,
-          
+
           -- ✅ NOU: Statistici e-factura
           COUNTIF(efactura_enabled = true) as facturi_efactura_enabled,
           COUNTIF(efactura_status = 'uploaded') as facturi_efactura_uploaded,
           COUNTIF(efactura_status = 'accepted') as facturi_efactura_accepted,
           COUNTIF(efactura_status = 'rejected') as facturi_efactura_rejected,
           COUNTIF(efactura_status = 'mock_pending') as facturi_efactura_mock,
-          
+
           SUM(total) as valoare_totala,
           SUM(COALESCE(valoare_platita, 0)) as valoare_platita,
           SUM(total - COALESCE(valoare_platita, 0)) as rest_de_plata,
-          
+
           -- Facturi expirate
           COUNTIF(data_scadenta < CURRENT_DATE() AND (total - COALESCE(valoare_platita, 0)) > 0) as facturi_expirate,
-          
+
           -- Facturi care expira in 7 zile
           COUNTIF(
-            DATE_DIFF(data_scadenta, CURRENT_DATE(), DAY) <= 7 
+            DATE_DIFF(data_scadenta, CURRENT_DATE(), DAY) <= 7
             AND DATE_DIFF(data_scadenta, CURRENT_DATE(), DAY) >= 0
             AND (total - COALESCE(valoare_platita, 0)) > 0
           ) as facturi_expira_curand
-          
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\`
+
+        FROM ${TABLE_FACTURI_GENERATE}
         WHERE data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL @perioada DAY)
       ),
-      
+
       top_clienti AS (
-        SELECT 
+        SELECT
           client_nume,
           COUNT(*) as nr_facturi,
           SUM(total) as valoare_totala
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\`
+        FROM ${TABLE_FACTURI_GENERATE}
         WHERE data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL @perioada DAY)
         GROUP BY client_nume
         ORDER BY valoare_totala DESC
         LIMIT 5
       )
-      
-      SELECT 
+
+      SELECT
         (SELECT AS STRUCT * FROM facturi_stats) as statistici,
         ARRAY(SELECT AS STRUCT * FROM top_clienti) as top_clienti
     `;
