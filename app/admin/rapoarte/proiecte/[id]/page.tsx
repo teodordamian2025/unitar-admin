@@ -32,6 +32,9 @@ interface ProiectDetails {
   Adresa?: string;
   Descriere?: string;
   Responsabil?: string;
+  progres_procent?: number; // NOU: 04.10.2025 - Tracking progres 0-100%
+  status_predare?: string; // NOU: 04.10.2025 - Pentru afișare status proiect
+  status_contract?: string; // NOU: 04.10.2025 - Pentru afișare status proiect
 }
 
 interface ContractInfo {
@@ -82,6 +85,7 @@ interface SubproiectInfo {
   status_predare: string;
   status_contract: string;
   Data_Final: any;
+  progres_procent?: number; // NOU: 04.10.2025 - Tracking progres subproiect 0-100%
 }
 
 export default function ProiectDetailsPage() {
@@ -388,6 +392,87 @@ export default function ProiectDetailsPage() {
     }
   };
 
+  // NOU: Handler pentru actualizare progres proiect (04.10.2025)
+  const handleProiectProgresUpdate = async (value: number) => {
+    if (!proiectId) return;
+
+    // Validare 0-100
+    if (value < 0 || value > 100) {
+      toast.error('Progresul trebuie să fie între 0 și 100');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progres_procent: value })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Progres actualizat cu succes!');
+        // Actualizează local state-ul
+        setProiect(prev => prev ? { ...prev, progres_procent: value } : null);
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare progres');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea progresului proiect:', error);
+      toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  };
+
+  // NOU: Handler pentru actualizare progres subproiect (04.10.2025)
+  const handleSubproiectProgresUpdate = async (subproiectId: string, value: number) => {
+    // Validare 0-100
+    if (value < 0 || value > 100) {
+      toast.error('Progresul trebuie să fie între 0 și 100');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progres_procent: value })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Progres actualizat cu succes!');
+
+        // Actualizează local state subproiect
+        setSubproiecte(prev => prev.map(sub =>
+          sub.ID_Subproiect === subproiectId
+            ? { ...sub, progres_procent: value }
+            : sub
+        ));
+
+        // IMPORTANT: Dacă API a returnat progres_proiect recalculat, actualizează și proiectul
+        if (data.data?.progres_proiect !== undefined) {
+          setProiect(prev => prev ? { ...prev, progres_procent: data.data.progres_proiect } : null);
+          toast.info(`Progres proiect actualizat automat la ${data.data.progres_proiect}%`);
+        }
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare progres');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea progresului subproiect:', error);
+      toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  };
+
   const renderStatus = (status: string) => {
     const statusConfig = {
       'Activ': { color: '#28a745', icon: '🟢' },
@@ -639,6 +724,63 @@ export default function ProiectDetailsPage() {
               </div>
             </div>
 
+            {/* NOU: Progres Proiect cu input (04.10.2025) */}
+            <div>
+              <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
+                Progres Proiect
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={proiect.progres_procent ?? 0}
+                  onChange={(e) => {
+                    const newProgres = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                    handleProiectProgresUpdate(newProgres);
+                  }}
+                  disabled={subproiecte.length > 0} // Disabled dacă are subproiecte (se calculează automat)
+                  style={{
+                    width: '80px',
+                    padding: '0.5rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    background: subproiecte.length > 0 ? '#f0f0f0' : 'white',
+                    cursor: subproiecte.length > 0 ? 'not-allowed' : 'text'
+                  }}
+                />
+                <div style={{
+                  flex: 1,
+                  height: '8px',
+                  background: '#e9ecef',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${proiect.progres_procent ?? 0}%`,
+                    background: `linear-gradient(90deg, ${
+                      (proiect.progres_procent ?? 0) < 30 ? '#dc3545' :
+                      (proiect.progres_procent ?? 0) < 70 ? '#ffc107' : '#28a745'
+                    }, ${
+                      (proiect.progres_procent ?? 0) < 30 ? '#c82333' :
+                      (proiect.progres_procent ?? 0) < 70 ? '#e0a800' : '#218838'
+                    })`,
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#495057', minWidth: '45px' }}>
+                  {proiect.progres_procent ?? 0}%
+                </span>
+              </div>
+              {subproiecte.length > 0 && (
+                <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                  Se calculează automat din subproiecte
+                </div>
+              )}
+            </div>
+
             {proiect.Responsabil && (
               <div>
                 <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
@@ -657,6 +799,61 @@ export default function ProiectDetailsPage() {
               </div>
             )}
 
+            {/* NOU: PROGRES PROIECT (04.10.2025) */}
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e9ecef' }}>
+              <label style={{ display: 'block', fontWeight: 600, color: '#495057', marginBottom: '0.5rem' }}>
+                Progres Proiect
+              </label>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={proiect.progres_procent ?? 0}
+                  onChange={(e) => handleProiectProgresUpdate(parseInt(e.target.value) || 0)}
+                  disabled={subproiecte.length > 0}
+                  style={{
+                    width: '80px',
+                    padding: '0.5rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    background: subproiecte.length > 0 ? '#f0f0f0' : 'white',
+                    cursor: subproiecte.length > 0 ? 'not-allowed' : 'text'
+                  }}
+                />
+                <span style={{ fontSize: '14px', color: '#6c757d' }}>%</span>
+
+                <div style={{ flex: 1, height: '24px', background: '#e9ecef', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${proiect.progres_procent ?? 0}%`,
+                    background: `linear-gradient(90deg, #3b82f6, #10b981)`,
+                    transition: 'width 0.3s ease',
+                    borderRadius: '12px'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: (proiect.progres_procent ?? 0) > 50 ? 'white' : '#2c3e50'
+                  }}>
+                    {proiect.progres_procent ?? 0}%
+                  </div>
+                </div>
+              </div>
+
+              {subproiecte.length > 0 && (
+                <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                  ℹ️ Progresul se calculează automat ca medie a subproiectelor active (nu poate fi editat manual)
+                </div>
+              )}
+            </div>
+
             {/* NOU: Lista Subproiecte cu statusuri editabile (04.10.2025) */}
             {loadingSubproiecte ? (
               <div style={{ color: '#6c757d', fontStyle: 'italic', marginTop: '1rem' }}>
@@ -672,7 +869,7 @@ export default function ProiectDetailsPage() {
                   {subproiecte.map((sub) => (
                     <div key={sub.ID_Subproiect} style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr',
+                      gridTemplateColumns: '2fr 1fr 1fr 1fr',
                       gap: '0.75rem',
                       alignItems: 'center',
                       padding: '0.75rem',
@@ -728,6 +925,36 @@ export default function ProiectDetailsPage() {
                           <option value="Nesemnat">Nesemnat</option>
                           <option value="Semnat">Semnat</option>
                         </select>
+                      </div>
+
+                      {/* NOU: Coloană Progres Subproiect (04.10.2025) */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
+                          Progres
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={sub.progres_procent ?? 0}
+                            onChange={(e) => {
+                              const newProgres = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
+                              handleSubproiectProgresUpdate(sub.ID_Subproiect, newProgres);
+                            }}
+                            style={{
+                              width: '60px',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              background: 'white'
+                            }}
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#495057' }}>
+                            %
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}

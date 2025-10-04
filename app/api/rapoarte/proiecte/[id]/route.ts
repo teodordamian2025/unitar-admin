@@ -18,6 +18,7 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 const dataset = 'PanouControlUnitar';
 const table = `Proiecte${tableSuffix}`;
 const tableClienti = `Clienti${tableSuffix}`;
+const tableSubproiecte = `Subproiecte${tableSuffix}`; // NOU: Pentru validare progres_procent
 
 console.log(`🔧 Proiecte [ID] API - Tables Mode: ${useV2Tables ? 'V2 (Optimized)' : 'V1 (Standard)'}`);
 
@@ -296,16 +297,50 @@ export async function PUT(
     console.log('Proiect ID:', proiectId);
     console.log('Update data:', updateData);
 
+    // VALIDARE CRITICĂ: Dacă se încearcă actualizarea progres_procent, verifică dacă proiectul ARE subproiecte
+    if (updateData.progres_procent !== undefined) {
+      // Validare 0-100
+      const progresValue = parseInt(updateData.progres_procent);
+      if (isNaN(progresValue) || progresValue < 0 || progresValue > 100) {
+        return NextResponse.json({
+          success: false,
+          error: 'Progresul trebuie să fie un număr între 0 și 100'
+        }, { status: 400 });
+      }
+
+      // Verifică dacă proiectul are subproiecte active
+      const checkSubproiecteQuery = `
+        SELECT COUNT(*) as count
+        FROM \`${PROJECT_ID}.${dataset}.${tableSubproiecte}\`
+        WHERE ID_Proiect = '${escapeString(proiectId)}' AND activ = true
+      `;
+
+      const [checkRows] = await bigquery.query({
+        query: checkSubproiecteQuery,
+        location: 'EU',
+      });
+
+      const subproiecteCount = parseInt(checkRows[0]?.count?.toString() || '0');
+
+      if (subproiecteCount > 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'Progresul se calculează automat din subproiecte. Nu poate fi editat manual pentru proiecte cu subproiecte.'
+        }, { status: 400 });
+      }
+    }
+
     // Construire query UPDATE dinamic cu DATE literale (PĂSTRAT)
     const updateFields: string[] = [];
 
-    // Lista câmpurilor permise pentru actualizare (PĂSTRAT + EXTINS)
+    // Lista câmpurilor permise pentru actualizare (PĂSTRAT + EXTINS cu progres_procent)
     const allowedFields = [
-      'Denumire', 'Client', 'Status', 'Data_Start', 
-      'Data_Final', 'Valoare_Estimata', 'Adresa', 
+      'Denumire', 'Client', 'Status', 'Data_Start',
+      'Data_Final', 'Valoare_Estimata', 'Adresa',
       'Descriere', 'Responsabil', 'Observatii',
       'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
-      'status_predare', 'status_contract', 'status_facturare', 'status_achitare'
+      'status_predare', 'status_contract', 'status_facturare', 'status_achitare',
+      'progres_procent' // NOU: 04.10.2025 - Tracking progres 0-100%
     ];
 
     Object.entries(updateData).forEach(([key, value]) => {
