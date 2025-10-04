@@ -33,12 +33,13 @@ const DATASET = 'PanouControlUnitar';
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``; // ✅ NOU: Tabel pentru update status_facturare
 const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca${tableSuffix}\``;
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
 
 console.log(`🔧 Invoice Generation - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, SetariBanca${tableSuffix}, FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
+console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, SetariBanca${tableSuffix}, FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
 
 // ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
@@ -333,6 +334,37 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       });
 
     await Promise.all([...updateEtapeContract, ...updateEtapeAnexe]);
+
+    // PASUL 3: Update status_facturare în Subproiecte pentru toate subproiectele facturate
+    // ✅ NOU: 04.10.2025 21:00 - Actualizare automată status_facturare în Subproiecte
+    const updateSubproiecte = etapeFacturate
+      .filter(etapa => etapa.subproiect_id) // Doar etapele cu subproiect_id valid
+      .map(async (etapa) => {
+        const updateQuery = `
+          UPDATE ${TABLE_SUBPROIECTE}
+          SET
+            status_facturare = 'Facturat',
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Subproiect = @subproiectId
+        `;
+
+        console.log(`🔷 [SUBPROIECTE] UPDATE status_facturare pentru subproiect: ${etapa.subproiect_id}`);
+
+        await bigquery.query({
+          query: updateQuery,
+          params: { subproiectId: etapa.subproiect_id },
+          types: { subproiectId: 'STRING' },
+          location: 'EU',
+        });
+
+        console.log(`✅ [SUBPROIECTE] Subproiect ${etapa.subproiect_id} marcat ca Facturat`);
+      });
+
+    // Execută toate UPDATE-urile pentru subproiecte în paralel
+    if (updateSubproiecte.length > 0) {
+      await Promise.all(updateSubproiecte);
+      console.log(`✅ [SUBPROIECTE] ${updateSubproiecte.length} subproiecte actualizate cu status_facturare = Facturat`);
+    }
 
     console.log(`✅ [ETAPE-FACTURI] Statusuri actualizate cu succes pentru ${etapeFacturate.length} etape (${isEdit ? 'EDIT' : 'NEW'} mode)`);
 
