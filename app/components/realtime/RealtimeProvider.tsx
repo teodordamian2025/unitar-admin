@@ -40,19 +40,19 @@ export interface RealtimeContextType {
   refreshData: () => void;
 }
 
-// Configurare intervale smart pentru reducere trafic
+// Configurare intervale smart pentru reducere trafic - OPTIMIZAT 04.10.2025
 const SMART_INTERVALS = {
   // Intervale când tab-ul este ACTIV (în focus)
   ACTIVE: {
-    DASHBOARD: 30000,     // 30s - dashboard stats
-    ANALYTICS: 60000,     // 1min - time tracking
-    NOTIFICATIONS: 300000 // 5min - ANAF notifications (se schimbă rar)
+    DASHBOARD: 900000,     // 15min - dashboard stats (reducere 97% vs 30s)
+    ANALYTICS: 900000,     // 15min - time tracking (reducere 93% vs 1min)
+    NOTIFICATIONS: 900000  // 15min - ANAF notifications (reducere 67% vs 5min)
   },
   // Intervale când tab-ul este INACTIV (background)
   INACTIVE: {
-    DASHBOARD: 120000,    // 2min - dashboard stats
-    ANALYTICS: 300000,    // 5min - time tracking
-    NOTIFICATIONS: 600000 // 10min - ANAF notifications
+    DASHBOARD: 1800000,    // 30min - dashboard stats (reducere 93% vs 2min)
+    ANALYTICS: 1800000,    // 30min - time tracking (reducere 83% vs 5min)
+    NOTIFICATIONS: 1800000 // 30min - ANAF notifications (reducere 67% vs 10min)
   }
 };
 

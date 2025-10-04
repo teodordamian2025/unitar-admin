@@ -263,7 +263,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
           utilizator_uid: user.uid,
           proiect_id: finalProiectId,
           sarcina_id: finalSarcinaId,
-          descriere_activitate: newSessionDescription || 'Sesiune de lucru'
+          descriere_sesiune: newSessionDescription || 'Sesiune de lucru'
         })
       });
 

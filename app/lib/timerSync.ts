@@ -110,9 +110,9 @@ class TimerSyncManager {
       return;
     }
 
-    // Verifică dacă tab-ul e vizibil
+    // ✅ OPTIMIZAT: Verifică Page Visibility API - skip polling când tab hidden
     if (typeof document !== 'undefined' && document.hidden) {
-      console.log('⏭️ TimerSync: Tab hidden, skipping check');
+      console.log('⏭️ TimerSync: Tab hidden, skipping check (Page Visibility API)');
       return;
     }
 
@@ -261,15 +261,15 @@ class TimerSyncManager {
       return;
     }
 
-    console.log('🚀 TimerSync: Starting polling (60s interval - optimized)');
+    console.log('🚀 TimerSync: Starting polling (300s interval - optimized for cost reduction)');
 
     // Check imediat
     this.checkTimer();
 
-    // Apoi la fiecare 60 secunde (OPTIMIZED: reducere 50% requests)
+    // Apoi la fiecare 300 secunde / 5 minute (OPTIMIZED: reducere 80% requests vs 60s)
     this.interval = setInterval(() => {
       this.checkTimer();
-    }, 60000); // 60 secunde - sweet spot între eficiență și responsiveness
+    }, 300000); // 300 secunde (5 minute) - economie costuri Vercel/BigQuery
   }
 
   // Oprește polling-ul

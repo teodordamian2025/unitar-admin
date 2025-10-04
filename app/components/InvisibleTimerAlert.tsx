@@ -59,11 +59,11 @@ const InvisibleTimerAlert: React.FC<InvisibleTimerAlertProps> = ({
 
     // ✅ Pornește polling DOAR dacă există sesiune activă în context
     if (contextHasSession) {
-      console.log('✅ InvisibleTimerAlert: Active session detected → START polling (2min interval)');
+      console.log('✅ InvisibleTimerAlert: Active session detected → START polling (30min interval - optimized 04.10.2025)');
 
       const interval = setInterval(() => {
         checkForInvisibleSessions();
-      }, 120000); // 2 minute
+      }, 1800000); // 30 minute (reducere costuri 93% vs 2min)
 
       return () => {
         console.log('🛑 InvisibleTimerAlert: Clearing polling interval');
