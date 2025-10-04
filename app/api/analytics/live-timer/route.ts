@@ -140,15 +140,15 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('include_completed') === 'true';
     const teamView = searchParams.get('team_view') !== 'false';
 
-    // Query optimizat cu ierarhie corectă
+    // Query optimizat cu ierarhie corectă - FIX: Eliminat JOIN Sarcini pentru a preveni duplicate
     const activeSessionsQuery = `
       WITH active_sessions AS (
-        SELECT 
+        SELECT
           sl.id,
           sl.utilizator_uid,
           COALESCE(CONCAT(u.nume, ' ', u.prenume), 'Test User') as utilizator_nume,
           sl.proiect_id,
-          
+
           -- Determinare nume proiect bazat pe context (proiect sau subproiect)
           CASE
             WHEN sub.ID_Subproiect IS NOT NULL THEN
@@ -157,23 +157,21 @@ export async function GET(request: NextRequest) {
               COALESCE(p.ID_Proiect, sl.proiect_id)
           END as proiect_nume,
 
-          -- Titlu sarcină din tabelul Sarcini sau activitate generală
+          -- FIX: Folosim doar descriere_activitate din SesiuniLucru (fără JOIN Sarcini pentru a evita duplicate)
           CASE
-            WHEN s.id IS NOT NULL AND s.titlu IS NOT NULL THEN
-              CONCAT(s.titlu, CASE WHEN s.descriere IS NOT NULL THEN CONCAT(' - ', s.descriere) ELSE '' END)
             WHEN sl.descriere_activitate IS NOT NULL AND sl.descriere_activitate != '' THEN
               sl.descriere_activitate
             ELSE
               'Activitate generală'
           END as sarcina_titlu,
-          
+
           'normala' as prioritate,
           sl.data_start,
           sl.data_stop,
           sl.status,
           sl.descriere_activitate as descriere_sesiune,
           sl.ore_lucrate,
-          
+
           -- Calculez timpul elapsed în secunde
           CAST(
             CASE
@@ -189,14 +187,14 @@ export async function GET(request: NextRequest) {
 
           -- Ultima activitate
           COALESCE(sl.data_stop, sl.data_start) as ultima_activitate,
-          
+
           -- Calculez productivitatea
-          CASE 
+          CASE
             WHEN sl.status = 'activ' THEN 85
             WHEN sl.status = 'pausat' THEN 50
             ELSE 65
           END as productivity_score,
-          
+
           -- Break time calculation
           CAST(
             CASE
@@ -205,7 +203,7 @@ export async function GET(request: NextRequest) {
               ELSE 0
             END AS INT64
           ) as break_time_seconds
-          
+
         FROM ${TABLE_SESIUNI_LUCRU} sl
         LEFT JOIN ${TABLE_UTILIZATORI} u
           ON sl.utilizator_uid = u.uid
@@ -218,9 +216,7 @@ export async function GET(request: NextRequest) {
         -- Join pentru numele proiectului principal al subproiectului
         LEFT JOIN ${TABLE_PROIECTE} p_parent
           ON sub.ID_Proiect = p_parent.ID_Proiect
-        -- Join cu Sarcini pentru a obține detalii sarcină reală
-        LEFT JOIN ${TABLE_SARCINI} s
-          ON (sl.proiect_id = s.proiect_id OR sl.proiect_id = s.subproiect_id)
+        -- FIX: ELIMINAT JOIN cu Sarcini care crea duplicate când un proiect avea multiple sarcini
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
           ${userId ? `AND sl.utilizator_uid = @userId` : ''}
@@ -262,23 +258,22 @@ export async function GET(request: NextRequest) {
             ELSE
               COALESCE(p2.ID_Proiect, sl2.proiect_id)
           END as proiect_nume,
+          -- FIX: Folosim doar descriere_activitate din SesiuniLucru (fără JOIN Sarcini pentru a evita duplicate)
           CASE
-            WHEN s2.id IS NOT NULL AND s2.titlu IS NOT NULL THEN
-              CONCAT(s2.titlu, CASE WHEN s2.descriere IS NOT NULL THEN CONCAT(' - ', s2.descriere) ELSE '' END)
             WHEN sl2.descriere_activitate IS NOT NULL AND sl2.descriere_activitate != '' THEN
               sl2.descriere_activitate
             ELSE
               'Activitate generală'
-          END as sarcina_titlu, 
-          'normala' as prioritate, 
-          sl2.data_start, 
+          END as sarcina_titlu,
+          'normala' as prioritate,
+          sl2.data_start,
           sl2.data_stop,
-          'completat' as status, 
+          'completat' as status,
           sl2.descriere_activitate as descriere_sesiune,
           sl2.ore_lucrate,
           CAST(TIMESTAMP_DIFF(sl2.data_stop, sl2.data_start, SECOND) AS INT64) as elapsed_seconds,
-          sl2.data_stop as ultima_activitate, 
-          85 as productivity_score, 
+          sl2.data_stop as ultima_activitate,
+          85 as productivity_score,
           0 as break_time_seconds,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_start) as data_start_formatted,
           FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', sl2.data_stop) as ultima_activitate_formatted
@@ -291,8 +286,7 @@ export async function GET(request: NextRequest) {
           ON sl2.proiect_id = sub2.ID_Subproiect
         LEFT JOIN ${TABLE_PROIECTE} p2_parent
           ON sub2.ID_Proiect = p2_parent.ID_Proiect
-        LEFT JOIN ${TABLE_SARCINI} s2
-          ON (sl2.proiect_id = s2.proiect_id OR sl2.proiect_id = s2.subproiect_id)
+        -- FIX: ELIMINAT JOIN cu Sarcini care crea duplicate când un proiect avea multiple sarcini
         WHERE sl2.status = 'completat'
           AND sl2.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 8 HOUR)
           ${userId ? `AND sl2.utilizator_uid = @userId` : ''}

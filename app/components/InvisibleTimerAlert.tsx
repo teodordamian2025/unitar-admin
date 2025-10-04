@@ -240,7 +240,7 @@ const InvisibleTimerAlert: React.FC<InvisibleTimerAlertProps> = ({
           ⚠️ CRONOMETRU INVIZIBIL ACTIV
         </div>
         <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-          {invisibleSessions.length} sesiune{invisibleSessions.length > 1 ? 's' : ''} activă dar ascunsă
+          {invisibleSessions.length} sesiuni{invisibleSessions.length === 1 ? 'e' : ''} activ{invisibleSessions.length === 1 ? 'ă' : 'e'} dar ascuns{invisibleSessions.length === 1 ? 'ă' : 'e'}
           {invisibleSessions.length === 1 && ` • ${formatTime(invisibleSessions[0].elapsed_seconds)}`}
         </div>
       </div>
