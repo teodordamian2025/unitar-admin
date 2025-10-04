@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/list/route.ts
-// DATA: 10.08.2025 16:45
-// CORECTAT: Include fg.proiect_id în SELECT pentru Edit/Storno
+// DATA: 04.10.2025 20:00 (ora României)
+// MODIFICAT: Adăugat JOIN cu EtapeFacturi și Subproiecte pentru corespondențe
+// PĂSTRATE: Toate funcționalitățile existente
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,9 +18,11 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 // ✅ Tabele cu suffix dinamic
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 
 console.log(`🔧 Invoices List API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, Proiecte${tableSuffix}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, Proiecte${tableSuffix}, EtapeFacturi${tableSuffix}, Subproiecte${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     
     let query = `
-      SELECT 
+      SELECT
         fg.id,
         fg.numar,
         fg.data_factura,
@@ -57,39 +60,50 @@ export async function GET(request: NextRequest) {
         fg.data_creare,
         fg.data_actualizare,
         fg.date_complete_json, -- ✅ ADĂUGAT: Pentru datele complete
-        
+
         -- ✅ CRUCIAL: Include proiect_id din BigQuery pentru Edit/Storno
         fg.proiect_id,
-        
+
         -- ✅ Date proiect din JOIN
         p.Denumire as proiect_denumire,
         p.Status as proiect_status,
-        
+
+        -- ✅ NOU: Corespondențe cu Subproiecte și Etape (04.10.2025)
+        ef.subproiect_id,
+        s.Denumire as subproiect_denumire,
+        ef.tip_etapa,
+        ef.etapa_id,
+        ef.anexa_id,
+
         -- ✅ Câmpuri e-factura
         fg.efactura_enabled,
         fg.efactura_status,
         fg.anaf_upload_id,
-        
+
         -- ✅ Mock mode indicator
         CASE
           WHEN fg.efactura_status = 'mock_pending' THEN true
           ELSE false
         END as efactura_mock_mode,
-        
+
         -- Calcule utile
         (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
-        
-        CASE 
+
+        CASE
           WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expirată'
           WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
           WHEN (fg.total - COALESCE(fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
           ELSE 'În regulă'
         END as status_scadenta
-        
+
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.FacturiGenerate\` fg
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p 
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\` p
         ON fg.proiect_id = p.ID_Proiect
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.EtapeFacturi\` ef
+        ON fg.id = ef.factura_id AND ef.activ = true
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Subproiecte\` s
+        ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
       WHERE 1=1
     `;
     

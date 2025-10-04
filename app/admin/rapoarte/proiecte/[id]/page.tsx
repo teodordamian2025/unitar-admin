@@ -57,6 +57,12 @@ interface InvoiceInfo {
   status: string;
   rest_de_plata: number;
   status_scadenta: string;
+  // NOU: Corespondențe cu subproiecte și etape (04.10.2025)
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  tip_etapa?: string; // 'contract' sau 'anexa'
+  etapa_id?: string;
+  anexa_id?: string;
 }
 
 interface PaymentInfo {
@@ -67,6 +73,15 @@ interface PaymentInfo {
   descriere: string;
   factura_id?: string;
   status: string;
+}
+
+interface SubproiectInfo {
+  ID_Subproiect: string;
+  Denumire: string;
+  Status: string;
+  status_predare: string;
+  status_contract: string;
+  Data_Final: any;
 }
 
 export default function ProiectDetailsPage() {
@@ -83,10 +98,12 @@ export default function ProiectDetailsPage() {
   const [contracte, setContracte] = useState<ContractInfo[]>([]);
   const [facturi, setFacturi] = useState<InvoiceInfo[]>([]);
   const [plati, setPlati] = useState<PaymentInfo[]>([]);
+  const [subproiecte, setSubproiecte] = useState<SubproiectInfo[]>([]); // NOU: 04.10.2025
   const [loading, setLoading] = useState(true);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [loadingSubproiecte, setLoadingSubproiecte] = useState(false); // NOU: 04.10.2025
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('admin');
@@ -113,6 +130,7 @@ export default function ProiectDetailsPage() {
       fetchContractInfo();
       fetchInvoiceInfo();
       fetchPaymentInfo();
+      fetchSubproiecte(); // NOU: 04.10.2025
     } else {
       router.push('/admin/rapoarte/proiecte');
     }
@@ -233,6 +251,42 @@ export default function ProiectDetailsPage() {
     }
   };
 
+  // NOU: Fetch subproiecte pentru afișare în Informații Generale (04.10.2025)
+  const fetchSubproiecte = async () => {
+    if (!proiectId) return;
+
+    setLoadingSubproiecte(true);
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('proiect_id', proiectId);
+
+      const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Procesează datele DATE de la BigQuery
+        const subproiecteFormatate = data.data.map((sub: any) => ({
+          ...sub,
+          Data_Final: sub.Data_Final?.value || sub.Data_Final
+        }));
+        setSubproiecte(subproiecteFormatate);
+        console.log(`🔷 Subproiecte încărcate pentru proiect ${proiectId}: ${subproiecteFormatate.length}`);
+      } else {
+        console.warn('🔷 API subproiecte nu a returnat date:', data);
+        setSubproiecte([]);
+      }
+    } catch (error) {
+      console.error('🔷 Eroare la încărcarea subproiectelor:', error);
+      setSubproiecte([]);
+    } finally {
+      setLoadingSubproiecte(false);
+    }
+  };
+
   const handleGenerateInvoice = async () => {
     if (!proiect) return;
     
@@ -300,6 +354,38 @@ export default function ProiectDetailsPage() {
     setShowEditModal(false);
     // Navigare înapoi la lista de proiecte
     router.push('/admin/rapoarte/proiecte');
+  };
+
+  // NOU: Handler pentru actualizare status subproiect (04.10.2025)
+  const handleSubproiectStatusUpdate = async (subproiectId: string, field: 'status_predare' | 'status_contract', value: string) => {
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Status actualizat cu succes!`);
+        // Actualizează local state-ul
+        setSubproiecte(prev => prev.map(sub =>
+          sub.ID_Subproiect === subproiectId
+            ? { ...sub, [field]: value }
+            : sub
+        ));
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea statusului subproiect:', error);
+      toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
   };
 
   const renderStatus = (status: string) => {
@@ -570,6 +656,84 @@ export default function ProiectDetailsPage() {
                 <div style={{ color: '#6c757d' }}>{proiect.Adresa}</div>
               </div>
             )}
+
+            {/* NOU: Lista Subproiecte cu statusuri editabile (04.10.2025) */}
+            {loadingSubproiecte ? (
+              <div style={{ color: '#6c757d', fontStyle: 'italic', marginTop: '1rem' }}>
+                Se încarcă subproiectele...
+              </div>
+            ) : subproiecte.length > 0 && (
+              <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e9ecef' }}>
+                <label style={{ display: 'block', fontWeight: 600, color: '#495057', marginBottom: '1rem' }}>
+                  Subproiecte ({subproiecte.length})
+                </label>
+
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  {subproiecte.map((sub) => (
+                    <div key={sub.ID_Subproiect} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr',
+                      gap: '0.75rem',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      background: 'rgba(59, 130, 246, 0.05)',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(59, 130, 246, 0.1)'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 500, color: '#2c3e50' }}>{sub.Denumire}</div>
+                        <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem' }}>
+                          Status: {sub.Status}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
+                          Predare
+                        </label>
+                        <select
+                          value={sub.status_predare || 'Nepredat'}
+                          onChange={(e) => handleSubproiectStatusUpdate(sub.ID_Subproiect, 'status_predare', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            background: 'white'
+                          }}
+                        >
+                          <option value="Nepredat">Nepredat</option>
+                          <option value="Predat">Predat</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
+                          Contract
+                        </label>
+                        <select
+                          value={sub.status_contract || 'Nu e cazul'}
+                          onChange={(e) => handleSubproiectStatusUpdate(sub.ID_Subproiect, 'status_contract', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            background: 'white'
+                          }}
+                        >
+                          <option value="Nu e cazul">Nu e cazul</option>
+                          <option value="Nesemnat">Nesemnat</option>
+                          <option value="Semnat">Semnat</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -683,6 +847,23 @@ export default function ProiectDetailsPage() {
                       {factura.status_scadenta}
                     </span>
                   </div>
+
+                  {/* NOU: Corespondență cu Subproiect (04.10.2025) */}
+                  {factura.subproiect_denumire && (
+                    <div style={{
+                      padding: '0.5rem',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      borderRadius: '4px',
+                      marginBottom: '0.5rem',
+                      fontSize: '13px'
+                    }}>
+                      <span style={{ color: '#3b82f6', fontWeight: 500 }}>📍 Corespondență: </span>
+                      <span style={{ color: '#1f2937' }}>
+                        {factura.tip_etapa === 'contract' ? 'Etapă Contract' : 'Etapă Anexă'} →
+                        Subproiect "{factura.subproiect_denumire}"
+                      </span>
+                    </div>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', fontSize: '14px' }}>
                     <div>
