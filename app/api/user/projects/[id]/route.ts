@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/projects/[id]/route.ts
-// DATA: 23.09.2025 18:20 (ora României)
+// DATA: 04.10.2025 23:30 (ora României)
 // DESCRIERE: API pentru detalii proiect utilizatori normali - FĂRĂ date financiare
 // FUNCȚIONALITATE: Returnează detalii complete proiect cu contracte, facturi - dar exclude valorile financiare
+// MODIFICAT: Adăugat progres_procent, ID_Subproiect și fix tabele _v2
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,8 +27,10 @@ const bigquery = new BigQuery({
 
 const dataset = bigquery.dataset(DATASET);
 const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 const CONTRACTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
 const FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const ETAPE_CONTRACT_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 
 console.log(`🔧 [User Projects ID] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -54,9 +57,10 @@ export async function GET(
         Descriere,
         Responsabil,
         status_predare,
+        progres_procent,
         Observatii
         -- Exclude: Prioritate (not in Proiecte table), Valoare_Estimata, valoare_ron, moneda, buget_*, cost_*
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\`
+      FROM ${PROIECTE_TABLE}
       WHERE ID_Proiect = @projectId
     `;
 
@@ -75,14 +79,16 @@ export async function GET(
     const subproiecteQuery = `
       SELECT
         ID_Subproiect,
+        ID_Proiect,
         Denumire,
         Status,
         Data_Start,
         Data_Final,
         Responsabil,
-        status_predare
+        status_predare,
+        progres_procent
         -- Exclude: financial fields (Valoare_Estimata, valoare_ron, moneda)
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\`
+      FROM ${SUBPROIECTE_TABLE}
       WHERE ID_Proiect = @projectId AND activ = true
       ORDER BY Data_Start DESC
     `;
@@ -100,7 +106,7 @@ export async function GET(
         c.Status_Contract,
         c.Observatii
         -- Exclude: Valoare_Contract, Moneda, etc.
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Contracte\` c
+      FROM ${CONTRACTE_TABLE} c
       WHERE c.ID_Proiect = @projectId
       ORDER BY c.Data_Semnare DESC
     `;
@@ -124,8 +130,8 @@ export async function GET(
         f.Status_Plata,
         ec.Denumire_Etapa as Subproiect_Asociat
         -- Exclude: Valoare_Factura, Suma_*, TVA_*, Total_*
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.FacturiGenerate\` f
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.EtapeContract\` ec
+      FROM ${FACTURI_TABLE} f
+      LEFT JOIN ${ETAPE_CONTRACT_TABLE} ec
         ON f.ID_Etapa = ec.ID_Etapa
       WHERE f.ID_Proiect = @projectId
       ORDER BY f.Data_Emitere DESC
@@ -144,7 +150,7 @@ export async function GET(
     // Procesare date pentru a elimina orice urmă de informații financiare
     const processedProiect = {
       ...proiect,
-      // Asigură că nu există câmpuri financiare
+      // Asigură că nu există câmpuri financiare (PĂSTRĂM progres_procent și status_predare)
       Valoare_Estimata: undefined,
       valoare_ron: undefined,
       moneda: undefined,
@@ -155,7 +161,7 @@ export async function GET(
 
     const processedSubproiecte = subproiecteRows.map((sub: any) => ({
       ...sub,
-      // Elimină câmpurile financiare
+      // Elimină câmpurile financiare (PĂSTRĂM progres_procent și status_predare)
       Valoare_Estimata: undefined,
       valoare_ron: undefined,
       moneda: undefined,

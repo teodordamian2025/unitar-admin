@@ -20,6 +20,7 @@ import { toast } from 'react-toastify';
 
 interface ProiectDetails {
   ID_Proiect: string;
+  ID_Subproiect?: string;    // NOU - 04.10.2025 - pentru subproiecte
   Denumire: string;
   Client: string;
   Status: string;
@@ -163,8 +164,10 @@ export default function UserProiectDetailsPage() {
       const newProgres: Record<string, number> = {};
       const newStatus: Record<string, string> = {};
       subproiecte.forEach(sub => {
-        newProgres[sub.ID_Proiect] = sub.progres_procent ?? 0;
-        newStatus[sub.ID_Proiect] = sub.status_predare || 'Nepredat';
+        // FIX: Folosim ID_Subproiect pentru indexare, nu ID_Proiect
+        const subId = sub.ID_Subproiect || sub.ID_Proiect;
+        newProgres[subId] = sub.progres_procent ?? 0;
+        newStatus[subId] = sub.status_predare || 'Nepredat';
       });
       setLocalProgresSubproiecte(newProgres);
       setLocalStatusPredareSubproiecte(newStatus);
@@ -189,7 +192,8 @@ export default function UserProiectDetailsPage() {
   useEffect(() => {
     Object.keys(debouncedProgresSubproiecte).forEach(subproiectId => {
       const debouncedValue = debouncedProgresSubproiecte[subproiectId];
-      const currentSub = subproiecte.find(s => s.ID_Proiect === subproiectId);
+      // FIX: Căutăm subproiectul după ID_Subproiect, nu ID_Proiect
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
 
       if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.progres_procent) {
         handleSubproiectProgresSave(subproiectId, debouncedValue);
@@ -201,7 +205,8 @@ export default function UserProiectDetailsPage() {
   useEffect(() => {
     Object.keys(debouncedStatusPredareSubproiecte).forEach(subproiectId => {
       const debouncedValue = debouncedStatusPredareSubproiecte[subproiectId];
-      const currentSub = subproiecte.find(s => s.ID_Proiect === subproiectId);
+      // FIX: Căutăm subproiectul după ID_Subproiect, nu ID_Proiect
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
 
       if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.status_predare) {
         handleStatusPredareSubproiect(subproiectId, debouncedValue);
@@ -335,8 +340,9 @@ export default function UserProiectDetailsPage() {
 
       if (data.success) {
         toast.success('Progres subproiect salvat!', { autoClose: 2000 });
+        // FIX: Căutăm după ID_Subproiect, nu ID_Proiect
         setSubproiecte(prev => prev.map(sub =>
-          sub.ID_Proiect === subproiectId ? { ...sub, progres_procent: value } : sub
+          (sub.ID_Subproiect || sub.ID_Proiect) === subproiectId ? { ...sub, progres_procent: value } : sub
         ));
 
         // Dacă API a returnat progres_proiect recalculat, actualizează și proiectul
@@ -354,7 +360,8 @@ export default function UserProiectDetailsPage() {
     } catch (error) {
       console.error('Eroare la actualizarea progresului subproiect:', error);
       toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
-      const currentSub = subproiecte.find(s => s.ID_Proiect === subproiectId);
+      // FIX: Căutăm după ID_Subproiect, nu ID_Proiect
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
       if (currentSub) {
         setLocalProgresSubproiecte(prev => ({ ...prev, [subproiectId]: currentSub.progres_procent ?? 0 }));
       }
@@ -378,8 +385,9 @@ export default function UserProiectDetailsPage() {
 
       if (data.success) {
         toast.success('Status predare actualizat!', { autoClose: 2000 });
+        // FIX: Căutăm după ID_Subproiect, nu ID_Proiect
         setSubproiecte(prev => prev.map(sub =>
-          sub.ID_Proiect === subproiectId ? { ...sub, status_predare: value } : sub
+          (sub.ID_Subproiect || sub.ID_Proiect) === subproiectId ? { ...sub, status_predare: value } : sub
         ));
       } else {
         throw new Error(data.error || 'Eroare la actualizare status');
@@ -387,7 +395,8 @@ export default function UserProiectDetailsPage() {
     } catch (error) {
       console.error('Eroare la actualizarea statusului predare:', error);
       toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
-      const currentSub = subproiecte.find(s => s.ID_Proiect === subproiectId);
+      // FIX: Căutăm după ID_Subproiect, nu ID_Proiect
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
       if (currentSub) {
         setLocalStatusPredareSubproiecte(prev => ({ ...prev, [subproiectId]: currentSub.status_predare || 'Nepredat' }));
       }
@@ -806,8 +815,11 @@ export default function UserProiectDetailsPage() {
             </h3>
 
             <div style={{ display: 'grid', gap: '1rem' }}>
-              {subproiecte.map(subproiect => (
-                <div key={subproiect.ID_Proiect} style={{
+              {subproiecte.map(subproiect => {
+                // FIX: Folosim ID_Subproiect pentru indexare în state-uri
+                const subId = subproiect.ID_Subproiect || subproiect.ID_Proiect;
+                return (
+                <div key={subId} style={{
                   border: '1px solid #dee2e6',
                   borderRadius: '8px',
                   padding: '1rem',
@@ -829,7 +841,7 @@ export default function UserProiectDetailsPage() {
                       </span>
                     </div>
                     <p style={{ margin: 0, color: '#7f8c8d', fontSize: '13px' }}>
-                      ID: {subproiect.ID_Proiect} • {formatDate(subproiect.Data_Start)} → {formatDate(subproiect.Data_Final)}
+                      ID: {subId} • {formatDate(subproiect.Data_Start)} → {formatDate(subproiect.Data_Final)}
                     </p>
                   </div>
 
@@ -849,26 +861,26 @@ export default function UserProiectDetailsPage() {
                             type="number"
                             min="0"
                             max="100"
-                            value={localProgresSubproiecte[subproiect.ID_Proiect] ?? 0}
+                            value={localProgresSubproiecte[subId] ?? 0}
                             onChange={(e) => {
                               const newProgres = Math.max(0, Math.min(100, parseInt(e.target.value) || 0));
                               setLocalProgresSubproiecte(prev => ({
                                 ...prev,
-                                [subproiect.ID_Proiect]: newProgres
+                                [subId]: newProgres
                               }));
                             }}
-                            disabled={savingProgresSubproiect === subproiect.ID_Proiect}
+                            disabled={savingProgresSubproiect === subId}
                             style={{
                               width: '60px',
                               padding: '0.5rem',
-                              paddingRight: savingProgresSubproiect === subproiect.ID_Proiect ? '1.75rem' : '0.5rem',
+                              paddingRight: savingProgresSubproiect === subId ? '1.75rem' : '0.5rem',
                               border: '1px solid #ddd',
                               borderRadius: '4px',
                               fontSize: '13px',
-                              background: savingProgresSubproiect === subproiect.ID_Proiect ? '#f0f0f0' : 'white'
+                              background: savingProgresSubproiect === subId ? '#f0f0f0' : 'white'
                             }}
                           />
-                          {savingProgresSubproiect === subproiect.ID_Proiect && (
+                          {savingProgresSubproiect === subId && (
                             <div style={{
                               position: 'absolute',
                               right: '6px',
@@ -889,7 +901,7 @@ export default function UserProiectDetailsPage() {
                       <div style={{ height: '16px', background: '#e9ecef', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
                         <div style={{
                           height: '100%',
-                          width: `${localProgresSubproiecte[subproiect.ID_Proiect] ?? 0}%`,
+                          width: `${localProgresSubproiecte[subId] ?? 0}%`,
                           background: 'linear-gradient(90deg, #3b82f6, #10b981)',
                           transition: 'width 0.3s ease',
                           borderRadius: '8px'
@@ -903,22 +915,22 @@ export default function UserProiectDetailsPage() {
                         <strong style={{ fontSize: '13px', color: '#f39c12' }}>Status Predare:</strong>
                       </div>
                       <select
-                        value={localStatusPredareSubproiecte[subproiect.ID_Proiect] || 'Nepredat'}
+                        value={localStatusPredareSubproiecte[subId] || 'Nepredat'}
                         onChange={(e) => {
                           setLocalStatusPredareSubproiecte(prev => ({
                             ...prev,
-                            [subproiect.ID_Proiect]: e.target.value
+                            [subId]: e.target.value
                           }));
                         }}
-                        disabled={savingStatusSubproiect === subproiect.ID_Proiect}
+                        disabled={savingStatusSubproiect === subId}
                         style={{
                           width: '100%',
                           padding: '0.5rem',
                           border: '1px solid #ddd',
                           borderRadius: '4px',
                           fontSize: '13px',
-                          background: savingStatusSubproiect === subproiect.ID_Proiect ? '#f0f0f0' : 'white',
-                          cursor: savingStatusSubproiect === subproiect.ID_Proiect ? 'not-allowed' : 'pointer'
+                          background: savingStatusSubproiect === subId ? '#f0f0f0' : 'white',
+                          cursor: savingStatusSubproiect === subId ? 'not-allowed' : 'pointer'
                         }}
                       >
                         <option value="Nepredat">Nepredat</option>
@@ -949,7 +961,8 @@ export default function UserProiectDetailsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}
