@@ -121,10 +121,10 @@ const formatDateLiteral = (dateString: string | null): string => {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const proiectId = params.id;
+    const { id: proiectId } = await props.params;
 
     console.log('🔍 GET PROIECT BY ID:', proiectId);
 
@@ -287,10 +287,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const proiectId = params.id;
+    const { id: proiectId } = await props.params;
     const updateData = await request.json();
 
     console.log('=== DEBUG PUT BY ID: Date primite pentru actualizare ===');
@@ -403,10 +403,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const proiectId = params.id;
+    const { id: proiectId } = await props.params;
 
     if (!proiectId) {
       return NextResponse.json({ 

@@ -82,10 +82,10 @@ async function recalculateProiectProgres(proiectId: string): Promise<number> {
 // PUT: Actualizare status_predare sau status_contract
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const subproiectId = params.id;
+    const { id: subproiectId } = await props.params;
     const body = await request.json();
 
     console.log('🔷 UPDATE Subproiect:', { subproiectId, body });
@@ -230,10 +230,10 @@ export async function PUT(
 // GET: Detalii subproiect individual (optional, pentru viitor)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const subproiectId = params.id;
+    const { id: subproiectId } = await props.params;
 
     const query = `
       SELECT *
