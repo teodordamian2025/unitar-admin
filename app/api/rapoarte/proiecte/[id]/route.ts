@@ -1,7 +1,10 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/proiecte/[id]/route.ts
-// DATA: 02.09.2025 23:15 (ora României)
-// FIX CRITIC: Îmbunătățire convertBigQueryNumeric pentru valorile NUMERIC din BigQuery
+// DATA: 05.10.2025 01:00 (ora României)
+// MODIFICAT: Fix CRITICAL - Folosire corectă tabele _v2 cu suffix dinamic
+// CAUZA: Query-urile foloseau hard-coded tabele fără _v2 → eroare încărcare date proiect complet
+// FIX: Înlocuit toate referințele cu variabilele TABLE_* definite cu tableSuffix
+// FIX ANTERIOR: Îmbunătățire convertBigQueryNumeric pentru valorile NUMERIC din BigQuery
 // PĂSTRATE: Toate funcționalitățile existente + JOIN cu Clienti
 // ==================================================================
 
@@ -19,8 +22,16 @@ const dataset = 'PanouControlUnitar';
 const table = `Proiecte${tableSuffix}`;
 const tableClienti = `Clienti${tableSuffix}`;
 const tableSubproiecte = `Subproiecte${tableSuffix}`; // NOU: Pentru validare progres_procent
+const tableSesiuniLucru = `SesiuniLucru${tableSuffix}`;
+
+// ✅ Variabile cu path complet pentru query-uri (fără backticks în definiție)
+const TABLE_PROIECTE = `${PROJECT_ID}.${dataset}.Proiecte${tableSuffix}`;
+const TABLE_CLIENTI = `${PROJECT_ID}.${dataset}.Clienti${tableSuffix}`;
+const TABLE_SUBPROIECTE = `${PROJECT_ID}.${dataset}.Subproiecte${tableSuffix}`;
+const TABLE_SESIUNI_LUCRU = `${PROJECT_ID}.${dataset}.SesiuniLucru${tableSuffix}`;
 
 console.log(`🔧 Proiecte [ID] API - Tables Mode: ${useV2Tables ? 'V2 (Optimized)' : 'V1 (Standard)'}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, Subproiecte${tableSuffix}, SesiuniLucru${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -130,7 +141,7 @@ export async function GET(
 
     // Query cu JOIN pentru client_id și date complete (PĂSTRAT)
     const proiectQuery = `
-      SELECT 
+      SELECT
         p.*,
         c.id as client_id,
         c.nume as client_nume,
@@ -143,15 +154,15 @@ export async function GET(
         c.email as client_email,
         c.banca as client_banca,
         c.iban as client_iban
-      FROM \`${PROJECT_ID}.${dataset}.Proiecte\` p
-      LEFT JOIN \`${PROJECT_ID}.${dataset}.Clienti\` c
+      FROM \`${TABLE_PROIECTE}\` p
+      LEFT JOIN \`${TABLE_CLIENTI}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
       WHERE p.ID_Proiect = @proiectId
     `;
 
     // Query pentru subproiecte asociate (PĂSTRAT)
     const subproiecteQuery = `
-      SELECT * FROM \`${PROJECT_ID}.${dataset}.Subproiecte\`
+      SELECT * FROM \`${TABLE_SUBPROIECTE}\`
       WHERE ID_Proiect = @proiectId
       AND (activ IS NULL OR activ = true)
       ORDER BY Denumire ASC
@@ -159,7 +170,7 @@ export async function GET(
 
     // Query pentru sesiuni de lucru (PĂSTRAT)
     const sesiuniQuery = `
-      SELECT * FROM \`${PROJECT_ID}.${dataset}.SesiuniLucru\`
+      SELECT * FROM \`${TABLE_SESIUNI_LUCRU}\`
       WHERE proiect_id = @proiectId
       ORDER BY data_start DESC
       LIMIT 10
@@ -311,7 +322,7 @@ export async function PUT(
       // Verifică dacă proiectul are subproiecte active
       const checkSubproiecteQuery = `
         SELECT COUNT(*) as count
-        FROM \`${PROJECT_ID}.${dataset}.${tableSubproiecte}\`
+        FROM \`${TABLE_SUBPROIECTE}\`
         WHERE ID_Proiect = '${escapeString(proiectId)}' AND activ = true
       `;
 
@@ -369,7 +380,7 @@ export async function PUT(
     }
 
     const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${dataset}.Proiecte\`
+      UPDATE \`${TABLE_PROIECTE}\`
       SET ${updateFields.join(', ')}
       WHERE ID_Proiect = '${escapeString(proiectId)}'
     `;
@@ -419,7 +430,7 @@ export async function DELETE(
     console.log('Proiect ID:', proiectId);
 
     const deleteQuery = `
-      DELETE FROM \`${PROJECT_ID}.${dataset}.Proiecte\`
+      DELETE FROM \`${TABLE_PROIECTE}\`
       WHERE ID_Proiect = '${escapeString(proiectId)}'
     `;
 
