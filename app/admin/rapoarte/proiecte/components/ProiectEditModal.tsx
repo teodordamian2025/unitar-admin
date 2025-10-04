@@ -1677,6 +1677,7 @@ export default function ProiectEditModal({
                   }}
                 >
                   <option value="Nefacturat">Nefacturat</option>
+                  <option value="Partial Facturat">Partial Facturat</option>
                   <option value="Facturat">Facturat</option>
                 </select>
               </div>
@@ -2149,6 +2150,7 @@ export default function ProiectEditModal({
                     }}
                   >
                     <option value="Nefacturat">Nefacturat</option>
+                    <option value="Partial Facturat">Partial Facturat</option>
                     <option value="Facturat">Facturat</option>
                   </select>
                   

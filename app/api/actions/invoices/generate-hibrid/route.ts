@@ -34,6 +34,7 @@ const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffi
 const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
 const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``; // ✅ NOU: Tabel pentru update status_facturare
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``; // ✅ NOU: Tabel pentru update status_facturare proiect părinte
 const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca${tableSuffix}\``;
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
@@ -374,6 +375,106 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       isEdit,
       facturaId,
       etapeCount: etapeFacturate.length,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    // Nu oprește procesul - continuă cu generarea facturii
+  }
+}
+
+// ✅ NOUĂ: Funcție pentru actualizarea status_facturare la proiectul părinte
+// DATA: 04.10.2025 21:30 (ora României)
+// SCOP: După facturarea subproiectelor, actualizează statusul proiectului părinte:
+//       - "Facturat" dacă TOATE subproiectele sunt facturate
+//       - "Partial Facturat" dacă UNELE (dar nu toate) sunt facturate
+//       - "Nefacturat" dacă NICIUN subproiect nu e facturat
+async function updateProiectStatusFacturare(proiectId: string) {
+  if (!proiectId) {
+    console.log('⚠️ [PROIECT-STATUS] Nu există proiectId pentru actualizare status');
+    return;
+  }
+
+  console.log(`🔍 [PROIECT-STATUS] Verificare status facturare pentru proiect: ${proiectId}`);
+
+  try {
+    // PASUL 1: Numără subproiectele și câte sunt facturate
+    const countQuery = `
+      SELECT
+        COUNT(*) as total_subproiecte,
+        COUNTIF(status_facturare = 'Facturat') as facturate
+      FROM ${TABLE_SUBPROIECTE}
+      WHERE ID_Proiect = @proiectId AND activ = true
+    `;
+
+    const [countRows] = await bigquery.query({
+      query: countQuery,
+      params: { proiectId },
+      types: { proiectId: 'STRING' },
+      location: 'EU'
+    });
+
+    if (!countRows || countRows.length === 0) {
+      console.log(`⚠️ [PROIECT-STATUS] Nu s-au găsit subproiecte pentru proiect ${proiectId}`);
+      return;
+    }
+
+    const stats = countRows[0];
+    const totalSubproiecte = parseInt(stats.total_subproiecte) || 0;
+    const facturate = parseInt(stats.facturate) || 0;
+
+    console.log(`📊 [PROIECT-STATUS] Statistici subproiecte pentru ${proiectId}:`, {
+      total: totalSubproiecte,
+      facturate: facturate,
+      nefacturate: totalSubproiecte - facturate
+    });
+
+    // PASUL 2: Determină statusul proiectului părinte
+    let statusProiect = 'Nefacturat';
+
+    if (totalSubproiecte === 0) {
+      // Dacă nu are subproiecte, nu schimbăm statusul
+      console.log(`ℹ️ [PROIECT-STATUS] Proiect fără subproiecte - nu se modifică statusul`);
+      return;
+    } else if (facturate === totalSubproiecte) {
+      // Toate subproiectele sunt facturate
+      statusProiect = 'Facturat';
+    } else if (facturate > 0) {
+      // Unele (dar nu toate) sunt facturate
+      statusProiect = 'Partial Facturat';
+    } else {
+      // Niciun subproiect nu e facturat
+      statusProiect = 'Nefacturat';
+    }
+
+    console.log(`✅ [PROIECT-STATUS] Status calculat pentru proiect ${proiectId}: "${statusProiect}"`);
+
+    // PASUL 3: Actualizează statusul proiectului în BigQuery
+    const updateQuery = `
+      UPDATE ${TABLE_PROIECTE}
+      SET
+        status_facturare = @statusFacturare,
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE ID_Proiect = @proiectId
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: {
+        statusFacturare: statusProiect,
+        proiectId
+      },
+      types: {
+        statusFacturare: 'STRING',
+        proiectId: 'STRING'
+      },
+      location: 'EU'
+    });
+
+    console.log(`✅ [PROIECT-STATUS] Proiect ${proiectId} actualizat cu status_facturare = "${statusProiect}"`);
+
+  } catch (error) {
+    console.error('❌ [PROIECT-STATUS] Eroare la actualizarea statusului proiectului:', error);
+    console.error('📋 [DEBUG] Detalii eroare:', {
+      proiectId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     // Nu oprește procesul - continuă cu generarea facturii
@@ -1382,10 +1483,16 @@ export async function POST(request: NextRequest) {
       // ✅ NOU: Update statusuri etape după salvarea facturii cu flag isEdit
       if (etapeFacturate && etapeFacturate.length > 0) {
         console.log(`📋 [ETAPE-FACTURI] Actualizez statusurile pentru ${etapeFacturate.length} etape ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}...`);
-        
+
         try {
           await updateEtapeStatusuri(etapeFacturate, currentFacturaId, proiectId, isEdit);
           console.log(`✅ [ETAPE-FACTURI] Statusuri etape actualizate cu succes ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
+
+          // ✅ NOU: Actualizează și statusul proiectului părinte după facturarea etapelor
+          // DATA: 04.10.2025 21:35 (ora României)
+          console.log(`📋 [PROIECT-STATUS] Actualizez status_facturare pentru proiect părinte: ${proiectId}...`);
+          await updateProiectStatusFacturare(proiectId);
+          console.log(`✅ [PROIECT-STATUS] Status proiect actualizat cu succes`);
         } catch (etapeError) {
           console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor etapelor:', etapeError);
           // Nu oprește procesul - continuă cu factura generată

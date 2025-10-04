@@ -1326,6 +1326,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                   }}
                 >
                   <option value="Nefacturat">Nefacturat</option>
+                  <option value="Partial Facturat">Partial Facturat</option>
                   <option value="Facturat">Facturat</option>
                 </select>
               </div>
@@ -1783,6 +1784,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     }}
                   >
                     <option value="Nefacturat">Nefacturat</option>
+                    <option value="Partial Facturat">Partial Facturat</option>
                     <option value="Facturat">Facturat</option>
                   </select>
                   
