@@ -1,7 +1,10 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/cheltuieli/route.ts
-// DATA: 24.08.2025 22:18 (ora României)
-// FIX: data_curs_valutar cu literale SQL ca la Proiecte
+// DATA: 05.10.2025 00:35 (ora României)
+// MODIFICAT: Fix CRITICAL - Eliminat backticks dublate din definițiile TABLE_*
+// CAUZA: Variabilele aveau backticks incluse, query-urile adăugau încă backticks → eroare BigQuery
+// FIX: Eliminat backticks din liniile 18-20, query-urile rămân neschimbate
+// FIX ANTERIOR: data_curs_valutar cu literale SQL ca la Proiecte
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,10 +17,10 @@ const DATASET = 'PanouControlUnitar';
 const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
 const tableSuffix = useV2Tables ? '_v2' : '';
 
-// ✅ Tabele cu suffix dinamic
-const TABLE_PROIECTE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
-const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
-const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+// ✅ Tabele cu suffix dinamic (fără backticks în definiție pentru consistență cu pattern-ul aplicației)
+const TABLE_PROIECTE_CHELTUIELI = `${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}`;
+const TABLE_PROIECTE = `${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}`;
+const TABLE_SUBPROIECTE = `${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}`;
 
 console.log(`🔧 Cheltuieli API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: ProiecteCheltuieli${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}`);

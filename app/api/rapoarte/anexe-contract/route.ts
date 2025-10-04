@@ -1,6 +1,9 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/anexe-contract/route.ts
-// DATA: 07.09.2025 16:05 (ora României)
+// DATA: 05.10.2025 00:35 (ora României)
+// MODIFICAT: Fix CRITICAL - Eliminat backticks dublate din definițiile TABLE_*
+// CAUZA: Variabilele aveau backticks incluse, query-urile adăugau încă backticks → eroare BigQuery
+// FIX: Eliminat backticks din liniile 19-21, query-urile rămân neschimbate
 // DESCRIERE: API pentru managementul anexelor la contracte cu structură similară EtapeContract
 // ==================================================================
 
@@ -14,11 +17,11 @@ const DATASET = 'PanouControlUnitar';
 const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
 const tableSuffix = useV2Tables ? '_v2' : '';
 
-// ✅ Tabele cu suffix dinamic
+// ✅ Tabele cu suffix dinamic (fără backticks în definiție pentru consistență cu pattern-ul aplicației)
 const TABLE = `AnexeContract${tableSuffix}`;
-const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
-const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
-const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}`;
+const TABLE_CONTRACTE = `${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}`;
+const TABLE_SUBPROIECTE = `${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}`;
 
 console.log(`🔧 Anexe Contract API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: AnexeContract${tableSuffix}, Contracte${tableSuffix}, Subproiecte${tableSuffix}`);
