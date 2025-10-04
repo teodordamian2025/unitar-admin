@@ -325,7 +325,92 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// MODIFICAT: Funcție helper pentru generarea următorului număr - EXPORTATĂ
+// ✅ NOUĂ: Funcție PREVIEW - citește numărul FĂRĂ a-l incrementa în BigQuery
+// DATA: 04.10.2025 23:45 (ora României)
+// SCOP: Frontend poate afișa preview-ul numărului FĂRĂ să consume un număr
+export async function previewNextContractNumber(tipDocument: string, proiectId?: string, contractParinteId?: string) {
+  try {
+    await ensureTableExists();
+
+    console.log(`[SETARI-CONTRACTE-PREVIEW] Preview număr pentru tipDocument: ${tipDocument}, proiectId: ${proiectId}`);
+
+    // Încarcă setările pentru tipul de document
+    const setariQuery = `
+      SELECT * FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      WHERE tip_document = @tip_document AND activ = true
+      LIMIT 1
+    `;
+
+    const [setariRows] = await bigquery.query({
+      query: setariQuery,
+      params: { tip_document: tipDocument },
+      types: { tip_document: 'STRING' },
+      location: 'EU',
+    });
+
+    if (setariRows.length === 0) {
+      // Returnează număr default dacă nu există setări
+      const currentYear = new Date().getFullYear();
+      const defaultSerie = tipDocument === 'contract' ? 'CONTR' : tipDocument === 'pv' ? 'PV' : 'ANX';
+      return {
+        numar_contract: `${defaultSerie}-1001-${currentYear}`,
+        numar_secvential: 1001,
+        serie: defaultSerie,
+        setari: { tip_document: tipDocument }
+      };
+    }
+
+    const setari = setariRows[0];
+    // ✅ PREVIEW: Calculează nextNumber FĂRĂ a executa UPDATE
+    const nextNumber = convertBigQueryNumeric(setari.numar_curent || 1000) + 1;
+
+    console.log(`[SETARI-CONTRACTE-PREVIEW] Preview calculat:`, {
+      serie: setari.serie,
+      numar_curent_db: convertBigQueryNumeric(setari.numar_curent),
+      nextNumber_preview: nextNumber,
+      format: setari.format_numerotare
+    });
+
+    // Construiește numărul contractului (FĂRĂ UPDATE în BigQuery)
+    let numarContract = setari.format_numerotare;
+
+    numarContract = numarContract.replace('{serie}', setari.serie);
+    numarContract = numarContract.replace('{prefix}', setari.prefix || '');
+    numarContract = numarContract.replace('{numar}', nextNumber.toString().padStart(4, '0'));
+
+    if (setari.include_an) {
+      numarContract = numarContract.replace('{an}', new Date().getFullYear().toString());
+    }
+
+    if (setari.include_luna) {
+      const luna = String(new Date().getMonth() + 1).padStart(2, '0');
+      numarContract = numarContract.replace('{luna}', luna);
+    }
+
+    if (setari.include_proiect_id && proiectId) {
+      numarContract = numarContract.replace('{proiect_id}', proiectId);
+    }
+
+    if (contractParinteId) {
+      numarContract = numarContract.replace('{contract_id}', contractParinteId);
+    }
+
+    console.log(`[SETARI-CONTRACTE-PREVIEW] ✅ Preview generat (FĂRĂ UPDATE): ${numarContract}`);
+
+    return {
+      numar_contract: numarContract,
+      numar_secvential: nextNumber,
+      serie: setari.serie,
+      setari: setari
+    };
+
+  } catch (error) {
+    logError('[SETARI-CONTRACTE-PREVIEW] Eroare la preview număr:', error);
+    throw error;
+  }
+}
+
+// MODIFICAT: Funcție helper pentru CONSUME (generarea ȘI incrementarea) următorului număr - EXPORTATĂ
 export async function getNextContractNumber(tipDocument: string, proiectId?: string, contractParinteId?: string) {
   try {
     await ensureTableExists();

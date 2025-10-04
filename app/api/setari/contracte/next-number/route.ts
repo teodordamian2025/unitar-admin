@@ -1,12 +1,12 @@
 // ==================================================================
 // CALEA: app/api/setari/contracte/next-number/route.ts
-// DATA: 12.09.2025 21:00 (ora României)
-// VERIFICAT: Import corect din funcția exportată + logging îmbunătățit
-// PĂSTRATE: Toate funcționalitățile existente
+// DATA: 04.10.2025 23:50 (ora României)
+// MODIFICAT: Folosește previewNextContractNumber (FĂRĂ UPDATE) pentru preview frontend
+// SCOP: Frontend poate afișa preview FĂRĂ să consume un număr din BigQuery
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getNextContractNumber } from '../route';
+import { previewNextContractNumber } from '../route';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[NEXT-NUMBER] 🔢 Preview număr contract pentru:', { tipDocument, proiectId });
 
-    // VERIFICAT: Folosește funcția exportată din ../route.ts pentru numerotarea consecutivă
-    const contractData = await getNextContractNumber(tipDocument, proiectId);
+    // ✅ FOLOSEȘTE PREVIEW - NU INCREMENTEAZĂ numărul în BigQuery
+    const contractData = await previewNextContractNumber(tipDocument, proiectId);
 
     console.log('[NEXT-NUMBER] ✅ Număr contract generat:', {
       numar_contract: contractData.numar_contract,
