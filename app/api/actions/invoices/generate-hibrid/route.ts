@@ -410,11 +410,22 @@ async function updateProiectStatusFacturare(proiectId: string) {
       WHERE ID_Proiect = @proiectId AND activ = true
     `;
 
+    console.log(`🔍 [PROIECT-STATUS] Query pentru numărare subproiecte:`, {
+      query: countQuery,
+      proiectId,
+      table: TABLE_SUBPROIECTE
+    });
+
     const [countRows] = await bigquery.query({
       query: countQuery,
       params: { proiectId },
       types: { proiectId: 'STRING' },
       location: 'EU'
+    });
+
+    console.log(`📊 [PROIECT-STATUS] Rezultate query BigQuery:`, {
+      rows_count: countRows?.length || 0,
+      raw_data: countRows && countRows.length > 0 ? countRows[0] : null
     });
 
     if (!countRows || countRows.length === 0) {
@@ -429,7 +440,9 @@ async function updateProiectStatusFacturare(proiectId: string) {
     console.log(`📊 [PROIECT-STATUS] Statistici subproiecte pentru ${proiectId}:`, {
       total: totalSubproiecte,
       facturate: facturate,
-      nefacturate: totalSubproiecte - facturate
+      nefacturate: totalSubproiecte - facturate,
+      raw_total: stats.total_subproiecte,
+      raw_facturate: stats.facturate
     });
 
     // PASUL 2: Determină statusul proiectului părinte
@@ -461,6 +474,13 @@ async function updateProiectStatusFacturare(proiectId: string) {
       WHERE ID_Proiect = @proiectId
     `;
 
+    console.log(`🔄 [PROIECT-STATUS] Execut UPDATE pentru proiect:`, {
+      query: updateQuery,
+      statusFacturare: statusProiect,
+      proiectId,
+      table: TABLE_PROIECTE
+    });
+
     await bigquery.query({
       query: updateQuery,
       params: {
@@ -472,6 +492,11 @@ async function updateProiectStatusFacturare(proiectId: string) {
         proiectId: 'STRING'
       },
       location: 'EU'
+    });
+
+    console.log(`✅ [PROIECT-STATUS] UPDATE executat cu succes:`, {
+      statusNou: statusProiect,
+      proiectId
     });
 
     console.log(`✅ [PROIECT-STATUS] Proiect ${proiectId} actualizat cu status_facturare = "${statusProiect}"`);
@@ -1501,25 +1526,33 @@ export async function POST(request: NextRequest) {
         console.log('📋 [ETAPE-FACTURI] Nu există etape pentru actualizare statusuri');
       }
 
-      // ✅ PĂSTRAT: Actualizează numărul curent în setări doar pentru facturi noi (nu edit)
-      if (!isEdit && !isStorno && setariFacturare && numarFactura) {
+      // ✅ FIX CRITICAL: Incrementare număr curent direct în BigQuery (fără fetch)
+      // DATA: 04.10.2025 22:30 (ora României)
+      // SCOP: Rezolvare problemă numerotare factură - fetch server-side eșua silent
+      if (!isEdit && !isStorno && setariFacturare) {
         try {
-          const updateSetariResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/setari/facturare`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...setariFacturare,
-              numar_curent_facturi: (setariFacturare.numar_curent_facturi || 0) + 1
-            })
+          console.log(`🔢 [NUMEROTARE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1}...`);
+
+          const TABLE_SETARI_FACTURARE = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
+
+          const incrementQuery = `
+            UPDATE ${TABLE_SETARI_FACTURARE}
+            SET
+              numar_curent_facturi = numar_curent_facturi + 1,
+              data_actualizare = CURRENT_TIMESTAMP()
+            WHERE id = 'setari_facturare_main'
+          `;
+
+          await bigquery.query({
+            query: incrementQuery,
+            location: 'EU'
           });
-          
-          if (updateSetariResponse.ok) {
-            console.log('✅ Număr curent actualizat în setări');
-          } else {
-            console.log('⚠️ Nu s-a putut actualiza numărul curent - response not ok');
-          }
+
+          console.log(`✅ [NUMEROTARE] Număr curent incrementat cu succes în BigQuery SetariFacturare`);
+
         } catch (error) {
-          console.error('⚠️ Nu s-a putut actualiza numărul curent:', error);
+          console.error('❌ [NUMEROTARE] Eroare la incrementarea numărului curent:', error);
+          // Nu oprește procesul - factura a fost deja salvată
         }
       }
 
