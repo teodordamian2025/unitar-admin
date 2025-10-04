@@ -10,6 +10,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { getNextContractNumber } from '@/app/api/setari/contracte/route';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -139,33 +140,38 @@ const sanitizeStringForBigQuery = (value: any): string | null => {
   return String(value).trim() || null;
 };
 
-// PĂSTRAT identic - Funcție pentru obținerea următorului număr PV
+// ✅ FIX CRITICAL: Apel DIRECT la getNextContractNumber (fără fetch, fără UPDATE duplicat)
+// DATA: 04.10.2025 23:15 (ora României)
+// SCOP: Rezolvare problemă numerotare PV "sare din 2 în 2" - eliminat fetch către API
 async function getNextPVNumber(proiectId?: string): Promise<any> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/setari/contracte/next-number?tipDocument=pv&proiectId=${proiectId || ''}`);
-    const result = await response.json();
-    
-    if (result.success) {
-      return {
-        numar_pv: result.contract_preview,
-        numar_secvential: result.numar_secvential,
-        serie: result.serie,
-        setari: result
-      };
-    } else {
-      const currentYear = new Date().getFullYear();
-      const fallbackNumber = Math.floor(Math.random() * 1000) + 100;
-      return {
-        numar_pv: `PV-${fallbackNumber}-${currentYear}`,
-        numar_secvential: fallbackNumber,
-        serie: 'PV',
-        setari: { tip_document: 'pv' }
-      };
-    }
+    console.log(`🔢 [PV-NUMEROTARE] Generez număr PV pentru proiect: ${proiectId || 'N/A'}`);
+
+    // ✅ APEL DIRECT la funcția exportată - elimină UPDATE duplicat
+    const contractData = await getNextContractNumber('pv', proiectId);
+
+    console.log(`✅ [PV-NUMEROTARE] Număr PV generat:`, {
+      numar_pv: contractData.numar_contract,
+      numar_secvential: contractData.numar_secvential,
+      serie: contractData.serie
+    });
+
+    return {
+      numar_pv: contractData.numar_contract,
+      numar_secvential: contractData.numar_secvential,
+      serie: contractData.serie,
+      setari: contractData.setari
+    };
+
   } catch (error) {
-    console.error('Eroare la obținerea numărului PV:', error);
+    console.error('❌ [PV-NUMEROTARE] Eroare la obținerea numărului PV:', error);
+
+    // Fallback cu număr random dacă BigQuery eșuează
     const currentYear = new Date().getFullYear();
     const fallbackNumber = Math.floor(Math.random() * 1000) + 100;
+
+    console.warn(`⚠️ [PV-NUMEROTARE] Folosesc număr fallback: PV-${fallbackNumber}-${currentYear}`);
+
     return {
       numar_pv: `PV-${fallbackNumber}-${currentYear}`,
       numar_secvential: fallbackNumber,
