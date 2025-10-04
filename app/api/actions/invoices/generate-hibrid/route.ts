@@ -365,6 +365,11 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
     if (updateSubproiecte.length > 0) {
       await Promise.all(updateSubproiecte);
       console.log(`✅ [SUBPROIECTE] ${updateSubproiecte.length} subproiecte actualizate cu status_facturare = Facturat`);
+
+      // ✅ CRUCIAL: După actualizarea subproiectelor, actualizează și proiectul părinte
+      // DATA: 04.10.2025 22:00 (ora României)
+      console.log(`📋 [PROIECT-STATUS] Actualizez proiect părinte după facturarea subproiectelor: ${proiectId}...`);
+      await updateProiectStatusFacturare(proiectId);
     }
 
     console.log(`✅ [ETAPE-FACTURI] Statusuri actualizate cu succes pentru ${etapeFacturate.length} etape (${isEdit ? 'EDIT' : 'NEW'} mode)`);
@@ -1487,12 +1492,7 @@ export async function POST(request: NextRequest) {
         try {
           await updateEtapeStatusuri(etapeFacturate, currentFacturaId, proiectId, isEdit);
           console.log(`✅ [ETAPE-FACTURI] Statusuri etape actualizate cu succes ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
-
-          // ✅ NOU: Actualizează și statusul proiectului părinte după facturarea etapelor
-          // DATA: 04.10.2025 21:35 (ora României)
-          console.log(`📋 [PROIECT-STATUS] Actualizez status_facturare pentru proiect părinte: ${proiectId}...`);
-          await updateProiectStatusFacturare(proiectId);
-          console.log(`✅ [PROIECT-STATUS] Status proiect actualizat cu succes`);
+          // ✅ Nota: updateProiectStatusFacturare() se apelează AUTOMAT în updateEtapeStatusuri() după actualizarea subproiectelor
         } catch (etapeError) {
           console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor etapelor:', etapeError);
           // Nu oprește procesul - continuă cu factura generată
