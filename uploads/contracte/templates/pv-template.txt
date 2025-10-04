@@ -5,7 +5,7 @@
 **{{client.nume}}**, având CIF {{client.cui}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, denumită în continuare **BENEFICIAR**
 
 Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} exemplare 
-Proiect: **{{proiect.denumire}}** din {{proiect.adresa}} 
+Proiect: **{{proiect.denumire}}** {{proiect.adresa}} 
 {{subproiecte_lista}}.
 {{observatii_clause}}
 ---
