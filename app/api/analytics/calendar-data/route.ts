@@ -91,9 +91,9 @@ export async function GET(request: NextRequest) {
             AND s.data_scadenta <= '${endDate}'
             ${userId ? `AND sr.responsabil_uid = '${userId}'` : ''}
             ${proiectId ? `AND s.proiect_id = '${proiectId}'` : ''}
-          GROUP BY s.id, s.titlu, s.descriere, s.prioritate, s.status, 
-                   s.data_scadenta, s.data_creare, s.data_finalizare, 
-                   s.proiect_id, s.timp_estimat_total_ore, p.Denumire, p.Status
+          GROUP BY s.id, s.titlu, s.descriere, s.prioritate, s.status,
+                   s.data_scadenta, s.data_creare, s.data_finalizare,
+                   s.proiect_id, s.timp_estimat_total_ore, s.progres_procent, p.Denumire, p.Status
         )
         SELECT 
           id,

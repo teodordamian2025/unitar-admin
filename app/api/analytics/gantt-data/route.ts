@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
           ${startDate ? 'AND p.Data_Final >= @startDate' : ''}
           ${endDate ? 'AND p.Data_Start <= @endDate' : ''}
         GROUP BY p.ID_Proiect, p.Denumire, p.Adresa, p.Data_Start, p.Data_Final,
-                 p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil
+                 p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil, p.progres_procent
       )
       SELECT
         ID_Proiect as id,
@@ -190,8 +190,8 @@ export async function GET(request: NextRequest) {
           ${projectIds ? 'AND sp.ID_Proiect IN UNNEST(@projectIds)' : ''}
           ${startDate ? 'AND sp.Data_Final >= @startDate' : ''}
           ${endDate ? 'AND sp.Data_Start <= @endDate' : ''}
-        GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start, 
-                 sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil
+        GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start,
+                 sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil, sp.progres_procent
       )
       SELECT
         ID_Subproiect as id,
@@ -273,8 +273,8 @@ export async function GET(request: NextRequest) {
           ${userId ? 'AND sr.responsabil_uid = @userId' : ''}
           ${startDate ? 'AND s.data_scadenta >= @startDate' : ''}
           ${endDate ? 'AND s.data_creare <= @endDate' : ''}
-        GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.data_creare, 
-                 s.data_scadenta, s.status, s.prioritate, s.timp_estimat_total_ore
+        GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.data_creare,
+                 s.data_scadenta, s.status, s.prioritate, s.timp_estimat_total_ore, s.progres_procent
       )
       SELECT
         id,

@@ -667,6 +667,7 @@ Proiecte_v2,status_achitare,STRING,YES,16
 Proiecte_v2,curs_valutar,"NUMERIC(10, 4)",YES,17
 Proiecte_v2,data_curs_valutar,DATE,YES,18
 Proiecte_v2,valoare_ron,"NUMERIC(15, 2)",YES,19
+Proiecte_v2,progres_procent,INT64,YES,20
 RaportFacturi,id,STRING,YES,1
 RaportFacturi,numar_complet,STRING,YES,2
 RaportFacturi,data_factura,DATE,YES,3
@@ -776,6 +777,19 @@ SetariContracte,include_proiect_id,BOOL,YES,10
 SetariContracte,activ,BOOL,YES,11
 SetariContracte,data_creare,TIMESTAMP,YES,12
 SetariContracte,data_actualizare,TIMESTAMP,YES,13
+SetariContracte_v2,id,STRING,NO,1
+SetariContracte_v2,tip_document,STRING,NO,2
+SetariContracte_v2,serie,STRING,NO,3
+SetariContracte_v2,prefix,STRING,YES,4
+SetariContracte_v2,numar_curent,INT64,NO,5
+SetariContracte_v2,format_numerotare,STRING,NO,6
+SetariContracte_v2,separator,STRING,NO,7
+SetariContracte_v2,include_an,BOOL,NO,8
+SetariContracte_v2,include_luna,BOOL,NO,9
+SetariContracte_v2,include_proiect_id,BOOL,NO,10
+SetariContracte_v2,activ,BOOL,NO,11
+SetariContracte_v2,data_creare,TIMESTAMP,NO,12
+SetariContracte_v2,data_actualizare,TIMESTAMP,NO,13
 SetariFacturare,id,STRING,NO,1
 SetariFacturare,serie_facturi,STRING,NO,2
 SetariFacturare,serie_proforme,STRING,NO,3
@@ -799,6 +813,29 @@ SetariFacturare,valabilitate_proforme,INT64,NO,20
 SetariFacturare,termen_plata_standard,INT64,NO,21
 SetariFacturare,data_creare,TIMESTAMP,NO,22
 SetariFacturare,data_actualizare,TIMESTAMP,NO,23
+SetariFacturare_v2,id,STRING,NO,1
+SetariFacturare_v2,serie_facturi,STRING,NO,2
+SetariFacturare_v2,serie_proforme,STRING,NO,3
+SetariFacturare_v2,serie_chitante,STRING,NO,4
+SetariFacturare_v2,serie_contracte,STRING,NO,5
+SetariFacturare_v2,numar_curent_facturi,INT64,NO,6
+SetariFacturare_v2,numar_curent_proforme,INT64,NO,7
+SetariFacturare_v2,numar_curent_chitante,INT64,NO,8
+SetariFacturare_v2,numar_curent_contracte,INT64,NO,9
+SetariFacturare_v2,format_numerotare,STRING,NO,10
+SetariFacturare_v2,separator_numerotare,STRING,NO,11
+SetariFacturare_v2,include_an_numerotare,BOOL,NO,12
+SetariFacturare_v2,include_luna_numerotare,BOOL,NO,13
+SetariFacturare_v2,efactura_enabled,BOOL,NO,14
+SetariFacturare_v2,efactura_timp_intarziere,INT64,NO,15
+SetariFacturare_v2,efactura_mock_mode,BOOL,NO,16
+SetariFacturare_v2,efactura_auto_send,BOOL,NO,17
+SetariFacturare_v2,cota_tva_standard,INT64,NO,18
+SetariFacturare_v2,cota_tva_redusa,INT64,NO,19
+SetariFacturare_v2,valabilitate_proforme,INT64,NO,20
+SetariFacturare_v2,termen_plata_standard,INT64,NO,21
+SetariFacturare_v2,data_creare,TIMESTAMP,NO,22
+SetariFacturare_v2,data_actualizare,TIMESTAMP,NO,23
 SetariFirma,id,STRING,NO,1
 SetariFirma,nume_firma,STRING,NO,2
 SetariFirma,cui,STRING,NO,3
@@ -922,6 +959,7 @@ Subproiecte_v2,status_achitare,STRING,YES,16
 Subproiecte_v2,curs_valutar,"NUMERIC(10, 4)",YES,17
 Subproiecte_v2,data_curs_valutar,DATE,YES,18
 Subproiecte_v2,valoare_ron,"NUMERIC(15, 2)",YES,19
+Subproiecte_v2,progres_procent,INT64,YES,20
 TimeTracking,id,STRING,NO,1
 TimeTracking,sarcina_id,STRING,YES,2
 TimeTracking,utilizator_uid,STRING,NO,3
