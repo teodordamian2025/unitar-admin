@@ -265,23 +265,11 @@ export default function GanttView() {
               .reduce((sum: number, t: any) => sum + (t.ore || 0), 0);
           }
 
-          // Calculate progress based on real data or status - FIXED: Read from database
-          let progress = 0;
-          if (p.Progres !== undefined && p.Progres !== null) {
-            // Use real progress from database
-            progress = Math.max(0, Math.min(100, Math.round(p.Progres)));
-          } else if (p.Status === 'Finalizat') {
-            progress = 100;
-          } else if (p.Status === 'In Progres' || p.Status === 'Activ') {
-            // Only fall back to calculation if no real data
-            if (workedHours > 0 && p.Ore_Estimate > 0) {
-              progress = Math.min(100, Math.round((workedHours / p.Ore_Estimate) * 100));
-            } else {
-              progress = 25; // Default for active projects
-            }
-          } else {
-            progress = 0; // Not started
-          }
+          // FIX CRITICAL: Read progres_procent from database (not Progres)
+          // NULL or 0 returns 0, no fallback to calculation
+          const progress = p.progres_procent !== undefined && p.progres_procent !== null
+            ? Math.max(0, Math.min(100, Math.round(p.progres_procent)))
+            : 0;
 
           return {
             id: `proj_${p.ID_Proiect || index}`,
@@ -335,12 +323,17 @@ export default function GanttView() {
           const dataStart = s.Data_Start?.value || s.Data_Start;
           const dataFinal = s.Data_Final?.value || s.Data_Final;
 
+          // FIX CRITICAL: Read progres_procent from database (not Progres)
+          const progress = s.progres_procent !== undefined && s.progres_procent !== null
+            ? Math.max(0, Math.min(100, Math.round(s.progres_procent)))
+            : 0;
+
           return {
             id: `subproj_${s.ID_Subproiect || index}`,
             name: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`,
             startDate: dataStart || new Date().toISOString().split('T')[0],
             endDate: dataFinal || new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: s.Progres !== undefined && s.Progres !== null ? Math.max(0, Math.min(100, Math.round(s.Progres))) : (s.Status === 'Finalizat' ? 100 : (s.Status === 'Activ' ? 50 : 0)),
+            progress,
             type: 'subproiect' as const,
             parentId: `proj_${s.ID_Proiect}`,
             dependencies: [],
@@ -388,12 +381,17 @@ export default function GanttView() {
           const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
           const dataCreare = s.data_creare?.value || s.data_creare;
 
+          // FIX CRITICAL: Read progres_procent from database (not progres)
+          const progress = s.progres_procent !== undefined && s.progres_procent !== null
+            ? Math.max(0, Math.min(100, Math.round(s.progres_procent)))
+            : 0;
+
           return {
             id: `task_${s.id || index}`,
             name: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`,
             startDate: dataCreare || new Date().toISOString().split('T')[0],
             endDate: dataScadenta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: s.progres !== undefined && s.progres !== null ? Math.max(0, Math.min(100, Math.round(s.progres))) : (s.status === 'finalizata' ? 100 : (s.status === 'in_progress' ? 50 : 0)),
+            progress,
             type: 'sarcina' as const,
             parentId: s.subproiect_id ? `subproj_${s.subproiect_id}` : `proj_${s.proiect_id}`,
             dependencies: [],
