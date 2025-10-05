@@ -72,16 +72,12 @@ export async function GET(request: NextRequest) {
             
             -- Responsabili (concatenați)
             STRING_AGG(DISTINCT sr.responsabil_nume, ', ') as responsabili,
-            
+
             -- Ore lucrate din TimeTracking
             COALESCE(SUM(tt.ore_lucrate), 0) as ore_lucrate_total,
-            
-            -- Calculez progres
-            CASE 
-              WHEN s.timp_estimat_total_ore > 0 
-              THEN ROUND(COALESCE(SUM(tt.ore_lucrate), 0) / s.timp_estimat_total_ore * 100, 1)
-              ELSE 0 
-            END as progres_procent
+
+            -- ✅ CITEȘTE DIRECT din Sarcini_v2.progres_procent (05.10.2025)
+            COALESCE(s.progres_procent, 0) as progres_procent
             
           FROM ${TABLE_SARCINI} s
           LEFT JOIN ${TABLE_PROIECTE} p 

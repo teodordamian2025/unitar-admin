@@ -62,16 +62,9 @@ export async function GET(request: NextRequest) {
           p.Valoare_Estimata,
           p.moneda,
           p.Responsabil,
-          
-          -- Calculez progres bazat pe subproiecte și sarcini
-          COALESCE(
-            ROUND(
-              (COUNT(CASE WHEN s.status = 'finalizata' THEN 1 END) * 100.0) / 
-              NULLIF(COUNT(s.id), 0), 
-              1
-            ), 
-            0
-          ) as progress_from_sarcini,
+
+          -- ✅ CITEȘTE DIRECT din Proiecte_v2.progres_procent (05.10.2025)
+          COALESCE(p.progres_procent, 0) as progress_from_column,
           
           -- Ore estimate și lucrate
           SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
@@ -108,7 +101,7 @@ export async function GET(request: NextRequest) {
         Adresa,
         Data_Start as startDate,
         Data_Final as endDate,
-        progress_from_sarcini as progress,
+        progress_from_column as progress,
         'proiect' as type,
         NULL as parentId,
         ARRAY<STRING>[] as dependencies,
@@ -160,7 +153,7 @@ export async function GET(request: NextRequest) {
     // 2. SUBPROIECTE - nivel 1 în hierarchy
     const subproiecteQuery = `
       WITH subproject_stats AS (
-        SELECT 
+        SELECT
           sp.ID_Subproiect,
           sp.ID_Proiect,
           sp.Denumire,
@@ -169,16 +162,9 @@ export async function GET(request: NextRequest) {
           sp.Status,
           sp.Valoare_Estimata,
           sp.Responsabil,
-          
-          -- Progres din sarcini
-          COALESCE(
-            ROUND(
-              (COUNT(CASE WHEN s.status = 'finalizata' THEN 1 END) * 100.0) / 
-              NULLIF(COUNT(s.id), 0), 
-              1
-            ), 
-            0
-          ) as progress_from_sarcini,
+
+          -- ✅ CITEȘTE DIRECT din Subproiecte_v2.progres_procent (05.10.2025)
+          COALESCE(sp.progres_procent, 0) as progress_from_column,
           
           -- Ore
           SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
@@ -207,12 +193,12 @@ export async function GET(request: NextRequest) {
         GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start, 
                  sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil
       )
-      SELECT 
+      SELECT
         ID_Subproiect as id,
         Denumire as name,
         Data_Start as startDate,
         Data_Final as endDate,
-        progress_from_sarcini as progress,
+        progress_from_column as progress,
         'subproiect' as type,
         ID_Proiect as parentId,
         ARRAY<STRING>[] as dependencies,
@@ -248,7 +234,7 @@ export async function GET(request: NextRequest) {
     // 3. SARCINI - nivel 2-3 în hierarchy
     const sarciniQuery = `
       WITH task_stats AS (
-        SELECT 
+        SELECT
           s.id,
           s.proiect_id,
           s.tip_proiect,
@@ -258,13 +244,9 @@ export async function GET(request: NextRequest) {
           s.status,
           s.prioritate,
           s.timp_estimat_total_ore,
-          
-          -- Progres din ore lucrate vs estimate
-          CASE 
-            WHEN s.timp_estimat_total_ore > 0 
-            THEN LEAST(100, ROUND((SUM(COALESCE(tt.ore_lucrate, 0)) / s.timp_estimat_total_ore) * 100, 1))
-            ELSE CASE WHEN s.status = 'finalizata' THEN 100 ELSE 0 END
-          END as calculated_progress,
+
+          -- ✅ CITEȘTE DIRECT din Sarcini_v2.progres_procent (05.10.2025)
+          COALESCE(s.progres_procent, 0) as progress_from_column,
           
           -- Ore lucrate
           SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
@@ -294,12 +276,12 @@ export async function GET(request: NextRequest) {
         GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.data_creare, 
                  s.data_scadenta, s.status, s.prioritate, s.timp_estimat_total_ore
       )
-      SELECT 
+      SELECT
         id,
         titlu as name,
         data_creare as startDate,
         data_scadenta as endDate,
-        calculated_progress as progress,
+        progress_from_column as progress,
         'sarcina' as type,
         proiect_id as parentId,
         COALESCE(task_dependencies, ARRAY<STRING>[]) as dependencies,
