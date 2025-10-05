@@ -388,6 +388,7 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
 
 // ✅ NOUĂ: Funcție pentru actualizarea status_facturare la proiectul părinte
 // DATA: 04.10.2025 21:30 (ora României)
+// MODIFICAT: 05.10.2025 09:00 - FIX CRUCIAL pentru Proiecte_v2 partitioned table
 // SCOP: După facturarea subproiectelor, actualizează statusul proiectului părinte:
 //       - "Facturat" dacă TOATE subproiectele sunt facturate
 //       - "Partial Facturat" dacă UNELE (dar nu toate) sunt facturate
@@ -465,19 +466,64 @@ async function updateProiectStatusFacturare(proiectId: string) {
 
     console.log(`✅ [PROIECT-STATUS] Status calculat pentru proiect ${proiectId}: "${statusProiect}"`);
 
-    // PASUL 3: Actualizează statusul proiectului în BigQuery
+    // ✅ FIX CRITICAL: PASUL 2.5 - Citește Data_Start pentru partition key (Proiecte_v2 e partitioned)
+    // DATA: 05.10.2025 09:00 (ora României)
+    // PROBLEMA: Proiecte_v2 folosește partitioning pe Data_Start, UPDATE fără partition key eșuează silent
+    // SOLUȚIE: Citește Data_Start înainte de UPDATE și adaugă în WHERE clause
+    const proiectQuery = `
+      SELECT Data_Start
+      FROM ${TABLE_PROIECTE}
+      WHERE ID_Proiect = @proiectId
+    `;
+
+    console.log(`🔍 [PROIECT-STATUS] Citesc Data_Start pentru partition key:`, {
+      query: proiectQuery,
+      proiectId
+    });
+
+    const [proiectRows] = await bigquery.query({
+      query: proiectQuery,
+      params: { proiectId },
+      types: { proiectId: 'STRING' },
+      location: 'EU'
+    });
+
+    if (!proiectRows || proiectRows.length === 0) {
+      console.error(`❌ [PROIECT-STATUS] Nu s-a găsit proiectul ${proiectId} în BigQuery`);
+      return;
+    }
+
+    // ✅ Gestionare BigQuery DATE field ca obiect {value: "2025-09-10"}
+    const dataStartRaw = proiectRows[0]?.Data_Start;
+    const dataStart = dataStartRaw?.value || dataStartRaw;
+
+    console.log(`📅 [PROIECT-STATUS] Data_Start găsit pentru partition:`, {
+      raw: dataStartRaw,
+      processed: dataStart,
+      type: typeof dataStart
+    });
+
+    if (!dataStart) {
+      console.error(`❌ [PROIECT-STATUS] Data_Start lipsă pentru proiect ${proiectId} - UPDATE nu poate continua`);
+      return;
+    }
+
+    // PASUL 3: Actualizează statusul proiectului în BigQuery CU partition key
+    // ✅ FIX: Adăugat Data_Start în WHERE pentru partition pruning corect
     const updateQuery = `
       UPDATE ${TABLE_PROIECTE}
       SET
         status_facturare = @statusFacturare,
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE ID_Proiect = @proiectId
+        AND Data_Start = DATE(@dataStart)
     `;
 
-    console.log(`🔄 [PROIECT-STATUS] Execut UPDATE pentru proiect:`, {
+    console.log(`🔄 [PROIECT-STATUS] Execut UPDATE pentru proiect CU partition key:`, {
       query: updateQuery,
       statusFacturare: statusProiect,
       proiectId,
+      dataStart,
       table: TABLE_PROIECTE
     });
 
@@ -485,21 +531,25 @@ async function updateProiectStatusFacturare(proiectId: string) {
       query: updateQuery,
       params: {
         statusFacturare: statusProiect,
-        proiectId
+        proiectId,
+        dataStart: dataStart // ✅ FIX: Partition key pentru Proiecte_v2
       },
       types: {
         statusFacturare: 'STRING',
-        proiectId: 'STRING'
+        proiectId: 'STRING',
+        dataStart: 'STRING' // ✅ STRING pentru conversie la DATE în query
       },
       location: 'EU'
     });
 
-    console.log(`✅ [PROIECT-STATUS] UPDATE executat cu succes:`, {
+    console.log(`✅ [PROIECT-STATUS] UPDATE executat cu succes CU partition key:`, {
       statusNou: statusProiect,
-      proiectId
+      proiectId,
+      dataStart,
+      partition_key_folosit: true
     });
 
-    console.log(`✅ [PROIECT-STATUS] Proiect ${proiectId} actualizat cu status_facturare = "${statusProiect}"`);
+    console.log(`✅ [PROIECT-STATUS] Proiect ${proiectId} actualizat cu status_facturare = "${statusProiect}" (fix partitioning aplicat)`);
 
   } catch (error) {
     console.error('❌ [PROIECT-STATUS] Eroare la actualizarea statusului proiectului:', error);
