@@ -304,6 +304,43 @@ export async function POST(request: NextRequest) {
 
     console.log(`FIXAT - Sarcină ${sarcinaId} creată cu progres ${progresProcent}% și data_finalizare: ${dataFinalizareLiteral}`);
 
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare fiecărui responsabil la atribuire sarcină
+    if (data.responsabili && data.responsabili.length > 0) {
+      for (const responsabil of data.responsabili) {
+        // Nu trimite notificare dacă responsabilul este creatorul sarcinii
+        if (responsabil.uid === data.created_by) {
+          console.log(`⏭️ Skip notificare pentru creator (${responsabil.uid})`);
+          continue;
+        }
+
+        try {
+          const notifyResponse = await fetch(`${request.url.split('/api/')[0]}/api/notifications/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tip_notificare: 'sarcina_atribuita',
+              user_id: responsabil.uid,
+              context: {
+                sarcina_id: sarcinaId,
+                sarcina_titlu: data.titlu,
+                sarcina_descriere: data.descriere || '',
+                sarcina_prioritate: data.prioritate,
+                sarcina_deadline: data.data_scadenta || '',
+                proiect_id: data.proiect_id,
+                user_name: responsabil.nume_complet,
+              }
+            })
+          });
+
+          const notifyResult = await notifyResponse.json();
+          console.log(`✅ Notificare sarcină trimisă pentru ${responsabil.nume_complet}:`, notifyResult);
+        } catch (notifyError) {
+          console.error(`⚠️ Eroare la trimitere notificare pentru ${responsabil.nume_complet} (non-blocking):`, notifyError);
+          // Nu blocăm crearea sarcinii dacă notificarea eșuează
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Sarcină creată cu succes',

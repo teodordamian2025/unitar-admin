@@ -15,6 +15,7 @@ import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
 import PersistentTimer from './PersistentTimer';
 import InvisibleTimerAlert from './InvisibleTimerAlert';
+import NotificationBell from './notifications/NotificationBell';
 
 interface ModernLayoutProps {
   children: ReactNode;
@@ -404,6 +405,11 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
                 userId={user.uid}
                 user={user}
               />
+            )}
+
+            {/* Notification Bell - Clopoțel notificări */}
+            {user?.uid && (
+              <NotificationBell userId={user.uid} />
             )}
 
             {/* Persistent Timer */}

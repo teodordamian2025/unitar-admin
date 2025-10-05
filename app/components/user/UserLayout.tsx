@@ -15,6 +15,7 @@ import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
 import UserPersistentTimer from './UserPersistentTimer';
 import InvisibleTimerAlert from '../InvisibleTimerAlert';
+import NotificationBell from '../notifications/NotificationBell';
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -417,7 +418,25 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
           }}>
             UNITAR USER
           </h1>
-          <div style={{ width: '2.5rem' }} /> {/* Spacer */}
+          {/* Notification Bell pentru mobile */}
+          {user?.uid && (
+            <NotificationBell userId={user.uid} />
+          )}
+        </div>
+
+        {/* Top bar pentru desktop cu NotificationBell */}
+        <div style={{
+          display: !isMobile ? 'flex' : 'none',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          padding: '1rem 1.5rem',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+        }}>
+          {user?.uid && (
+            <NotificationBell userId={user.uid} />
+          )}
         </div>
 
         {/* Page content */}

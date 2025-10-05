@@ -480,6 +480,34 @@ export async function POST(request: NextRequest) {
 
     console.log('=== DEBUG BACKEND: Insert executat cu succes ===');
 
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare responsabil la atribuire proiect
+    if (Responsabil) {
+      try {
+        const notifyResponse = await fetch(`${request.url.split('/api/')[0]}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip_notificare: 'proiect_atribuit',
+            user_id: Responsabil,
+            context: {
+              proiect_id: ID_Proiect,
+              proiect_denumire: Denumire,
+              proiect_client: Client,
+              proiect_descriere: Descriere || '',
+              proiect_deadline: Data_Final || '',
+              user_name: Responsabil, // Poate fi îmbunătățit cu numele real din Utilizatori
+            }
+          })
+        });
+
+        const notifyResult = await notifyResponse.json();
+        console.log('✅ Notificare proiect trimisă:', notifyResult);
+      } catch (notifyError) {
+        console.error('⚠️ Eroare la trimitere notificare (non-blocking):', notifyError);
+        // Nu blocăm crearea proiectului dacă notificarea eșuează
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Proiect adăugat cu succes'
