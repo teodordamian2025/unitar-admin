@@ -15,6 +15,7 @@ import { auth } from '@/lib/firebaseConfig';
 import UserLayout from '@/app/components/user/UserLayout';
 import { LoadingSpinner } from '@/app/components/ui';
 import UserSarciniProiectModal from '../components/UserSarciniProiectModal';
+import ProcesVerbalModal from '@/app/admin/rapoarte/proiecte/components/ProcesVerbalModal';
 import { useDebounce } from '@/app/hooks/useDebounce';
 import { toast } from 'react-toastify';
 
@@ -71,6 +72,7 @@ export default function UserProiectDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSarciniModal, setShowSarciniModal] = useState(false);
   const [selectedProiectForSarcini, setSelectedProiectForSarcini] = useState<ProiectDetails | null>(null);
+  const [showPVModal, setShowPVModal] = useState(false); // NOU: State pentru Proces Verbal modal
 
   // NOU: State pentru debouncing progres și status predare (04.10.2025)
   const [localProgresProiect, setLocalProgresProiect] = useState<number>(0);
@@ -515,10 +517,10 @@ export default function UserProiectDetailsPage() {
             )}
           </div>
 
-          {/* NOU: Progres și Status Predare Proiect (04.10.2025) */}
+          {/* NOU: Progres, Status Predare și Proces Verbal - Layout 3 coloane (05.10.2025) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gridTemplateColumns: '1fr auto auto', // 50% | 25% | 25%
             gap: '2rem',
             marginTop: '2rem',
             padding: '1.5rem',
@@ -526,7 +528,7 @@ export default function UserProiectDetailsPage() {
             borderRadius: '12px',
             border: '1px solid rgba(52, 152, 219, 0.2)'
           }}>
-            {/* Progres Proiect */}
+            {/* Coloana 1: Progres Proiect (50%) */}
             <div>
               <h4 style={{ margin: '0 0 1rem 0', color: '#3498db' }}>📊 Progres Proiect</h4>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -597,8 +599,8 @@ export default function UserProiectDetailsPage() {
               )}
             </div>
 
-            {/* Status Predare Proiect */}
-            <div>
+            {/* Coloana 2: Status Predare (25%) */}
+            <div style={{ minWidth: '200px' }}>
               <h4 style={{ margin: '0 0 1rem 0', color: '#f39c12' }}>📦 Status Predare</h4>
               <select
                 value={localStatusPredareProiect}
@@ -616,6 +618,50 @@ export default function UserProiectDetailsPage() {
                 <option value="Nepredat">Nepredat</option>
                 <option value="Predat">Predat</option>
               </select>
+            </div>
+
+            {/* Coloana 3: Proces Verbal (25%) - NOU */}
+            <div style={{ minWidth: '200px' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#27ae60' }}>📋 Proces Verbal</h4>
+              <button
+                onClick={() => setShowPVModal(true)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #27ae60 0%, #229954 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(39, 174, 96, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(39, 174, 96, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(39, 174, 96, 0.3)';
+                }}
+              >
+                📋 Generează PV
+              </button>
+              <p style={{
+                margin: '0.5rem 0 0 0',
+                fontSize: '12px',
+                color: '#7f8c8d',
+                fontStyle: 'italic',
+                textAlign: 'center'
+              }}>
+                Pentru predarea proiectului
+              </p>
             </div>
           </div>
 
@@ -977,6 +1023,30 @@ export default function UserProiectDetailsPage() {
             setSelectedProiectForSarcini(null);
           }}
           proiect={selectedProiectForSarcini}
+        />
+      )}
+
+      {/* Proces Verbal Modal - NOU (05.10.2025) - Reutilizează componenta admin */}
+      {showPVModal && proiect && (
+        <ProcesVerbalModal
+          proiect={{
+            ID_Proiect: proiect.ID_Proiect,
+            Denumire: proiect.Denumire,
+            Client: proiect.Client,
+            Status: proiect.Status,
+            Data_Start: proiect.Data_Start,
+            Data_Final: proiect.Data_Final,
+            Responsabil: proiect.Responsabil_Principal,
+            Adresa: proiect.Client_Adresa,
+            Descriere: proiect.Descriere
+          }}
+          isOpen={showPVModal}
+          onClose={() => setShowPVModal(false)}
+          onSuccess={() => {
+            setShowPVModal(false);
+            loadProiectDetails(); // Refresh datele după generare PV
+            toast.success('Proces Verbal generat cu succes!', { autoClose: 3000 });
+          }}
         />
       )}
 
