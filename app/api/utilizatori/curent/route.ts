@@ -39,17 +39,17 @@ export async function POST(request: NextRequest) {
 
     // Extrage datele complete ale utilizatorului din BigQuery
     const query = `
-      SELECT 
-        uid, 
-        email, 
-        nume, 
-        prenume, 
-        rol, 
-        permisiuni, 
+      SELECT
+        uid,
+        email,
+        nume,
+        prenume,
+        rol,
+        permisiuni,
         activ,
         data_creare,
         data_ultima_conectare
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\`
+      FROM ${UTILIZATORI_TABLE}
       WHERE uid = @uid AND activ = true
     `;
 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizează ultima conectare
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\`
+      UPDATE ${UTILIZATORI_TABLE}
       SET data_ultima_conectare = CURRENT_TIMESTAMP()
       WHERE uid = @uid
     `;

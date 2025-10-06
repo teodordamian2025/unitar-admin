@@ -27,6 +27,7 @@ const bigquery = new BigQuery({
 const dataset = bigquery.dataset(DATASET);
 const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
 const RESPONSABILI_TABLE = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+const TIME_TRACKING_TABLE = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
 
 console.log(`🔧 [User Sarcini] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -48,16 +49,16 @@ export async function GET(request: NextRequest) {
             sr.responsabil_uid,
             sr.responsabil_nume,
             sr.rol_in_sarcina
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
+          FROM ${RESPONSABILI_TABLE} sr
           WHERE sr.sarcina_id = s.id
         ) as responsabili,
         COALESCE(
           (SELECT SUM(CAST(tt.ore_lucrate AS FLOAT64))
-           FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\` tt
+           FROM ${TIME_TRACKING_TABLE} tt
            WHERE tt.sarcina_id = s.id),
           0
         ) as total_ore_lucrate
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
+      FROM ${SARCINI_TABLE} s
       WHERE s.proiect_id = @proiect_id
       ORDER BY s.data_creare DESC
     `;
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Inserare sarcină în BigQuery cu gestionare NULL-uri
     const insertSarcinaQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      INSERT INTO ${SARCINI_TABLE}
       (
         id, proiect_id, tip_proiect, titlu, descriere, status, prioritate,
         progres_procent, progres_descriere, data_scadenta, observatii,
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
     // Inserare responsabili - IDENTIC cu admin
     if (sarcinaData.responsabili && sarcinaData.responsabili.length > 0) {
       const insertResponsabiliQuery = `
-        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
+        INSERT INTO ${RESPONSABILI_TABLE}
         (sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_asignare)
         VALUES
       `;

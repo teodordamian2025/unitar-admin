@@ -28,6 +28,7 @@ const bigquery = new BigQuery({
 const dataset = bigquery.dataset(DATASET);
 const TRANZACTII_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiImportate${tableSuffix}\``;
 const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacuri${tableSuffix}\``;
+const TRANZACTII_BANCARE_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
 
 console.log(`🔧 [Auto Match] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -576,12 +577,12 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
     // Actualizăm statusul tranzacțiilor
     const tranzactieIds = matches.map(m => `"${m.tranzactie_id}"`).join(',');
     await bigquery.query(`
-      UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-      SET 
+      UPDATE ${TRANZACTII_BANCARE_TABLE}
+      SET
         matching_tip = 'auto',
         matching_confidence = (
-          SELECT confidence_score 
-          FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiMatching\`
+          SELECT confidence_score
+          FROM \`${PROJECT_ID}.${DATASET}.TranzactiiMatching${tableSuffix}\`
           WHERE tranzactie_id = TranzactiiBancare.id AND status = 'active'
           ORDER BY confidence_score DESC LIMIT 1
         ),
@@ -666,7 +667,7 @@ export async function POST(request: NextRequest) {
     // Căutăm tranzacțiile fără matching
     const whereClause = account_id ? `AND account_id = "${account_id}"` : '';
     const [tranzactii] = await bigquery.query(`
-      SELECT 
+      SELECT
         id,
         suma,
         data_procesare,
@@ -674,8 +675,8 @@ export async function POST(request: NextRequest) {
         cui_contrapartida,
         detalii_tranzactie,
         directie
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-      WHERE 
+      FROM ${TRANZACTII_BANCARE_TABLE}
+      WHERE
         (matching_tip IS NULL OR matching_tip = 'none')
         AND processed = FALSE
         AND status = 'nou'

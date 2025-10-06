@@ -28,6 +28,7 @@ const bigquery = new BigQuery({
 const dataset = bigquery.dataset(DATASET);
 const TRANZACTII_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiImportate${tableSuffix}\``;
 const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacuri${tableSuffix}\``;
+const TRANZACTII_BANCARE_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
 
 console.log(`🔧 [Manual Match] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -550,7 +551,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
   try {
     // Obținem detaliile tranzacției
     const [tranzactiiRows] = await bigquery.query(`
-      SELECT * FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+      SELECT * FROM ${TRANZACTII_BANCARE_TABLE}
       WHERE id = "${matchRequest.tranzactie_id}"
     `);
 
@@ -654,8 +655,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 
     // Actualizăm tranzacția
     await bigquery.query(`
-      UPDATE \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
-      SET 
+      UPDATE ${TRANZACTII_BANCARE_TABLE}
+      SET
         matching_tip = 'manual',
         matching_confidence = ${matchRequest.confidence_manual},
         status = 'matched',
@@ -737,10 +738,10 @@ export async function GET(request: NextRequest) {
 
     // Obținem detaliile tranzacției
     const [tranzactiiRows] = await bigquery.query(`
-      SELECT 
-        id, suma, data_procesare, directie, nume_contrapartida, 
+      SELECT
+        id, suma, data_procesare, directie, nume_contrapartida,
         cui_contrapartida, detalii_tranzactie, tip_categorie
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+      FROM ${TRANZACTII_BANCARE_TABLE}
       WHERE id = "${tranzactieId}"
     `);
 

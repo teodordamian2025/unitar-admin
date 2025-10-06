@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     // Verifică dacă utilizatorul există în BigQuery
     const query = `
       SELECT rol, permisiuni, activ
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\`
+      FROM ${UTILIZATORI_TABLE}
       WHERE uid = @uid
     `;
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) {
       // Utilizatorul nu există, creează-l cu rol normal
       const insertQuery = `
-        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\`
+        INSERT INTO ${UTILIZATORI_TABLE}
         (uid, email, rol, permisiuni, activ, data_creare)
         VALUES (@uid, @email, 'normal', JSON '{"proiecte": {"read": true, "write": true}, "timp": {"read": true, "write": true}, "rapoarte": {"read": true}, "financiar": {"read": false, "write": false}}', true, CURRENT_TIMESTAMP())
       `;
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizează ultima conectare
     const updateQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Utilizatori\`
+      UPDATE ${UTILIZATORI_TABLE}
       SET data_ultima_conectare = CURRENT_TIMESTAMP()
       WHERE uid = @uid
     `;

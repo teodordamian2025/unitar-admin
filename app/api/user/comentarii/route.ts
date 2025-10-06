@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         autor_uid,
         autor_nume,
         data_comentariu
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiectComentarii\`
+      FROM ${COMENTARII_TABLE}
       WHERE proiect_id = @proiect_id
       ORDER BY data_comentariu DESC
     `;
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Inserare comentariu în BigQuery cu tip_proiect obligatoriu
     const insertComentariuQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiectComentarii\`
+      INSERT INTO ${COMENTARII_TABLE}
       (
         id, proiect_id, tip_proiect, autor_uid, autor_nume, comentariu, data_comentariu, tip_comentariu
       )

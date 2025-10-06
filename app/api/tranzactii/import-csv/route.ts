@@ -27,6 +27,8 @@ const bigquery = new BigQuery({
 
 const dataset = bigquery.dataset(DATASET);
 const TRANZACTII_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiImportate${tableSuffix}\``;
+const TRANZACTII_BANCARE_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
+const TRANZACTII_ACCOUNTS_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiAccounts${tableSuffix}\``;
 
 console.log(`🔧 [Import CSV] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -310,8 +312,8 @@ async function deduplicateTransactions(transactions: INGTransaction[]): Promise<
   try {
     // Interogare BigQuery pentru hash-uri existente
     const query = `
-      SELECT transaction_hash 
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare\`
+      SELECT transaction_hash
+      FROM ${TRANZACTII_BANCARE_TABLE}
       WHERE transaction_hash IN (${hashes.map(h => `"${h}"`).join(',')})
     `;
 
@@ -468,7 +470,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Căutăm contul ING în baza de date
       const [accounts] = await bigquery.query(`
-        SELECT id FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiAccounts\`
+        SELECT id FROM ${TRANZACTII_ACCOUNTS_TABLE}
         WHERE iban = 'RO82INGB0000999905667533' AND activ = TRUE
         LIMIT 1
       `);

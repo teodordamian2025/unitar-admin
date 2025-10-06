@@ -27,6 +27,8 @@ const bigquery = new BigQuery({
 const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const PROIECTE_RESPONSABILI_TABLE = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+const SARCINI_RESPONSABILI_TABLE = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
 
 console.log(`🔧 [User Objectives] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -43,8 +45,8 @@ export async function GET(request: NextRequest) {
     const objectivesQuery = `
       WITH UserProjects AS (
         SELECT DISTINCT p.ID_Proiect, p.Denumire, p.Status, p.Data_Start, p.Data_Final
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Proiecte\` p
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.ProiecteResponsabili\` pr
+        FROM ${PROIECTE_TABLE} p
+        LEFT JOIN ${PROIECTE_RESPONSABILI_TABLE} pr
           ON p.ID_Proiect = pr.proiect_id
         WHERE (p.Status != 'Inchis' OR p.Status IS NULL)
       ),
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
           sp.Status,
           sp.Data_Start,
           sp.Data_Final
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` sp
+        FROM ${SUBPROIECTE_TABLE} sp
         INNER JOIN UserProjects up ON sp.ID_Proiect = up.ID_Proiect
         WHERE (sp.Status != 'Inchis' OR sp.Status IS NULL)
       ),
@@ -73,15 +75,15 @@ export async function GET(request: NextRequest) {
           CASE
             WHEN s.tip_proiect = 'proiect' THEN s.proiect_id
             WHEN s.tip_proiect = 'subproiect' THEN
-              (SELECT sp.ID_Proiect FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Subproiecte\` sp WHERE sp.ID_Subproiect = s.proiect_id)
+              (SELECT sp.ID_Proiect FROM ${SUBPROIECTE_TABLE} sp WHERE sp.ID_Subproiect = s.proiect_id)
             ELSE s.proiect_id
           END as actual_proiect_id,
           s.titlu,
           s.status,
           s.prioritate,
           s.data_scadenta
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\` s
-        LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\` sr
+        FROM ${SARCINI_TABLE} s
+        LEFT JOIN ${SARCINI_RESPONSABILI_TABLE} sr
           ON s.id = sr.sarcina_id
         WHERE (s.status != 'Finalizata' OR s.status IS NULL)
       ),

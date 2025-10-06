@@ -245,10 +245,10 @@ export async function POST(request: NextRequest) {
 
     // Inserare sarcină cu progres și data_finalizare FIXAT
     const sarcinaId = data.id || `TASK_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    
+
     const insertSarcinaQuery = `
-      INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
-      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, data_finalizare, observatii, 
+      INSERT INTO ${TABLE_SARCINI}
+      (id, proiect_id, tip_proiect, titlu, descriere, prioritate, status, data_scadenta, data_finalizare, observatii,
        created_by, data_creare, updated_at, timp_estimat_zile, timp_estimat_ore, timp_estimat_total_ore,
        progres_procent, progres_descriere)
       VALUES (
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
     // Inserare responsabili
     for (const responsabil of data.responsabili) {
       const insertResponsabilQuery = `
-        INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
+        INSERT INTO ${TABLE_SARCINI_RESPONSABILI}
         (id, sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_atribuire, atribuit_de)
         VALUES (
           '${escapeString(`RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`)}',
@@ -493,7 +493,7 @@ export async function PUT(request: NextRequest) {
     updateFields.push('updated_at = CURRENT_TIMESTAMP()');
 
     const query = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      UPDATE ${TABLE_SARCINI}
       SET ${updateFields.join(', ')}
       WHERE id = '${escapeString(data.id)}'
     `;
@@ -519,7 +519,7 @@ export async function PUT(request: NextRequest) {
 
       for (const responsabil of data.responsabili) {
         const insertResponsabilQuery = `
-          INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.SarciniResponsabili\`
+          INSERT INTO ${TABLE_SARCINI_RESPONSABILI}
           (id, sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_atribuire, atribuit_de)
           VALUES (
             '${escapeString(`RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`)}',
@@ -577,7 +577,7 @@ export async function DELETE(request: NextRequest) {
 
     // Șterge înregistrările de timp
     const deleteTimeTrackingQuery = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.TimeTracking\`
+      DELETE FROM ${TABLE_TIME_TRACKING}
       WHERE sarcina_id = '${escapeString(id)}'
     `;
 

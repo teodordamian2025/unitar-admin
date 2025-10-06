@@ -26,6 +26,7 @@ const bigquery = new BigQuery({
 });
 
 const ANAF_OAUTH_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafOAuthTokens${tableSuffix}\``;
+const ANAF_TOKENS_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafTokens${tableSuffix}\``;
 
 console.log(`🔧 [ANAF OAuth Callback] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -241,7 +242,7 @@ async function saveTokensToDatabase(tokenData: any) {
     // Dezactivează token-urile vechi înainte de a salva unul nou
     await table.query({
       query: `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
+        UPDATE ${ANAF_TOKENS_TABLE}
         SET is_active = false, data_actualizare = CURRENT_TIMESTAMP()
         WHERE client_id = @client_id AND is_active = true
       `,

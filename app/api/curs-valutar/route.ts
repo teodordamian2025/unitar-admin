@@ -412,13 +412,13 @@ async function gasestZileLipsaDinTrecut(panaLaData: string): Promise<string[]> {
       ),
       date_existente AS (
         SELECT DISTINCT data
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+        FROM ${CURS_TABLE}
         WHERE data BETWEEN '2025-01-01' AND '${panaLaData}'
           AND moneda IN ('EUR', 'USD', 'GBP')
       ),
       zile_cu_toate_monedele AS (
         SELECT data
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+        FROM ${CURS_TABLE}
         WHERE data BETWEEN '2025-01-01' AND '${panaLaData}'
           AND moneda IN ('EUR', 'USD', 'GBP')
         GROUP BY data
@@ -569,8 +569,8 @@ async function actualizeazaCursInBigQuery(
 ): Promise<void> {
   try {
     const query = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
-      SET 
+      UPDATE ${CURS_TABLE}
+      SET
         curs = @curs,
         sursa = @sursa,
         precizie_originala = @precizie_originala,
@@ -604,7 +604,7 @@ async function actualizeazaCursInBigQuery(
 async function curataTeste(): Promise<void> {
   try {
     const query = `
-      DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+      DELETE FROM ${CURS_TABLE}
       WHERE moneda = 'TEST' OR sursa LIKE '%TEST%'
     `;
 
@@ -629,13 +629,13 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
     console.log(`🔍 BigQuery SEARCH: ${moneda} pentru ${data}`);
 
     const query = `
-      SELECT 
+      SELECT
         moneda,
         curs,
         data,
         precizie_originala,
         sursa
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
+      FROM ${CURS_TABLE}
       WHERE data = '${data}' AND moneda = '${moneda}'
       LIMIT 1
     `;
@@ -668,15 +668,15 @@ async function getCursFromBigQuery(moneda: string, data: string): Promise<CursVa
 async function getClosestCursFromBigQuery(moneda: string, data: string): Promise<CursValutar | null> {
   try {
     const query = `
-      SELECT 
+      SELECT
         moneda,
         curs,
         data,
         precizie_originala,
         sursa,
         ABS(DATE_DIFF(@data, data, DAY)) as diferenta_zile
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.CursuriValutare\`
-      WHERE moneda = @moneda 
+      FROM ${CURS_TABLE}
+      WHERE moneda = @moneda
         AND ABS(DATE_DIFF(@data, data, DAY)) <= 7
       ORDER BY diferenta_zile ASC, data DESC
       LIMIT 1

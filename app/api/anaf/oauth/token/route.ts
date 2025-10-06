@@ -26,6 +26,7 @@ const bigquery = new BigQuery({
 });
 
 const ANAF_OAUTH_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafOAuthTokens${tableSuffix}\``;
+const ANAF_TOKENS_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafTokens${tableSuffix}\``;
 
 console.log(`🔧 [ANAF OAuth Token] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -152,8 +153,8 @@ async function getCurrentToken() {
     const dataset = bigquery.dataset('PanouControlUnitar');
     const query = `
       SELECT *
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
-      WHERE client_id = @client_id 
+      FROM ${ANAF_TOKENS_TABLE}
+      WHERE client_id = @client_id
         AND is_active = true
       ORDER BY data_creare DESC
       LIMIT 1
@@ -247,7 +248,7 @@ async function handleRevokeToken() {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
     const query = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
+      UPDATE ${ANAF_TOKENS_TABLE}
       SET is_active = false, data_actualizare = CURRENT_TIMESTAMP()
       WHERE client_id = @client_id AND is_active = true
     `;
@@ -397,7 +398,7 @@ async function saveNewRefreshedToken(tokenData: any) {
     // Dezactivează token-urile vechi
     await table.query({
       query: `
-        UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.AnafTokens\`
+        UPDATE ${ANAF_TOKENS_TABLE}
         SET is_active = false, data_actualizare = CURRENT_TIMESTAMP()
         WHERE client_id = @client_id AND is_active = true
       `,

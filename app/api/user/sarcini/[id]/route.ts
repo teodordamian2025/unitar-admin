@@ -54,7 +54,7 @@ export async function PUT(
 
     // Update sarcină în BigQuery - IDENTIC cu admin
     const updateSarcinaQuery = `
-      UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.PanouControlUnitar.Sarcini\`
+      UPDATE ${SARCINI_TABLE}
       SET
         titlu = @titlu,
         descriere = @descriere,
