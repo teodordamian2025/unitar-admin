@@ -449,7 +449,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
     }
 
     // ✅ NOU: Verifică și RESET subproiecte dacă nu mai există alte facturi active
-    for (const subproiectId of subproiecteDeVerificat) {
+    for (const subproiectId of Array.from(subproiecteDeVerificat)) {
       console.log(`🔍 [SUBPROIECT-RESET] Verific subproiect ${subproiectId} pentru RESET...`);
       
       // Verifică dacă mai există alte facturi active pentru acest subproiect
@@ -645,7 +645,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
     }
 
     // ✅ NOU: UPDATE Subproiecte la Facturat pentru etapele noi adăugate
-    for (const subproiectId of subproiecteDeActualizat) {
+    for (const subproiectId of Array.from(subproiecteDeActualizat)) {
       console.log(`🔷 [SUBPROIECT-UPDATE] UPDATE status_facturare pentru subproiect: ${subproiectId}`);
       
       const updateSubproiectQuery = `
