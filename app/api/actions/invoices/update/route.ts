@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/update/route.ts
-// DATA: 11.09.2025 20:30 (ora României)
-// MODIFICAT: Suport complet pentru etape contracte + EtapeFacturi la editare
-// PĂSTRATE: Toate funcționalitățile existente (Edit simplu + Edit complet)
+// DATA: 06.10.2025 16:45 (ora României)
+// MODIFICAT: Fix complet status_facturare pentru Proiecte_v2 la editare facturi
+// PĂSTRATE: Toate funcționalitățile existente (Edit simplu + Edit complet + EtapeFacturi)
+// FIX: Race condition + UPDATE Subproiecte + RESET logic + logging avansat
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,9 +21,11 @@ const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tabl
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 
 console.log(`🔧 Invoice Update API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, Proiecte${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -33,7 +36,7 @@ const bigquery = new BigQuery({
   },
 });
 
-// NOUĂ: Interfață pentru etapele facturate (din frontend)
+// ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
   tip: 'etapa_contract' | 'etapa_anexa';
   id: string; // ID_Etapa sau ID_Anexa
@@ -45,15 +48,233 @@ interface EtapaFacturata {
   curs_valutar?: number;
 }
 
+// ✅ NOUĂ: Funcție pentru actualizarea status_facturare la proiectul părinte (DUPLICATĂ din generate-hibrid)
+// DATA: 06.10.2025 16:45 (ora României)
+// FIX APLICAT: Race condition + logging avansat + retry logic + verificare DATE field
+async function updateProiectStatusFacturare(proiectId: string) {
+  if (!proiectId) {
+    console.log('⚠️ [PROIECT-STATUS-EDIT] Nu există proiectId pentru actualizare status');
+    return;
+  }
+
+  console.log(`🔍 [PROIECT-STATUS-EDIT] Verificare status facturare pentru proiect: ${proiectId}`);
+
+  try {
+    // PASUL 1: Numără subproiectele și câte sunt facturate
+    const countQuery = `
+      SELECT
+        COUNT(*) as total_subproiecte,
+        COUNTIF(status_facturare = 'Facturat') as facturate
+      FROM ${TABLE_SUBPROIECTE}
+      WHERE ID_Proiect = @proiectId AND activ = true
+    `;
+
+    console.log(`🔍 [PROIECT-STATUS-EDIT] Query pentru numărare subproiecte:`, {
+      query: countQuery,
+      proiectId,
+      table: TABLE_SUBPROIECTE
+    });
+
+    const [countRows] = await bigquery.query({
+      query: countQuery,
+      params: { proiectId },
+      types: { proiectId: 'STRING' },
+      location: 'EU'
+    });
+
+    console.log(`📊 [PROIECT-STATUS-EDIT] Rezultate query BigQuery:`, {
+      rows_count: countRows?.length || 0,
+      raw_data: countRows && countRows.length > 0 ? countRows[0] : null
+    });
+
+    // ✅ FIX #2: Verifică și loggează mai detaliat dacă query-ul returnează 0 rânduri
+    if (!countRows || countRows.length === 0) {
+      console.error(`❌ [PROIECT-STATUS-EDIT] COUNT query a returnat 0 rânduri!`, {
+        proiectId,
+        query_executat: countQuery,
+        table: TABLE_SUBPROIECTE,
+        filtru_activ: 'activ = true'
+      });
+      
+      // ✅ FIX #3 FALLBACK: Încearcă query-ul FĂRĂ activ = true
+      console.log('⚠️ [PROIECT-STATUS-EDIT] Retry fără filtru activ...');
+      
+      const retryQuery = `
+        SELECT
+          COUNT(*) as total_subproiecte,
+          COUNTIF(status_facturare = 'Facturat') as facturate
+        FROM ${TABLE_SUBPROIECTE}
+        WHERE ID_Proiect = @proiectId
+      `;
+
+      console.log(`🔄 [PROIECT-STATUS-EDIT] Retry query:`, {
+        query: retryQuery,
+        proiectId
+      });
+
+      const [retryRows] = await bigquery.query({
+        query: retryQuery,
+        params: { proiectId },
+        types: { proiectId: 'STRING' },
+        location: 'EU'
+      });
+
+      console.log(`📊 [PROIECT-STATUS-EDIT] Rezultate retry query:`, {
+        rows_count: retryRows?.length || 0,
+        raw_data: retryRows && retryRows.length > 0 ? retryRows[0] : null
+      });
+
+      if (retryRows && retryRows.length > 0) {
+        console.log(`✅ [PROIECT-STATUS-EDIT] Retry reușit - folosesc datele fără filtru activ`);
+        countRows.push(...retryRows);
+      } else {
+        console.error('❌ [PROIECT-STATUS-EDIT] Nici retry-ul nu a găsit subproiecte');
+        return;
+      }
+    }
+
+    const stats = countRows[0];
+    const totalSubproiecte = parseInt(stats.total_subproiecte) || 0;
+    const facturate = parseInt(stats.facturate) || 0;
+
+    console.log(`📊 [PROIECT-STATUS-EDIT] Statistici subproiecte pentru ${proiectId}:`, {
+      total: totalSubproiecte,
+      facturate: facturate,
+      nefacturate: totalSubproiecte - facturate,
+      procent_facturate: totalSubproiecte > 0 ? ((facturate / totalSubproiecte) * 100).toFixed(2) + '%' : 'N/A',
+      raw_total: stats.total_subproiecte,
+      raw_facturate: stats.facturate
+    });
+
+    // PASUL 2: Determină statusul proiectului părinte
+    let statusProiect = 'Nefacturat';
+
+    if (totalSubproiecte === 0) {
+      console.log(`ℹ️ [PROIECT-STATUS-EDIT] Proiect fără subproiecte - nu se modifică statusul`);
+      return;
+    } else if (facturate === totalSubproiecte) {
+      statusProiect = 'Facturat';
+      console.log(`✅ [PROIECT-STATUS-EDIT] TOATE subproiectele sunt facturate (${facturate}/${totalSubproiecte})`);
+    } else if (facturate > 0) {
+      statusProiect = 'Partial Facturat';
+      console.log(`⚠️ [PROIECT-STATUS-EDIT] Doar UNELE subproiecte sunt facturate (${facturate}/${totalSubproiecte})`);
+    } else {
+      statusProiect = 'Nefacturat';
+      console.log(`❌ [PROIECT-STATUS-EDIT] NICIUN subproiect nu e facturat (0/${totalSubproiecte})`);
+    }
+
+    console.log(`✅ [PROIECT-STATUS-EDIT] Status calculat pentru proiect ${proiectId}: "${statusProiect}"`);
+
+    // ✅ PASUL 2.5: Citește Data_Start pentru partition key (Proiecte_v2 e partitioned)
+    const proiectQuery = `
+      SELECT Data_Start
+      FROM ${TABLE_PROIECTE}
+      WHERE ID_Proiect = @proiectId
+    `;
+
+    console.log(`🔍 [PROIECT-STATUS-EDIT] Citesc Data_Start pentru partition key:`, {
+      query: proiectQuery,
+      proiectId
+    });
+
+    const [proiectRows] = await bigquery.query({
+      query: proiectQuery,
+      params: { proiectId },
+      types: { proiectId: 'STRING' },
+      location: 'EU'
+    });
+
+    if (!proiectRows || proiectRows.length === 0) {
+      console.error(`❌ [PROIECT-STATUS-EDIT] Nu s-a găsit proiectul ${proiectId} în BigQuery`);
+      return;
+    }
+
+    // ✅ Gestionare BigQuery DATE field ca obiect {value: "2025-09-10"}
+    const dataStartRaw = proiectRows[0]?.Data_Start;
+    const dataStart = dataStartRaw?.value || dataStartRaw;
+
+    console.log(`📅 [PROIECT-STATUS-EDIT] Data_Start găsit pentru partition:`, {
+      raw: dataStartRaw,
+      processed: dataStart,
+      type: typeof dataStart
+    });
+
+    if (!dataStart) {
+      console.error(`❌ [PROIECT-STATUS-EDIT] Data_Start lipsă pentru proiect ${proiectId} - UPDATE nu poate continua`);
+      return;
+    }
+
+    // PASUL 3: Actualizează statusul proiectului în BigQuery CU partition key
+    const updateQuery = `
+      UPDATE ${TABLE_PROIECTE}
+      SET
+        status_facturare = @statusFacturare,
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE ID_Proiect = @proiectId
+        AND Data_Start = DATE(@dataStart)
+    `;
+
+    console.log(`🔧 [DEBUG-EDIT] Parametri UPDATE proiect:`, {
+      statusFacturare: statusProiect,
+      proiectId: proiectId,
+      dataStart: dataStart,
+      query: updateQuery,
+      table: TABLE_PROIECTE
+    });
+
+    console.log(`🔄 [PROIECT-STATUS-EDIT] Execut UPDATE pentru proiect CU partition key:`, {
+      statusFacturare: statusProiect,
+      proiectId,
+      dataStart,
+      table: TABLE_PROIECTE
+    });
+
+    await bigquery.query({
+      query: updateQuery,
+      params: {
+        statusFacturare: statusProiect,
+        proiectId,
+        dataStart: dataStart
+      },
+      types: {
+        statusFacturare: 'STRING',
+        proiectId: 'STRING',
+        dataStart: 'STRING'
+      },
+      location: 'EU'
+    });
+
+    console.log(`✅ [PROIECT-STATUS-EDIT] UPDATE executat cu succes CU partition key:`, {
+      statusNou: statusProiect,
+      proiectId,
+      dataStart,
+      partition_key_folosit: true,
+      delay_aplicat_inainte: '500ms',
+      context: 'edit_factura'
+    });
+
+    console.log(`✅ [PROIECT-STATUS-EDIT] Proiect ${proiectId} actualizat cu status_facturare = "${statusProiect}" (fix race condition + logging aplicat la editare)`);
+
+  } catch (error) {
+    console.error('❌ [PROIECT-STATUS-EDIT] Eroare la actualizarea statusului proiectului:', error);
+    console.error('📋 [DEBUG-EDIT] Detalii eroare:', {
+      proiectId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    // Nu oprește procesul - continuă cu editarea facturii
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('📝 UPDATE factură - payload primit:', {
+    console.log('🔍 UPDATE factură - payload primit:', {
       facturaId: body.facturaId,
       hasLiniiFactura: !!body.liniiFactura,
       hasClientInfo: !!body.clientInfo,
       hasObservatii: !!body.observatii,
-      hasEtapeFacturate: !!(body.etapeFacturate && body.etapeFacturate.length > 0), // NOUĂ
+      hasEtapeFacturate: !!(body.etapeFacturate && body.etapeFacturate.length > 0),
       keys: Object.keys(body)
     });
 
@@ -61,10 +282,10 @@ export async function PUT(request: NextRequest) {
     const isSimpleStatusUpdate = body.status && !body.liniiFactura && !body.clientInfo;
     
     if (isSimpleStatusUpdate) {
-      console.log('📝 Simple status update pentru factura:', body.facturaId);
+      console.log('🔍 Simple status update pentru factura:', body.facturaId);
       return await handleSimpleStatusUpdate(body);
     } else {
-      console.log('📝 Complete edit update pentru factura:', body.facturaId);
+      console.log('🔍 Complete edit update pentru factura:', body.facturaId);
       return await handleCompleteEditUpdate(body);
     }
 
@@ -91,7 +312,7 @@ async function handleSimpleStatusUpdate(body: any) {
     );
   }
 
-  console.log(`📝 Simple update factură ${facturaId}: status=${status}`);
+  console.log(`🔍 Simple update factură ${facturaId}: status=${status}`);
 
   const updateQuery = `
     UPDATE ${TABLE_FACTURI_GENERATE}
@@ -122,19 +343,19 @@ async function handleSimpleStatusUpdate(body: any) {
   });
 }
 
-// NOUĂ: Funcție pentru update statusuri etape la editare (similară cu generate-hibrid)
+// ✅ MODIFICATĂ: Funcție pentru update statusuri etape la editare cu suport UPDATE/RESET Subproiecte
 async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string) {
   if (!etapeFacturate || etapeFacturate.length === 0) {
-    console.log('📝 [ETAPE-EDIT] Nu există etape de actualizat');
+    console.log('🔍 [ETAPE-EDIT] Nu există etape de actualizat');
     return;
   }
 
-  console.log(`📝 [ETAPE-EDIT] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId}`);
+  console.log(`🔍 [ETAPE-EDIT] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId}`);
 
   try {
     // PASUL 1: Verifică dacă etapele sunt deja în EtapeFacturi pentru această factură
     const checkQuery = `
-      SELECT etapa_id, anexa_id, tip_etapa 
+      SELECT etapa_id, anexa_id, tip_etapa, subproiect_id
       FROM ${TABLE_ETAPE_FACTURI}
       WHERE factura_id = @facturaId AND activ = true
     `;
@@ -146,17 +367,20 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
       location: 'EU'
     });
 
-    console.log(`📝 [ETAPE-EDIT] Găsite ${existingEtape.length} etape existente în EtapeFacturi pentru această factură`);
+    console.log(`🔍 [ETAPE-EDIT] Găsite ${existingEtape.length} etape existente în EtapeFacturi pentru această factură`);
 
     // Creează set-uri pentru comparație
     const existingEtapeIds = new Set(existingEtape.map((etapa: any) => etapa.etapa_id || etapa.anexa_id));
     const noulEtapeIds = new Set(etapeFacturate.map(etapa => etapa.id));
 
-    // PASUL 2: Dezactivează etapele care nu mai sunt în factură
+    // PASUL 2: Dezactivează etapele care nu mai sunt în factură + RESET Subproiecte dacă e cazul
     const etapeDeDezactivat = existingEtape.filter((etapa: any) => {
       const etapaId = etapa.etapa_id || etapa.anexa_id;
       return !noulEtapeIds.has(etapaId);
     });
+
+    // ✅ NOU: Set pentru tracking subproiecte care trebuie verificate pentru RESET
+    const subproiecteDeVerificat = new Set<string>();
 
     for (const etapa of etapeDeDezactivat) {
       const etapaId = etapa.etapa_id || etapa.anexa_id;
@@ -216,11 +440,65 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
         });
       }
 
-      console.log(`📝 [ETAPE-EDIT] Dezactivată etapa ${etapaId} din factură`);
+      // ✅ NOU: Adaugă subproiectul pentru verificare RESET
+      if (etapa.subproiect_id) {
+        subproiecteDeVerificat.add(etapa.subproiect_id);
+      }
+
+      console.log(`🔍 [ETAPE-EDIT] Dezactivată etapa ${etapaId} din factură`);
     }
 
-    // PASUL 3: Adaugă etapele noi
+    // ✅ NOU: Verifică și RESET subproiecte dacă nu mai există alte facturi active
+    for (const subproiectId of subproiecteDeVerificat) {
+      console.log(`🔍 [SUBPROIECT-RESET] Verific subproiect ${subproiectId} pentru RESET...`);
+      
+      // Verifică dacă mai există alte facturi active pentru acest subproiect
+      const checkOtherFacturiQuery = `
+        SELECT COUNT(*) as count
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE subproiect_id = @subproiectId 
+          AND activ = true
+      `;
+
+      const [checkResult] = await bigquery.query({
+        query: checkOtherFacturiQuery,
+        params: { subproiectId },
+        types: { subproiectId: 'STRING' },
+        location: 'EU'
+      });
+
+      const alteleFacturiCount = parseInt(checkResult[0]?.count) || 0;
+      
+      console.log(`📊 [SUBPROIECT-RESET] Subproiect ${subproiectId}: ${alteleFacturiCount} facturi active rămase`);
+
+      if (alteleFacturiCount === 0) {
+        // Nu mai există alte facturi active → RESET la Nefacturat
+        const resetSubproiectQuery = `
+          UPDATE ${TABLE_SUBPROIECTE}
+          SET
+            status_facturare = 'Nefacturat',
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE ID_Subproiect = @subproiectId
+        `;
+
+        await bigquery.query({
+          query: resetSubproiectQuery,
+          params: { subproiectId },
+          types: { subproiectId: 'STRING' },
+          location: 'EU'
+        });
+
+        console.log(`✅ [SUBPROIECT-RESET] Subproiect ${subproiectId} resetat la Nefacturat (nu mai există facturi active)`);
+      } else {
+        console.log(`ℹ️ [SUBPROIECT-RESET] Subproiect ${subproiectId} păstrează status Facturat (mai există ${alteleFacturiCount} facturi active)`);
+      }
+    }
+
+    // PASUL 3: Adaugă etapele noi + UPDATE Subproiecte
     const etapeDeAdaugat = etapeFacturate.filter(etapa => !existingEtapeIds.has(etapa.id));
+    
+    // ✅ NOU: Set pentru tracking subproiecte care trebuie actualizate la Facturat
+    const subproiecteDeActualizat = new Set<string>();
 
     for (const etapa of etapeDeAdaugat) {
       const etapaFacturaId = `EF_EDIT_${facturaId}_${etapa.id}_${Date.now()}`;
@@ -272,7 +550,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
         statusIncasare: 'Neincasat',
         valoareIncasata: 0,
         activ: true,
-        versiune: 2, // Versiune edit
+        versiune: 2,
         creatDe: 'System_Edit'
       };
 
@@ -358,10 +636,48 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
         });
       }
 
+      // ✅ NOU: Adaugă subproiectul pentru actualizare la Facturat
+      if (etapa.subproiect_id) {
+        subproiecteDeActualizat.add(etapa.subproiect_id);
+      }
+
       console.log(`✅ [ETAPE-EDIT] Inserată etapa nouă ${etapa.id} în EtapeFacturi`);
     }
 
+    // ✅ NOU: UPDATE Subproiecte la Facturat pentru etapele noi adăugate
+    for (const subproiectId of subproiecteDeActualizat) {
+      console.log(`🔷 [SUBPROIECT-UPDATE] UPDATE status_facturare pentru subproiect: ${subproiectId}`);
+      
+      const updateSubproiectQuery = `
+        UPDATE ${TABLE_SUBPROIECTE}
+        SET
+          status_facturare = 'Facturat',
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE ID_Subproiect = @subproiectId
+      `;
+
+      await bigquery.query({
+        query: updateSubproiectQuery,
+        params: { subproiectId },
+        types: { subproiectId: 'STRING' },
+        location: 'EU'
+      });
+
+      console.log(`✅ [SUBPROIECT-UPDATE] Subproiect ${subproiectId} marcat ca Facturat`);
+    }
+
     console.log(`✅ [ETAPE-EDIT] Statusuri etape actualizate cu succes: ${etapeDeDezactivat.length} dezactivate, ${etapeDeAdaugat.length} adăugate`);
+    console.log(`✅ [SUBPROIECTE-EDIT] Subproiecte actualizate: ${subproiecteDeVerificat.size} verificate pentru RESET, ${subproiecteDeActualizat.size} marcate ca Facturat`);
+
+    // ✅ NOU: Delay 500ms + Actualizare status proiect părinte
+    if (subproiecteDeVerificat.size > 0 || subproiecteDeActualizat.size > 0) {
+      console.log(`⏳ [DELAY-EDIT] Aștept 500ms pentru propagarea modificărilor BigQuery...`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log(`✅ [DELAY-EDIT] Delay completat, continui cu actualizarea proiectului părinte`);
+
+      console.log(`📋 [PROIECT-STATUS-EDIT] Actualizez proiect părinte după editarea facturii: ${proiectId}...`);
+      await updateProiectStatusFacturare(proiectId);
+    }
 
   } catch (error) {
     console.error('❌ [ETAPE-EDIT] Eroare la actualizarea statusurilor:', error);
@@ -369,7 +685,7 @@ async function updateEtapeStatusuriLaEditare(etapeFacturate: EtapaFacturata[], f
   }
 }
 
-// ✅ FUNCȚIE NOUĂ: Update complet pentru editare factură cu suport etape
+// ✅ FUNCȚIE NOUĂ: Update complet pentru editare factură cu suport etape + UPDATE Proiect
 async function handleCompleteEditUpdate(body: any) {
   const { 
     facturaId,
@@ -380,7 +696,7 @@ async function handleCompleteEditUpdate(body: any) {
     proiectInfo,
     setariFacturare,
     contariBancare,
-    etapeFacturate // NOUĂ: Array cu etapele facturate
+    etapeFacturate
   } = body;
 
   if (!facturaId) {
@@ -404,12 +720,12 @@ async function handleCompleteEditUpdate(body: any) {
     );
   }
 
-  console.log(`📝 Complete edit pentru factură ${facturaId}:`, {
+  console.log(`🔍 Complete edit pentru factură ${facturaId}:`, {
     linii_count: liniiFactura.length,
     client: clientInfo.denumire,
     has_cursuri: !!cursuriUtilizate,
     has_proiect_info: !!proiectInfo,
-    etape_facturate_count: etapeFacturate?.length || 0 // NOUĂ
+    etape_facturate_count: etapeFacturate?.length || 0
   });
 
   // ✅ CALCULEAZĂ totalurile din liniile facturii
@@ -424,10 +740,9 @@ async function handleCompleteEditUpdate(body: any) {
       cantitate: Number(linie.cantitate) || 1,
       pretUnitar: typeof linie.pretUnitar === 'string' ? 
         parseFloat(linie.pretUnitar) : Number(linie.pretUnitar) || 0,
-      cotaTva: Number(linie.cotaTva) || 21, // ✅ Default 21%
+      cotaTva: Number(linie.cotaTva) || 21,
       tip: linie.tip || 'produs',
       subproiect_id: linie.subproiect_id || null,
-      // NOUĂ: Suport pentru etape
       etapa_id: linie.etapa_id || null,
       anexa_id: linie.anexa_id || null,
       contract_id: linie.contract_id || null,
@@ -443,7 +758,7 @@ async function handleCompleteEditUpdate(body: any) {
     observatii: observatii || '',
     
     clientInfo: {
-      nume: clientInfo.denumire || clientInfo.nume, // ✅ Support dual
+      nume: clientInfo.denumire || clientInfo.nume,
       denumire: clientInfo.denumire || clientInfo.nume,
       cui: clientInfo.cui || '',
       nr_reg_com: clientInfo.nrRegCom || clientInfo.nr_reg_com || '',
@@ -464,15 +779,15 @@ async function handleCompleteEditUpdate(body: any) {
     
     contariBancare: contariBancare || [],
     
-    // NOUĂ: Etapele facturate pentru tracking
     etapeFacturate: etapeFacturate || [],
     
     // ✅ METADATA pentru tracking
     isUpdated: true,
     dataUltimeiActualizari: new Date().toISOString(),
-    versiune: 3, // ✅ Versiune pentru tracking cu etape
-    sistem_etape_implementat: true, // ✅ Flag pentru noul sistem
-    tip_editare: 'complet_cu_etape'
+    versiune: 4, // ✅ Versiune nouă cu UPDATE Proiect la editare
+    sistem_etape_implementat: true,
+    update_proiect_status: true, // ✅ NOU: Flag pentru UPDATE proiect
+    tip_editare: 'complet_cu_etape_si_proiect'
   };
 
   // ✅ GENEREAZĂ nota cursuri pentru observații
@@ -515,19 +830,19 @@ async function handleCompleteEditUpdate(body: any) {
     location: 'EU'
   });
 
-  // NOUĂ: Actualizează statusurile etapelor dacă există
+  // ✅ MODIFICAT: Actualizează statusurile etapelor dacă există (include delay + UPDATE Proiect)
   if (etapeFacturate && etapeFacturate.length > 0 && proiectInfo?.id) {
-    console.log(`📝 [ETAPE-EDIT] Actualizez statusurile pentru ${etapeFacturate.length} etape...`);
+    console.log(`🔍 [ETAPE-EDIT] Actualizez statusurile pentru ${etapeFacturate.length} etape...`);
     
     try {
       await updateEtapeStatusuriLaEditare(etapeFacturate, facturaId, proiectInfo.id);
-      console.log('✅ [ETAPE-EDIT] Statusuri etape actualizate cu succes');
+      console.log('✅ [ETAPE-EDIT] Statusuri etape + subproiecte + proiect actualizate cu succes');
     } catch (etapeError) {
       console.error('❌ [ETAPE-EDIT] Eroare la actualizarea statusurilor etapelor:', etapeError);
       // Nu oprește procesul - continuă cu editarea facturii
     }
   } else {
-    console.log('📝 [ETAPE-EDIT] Nu există etape pentru actualizare statusuri sau lipsește proiectInfo');
+    console.log('🔍 [ETAPE-EDIT] Nu există etape pentru actualizare statusuri sau lipsește proiectInfo');
   }
 
   console.log(`✅ Factură ${facturaId} actualizată complet:`, {
@@ -537,20 +852,29 @@ async function handleCompleteEditUpdate(body: any) {
     total: totals.totalGeneral,
     linii_factura: liniiFactura.length,
     cursuri_count: Object.keys(cursuriUtilizate || {}).length,
-    etape_count: etapeFacturate?.length || 0 // NOUĂ
+    etape_count: etapeFacturate?.length || 0,
+    update_proiect_aplicat: !!(etapeFacturate && etapeFacturate.length > 0 && proiectInfo?.id)
   });
 
   return NextResponse.json({
     success: true,
-    message: 'Factură editată și salvată cu succes (cu suport etape contracte)',
+    message: 'Factură editată și salvată cu succes (cu suport etape contracte + UPDATE proiect)',
     data: {
       facturaId,
       totals,
       linii_count: liniiFactura.length,
       cursuri_utilizate: Object.keys(cursuriUtilizate || {}).length,
       client_actualizat: clientInfo.denumire,
-      etape_actualizate: etapeFacturate?.length || 0, // NOUĂ
-      sistem_etape_activ: true // NOUĂ
+      etape_actualizate: etapeFacturate?.length || 0,
+      sistem_etape_activ: true,
+      update_proiect_status: true, // ✅ NOU
+      fixes_applied: [
+        '500ms delay între UPDATE subproiecte și UPDATE proiect',
+        'RESET logic pentru subproiecte fără facturi active',
+        'Verificare alte facturi înainte de RESET',
+        'Logging avansat pentru debugging',
+        'Race condition fix aplicat'
+      ]
     }
   });
 }
