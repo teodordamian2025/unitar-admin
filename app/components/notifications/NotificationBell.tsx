@@ -1,12 +1,15 @@
 // CALEA: /app/components/notifications/NotificationBell.tsx
-// DATA: 05.10.2025 (ora României)
-// DESCRIERE: Clopoțel notificări în header cu dropdown și real-time updates
+// DATA: 08.10.2025 (ora României)
+// DESCRIERE: Clopoțel notificări cu Singleton Polling Service (10 min interval)
+// UPDATED: Folosește NotificationPollingService singleton (zero duplicate requests)
 
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 import type { Notificare, ListNotificationsResponse } from '@/lib/notifications/types';
+import NotificationPollingService from '@/lib/notifications/NotificationPollingService';
 
 interface NotificationBellProps {
   userId: string;
@@ -21,27 +24,24 @@ export default function NotificationBell({ userId, className = '' }: Notificatio
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // Fetch notificări
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/notifications/list?user_id=${userId}&limit=10`);
-      const data: ListNotificationsResponse = await response.json();
+  // ✅ SINGLETON POLLING: Subscribe la NotificationPollingService (10 min interval)
+  useEffect(() => {
+    const service = NotificationPollingService.getInstance();
 
+    // Callback handler pentru notificări
+    const handleNotificationsUpdate = (data: ListNotificationsResponse) => {
       setNotifications(data.notifications || []);
       setUnreadCount(data.unread_count || 0);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  // Polling pentru real-time updates (30s)
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    // Subscribe la polling service
+    service.subscribe(userId, handleNotificationsUpdate);
+
+    // Cleanup: unsubscribe când componenta se demontează
+    return () => {
+      service.unsubscribe(userId);
+    };
   }, [userId]);
 
   // Close dropdown când se dă click afară
@@ -61,10 +61,10 @@ export default function NotificationBell({ userId, className = '' }: Notificatio
     };
   }, [isOpen]);
 
-  // Marchează notificare ca citită
+  // Marchează notificare ca citită (cu error handling UI)
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch('/api/notifications/mark-read', {
+      const response = await fetch('/api/notifications/mark-read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,29 +73,52 @@ export default function NotificationBell({ userId, className = '' }: Notificatio
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       // Update local state
       setNotifications(prev =>
         prev.map(n => (n.id === notificationId ? { ...n, citita: true } : n))
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
+
     } catch (error) {
       console.error('Error marking as read:', error);
+      toast.error('Eroare la marcarea notificării ca citită', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     }
   };
 
-  // Marchează toate ca citite
+  // Marchează toate ca citite (cu error handling UI)
   const markAllAsRead = async () => {
     try {
-      await fetch('/api/notifications/mark-read', {
+      const response = await fetch('/api/notifications/mark-read', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       setNotifications(prev => prev.map(n => ({ ...n, citita: true })));
       setUnreadCount(0);
+
+      toast.success('Toate notificările au fost marcate ca citite', {
+        position: 'top-right',
+        autoClose: 2000,
+      });
+
     } catch (error) {
       console.error('Error marking all as read:', error);
+      toast.error('Eroare la marcarea tuturor notificărilor', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     }
   };
 
