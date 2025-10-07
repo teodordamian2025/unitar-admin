@@ -14,7 +14,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
 import PersistentTimer from './PersistentTimer';
-import InvisibleTimerAlert from './InvisibleTimerAlert';
+import ActiveTimerNotification from './ActiveTimerNotification';
 import NotificationBell from './notifications/NotificationBell';
 
 interface ModernLayoutProps {
@@ -302,6 +302,14 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           ))}
         </nav>
 
+        {/* Active Timer Notification - poziționat sub meniu, deasupra User Info */}
+        {!sidebarCollapsed && user?.uid && (
+          <ActiveTimerNotification
+            userId={user.uid}
+            user={user}
+          />
+        )}
+
         {/* User Info & Logout */}
         <div
           style={{
@@ -399,14 +407,6 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
 
           {/* Quick Actions */}
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            {/* Invisible Timer Alert - PRIORITATE MAXIMĂ */}
-            {user?.uid && (
-              <InvisibleTimerAlert
-                userId={user.uid}
-                user={user}
-              />
-            )}
-
             {/* Notification Bell - Clopoțel notificări */}
             {user?.uid && (
               <NotificationBell userId={user.uid} />

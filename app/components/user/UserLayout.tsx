@@ -14,7 +14,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { toast } from 'react-toastify';
 import UserPersistentTimer from './UserPersistentTimer';
-import InvisibleTimerAlert from '../InvisibleTimerAlert';
+import ActiveTimerNotification from '../ActiveTimerNotification';
 import NotificationBell from '../notifications/NotificationBell';
 
 interface UserLayoutProps {
@@ -279,14 +279,12 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
         ))}
       </nav>
 
-      {/* Invisible Timer Alert - PRIORITATE MAXIMĂ */}
+      {/* Active Timer Notification - poziționat sub "Profilul Meu", deasupra cronometrului */}
       {user?.uid && (
-        <div style={{ padding: '0 1.5rem 1rem 1.5rem' }}>
-          <InvisibleTimerAlert
-            userId={user.uid}
-            user={user}
-          />
-        </div>
+        <ActiveTimerNotification
+          userId={user.uid}
+          user={user}
+        />
       )}
 
       {/* Persistent Timer Widget */}
