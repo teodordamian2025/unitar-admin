@@ -650,7 +650,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     };
 
     // Inserăm în BigQuery
-    const matchingTable = dataset.table('TranzactiiMatching');
+    const matchingTable = dataset.table(`TranzactiiMatching${tableSuffix}`);
     await matchingTable.insert([matchingRecord]);
 
     // Actualizăm tranzacția

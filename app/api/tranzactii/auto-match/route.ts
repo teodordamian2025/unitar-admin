@@ -571,7 +571,7 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
     }));
 
     // Inserăm în batch
-    const matchingTable = dataset.table('TranzactiiMatching');
+    const matchingTable = dataset.table(`TranzactiiMatching${tableSuffix}`);
     await matchingTable.insert(matchingRecords);
 
     // Actualizăm statusul tranzacțiilor

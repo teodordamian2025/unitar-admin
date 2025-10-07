@@ -215,7 +215,7 @@ async function exchangeCodeForToken(code: string) {
 async function saveTokensToDatabase(tokenData: any) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('AnafTokens');
+    const table = dataset.table(`AnafTokens${tableSuffix}`);
 
     // Calculează expirarea
     const expiresAt = new Date();

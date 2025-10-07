@@ -466,7 +466,7 @@ async function generateUBLXml(facturaData: any) {
 async function saveXmlToDatabase(facturaId: string, xmlContent: string) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('AnafEFactura');
+    const table = dataset.table(`AnafEFactura${tableSuffix}`);
 
     const xmlRecord = [{
       id: uuidv4(),

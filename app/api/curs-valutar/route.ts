@@ -531,13 +531,13 @@ async function esteZiDeSarbatoare(data: string): Promise<boolean> {
 
 // Salvează curs în BigQuery cu detalii complete
 async function salvezCursInBigQueryCuDetalii(
-  curs: CursValutar, 
-  sursa: string, 
+  curs: CursValutar,
+  sursa: string,
   observatii: string
 ): Promise<void> {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('CursuriValutare');
+    const table = dataset.table(`CursuriValutare${tableSuffix}`);
 
     const record = [{
       data: curs.data,
@@ -712,7 +712,7 @@ async function getClosestCursFromBigQuery(moneda: string, data: string): Promise
 async function saveCursInBigQuery(curs: CursValutar): Promise<void> {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
-    const table = dataset.table('CursuriValutare');
+    const table = dataset.table(`CursuriValutare${tableSuffix}`);
 
     const record = [{
       data: curs.data,

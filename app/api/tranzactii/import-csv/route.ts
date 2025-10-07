@@ -354,8 +354,8 @@ async function insertTransactionsToBigQuery(transactions: INGTransaction[]): Pro
   }
 
   try {
-    const table = dataset.table('TranzactiiBancare');
-    
+    const table = dataset.table(`TranzactiiBancare${tableSuffix}`);
+
     // Inserare în batch-uri de 1000
     const batchSize = 1000;
     for (let i = 0; i < transactions.length; i += batchSize) {
@@ -413,7 +413,7 @@ async function logImportOperation(
       creat_de: 'system_import'
     };
 
-    const table = dataset.table('TranzactiiSyncLogs');
+    const table = dataset.table(`TranzactiiSyncLogs${tableSuffix}`);
     await table.insert([logEntry]);
 
   } catch (error) {
