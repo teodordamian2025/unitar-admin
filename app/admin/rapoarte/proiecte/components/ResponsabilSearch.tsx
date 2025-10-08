@@ -335,12 +335,21 @@ export default function ResponsabilSearch({
                       📧 {user.email}
                     </div>
                     {user.data_ultima_conectare && (
-                      <div style={{ 
-                        fontSize: '11px', 
+                      <div style={{
+                        fontSize: '11px',
                         color: '#95a5a6',
                         marginTop: '0.25rem'
                       }}>
-                        Ultima conectare: {new Date(user.data_ultima_conectare).toLocaleDateString('ro-RO')}
+                        Ultima conectare: {(() => {
+                          try {
+                            const dateValue = typeof user.data_ultima_conectare === 'object' && user.data_ultima_conectare !== null && 'value' in user.data_ultima_conectare
+                              ? (user.data_ultima_conectare as any).value
+                              : user.data_ultima_conectare;
+                            return new Date(dateValue).toLocaleDateString('ro-RO');
+                          } catch {
+                            return 'N/A';
+                          }
+                        })()}
                       </div>
                     )}
                   </div>

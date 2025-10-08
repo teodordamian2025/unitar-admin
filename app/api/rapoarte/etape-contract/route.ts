@@ -142,9 +142,9 @@ export async function GET(request: NextRequest) {
         c.client_nume,
         s.Denumire as subproiect_denumire
       FROM \`${PROJECT_ID}.${DATASET}.${TABLE}\` e
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Contracte\` c 
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\` c
         ON e.contract_id = c.ID_Contract
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte\` s 
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` s
         ON e.subproiect_id = s.ID_Subproiect
       WHERE e.activ = true
     `;

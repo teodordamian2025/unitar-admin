@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         u.nume,
         u.rol as rol_sistem
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\` pr
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Utilizatori\` u 
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Utilizatori${tableSuffix}\` u
         ON pr.responsabil_uid = u.uid
       WHERE pr.proiect_id = @proiectId
       ORDER BY 

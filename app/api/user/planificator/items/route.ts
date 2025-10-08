@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
       -- Join subproiecte
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr2
         ON sp.ID_Proiect = pr2.ID_Proiect
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         ON s.tip_proiect = 'proiect' AND s.proiect_id = pr3.ID_Proiect
 
       -- Join pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` s_sp
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` s_sp
         ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` s_sp_pr
         ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect

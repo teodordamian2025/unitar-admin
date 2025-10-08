@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       query += ' AND ' + conditions.join(' AND ');
     }
 
-    query += ' ORDER BY s.ID_Proiect, s.Data_Start DESC';
+    query += ' ORDER BY s.ID_Proiect, s.data_creare ASC';
 
     console.log('Executing subproiecte query:', query);
 

@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
     
     try {
       const subproiecteQuery = `
-        SELECT * FROM \`${PROJECT_ID}.${DATASET}.Subproiecte\`
+        SELECT * FROM \`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
         WHERE ID_Proiect = @proiectId
         AND activ = true
         ORDER BY Denumire ASC

@@ -64,7 +64,7 @@ console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async f
         -- Contorizare subproiecte și sarcini pentru feedback
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\`
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
           WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
         ) as subproiecte_count,
         (
