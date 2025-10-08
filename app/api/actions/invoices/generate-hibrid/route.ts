@@ -1536,7 +1536,35 @@ export async function POST(request: NextRequest) {
       } else {
         // ✅ Creează factură nouă (inclusiv storno) cu date exacte din frontend
         console.log('🔍 NEW MODE: Creez factură nouă în BigQuery cu date exacte din frontend...');
-        
+
+        // ✅ FIX CRITICAL: Incrementare număr curent ÎNAINTE de salvare (pentru race condition)
+        if (!isStorno && setariFacturare) {
+          try {
+            console.log(`🔢 [NUMEROTARE-PRE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1} ÎNAINTE de salvare...`);
+
+            const TABLE_SETARI_FACTURARE = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
+
+            const incrementQuery = `
+              UPDATE ${TABLE_SETARI_FACTURARE}
+              SET
+                numar_curent_facturi = numar_curent_facturi + 1,
+                data_actualizare = CURRENT_TIMESTAMP()
+              WHERE id = 'setari_facturare_main'
+            `;
+
+            await bigquery.query({
+              query: incrementQuery,
+              location: 'EU'
+            });
+
+            console.log(`✅ [NUMEROTARE-PRE] Număr curent incrementat cu succes ÎNAINTE de salvare facturii`);
+
+          } catch (error) {
+            console.error('❌ [NUMEROTARE-PRE] Eroare la incrementarea numărului curent:', error);
+            // Continuăm - factura va folosi numărul deja alocat din frontend
+          }
+        }
+
         // ✅ FIX: Extragere număr fără seria pentru coloana numar
         const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
         const serieFactura = setariFacturare?.serie_facturi || 'INV';
@@ -1624,33 +1652,7 @@ export async function POST(request: NextRequest) {
         console.log('📋 [ETAPE-FACTURI] Nu există etape pentru actualizare statusuri');
       }
 
-      // ✅ FIX CRITICAL: Incrementare număr curent direct în BigQuery (fără fetch)
-      if (!isEdit && !isStorno && setariFacturare) {
-        try {
-          console.log(`🔢 [NUMEROTARE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1}...`);
-
-          const TABLE_SETARI_FACTURARE = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
-
-          const incrementQuery = `
-            UPDATE ${TABLE_SETARI_FACTURARE}
-            SET
-              numar_curent_facturi = numar_curent_facturi + 1,
-              data_actualizare = CURRENT_TIMESTAMP()
-            WHERE id = 'setari_facturare_main'
-          `;
-
-          await bigquery.query({
-            query: incrementQuery,
-            location: 'EU'
-          });
-
-          console.log(`✅ [NUMEROTARE] Număr curent incrementat cu succes în BigQuery SetariFacturare`);
-
-        } catch (error) {
-          console.error('❌ [NUMEROTARE] Eroare la incrementarea numărului curent:', error);
-          // Nu oprește procesul - factura a fost deja salvată
-        }
-      }
+      // ✅ NOTA: Incrementarea numar_curent_facturi s-a mutat ÎNAINTE de salvare (linia ~1540) pentru a preveni race conditions
 
     } catch (bgError) {
       console.error('❌ Eroare la salvarea în BigQuery FacturiGenerate:', bgError);
