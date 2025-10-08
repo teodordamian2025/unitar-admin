@@ -40,11 +40,22 @@ export async function findFolder(folderName: string, parentId?: string) {
   console.log(`🔍 Searching for folder: "${folderName}"${parentId ? ` in parent ${parentId}` : ''}`);
   console.log(`📝 Query: ${query}`);
 
-  const response = await drive.files.list({
+  const requestParams: any = {
     q: query,
     fields: 'files(id, name)',
     spaces: 'drive',
-  });
+  };
+
+  // Dacă avem SHARED_DRIVE_ID, căutăm în Shared Drive
+  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
+    requestParams.driveId = process.env.GOOGLE_SHARED_DRIVE_ID;
+    requestParams.includeItemsFromAllDrives = true;
+    requestParams.supportsAllDrives = true;
+    requestParams.corpora = 'drive';
+    console.log(`📁 Searching in Shared Drive: ${process.env.GOOGLE_SHARED_DRIVE_ID}`);
+  }
+
+  const response = await drive.files.list(requestParams);
 
   console.log(`📂 Found ${response.data.files?.length || 0} folders matching query`);
 
@@ -74,10 +85,17 @@ export async function createFolder(folderName: string, parentId?: string) {
     fileMetadata.parents = [parentId];
   }
 
-  const response = await drive.files.create({
+  const requestParams: any = {
     requestBody: fileMetadata,
     fields: 'id, name',
-  });
+  };
+
+  // Dacă avem SHARED_DRIVE_ID, creăm în Shared Drive
+  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
+    requestParams.supportsAllDrives = true;
+  }
+
+  const response = await drive.files.create(requestParams);
 
   console.log(`✅ Folder "${folderName}" creat cu succes (ID: ${response.data.id})`);
   return response.data.id!;
@@ -121,11 +139,18 @@ export async function uploadFile(
     body: require('stream').Readable.from(fileBuffer),
   };
 
-  const response = await drive.files.create({
+  const requestParams: any = {
     requestBody: fileMetadata,
     media: media,
     fields: 'id, name, webViewLink, webContentLink',
-  });
+  };
+
+  // Dacă avem SHARED_DRIVE_ID, uploadăm în Shared Drive
+  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
+    requestParams.supportsAllDrives = true;
+  }
+
+  const response = await drive.files.create(requestParams);
 
   console.log(`✅ Fișier "${fileName}" uploaded (ID: ${response.data.id})`);
 
@@ -157,11 +182,19 @@ export async function downloadFile(fileId: string): Promise<Buffer> {
 export async function listFiles(folderId: string) {
   const drive = getDriveClient();
 
-  const response = await drive.files.list({
+  const requestParams: any = {
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink)',
     orderBy: 'createdTime desc',
-  });
+  };
+
+  // Dacă avem SHARED_DRIVE_ID, listăm din Shared Drive
+  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
+    requestParams.includeItemsFromAllDrives = true;
+    requestParams.supportsAllDrives = true;
+  }
+
+  const response = await drive.files.list(requestParams);
 
   return response.data.files || [];
 }

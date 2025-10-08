@@ -128,6 +128,9 @@ GOOGLE_CLOUD_PROJECT_ID=
 GOOGLE_CLOUD_PRIVATE_KEY=
 GOOGLE_CLOUD_CLIENT_EMAIL=
 
+# Google Drive (pentru Facturi Primite ANAF)
+GOOGLE_SHARED_DRIVE_ID=        # REQUIRED for service account uploads
+
 # Firebase Authentication
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_API_KEY=
@@ -141,6 +144,31 @@ UNITAR_ADRESA=
 UNITAR_TELEFON=
 UNITAR_EMAIL=
 ```
+
+**IMPORTANT - Google Drive Shared Drive Setup:**
+Service accounts cannot upload to personal "My Drive" folders. You must use a **Shared Drive**:
+
+1. **Create Shared Drive** în Google Drive:
+   - Click "Shared drives" în sidebar
+   - Click "New" → nume: "Facturi ANAF" (sau alt nume)
+   - Copiază Shared Drive ID din URL: `https://drive.google.com/drive/folders/SHARED_DRIVE_ID`
+
+2. **Adaugă service account ca member**:
+   - Deschide Shared Drive → click "Manage members"
+   - Adaugă email: `GOOGLE_CLOUD_CLIENT_EMAIL` (din .env.local)
+   - Rol: **Content Manager** (poate crea/edita/șterge)
+
+3. **Creează folder în Shared Drive**:
+   - În Shared Drive, creează folder "Facturi Primite ANAF"
+   - Aceasta va fi rădăcina pentru storage facturi
+
+4. **Configurează .env.local**:
+   ```
+   GOOGLE_SHARED_DRIVE_ID=<ID-ul copiat din URL>
+   ```
+
+5. **Deploy la Vercel**:
+   - Adaugă `GOOGLE_SHARED_DRIVE_ID` în Vercel Environment Variables
 
 ## TypeScript Configuration
 
