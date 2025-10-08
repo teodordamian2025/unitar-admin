@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Build WHERE clause
-    const whereConditions: string[] = ['activ = TRUE'];
+    const whereConditions: string[] = ['f.activ = TRUE'];
     const params: any = {
       data_start: filters.data_start,
       data_end: filters.data_end,
@@ -63,31 +63,31 @@ export async function GET(req: NextRequest) {
 
     // Filter by data_factura (dacă există) SAU data_preluare
     whereConditions.push(
-      `(data_factura BETWEEN @data_start AND @data_end OR DATE(data_preluare) BETWEEN @data_start AND @data_end)`
+      `(f.data_factura BETWEEN @data_start AND @data_end OR DATE(f.data_preluare) BETWEEN @data_start AND @data_end)`
     );
 
     if (filters.cif_emitent) {
-      whereConditions.push('cif_emitent = @cif_emitent');
+      whereConditions.push('f.cif_emitent = @cif_emitent');
       params.cif_emitent = filters.cif_emitent;
     }
 
     if (filters.status_procesare) {
-      whereConditions.push('status_procesare = @status_procesare');
+      whereConditions.push('f.status_procesare = @status_procesare');
       params.status_procesare = filters.status_procesare;
     }
 
     if (filters.asociat === 'true') {
-      whereConditions.push('cheltuiala_asociata_id IS NOT NULL');
+      whereConditions.push('f.cheltuiala_asociata_id IS NOT NULL');
     } else if (filters.asociat === 'false') {
-      whereConditions.push('cheltuiala_asociata_id IS NULL');
+      whereConditions.push('f.cheltuiala_asociata_id IS NULL');
     }
 
     if (filters.search) {
       whereConditions.push(
         `(
-          LOWER(serie_numar) LIKE @search OR
-          LOWER(nume_emitent) LIKE @search OR
-          LOWER(observatii) LIKE @search
+          LOWER(f.serie_numar) LIKE @search OR
+          LOWER(f.nume_emitent) LIKE @search OR
+          LOWER(f.observatii) LIKE @search
         )`
       );
       params.search = `%${filters.search.toLowerCase()}%`;
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
     // Query count
     const countQuery = `
       SELECT COUNT(*) AS total
-      FROM \`${FACTURI_TABLE}\`
+      FROM \`${FACTURI_TABLE}\` f
       WHERE ${whereClause}
     `;
 
