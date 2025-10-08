@@ -1,29 +1,108 @@
 // =====================================================
 // GOOGLE DRIVE API HELPER
 // Funcții helper pentru interacțiune cu Google Drive
-// Data: 08.10.2025
+// Update 08.10.2025: OAuth refresh token pentru cont personal
 // =====================================================
 
 import { google } from 'googleapis';
+import { BigQuery } from '@google-cloud/bigquery';
+import crypto from 'crypto';
+
+const bigquery = new BigQuery({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+});
 
 /**
- * Inițializare client Google Drive cu service account
+ * Obține OAuth client cu refresh token din BigQuery
  */
-export function getDriveClient() {
-  const privateKey = process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  if (!privateKey || !process.env.GOOGLE_CLOUD_CLIENT_EMAIL) {
-    throw new Error('Missing Google Cloud credentials in .env.local');
-  }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
-      private_key: privateKey,
-    },
-    scopes: ['https://www.googleapis.com/auth/drive'],
+async function getOAuthClient() {
+  // Fetch refresh token din BigQuery
+  const [rows] = await bigquery.query({
+    query: `
+      SELECT refresh_token, access_token, expires_at
+      FROM \`PanouControlUnitar.GoogleDriveTokens\`
+      WHERE user_email = 'unitarproiect@gmail.com'
+        AND activ = TRUE
+      ORDER BY data_creare DESC
+      LIMIT 1
+    `,
   });
 
+  if (rows.length === 0) {
+    throw new Error(
+      'No Google Drive OAuth token found. ' +
+      'Please authorize at: ' +
+      (process.env.NEXT_PUBLIC_BASE_URL || 'https://admin.unitarproiect.eu') +
+      '/api/oauth/google-drive'
+    );
+  }
+
+  const token = rows[0];
+  const decryptedRefreshToken = decryptToken(token.refresh_token);
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    `${process.env.NEXT_PUBLIC_BASE_URL}/api/oauth/google-drive/callback`
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: decryptedRefreshToken,
+    access_token: token.access_token,
+  });
+
+  // Auto-refresh access token când expiră
+  oauth2Client.on('tokens', async (tokens) => {
+    if (tokens.access_token) {
+      console.log('🔄 Refreshing Google Drive access token...');
+      await bigquery.query({
+        query: `
+          UPDATE \`PanouControlUnitar.GoogleDriveTokens\`
+          SET access_token = @access_token,
+              expires_at = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 3600 SECOND)
+          WHERE user_email = 'unitarproiect@gmail.com' AND activ = TRUE
+        `,
+        params: { access_token: tokens.access_token },
+      });
+    }
+  });
+
+  return oauth2Client;
+}
+
+/**
+ * Decriptează refresh token din BigQuery
+ */
+function decryptToken(encryptedToken: string): string {
+  const key = process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY;
+
+  if (!key || key.length !== 64) {
+    throw new Error('Invalid GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY (must be 64 hex chars)');
+  }
+
+  const parts = encryptedToken.split(':');
+  if (parts.length !== 2) {
+    throw new Error('Invalid encrypted token format');
+  }
+
+  const iv = Buffer.from(parts[0], 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+
+  let decrypted = decipher.update(parts[1], 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
+
+/**
+ * Inițializare client Google Drive cu OAuth refresh token
+ */
+export async function getDriveClient() {
+  const auth = await getOAuthClient();
   return google.drive({ version: 'v3', auth });
 }
 
@@ -31,7 +110,7 @@ export function getDriveClient() {
  * Găsește folder după nume în parent folder
  */
 export async function findFolder(folderName: string, parentId?: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const query = parentId
     ? `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
@@ -40,22 +119,11 @@ export async function findFolder(folderName: string, parentId?: string) {
   console.log(`🔍 Searching for folder: "${folderName}"${parentId ? ` in parent ${parentId}` : ''}`);
   console.log(`📝 Query: ${query}`);
 
-  const requestParams: any = {
+  const response = await drive.files.list({
     q: query,
     fields: 'files(id, name)',
     spaces: 'drive',
-  };
-
-  // Dacă avem SHARED_DRIVE_ID, căutăm în Shared Drive
-  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
-    requestParams.driveId = process.env.GOOGLE_SHARED_DRIVE_ID;
-    requestParams.includeItemsFromAllDrives = true;
-    requestParams.supportsAllDrives = true;
-    requestParams.corpora = 'drive';
-    console.log(`📁 Searching in Shared Drive: ${process.env.GOOGLE_SHARED_DRIVE_ID}`);
-  }
-
-  const response = await drive.files.list(requestParams);
+  });
 
   console.log(`📂 Found ${response.data.files?.length || 0} folders matching query`);
 
@@ -66,7 +134,7 @@ export async function findFolder(folderName: string, parentId?: string) {
  * Creează folder nou (sau returnează ID dacă există deja)
  */
 export async function createFolder(folderName: string, parentId?: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   // Verifică dacă există deja
   const existingFolder = await findFolder(folderName, parentId);
@@ -85,17 +153,10 @@ export async function createFolder(folderName: string, parentId?: string) {
     fileMetadata.parents = [parentId];
   }
 
-  const requestParams: any = {
+  const response = await drive.files.create({
     requestBody: fileMetadata,
     fields: 'id, name',
-  };
-
-  // Dacă avem SHARED_DRIVE_ID, creăm în Shared Drive
-  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
-    requestParams.supportsAllDrives = true;
-  }
-
-  const response = await drive.files.create(requestParams);
+  });
 
   console.log(`✅ Folder "${folderName}" creat cu succes (ID: ${response.data.id})`);
   return response.data.id!;
@@ -124,7 +185,7 @@ export async function uploadFile(
   mimeType: string,
   parentFolderId?: string
 ) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const fileMetadata: any = {
     name: fileName,
@@ -139,18 +200,11 @@ export async function uploadFile(
     body: require('stream').Readable.from(fileBuffer),
   };
 
-  const requestParams: any = {
+  const response = await drive.files.create({
     requestBody: fileMetadata,
     media: media,
     fields: 'id, name, webViewLink, webContentLink',
-  };
-
-  // Dacă avem SHARED_DRIVE_ID, uploadăm în Shared Drive
-  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
-    requestParams.supportsAllDrives = true;
-  }
-
-  const response = await drive.files.create(requestParams);
+  });
 
   console.log(`✅ Fișier "${fileName}" uploaded (ID: ${response.data.id})`);
 
@@ -166,7 +220,7 @@ export async function uploadFile(
  * Download fișier din Google Drive
  */
 export async function downloadFile(fileId: string): Promise<Buffer> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const response = await drive.files.get(
     { fileId, alt: 'media' },
@@ -180,21 +234,13 @@ export async function downloadFile(fileId: string): Promise<Buffer> {
  * Listează fișiere din folder
  */
 export async function listFiles(folderId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
-  const requestParams: any = {
+  const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink)',
     orderBy: 'createdTime desc',
-  };
-
-  // Dacă avem SHARED_DRIVE_ID, listăm din Shared Drive
-  if (process.env.GOOGLE_SHARED_DRIVE_ID) {
-    requestParams.includeItemsFromAllDrives = true;
-    requestParams.supportsAllDrives = true;
-  }
-
-  const response = await drive.files.list(requestParams);
+  });
 
   return response.data.files || [];
 }
@@ -203,7 +249,7 @@ export async function listFiles(folderId: string) {
  * Șterge fișier (move to trash)
  */
 export async function deleteFile(fileId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   await drive.files.delete({ fileId });
   console.log(`🗑️ Fișier ${fileId} șters din Google Drive`);
 }
@@ -212,7 +258,7 @@ export async function deleteFile(fileId: string) {
  * Obține metadata fișier
  */
 export async function getFileMetadata(fileId: string) {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   const response = await drive.files.get({
     fileId,
