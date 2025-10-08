@@ -35,12 +35,12 @@ const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuf
 const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
 const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
-const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca${tableSuffix}\``;
+const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca\``; // ⚠️ SetariBanca NU are versiune _v2
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
 
 console.log(`🔧 Invoice Generation - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, SetariBanca${tableSuffix}, FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
+console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, SetariBanca (no _v2), FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
 
 // ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
@@ -581,8 +581,7 @@ async function updateProiectStatusFacturare(proiectId: string) {
     const updateQuery = `
       UPDATE ${TABLE_PROIECTE}
       SET
-        status_facturare = @statusFacturare,
-        data_actualizare = CURRENT_TIMESTAMP()
+        status_facturare = @statusFacturare
       WHERE ID_Proiect = @proiectId
         AND Data_Start = DATE(@dataStart)
     `;
