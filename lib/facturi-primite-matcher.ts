@@ -113,7 +113,7 @@ export function calculateMatchScore(
       valoare: cheltuiala.valoare,
       valoare_ron: cheltuiala.valoare_ron,
       moneda: cheltuiala.moneda,
-      data_factura_furnizor: extractDateString(cheltuiala.data_factura_furnizor),
+      data_factura_furnizor: extractDateString(cheltuiala.data_factura_furnizor) || undefined,
       nr_factura_furnizor: cheltuiala.nr_factura_furnizor,
       descriere: cheltuiala.descriere,
     },
@@ -326,7 +326,7 @@ function extractDate(field: any): Date | null {
 /**
  * Extract date string in format YYYY-MM-DD
  */
-function extractDateString(field: any): string | null {
+function extractDateString(field: any): string | null | undefined {
   const date = extractDate(field);
   if (!date) return null;
 
