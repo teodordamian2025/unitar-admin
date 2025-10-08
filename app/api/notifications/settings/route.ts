@@ -37,7 +37,7 @@ async function isUserAdmin(user_id: string): Promise<boolean> {
   const query = `
     SELECT rol
     FROM ${TABLE_UTILIZATORI}
-    WHERE user_id = @user_id
+    WHERE uid = @user_id
     LIMIT 1
   `;
 
