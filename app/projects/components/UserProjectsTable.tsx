@@ -676,22 +676,6 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                       <td style={{
                         padding: '0.5rem 0.75rem'
                       }}>
-                        <button
-                          style={{
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '0.4rem 0.6rem',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                          }}
-                          onClick={() => handleNavigateToDetails(subproject.ID_Subproiect)}
-                        >
-                          📋 Detalii
-                        </button>
                         {subproject.Status === 'Activ' && (
                           <button
                             style={{
@@ -703,8 +687,7 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                               fontSize: '0.75rem',
                               fontWeight: '600',
                               cursor: 'pointer',
-                              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)',
-                              marginLeft: '0.5rem'
+                              boxShadow: '0 2px 4px rgba(102, 126, 234, 0.3)'
                             }}
                             onClick={() => handleOpenSarcini({
                               ID_Proiect: subproject.ID_Subproiect,

@@ -48,7 +48,6 @@ interface ProiectActionsProps {
   onRefresh?: () => void;
   // Callback-uri pentru modale externe (gestionate în ProiecteTable)
   onShowFacturaModal?: (proiect: any) => void;
-  onShowSubproiectModal?: (proiect: any) => void;
   onShowEditModal?: (proiect: any) => void;
   onShowContractModal?: (proiect: any) => void;
   onShowPVModal?: (proiect: any) => void;  // ✅ NOU: Callback pentru PV
@@ -106,7 +105,6 @@ export default function ProiectActions({
   proiect,
   onRefresh,
   onShowFacturaModal,
-  onShowSubproiectModal,
   onShowEditModal,
   onShowContractModal,
   onShowPVModal  // ✅ NOU: Callback PV
@@ -170,14 +168,6 @@ export default function ProiectActions({
         icon: '📋',
         color: 'primary' as const
       }] : []),
-      // Adaugă subproiect doar pentru proiecte principale
-      {
-        key: 'add_subproiect',
-        label: 'Adaugă Subproiect',
-        icon: '📄',
-        color: 'primary' as const,
-        disabled: proiect.Status === 'Anulat' || proiect.Status === 'Finalizat'
-      },
       {
         key: 'divider1',
         label: '',
@@ -257,9 +247,6 @@ export default function ProiectActions({
         case 'sarcini':
           handleSarcini();
           break;
-        case 'add_subproiect':
-          handleAddSubproiect();
-          break;
         case 'generate_invoice':
           handleCreateInvoiceHibrid();
           break;
@@ -291,16 +278,6 @@ export default function ProiectActions({
   const handleSarcini = () => {
     setShowSarciniModal(true);
     console.log('Deschidere modal sarcini pentru:', proiect.ID_Proiect);
-  };
-
-  // Handler pentru Adăugare Subproiect (doar pentru proiecte principale)
-  const handleAddSubproiect = () => {
-    if (onShowSubproiectModal) {
-      onShowSubproiectModal(proiect);
-    } else {
-      console.warn('onShowSubproiectModal callback not provided');
-      showToast('Funcția de adăugare subproiect nu este disponibilă', 'error');
-    }
   };
 
   const handleCreateInvoiceHibrid = () => {

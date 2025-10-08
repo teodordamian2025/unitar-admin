@@ -419,11 +419,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     setShowFacturaModal(true);
   };
 
-  const handleShowSubproiectModal = (proiect: any) => {
-    setSelectedProiect(proiect);
-    setShowSubproiectModal(true);
-  };
-
   const handleShowEditModal = (proiect: any) => {
     setSelectedProiect(proiect);
     setShowEditModal(true);
@@ -1243,7 +1238,6 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             proiect={proiect}
                             onRefresh={handleRefresh}
                             onShowFacturaModal={handleShowFacturaModal}
-                            onShowSubproiectModal={handleShowSubproiectModal}
                             onShowEditModal={handleShowEditModal}
                             onShowContractModal={handleShowContractModal}
                             onShowPVModal={handleShowPVModal}  // ✅ NOU: Callback pentru PV
@@ -1371,10 +1365,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                 Adresa: undefined,
                                 Descriere: undefined,
                                 Observatii: undefined
-                              }} 
+                              }}
                               onRefresh={handleRefresh}
                               onShowFacturaModal={handleShowFacturaModal}
-                              onShowSubproiectModal={handleShowSubproiectModal}
                               onShowEditModal={handleShowEditModal}
                               onShowContractModal={handleShowContractModal}
                               onShowPVModal={handleShowPVModal}  // ✅ NOU: Callback pentru PV și pentru subproiecte
