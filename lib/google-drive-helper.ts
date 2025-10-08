@@ -21,7 +21,7 @@ export function getDriveClient() {
       client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
       private_key: privateKey,
     },
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes: ['https://www.googleapis.com/auth/drive'],
   });
 
   return google.drive({ version: 'v3', auth });
@@ -37,11 +37,16 @@ export async function findFolder(folderName: string, parentId?: string) {
     ? `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
     : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
+  console.log(`🔍 Searching for folder: "${folderName}"${parentId ? ` in parent ${parentId}` : ''}`);
+  console.log(`📝 Query: ${query}`);
+
   const response = await drive.files.list({
     q: query,
     fields: 'files(id, name)',
     spaces: 'drive',
   });
+
+  console.log(`📂 Found ${response.data.files?.length || 0} folders matching query`);
 
   return response.data.files?.[0] || null;
 }

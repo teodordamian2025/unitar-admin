@@ -18,11 +18,20 @@ export async function GET(req: NextRequest) {
     const results: any = {
       success: true,
       tests: [],
+      debug: {},
+    };
+
+    // Debug info
+    results.debug = {
+      has_client_email: !!process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+      has_private_key: !!process.env.GOOGLE_CLOUD_PRIVATE_KEY,
+      client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
     };
 
     // Test 1: Găsește folder rădăcină
     console.log('1️⃣ Găsesc folder rădăcină "Facturi Primite ANAF"...');
     const rootFolderId = await getRootFacturiFolder();
+    console.log(`✅ Root folder găsit: ${rootFolderId}`);
     results.tests.push({
       name: 'Find root folder',
       status: 'success',

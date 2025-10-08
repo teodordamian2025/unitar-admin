@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     // Parse sort
     const [sortField, sortDir] = filters.sort.split(':');
-    const sortClause = `${sortField} ${sortDir.toUpperCase()}`;
+    const sortClause = `f.${sortField} ${sortDir.toUpperCase()}`;
 
     // Query principal
     const query = `
