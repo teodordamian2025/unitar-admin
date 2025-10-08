@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
 
     // 2. Fetch user info pentru fiecare destinatar
     const usersQuery = `
-      SELECT user_id, nume, email
+      SELECT uid as user_id, nume, email
       FROM ${TABLE_UTILIZATORI}
-      WHERE user_id IN UNNEST(@user_ids)
+      WHERE uid IN UNNEST(@user_ids)
     `;
 
     const [userRows] = await bigquery.query({
