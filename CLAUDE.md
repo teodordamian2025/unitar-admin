@@ -68,6 +68,11 @@ BigQuery DATE fields return objects `{value: "2025-08-16"}`, not string primitiv
 - OAuth flow for e-invoicing authorization
 - Company data lookup and validation
 - Error monitoring and notifications
+- **Facturi Primite** (`/api/anaf/facturi-primite/`) - NEW 08.10.2025
+  - Sync facturi primite din ANAF e-Factura
+  - Auto-asociere cu cheltuieli proiecte (ML scoring)
+  - Google Drive storage pentru PDF/XML
+  - Cron job zilnic sincronizare
 
 ## Business Logic Flow
 
@@ -900,3 +905,171 @@ service.forceRefresh();
 - 🔜 Digest email zilnic/săptămânal (reduce spam email)
 
 ---
+
+---
+
+## 📥 SISTEM FACTURI PRIMITE ANAF - 08.10.2025
+
+**STATUS**: ✅ IMPLEMENTAT COMPLET
+**OBIECTIV**: Sincronizare automată facturi primite din ANAF e-Factura cu auto-asociere la cheltuieli proiecte
+
+### **ARHITECTURĂ SISTEM**
+
+#### **Tabel BigQuery: FacturiPrimiteANAF_v2**
+```sql
+- id, id_mesaj_anaf, id_descarcare
+- cif_emitent, nume_emitent, serie_numar
+- data_factura, valoare_totala, moneda, valoare_ron
+- status_procesare: 'nou'/'procesat'/'asociat'/'eroare'
+- google_drive_folder_id, zip_file_id, xml_file_id, pdf_file_id
+- cheltuiala_asociata_id (FK → ProiecteCheltuieli_v2)
+- asociere_automata, asociere_confidence (0-1 score)
+PARTITION BY DATE(data_preluare)
+CLUSTER BY (cif_emitent, status_procesare, cheltuiala_asociata_id)
+```
+
+#### **Google Drive Storage**
+```
+Facturi Primite ANAF/
+├── 2025/
+│   ├── 10/
+│   │   ├── {CUI}_{serie}_{data}.zip
+│   │   ├── {CUI}_{serie}_{data}.xml
+│   │   └── {CUI}_{serie}_{data}.pdf
+│   └── 11/
+```
+**Sync automat**: Google Drive Desktop sync folder → apare în "Computers/My Laptop"
+
+### **API ROUTES**
+
+1. **POST /api/anaf/facturi-primite/sync** - Sincronizare ANAF
+   - Body: `{ zile: 7 }` (default ultimele 7 zile)
+   - Flow: Fetch ANAF → Download ZIP → Extract XML/PDF → Upload Drive → Parse metadata → Insert BigQuery → Auto-asociere
+   - Reutilizează OAuth tokens din `AnafTokens` (același canal cu e-factura emit)
+
+2. **GET /api/anaf/facturi-primite/list** - Listare cu filtre
+   - Query params: `data_start`, `data_end`, `cif_emitent`, `status_procesare`, `asociat`, `search`, `limit`, `offset`
+   - Include JOIN cu ProiecteCheltuieli_v2 pentru afișare asociere
+
+3. **POST /api/anaf/facturi-primite/associate** - Asociere manuală
+   - Body: `{ factura_id, cheltuiala_id, user_id, observatii }`
+   - Update ambele tabele (factură + cheltuială)
+
+4. **GET /api/anaf/facturi-primite/associate?factura_id=xxx** - Sugestii match
+   - Returnează top match-uri sorted by score (threshold 50%)
+
+5. **GET /api/anaf/facturi-primite/cron** - Cron job zilnic
+   - Rulează automat la 06:00 AM (Vercel Cron)
+   - Trigger manual din admin UI
+
+### **AUTO-MATCH LOGIC (ML-style Scoring)**
+
+**Criterii matching:**
+- **CUI Furnizor (40%)**: Exact match `cif_emitent = furnizor_cui`
+- **Valoare (30%)**: Tolerance ±2% → 30p, ±5% → 20p, ±10% → 10p
+- **Data factură (20%)**: Same day → 20p, ±3 zile → 15p, ±7 zile → 10p, ±14 zile → 5p
+- **Serie/număr (10%)**: Exact match după normalizare
+
+**Threshold automat:**
+- Score ≥ 80% → Asociere automată cu flag `asociere_automata = TRUE`
+- Score 50-79% → Afișat în UI ca sugestie
+- Score < 50% → Nu sugerăm
+
+**Algoritm**: `/lib/facturi-primite-matcher.ts` (`calculateMatchScore`, `autoAssociate`, `manualAssociate`)
+
+### **LIBRARY FILES**
+
+1. **`/lib/google-drive-helper.ts`** - Google Drive API wrapper
+   - `getRootFacturiFolder()`, `getMonthFolder(year, month)`
+   - `uploadFile()`, `downloadFile()`, `listFiles()`
+
+2. **`/lib/anaf-invoice-parser.ts`** - XML UBL 2.1 parser
+   - `parseInvoiceXML(xmlContent)` → FacturaXMLData
+   - `validateInvoiceRecipient()` - Verifică CUI destinatar
+   - `extractSerieNumar()`, `parseAnafDate()`
+
+3. **`/lib/facturi-primite-matcher.ts`** - Auto-match logic
+   - `calculateMatchScore()`, `findMatches()`, `autoAssociate()`, `manualAssociate()`
+
+4. **`/lib/facturi-primite-types.ts`** - TypeScript interfaces
+   - `FacturaPrimita`, `AnafMesajFactura`, `FacturaXMLData`, `MatchResult`
+
+### **UI ADMIN**
+
+**Pagină**: `/admin/financiar/facturi-primite`
+
+**Funcționalități:**
+- Tabel cu facturi (serie, furnizor, CUI, dată, valoare, status, asociere)
+- Filtre: search, status, asociat/neasociat
+- Button "Sincronizare Manuală" → trigger `/sync`
+- Status badges: 🟢 Asociat | 🔵 Procesat | 🟡 Nou
+- Link asociere: 🤖 Automat | 👤 Manual
+- Design glassmorphism consistent
+
+### **SETUP INSTRUCȚIUNI**
+
+**1. BigQuery:**
+```bash
+# Rulează în BigQuery Console:
+/scripts/facturi-primite-create-table.sql
+/scripts/facturi-primite-seed-notification.sql
+```
+
+**2. Google Drive:**
+- Deja configurat: API enabled + folder creat + permisiuni Editor
+- Service account email: `GOOGLE_CLOUD_CLIENT_EMAIL` din `.env.local`
+- Folder: "Facturi Primite ANAF" (găsit automat de helper)
+
+**3. ANAF OAuth:**
+- Reutilizează token-uri din `AnafTokens` (același canal cu e-factura emit)
+- Nu necesită setup suplimentar
+
+**4. Test Local:**
+```bash
+# Test Google Drive:
+curl http://localhost:3000/api/test/google-drive
+
+# Test sync manual:
+curl -X POST http://localhost:3000/api/anaf/facturi-primite/sync \
+  -H "Content-Type: application/json" \
+  -d '{"zile": 7}'
+
+# Vezi facturi:
+open http://localhost:3000/admin/financiar/facturi-primite
+```
+
+### **PRODUCTION DEPLOYMENT**
+
+**Vercel Cron Configuration:**
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/anaf/facturi-primite/cron",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
+```
+
+**Environment Variables (deja configurate):**
+```
+GOOGLE_CLOUD_PROJECT_ID
+GOOGLE_CLOUD_CLIENT_EMAIL
+GOOGLE_CLOUD_PRIVATE_KEY
+ANAF_TOKEN_ENCRYPTION_KEY
+UNITAR_CUI=35639210
+```
+
+### **KEY FEATURES**
+
+✅ Reutilizare infrastructură OAuth ANAF (zero config nou)
+✅ Google Drive sync automat pe laptop (via Drive Desktop)
+✅ Auto-asociere inteligentă cu scoring ML (80% threshold)
+✅ UI admin simplu pentru manual matching
+✅ Cron job zilnic sincronizare (06:00 AM)
+✅ Zero impact pe funcționalități existente
+✅ TypeScript types complete + error handling
+
+**ULTIMA ACTUALIZARE**: 08.10.2025 - Implementare completă production-ready
