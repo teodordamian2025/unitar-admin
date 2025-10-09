@@ -132,7 +132,31 @@ export async function findMatches(
     // Query cheltuieli neasociate din ultimele 90 zile
     const query = `
       SELECT
-        ch.*,
+        ch.id,
+        ch.proiect_id,
+        ch.subproiect_id,
+        ch.tip_cheltuiala,
+        ch.furnizor_nume,
+        ch.furnizor_cui,
+        ch.furnizor_contact,
+        ch.descriere,
+        ch.valoare,
+        ch.moneda,
+        ch.curs_valutar,
+        ch.data_curs_valutar,
+        ch.valoare_ron,
+        ch.status_predare,
+        ch.status_contract,
+        ch.status_facturare,
+        ch.status_achitare,
+        ch.nr_factura_furnizor,
+        ch.data_factura_furnizor,
+        ch.nr_contract_furnizor,
+        ch.data_contract_furnizor,
+        ch.data_creare,
+        ch.data_actualizare,
+        ch.activ,
+        ch.observatii,
         p.Denumire_Proiect AS proiect_denumire,
         sp.Denumire AS subproiect_denumire
       FROM \`PanouControlUnitar.ProiecteCheltuieli_v2\` ch
