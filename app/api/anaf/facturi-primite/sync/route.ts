@@ -268,8 +268,9 @@ async function getAnafAccessToken(): Promise<{ success: boolean; token?: string;
 
     const token = rows[0];
 
-    // Verifică expirare
-    const expiresAt = new Date(token.expires_at);
+    // Verifică expirare (BigQuery returnează DATE ca {value: "..."})
+    const expiresAtValue = token.expires_at?.value || token.expires_at;
+    const expiresAt = new Date(expiresAtValue);
     if (new Date() >= expiresAt) {
       return { success: false, error: 'Token ANAF expirat. Reautorizează aplicația.' };
     }
