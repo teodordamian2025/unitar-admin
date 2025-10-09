@@ -159,9 +159,14 @@ export async function GET(req: NextRequest) {
 
     // Execute queries
     const [rows] = await bigquery.query({ query, params });
+
+    // Count query - exclude limit/offset from params
+    const countParams = { ...params };
+    delete countParams.limit;
+    delete countParams.offset;
     const [countRows] = await bigquery.query({
       query: countQuery,
-      params: { ...params, limit: undefined, offset: undefined },
+      params: countParams,
     });
 
     const total = countRows[0]?.total || 0;
