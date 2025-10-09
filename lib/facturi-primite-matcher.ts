@@ -157,7 +157,7 @@ export async function findMatches(
         ch.data_actualizare,
         ch.activ,
         ch.observatii,
-        p.Denumire_Proiect AS proiect_denumire,
+        p.Denumire AS proiect_denumire,
         sp.Denumire AS subproiect_denumire
       FROM \`PanouControlUnitar.ProiecteCheltuieli_v2\` ch
       LEFT JOIN \`PanouControlUnitar.Proiecte_v2\` p ON ch.proiect_id = p.ID_Proiect

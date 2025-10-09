@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
         ch.proiect_id,
         ch.subproiect_id,
         ch.descriere AS cheltuiala_descriere,
-        p.Denumire_Proiect AS proiect_denumire,
+        p.Denumire AS proiect_denumire,
         sp.Denumire AS subproiect_denumire
       FROM \`${FACTURI_TABLE}\` f
       LEFT JOIN \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli_v2\` ch
