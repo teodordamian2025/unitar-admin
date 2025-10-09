@@ -139,9 +139,9 @@ export async function GET(req: NextRequest) {
       LEFT JOIN \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli_v2\` ch
         ON f.cheltuiala_asociata_id = ch.id
       LEFT JOIN \`${PROJECT_ID}.${DATASET}.Proiecte_v2\` p
-        ON ch.proiect_id = p.id
+        ON ch.proiect_id = p.ID_Proiect
       LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte_v2\` sp
-        ON ch.subproiect_id = sp.id
+        ON ch.subproiect_id = sp.ID_Subproiect
       WHERE ${whereClause}
       ORDER BY ${sortClause}
       LIMIT @limit OFFSET @offset

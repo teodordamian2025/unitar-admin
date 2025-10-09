@@ -160,8 +160,8 @@ export async function findMatches(
         p.Denumire_Proiect AS proiect_denumire,
         sp.Denumire AS subproiect_denumire
       FROM \`PanouControlUnitar.ProiecteCheltuieli_v2\` ch
-      LEFT JOIN \`PanouControlUnitar.Proiecte_v2\` p ON ch.proiect_id = p.id
-      LEFT JOIN \`PanouControlUnitar.Subproiecte_v2\` sp ON ch.subproiect_id = sp.id
+      LEFT JOIN \`PanouControlUnitar.Proiecte_v2\` p ON ch.proiect_id = p.ID_Proiect
+      LEFT JOIN \`PanouControlUnitar.Subproiecte_v2\` sp ON ch.subproiect_id = sp.ID_Subproiect
       WHERE ch.activ = TRUE
         AND (ch.status_facturare IS NULL OR ch.status_facturare != 'asociat')
         AND ch.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
