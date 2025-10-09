@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
-const ANAF_TOKENS_TABLE = `${PROJECT_ID}.${DATASET}.AnafTokens`;
+const ANAF_TOKENS_TABLE = `${PROJECT_ID}.${DATASET}.AnafTokens_v2`;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,

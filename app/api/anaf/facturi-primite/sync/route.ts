@@ -42,7 +42,7 @@ const bigquery = new BigQuery({
 });
 
 const FACTURI_PRIMITE_TABLE = `${PROJECT_ID}.${DATASET}.FacturiPrimiteANAF_v2`;
-const ANAF_TOKENS_TABLE = `${PROJECT_ID}.${DATASET}.AnafTokens`;
+const ANAF_TOKENS_TABLE = `${PROJECT_ID}.${DATASET}.AnafTokens_v2`;
 
 /**
  * POST /api/anaf/facturi-primite/sync
