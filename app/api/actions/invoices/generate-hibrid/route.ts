@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
+// ✅ IMPORT funcții pentru generare XML ANAF (FIX ECONNREFUSED - apel direct în loc de fetch)
+import { generateUBLXml, saveXmlToDatabase } from '@/app/api/actions/invoices/generate-xml/route';
 
 // ✅ MOCK MODE pentru testare e-factura - setează la true pentru teste sigure
 const MOCK_EFACTURA_MODE = false; // ← SCHIMBĂ la false pentru producție reală
@@ -1610,50 +1612,55 @@ export async function POST(request: NextRequest) {
           console.log(`✅ MOCK XML generat: ${mockXmlId} (salvat în AnafEFactura_v2)`);
 
         } else {
-          // ✅ PRODUCȚIE: Apel real la API pentru generare XML ANAF
+          // ✅ PRODUCȚIE: Apel DIRECT la funcțiile de generare XML (FIX ECONNREFUSED)
           try {
-            console.log('🚀 PRODUCȚIE MODE - generez XML real pentru ANAF');
+            console.log('🚀 PRODUCȚIE MODE - generez XML real pentru ANAF cu apel direct (fără fetch)');
 
-            const xmlGenerationUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/anaf/invoices/generate-xml`;
-
-            const xmlRequestBody = {
-              facturaId: currentFacturaId,
-              clientInfo: safeClientData,
-              liniiFactura: liniiFacturaActualizate,
-              subtotal,
-              totalTva,
-              total,
-              observatii: observatiiFinale,
-              numarFactura: numarFactura || safeInvoiceData.numarFactura,
-              isEdit
+            // ✅ Construiește obiectul facturaData pentru generateUBLXml
+            const facturaDataForXml = {
+              id: currentFacturaId,
+              numar: numarFactura || safeInvoiceData.numarFactura,
+              serie: setariFacturare?.serie_facturi || 'INV',
+              data_factura: new Date().toISOString().split('T')[0],
+              data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              proiect_id: proiectId,
+              subtotal: Number(subtotal.toFixed(2)),
+              total_tva: Number(totalTva.toFixed(2)),
+              total: Number(total.toFixed(2)),
+              dateComplete: {
+                liniiFactura: liniiFacturaActualizate,
+                clientInfo: safeClientData,
+                observatii: observatiiFinale
+              }
             };
 
-            console.log('📤 Trimit request pentru generare XML ANAF:', {
-              url: xmlGenerationUrl,
+            console.log('📤 Generez XML ANAF cu apel direct la funcții:', {
               facturaId: currentFacturaId,
               total: total.toFixed(2),
               isEdit
             });
 
-            const xmlResponse = await fetch(xmlGenerationUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(xmlRequestBody)
-            });
+            // ✅ Apel DIRECT la generateUBLXml (FĂRĂ HTTP fetch)
+            const xmlGenResult = await generateUBLXml(facturaDataForXml);
 
-            const xmlData = await xmlResponse.json();
+            if (xmlGenResult.success && xmlGenResult.xml) {
+              // ✅ Salvează XML-ul în BigQuery
+              const saveResult = await saveXmlToDatabase(currentFacturaId, xmlGenResult.xml);
 
-            if (xmlData.success) {
-              xmlResult = {
-                success: true,
-                xmlId: xmlData.xmlId || xmlData.anafUploadId,
-                status: 'uploaded',
-                message: `XML generat și trimis la ANAF cu succes ${isEdit ? '(EDIT)' : '(NEW)'}`,
-                mockMode: false
-              };
-              console.log(`✅ XML ANAF generat cu succes: ${xmlResult.xmlId}`);
+              if (saveResult.success) {
+                xmlResult = {
+                  success: true,
+                  xmlId: saveResult.xmlId,
+                  status: 'draft',
+                  message: `XML generat cu succes ${isEdit ? '(EDIT)' : '(NEW)'}`,
+                  mockMode: false
+                };
+                console.log(`✅ XML ANAF generat și salvat cu succes: ${xmlResult.xmlId}`);
+              } else {
+                throw new Error('Failed to save XML to database');
+              }
             } else {
-              throw new Error(xmlData.error || 'Eroare necunoscută la generarea XML');
+              throw new Error(xmlGenResult.error || 'XML generation failed');
             }
 
           } catch (xmlError) {

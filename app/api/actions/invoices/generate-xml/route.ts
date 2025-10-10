@@ -277,7 +277,8 @@ async function getFacturaData(facturaId: string) {
   }
 }
 
-async function generateUBLXml(facturaData: any) {
+// ✅ EXPORTAT pentru reutilizare în alte API-uri (generate-hibrid)
+export async function generateUBLXml(facturaData: any) {
   try {
     console.log('🔄 Generating UBL XML for factura:', facturaData.numar);
 
@@ -463,7 +464,8 @@ async function generateUBLXml(facturaData: any) {
   }
 }
 
-async function saveXmlToDatabase(facturaId: string, xmlContent: string) {
+// ✅ EXPORTAT pentru reutilizare în alte API-uri (generate-hibrid)
+export async function saveXmlToDatabase(facturaId: string, xmlContent: string) {
   try {
     const dataset = bigquery.dataset('PanouControlUnitar');
     const table = dataset.table(`AnafEFactura${tableSuffix}`);
