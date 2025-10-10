@@ -227,6 +227,59 @@ const calculateFacturareStatus = (factureData: any[]): { status: string, display
   };
 };
 
+// NOU: Încărcarea facturilor directe pentru contract (fără etape/anexe)
+const loadFacturiDirecteContract = async (proiectId: string) => {
+  try {
+    const facturiDirecteQuery = `
+      SELECT
+        fg.id as factura_id,
+        fg.serie,
+        fg.numar,
+        fg.total as valoare,
+        'RON' as moneda,
+        fg.data_factura as data_facturare,
+        fg.data_plata as data_incasare,
+        fg.valoare_platita as valoare_incasata,
+        fg.status as status_factura,
+        CASE
+          WHEN COALESCE(fg.valoare_platita, 0) = 0 THEN 'Neincasat'
+          WHEN COALESCE(fg.valoare_platita, 0) >= fg.total THEN 'Incasat complet'
+          ELSE 'Incasat partial'
+        END as status_incasare
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      WHERE fg.proiect_id = '${proiectId}'
+        AND fg.id NOT IN (
+          SELECT DISTINCT factura_id
+          FROM ${TABLE_ETAPE_FACTURI}
+          WHERE activ = true AND factura_id IS NOT NULL
+        )
+      ORDER BY fg.data_factura DESC
+    `;
+
+    const [facturiRows] = await bigquery.query({
+      query: facturiDirecteQuery,
+      location: 'EU',
+    });
+
+    return facturiRows.map((row: any) => ({
+      factura_id: row.factura_id,
+      serie: row.serie,
+      numar: row.numar,
+      valoare: row.valoare,
+      moneda: row.moneda,
+      data_facturare: row.data_facturare,
+      data_incasare: row.data_incasare,
+      valoare_incasata: row.valoare_incasata,
+      status_incasare: row.status_incasare,
+      status_factura: row.status_factura,
+      activ: true
+    }));
+  } catch (error) {
+    console.error(`[CONTRACTE] Eroare la încărcarea facturilor directe pentru proiectul ${proiectId}:`, error);
+    return [];
+  }
+};
+
 // NOU: Încărcarea etapelor din EtapeContract cu informații de facturare
 const loadEtapeContractCuFacturi = async (contractId: string) => {
   try {
@@ -564,10 +617,14 @@ export async function GET(request: NextRequest) {
       // Încarcă anexele din AnexeContract cu informații de facturare
       const anexe = await loadAnexeContractCuFacturi(contract.ID_Contract);
 
+      // NOU: Încarcă facturile directe (fără etape/anexe) pentru contract
+      const facturiDirecte = await loadFacturiDirecteContract(contract.proiect_id);
+
       // Calculează status de facturare general pentru contract
       const toateFacturile = [
         ...etape.flatMap(e => e.facturi || []),
-        ...anexe.flatMap(a => a.facturi || [])
+        ...anexe.flatMap(a => a.facturi || []),
+        ...facturiDirecte  // Adaugă facturile directe
       ];
 
       const statusFacturareContract = calculateFacturareStatus(toateFacturile);
@@ -662,11 +719,10 @@ export async function GET(request: NextRequest) {
 
     console.log(`[CONTRACTE] Contracte găsite: ${contracteFiltrate.length} din ${total} total`);
     
-    // NOU: Log pentru debug etape și anexe
+    // NOU: Log pentru debug etape, anexe și facturi directe
     contracteFiltrate.forEach(c => {
-      if (c.etape_count > 0 || c.anexe_count > 0) {
-        console.log(`[CONTRACTE] ${c.numar_contract}: ${c.etape_count} etape, ${c.anexe_count} anexe, status: ${c.status_facturare_filtru}`);
-      }
+      const totalFacturi = (c.status_facturare_display && c.status_facturare_display !== 'Nefacturat') ? 'cu facturi' : 'fără facturi';
+      console.log(`[CONTRACTE] ${c.numar_contract}: ${c.etape_count} etape, ${c.anexe_count} anexe, ${totalFacturi}, status: ${c.status_facturare_filtru}`);
     });
 
     return NextResponse.json({
