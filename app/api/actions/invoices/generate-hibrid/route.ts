@@ -1336,84 +1336,10 @@ export async function POST(request: NextRequest) {
         </div>
     </body>
     </html>`;
-    
-    // ✅ MANAGEMENT e-FACTURA - Mock Mode sau Producție (PĂSTRAT IDENTIC)
+
+    // ✅ MODIFICAT: Salvare în BigQuery ÎNAINTE de generarea XML (FIX timing issue)
     let xmlResult: any = null;
 
-    if (sendToAnaf) {
-      if (MOCK_EFACTURA_MODE) {
-        // 🧪 MOCK MODE - Simulează e-factura fără trimitere la ANAF
-        console.log('🧪 MOCK MODE: Simulez e-factura pentru:', {
-          facturaId: currentFacturaId,
-          clientCUI: safeClientData.cui,
-          totalFactura: safeFormat(total),
-          liniiFactura: liniiFacturaActualizate.length,
-          cursuriUtilizate: Object.keys(cursuriUtilizate).length,
-          etapeFacturate: etapeFacturate.length,
-          isEdit: isEdit
-        });
-
-        const mockXmlId = `MOCK_XML_${isEdit ? 'EDIT' : 'NEW'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Simulează salvare în BigQuery FacturiEFACTURA
-        await saveMockEfacturaRecord({
-          xmlId: mockXmlId,
-          facturaId: currentFacturaId,
-          proiectId,
-          clientInfo: safeClientData,
-          liniiFactura: liniiFacturaActualizate,
-          total: safeFormat(total),
-          subtotal: safeFormat(subtotal),
-          totalTva: safeFormat(totalTva),
-          isEdit: isEdit
-        });
-
-        xmlResult = {
-          success: true,
-          xmlId: mockXmlId,
-          status: isEdit ? 'mock_edit_generated' : 'mock_generated',
-          mockMode: true,
-          message: `🧪 XML generat în mode test ${isEdit ? '(EDIT)' : '(NEW)'} - NU trimis la ANAF`,
-          editMode: isEdit
-        };
-
-        console.log(`✅ Mock e-factura completă ${isEdit ? 'EDIT' : 'NEW'}:`, mockXmlId);
-
-      } else {
-        // 🚀 PRODUCȚIE - Cod real pentru ANAF
-        console.log(`🚀 PRODUCȚIE: Generez XML real pentru ANAF ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}...`);
-        
-        try {
-          const xmlResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/actions/invoices/generate-xml`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              facturaId: currentFacturaId,
-              forceRegenerate: isEdit,
-              isEdit: isEdit
-            })
-          });
-
-          xmlResult = await xmlResponse.json();
-          
-          if (xmlResult.success) {
-            console.log(`✅ XML real generat pentru ANAF ${isEdit ? '(EDIT)' : '(NEW)'}:`, xmlResult.xmlId);
-          } else {
-            console.error('❌ Eroare la generarea XML ANAF:', xmlResult.error);
-          }
-        } catch (xmlError) {
-          console.error('❌ Eroare la apelarea API-ului XML:', xmlError);
-          xmlResult = {
-            success: false,
-            error: 'Eroare la generarea XML pentru ANAF',
-            details: xmlError instanceof Error ? xmlError.message : 'Eroare necunoscută',
-            editMode: isEdit
-          };
-        }
-      }
-    }
-
-    // ✅ MODIFICAT: Salvare în BigQuery cu suport pentru Edit și types corecte + DATE EXACTE DIN FRONTEND
     try {
       const dataset = bigquery.dataset(DATASET);
       const table = dataset.table(`FacturiGenerate${tableSuffix}`);
@@ -1653,6 +1579,96 @@ export async function POST(request: NextRequest) {
       }
 
       // ✅ NOTA: Incrementarea numar_curent_facturi s-a mutat ÎNAINTE de salvare (linia ~1540) pentru a preveni race conditions
+
+      // ✅ NOU: GENERARE XML ANAF DUPĂ salvarea facturii în BigQuery (FIX timing issue)
+      if (sendToAnaf) {
+        console.log(`📤 Generez XML ANAF pentru factura ${currentFacturaId} ${MOCK_EFACTURA_MODE ? '(MOCK MODE)' : '(PRODUCȚIE)'}...`);
+
+        if (MOCK_EFACTURA_MODE) {
+          // ✅ MOCK MODE: Salvare record test fără apel real la ANAF
+          const mockXmlId = `MOCK_${currentFacturaId}_${Date.now()}`;
+
+          console.log('🧪 MOCK MODE activat - generez XML fără trimitere la ANAF');
+
+          await saveMockEfacturaRecord({
+            xmlId: mockXmlId,
+            facturaId: currentFacturaId,
+            subtotal: subtotal.toFixed(2),
+            total: total.toFixed(2),
+            clientInfo: safeClientData,
+            isEdit
+          });
+
+          xmlResult = {
+            success: true,
+            xmlId: mockXmlId,
+            status: 'mock_generated',
+            message: `XML generat în MOCK MODE ${isEdit ? '(EDIT)' : '(NEW)'} - NU trimis la ANAF`,
+            mockMode: true
+          };
+
+          console.log(`✅ MOCK XML generat: ${mockXmlId} (salvat în AnafEFactura_v2)`);
+
+        } else {
+          // ✅ PRODUCȚIE: Apel real la API pentru generare XML ANAF
+          try {
+            console.log('🚀 PRODUCȚIE MODE - generez XML real pentru ANAF');
+
+            const xmlGenerationUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/anaf/invoices/generate-xml`;
+
+            const xmlRequestBody = {
+              facturaId: currentFacturaId,
+              clientInfo: safeClientData,
+              liniiFactura: liniiFacturaActualizate,
+              subtotal,
+              totalTva,
+              total,
+              observatii: observatiiFinale,
+              numarFactura: numarFactura || safeInvoiceData.numarFactura,
+              isEdit
+            };
+
+            console.log('📤 Trimit request pentru generare XML ANAF:', {
+              url: xmlGenerationUrl,
+              facturaId: currentFacturaId,
+              total: total.toFixed(2),
+              isEdit
+            });
+
+            const xmlResponse = await fetch(xmlGenerationUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(xmlRequestBody)
+            });
+
+            const xmlData = await xmlResponse.json();
+
+            if (xmlData.success) {
+              xmlResult = {
+                success: true,
+                xmlId: xmlData.xmlId || xmlData.anafUploadId,
+                status: 'uploaded',
+                message: `XML generat și trimis la ANAF cu succes ${isEdit ? '(EDIT)' : '(NEW)'}`,
+                mockMode: false
+              };
+              console.log(`✅ XML ANAF generat cu succes: ${xmlResult.xmlId}`);
+            } else {
+              throw new Error(xmlData.error || 'Eroare necunoscută la generarea XML');
+            }
+
+          } catch (xmlError) {
+            console.error('❌ Eroare la generarea XML ANAF:', xmlError);
+            xmlResult = {
+              success: false,
+              xmlId: null,
+              status: 'error',
+              error: xmlError instanceof Error ? xmlError.message : 'Eroare necunoscută',
+              message: 'Factura salvată, dar XML-ul ANAF a eșuat',
+              mockMode: false
+            };
+          }
+        }
+      }
 
     } catch (bgError) {
       console.error('❌ Eroare la salvarea în BigQuery FacturiGenerate:', bgError);
