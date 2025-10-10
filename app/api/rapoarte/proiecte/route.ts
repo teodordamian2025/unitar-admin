@@ -481,27 +481,55 @@ export async function POST(request: NextRequest) {
     console.log('=== DEBUG BACKEND: Insert executat cu succes ===');
 
     // ✅ HOOK NOTIFICĂRI: Trimite notificare responsabil la atribuire proiect
+    // FIX: Găsește UID-ul responsabilului din tabela Utilizatori_v2
     if (Responsabil) {
       try {
-        const notifyResponse = await fetch(`${request.url.split('/api/')[0]}/api/notifications/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tip_notificare: 'proiect_atribuit',
-            user_id: Responsabil,
-            context: {
-              proiect_id: ID_Proiect,
-              proiect_denumire: Denumire,
-              proiect_client: Client,
-              proiect_descriere: Descriere || '',
-              proiect_deadline: Data_Final || '',
-              user_name: Responsabil, // Poate fi îmbunătățit cu numele real din Utilizatori
-            }
-          })
+        const tableUtilizatori = `Utilizatori${tableSuffix}`;
+
+        // Caută UID-ul responsabilului după nume în tabela Utilizatori_v2
+        const responsabiliQuery = `
+          SELECT uid, nume, prenume, email
+          FROM \`${PROJECT_ID}.${dataset}.${tableUtilizatori}\`
+          WHERE CONCAT(nume, ' ', prenume) = @responsabil
+            OR nume = @responsabil
+          LIMIT 1
+        `;
+
+        const [responsabiliRows] = await bigquery.query({
+          query: responsabiliQuery,
+          params: { responsabil: Responsabil },
+          location: 'EU',
         });
 
-        const notifyResult = await notifyResponse.json();
-        console.log('✅ Notificare proiect trimisă:', notifyResult);
+        // Dacă găsim responsabilul, trimitem notificarea
+        if (responsabiliRows.length > 0) {
+          const responsabilUser = responsabiliRows[0];
+
+          const notifyResponse = await fetch(`${request.url.split('/api/')[0]}/api/notifications/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tip_notificare: 'proiect_atribuit',
+              user_id: responsabilUser.uid, // ✅ FIXED: Trimitem UID-ul, nu numele
+              context: {
+                proiect_id: ID_Proiect,
+                proiect_denumire: Denumire,
+                proiect_client: Client,
+                proiect_descriere: Descriere || '',
+                proiect_deadline: Data_Final || '',
+                user_name: `${responsabilUser.nume} ${responsabilUser.prenume}`,
+                data_atribuire: new Date().toISOString().split('T')[0],
+                termen_realizare: Data_Final || 'Neespecificat',
+                link_detalii: `${request.url.split('/api/')[0]}/admin/rapoarte/proiecte?search=${encodeURIComponent(ID_Proiect)}`
+              }
+            })
+          });
+
+          const notifyResult = await notifyResponse.json();
+          console.log('✅ Notificare proiect trimisă către UID:', responsabilUser.uid, notifyResult);
+        } else {
+          console.warn(`⚠️ Nu s-a găsit utilizator cu numele "${Responsabil}" în Utilizatori_v2`);
+        }
       } catch (notifyError) {
         console.error('⚠️ Eroare la trimitere notificare (non-blocking):', notifyError);
         // Nu blocăm crearea proiectului dacă notificarea eșuează
