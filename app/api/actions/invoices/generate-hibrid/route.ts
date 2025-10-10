@@ -1556,8 +1556,8 @@ export async function POST(request: NextRequest) {
           data_creare: new Date().toISOString(),
           data_actualizare: new Date().toISOString(),
           efactura_enabled: sendToAnaf,
-          efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'pending') : null,
-          anaf_upload_id: xmlResult?.xmlId || null
+          efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'draft') : null,
+          anaf_upload_id: null // ✅ Se va actualiza mai târziu când se trimite efectiv la ANAF (evită streaming buffer)
         }];
 
         await table.insert(facturaData);
@@ -1657,40 +1657,10 @@ export async function POST(request: NextRequest) {
                 };
                 console.log(`✅ XML ANAF generat și salvat cu succes: ${xmlResult.xmlId}`);
 
-                // ✅ FIX STREAMING BUFFER: Așteaptă 2s înainte de UPDATE pe factura inserată
-                console.log('⏳ [STREAMING-BUFFER] Așteaptă 2s pentru clearing streaming buffer...');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                console.log('✅ [STREAMING-BUFFER] Delay completat, actualizez efactura_status...');
-
-                // ✅ UPDATE efactura_status DUPĂ delay pentru evitare streaming buffer error
-                try {
-                  const updateStatusQuery = `
-                    UPDATE ${TABLE_FACTURI_GENERATE}
-                    SET
-                      efactura_status = 'draft',
-                      anaf_upload_id = @xmlId,
-                      data_actualizare = CURRENT_TIMESTAMP()
-                    WHERE id = @facturaId
-                  `;
-
-                  await bigquery.query({
-                    query: updateStatusQuery,
-                    params: {
-                      xmlId: saveResult.xmlId,
-                      facturaId: currentFacturaId
-                    },
-                    types: {
-                      xmlId: 'STRING',
-                      facturaId: 'STRING'
-                    },
-                    location: 'EU'
-                  });
-
-                  console.log(`✅ [STREAMING-BUFFER] efactura_status actualizat la 'draft' pentru factura: ${currentFacturaId}`);
-                } catch (updateError) {
-                  console.error('⚠️ [STREAMING-BUFFER] Nu s-a putut actualiza efactura_status (non-critical):', updateError);
-                  // Nu oprește procesul - XML-ul a fost salvat deja cu succes
-                }
+                // ✅ FIX STREAMING BUFFER: efactura_status este deja setat la 'draft' în INSERT
+                // anaf_upload_id se va actualiza mai târziu când se trimite efectiv la ANAF
+                console.log(`ℹ️ [STREAMING-BUFFER] efactura_status deja setat la 'draft' în INSERT (evită UPDATE)`);
+                console.log(`ℹ️ [STREAMING-BUFFER] anaf_upload_id (${saveResult.xmlId}) va fi actualizat la trimiterea efectivă ANAF`);
               } else {
                 throw new Error('Failed to save XML to database');
               }
