@@ -269,8 +269,8 @@ function processPlaceholders(text: string, data: any): string {
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
     '{{client.adresa}}': data.client?.adresa || 'ADRESA NECUNOSCUTA',
-    '{{client.telefon}}': data.client?.telefon || '',
-    '{{client.email}}': data.client?.email || '',
+    '{{client.telefon}}': (typeof data.client?.telefon === 'string' ? data.client.telefon : '') || '',
+    '{{client.email}}': (typeof data.client?.email === 'string' ? data.client.email : '') || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
     
     // Proiect info
@@ -338,10 +338,13 @@ function processPlaceholders(text: string, data: any): string {
   
   // Contact client
   let contactClause = '';
-  if (data.client?.telefon && data.client.telefon.trim()) {
-    contactClause = `C). Persoană de contact: ${data.client.nume} (Tel: ${data.client.telefon}`;
-    if (data.client?.email && data.client.email.trim()) {
-      contactClause += `, Email: ${data.client.email}`;
+  const clientTelefon = typeof data.client?.telefon === 'string' ? data.client.telefon.trim() : '';
+  const clientEmail = typeof data.client?.email === 'string' ? data.client.email.trim() : '';
+
+  if (clientTelefon) {
+    contactClause = `C). Persoană de contact: ${data.client.nume} (Tel: ${clientTelefon}`;
+    if (clientEmail) {
+      contactClause += `, Email: ${clientEmail}`;
     }
     contactClause += ')';
   }
@@ -418,8 +421,8 @@ function processAnexaPlaceholders(text: string, data: any): string {
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
     '{{client.adresa}}': data.client?.adresa || 'ADRESA NECUNOSCUTA',
-    '{{client.telefon}}': data.client?.telefon || '',
-    '{{client.email}}': data.client?.email || '',
+    '{{client.telefon}}': (typeof data.client?.telefon === 'string' ? data.client.telefon : '') || '',
+    '{{client.email}}': (typeof data.client?.email === 'string' ? data.client.email : '') || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
     
     // Proiect info - păstrează din contract  

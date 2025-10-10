@@ -284,22 +284,30 @@ async function checkExistingClient(cui: string) {
 async function importClientToBD(anafData: any) {
   try {
     const clientId = `CLI_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    
+
+    // Helper: Convertește empty strings în null pentru BigQuery
+    const toNullIfEmpty = (value: any) => {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+      return typeof value === 'string' ? value.trim() : value;
+    };
+
     const clientData = {
       id: clientId,
       nume: anafData.denumire,
       tip_client: anafData.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic',
       cui: anafData.cui,
-      nr_reg_com: anafData.nrRegCom,
-      adresa: anafData.adresa,
-      judet: anafData.judet,
-      oras: anafData.oras,
-      cod_postal: anafData.codPostal,
+      nr_reg_com: toNullIfEmpty(anafData.nrRegCom),
+      adresa: toNullIfEmpty(anafData.adresa),
+      judet: toNullIfEmpty(anafData.judet),
+      oras: toNullIfEmpty(anafData.oras),
+      cod_postal: toNullIfEmpty(anafData.codPostal),
       tara: 'Romania',
-      telefon: anafData.telefon,
-      email: anafData.email,
-      banca: '',
-      iban: '',
+      telefon: toNullIfEmpty(anafData.telefon),
+      email: toNullIfEmpty(anafData.email),
+      banca: null,
+      iban: null,
       cnp: null,
       ci_serie: null,
       ci_numar: null,
@@ -310,15 +318,14 @@ async function importClientToBD(anafData: any) {
       activ: anafData.status === 'Activ',
       observatii: `Importat automat din ANAF la ${new Date().toLocaleString('ro-RO')}`,
       id_factureaza: null,
-      sincronizat_factureaza: false,
       data_ultima_sincronizare: null
     };
-    
+
     await clientiTable.insert([clientData]);
-    
+
     console.log(`Client importat cu ID: ${clientId}`);
     return { clientId, clientData };
-    
+
   } catch (error) {
     console.error('Eroare import client în BD:', error);
     throw error;
