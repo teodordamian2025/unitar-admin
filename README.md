@@ -878,3 +878,15 @@ S-a implementat E-factura cron Vercel, pentru retrimitere e-facturi la anaf
   - Notificări: Admin știe exact când trebuie să intervină manual
 
   🎉 Sistemul este production-ready și gata de deploy!
+  cum în Vercel Dashboard ar trebui să vezi:
+
+  1. Deployments tab:
+    - Un nou deployment în curs/completat pentru commit 9b504000
+    - Build logs care arată compilarea noilor API routes
+  2. Cron Jobs tab (după deployment):
+    - /api/anaf/retry-invoices/cron - */10 * * * * (la 10 minute)
+    - Status: Active
+  3. Functions tab:
+    - api/anaf/upload-invoice - API pentru upload facturi
+    - api/anaf/retry-invoices/cron - Cron job pentru retry automat
+
