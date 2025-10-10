@@ -1,0 +1,32 @@
+name: ANAF Retry Invoices Cron
+
+on:
+  schedule:
+    # Rulează la fiecare 10 minute
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permite trigger manual din GitHub UI
+
+jobs:
+  retry-invoices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call ANAF Retry API
+        run: |
+          echo "🔄 Triggering ANAF retry invoices cron job..."
+
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET \
+            https://admin.unitarproiect.eu/api/anaf/retry-invoices/cron)
+
+          if [ $response -eq 200 ]; then
+            echo "✅ Cron job completed successfully (HTTP $response)"
+          else
+            echo "❌ Cron job failed with HTTP $response"
+            exit 1
+          fi
+
+      - name: Log timestamp
+        if: always()
+        run: |
+          echo "Executed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
