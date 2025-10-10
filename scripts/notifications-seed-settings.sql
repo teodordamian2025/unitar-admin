@@ -21,9 +21,9 @@ INSERT INTO `PanouControlUnitar.NotificariSetari_v2` (
   'Notificare când utilizator este atribuit responsabil la un proiect nou',
   'proiecte',
   true, true, true, false,
-  '{{user_name}}, ai fost atribuit la proiectul {{proiect_denumire}}',
-  'Bună {{user_name}},\n\nTocmai ai fost atribuit ca responsabil la proiectul {{proiect_denumire}} ({{proiect_id}}).\n\nClient: {{proiect_client}}\nDeadline: {{proiect_deadline}}\n\nPoți vedea detaliile aici: {{link_detalii}}',
-  '<p>Bună <strong>{{user_name}}</strong>,</p><p>Tocmai ai fost atribuit ca responsabil la proiectul <strong>{{proiect_denumire}}</strong> ({{proiect_id}}).</p><p><strong>Client:</strong> {{proiect_client}}<br><strong>Deadline:</strong> {{proiect_deadline}}</p>',
+  '{{user_prenume}}, ai fost atribuit la proiectul {{proiect_denumire}}',
+  'Bună {{user_prenume}},\n\nTocmai ai fost atribuit ca responsabil la proiectul {{proiect_denumire}} ({{proiect_id}}) în data de {{data_atribuire}}.\n\nTermen de finalizare: {{termen_realizare}}\n\n{{#if subproiecte_count}}Ai fost atribuit și la {{subproiecte_count}} subproiecte din acest proiect.{{/if}}\n\nPoți vedea detaliile aici: {{link_detalii}}',
+  '<p>Bună <strong>{{user_prenume}}</strong>,</p><p>Tocmai ai fost atribuit ca responsabil la proiectul <strong>{{proiect_denumire}}</strong> ({{proiect_id}}) în data de {{data_atribuire}}.</p><p><strong>Termen de finalizare:</strong> {{termen_realizare}}</p>{{#if subproiecte_count}}<p>Ai fost atribuit și la <strong>{{subproiecte_count}} subproiecte</strong> din acest proiect.</p>{{/if}}',
   ['admin', 'normal'], true, JSON '{}', 'instant',
   NULL, NULL, NULL,
   CURRENT_DATE(), CURRENT_TIMESTAMP(), 'system', 1

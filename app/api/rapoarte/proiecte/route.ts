@@ -521,8 +521,9 @@ export async function POST(request: NextRequest) {
                 proiect_descriere: Descriere || '',
                 proiect_deadline: Data_Final || '',
                 user_name: `${responsabilUser.nume} ${responsabilUser.prenume}`,
+                user_prenume: responsabilUser.prenume, // ✅ ADDED: Prenume pentru adresare în email
                 data_atribuire: new Date().toISOString().split('T')[0],
-                termen_realizare: Data_Final || 'Neespecificat',
+                termen_realizare: Data_Final || 'Nespecificat',
                 link_detalii: `${request.url.split('/api/')[0]}/admin/rapoarte/proiecte?search=${encodeURIComponent(ID_Proiect)}`
               }
             })

@@ -82,7 +82,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailSendResult>
     const transport = getEmailTransporter();
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'UNITAR PROIECT <office@unitarproiect.eu>',
+      from: process.env.SMTP_FROM || 'UNITAR PROIECT TDA <office@unitarproiect.eu>',
       to: Array.isArray(payload.to) ? payload.to.join(', ') : payload.to,
       cc: payload.cc?.join(', '),
       bcc: payload.bcc?.join(', '),
@@ -263,9 +263,9 @@ export function wrapEmailHTML(content: string, title: string): string {
   <div class="email-container">
     <div class="email-header">
       <div class="logo">
-        <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="120" height="40" rx="8" fill="white" fill-opacity="0.2"/>
-          <text x="60" y="27" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">UNITAR</text>
+        <svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="180" height="40" rx="8" fill="white" fill-opacity="0.2"/>
+          <text x="90" y="27" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">UNITAR PROIECT TDA</text>
         </svg>
       </div>
       <h1>${title}</h1>
@@ -274,17 +274,17 @@ export function wrapEmailHTML(content: string, title: string): string {
       ${content}
       <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
         Cu stimă,<br>
-        <strong>Echipa UNITAR PROIECT</strong>
+        <strong>Echipa UNITAR PROIECT TDA</strong>
       </p>
     </div>
     <div class="email-footer">
-      <p><strong>UNITAR PROIECT</strong></p>
+      <p><strong>UNITAR PROIECT TDA</strong></p>
       <p>
         📧 <a href="mailto:office@unitarproiect.eu">office@unitarproiect.eu</a> |
         🌐 <a href="https://admin.unitarproiect.eu">admin.unitarproiect.eu</a>
       </p>
       <p style="margin-top: 15px; font-size: 12px;">
-        Acest email a fost trimis automat de sistemul UNITAR PROIECT.<br>
+        Acest email a fost trimis automat de sistemul UNITAR PROIECT TDA.<br>
         Dacă aveți întrebări, vă rugăm să ne contactați.
       </p>
     </div>
