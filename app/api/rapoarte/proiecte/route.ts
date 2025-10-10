@@ -487,11 +487,14 @@ export async function POST(request: NextRequest) {
         const tableUtilizatori = `Utilizatori${tableSuffix}`;
 
         // Caută UID-ul responsabilului după nume în tabela Utilizatori_v2
+        // Caută în ambele ordini: "Nume Prenume" SAU "Prenume Nume"
         const responsabiliQuery = `
           SELECT uid, nume, prenume, email
           FROM \`${PROJECT_ID}.${dataset}.${tableUtilizatori}\`
           WHERE CONCAT(nume, ' ', prenume) = @responsabil
+            OR CONCAT(prenume, ' ', nume) = @responsabil
             OR nume = @responsabil
+            OR prenume = @responsabil
           LIMIT 1
         `;
 
