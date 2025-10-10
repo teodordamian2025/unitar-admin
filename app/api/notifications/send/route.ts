@@ -150,6 +150,23 @@ export async function POST(request: NextRequest) {
             prioritate: prioritate || ('normal' as PrioritateNotificare),
             creator_id: context.creator_id || null,
           },
+          types: {
+            id: 'STRING',
+            tip_notificare: 'STRING',
+            user_id: 'STRING',
+            proiect_id: 'STRING',
+            subproiect_id: 'STRING',
+            sarcina_id: 'STRING',
+            factura_id: 'STRING',
+            contract_id: 'STRING',
+            continut_json: 'STRING',
+            titlu: 'STRING',
+            mesaj: 'STRING',
+            link_actiune: 'STRING',
+            trimis_email: 'BOOL',
+            prioritate: 'STRING',
+            creator_id: 'STRING',
+          },
         });
 
         notification_ids.push(notification_id);
@@ -189,6 +206,11 @@ export async function POST(request: NextRequest) {
                 id: notification_id,
                 deliverat: emailResult.success,
                 eroare: emailResult.error || null,
+              },
+              types: {
+                id: 'STRING',
+                deliverat: 'BOOL',
+                eroare: 'STRING',
               },
             });
           }
