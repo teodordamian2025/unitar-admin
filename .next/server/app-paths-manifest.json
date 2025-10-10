@@ -1,1 +1,5 @@
-{}
+{
+  "/api/anaf/upload-invoice/route": "app/api/anaf/upload-invoice/route.js",
+  "/api/anaf/error-handler/route": "app/api/anaf/error-handler/route.js",
+  "/api/anaf/retry-invoices/cron/route": "app/api/anaf/retry-invoices/cron/route.js"
+}

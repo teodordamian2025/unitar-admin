@@ -803,7 +803,7 @@ Extragere Date din Bigquery
 BigQuery prin Node.js client returnează DATE fields ca obiecte {value: "2025-08-16"} în loc de string-uri simple.
 Logica programului. Se creaza intai proiecte cu subproiecte. Apoi se fac contracte si anexe la contract daca e cazul cu etape, iar etapele sunt corelate cu subproiectele, sau direct cu proiectele daca nu au subproiecte. Apoi se fac facturi in baza contractelor, iar continutul facturilor vor fi articole identice cu etapele din contracte sau contractele in intregime. Apoi cand se fac incasarile ar trebui sa se inchida facturile. Daca se achita partial atunci ar trebui sa se inchida articolele facturilor , adica etapele facturilor in ordine crescatoare.
 
-S-a implementat E-factura cron Vercel, pentru retrimitere e-facturi la anaf
+S-a implementat E-factura cron GitHub Actions, pentru retrimitere e-facturi la anaf
  Buton Retry în UI ✅
 
   - Integrat în dropdown actions din FacturiList.tsx
@@ -841,7 +841,7 @@ S-a implementat E-factura cron Vercel, pentru retrimitere e-facturi la anaf
   Noi:
   - app/api/anaf/upload-invoice/route.ts - 447 linii
   - app/api/anaf/retry-invoices/cron/route.ts - 276 linii
-  - vercel.json - cron config
+  - GitHub Actions cron config
 
   Modificate:
   - app/admin/anaf/monitoring/page.tsx - polling 30s → 30min
@@ -866,8 +866,6 @@ S-a implementat E-factura cron Vercel, pentru retrimitere e-facturi la anaf
   3. Notificări email după max retries (3 încercări)
   4. Buton manual retry disponibil în UI pentru admin
 
-  ⚠️ IMPORTANT: După deploy, verifică în Vercel dashboard că cron job-ul a
-  fost configurat corect în tab-ul "Cron Jobs".
 
   ---
   📊 IMPACT:

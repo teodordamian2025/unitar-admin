@@ -104,25 +104,25 @@ async function getFacturasPendingRetry() {
       SELECT
         ae.factura_id,
         ae.retry_count,
-        ae.last_retry_at,
+        ae.data_actualizare,
         ae.error_message,
         fg.numar as factura_numar,
         fg.serie as factura_serie
       FROM ${TABLE_ANAF_EFACTURA} ae
       JOIN ${TABLE_FACTURI_GENERATE} fg ON ae.factura_id = fg.id
-      WHERE ae.anaf_status = 'error'
+      WHERE ae.anaf_status IN ('draft', 'error')
         AND ae.retry_count < 3
         AND (
-          -- Prima încercare (5 min)
+          -- Prima încercare (5 min) - inclusiv draft-uri noi
           (ae.retry_count = 0 AND ae.data_creare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 MINUTE))
           OR
           -- A doua încercare (15 min)
-          (ae.retry_count = 1 AND ae.last_retry_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 15 MINUTE))
+          (ae.retry_count = 1 AND ae.data_actualizare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 15 MINUTE))
           OR
           -- A treia încercare (60 min)
-          (ae.retry_count = 2 AND ae.last_retry_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE))
+          (ae.retry_count = 2 AND ae.data_actualizare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE))
         )
-      ORDER BY ae.retry_count ASC, ae.last_retry_at ASC
+      ORDER BY ae.retry_count ASC, ae.data_actualizare ASC
       LIMIT 50
     `;
 
@@ -131,7 +131,7 @@ async function getFacturasPendingRetry() {
     return rows.map((row: any) => ({
       factura_id: row.factura_id,
       retry_count: parseInt(row.retry_count) || 0,
-      last_retry_at: row.last_retry_at,
+      last_retry_at: row.data_actualizare, // folosim data_actualizare în loc de last_retry_at
       error_message: row.error_message,
       factura_numar: row.factura_numar,
       factura_serie: row.factura_serie

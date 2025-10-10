@@ -371,7 +371,6 @@ async function updateFacturaStatus(facturaId: string, uploadResult: UploadResult
         anaf_status = @anafStatus,
         anaf_upload_id = @anafUploadId,
         retry_count = @retryCount,
-        last_retry_at = CURRENT_TIMESTAMP(),
         error_message = @errorMessage,
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE factura_id = @facturaId
