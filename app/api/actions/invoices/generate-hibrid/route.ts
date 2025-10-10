@@ -1656,6 +1656,41 @@ export async function POST(request: NextRequest) {
                   mockMode: false
                 };
                 console.log(`✅ XML ANAF generat și salvat cu succes: ${xmlResult.xmlId}`);
+
+                // ✅ FIX STREAMING BUFFER: Așteaptă 2s înainte de UPDATE pe factura inserată
+                console.log('⏳ [STREAMING-BUFFER] Așteaptă 2s pentru clearing streaming buffer...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                console.log('✅ [STREAMING-BUFFER] Delay completat, actualizez efactura_status...');
+
+                // ✅ UPDATE efactura_status DUPĂ delay pentru evitare streaming buffer error
+                try {
+                  const updateStatusQuery = `
+                    UPDATE ${TABLE_FACTURI_GENERATE}
+                    SET
+                      efactura_status = 'draft',
+                      anaf_upload_id = @xmlId,
+                      data_actualizare = CURRENT_TIMESTAMP()
+                    WHERE id = @facturaId
+                  `;
+
+                  await bigquery.query({
+                    query: updateStatusQuery,
+                    params: {
+                      xmlId: saveResult.xmlId,
+                      facturaId: currentFacturaId
+                    },
+                    types: {
+                      xmlId: 'STRING',
+                      facturaId: 'STRING'
+                    },
+                    location: 'EU'
+                  });
+
+                  console.log(`✅ [STREAMING-BUFFER] efactura_status actualizat la 'draft' pentru factura: ${currentFacturaId}`);
+                } catch (updateError) {
+                  console.error('⚠️ [STREAMING-BUFFER] Nu s-a putut actualiza efactura_status (non-critical):', updateError);
+                  // Nu oprește procesul - XML-ul a fost salvat deja cu succes
+                }
               } else {
                 throw new Error('Failed to save XML to database');
               }

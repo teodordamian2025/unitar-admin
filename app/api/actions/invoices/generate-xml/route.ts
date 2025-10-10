@@ -489,22 +489,9 @@ export async function saveXmlToDatabase(facturaId: string, xmlContent: string) {
 
     await table.insert(xmlRecord);
 
-    // Update FacturiGenerate cu status e-factura
-    const updateQuery = `
-      UPDATE ${TABLE_FACTURI_GENERATE}
-      SET 
-        efactura_status = 'draft',
-        data_actualizare = CURRENT_TIMESTAMP()
-      WHERE id = @facturaId
-    `;
-
-    await bigquery.query({
-      query: updateQuery,
-      params: { facturaId },
-      location: 'EU'
-    });
-
-    console.log('✅ XML saved to database successfully');
+    // ✅ FIX STREAMING BUFFER: NU putem face UPDATE imediat după INSERT
+    // efactura_status va fi setat direct în INSERT-ul facturii (generate-hibrid)
+    console.log('✅ XML saved to AnafEFactura_v2 successfully (skipped UPDATE due to streaming buffer)');
 
     return {
       success: true,
