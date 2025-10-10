@@ -189,39 +189,33 @@ async function updateFacturiGenerateStatus() {
   try {
     // Update FacturiGenerate pentru facturi care au status actualizat în AnafEFactura
     // Doar pentru rânduri create cu > 2 minute în urmă (evită streaming buffer)
+    // ✅ Folosim MERGE cu JOIN pentru a evita correlated subquery errors
     const updateQuery = `
-      UPDATE ${TABLE_FACTURI_GENERATE} fg
-      SET
-        efactura_status = (
-          SELECT
-            CASE
-              WHEN ae.anaf_status = 'processing' THEN 'pending'
-              WHEN ae.anaf_status = 'validated' THEN 'validated'
-              WHEN ae.anaf_status = 'error' AND ae.retry_count >= 3 THEN 'anaf_error'
-              WHEN ae.anaf_status = 'error' THEN 'pending'
-              ELSE fg.efactura_status
-            END
-          FROM ${TABLE_ANAF_EFACTURA} ae
-          WHERE ae.factura_id = fg.id
-          ORDER BY ae.data_creare DESC
-          LIMIT 1
-        ),
-        anaf_upload_id = (
-          SELECT ae.anaf_upload_id
-          FROM ${TABLE_ANAF_EFACTURA} ae
-          WHERE ae.factura_id = fg.id
-          ORDER BY ae.data_creare DESC
-          LIMIT 1
-        ),
-        data_actualizare = CURRENT_TIMESTAMP()
-      WHERE fg.efactura_enabled = true
+      MERGE ${TABLE_FACTURI_GENERATE} fg
+      USING (
+        SELECT
+          ae.factura_id,
+          CASE
+            WHEN ae.anaf_status = 'processing' THEN 'pending'
+            WHEN ae.anaf_status = 'validated' THEN 'validated'
+            WHEN ae.anaf_status = 'error' AND ae.retry_count >= 3 THEN 'anaf_error'
+            WHEN ae.anaf_status = 'error' THEN 'pending'
+            ELSE 'draft'
+          END as new_efactura_status,
+          ae.anaf_upload_id,
+          ROW_NUMBER() OVER (PARTITION BY ae.factura_id ORDER BY ae.data_creare DESC) as rn
+        FROM ${TABLE_ANAF_EFACTURA} ae
+        WHERE ae.data_actualizare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 15 MINUTE)
+      ) ae_latest
+      ON fg.id = ae_latest.factura_id
+        AND ae_latest.rn = 1
+        AND fg.efactura_enabled = true
         AND fg.data_creare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 MINUTE)
-        AND EXISTS (
-          SELECT 1
-          FROM ${TABLE_ANAF_EFACTURA} ae
-          WHERE ae.factura_id = fg.id
-            AND ae.data_actualizare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 15 MINUTE)
-        )
+      WHEN MATCHED THEN
+        UPDATE SET
+          efactura_status = ae_latest.new_efactura_status,
+          anaf_upload_id = ae_latest.anaf_upload_id,
+          data_actualizare = CURRENT_TIMESTAMP()
     `;
 
     await bigquery.query({ query: updateQuery, location: 'EU' });

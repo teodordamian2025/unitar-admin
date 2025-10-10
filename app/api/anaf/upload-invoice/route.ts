@@ -386,6 +386,10 @@ async function updateFacturaStatus(facturaId: string, uploadResult: UploadResult
         errorMessage: uploadResult.success ? null : uploadResult.message,
         facturaId
       },
+      types: {
+        anafUploadId: 'STRING',
+        errorMessage: 'STRING'
+      },
       location: 'EU'
     });
 
