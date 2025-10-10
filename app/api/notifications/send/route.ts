@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
             sarcina_id: context.sarcina_id || null,
             factura_id: context.factura_id || null,
             contract_id: context.contract_id || null,
-            continut_json: JSON.stringify(final_context),
+            continut_json: final_context, // ✅ FIXED: Trimite obiect JSON, nu string
             titlu,
             mesaj,
             link_actiune: context.link_detalii || null,
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
             sarcina_id: 'STRING',
             factura_id: 'STRING',
             contract_id: 'STRING',
-            continut_json: 'STRING',
+            continut_json: 'JSON', // ✅ FIXED: Tip JSON, nu STRING
             titlu: 'STRING',
             mesaj: 'STRING',
             link_actiune: 'STRING',
