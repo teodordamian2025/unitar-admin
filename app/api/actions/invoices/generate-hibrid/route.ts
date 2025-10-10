@@ -11,7 +11,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
 
 // ✅ MOCK MODE pentru testare e-factura - setează la true pentru teste sigure
-const MOCK_EFACTURA_MODE = true; // ← SCHIMBĂ la false pentru producție reală
+const MOCK_EFACTURA_MODE = false; // ← SCHIMBĂ la false pentru producție reală
 
 // Inițializare BigQuery
 const bigquery = new BigQuery({
