@@ -146,7 +146,7 @@ export default function ANAFMonitoringDashboard() {
       loadDashboardData();
 
       if (autoRefresh) {
-        const interval = setInterval(loadDashboardData, 30000); // 30 seconds
+        const interval = setInterval(loadDashboardData, 1800000); // 30 minutes (1800000ms)
         return () => clearInterval(interval);
       }
     }

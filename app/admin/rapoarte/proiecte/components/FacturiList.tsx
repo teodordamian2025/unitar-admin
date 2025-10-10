@@ -655,14 +655,30 @@ export default function FacturiList({
     }
 
     setProcessingActions(prev => ({ ...prev, [factura.id]: true }));
-    
+
     try {
       showToast(`Se reincearca trimiterea la ANAF...`, 'info');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      showToast(`Retry pentru factura ${factura.numar} a fost trimis la ANAF!`, 'success');
+
+      // Call upload-invoice API pentru retry manual
+      const response = await fetch('/api/anaf/upload-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facturaId: factura.id,
+          isManualRetry: true
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Retry pentru factura ${factura.numar} trimis cu succes la ANAF!`, 'success');
+      } else {
+        throw new Error(result.message || 'Retry failed');
+      }
+
       await loadFacturi();
-      
+
     } catch (error) {
       showToast(`Eroare la retry ANAF: ${error instanceof Error ? error.message : 'Eroare necunoscuta'}`, 'error');
     } finally {
