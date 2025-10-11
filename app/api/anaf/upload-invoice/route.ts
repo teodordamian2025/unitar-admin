@@ -230,25 +230,26 @@ async function getValidOAuthToken() {
 
 function decryptToken(encryptedToken: string): string {
   try {
-    const key = process.env.ANAF_TOKEN_ENCRYPTION_KEY || 'default-key-change-this';
-    const algorithm = 'aes-256-cbc';
+    const key = process.env.ANAF_TOKEN_ENCRYPTION_KEY;
+    if (!key || key.length !== 64) {
+      throw new Error('Invalid encryption key - must be 64 hex characters');
+    }
 
     const parts = encryptedToken.split(':');
     if (parts.length !== 2) {
-      return encryptedToken; // Already decrypted
+      throw new Error('Invalid encrypted token format - missing IV separator');
     }
 
     const iv = Buffer.from(parts[0], 'hex');
-    const encryptedText = Buffer.from(parts[1], 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(key.padEnd(32, '0').slice(0, 32)), iv);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
 
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    let decrypted = decipher.update(parts[1], 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
 
-    return decrypted.toString();
+    return decrypted;
   } catch (error) {
-    console.error('Error decrypting token:', error);
-    return encryptedToken;
+    console.error('❌ Error decrypting ANAF token:', error);
+    throw new Error(`Token decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
