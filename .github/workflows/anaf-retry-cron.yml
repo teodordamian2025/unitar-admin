@@ -2,8 +2,8 @@ name: ANAF Retry Invoices Cron
 
 on:
   schedule:
-    # Rulează la fiecare 30 minute (2 execuții/oră)
-    - cron: '*/30 * * * *'
+    # Rulează la fiecare 10 minute (6 execuții/oră)
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Permite trigger manual din GitHub UI
 
 jobs:

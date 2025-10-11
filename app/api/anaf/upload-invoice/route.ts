@@ -46,6 +46,8 @@ interface UploadResult {
   errorCategory?: string;
   retryAfter?: number; // minutes
   attemptNumber?: number;
+  shouldRetry?: boolean; // NEW: TRUE dacă trebuie continuat retry
+  nextRetryAt?: Date | null; // NEW: Timestamp când trebuie făcut următorul retry
 }
 
 // ==================================================================
@@ -107,8 +109,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 6. Trimite notificare admin dacă max retries depășit
-    if (uploadResult.attemptNumber && uploadResult.attemptNumber >= 3 && !uploadResult.success) {
+    // 6. Trimite notificare admin dacă max retries depășit (shouldRetry = FALSE)
+    if (!uploadResult.success && uploadResult.shouldRetry === false) {
       await sendMaxRetriesNotification(facturaId, uploadResult);
     }
 
@@ -290,13 +292,18 @@ async function uploadToANAF(
         anafUploadId: responseData.upload_index,
         status: 'anaf_processing',
         message: 'Factura uploaded successfully to ANAF',
-        attemptNumber: attemptNumber + 1
+        attemptNumber: attemptNumber + 1,
+        shouldRetry: false, // Success → STOP retry
+        nextRetryAt: null
       };
     }
 
     // Error cases
     const errorCategory = categorizeANAFError(response.status, responseData);
-    const retryAfter = getRetryInterval(attemptNumber, errorCategory);
+    const newAttemptNumber = attemptNumber + 1;
+    const retryAfter = getRetryInterval(newAttemptNumber, errorCategory);
+    const shouldRetry = !shouldStopRetrying(newAttemptNumber, errorCategory, false);
+    const nextRetryAt = shouldRetry ? calculateNextRetryAt(newAttemptNumber, errorCategory) : null;
 
     return {
       success: false,
@@ -305,7 +312,9 @@ async function uploadToANAF(
       message: responseData.message || responseData.error || 'ANAF upload failed',
       errorCategory,
       retryAfter,
-      attemptNumber: attemptNumber + 1
+      attemptNumber: newAttemptNumber,
+      shouldRetry,
+      nextRetryAt
     };
 
   } catch (error) {
@@ -313,6 +322,10 @@ async function uploadToANAF(
 
     const errorMessage = error instanceof Error ? error.message : 'Network error';
     const errorCategory = errorMessage.includes('timeout') ? 'anaf_timeout' : 'anaf_connection';
+    const newAttemptNumber = attemptNumber + 1;
+    const retryAfter = getRetryInterval(newAttemptNumber, errorCategory);
+    const shouldRetry = !shouldStopRetrying(newAttemptNumber, errorCategory, false);
+    const nextRetryAt = shouldRetry ? calculateNextRetryAt(newAttemptNumber, errorCategory) : null;
 
     return {
       success: false,
@@ -320,8 +333,10 @@ async function uploadToANAF(
       status: 'error',
       message: errorMessage,
       errorCategory,
-      retryAfter: getRetryInterval(attemptNumber, errorCategory),
-      attemptNumber: attemptNumber + 1
+      retryAfter,
+      attemptNumber: newAttemptNumber,
+      shouldRetry,
+      nextRetryAt
     };
   }
 }
@@ -345,27 +360,61 @@ function categorizeANAFError(statusCode: number, responseData: any): string {
   return 'unknown_error';
 }
 
-function getRetryInterval(attemptNumber: number, errorCategory: string): number {
-  // Retry intervals based on error category (în minute)
+// ✅ NEW: Strategii exponential backoff pentru retry (în minute)
+function getRetryStrategy(errorCategory: string): number[] {
   const retryStrategies: Record<string, number[]> = {
-    'oauth_expired': [1, 5, 15],
-    'anaf_connection': [5, 15, 60],
-    'anaf_timeout': [5, 15, 60],
-    'anaf_server_error': [60, 240, 1440], // 1h, 4h, 24h
-    'xml_validation': [0, 0, 0], // Nu retry pentru validare XML
-    'anaf_business_error': [0, 0, 0], // Nu retry pentru erori business
-    'unknown_error': [10, 30, 60]
+    'oauth_expired': [0, 1, 5, 15], // Rapid retry - 4 încercări
+    'anaf_connection': [0, 5, 10, 20, 40, 120], // Exponențial - 6 încercări
+    'anaf_timeout': [0, 5, 10, 20, 40, 120], // Exponențial - 6 încercări
+    'anaf_server_error': [0, 60, 240, 1440], // Lent (1h, 4h, 24h) - 4 încercări
+    'xml_validation': [], // STOP imediat - eroare permanentă
+    'anaf_business_error': [], // STOP imediat - eroare permanentă
+    'unknown_error': [0, 10, 30, 60, 120] // Medium - 5 încercări
   };
 
-  const strategy = retryStrategies[errorCategory] || [10, 30, 60];
-  return strategy[Math.min(attemptNumber, strategy.length - 1)];
+  return retryStrategies[errorCategory] || [0, 10, 30, 60];
+}
+
+function getRetryInterval(attemptNumber: number, errorCategory: string): number {
+  const strategy = getRetryStrategy(errorCategory);
+  return strategy[Math.min(attemptNumber, strategy.length - 1)] || 0;
+}
+
+// ✅ NEW: Determină dacă trebuie continuat retry sau stop
+function shouldStopRetrying(attemptNumber: number, errorCategory: string, success: boolean): boolean {
+  // 1. Succes → STOP
+  if (success) return true;
+
+  // 2. Erori permanente → STOP imediat
+  const permanentErrors = ['oauth_expired', 'xml_validation', 'anaf_business_error'];
+  if (permanentErrors.includes(errorCategory)) return true;
+
+  // 3. Max retries pentru categoria respectivă → STOP
+  const strategy = getRetryStrategy(errorCategory);
+  if (attemptNumber >= strategy.length) return true;
+
+  // 4. Continuă retry pentru erori temporare
+  return false;
+}
+
+// ✅ NEW: Calculează next_retry_at timestamp
+function calculateNextRetryAt(attemptNumber: number, errorCategory: string): Date | null {
+  const strategy = getRetryStrategy(errorCategory);
+
+  // Dacă am depășit numărul de încercări disponibile → NULL
+  if (attemptNumber >= strategy.length) {
+    return null;
+  }
+
+  const minutes = strategy[attemptNumber];
+  return new Date(Date.now() + minutes * 60 * 1000);
 }
 
 async function updateFacturaStatus(facturaId: string, uploadResult: UploadResult) {
   try {
     const dataset = bigquery.dataset(DATASET);
 
-    // Update AnafEFactura
+    // Update AnafEFactura cu noile coloane: should_retry, next_retry_at, error_category
     const updateEfacturaQuery = `
       UPDATE ${TABLE_ANAF_EFACTURA}
       SET
@@ -373,6 +422,9 @@ async function updateFacturaStatus(facturaId: string, uploadResult: UploadResult
         anaf_upload_id = @anafUploadId,
         retry_count = @retryCount,
         error_message = @errorMessage,
+        error_category = @errorCategory,
+        should_retry = @shouldRetry,
+        next_retry_at = @nextRetryAt,
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE factura_id = @facturaId
         AND anaf_status IN ('draft', 'error')
@@ -385,18 +437,24 @@ async function updateFacturaStatus(facturaId: string, uploadResult: UploadResult
         anafUploadId: uploadResult.anafUploadId || null,
         retryCount: uploadResult.attemptNumber || 1,
         errorMessage: uploadResult.success ? null : uploadResult.message,
+        errorCategory: uploadResult.errorCategory || null,
+        shouldRetry: uploadResult.shouldRetry !== undefined ? uploadResult.shouldRetry : true,
+        nextRetryAt: uploadResult.nextRetryAt || null,
         facturaId
       },
       types: {
         anafUploadId: 'STRING',
-        errorMessage: 'STRING'
+        errorMessage: 'STRING',
+        errorCategory: 'STRING',
+        nextRetryAt: 'TIMESTAMP'
       },
       location: 'EU'
     });
 
+    console.log(`✅ Updated AnafEFactura status for ${facturaId} - shouldRetry: ${uploadResult.shouldRetry}, nextRetryAt: ${uploadResult.nextRetryAt?.toISOString() || 'NULL'}`);
+
     // Update FacturiGenerate (doar dacă nu e în streaming buffer - >= 90s după creare)
     // Pentru siguranță, nu facem UPDATE aici - va fi făcut de cron job după 2 minute
-    console.log(`✅ Updated AnafEFactura status for ${facturaId}`);
 
   } catch (error) {
     console.error('❌ Error updating factura status:', error);

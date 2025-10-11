@@ -1661,6 +1661,23 @@ export async function POST(request: NextRequest) {
                 // anaf_upload_id se va actualiza mai târziu când se trimite efectiv la ANAF
                 console.log(`ℹ️ [STREAMING-BUFFER] efactura_status deja setat la 'draft' în INSERT (evită UPDATE)`);
                 console.log(`ℹ️ [STREAMING-BUFFER] anaf_upload_id (${saveResult.xmlId}) va fi actualizat la trimiterea efectivă ANAF`);
+
+                // ✅ NEW: Trigger INSTANT upload la ANAF (nu aștepta cron-ul)
+                console.log(`🚀 Trigger instant upload la ANAF pentru factura ${currentFacturaId}...`);
+                fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/anaf/upload-invoice`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    facturaId: currentFacturaId,
+                    isManualRetry: false
+                  })
+                }).then(res => res.json())
+                  .then(result => {
+                    console.log(`✅ Trigger instant upload completat pentru ${currentFacturaId}:`, result.success ? 'SUCCESS' : 'FAILED');
+                  })
+                  .catch(err => {
+                    console.log(`⚠️ Trigger instant upload eșuat pentru ${currentFacturaId} - cron-ul va relua:`, err.message);
+                  });
               } else {
                 throw new Error('Failed to save XML to database');
               }
