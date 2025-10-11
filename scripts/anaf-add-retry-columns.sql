@@ -9,10 +9,15 @@ ALTER TABLE `PanouControlUnitar.AnafEFactura_v2`
 ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMP;
 
 -- 2. Adaugă coloană should_retry (BOOLEAN - TRUE dacă mai trebuie retry, FALSE pentru stop)
+-- ✅ FIX: BigQuery nu permite DEFAULT în ADD COLUMN - se face în 2 pași
 ALTER TABLE `PanouControlUnitar.AnafEFactura_v2`
-ADD COLUMN IF NOT EXISTS should_retry BOOL DEFAULT TRUE;
+ADD COLUMN IF NOT EXISTS should_retry BOOL;
 
--- 3. Adaugă coloană error_category (STRING - categorie eroare pentru strategie retry)
+-- 3. Setează DEFAULT pentru should_retry
+ALTER TABLE `PanouControlUnitar.AnafEFactura_v2`
+ALTER COLUMN should_retry SET DEFAULT TRUE;
+
+-- 4. Adaugă coloană error_category (STRING - categorie eroare pentru strategie retry)
 ALTER TABLE `PanouControlUnitar.AnafEFactura_v2`
 ADD COLUMN IF NOT EXISTS error_category STRING;
 
