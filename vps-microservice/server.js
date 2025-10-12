@@ -13,6 +13,8 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const https = require('https');
 const winston = require('winston');
+const { DOMParser, XMLSerializer } = require('xmldom');
+const SignedXml = require('xml-crypto').SignedXml;
 
 // ==================================================================
 // CONFIGURARE LOGGING
@@ -156,6 +158,72 @@ if (!certLoaded) {
 }
 
 // ==================================================================
+// SEMNARE XML CU XMLDSig
+// ==================================================================
+
+/**
+ * Semnează XML-ul cu certificatul digital conform standardului XMLDSig
+ * ANAF necesită XML semnat digital pentru validare
+ */
+function signXML(xmlString) {
+  try {
+    if (!certificatePEM || !privateKeyPEM) {
+      throw new Error('Certificate or private key not loaded');
+    }
+
+    logger.info('📝 Signing XML with digital certificate...');
+
+    // Parse XML
+    const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+
+    // Creează SignedXml cu private key
+    const sig = new SignedXml();
+    sig.signingKey = privateKeyPEM;
+
+    // Configurare algoritmi conform ANAF
+    sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+    sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+
+    // Adaugă referință la documentul întreg
+    sig.addReference(
+      "/*",
+      [
+        'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+        'http://www.w3.org/2001/10/xml-exc-c14n#'
+      ],
+      'http://www.w3.org/2001/04/xmlenc#sha256'
+    );
+
+    // Adaugă certificatul în KeyInfo
+    sig.keyInfoProvider = {
+      getKeyInfo: function() {
+        // Extrage doar conținutul certificatului (fără header/footer PEM)
+        const certContent = certificatePEM
+          .replace(/-----BEGIN CERTIFICATE-----/, '')
+          .replace(/-----END CERTIFICATE-----/, '')
+          .replace(/\n/g, '');
+
+        return `<X509Data><X509Certificate>${certContent}</X509Certificate></X509Data>`;
+      }
+    };
+
+    // Semnează documentul
+    sig.computeSignature(xmlString);
+
+    // Obține XML-ul semnat
+    const signedXml = sig.getSignedXml();
+
+    logger.info('✅ XML signed successfully');
+
+    return signedXml;
+
+  } catch (error) {
+    logger.error('❌ XML signing failed:', error.message);
+    throw error;
+  }
+}
+
+// ==================================================================
 // ENDPOINT: HEALTH CHECK
 // ==================================================================
 
@@ -201,6 +269,27 @@ app.post('/upload-invoice', requireApiKey, async (req, res) => {
   });
 
   try {
+    // SEMNARE XML cu certificat digital (OBLIGATORIU pentru ANAF)
+    let signedXml;
+    try {
+      signedXml = signXML(xml);
+      logger.info('✅ XML signed successfully', {
+        facturaId,
+        originalSize: xml.length,
+        signedSize: signedXml.length
+      });
+    } catch (signError) {
+      logger.error('❌ XML signing failed', {
+        facturaId,
+        error: signError.message
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to sign XML with digital certificate',
+        details: signError.message
+      });
+    }
+
     // Determină endpoint ANAF (sandbox sau production)
     const isSandbox = process.env.ANAF_SANDBOX_MODE === 'true';
     const anafEndpoint = isSandbox
@@ -209,28 +298,20 @@ app.post('/upload-invoice', requireApiKey, async (req, res) => {
 
     logger.info(`🎯 Target ANAF endpoint: ${anafEndpoint} (${isSandbox ? 'SANDBOX' : 'PRODUCTION'})`);
 
-    // Creează FormData
+    // Creează FormData cu XML SEMNAT
     const formData = new FormData();
-    formData.append('file', Buffer.from(xml, 'utf8'), {
+    formData.append('file', Buffer.from(signedXml, 'utf8'), {
       filename: 'factura.xml',
       contentType: 'text/xml'
     });
     formData.append('cif', cif);
     formData.append('standard', 'UBL');
 
-    // Creează HTTPS Agent cu certificat client
-    const httpsAgent = new https.Agent({
-      cert: certificatePEM,
-      key: privateKeyPEM,
-      rejectUnauthorized: true // Verifică certificatul server-ului ANAF
-    });
-
-    // Trimite request la ANAF
+    // Trimite request la ANAF (fără mTLS - certificatul e folosit doar pt semnare XML)
     const response = await fetch(anafEndpoint, {
       method: 'POST',
       headers: formData.getHeaders(),
       body: formData,
-      agent: httpsAgent,
       timeout: 30000 // 30 secunde timeout
     });
 

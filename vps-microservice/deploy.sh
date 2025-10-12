@@ -9,7 +9,7 @@ echo "🚀 Deploying ANAF Upload Microservice to VPS..."
 echo "=================================================="
 
 # Configurare (MODIFICĂ ACESTEA)
-VPS_IP="YOUR_VPS_IP_HERE"  # Ex: 128.140.82.123
+VPS_IP="188.34.180.94"
 VPS_USER="root"
 VPS_PATH="/opt/anaf-upload-service"
 
@@ -22,12 +22,12 @@ fi
 echo "📦 Step 1/5: Creating deployment package..."
 # Creează arhivă cu fișierele necesare
 tar -czf anaf-microservice.tar.gz \
+  --exclude=node_modules \
+  --exclude=logs \
   package.json \
   server.js \
   ecosystem.config.js \
-  .env.example \
-  --exclude=node_modules \
-  --exclude=logs
+  .env.example
 
 echo "📤 Step 2/5: Uploading to VPS..."
 scp anaf-microservice.tar.gz $VPS_USER@$VPS_IP:$VPS_PATH/
