@@ -173,23 +173,24 @@ function signXML(xmlString) {
 
     logger.info('📝 Signing XML with digital certificate...');
 
-    // Creează SignedXml cu private key
-    const sig = new SignedXml();
-    sig.signingKey = privateKeyPEM;
+    // Creează SignedXml cu private key în constructor
+    const sig = new SignedXml({
+      privateKey: privateKeyPEM
+    });
 
     // Configurare algoritmi conform ANAF
     sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
     sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
 
-    // Adaugă referință la documentul întreg (string vid = întreg document)
-    sig.addReference(
-      "",  // String vid = referință la întreg documentul
-      [
+    // Adaugă referință la documentul întreg conform xml-crypto API
+    sig.addReference({
+      xpath: "//*",  // Referință la toate elementele din document
+      transforms: [
         'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
         'http://www.w3.org/2001/10/xml-exc-c14n#'
       ],
-      'http://www.w3.org/2001/04/xmlenc#sha256'
-    );
+      digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256'
+    });
 
     // Adaugă certificatul în KeyInfo
     sig.keyInfoProvider = {
@@ -215,7 +216,11 @@ function signXML(xmlString) {
     return signedXml;
 
   } catch (error) {
-    logger.error('❌ XML signing failed:', error.message);
+    logger.error('❌ XML signing failed:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     throw error;
   }
 }
