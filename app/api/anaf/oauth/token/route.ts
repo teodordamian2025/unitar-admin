@@ -84,7 +84,10 @@ export async function GET(request: NextRequest) {
 
     const token = tokenInfo.data;
     const now = new Date();
-    const expiresAt = new Date(token.expires_at);
+    // BigQuery returnează TIMESTAMP ca obiecte {value: "..."} - handle both formats
+    const expiresAtValue = token.expires_at?.value || token.expires_at;
+    const dataCreareValue = token.data_creare?.value || token.data_creare;
+    const expiresAt = new Date(expiresAtValue);
     const isExpired = now >= expiresAt;
     const expiresInMinutes = Math.floor((expiresAt.getTime() - now.getTime()) / (1000 * 60));
 
@@ -93,11 +96,11 @@ export async function GET(request: NextRequest) {
       hasValidToken: !isExpired,
       tokenInfo: {
         id: token.id,
-        expires_at: token.expires_at,
+        expires_at: expiresAtValue,
         expires_in_minutes: expiresInMinutes,
         is_expired: isExpired,
         scope: token.scope,
-        data_creare: token.data_creare
+        data_creare: dataCreareValue
       }
     });
 
@@ -287,8 +290,10 @@ async function handleTestConnection() {
 
     const token = tokenInfo.data;
     const now = new Date();
-    const expiresAt = new Date(token.expires_at);
-    
+    // BigQuery returnează TIMESTAMP ca obiecte {value: "..."} - handle both formats
+    const expiresAtValue = token.expires_at?.value || token.expires_at;
+    const expiresAt = new Date(expiresAtValue);
+
     if (now >= expiresAt) {
       return NextResponse.json({
         success: false,
@@ -299,7 +304,7 @@ async function handleTestConnection() {
 
     // TODO: În viitor, vom testa conexiunea efectivă cu API-ul ANAF
     // Pentru moment, verificăm doar dacă avem token valid
-    
+
     return NextResponse.json({
       success: true,
       isConnected: true,
