@@ -167,6 +167,21 @@ async function exchangeCodeForToken(code: string) {
       responseLength: responseText.length
     });
 
+    // DEBUG: Log token lengths
+    let tokenData;
+    try {
+      tokenData = JSON.parse(responseText);
+      console.log('🔍 DEBUG Token lengths:', {
+        access_token_length: tokenData.access_token?.length || 0,
+        refresh_token_length: tokenData.refresh_token?.length || 0,
+        access_token_preview: tokenData.access_token?.substring(0, 50) + '...',
+        token_type: tokenData.token_type,
+        expires_in: tokenData.expires_in
+      });
+    } catch (e) {
+      console.error('❌ Failed to parse token response:', responseText);
+    }
+
     if (!response.ok) {
       return {
         success: false,
@@ -175,7 +190,9 @@ async function exchangeCodeForToken(code: string) {
       };
     }
 
-    const tokenData = JSON.parse(responseText);
+    if (!tokenData) {
+      tokenData = JSON.parse(responseText);
+    }
 
     // Verifică dacă avem token-urile necesare
     if (!tokenData.access_token) {
