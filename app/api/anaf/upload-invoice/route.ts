@@ -31,10 +31,15 @@ const bigquery = new BigQuery({
   },
 });
 
-// ✅ ANAF API Endpoints
-const ANAF_API_BASE = 'https://api.anaf.ro/prod/FCTEL/rest';
+// ✅ ANAF API Endpoints (sandbox sau production)
+const isSandbox = process.env.ANAF_SANDBOX_MODE === 'true';
+const ANAF_API_BASE = isSandbox
+  ? 'https://api.anaf.ro/test/FCTEL/rest'
+  : 'https://api.anaf.ro/prod/FCTEL/rest';
 const ANAF_UPLOAD_ENDPOINT = `${ANAF_API_BASE}/upload`;
 const ANAF_DOWNLOAD_ENDPOINT = `${ANAF_API_BASE}/descarcare`;
+
+console.log(`🔧 ANAF Upload Invoice API - Mode: ${isSandbox ? 'SANDBOX (test)' : 'PRODUCTION'}, Tables: ${useV2Tables ? 'V2' : 'V1'}`);
 
 // ✅ Interfaces
 interface UploadResult {

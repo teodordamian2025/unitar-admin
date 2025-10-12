@@ -8,7 +8,12 @@ import crypto from 'crypto';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
-const ANAF_UPLOAD_ENDPOINT = 'https://api.anaf.ro/prod/FCTEL/rest/upload';
+
+// ✅ ANAF endpoint (sandbox sau production)
+const isSandbox = process.env.ANAF_SANDBOX_MODE === 'true';
+const ANAF_UPLOAD_ENDPOINT = isSandbox
+  ? 'https://api.anaf.ro/test/FCTEL/rest/upload'
+  : 'https://api.anaf.ro/prod/FCTEL/rest/upload';
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -106,6 +111,7 @@ export async function GET(request: NextRequest) {
     formData.append('standard', 'UBL');
 
     console.log('🚀 Testing ANAF upload with Bearer token...');
+    console.log('Mode:', isSandbox ? 'SANDBOX (test)' : 'PRODUCTION');
     console.log('Token preview:', accessToken.substring(0, 20) + '...');
     console.log('Endpoint:', ANAF_UPLOAD_ENDPOINT);
 
