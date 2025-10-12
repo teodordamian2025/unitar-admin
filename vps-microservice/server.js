@@ -173,9 +173,6 @@ function signXML(xmlString) {
 
     logger.info('📝 Signing XML with digital certificate...');
 
-    // Parse XML
-    const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
-
     // Creează SignedXml cu private key
     const sig = new SignedXml();
     sig.signingKey = privateKeyPEM;
@@ -184,9 +181,9 @@ function signXML(xmlString) {
     sig.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
     sig.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
 
-    // Adaugă referință la documentul întreg
+    // Adaugă referință la documentul întreg (string vid = întreg document)
     sig.addReference(
-      "/*",
+      "",  // String vid = referință la întreg documentul
       [
         'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
         'http://www.w3.org/2001/10/xml-exc-c14n#'
