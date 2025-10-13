@@ -247,20 +247,37 @@ function decryptToken(encryptedToken: string): string {
       throw new Error('Invalid encryption key - must be 64 hex characters');
     }
 
+    console.log('🔑 Decryption key length:', key.length);
+    console.log('🔐 Encrypted token length:', encryptedToken.length);
+
     const parts = encryptedToken.split(':');
     if (parts.length !== 2) {
       throw new Error('Invalid encrypted token format - missing IV separator');
     }
 
+    console.log('📦 IV length:', parts[0].length, 'Encrypted data length:', parts[1].length);
+
     const iv = Buffer.from(parts[0], 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+    const keyBuffer = Buffer.from(key, 'hex');
+
+    console.log('🔓 Creating decipher with AES-256-CBC...');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
 
     let decrypted = decipher.update(parts[1], 'hex', 'utf8');
     decrypted += decipher.final('utf8');
 
+    console.log('✅ Decryption complete, result length:', decrypted.length);
+    console.log('🔍 First 20 chars of decrypted:', decrypted.substring(0, 20));
+
+    // Validare critică: JWT trebuie să înceapă cu "eyJ"
+    if (!decrypted.startsWith('eyJ')) {
+      throw new Error(`Decrypted token is not JWT format (starts with: ${decrypted.substring(0, 10)})`);
+    }
+
     return decrypted;
   } catch (error) {
     console.error('❌ Error decrypting ANAF token:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
     throw new Error(`Token decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
