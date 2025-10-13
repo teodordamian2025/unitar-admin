@@ -262,48 +262,62 @@ function decryptToken(encryptedToken: string): string {
 
 async function uploadToANAF(
   xmlContent: string,
-  accessToken: string, // NU MAI E FOLOSIT - păstrat pentru backward compatibility
+  accessToken: string, // OAuth JWT token din BigQuery
   facturaId: string,
   attemptNumber: number
 ): Promise<UploadResult> {
   try {
-    console.log(`🚀 Uploading via VPS microservice (attempt ${attemptNumber + 1})...`);
+    console.log(`🚀 Uploading directly to ANAF with OAuth token (attempt ${attemptNumber + 1})...`);
 
-    // Verifică configurare VPS
-    const vpsUrl = process.env.VPS_UPLOAD_URL;
-    const vpsApiKey = process.env.VPS_API_KEY;
-
-    if (!vpsUrl || !vpsApiKey) {
-      throw new Error('VPS configuration missing - VPS_UPLOAD_URL or VPS_API_KEY not set in environment');
+    // Verifică că avem OAuth token
+    if (!accessToken) {
+      throw new Error('OAuth access token is required');
     }
 
-    // Trimite la VPS microservice
-    const response = await fetch(`${vpsUrl}/upload-invoice`, {
+    // Creează FormData cu XML NESEMNAT (conform documentație ANAF OAuth 2.0)
+    // Next.js 13.4+ are FormData built-in din Web API
+    const FormDataNode = (await import('form-data')).default;
+    const formData = new FormDataNode();
+
+    formData.append('file', Buffer.from(xmlContent, 'utf8'), {
+      filename: 'factura.xml',
+      contentType: 'text/xml'
+    });
+    formData.append('cif', process.env.UNITAR_CUI || '35639210');
+    formData.append('standard', 'UBL');
+
+    console.log(`📤 Sending to ${ANAF_UPLOAD_ENDPOINT} with Authorization: Bearer ${accessToken.substring(0, 20)}...`);
+
+    // Trimite DIRECT la ANAF cu OAuth token în header
+    const response = await fetch(ANAF_UPLOAD_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': vpsApiKey
+        ...formData.getHeaders(),
+        'Authorization': `Bearer ${accessToken}` // ⭐ CHEIA SUCCESULUI - conform doc ANAF
       },
-      body: JSON.stringify({
-        xml: xmlContent,
-        cif: process.env.UNITAR_CUI || '35639210',
-        facturaId
-      }),
+      body: formData,
       signal: AbortSignal.timeout(30000) // 30s timeout
     });
 
-    const responseData = await response.json();
+    const responseText = await response.text();
+    let responseData;
 
-    console.log(`📥 VPS Response (status ${response.status}):`, responseData);
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { raw: responseText };
+    }
+
+    console.log(`📥 ANAF Response (status ${response.status}):`, responseData);
 
     // Success case
-    if (response.ok && responseData.success && responseData.anafUploadId) {
+    if (response.ok && responseData.upload_index) {
       return {
         success: true,
         facturaId,
-        anafUploadId: responseData.anafUploadId,
+        anafUploadId: responseData.upload_index,
         status: 'anaf_processing',
-        message: 'Factura uploaded successfully to ANAF via VPS',
+        message: 'Factura uploaded successfully to ANAF',
         attemptNumber: attemptNumber + 1,
         shouldRetry: false, // Success → STOP retry
         nextRetryAt: null
@@ -321,7 +335,7 @@ async function uploadToANAF(
       success: false,
       facturaId,
       status: 'anaf_error',
-      message: responseData.error || responseData.message || 'VPS upload failed',
+      message: responseData.message || responseData.error || `ANAF upload failed (HTTP ${response.status})`,
       errorCategory,
       retryAfter,
       attemptNumber: newAttemptNumber,
@@ -330,10 +344,10 @@ async function uploadToANAF(
     };
 
   } catch (error) {
-    console.error('❌ VPS upload exception:', error);
+    console.error('❌ ANAF upload exception:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Network error';
-    const errorCategory = errorMessage.includes('timeout') ? 'vps_timeout' : 'vps_connection';
+    const errorCategory = errorMessage.includes('timeout') ? 'anaf_timeout' : 'anaf_connection';
     const newAttemptNumber = attemptNumber + 1;
     const retryAfter = getRetryInterval(newAttemptNumber, errorCategory);
     const shouldRetry = !shouldStopRetrying(newAttemptNumber, errorCategory, false);
@@ -354,44 +368,48 @@ async function uploadToANAF(
 }
 
 function categorizeANAFError(statusCode: number, responseData: any): string {
-  // Erori VPS (noi)
-  if (statusCode === 500 && responseData.type === 'exception') {
-    return 'vps_connection';
+  // Erori autentificare OAuth
+  if (statusCode === 401 || statusCode === 403) {
+    return 'oauth_expired'; // Token JWT expirat sau invalid
   }
 
-  // Erori ANAF (existente)
-  if (statusCode === 401 || statusCode === 403) {
-    return 'oauth_expired'; // Acum înseamnă certificat invalid/expirat
-  }
+  // Erori timeout
   if (statusCode === 408 || statusCode === 504) {
     return 'anaf_timeout';
   }
+
+  // Erori server ANAF
   if (statusCode >= 500) {
     return 'anaf_server_error';
   }
+
+  // Erori validare XML sau business
   if (statusCode === 400) {
     if (responseData.message?.includes('XML') || responseData.error?.includes('XML')) {
       return 'xml_validation';
     }
     return 'anaf_business_error';
   }
+
   return 'unknown_error';
 }
 
-// ✅ NEW: Strategii exponential backoff pentru retry (în minute)
+// ✅ Strategii exponential backoff pentru retry (în minute)
 function getRetryStrategy(errorCategory: string): number[] {
   const retryStrategies: Record<string, number[]> = {
-    // Erori VPS (noi)
-    'vps_connection': [0, 2, 5, 10, 20], // Retry rapid - 5 încercări
-    'vps_timeout': [0, 5, 10, 20], // Medium - 4 încercări
+    // Erori OAuth - STOP imediat (necesită re-autorizare)
+    'oauth_expired': [], // Token JWT expirat - admin trebuie să re-autorizeze
 
-    // Erori ANAF/Certificat (existente)
-    'oauth_expired': [], // STOP imediat - certificat invalid/expirat (necesită reinoire)
+    // Erori ANAF temporare - retry cu exponential backoff
     'anaf_connection': [0, 5, 10, 20, 40, 120], // Exponențial - 6 încercări
     'anaf_timeout': [0, 5, 10, 20, 40, 120], // Exponențial - 6 încercări
     'anaf_server_error': [0, 60, 240, 1440], // Lent (1h, 4h, 24h) - 4 încercări
-    'xml_validation': [], // STOP imediat - eroare permanentă
-    'anaf_business_error': [], // STOP imediat - eroare permanentă
+
+    // Erori permanente - STOP imediat
+    'xml_validation': [], // XML invalid - necesită corectare manuală
+    'anaf_business_error': [], // Eroare business ANAF - necesită verificare
+
+    // Erori necunoscute - retry moderat
     'unknown_error': [0, 10, 30, 60, 120] // Medium - 5 încercări
   };
 
