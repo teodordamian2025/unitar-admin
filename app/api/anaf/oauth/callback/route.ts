@@ -31,19 +31,23 @@ const ANAF_TOKENS_TABLE = `\`${PROJECT_ID}.${DATASET}.AnafTokens${tableSuffix}\`
 console.log(`🔧 [ANAF OAuth Callback] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
 // Funcție pentru criptarea token-urilor
+// FIX: Folosim Buffer-e intermediate pentru a evita corruption
 function encryptToken(token: string): string {
   const key = process.env.ANAF_TOKEN_ENCRYPTION_KEY;
   if (!key || key.length !== 64) {
     throw new Error('Invalid encryption key');
   }
-  
+
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
-  
-  let encrypted = cipher.update(token, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  return iv.toString('hex') + ':' + encrypted;
+
+  // Folosim Buffer concatenation în loc de string encoding amestecate
+  const encrypted = Buffer.concat([
+    cipher.update(token, 'utf8'),
+    cipher.final()
+  ]);
+
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
 export async function GET(request: NextRequest) {
