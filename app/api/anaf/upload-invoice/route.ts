@@ -275,7 +275,7 @@ async function uploadToANAF(
     }
 
     // Creează FormData cu XML NESEMNAT (conform documentație ANAF OAuth 2.0)
-    // Next.js 13.4+ are FormData built-in din Web API
+    // Folosim form-data (Node.js) pentru compatibility cu API routes
     const FormDataNode = (await import('form-data')).default;
     const formData = new FormDataNode();
 
@@ -289,12 +289,14 @@ async function uploadToANAF(
     console.log(`📤 Sending to ${ANAF_UPLOAD_ENDPOINT} with Authorization: Bearer ${accessToken.substring(0, 20)}...`);
 
     // Trimite DIRECT la ANAF cu OAuth token în header
+    // form-data returnează un Stream care e compatibil cu fetch
     const response = await fetch(ANAF_UPLOAD_ENDPOINT, {
       method: 'POST',
       headers: {
         ...formData.getHeaders(),
         'Authorization': `Bearer ${accessToken}` // ⭐ CHEIA SUCCESULUI - conform doc ANAF
       },
+      // @ts-expect-error - form-data Stream e compatibil cu fetch body la runtime
       body: formData,
       signal: AbortSignal.timeout(30000) // 30s timeout
     });
