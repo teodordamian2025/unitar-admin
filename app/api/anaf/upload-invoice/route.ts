@@ -217,8 +217,13 @@ async function getValidOAuthToken() {
 
     const token = rows[0];
 
+    console.log(`🔐 Encrypted token preview: ${token.access_token.substring(0, 50)}...`);
+
     // Decrypt access token
     const accessToken = decryptToken(token.access_token);
+
+    console.log(`✅ Decrypted token preview: ${accessToken.substring(0, 50)}...`);
+    console.log(`🔍 Token format check: ${accessToken.startsWith('eyJ') ? '✅ JWT format correct' : '❌ NOT JWT format!'}`);
 
     return {
       success: true,
