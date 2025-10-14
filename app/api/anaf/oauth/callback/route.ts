@@ -182,6 +182,14 @@ async function exchangeCodeForToken(code: string) {
         token_type: tokenData.token_type,
         expires_in: tokenData.expires_in
       });
+
+      // 🔓 TEMPORARY DEBUG: Log JWT plain pentru fix manual (VA FI ȘTERS!)
+      console.log('🔓🔓🔓 JWT PLAIN ACCESS TOKEN (TEMPORARY DEBUG - WILL DELETE):');
+      console.log(tokenData.access_token);
+      console.log('🔓🔓🔓 JWT PLAIN REFRESH TOKEN (TEMPORARY DEBUG - WILL DELETE):');
+      console.log(tokenData.refresh_token || 'N/A');
+      console.log('🔓🔓🔓 END JWT PLAIN');
+
     } catch (e) {
       console.error('❌ Failed to parse token response:', responseText);
     }
