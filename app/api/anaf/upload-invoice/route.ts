@@ -580,21 +580,3 @@ async function sendMaxRetriesNotification(facturaId: string, uploadResult: Uploa
     console.error('Failed to send max retries notification:', error);
   }
 }
-method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'manual_intervention',
-        data: {
-          errorCount: 1,
-          affectedInvoices: 1,
-          timeRange: '24h',
-          errorsByType: [{
-            category: uploadResult.errorCategory || 'unknown',
-            count: uploadResult.attemptNumber
-          }]
-        },
-        forceNotification: true
-      })
-    });
-  } catch (error) {
-    console.error('Failed to send max retries notification:', 
