@@ -255,13 +255,18 @@ async function saveTokensToDatabase(tokenData: any) {
     const encryptedRefreshToken = tokenData.refresh_token ? 
       encryptToken(tokenData.refresh_token) : null;
 
+    // IMPORTANT: Token-ul OAuth ANAF este legat de serialul certificatului digital
+    // folosit la autentificare. Serialul trebuie salvat pentru a identifica utilizatorul.
+    // Conform documentației ANAF: "Utilizatorii sunt identificați prin serialul certificatului"
+    const certificateSerial = process.env.ANAF_CERTIFICATE_SERIAL || '501bf75e00000013b927';
+
     const tokenRecord = [{
       id: crypto.randomUUID(),
       client_id: process.env.ANAF_CLIENT_ID,
       access_token: encryptedAccessToken,
       refresh_token: encryptedRefreshToken,
       expires_at: expiresAt.toISOString(),
-      certificate_serial: null, // Va fi populat când implementăm certificatul
+      certificate_serial: certificateSerial, // Serial certificat digital folosit la OAuth
       scope: tokenData.scope || 'RO e-Factura',
       is_active: true,
       data_creare: new Date().toISOString(),

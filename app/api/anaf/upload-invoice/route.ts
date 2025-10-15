@@ -198,7 +198,7 @@ async function getFacturaWithXml(facturaId: string) {
 async function getValidOAuthToken() {
   try {
     const query = `
-      SELECT access_token, expires_at
+      SELECT access_token, expires_at, certificate_serial
       FROM ${TABLE_ANAF_TOKENS}
       WHERE is_active = true
         AND expires_at > CURRENT_TIMESTAMP()
@@ -218,6 +218,7 @@ async function getValidOAuthToken() {
     const token = rows[0];
 
     console.log(`🔐 Encrypted token preview: ${token.access_token.substring(0, 50)}...`);
+    console.log(`🔐 Certificate serial: ${token.certificate_serial || 'NOT SET'}`);
 
     // Decrypt access token
     const accessToken = decryptToken(token.access_token);
@@ -228,6 +229,7 @@ async function getValidOAuthToken() {
     return {
       success: true,
       accessToken,
+      certificateSerial: token.certificate_serial,
       expiresAt: token.expires_at
     };
 
@@ -276,10 +278,15 @@ function decryptToken(encryptedToken: string): string {
     console.log('✅ Decryption complete, result length:', decryptedText.length);
     console.log('🔍 Decrypted token preview:', decryptedText.substring(0, 50) + '...');
 
-    // Validare critică: JWT trebuie să înceapă cu "eyJ"
-    if (!decryptedText.startsWith('eyJ')) {
-      throw new Error(`Decrypted token is not JWT format (starts with: ${decryptedText.substring(0, 10)})`);
+    // Validare: Token ANAF poate fi JWT (eyJ...) SAU opaque token OAuth2 (hex string)
+    // Ambele formate sunt valide conform documentației ANAF
+    if (!decryptedText || decryptedText.length < 10) {
+      throw new Error('Decrypted token is empty or too short');
     }
+
+    // Log format token pentru debugging
+    const tokenFormat = decryptedText.startsWith('eyJ') ? 'JWT' : 'OAuth2 opaque token';
+    console.log(`🔍 Token format detected: ${tokenFormat}`);
 
     return decryptedText;
   } catch (error) {
