@@ -74,18 +74,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Verifică parametrii necesari
-    if (!code || !state) {
+    // IMPORTANT: Nu verificăm state pentru că ANAF nu-l acceptă în request!
+    if (!code) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/admin/anaf/setup?error=missing_parameters`
-      );
-    }
-
-    // Verifică state pentru security (previne CSRF)
-    const storedState = request.cookies.get('anaf_oauth_state')?.value;
-    if (!storedState || storedState !== state) {
-      console.error('❌ Invalid OAuth state:', { stored: storedState, received: state });
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/admin/anaf/setup?error=invalid_state`
+        `${process.env.NEXT_PUBLIC_BASE_URL}/admin/anaf/setup?error=missing_code`
       );
     }
 
@@ -111,14 +103,9 @@ export async function GET(request: NextRequest) {
     console.log('✅ ANAF OAuth completed successfully');
 
     // Redirecționează către pagina de succes
-    const response = NextResponse.redirect(
+    return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/admin/anaf/setup?success=true`
     );
-
-    // Șterge state-ul din cookie
-    response.cookies.delete('anaf_oauth_state');
-
-    return response;
 
   } catch (error) {
     console.error('❌ Error in ANAF OAuth callback:', error);

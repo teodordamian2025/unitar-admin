@@ -4,7 +4,6 @@
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -21,20 +20,17 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Generează state pentru security (previne CSRF attacks)
-    const state = crypto.randomBytes(32).toString('hex');
-
     // Construiește URL-ul de autorizare ANAF
     // IMPORTANT: Conform documentației ANAF (pag 23-24):
     // - Scope se lasă necompletat
-    // - State se lasă necompletat (dar îl folosim pentru CSRF protection)
+    // - State se lasă necompletat (ANAF RESPINGE cererea dacă state este prezent!)
     // - token_content_type=jwt este OBLIGATORIU în Auth Request
     const authParams = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
-      token_content_type: 'jwt',  // ✅ OBLIGATORIU conform doc ANAF pag 24
-      state: state  // Păstrat pentru CSRF protection (nu influențează ANAF)
+      token_content_type: 'jwt'  // ✅ OBLIGATORIU conform doc ANAF pag 24
+      // ❌ NU trimitem state - ANAF returnează access_denied dacă e prezent!
     });
 
     const authUrl = `${oauthBase}/anaf-oauth2/v1/authorize?${authParams.toString()}`;
@@ -42,28 +38,15 @@ export async function GET(request: NextRequest) {
     console.log('🔐 ANAF OAuth authorize initiated:', {
       clientId: clientId.substring(0, 8) + '...',
       redirectUri,
-      token_content_type: 'jwt',
-      state: state.substring(0, 8) + '...'
+      token_content_type: 'jwt'
     });
 
-    // În producție, state-ul ar trebui salvat în sesiune sau Redis
-    // Pentru simplitate, îl returnam în response pentru a fi folosit la callback
-    const response = NextResponse.json({
+    // Returnează direct URL-ul de autorizare
+    return NextResponse.json({
       success: true,
       authUrl: authUrl,
-      state: state,
       message: 'Redirecting to ANAF authentication...'
     });
-
-    // Setează state-ul în cookie pentru verificare la callback
-    response.cookies.set('anaf_oauth_state', state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 600 // 10 minute
-    });
-
-    return response;
 
   } catch (error) {
     console.error('❌ Error initiating ANAF OAuth:', error);
