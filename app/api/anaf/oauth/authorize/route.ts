@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
     // Verifică environment variables
     const clientId = process.env.ANAF_CLIENT_ID;
     const redirectUri = process.env.ANAF_REDIRECT_URI;
-    const scope = process.env.ANAF_SCOPE || 'RO e-Factura';
     const oauthBase = process.env.ANAF_OAUTH_BASE;
 
     if (!clientId || !redirectUri || !oauthBase) {
@@ -24,14 +23,18 @@ export async function GET(request: NextRequest) {
 
     // Generează state pentru security (previne CSRF attacks)
     const state = crypto.randomBytes(32).toString('hex');
-    
+
     // Construiește URL-ul de autorizare ANAF
+    // IMPORTANT: Conform documentației ANAF (pag 23-24):
+    // - Scope se lasă necompletat
+    // - State se lasă necompletat (dar îl folosim pentru CSRF protection)
+    // - token_content_type=jwt este OBLIGATORIU în Auth Request
     const authParams = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: scope,
-      state: state
+      token_content_type: 'jwt',  // ✅ OBLIGATORIU conform doc ANAF pag 24
+      state: state  // Păstrat pentru CSRF protection (nu influențează ANAF)
     });
 
     const authUrl = `${oauthBase}/anaf-oauth2/v1/authorize?${authParams.toString()}`;
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
     console.log('🔐 ANAF OAuth authorize initiated:', {
       clientId: clientId.substring(0, 8) + '...',
       redirectUri,
-      scope,
+      token_content_type: 'jwt',
       state: state.substring(0, 8) + '...'
     });
 

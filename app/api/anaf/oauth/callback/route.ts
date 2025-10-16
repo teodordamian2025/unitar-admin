@@ -145,12 +145,16 @@ async function exchangeCodeForToken(code: string) {
       };
     }
 
+    // Body parameters pentru token exchange
+    // Conform documentației ANAF OAuth pag 16-19
+    // IMPORTANT: token_content_type=jwt OBLIGATORIU în Request Body (pag 24)
     const tokenParams = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uri: redirectUri,
-      code: code
+      code: code,
+      token_content_type: 'jwt'  // ✅ OBLIGATORIU conform doc ANAF pag 24
     });
 
     console.log('🔄 Exchanging code for token...');
