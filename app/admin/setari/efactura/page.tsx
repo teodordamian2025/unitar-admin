@@ -73,18 +73,18 @@ export default function SetariEFacturaPage() {
 
   return (
     <ModernLayout>
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Setări e-Factura</h1>
-          <p className="mt-2 text-gray-600">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Setări e-Factura</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600">
             Configurează metoda de transmitere a facturilor către ANAF e-Factura
           </p>
         </div>
 
         {/* Metodă Facturare */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">
             Metodă de facturare electronică
           </h2>
 
@@ -107,38 +107,38 @@ export default function SetariEFacturaPage() {
                 />
               </div>
               <div className="ml-4 flex-1">
-                <div className="flex items-center">
-                  <label className="text-lg font-medium text-gray-900">
+                <div className="flex items-center flex-wrap">
+                  <label className="text-base sm:text-lg font-medium text-gray-900">
                     iapp.ro (Recomandat)
                   </label>
                   <span className="ml-3 px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
                     RECOMANDAT
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-xs sm:text-sm text-gray-600">
                   Folosește platforma iapp.ro pentru emiterea și transmiterea automată a facturilor către ANAF e-Factura.
                 </p>
-                <ul className="mt-3 space-y-1 text-sm text-gray-600">
+                <ul className="mt-3 space-y-1 text-xs sm:text-sm text-gray-600">
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
                     Configurare simplificată (fără OAuth)
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
                     Auto-completare date client din CIF
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
                     Sincronizare automată facturi primite
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
                     Raportare și tracking avansat
@@ -165,27 +165,27 @@ export default function SetariEFacturaPage() {
                 />
               </div>
               <div className="ml-4 flex-1">
-                <label className="text-lg font-medium text-gray-900">
+                <label className="text-base sm:text-lg font-medium text-gray-900">
                   ANAF Direct (OAuth)
                 </label>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-xs sm:text-sm text-gray-600">
                   Transmitere directă către ANAF e-Factura folosind OAuth 2.0 cu certificat digital.
                 </p>
-                <ul className="mt-3 space-y-1 text-sm text-gray-600">
+                <ul className="mt-3 space-y-1 text-xs sm:text-sm text-gray-600">
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
                     </svg>
                     Necesită certificat digital și OAuth
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
                     </svg>
                     Configurare complexă
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 flex-shrink-0 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
                     </svg>
                     Fără sincronizare automată facturi primite

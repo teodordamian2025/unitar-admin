@@ -137,9 +137,9 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Verifică dacă există configurare
+    // Verifică dacă există configurare (citește toate datele, inclusiv criptate)
     const checkQuery = `
-      SELECT id FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
+      SELECT * FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
       WHERE activ = TRUE
       LIMIT 1
     `;
@@ -153,37 +153,51 @@ export async function PUT(request: NextRequest) {
       }, { status: 404 });
     }
 
-    const configId = existingRows[0].id;
+    const oldConfig = existingRows[0];
 
-    // Update configurare (doar câmpurile non-sensibile)
-    const updateQuery = `
+    // ✅ FIX: BigQuery streaming buffer issue - folosim DELETE + INSERT în loc de UPDATE
+    // Streaming buffer se golește după ~90s, UPDATE/DELETE nu funcționează în acest interval
+
+    // 1. DELETE configurarea veche (setează activ = FALSE)
+    const deactivateQuery = `
       UPDATE \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
-      SET tip_facturare = @tip_facturare,
-          auto_transmite_efactura = @auto_transmite,
-          serie_default = @serie,
-          moneda_default = @moneda,
-          footer_intocmit_name = @footer_name,
-          email_responsabil = @email,
-          data_actualizare = CURRENT_TIMESTAMP(),
-          actualizat_de = 'admin_ui'
+      SET activ = FALSE,
+          data_actualizare = CURRENT_TIMESTAMP()
       WHERE id = @config_id
     `;
 
-    await bigquery.query({
-      query: updateQuery,
-      params: {
-        config_id: configId,
-        tip_facturare,
-        auto_transmite: auto_transmite_efactura,
-        serie: serie_default || 'SERIE_TEST',
-        moneda: moneda_default || 'RON',
-        footer_name: footer_intocmit_name || '',
-        email: email_responsabil || 'contact@unitarproiect.eu'
-      },
-      location: 'EU'
-    });
+    try {
+      await bigquery.query({
+        query: deactivateQuery,
+        params: { config_id: oldConfig.id },
+        location: 'EU'
+      });
+    } catch (updateError: any) {
+      // Dacă UPDATE fail din cauza streaming buffer, continuăm cu INSERT direct
+      console.log('⚠️ [iapp.ro] UPDATE failed (streaming buffer), proceeding with INSERT');
+    }
 
-    console.log(`✅ [iapp.ro] Config updated: tip_facturare=${tip_facturare}`);
+    // 2. INSERT configurare nouă cu valorile actualizate (păstrăm credențialele criptate)
+    const newConfigRecord = [{
+      id: crypto.randomUUID(),
+      cod_firma: oldConfig.cod_firma, // Păstrăm credențialele criptate existente
+      parola_api: oldConfig.parola_api, // Păstrăm credențialele criptate existente
+      email_responsabil: email_responsabil || oldConfig.email_responsabil,
+      activ: true,
+      tip_facturare: tip_facturare,
+      auto_transmite_efactura: auto_transmite_efactura !== undefined ? auto_transmite_efactura : oldConfig.auto_transmite_efactura,
+      serie_default: serie_default || oldConfig.serie_default,
+      moneda_default: moneda_default || oldConfig.moneda_default,
+      footer_intocmit_name: footer_intocmit_name || oldConfig.footer_intocmit_name,
+      data_creare: new Date().toISOString(),
+      data_actualizare: new Date().toISOString(),
+      creat_de: oldConfig.creat_de || 'system',
+      actualizat_de: 'admin_ui'
+    }];
+
+    await bigquery.dataset(DATASET).table('IappConfig_v2').insert(newConfigRecord);
+
+    console.log(`✅ [iapp.ro] Config updated (DELETE+INSERT): tip_facturare=${tip_facturare}, new_id=${newConfigRecord[0].id}`);
 
     return NextResponse.json({
       success: true,
