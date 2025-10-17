@@ -1,0 +1,209 @@
+// ==================================================================
+// CALEA: app/api/iapp/config/route.ts
+// DESCRIERE: CRUD configurare iapp.ro (GET + PUT)
+// ==================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@google-cloud/bigquery';
+import crypto from 'crypto';
+
+export const dynamic = 'force-dynamic';
+
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+const bigquery = new BigQuery({
+  projectId: PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+});
+
+// Funcții criptare (nu returnăm valorile criptate către client!)
+function decryptValue(encryptedValue: string): string {
+  const key = process.env.IAPP_ENCRYPTION_KEY || process.env.ANAF_TOKEN_ENCRYPTION_KEY;
+  if (!key || key.length !== 64) {
+    throw new Error('Invalid encryption key');
+  }
+
+  const parts = encryptedValue.split(':');
+  const iv = Buffer.from(parts[0], 'hex');
+  const encryptedData = Buffer.from(parts[1], 'hex');
+  const keyBuffer = Buffer.from(key, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
+  const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+  return decrypted.toString('utf8');
+}
+
+function encryptValue(value: string): string {
+  const key = process.env.IAPP_ENCRYPTION_KEY || process.env.ANAF_TOKEN_ENCRYPTION_KEY;
+  if (!key || key.length !== 64) {
+    throw new Error('Invalid encryption key');
+  }
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+  const encrypted = Buffer.concat([
+    cipher.update(value, 'utf8'),
+    cipher.final()
+  ]);
+
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+// ==================================================================
+// GET: Citește configurare (fără credențiale sensibile)
+// ==================================================================
+export async function GET(request: NextRequest) {
+  try {
+    const query = `
+      SELECT id, email_responsabil, activ, tip_facturare,
+             auto_transmite_efactura, serie_default, moneda_default,
+             footer_intocmit_name, data_creare, data_actualizare
+      FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
+      WHERE activ = TRUE
+      ORDER BY data_creare DESC
+      LIMIT 1
+    `;
+
+    const [rows] = await bigquery.query({ query, location: 'EU' });
+
+    if (rows.length === 0) {
+      // Returnează setări default dacă nu există configurare
+      return NextResponse.json({
+        success: true,
+        config: {
+          tip_facturare: 'iapp',
+          auto_transmite_efactura: true,
+          serie_default: 'SERIE_TEST',
+          moneda_default: 'RON',
+          footer_intocmit_name: 'Administrator UNITAR',
+          email_responsabil: 'contact@unitarproiect.eu'
+        },
+        isDefault: true
+      });
+    }
+
+    const config = rows[0];
+
+    return NextResponse.json({
+      success: true,
+      config: {
+        id: config.id,
+        tip_facturare: config.tip_facturare,
+        auto_transmite_efactura: config.auto_transmite_efactura,
+        serie_default: config.serie_default,
+        moneda_default: config.moneda_default,
+        footer_intocmit_name: config.footer_intocmit_name,
+        email_responsabil: config.email_responsabil,
+        activ: config.activ,
+        data_creare: config.data_creare,
+        data_actualizare: config.data_actualizare
+      },
+      isDefault: false
+    });
+
+  } catch (error) {
+    console.error('❌ [iapp.ro] Error fetching config:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch configuration',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+// ==================================================================
+// PUT: Actualizează configurare (doar câmpuri non-sensibile)
+// ==================================================================
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      tip_facturare,
+      auto_transmite_efactura,
+      serie_default,
+      moneda_default,
+      footer_intocmit_name,
+      email_responsabil
+    } = body;
+
+    // Validare
+    if (!['iapp', 'anaf_direct'].includes(tip_facturare)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid tip_facturare. Must be "iapp" or "anaf_direct"'
+      }, { status: 400 });
+    }
+
+    // Verifică dacă există configurare
+    const checkQuery = `
+      SELECT id FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
+      WHERE activ = TRUE
+      LIMIT 1
+    `;
+
+    const [existingRows] = await bigquery.query({ query: checkQuery, location: 'EU' });
+
+    if (existingRows.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Configuration not found. Please run seed script first.'
+      }, { status: 404 });
+    }
+
+    const configId = existingRows[0].id;
+
+    // Update configurare (doar câmpurile non-sensibile)
+    const updateQuery = `
+      UPDATE \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
+      SET tip_facturare = @tip_facturare,
+          auto_transmite_efactura = @auto_transmite,
+          serie_default = @serie,
+          moneda_default = @moneda,
+          footer_intocmit_name = @footer_name,
+          email_responsabil = @email,
+          data_actualizare = CURRENT_TIMESTAMP(),
+          actualizat_de = 'admin_ui'
+      WHERE id = @config_id
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: {
+        config_id: configId,
+        tip_facturare,
+        auto_transmite: auto_transmite_efactura,
+        serie: serie_default || 'SERIE_TEST',
+        moneda: moneda_default || 'RON',
+        footer_name: footer_intocmit_name || '',
+        email: email_responsabil || 'contact@unitarproiect.eu'
+      },
+      location: 'EU'
+    });
+
+    console.log(`✅ [iapp.ro] Config updated: tip_facturare=${tip_facturare}`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Configuration updated successfully',
+      config: {
+        tip_facturare,
+        auto_transmite_efactura,
+        serie_default,
+        moneda_default,
+        footer_intocmit_name,
+        email_responsabil
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [iapp.ro] Error updating config:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to update configuration',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}

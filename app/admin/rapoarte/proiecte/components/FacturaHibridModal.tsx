@@ -284,6 +284,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
   const [isCheckingAnafToken, setIsCheckingAnafToken] = useState(false);
 
+  // State pentru configurare iapp.ro
+  const [iappConfig, setIappConfig] = useState<any>(null);
+  const [isLoadingIappConfig, setIsLoadingIappConfig] = useState(false);
+
   // State pentru termen plată editabil
   const [termenPlata, setTermenPlata] = useState(setariFacturare?.termen_plata_standard || 30);
 
@@ -596,6 +600,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     
     setTimeout(() => {
       checkAnafTokenStatus();
+      fetchIappConfig();
     }, 100);
   }, [proiect, isEdit, initialData]);
 
@@ -1103,22 +1108,57 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  const fetchIappConfig = async () => {
+    setIsLoadingIappConfig(true);
+    try {
+      const response = await fetch('/api/iapp/config');
+      const data = await response.json();
+
+      if (data.success && data.config) {
+        setIappConfig(data.config);
+        console.log(`✅ Configurare iapp.ro încărcată: tip_facturare=${data.config.tip_facturare}`);
+      } else {
+        console.log('⚠️ Nu s-a putut încărca configurarea iapp.ro');
+        setIappConfig(null);
+      }
+    } catch (error) {
+      console.error('Error fetching iapp config:', error);
+      setIappConfig(null);
+    } finally {
+      setIsLoadingIappConfig(false);
+    }
+  };
+
   const handleAnafCheckboxChange = (checked: boolean) => {
-    if (checked && !anafTokenStatus.hasValidToken) {
-      showToast('❌ Nu există token ANAF valid. Configurează OAuth mai întâi.', 'error');
+    // Verifică configurarea iapp.ro
+    if (!iappConfig) {
+      showToast('❌ Nu s-a putut încărca configurarea e-Factura. Reîncarcă pagina.', 'error');
       return;
     }
 
-    if (checked && anafTokenStatus.tokenInfo?.expires_in_days !== undefined && 
-        anafTokenStatus.tokenInfo.expires_in_days < 1) {
-      showToast('⚠️ Token ANAF expiră în mai puțin de o zi. Recomandăm refresh înainte de trimitere.', 'info');
+    if (checked) {
+      // Verifică tip facturare configurat în setări
+      if (iappConfig.tip_facturare === 'iapp') {
+        // Verificăm dacă există credențiale iapp (cod_firma + parola)
+        // Nu avem acces la credențiale (sunt criptate server-side), presupunem că sunt OK dacă config există
+        showToast('✅ Factura va fi trimisă automat prin iapp.ro la e-Factura', 'success');
+      } else if (iappConfig.tip_facturare === 'anaf_direct') {
+        // Verifică token ANAF pentru metoda directă
+        if (!anafTokenStatus.hasValidToken) {
+          showToast('❌ Nu există token ANAF valid. Configurează OAuth mai întâi.', 'error');
+          return;
+        }
+
+        if (anafTokenStatus.tokenInfo?.expires_in_days !== undefined &&
+            anafTokenStatus.tokenInfo.expires_in_days < 1) {
+          showToast('⚠️ Token ANAF expiră în mai puțin de o zi. Recomandăm refresh înainte de trimitere.', 'info');
+        }
+
+        showToast('✅ Factura va fi trimisă automat la ANAF ca e-Factură', 'success');
+      }
     }
 
     setSendToAnaf(checked);
-    
-    if (checked) {
-      showToast('✅ Factura va fi trimisă automat la ANAF ca e-Factură', 'success');
-    }
   };
 
   const loadClientFromDatabase = async () => {
@@ -1631,7 +1671,45 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         }
         
         await processPDF(result.htmlContent, result.fileName);
-        
+
+        // ✅ NOUĂ LOGICĂ: Trimite la iapp.ro DUPĂ PDF generat (dacă e configurat)
+        if (sendToAnaf && iappConfig?.tip_facturare === 'iapp' && result.facturaId) {
+          try {
+            showToast('📤 Se trimite factura prin iapp.ro...', 'info');
+
+            const iappResponse = await fetch('/api/iapp/emit-invoice', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                factura_id: result.facturaId,
+                client_cif: clientInfo?.cui?.replace('RO', '').trim() || '',
+                linii_factura: liniiFactura.map(linie => ({
+                  denumire: linie.denumire,
+                  cantitate: linie.cantitate,
+                  pret_unitar: linie.pretUnitar,
+                  cota_tva: linie.cotaTva
+                })),
+                observatii: observatii || ''
+              })
+            });
+
+            const iappResult = await iappResponse.json();
+
+            if (iappResult.success) {
+              showToast(`✅ Factură emisă prin iapp.ro! ID: ${iappResult.iapp_id_factura}`, 'success');
+              if (iappResult.efactura_upload_index) {
+                showToast(`📋 Factura a fost transmisă la ANAF e-Factura (Upload ID: ${iappResult.efactura_upload_index})`, 'success');
+              }
+            } else {
+              showToast(`⚠️ PDF generat, dar trimiterea prin iapp.ro a eșuat: ${iappResult.error}`, 'error');
+              console.error('Eroare iapp.ro:', iappResult);
+            }
+          } catch (iappError) {
+            console.error('Eroare trimitere iapp.ro:', iappError);
+            showToast('⚠️ PDF generat, dar trimiterea prin iapp.ro a eșuat', 'error');
+          }
+        }
+
         showToast('✅ Factură generată cu succes cu etape contracte!', 'success');
 
         if (!isEdit) {
@@ -2795,7 +2873,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  cursor: anafTokenStatus.hasValidToken ? 'pointer' : 'not-allowed',
+                  cursor: (iappConfig?.tip_facturare === 'iapp' || anafTokenStatus.hasValidToken) ? 'pointer' : 'not-allowed',
                   fontSize: '14px',
                   fontWeight: '500'
                 }}>
@@ -2803,52 +2881,82 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     type="checkbox"
                     checked={sendToAnaf}
                     onChange={(e) => handleAnafCheckboxChange(e.target.checked)}
-                    disabled={!anafTokenStatus.hasValidToken || isLoading}
+                    disabled={
+                      isLoadingIappConfig ||
+                      isLoading ||
+                      !iappConfig ||
+                      (iappConfig.tip_facturare === 'anaf_direct' && !anafTokenStatus.hasValidToken)
+                    }
                     style={{
                       transform: 'scale(1.2)',
                       marginRight: '0.25rem'
                     }}
                   />
-                  📤 Trimite automat la ANAF ca e-Factură
+                  📤 Trimite automat la e-Factura
                 </label>
 
                 <div style={{ flex: 1 }}>
-                  {anafTokenStatus.loading ? (
-                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
-                  ) : anafTokenStatus.hasValidToken ? (
-                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
-                      ✅ Token ANAF valid
-                      {anafTokenStatus.tokenInfo && (
-                        <span style={{ 
-                          color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60' 
-                        }}>
-                          {' '}
-                          {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
-                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
-                          ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
-                            `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
-                          ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
-                            `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
-                          ) : (
-                            '(verifică statusul)'
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
+                  {isLoadingIappConfig ? (
+                    <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se încarcă configurația...</span>
+                  ) : !iappConfig ? (
                     <div style={{ fontSize: '12px', color: '#e74c3c' }}>
-                      ❌ Nu există token ANAF valid.{' '}
-                      <a 
-                        href="/admin/anaf/setup"
+                      ❌ Configurație lipsă.{' '}
+                      <a
+                        href="/admin/setari/efactura"
                         target="_blank"
                         style={{ color: '#3498db', textDecoration: 'underline' }}
                       >
-                        Configurează OAuth
+                        Configurează e-Factura
                       </a>
+                    </div>
+                  ) : iappConfig.tip_facturare === 'iapp' ? (
+                    <div style={{ fontSize: '12px', color: '#27ae60' }}>
+                      ✅ Trimite prin iapp.ro (serie: {iappConfig.serie_default || 'N/A'})
+                    </div>
+                  ) : iappConfig.tip_facturare === 'anaf_direct' ? (
+                    <>
+                      {anafTokenStatus.loading ? (
+                        <span style={{ fontSize: '12px', color: '#7f8c8d' }}>Se verifică statusul OAuth...</span>
+                      ) : anafTokenStatus.hasValidToken ? (
+                        <div style={{ fontSize: '12px', color: '#27ae60' }}>
+                          ✅ Token ANAF valid (direct)
+                          {anafTokenStatus.tokenInfo && (
+                            <span style={{
+                              color: (anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days < 7) ? '#e67e22' : '#27ae60'
+                            }}>
+                              {' '}
+                              {anafTokenStatus.tokenInfo.expires_in_days !== undefined && anafTokenStatus.tokenInfo.expires_in_days >= 1 ? (
+                                `(expiră în ${anafTokenStatus.tokenInfo.expires_in_days} ${anafTokenStatus.tokenInfo.expires_in_days === 1 ? 'zi' : 'zile'})`
+                              ) : anafTokenStatus.tokenInfo.expires_in_minutes >= 60 ? (
+                                `(expiră în ${Math.floor(anafTokenStatus.tokenInfo.expires_in_minutes / 60)} ore)`
+                              ) : anafTokenStatus.tokenInfo.expires_in_minutes > 0 ? (
+                                `(expiră în ${anafTokenStatus.tokenInfo.expires_in_minutes} minute)`
+                              ) : (
+                                '(verifică statusul)'
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#e74c3c' }}>
+                          ❌ Nu există token ANAF valid.{' '}
+                          <a
+                            href="/admin/anaf/setup"
+                            target="_blank"
+                            style={{ color: '#3498db', textDecoration: 'underline' }}
+                          >
+                            Configurează OAuth
+                          </a>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                      ⚠️ Tip facturare necunoscut: {iappConfig.tip_facturare}
                     </div>
                   )}
 
-                  {sendToAnaf && (
+                  {sendToAnaf && iappConfig && (
                     <div style={{
                       marginTop: '0.5rem',
                       padding: '0.5rem',
@@ -2858,7 +2966,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                       fontSize: '12px',
                       color: '#2d5016'
                     }}>
-                      ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.
+                      {iappConfig.tip_facturare === 'iapp' ? (
+                        <>ℹ️ Factura va fi emisă prin iapp.ro și transmisă automat la ANAF e-Factura.</>
+                      ) : (
+                        <>ℹ️ Factura va fi generată ca PDF și va fi trimisă automat la ANAF ca XML UBL 2.1 pentru e-factura.</>
+                      )}
                     </div>
                   )}
                 </div>

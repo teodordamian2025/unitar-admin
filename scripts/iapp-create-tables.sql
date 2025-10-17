@@ -20,8 +20,7 @@ CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.IappConfig_v2
   creat_de STRING,
   actualizat_de STRING
 )
-PARTITION BY DATE(data_creare)
-CLUSTER BY (activ, tip_facturare);
+CLUSTER BY activ, tip_facturare;
 
 -- Tabel 2: IappFacturiEmise_v2 - Log facturi emise prin iapp.ro
 CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.IappFacturiEmise_v2` (
@@ -47,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.IappFacturiEm
   creat_de STRING
 )
 PARTITION BY data_emitere
-CLUSTER BY (status, client_cif, factura_id);
+CLUSTER BY status, client_cif, factura_id;
 
 -- Tabel 3: IappFacturiPrimite_v2 - Facturi primite sincronizate din iapp.ro
 CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.IappFacturiPrimite_v2` (
@@ -73,36 +72,26 @@ CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.IappFacturiPr
   sincronizat_de STRING
 )
 PARTITION BY data_factura
-CLUSTER BY (furnizor_cif, status, cheltuiala_asociata_id);
+CLUSTER BY furnizor_cif, status, cheltuiala_asociata_id;
 
--- Index pentru performanță
-CREATE INDEX IF NOT EXISTS idx_iapp_facturi_emise_factura_id
-ON `hale-mode-464009-i6.PanouControlUnitar.IappFacturiEmise_v2` (factura_id);
+-- ==================================================================
+-- NOTE: BigQuery nu suportă COMMENT ON TABLE
+-- Comentariile sunt în documentația codului și în descrierile coloanelor
+-- ==================================================================
 
-CREATE INDEX IF NOT EXISTS idx_iapp_facturi_primite_furnizor
-ON `hale-mode-464009-i6.PanouControlUnitar.IappFacturiPrimite_v2` (furnizor_cif);
-
--- Comentarii
-COMMENT ON TABLE `hale-mode-464009-i6.PanouControlUnitar.IappConfig_v2`
-IS 'Configurare integrare API iapp.ro pentru e-Factura';
-
-COMMENT ON TABLE `hale-mode-464009-i6.PanouControlUnitar.IappFacturiEmise_v2`
-IS 'Log facturi emise prin iapp.ro cu tracking status ANAF';
-
-COMMENT ON TABLE `hale-mode-464009-i6.PanouControlUnitar.IappFacturiPrimite_v2`
-IS 'Facturi primite sincronizate din iapp.ro cu auto-asociere cheltuieli';
-
--- Grant permissions (dacă ai setat service account specific)
--- GRANT SELECT, INSERT, UPDATE ON TABLE `hale-mode-464009-i6.PanouControlUnitar.IappConfig_v2` TO 'serviceAccount:your-sa@project.iam.gserviceaccount.com';
-
--- Seed configurare inițială (RULEAZĂ DOAR O DATĂ!)
+-- Seed configurare inițială
+-- ATENȚIE: NU rula direct din BigQuery Console!
+-- Folosește: node scripts/iapp-seed-config.js
+-- (scriptul va cripta automat credențialele)
+--
+-- Exemplu manual (DOAR pentru referință):
 -- INSERT INTO `hale-mode-464009-i6.PanouControlUnitar.IappConfig_v2` (
 --   id, cod_firma, parola_api, email_responsabil, activ, tip_facturare,
 --   serie_default, footer_intocmit_name, data_creare, data_actualizare, creat_de
 -- ) VALUES (
 --   GENERATE_UUID(),
---   'ENCRYPTED_COD_FIRMA',  -- Va fi encriptat în aplicație
---   'ENCRYPTED_PAROLA',     -- Va fi encriptată în aplicație
+--   'ENCRYPTED_COD_FIRMA',  -- Va fi encriptat cu iapp-seed-config.js
+--   'ENCRYPTED_PAROLA',     -- Va fi encriptată cu iapp-seed-config.js
 --   'contact@unitarproiect.eu',
 --   TRUE,
 --   'iapp',
