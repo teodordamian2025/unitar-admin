@@ -93,7 +93,7 @@ const ModernSettingsPage: React.FC = () => {
     },
     {
       title: 'Facturare',
-      description: 'Configurare numerotare, serii și parametri e-factura ANAF',
+      description: 'Configurare numerotare, serii și parametri facturi',
       icon: '📄',
       href: '/admin/setari/facturare',
       color: 'bg-gradient-to-br from-blue-500/20 to-blue-600/30 border-blue-200',
@@ -101,6 +101,18 @@ const ModernSettingsPage: React.FC = () => {
         { label: 'Serie curentă', value: 'INV-{proiectId}' },
         { label: 'Proforme', value: 'PRF' },
         { label: 'Delay e-factura', value: '30 min' }
+      ]
+    },
+    {
+      title: 'e-Factura',
+      description: 'Configurare metodă transmitere ANAF: iapp.ro sau OAuth direct',
+      icon: '📤',
+      href: '/admin/setari/efactura',
+      color: 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/30 border-emerald-200',
+      stats: [
+        { label: 'Metodă', value: 'iapp.ro' },
+        { label: 'Serie default', value: 'SERIE_TEST' },
+        { label: 'Auto-transmitere', value: 'Activă' }
       ]
     },
     {
