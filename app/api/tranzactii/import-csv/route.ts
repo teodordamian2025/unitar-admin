@@ -54,6 +54,7 @@ interface INGTransaction {
   directie: string;
   transaction_hash: string;
   data_creare: string;
+  data_actualizare: string; // ✅ NOU - pentru consistență cu Smart Fintech
 }
 
 interface ProcessingStats {
@@ -113,9 +114,10 @@ function categorizeINGTransaction(tipTranzactie: string, suma: number): string {
 
 /**
  * Determină direcția tranzacției
+ * ✅ FIX: Uniformizat cu Smart Fintech API ('intrare'/'iesire' în loc de 'in'/'out')
  */
 function getTransactionDirection(suma: number): string {
-  return suma > 0 ? 'in' : 'out';
+  return suma > 0 ? 'intrare' : 'iesire';
 }
 
 /**
@@ -268,9 +270,10 @@ async function parseINGCSV(csvContent: string, accountId: string): Promise<{
         detalii_tranzactie: detaliiTranzactie?.trim() || '',
         sold_intermediar: parseINGAmount(soldIntermediar),
         tip_categorie: categorizeINGTransaction(tipTranzactie, sumaParsed),
-        directie: getTransactionDirection(sumaParsed),
+        directie: getTransactionDirection(sumaParsed), // ✅ FIX: 'intrare'/'iesire' în loc de 'in'/'out'
         transaction_hash: '',
-        data_creare: new Date().toISOString()
+        data_creare: new Date().toISOString(),
+        data_actualizare: new Date().toISOString() // ✅ NOU
       };
 
       // Generăm hash pentru deduplication

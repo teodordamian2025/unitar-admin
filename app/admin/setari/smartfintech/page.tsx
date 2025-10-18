@@ -12,6 +12,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import ModernLayout from '@/app/components/ModernLayout';
 
 // ==================== TYPES ====================
 
@@ -228,14 +229,11 @@ export default function SmartFintechSettingsPage() {
   // ==================== RENDER ====================
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '2rem 1rem'
-    }}>
+    <ModernLayout>
       <div style={{
         maxWidth: '1200px',
-        margin: '0 auto'
+        margin: '0 auto',
+        padding: '2rem 1rem'
       }}>
         {/* Header */}
         <div style={{
@@ -598,6 +596,6 @@ export default function SmartFintechSettingsPage() {
           </div>
         </div>
       </div>
-    </div>
+    </ModernLayout>
   );
 }
