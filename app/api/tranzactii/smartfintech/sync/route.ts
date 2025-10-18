@@ -245,27 +245,30 @@ async function insertTransactionsToBigQuery(transactions: MappedTransaction[]): 
   }
 
   const rows = transactions.map(tx => ({
+    // Primary fields
     transaction_hash: tx.transaction_hash,
-    data_procesare: tx.data_procesare, // STRING în format YYYY-MM-DD
+    account_id: tx.account_id_smartfintech || `smartfintech_${tx.iban_cont}`, // Map to account_id
     iban_cont: tx.iban_cont,
-    nume_cont: tx.nume_cont,
-    sold_initial: tx.sold_initial || null,
-    sold_final: tx.sold_final || null,
+    data_procesare: tx.data_procesare, // DATE în format YYYY-MM-DD
     suma: tx.suma,
-    moneda: tx.moneda,
+    valuta: tx.moneda, // Schema uses 'valuta' not 'moneda'
     tip_tranzactie: tx.tip_tranzactie,
-    directie: tx.directie,
+
+    // Contrapartida
+    nume_contrapartida: tx.nume_contrapartida || null,
     iban_contrapartida: tx.iban_contrapartida || null,
-    nume_contrapartida: tx.nume_contrapartida,
     cui_contrapartida: tx.cui_contrapartida || null,
     detalii_tranzactie: tx.detalii_tranzactie || null,
-    categorie: tx.categorie,
-    subcategorie: tx.subcategorie,
+
+    // Metadata
+    sold_intermediar: tx.sold_final || null, // Map sold_final to sold_intermediar
     referinta_bancii: tx.referinta_bancii || null,
-    exchange_rate: tx.exchange_rate || null,
-    sursa_import: tx.sursa_import,
-    account_id_smartfintech: tx.account_id_smartfintech || null,
-    data_import: bigquery.timestamp(new Date()) // Use BigQuery timestamp helper
+    tip_categorie: tx.categorie ? `${tx.categorie} - ${tx.subcategorie}` : null, // Merge categorie+subcategorie
+    directie: tx.directie,
+
+    // Timestamps
+    data_creare: bigquery.timestamp(new Date()), // Map to data_creare
+    data_actualizare: bigquery.timestamp(new Date())
   }));
 
   await bigquery.dataset(DATASET).table(`TranzactiiBancare${tableSuffix}`).insert(rows);
@@ -282,12 +285,21 @@ async function logSyncOperation(
 ): Promise<void> {
   try {
     const log = {
-      operation_id: `smartfintech_sync_${Date.now()}`,
+      // Required fields per schema
+      id: `smartfintech_sync_${Date.now()}`,
+      account_id: 'smartfintech_api', // Generic account_id for API sync
       operation_type: 'smartfintech_api_sync',
-      status,
-      message,
-      metadata: JSON.stringify(metadata),
-      timestamp: bigquery.timestamp(new Date()) // Use BigQuery timestamp helper
+      operation_status: status, // Schema uses 'operation_status' not 'status'
+
+      // Optional metrics
+      records_processed: metadata.total_transactions || 0,
+      records_success: metadata.new_transactions || 0,
+      records_duplicates: metadata.total_transactions - metadata.new_transactions || 0,
+      processing_time_ms: metadata.duration_ms || 0,
+      summary_message: message,
+
+      // Timestamps
+      data_creare: bigquery.timestamp(new Date())
     };
 
     await bigquery.dataset(DATASET).table(`TranzactiiSyncLogs${tableSuffix}`).insert([log]);
