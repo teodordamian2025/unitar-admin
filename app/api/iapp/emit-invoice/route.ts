@@ -150,9 +150,11 @@ export async function POST(request: NextRequest) {
 
     try {
       const dateComplete = JSON.parse(factura.date_complete_json || '{}');
-      const linii = dateComplete.linii_factura || [];
+      // ✅ FIX: BigQuery salvează ca "liniiFactura" (camelCase), nu "linii_factura"
+      const linii = dateComplete.liniiFactura || dateComplete.linii_factura || [];
 
       console.log('✅ [iapp.ro] Line items găsite:', linii.length);
+      console.log('🔍 [iapp.ro] date_complete_json keys:', Object.keys(dateComplete));
 
       itemsRows = linii.map((linie: any) => ({
         title: linie.denumire || linie.Denumire_Etapa || 'Serviciu',
