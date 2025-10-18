@@ -1,0 +1,440 @@
+openapi: 3.0.1
+info:
+  title: Smart Accounts Platform  API
+  version: 1.0.0
+  description: >
+    # Introduction    
+    
+    <img src="https://static.wixstatic.com/media/d07c66_aed6f61e702242c287728877f0fd247f~mv2.png" width="400"/>
+    <br>
+    **Smart Accounts Platform** is a SaaS solution that assists companies of all sizes—from large enterprises to mid-sized businesses—by providing real-time aggregation of financial data across PSD2-compliant banks and bank accounts. It also provides reporting capabilities and integration with internal systems such as ERPs, CRMs, and other core business applications.
+    <br>
+    
+    <br>
+    The platform relies on our internally developed, PSD2-compliant Account Information Service (AIS) infrastructure—authorized and operational and since 2021—currently used by leading invoicing and financial applications in Romania. It serves tens of thousands of users and supports the interrogation of hundreds of thousands of bank accounts.
+    <br>
+    
+    <br>
+    With Smart Accounts Platform, your financial department—and any other authorized teams—can view account balances and transactions from the 11 largest banks in Romania: Banca Transilvania, Banca Comercială Română, ING Bank, BRD Groupe Société Générale, Raiffeisen Bank, CEC Bank, First Bank, UniCredit Bank, Revolut, Garanti BBVA, and Libra Bank.
+    <br>
+    
+    <br>
+    Below, you can find the API documentation for integrating your business systems with the Smart Accounts Platform. Through secure credentials, users can access transaction data via a REST API endpoint, enabling automated transaction export and reconciliation.
+    <br>
+
+servers:
+  - url: https://appsmartaccounts.eu/sacc-web-gateway
+tags:
+  - name: Step 1 - User Flow for Generating API Credentials
+    description: |
+      To initiate the integration process, the user must generate API credentials by creating a new Client ID (“ID Client”). The Client ID can be custom-defined, provided it adheres to the following criteria: 
+      - **Format**: Alphanumeric characters only (a-z, A-Z, 0-9, and “-”).;
+      - **Length**: Between 3 and 36 characters.
+      
+      After creating the Client ID, the user should click the "Generează cheie" button to generate the Client Secret. For security reasons, the Client Secret (e.g., 794f16d5-29ba-4a9c-a7ab-67fa7e93182f) is displayed only once. It is crucial that the user securely store this key, as it is required for all subsequent API integrations.
+
+  - name: Step 2 - Authentication and Token Management
+    description: |
+      Authentication is performed via the API using the Client ID, Client Secret, or a previously issued refresh token. Both token generation and token renewal utilize the same endpoint:
+      
+      https://appsmartaccounts.eu/sacc-web-gateway/ryke-authenticate-api/rest/api/authenticate/sacc-web/tokens
+
+  - name: Step 3 – Retrieving accounts Data through the Export Accounts API
+    description: |
+      In this step, the Export Accounts API returns the list of authorized accounts to facilitate the retrieval of transactions per account obtained in step 4.
+
+      https://appsmartaccounts.eu/sacc-web-gateway/ryke-accounts/rest/api/ais/sacc-web/export/aisp-accounts
+
+  - name: Step 4 – Retrieving Transaction Data through the Export Transactions API
+    description: |
+      In the final integration step, the Export Transactions API facilitates the retrieval of transaction data for automated reconciliation with external systems (i.e. ERPs, CRMs, core business systems, etc.).
+      
+      https://appsmartaccounts.eu/sacc-web-gateway/ryke-accounts/rest/api/ais/sacc-web/export/aisp-transactions?startDate=2024-12-01&endDate=2025-03-05&accountId=31&pageNumber=0&pageSize=50
+
+
+paths:
+  /ryke-authenticate-api/rest/api/authenticate/sacc-web/tokens:
+    post:
+      tags:
+        - Step 2 - Authentication and Token Management
+      summary: Generate Access Token & Refresh Token
+      description: >
+        **Key Services Provided:**
+          - **Access Token**: A short-lived token granting access to the Export Transactions API.
+          - **Token Renewal**: When the access token expires, it can be renewed using the provided refresh token.
+          - **Refresh Token**: Used to request a new access token.
+        
+        The API returns a response containing both the accessToken and refreshToken.
+      operationId: tokens
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+            example:
+              grant_type: client_credentials
+              client_id: accountTest1
+              client_secret: e0689821-3273-4353-9b4e-a90039a918d4
+              refresh_token: eyJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiYWxnIjoiZGlyIn0..QhQqy3b.....
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 200 OK
+                messageStatus: Token created successfully
+                result:
+                  accessToken: eyJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiYWxnIjoiZGlyIn0..msXFZNp.....
+                  refreshToken: eyJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiYWxnIjoiZGlyIn0..QhQqy3b.....
+        '400':
+          description: BAD REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 400 BAD_REQUEST
+                message: Bad Request
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 401 UNAUTHORIZED
+                message: Unauthorized
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 500
+                message: INTERNAL_SERVER_ERROR
+  /ryke-accounts/rest/api/ais/sacc-web/export/aisp-accounts:
+    get:
+      tags:
+        - Step 3 – Retrieving accounts Data through the Export Accounts API
+      summary: Export AISP-Accounts API
+      description: >
+        **Key Features**:
+          - **Data Integration**: It links the user’s system with bank accounts data from the Smart Accounts platform.
+        
+        **Security**: Requires an Authorization header with a valid access token to ensure secure access.<br>
+        <br>
+        **Authorization**
+          - The API must be called with an Authorization header containing the access_token.
+      operationId: getAispAccountsForExport
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AispAccountsResponseDTO'
+              example:
+                message: 'SUCCESS'
+                result:
+                  - accountId: '572'
+                    iban: 'LT803250059856240843'
+                    alias: 'CONT REV'
+                    balance:
+                      id: 231
+                      currency: 'EUR'
+                      amount: 0.0
+                    bank: 'BCR'
+                    remainingDays: 176
+                    consentStatus: 'VALID'
+                    balancesLastSync: 1730200094603
+                    transactionsLastSync: 1730200094603
+        '400':
+          description: BAD REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 400 BAD_REQUEST
+                message: Bad Request
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 401 UNAUTHORIZED
+                message: Unauthorized
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralResponseObject'
+              example:
+                status: 500
+                message: INTERNAL_SERVER_ERROR
+  /ryke-accounts/rest/api/ais/sacc-web/export/aisp-transactions:
+    get:
+      tags:
+        - Step 4 – Retrieving Transaction Data through the Export Transactions API
+      summary: Export Transactions API
+      description: >
+        **Key Features**:
+         - **Data Integration**: It links the user’s system with transactional data from the Smart Accounts platform.
+         - **Filtering Capability**: Supports filtering parameters such as startDate, endDate, accountId and pageNumber for targeted data retrieval.
+        
+        **Security**: Requires an Authorization header with a valid access token to ensure secure access.<br>
+        <br>
+        **Request Parameters**:
+          - Mandatory Parameters:
+            - startDate (yyyy-MM-dd): the starting date  for filtering transactions.
+            - endDate (yyyy-MM-dd): the ending date for filtering transactions.
+        
+          - Optional Parameters:
+            - accountId: Used to filter transactions based on a specific account id obtained in \"Step3 - Retrieving accounts Data through the Export Accounts API\"
+            - pageNumber: The page index for pagination. Value 0 will return the first page of transactions. If not specified, first page will be returned by default.
+            - pageSize: The number of transactions per page. If not specified, each page returns 50 transactions by default.
+        
+        **Authorization**
+          - The API must be called with an Authorization header containing the access_token.
+      operationId: getClientExportAispTransactions
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: accountId
+          in: query
+          schema:
+            type: string
+        - name: pageNumber
+          in: query
+          schema:
+            type: string
+        - name: pageSize
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaccWebGeneralResponse'
+              example:
+                message: 'SUCCESS'
+                result:
+                  - id: 12345
+                    transactionId: '1123132'
+                    bookingDate: '2025-01-31'
+                    valueDate: '2025-01-31'
+                    amount: -100.29
+                    currency: 'RON'
+                    transactionType: 'POS Purchase'
+                    creditorAccount:
+                      iban: 'RO68RNCB02850875132123123'
+                    creditorName: 'PPC Energie SA(fost MUNTENIA)'
+                    remittanceInformationUnstructured: '123132'
+                    smartTransactionDetails:
+                    debtorAccount:
+                      iban: 'RO55RNCB0318076123123132'
+                    debtorName: 'Dana Popescu'
+                    companyName: 'Firma X'
+                    bank: 'BCR'
+                    exchangeRate: string
+                    categoryType: 'Plati'
+                    codeType: 'PLT01'
+                    codeExplanation: 'Plati POS'
+                totalPages: 1
+                totalElements: 20
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaccWebGeneralResponse'
+              example:
+                message: startDate request parameter is required
+        '401':
+          description: Unauthorized
+          content:
+            application/json: {}
+        '500':
+          description: Internal Server Error
+          content:
+            application/json: {}
+components:
+  schemas:
+    TokenRequest:
+      required:
+        - client_id
+        - client_secret
+        - grant_type
+      type: object
+      properties:
+        grant_type:
+          type: string
+          description: "Determines whether the API call is for an access token or a refresh token. The same endpoint is used for both: <br>- client_credentials<br>Requests an access token using the client credentials flow.<br>- refresh_token<br> Requests a new access token using an existing refresh token."
+        client_id:
+          type: string
+          description: "ClientID generated in \"Step1 - User Flow for Generating API Credentials\""
+        client_secret:
+          type: string
+          description: "Client secret generated in \"Step1 - User Flow for Generating API Credentials\""
+        refresh_token:
+          type: string
+          description: "\"client_credentials\" or \"refresh_token\""
+    GeneralResponseObject:
+      type: object
+      properties:
+        result:
+          type: object
+        status:
+          type: string
+        message:
+          type: string
+    SaccWebGeneralResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaccWebExportAispTransactionsDTO'
+        totalPages:
+          type: integer
+          description : Total number of pages
+          format: int32
+        totalElements:
+          type: integer
+          description : Total number of elements
+          format: int64
+    SaccWebExportAispTransactionsDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        transactionId:
+          type: string
+          description: Unique identifier for each transaction
+        bookingDate:
+          type: string
+          description: Date when the payment was initiated
+        valueDate:
+          type: string
+          description: Date when the payment was processed
+        amount:
+          type: number
+          description : Transaction amount
+          format: double
+        currency:
+          type: string
+          description: Currency of the transaction
+        transactionType:
+          type: string
+          description: Type of transaction
+        creditorAccount:
+          $ref: '#/components/schemas/CreditorAccount'
+        creditorName:
+          type: string
+          description: Creditor’s name
+        debtorAccount:
+          $ref: '#/components/schemas/DebtorAccount'
+        debtorName:
+          type: string
+          description: Debtor’s name
+        remittanceInformationUnstructured:
+          type: string
+          description: Unstructured details of the transaction
+        smartTransactionDetails:
+          type: string
+          description: Structured details of the transaction, extracted
+        companyName:
+          type: string
+          description: Name of the company
+        bank:
+          type: string
+          description: Bank name
+        exchangeRate:
+          type: string
+          description: Exchange rate applies, if applicable
+        categoryType:
+          type: string
+          description: Category of the transaction
+        codeType:
+          type: string
+          description: Code representing the category type
+        codeExplanation:
+          type: string
+          description: Description of the code
+    DebtorAccount:
+      type: object
+      properties:
+        iban:
+          type: string
+          description: Debtor’s IBAN
+    CreditorAccount:
+      type: object
+      properties:
+        iban:
+          type: string
+          description: Creditor’s IBAN
+    AispAccountsResponseDTO:
+      type: object
+      properties:
+        accountId:
+          type: integer
+          description: Unique identifier for each bank account
+          format: int32
+        iban:
+          type: string
+          description: IBAN of the bank account
+        alias:
+          type: string
+          description: The name chosen by the user when he renamed the bank account
+        balance:
+          $ref: '#/components/schemas/BalanceDTO'
+        bank:
+          type: string
+          description: Bank name
+        remainingDays:
+          type: integer
+          description: Remaining days to have a valid consent
+          format: int64
+        consentStatus:
+          type: string
+          description: Status of the consent
+        balancesLastSync:
+          type: string
+          description: The date when the last synchronization for balance was made
+          format: date-time
+    BalanceDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the balance of the bank account
+          format: int64
+        currency:
+          type: string
+          description: Currency of the bank account
+        amount:
+          type: number
+          description: Bank account total amount
+          format: double

@@ -86,7 +86,8 @@ const navStructure: NavItem[] = [
       { href: '/admin/setari/efactura', label: 'E-Factura', icon: '📤' },
       { href: '/admin/setari/banca', label: 'Conturi Banca', icon: '🏦' },
       { href: '/admin/setari/contracte', label: 'Contracte', icon: '📋' },
-      { href: '/admin/setari/notificari', label: 'Notificări', icon: '🔔' }
+      { href: '/admin/setari/notificari', label: 'Notificări', icon: '🔔' },
+      { href: '/admin/setari/smartfintech', label: 'Smart Fintech API', icon: '🏦' }
     ]
   }
 ];
