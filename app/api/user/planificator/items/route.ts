@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/items/route.ts
-// DATA: 30.09.2025 00:15 (ora României)
+// DATA: 18.10.2025 (ora României) - FIXED: BigQuery v2 tables suffix
 // DESCRIERE: API planificator pentru utilizatori normali cu restricții financiare
 // FUNCȚIONALITATE: CRUD items planificator cu filtrare per utilizator și fără date financiare
+// FIX: Adăugat ${tableSuffix} la toate tabelele (Proiecte, Subproiecte, Sarcini)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -95,27 +96,27 @@ export async function GET(request: NextRequest) {
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` p
 
       -- Join proiecte direct
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` pr
         ON p.tip_item = 'proiect' AND p.item_id = pr.ID_Proiect
 
       -- Join subproiecte
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` sp
         ON p.tip_item = 'subproiect' AND p.item_id = sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr2
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` pr2
         ON sp.ID_Proiect = pr2.ID_Proiect
 
       -- Join sarcini
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\` s
         ON p.tip_item = 'sarcina' AND p.item_id = s.id
 
       -- Join pentru sarcini de proiect direct
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` pr3
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` pr3
         ON s.tip_proiect = 'proiect' AND s.proiect_id = pr3.ID_Proiect
 
       -- Join pentru sarcini de subproiect: găsește subproiectul și proiectul părinte
       LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` s_sp
         ON s.tip_proiect = 'subproiect' AND s.proiect_id = s_sp.ID_Subproiect
-      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` s_sp_pr
+      LEFT JOIN \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` s_sp_pr
         ON s_sp.ID_Proiect = s_sp_pr.ID_Proiect
 
       WHERE p.utilizator_uid = @userId AND p.activ = TRUE
