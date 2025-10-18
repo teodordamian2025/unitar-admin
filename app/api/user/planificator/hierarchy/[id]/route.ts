@@ -46,11 +46,11 @@ console.log(`🔧 [[id]] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async fun
         sp.ID_Subproiect as id,
         'subproiect' as tip,
         sp.Denumire as nume,
-        (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
+        (SELECT COUNT(*) FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\` s
          WHERE s.proiect_id = sp.ID_Subproiect AND s.status NOT IN ('Finalizată', 'Anulată')) as sarcini_count,
-        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\` pp
+        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` pp
                WHERE pp.item_id = sp.ID_Subproiect AND pp.tip_item = 'subproiect' AND pp.utilizator_uid = @userId) as in_planificator
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\` sp
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` sp
       WHERE sp.ID_Proiect = @proiectId
         AND sp.activ = TRUE
         AND sp.Status != 'Anulat'
@@ -64,12 +64,12 @@ console.log(`🔧 [[id]] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async fun
         'sarcina' as tip,
         s.titlu as nume,
         0 as sarcini_count,
-        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\` pp
+        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` pp
                WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
         s.prioritate as urgenta,
         s.data_scadenta,
         s.progres_procent
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\` s
       WHERE s.proiect_id = @proiectId
         AND (s.subproiect_id IS NULL OR s.subproiect_id = '')
         AND s.status NOT IN ('Finalizată', 'Anulată')

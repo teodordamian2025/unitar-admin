@@ -47,12 +47,12 @@ console.log(`🔧 [[id]] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async fun
         'sarcina' as tip,
         s.titlu as nume,
         0 as sarcini_count,
-        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\` pp
+        EXISTS(SELECT 1 FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` pp
                WHERE pp.item_id = s.id AND pp.tip_item = 'sarcina' AND pp.utilizator_uid = @userId) as in_planificator,
         s.prioritate as urgenta,
         s.data_scadenta,
         s.progres_procent
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\` s
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\` s
       WHERE s.proiect_id = @subproiectId
         AND s.status NOT IN ('Finalizată', 'Anulată')
       ORDER BY s.titlu
