@@ -42,12 +42,15 @@ function decryptValue(encryptedValue: string): string {
 // ==================================================================
 export async function POST(request: NextRequest) {
   try {
-    console.log('📤 [iapp.ro] Starting invoice emission...');
+    console.log('📤 [iapp.ro] ========== START INVOICE EMISSION ==========');
 
     const body = await request.json();
     const { factura_id, tip_factura = 'fiscala', use_v2_api = true } = body;
 
+    console.log('📤 [iapp.ro] Request payload:', { factura_id, tip_factura, use_v2_api });
+
     if (!factura_id) {
+      console.error('❌ [iapp.ro] Missing factura_id in request');
       return NextResponse.json({
         success: false,
         error: 'Missing factura_id'
@@ -65,7 +68,11 @@ export async function POST(request: NextRequest) {
     `;
 
     const [configRows] = await bigquery.query({ query: configQuery, location: 'EU' });
+
+    console.log('🔍 [iapp.ro] Config query rezultat:', configRows.length, 'rows');
+
     if (configRows.length === 0) {
+      console.error('❌ [iapp.ro] No configuration found in IappConfig_v2');
       return NextResponse.json({
         success: false,
         error: 'iapp.ro configuration not found. Please configure in settings.'
@@ -73,8 +80,20 @@ export async function POST(request: NextRequest) {
     }
 
     const config = configRows[0];
+    console.log('✅ [iapp.ro] Config găsită:', {
+      email_responsabil: config.email_responsabil,
+      serie_default: config.serie_default,
+      moneda_default: config.moneda_default,
+      auto_transmite: config.auto_transmite_efactura
+    });
+
     const codFirma = decryptValue(config.cod_firma);
     const parola = decryptValue(config.parola_api);
+
+    console.log('🔐 [iapp.ro] Credențiale decriptate:', {
+      codFirmaLength: codFirma.length,
+      parolaLength: parola.length
+    });
 
     // 2. Citește datele facturii din FacturiGenerate_v2
     const facturaQuery = `
@@ -93,7 +112,10 @@ export async function POST(request: NextRequest) {
       location: 'EU'
     });
 
+    console.log('🔍 [iapp.ro] Factură query rezultat:', facturaRows.length, 'rows');
+
     if (facturaRows.length === 0) {
+      console.error('❌ [iapp.ro] Invoice not found:', factura_id);
       return NextResponse.json({
         success: false,
         error: 'Invoice not found'
@@ -101,24 +123,49 @@ export async function POST(request: NextRequest) {
     }
 
     const factura = facturaRows[0];
-
-    // 3. Citește line items din EtapeContract_v2 (legat de factura_id)
-    const itemsQuery = `
-      SELECT Denumire_Etapa as title, Descriere as descriere,
-             Valoare_RON as pret, 1 as cantitate, 'buc' as um,
-             19 as tvapercent, ROUND(Valoare_RON * 0.19, 2) as tvavalue
-      FROM \`${PROJECT_ID}.${DATASET}.EtapeContract_v2\`
-      WHERE ID IN (
-        SELECT etapa_id FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
-        WHERE ID = @factura_id
-      )
-    `;
-
-    const [itemsRows] = await bigquery.query({
-      query: itemsQuery,
-      params: { factura_id },
-      location: 'EU'
+    console.log('✅ [iapp.ro] Factură găsită:', {
+      client_nume: factura.client_nume,
+      client_cui: factura.client_cui,
+      valoare_totala: factura.Valoare_Totala,
+      data_factura: factura.Data_Factura?.value
     });
+
+    // 3. Parse line items din date_complete_json
+    let itemsRows: any[] = [];
+
+    console.log('🔍 [iapp.ro] Parsing line items din date_complete_json...');
+
+    try {
+      const dateComplete = JSON.parse(factura.date_complete_json || '{}');
+      const linii = dateComplete.linii_factura || [];
+
+      console.log('✅ [iapp.ro] Line items găsite:', linii.length);
+
+      itemsRows = linii.map((linie: any) => ({
+        title: linie.denumire || linie.Denumire_Etapa || 'Serviciu',
+        descriere: linie.descriere || linie.Descriere || '',
+        um: 'buc',
+        cantitate: 1,
+        pret: linie.valoare_ron || linie.Valoare_RON || linie.pretUnitar || 0,
+        tvapercent: linie.cota_tva || linie.cotaTva || 19,
+        tvavalue: ((linie.valoare_ron || linie.Valoare_RON || linie.pretUnitar || 0) * (linie.cota_tva || linie.cotaTva || 19) / 100)
+      }));
+
+      console.log('✅ [iapp.ro] Items procesate pentru iapp.ro:', JSON.stringify(itemsRows, null, 2));
+    } catch (parseError) {
+      console.error('❌ [iapp.ro] Error parsing line items:', parseError);
+      // Fallback: creează un item generic
+      itemsRows = [{
+        title: 'Servicii ' + factura.client_nume,
+        descriere: 'Factură generată automat',
+        um: 'buc',
+        cantitate: 1,
+        pret: factura.Valoare_Totala || factura.total || 0,
+        tvapercent: 19,
+        tvavalue: (factura.Valoare_Totala || factura.total || 0) * 0.19
+      }];
+      console.log('⚠️ [iapp.ro] Folosit item fallback:', itemsRows[0]);
+    }
 
     // Construiește payload pentru iapp.ro
     const iappPayload: any = {
@@ -168,7 +215,12 @@ export async function POST(request: NextRequest) {
 
     const authHeader = Buffer.from(`${codFirma}:${parola}`).toString('base64');
 
-    console.log(`📡 [iapp.ro] Sending ${tip_factura} to ${apiUrl}...`);
+    console.log(`📡 [iapp.ro] ========== SENDING REQUEST ==========`);
+    console.log(`📡 [iapp.ro] URL: ${apiUrl}`);
+    console.log(`📡 [iapp.ro] Tip factură: ${tip_factura}`);
+    console.log(`📡 [iapp.ro] API version: ${use_v2_api ? 'v2 (doar CIF)' : 'v1 (toate datele)'}`);
+    console.log(`📡 [iapp.ro] Auth header length: ${authHeader.length}`);
+    console.log(`📡 [iapp.ro] Payload:`, JSON.stringify(iappPayload, null, 2));
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -189,7 +241,10 @@ export async function POST(request: NextRequest) {
       responseData = { raw: responseText };
     }
 
-    console.log(`📥 [iapp.ro] Response status: ${response.status}`, responseData);
+    console.log(`📥 [iapp.ro] ========== RESPONSE RECEIVED ==========`);
+    console.log(`📥 [iapp.ro] Status: ${response.status} ${response.statusText}`);
+    console.log(`📥 [iapp.ro] Headers:`, Object.fromEntries(response.headers.entries()));
+    console.log(`📥 [iapp.ro] Body:`, JSON.stringify(responseData, null, 2));
 
     // 5. Salvează în IappFacturiEmise_v2
     const now = new Date().toISOString();
@@ -216,30 +271,46 @@ export async function POST(request: NextRequest) {
       creat_de: 'system'
     }];
 
+    console.log('💾 [iapp.ro] Salvez în IappFacturiEmise_v2:', logRecord[0].id);
+
     await bigquery.dataset(DATASET).table('IappFacturiEmise_v2').insert(logRecord);
+
+    console.log('✅ [iapp.ro] Salvat în BigQuery IappFacturiEmise_v2');
 
     // 6. Update FacturiGenerate_v2 cu status
     if (response.ok && responseData.id_factura) {
-      const updateQuery = `
-        UPDATE \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
-        SET Status_Transmitere_eFactura = 'trimisa_iapp',
-            iapp_id_factura = @iapp_id,
-            Data_Actualizare = CURRENT_TIMESTAMP()
-        WHERE ID = @factura_id
-      `;
+      console.log('📝 [iapp.ro] Updating FacturiGenerate_v2 cu efactura_status');
 
-      await bigquery.query({
-        query: updateQuery,
-        params: {
-          factura_id,
-          iapp_id: responseData.id_factura
-        },
-        location: 'EU'
-      });
+      try {
+        const updateQuery = `
+          UPDATE \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
+          SET efactura_status = 'trimisa_iapp',
+              anaf_upload_id = @iapp_id,
+              data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id = @factura_id
+        `;
+
+        await bigquery.query({
+          query: updateQuery,
+          params: {
+            factura_id,
+            iapp_id: String(responseData.id_factura)
+          },
+          location: 'EU'
+        });
+
+        console.log('✅ [iapp.ro] FacturiGenerate_v2 updated successfully');
+      } catch (updateError) {
+        console.error('⚠️ [iapp.ro] Update FacturiGenerate_v2 failed (streaming buffer?):', updateError);
+      }
     }
 
     // Returnează rezultat
     if (!response.ok) {
+      console.error('❌ [iapp.ro] ========== EMISSION FAILED ==========');
+      console.error('❌ [iapp.ro] Status:', response.status);
+      console.error('❌ [iapp.ro] Error:', responseData);
+
       return NextResponse.json({
         success: false,
         error: 'iapp.ro API error',
@@ -247,6 +318,13 @@ export async function POST(request: NextRequest) {
         details: responseData
       }, { status: response.status });
     }
+
+    console.log('✅ [iapp.ro] ========== EMISSION SUCCESS ==========');
+    console.log('✅ [iapp.ro] iapp_id_factura:', responseData.id_factura);
+    console.log('✅ [iapp.ro] Serie:', responseData.serie);
+    console.log('✅ [iapp.ro] Număr:', responseData.numar);
+    console.log('✅ [iapp.ro] e-Factura uploaded:', !!responseData.efactura_upload_index);
+    console.log('✅ [iapp.ro] Upload index:', responseData.efactura_upload_index);
 
     return NextResponse.json({
       success: true,
