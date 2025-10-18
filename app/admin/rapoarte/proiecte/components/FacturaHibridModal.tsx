@@ -1683,16 +1683,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         await processPDF(result.htmlContent, result.fileName);
 
         // ✅ NOUĂ LOGICĂ: Trimite la iapp.ro DUPĂ PDF generat (dacă e configurat)
-        if (sendToAnaf && iappConfig?.tip_facturare === 'iapp' && result.facturaId) {
+        const facturaId = result.invoiceData?.facturaId || result.facturaId; // ✅ FIX: invoiceData.facturaId nested
+        if (sendToAnaf && iappConfig?.tip_facturare === 'iapp' && facturaId) {
           try {
-            console.log('📤 [iapp.ro] Trimitere factură:', result.facturaId);
+            console.log('📤 [iapp.ro] Trimitere factură:', facturaId);
             showToast('📤 Se trimite factura prin iapp.ro...', 'info');
 
             const iappResponse = await fetch('/api/iapp/emit-invoice', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                factura_id: result.facturaId,
+                factura_id: facturaId,
                 tip_factura: 'fiscala', // sau 'proforma' dacă e proformă
                 use_v2_api: true // folosește /emite/factura-v2 (doar CIF)
               })
