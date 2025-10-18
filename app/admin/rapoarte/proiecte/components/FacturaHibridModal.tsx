@@ -1497,23 +1497,29 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
 
     if (sendToAnaf) {
-      if (!anafTokenStatus.hasValidToken) {
-        showToast('❌ Nu există token ANAF valid pentru e-factura', 'error');
-        return;
-      }
-      
-      if (anafTokenStatus.tokenInfo?.is_expired) {
-        showToast('❌ Token ANAF a expirat. Reîmprospătează token-ul.', 'error');
-        return;
-      }
+      // Validare diferită în funcție de tip_facturare
+      if (iappConfig?.tip_facturare === 'anaf_direct') {
+        // Validare pentru ANAF Direct (OAuth)
+        if (!anafTokenStatus.hasValidToken) {
+          showToast('❌ Nu există token ANAF valid pentru e-factura', 'error');
+          return;
+        }
 
+        if (anafTokenStatus.tokenInfo?.is_expired) {
+          showToast('❌ Token ANAF a expirat. Reîmprospătează token-ul.', 'error');
+          return;
+        }
+      }
+      // Pentru iapp.ro, nu verificăm token ANAF (iapp.ro gestionează transmiterea)
+
+      // Validări comune pentru ambele metode
       if (!clientInfo.cui || clientInfo.cui === 'RO00000000') {
-        showToast('❌ CUI valid este obligatoriu pentru e-factura ANAF', 'error');
+        showToast('❌ CUI valid este obligatoriu pentru e-factura', 'error');
         return;
       }
 
       if (!clientInfo.adresa || clientInfo.adresa === 'Adresa client') {
-        showToast('❌ Adresa completă a clientului este obligatorie pentru e-factura ANAF', 'error');
+        showToast('❌ Adresa completă a clientului este obligatorie pentru e-factura', 'error');
         return;
       }
     }
