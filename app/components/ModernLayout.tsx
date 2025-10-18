@@ -83,6 +83,7 @@ const navStructure: NavItem[] = [
       { href: '/admin/setari/utilizatori', label: 'Utilizatori', icon: '👥' },
       { href: '/admin/setari/firma', label: 'Date Firmă', icon: '🏢' },
       { href: '/admin/setari/facturare', label: 'Facturare', icon: '📄' },
+      { href: '/admin/setari/efactura', label: 'E-Factura', icon: '📤' },
       { href: '/admin/setari/banca', label: 'Conturi Banca', icon: '🏦' },
       { href: '/admin/setari/contracte', label: 'Contracte', icon: '📋' },
       { href: '/admin/setari/notificari', label: 'Notificări', icon: '🔔' }
