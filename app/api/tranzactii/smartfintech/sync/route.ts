@@ -265,7 +265,7 @@ async function insertTransactionsToBigQuery(transactions: MappedTransaction[]): 
     exchange_rate: tx.exchange_rate || null,
     sursa_import: tx.sursa_import,
     account_id_smartfintech: tx.account_id_smartfintech || null,
-    data_import: new Date().toISOString()
+    data_import: bigquery.timestamp(new Date()) // Use BigQuery timestamp helper
   }));
 
   await bigquery.dataset(DATASET).table(`TranzactiiBancare${tableSuffix}`).insert(rows);
@@ -287,7 +287,7 @@ async function logSyncOperation(
       status,
       message,
       metadata: JSON.stringify(metadata),
-      timestamp: new Date().toISOString()
+      timestamp: bigquery.timestamp(new Date()) // Use BigQuery timestamp helper
     };
 
     await bigquery.dataset(DATASET).table(`TranzactiiSyncLogs${tableSuffix}`).insert([log]);
