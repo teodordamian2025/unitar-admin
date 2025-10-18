@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import {
   authenticateSmartFintech,
   getSmartFintechAccounts,
@@ -245,26 +246,25 @@ async function insertTransactionsToBigQuery(transactions: MappedTransaction[]): 
   }
 
   const rows = transactions.map(tx => ({
-    // Primary fields
+    // Required fields
+    id: uuidv4(), // Generate unique ID for each transaction
     transaction_hash: tx.transaction_hash,
     account_id: tx.account_id_smartfintech || `smartfintech_${tx.iban_cont}`, // Map to account_id
     iban_cont: tx.iban_cont,
     data_procesare: tx.data_procesare, // DATE în format YYYY-MM-DD
     suma: tx.suma,
-    valuta: tx.moneda, // Schema uses 'valuta' not 'moneda'
     tip_tranzactie: tx.tip_tranzactie,
 
-    // Contrapartida
+    // Optional fields
+    valuta: tx.moneda || null, // Schema uses 'valuta' not 'moneda'
     nume_contrapartida: tx.nume_contrapartida || null,
     iban_contrapartida: tx.iban_contrapartida || null,
     cui_contrapartida: tx.cui_contrapartida || null,
     detalii_tranzactie: tx.detalii_tranzactie || null,
-
-    // Metadata
     sold_intermediar: tx.sold_final || null, // Map sold_final to sold_intermediar
     referinta_bancii: tx.referinta_bancii || null,
     tip_categorie: tx.categorie ? `${tx.categorie} - ${tx.subcategorie}` : null, // Merge categorie+subcategorie
-    directie: tx.directie,
+    directie: tx.directie || null,
 
     // Timestamps
     data_creare: bigquery.timestamp(new Date()), // Map to data_creare
