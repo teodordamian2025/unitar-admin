@@ -1,5 +1,4 @@
 {
-  "/api/anaf/upload-invoice/route": "app/api/anaf/upload-invoice/route.js",
-  "/api/anaf/error-handler/route": "app/api/anaf/error-handler/route.js",
-  "/api/anaf/retry-invoices/cron/route": "app/api/anaf/retry-invoices/cron/route.js"
+  "/api/iapp/config/route": "app/api/iapp/config/route.js",
+  "/admin/setari/efactura/page": "app/admin/setari/efactura/page.js"
 }
