@@ -237,24 +237,24 @@ export default function SmartFintechSettingsPage() {
       }}>
         {/* Header */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.15)',
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
           borderRadius: '16px',
           padding: '2rem',
           marginBottom: '2rem',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
         }}>
           <h1 style={{
             fontSize: '2rem',
             fontWeight: '700',
-            color: 'white',
+            color: '#1f2937',
             marginBottom: '0.5rem'
           }}>
             ⚙️ Smart Fintech API - Configurare
           </h1>
           <p style={{
-            color: 'rgba(255, 255, 255, 0.8)',
+            color: '#4b5563',
             fontSize: '1rem'
           }}>
             Configurare acces Smart Accounts Platform pentru sincronizare automată tranzacții bancare
@@ -264,18 +264,18 @@ export default function SmartFintechSettingsPage() {
         {/* Status Card */}
         {config && (
           <div style={{
-            background: 'rgba(255, 255, 255, 0.15)',
+            background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',
             borderRadius: '16px',
             padding: '1.5rem',
             marginBottom: '2rem',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{
               fontSize: '1.25rem',
               fontWeight: '600',
-              color: 'white',
+              color: '#1f2937',
               marginBottom: '1rem'
             }}>
               📊 Status Sincronizare
@@ -287,10 +287,10 @@ export default function SmartFintechSettingsPage() {
               gap: '1rem'
             }}>
               <div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
                   Ultima sincronizare
                 </div>
-                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '600' }}>
+                <div style={{ color: '#1f2937', fontSize: '1rem', fontWeight: '600' }}>
                   {config.ultima_sincronizare
                     ? new Date(config.ultima_sincronizare).toLocaleString('ro-RO')
                     : 'Niciodată'}
@@ -298,20 +298,20 @@ export default function SmartFintechSettingsPage() {
               </div>
 
               <div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
                   Conturi conectate
                 </div>
-                <div style={{ color: 'white', fontSize: '1rem', fontWeight: '600' }}>
+                <div style={{ color: '#1f2937', fontSize: '1rem', fontWeight: '600' }}>
                   {config.numar_conturi || 0} conturi
                 </div>
               </div>
 
               <div>
-                <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
                   Status
                 </div>
                 <div style={{
-                  color: config.ultima_eroare ? '#fca5a5' : '#86efac',
+                  color: config.ultima_eroare ? '#dc2626' : '#059669',
                   fontSize: '1rem',
                   fontWeight: '600'
                 }}>
@@ -324,10 +324,10 @@ export default function SmartFintechSettingsPage() {
               <div style={{
                 marginTop: '1rem',
                 padding: '1rem',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: 'rgba(0, 0, 0, 0.05)',
                 borderRadius: '8px'
               }}>
-                <div style={{ color: 'white', fontSize: '0.875rem' }}>
+                <div style={{ color: '#1f2937', fontSize: '0.875rem' }}>
                   <strong>Ultimul sync:</strong>{' '}
                   {syncStatus.last_sync_result.new_transactions} tranzacții noi din{' '}
                   {syncStatus.last_sync_result.total_transactions} total{' '}
@@ -340,18 +340,18 @@ export default function SmartFintechSettingsPage() {
 
         {/* Config Form */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.15)',
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
           borderRadius: '16px',
           padding: '2rem',
           marginBottom: '2rem',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
         }}>
           <h2 style={{
             fontSize: '1.25rem',
             fontWeight: '600',
-            color: 'white',
+            color: '#1f2937',
             marginBottom: '1.5rem'
           }}>
             🔑 Credențiale API
@@ -362,7 +362,7 @@ export default function SmartFintechSettingsPage() {
             <div>
               <label style={{
                 display: 'block',
-                color: 'white',
+                color: '#1f2937',
                 fontSize: '0.875rem',
                 fontWeight: '600',
                 marginBottom: '0.5rem'
@@ -390,7 +390,7 @@ export default function SmartFintechSettingsPage() {
             <div>
               <label style={{
                 display: 'block',
-                color: 'white',
+                color: '#1f2937',
                 fontSize: '0.875rem',
                 fontWeight: '600',
                 marginBottom: '0.5rem'
@@ -400,7 +400,7 @@ export default function SmartFintechSettingsPage() {
                   <span style={{
                     marginLeft: '0.5rem',
                     fontSize: '0.75rem',
-                    color: 'rgba(255, 255, 255, 0.7)'
+                    color: '#6b7280'
                   }}>
                     (lasă gol dacă nu dorești să schimbi)
                   </span>
@@ -469,17 +469,17 @@ export default function SmartFintechSettingsPage() {
         {/* Actions */}
         {config && (
           <div style={{
-            background: 'rgba(255, 255, 255, 0.15)',
+            background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',
             borderRadius: '16px',
             padding: '2rem',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{
               fontSize: '1.25rem',
               fontWeight: '600',
-              color: 'white',
+              color: '#1f2937',
               marginBottom: '1.5rem'
             }}>
               🎯 Acțiuni
@@ -559,22 +559,22 @@ export default function SmartFintechSettingsPage() {
         {/* Documentation */}
         <div style={{
           marginTop: '2rem',
-          background: 'rgba(255, 255, 255, 0.1)',
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
           borderRadius: '16px',
           padding: '1.5rem',
-          border: '1px solid rgba(255, 255, 255, 0.2)'
+          border: '1px solid rgba(0, 0, 0, 0.1)'
         }}>
           <h3 style={{
             fontSize: '1rem',
             fontWeight: '600',
-            color: 'white',
+            color: '#1f2937',
             marginBottom: '1rem'
           }}>
             📚 Informații
           </h3>
           <div style={{
-            color: 'rgba(255, 255, 255, 0.8)',
+            color: '#4b5563',
             fontSize: '0.875rem',
             lineHeight: '1.6'
           }}>
