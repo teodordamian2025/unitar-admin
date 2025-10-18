@@ -908,7 +908,6 @@ export async function POST(request: NextRequest) {
     // ✅ PĂSTRAT: TEMPLATE HTML cu marker pentru Edit Mode în antet și footer
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `factura-${numarFactura || proiectId}-${timestamp}.pdf`;
 
     // ✅ PĂSTRAT: Curățare note curs pentru PDF
     const notaCursValutarClean = cleanNonAscii(notaCursValutar);
@@ -930,7 +929,11 @@ export async function POST(request: NextRequest) {
     // Reconstruiește cu seria corectă
     const numarFacturaDisplay = `${serieForDisplay}${separatorForDisplay}${numarForDisplay}`;
 
+    // ✅ Folosește seria corectă și în numele fișierului PDF
+    const fileName = `factura-${numarFacturaDisplay || proiectId}-${timestamp}.pdf`;
+
     console.log(`🔢 [PDF] Număr factură pentru display: "${numarFactura}" -> "${numarFacturaDisplay}" (serie: ${serieForDisplay})`);
+    console.log(`📄 [PDF] Nume fișier generat: ${fileName}`);
 
     const htmlTemplate = `
     <!DOCTYPE html>

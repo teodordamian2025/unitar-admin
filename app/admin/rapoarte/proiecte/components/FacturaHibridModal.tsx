@@ -277,7 +277,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [numarFactura, setNumarFactura] = useState(initialData?.numarFactura || '');
   const [dataFactura] = useState(new Date());
   const [isLoadingSetari, setIsLoadingSetari] = useState(false);
-  const [sendToAnaf, setSendToAnaf] = useState(false);
+  const [sendToAnaf, setSendToAnaf] = useState(true); // ✅ Default checked - utilizatorul poate debifa dacă nu dorește transmitere e-Factură
   const [anafTokenStatus, setAnafTokenStatus] = useState<ANAFTokenStatus>({
     hasValidToken: false,
     loading: true
