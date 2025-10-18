@@ -1616,6 +1616,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             termen_plata_standard: termenPlata
           },
           sendToAnaf,
+          tip_facturare: iappConfig?.tip_facturare || 'anaf_direct', // ✅ TRANSMITE tip_facturare
           cursuriUtilizate: cursuriPentruAPI,
           isEdit,
           isStorno,
@@ -1667,7 +1668,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         }
 
         if (sendToAnaf) {
-          if (result.efactura?.xmlGenerated) {
+          // ✅ Pentru iapp.ro, nu afișăm mesaj despre XML (nu se generează)
+          if (iappConfig?.tip_facturare === 'iapp') {
+            showToast('✅ Template generat! Se procesează PDF-ul și se va trimite prin iapp.ro...', 'success');
+          } else if (result.efactura?.xmlGenerated) {
             showToast(`✅ PDF + XML generat! XML ID: ${result.efactura.xmlId}`, 'success');
           } else {
             showToast(`⚠️ PDF generat, dar XML a eșuat: ${result.efactura?.xmlError}`, 'info');

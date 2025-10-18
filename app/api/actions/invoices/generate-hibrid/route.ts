@@ -741,30 +741,32 @@ export async function POST(request: NextRequest) {
       numarFactura,
       setariFacturare,
       sendToAnaf = false,
+      tip_facturare = 'anaf_direct', // ✅ NOU: Primește tip_facturare din frontend
       cursuriUtilizate = {}, // ✅ CORECT: Primește cursurile cu key-ul corect
-      isEdit = false,        
-      isStorno = false,      
-      facturaId = null,      
+      isEdit = false,
+      isStorno = false,
+      facturaId = null,
       facturaOriginala = null,
       etapeFacturate = [] // ✅ NOU: Array cu etapele facturate
     } = body;
 
-    console.log('📋 Date primite pentru factură:', { 
-      proiectId, 
-      liniiFactura: liniiFactura?.length, 
-      observatii: observatii?.length, 
+    console.log('📋 Date primite pentru factură:', {
+      proiectId,
+      liniiFactura: liniiFactura?.length,
+      observatii: observatii?.length,
       clientInfo: clientInfo?.nume || clientInfo?.denumire,
       numarFactura,
       sendToAnaf,
+      tip_facturare, // ✅ NOU: Log tip_facturare
       isEdit,
       isStorno,
       facturaId,
       etapeFacturate: etapeFacturate?.length || 0, // ✅ NOU: Log etape facturate
-      cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ? 
-        Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') : 
+      cursuriUtilizate: Object.keys(cursuriUtilizate).length > 0 ?
+        Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') :
         'Niciun curs',
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
-      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed'
+      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed_IAPP'
     });
 
     // ✅ PĂSTRATE: VALIDĂRI EXISTENTE - păstrate identice
@@ -1583,8 +1585,18 @@ export async function POST(request: NextRequest) {
       // ✅ NOTA: Incrementarea numar_curent_facturi s-a mutat ÎNAINTE de salvare (linia ~1540) pentru a preveni race conditions
 
       // ✅ NOU: GENERARE XML ANAF DUPĂ salvarea facturii în BigQuery (FIX timing issue)
-      if (sendToAnaf) {
-        console.log(`📤 Generez XML ANAF pentru factura ${currentFacturaId} ${MOCK_EFACTURA_MODE ? '(MOCK MODE)' : '(PRODUCȚIE)'}...`);
+      // ✅ NOU: Generează XML DOAR pentru anaf_direct, NU pentru iapp.ro
+      if (sendToAnaf && tip_facturare === 'iapp') {
+        console.log(`📤 [iapp.ro] sendToAnaf=true dar tip_facturare='iapp' → SKIP generare XML ANAF direct`);
+        console.log(`📤 [iapp.ro] Trimiterea către iapp.ro se va face în frontend DUPĂ generarea PDF-ului`);
+        xmlResult = {
+          success: true,
+          xmlGenerated: false,
+          message: 'XML skipped - va fi trimis prin iapp.ro',
+          tip_facturare: 'iapp'
+        };
+      } else if (sendToAnaf && tip_facturare === 'anaf_direct') {
+        console.log(`📤 Generez XML ANAF DIRECT pentru factura ${currentFacturaId} ${MOCK_EFACTURA_MODE ? '(MOCK MODE)' : '(PRODUCȚIE)'}...`);
 
         if (MOCK_EFACTURA_MODE) {
           // ✅ MOCK MODE: Salvare record test fără apel real la ANAF
