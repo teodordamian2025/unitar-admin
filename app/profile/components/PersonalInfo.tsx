@@ -1,8 +1,10 @@
 // ==================================================================
 // CALEA: app/profile/components/PersonalInfo.tsx
-// DATA: 21.09.2025 19:00 (ora României)
+// DATA: 18.10.2025 (ora României) - FIXED: Dropdown-uri Departament și Poziție
 // DESCRIERE: Component informații personale pentru utilizatori normali
 // FUNCȚIONALITATE: Afișare și editare informații de bază utilizator
+// FIX: Dropdown Departament (Rezistenta/Arhitectura/Instalatii/Administrativ)
+//      Dropdown Poziție (Normal/Manager/Admin)
 // ==================================================================
 
 'use client';
@@ -47,15 +49,42 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
 
   const loadUserProfile = async () => {
     try {
-      // Încearcă să încarce profilul din BigQuery sau localStorage
-      const savedProfile = localStorage.getItem(`userProfile_${user.uid}`);
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile);
-        setProfile(prev => ({ ...prev, ...parsed }));
-        setInitialProfile(parsed);
+      setLoading(true);
+      const idToken = await user.getIdToken();
+
+      const response = await fetch('/api/profile', {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const loadedProfile = {
+          displayName: data.displayName || user.displayName || '',
+          email: data.email || user.email || '',
+          phone: data.phone || '',
+          department: data.department || '',
+          position: data.position || '',
+          startDate: data.startDate || '',
+          bio: data.bio || ''
+        };
+        setProfile(loadedProfile);
+        setInitialProfile(loadedProfile);
+      } else {
+        // Fallback la localStorage pentru utilizatori care nu au profil în BigQuery încă
+        const savedProfile = localStorage.getItem(`userProfile_${user.uid}`);
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile);
+          setProfile(prev => ({ ...prev, ...parsed }));
+          setInitialProfile(parsed);
+        }
       }
     } catch (error) {
       console.error('Eroare la încărcarea profilului:', error);
+      toast.error('Nu s-a putut încărca profilul');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,7 +112,28 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
         });
       }
 
-      // Salvează în localStorage (în producție ar fi BigQuery)
+      // Salvează în BigQuery prin API
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          displayName: profile.displayName,
+          phone: profile.phone,
+          department: profile.department,
+          position: profile.position,
+          startDate: profile.startDate,
+          bio: profile.bio
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save profile');
+      }
+
       const profileToSave = {
         displayName: profile.displayName,
         email: profile.email,
@@ -94,6 +144,7 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
         bio: profile.bio
       };
 
+      // Backup în localStorage
       localStorage.setItem(`userProfile_${user.uid}`, JSON.stringify(profileToSave));
       setInitialProfile(profileToSave);
 
@@ -348,7 +399,7 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
           )}
         </div>
 
-        {/* Departament */}
+        {/* Departament - DROPDOWN */}
         <div>
           <label style={{
             display: 'block',
@@ -360,11 +411,9 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
             Departament
           </label>
           {editing ? (
-            <input
-              type="text"
+            <select
               value={profile.department}
               onChange={(e) => handleInputChange('department', e.target.value)}
-              placeholder="ex: IT, Marketing, Vânzări"
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -372,7 +421,8 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
                 border: '1px solid rgba(209, 213, 219, 0.8)',
                 fontSize: '0.875rem',
                 background: 'rgba(255, 255, 255, 0.9)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#3b82f6';
@@ -382,7 +432,13 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
                 e.target.style.borderColor = 'rgba(209, 213, 219, 0.8)';
                 e.target.style.boxShadow = 'none';
               }}
-            />
+            >
+              <option value="">Selectează departament</option>
+              <option value="Rezistenta">Rezistenta</option>
+              <option value="Arhitectura">Arhitectura</option>
+              <option value="Instalatii">Instalatii</option>
+              <option value="Administrativ">Administrativ</option>
+            </select>
           ) : (
             <p style={{
               padding: '0.75rem',
@@ -397,7 +453,7 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
           )}
         </div>
 
-        {/* Poziție */}
+        {/* Poziție - DROPDOWN */}
         <div>
           <label style={{
             display: 'block',
@@ -409,11 +465,9 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
             Poziție
           </label>
           {editing ? (
-            <input
-              type="text"
+            <select
               value={profile.position}
               onChange={(e) => handleInputChange('position', e.target.value)}
-              placeholder="ex: Developer, Manager, Consultant"
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -421,7 +475,8 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
                 border: '1px solid rgba(209, 213, 219, 0.8)',
                 fontSize: '0.875rem',
                 background: 'rgba(255, 255, 255, 0.9)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#3b82f6';
@@ -431,7 +486,12 @@ export default function PersonalInfo({ user, displayName }: PersonalInfoProps) {
                 e.target.style.borderColor = 'rgba(209, 213, 219, 0.8)';
                 e.target.style.boxShadow = 'none';
               }}
-            />
+            >
+              <option value="">Selectează poziție</option>
+              <option value="Normal">Normal</option>
+              <option value="Manager">Manager</option>
+              <option value="Admin">Admin</option>
+            </select>
           ) : (
             <p style={{
               padding: '0.75rem',

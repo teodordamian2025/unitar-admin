@@ -1,14 +1,13 @@
 // ==================================================================
 // CALEA: app/planificator/components/PlanificatorInteligent.tsx
-// DATA: 02.10.2025 (ora României) - FIXED: Force refresh după pin
+// DATA: 18.10.2025 (ora României) - FIXED: Replace drag & drop cu săgeți discrete sus/jos
 // DESCRIERE: Componenta principală planificator inteligent - consumă timer din context (ZERO duplicate requests)
-// FUNCȚIONALITATE: Drag & drop, timer integration, pin activ, notificări + force refresh după pin
+// FUNCȚIONALITATE: Arrow buttons reordering, timer integration, pin activ, notificări + force refresh după pin
 // ==================================================================
 
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { User } from 'firebase/auth';
 import { toast } from 'react-toastify';
 import { useTimer } from '@/app/contexts/TimerContext';
@@ -718,19 +717,22 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
-  // Drag & Drop handler
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination) return;
+  // ✅ NOU: Move item up/down cu săgeți (înlocuiește drag & drop)
+  const moveItem = async (itemId: string, direction: 'up' | 'down') => {
+    const currentIndex = items.findIndex(item => item.id === itemId);
+    if (currentIndex === -1) return;
 
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
+    // Nu poate merge mai sus decât poziția 0
+    if (direction === 'up' && currentIndex === 0) return;
+    // Nu poate merge mai jos decât ultima poziție
+    if (direction === 'down' && currentIndex === items.length - 1) return;
 
-    if (sourceIndex === destinationIndex) return;
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
 
     // Reorder local state
     const newItems = Array.from(items);
-    const [reorderedItem] = newItems.splice(sourceIndex, 1);
-    newItems.splice(destinationIndex, 0, reorderedItem);
+    const [movedItem] = newItems.splice(currentIndex, 1);
+    newItems.splice(newIndex, 0, movedItem);
 
     // Update ordine_pozitie pentru toate items
     const updatedItems = newItems.map((item, index) => ({
@@ -949,74 +951,98 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
             </p>
           </div>
         ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="planificator-list">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
-                >
-                  {items.map((item, index) => (
-                    <Draggable key={item.id} draggableId={item.id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          onClick={(e) => {
-                            // Previne click-uri accidentale pe card
-                            const target = e.target as HTMLElement;
-                            if (target.tagName === 'BUTTON' || target.closest('button')) {
-                              return;
-                            }
-                          }}
-                          style={{
-                            ...provided.draggableProps.style,
-                            background: item.is_realizat
-                              ? 'rgba(34, 197, 94, 0.1)'
-                              : item.is_pinned
-                              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)'
-                              : 'rgba(255, 255, 255, 0.7)',
-                            backdropFilter: 'blur(8px)',
-                            border: item.is_realizat
-                              ? '2px solid rgba(34, 197, 94, 0.3)'
-                              : item.is_pinned
-                              ? '2px solid rgba(59, 130, 246, 0.3)'
-                              : '1px solid rgba(255, 255, 255, 0.3)',
-                            borderRadius: '12px',
-                            padding: '1rem',
-                            boxShadow: snapshot.isDragging
-                              ? '0 10px 40px rgba(0, 0, 0, 0.2)'
-                              : '0 4px 16px rgba(0, 0, 0, 0.1)',
-                            transform: snapshot.isDragging
-                              ? 'rotate(2deg) scale(1.02)'
-                              : 'none',
-                            transition: 'all 0.2s ease',
-                            opacity: item.is_realizat ? 0.7 : 1,
-                            position: 'relative'
-                          }}
-                        >
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '1rem'
-                          }}>
-                            {/* Drag Handle */}
-                            <div
-                              {...provided.dragHandleProps}
-                              style={{
-                                cursor: 'grab',
-                                color: '#9ca3af',
-                                fontSize: '1.25rem',
-                                lineHeight: 1,
-                                marginTop: '0.25rem'
-                              }}
-                            >
-                              ⋮⋮
-                            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {items.map((item, index) => (
+              <div
+                key={item.id}
+                style={{
+                  background: item.is_realizat
+                    ? 'rgba(34, 197, 94, 0.1)'
+                    : item.is_pinned
+                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)'
+                    : 'rgba(255, 255, 255, 0.7)',
+                  backdropFilter: 'blur(8px)',
+                  border: item.is_realizat
+                    ? '2px solid rgba(34, 197, 94, 0.3)'
+                    : item.is_pinned
+                    ? '2px solid rgba(59, 130, 246, 0.3)'
+                    : '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s ease',
+                  opacity: item.is_realizat ? 0.7 : 1,
+                  position: 'relative'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.75rem'
+                }}>
+                  {/* Săgeți reordonare */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem',
+                    marginTop: '0.25rem'
+                  }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveItem(item.id, 'up');
+                      }}
+                      disabled={index === 0}
+                      style={{
+                        background: index === 0 ? 'rgba(107, 114, 128, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        border: `1px solid ${index === 0 ? 'rgba(107, 114, 128, 0.2)' : 'rgba(59, 130, 246, 0.3)'}`,
+                        borderRadius: '4px',
+                        padding: '0.15rem 0.3rem',
+                        cursor: index === 0 ? 'not-allowed' : 'pointer',
+                        opacity: index === 0 ? 0.4 : 1,
+                        fontSize: '0.75rem',
+                        color: index === 0 ? '#9ca3af' : '#3b82f6',
+                        lineHeight: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '24px',
+                        minHeight: '24px'
+                      }}
+                      title="Mută în sus"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveItem(item.id, 'down');
+                      }}
+                      disabled={index === items.length - 1}
+                      style={{
+                        background: index === items.length - 1 ? 'rgba(107, 114, 128, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        border: `1px solid ${index === items.length - 1 ? 'rgba(107, 114, 128, 0.2)' : 'rgba(59, 130, 246, 0.3)'}`,
+                        borderRadius: '4px',
+                        padding: '0.15rem 0.3rem',
+                        cursor: index === items.length - 1 ? 'not-allowed' : 'pointer',
+                        opacity: index === items.length - 1 ? 0.4 : 1,
+                        fontSize: '0.75rem',
+                        color: index === items.length - 1 ? '#9ca3af' : '#3b82f6',
+                        lineHeight: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '24px',
+                        minHeight: '24px'
+                      }}
+                      title="Mută în jos"
+                    >
+                      ↓
+                    </button>
+                  </div>
 
-                            {/* Content */}
-                            <div style={{ flex: 1 }}>
+                  {/* Content */}
+                  <div style={{ flex: 1 }}>
                               {/* Header cu urgență și pin */}
                               <div style={{
                                 display: 'flex',
@@ -1279,14 +1305,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                             </div>
                           </div>
                         </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+              ))}
+          </div>
         )}
       </div>
 
