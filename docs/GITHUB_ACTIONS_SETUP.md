@@ -42,18 +42,15 @@ openssl rand -hex 32
 
 ## 📋 Cron Jobs Active
 
-### 1. ANAF Retry Invoices
-**File**: `.github/workflows/anaf-retry-cron.yml`
-- **Schedule**: La fiecare 10 minute (`*/10 * * * *`)
-- **Endpoint**: `GET /api/anaf/retry-invoices/cron`
-- **Purpose**: Retry facturi failed ANAF upload
-
-### 2. Smart Fintech Sync
+### Smart Fintech Sync
 **File**: `.github/workflows/smartfintech-cron.yml`
 - **Schedule**: La fiecare 6 ore (`0 0,6,12,18 * * *`) - 00:00, 06:00, 12:00, 18:00 UTC
 - **Endpoint**: `POST /api/tranzactii/smartfintech/cron`
 - **Purpose**: Sincronizare automată tranzacții bancare
 - **Auth**: Requires `CRON_SECRET` header
+
+### ~~ANAF Retry Invoices~~ (DEZACTIVAT - 18.10.2025)
+**Motiv**: E-factura acum folosește integrare externă cu iapp.ro, cron-ul ANAF nu mai este necesar.
 
 ---
 
@@ -62,16 +59,13 @@ openssl rand -hex 32
 ### Din GitHub UI:
 
 1. Intră pe: https://github.com/teodordamian2025/unitar-admin/actions
-2. Selectează workflow-ul dorit (ANAF sau Smart Fintech)
+2. Selectează workflow-ul **"Smart Fintech Sync - Cron Job"**
 3. Click "Run workflow" → "Run workflow" (buton verde)
 4. Verifică rezultatul în tab-ul "Actions"
 
 ### Din CLI (cu GitHub CLI):
 
 ```bash
-# Trigger ANAF cron:
-gh workflow run anaf-retry-cron.yml
-
 # Trigger Smart Fintech cron:
 gh workflow run smartfintech-cron.yml
 ```
