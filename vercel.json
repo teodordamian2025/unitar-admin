@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/tranzactii/smartfintech/cron",
-      "schedule": "0 */6 * * *"
-    }
-  ]
-}
