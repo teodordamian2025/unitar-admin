@@ -96,14 +96,11 @@ export async function POST(request: NextRequest) {
     });
 
     // 2. Citește datele facturii din FacturiGenerate_v2
+    // ✅ FIX: Nu mai facem JOIN cu Clienti_v2, datele client sunt în date_complete_json și coloane directe
     const facturaQuery = `
-      SELECT f.*, c.Denumire as client_nume, c.CUI as client_cui,
-             c.Reg_Com as client_reg_com, c.Adresa as client_adresa,
-             c.Tara as client_tara, c.Judet as client_judet,
-             c.Oras as client_oras, c.Strada as client_strada
-      FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` f
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Clienti_v2\` c ON f.Client_ID = c.ID
-      WHERE f.ID = @factura_id
+      SELECT *
+      FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
+      WHERE id = @factura_id
     `;
 
     const [facturaRows] = await bigquery.query({
@@ -123,11 +120,27 @@ export async function POST(request: NextRequest) {
     }
 
     const factura = facturaRows[0];
+
+    // ✅ Parse date_complete_json pentru date client
+    let clientInfo: any = {};
+    try {
+      const dateComplete = JSON.parse(factura.date_complete_json || '{}');
+      clientInfo = dateComplete.clientInfo || {};
+    } catch (err) {
+      console.warn('⚠️ [iapp.ro] Nu s-a putut parsa date_complete_json');
+    }
+
+    // ✅ Folosește date din coloane directe SAU din JSON
+    const client_nume = factura.client_nume || clientInfo.nume || clientInfo.denumire || 'N/A';
+    const client_cui = factura.client_cui || clientInfo.cui || 'N/A';
+
     console.log('✅ [iapp.ro] Factură găsită:', {
-      client_nume: factura.client_nume,
-      client_cui: factura.client_cui,
-      valoare_totala: factura.Valoare_Totala,
-      data_factura: factura.Data_Factura?.value
+      client_nume,
+      client_cui,
+      valoare_totala: factura.total || factura.Valoare_Totala,
+      data_factura: factura.data_factura?.value || factura.data_factura,
+      serie: factura.serie,
+      numar: factura.numar
     });
 
     // 3. Parse line items din date_complete_json
@@ -155,14 +168,16 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.error('❌ [iapp.ro] Error parsing line items:', parseError);
       // Fallback: creează un item generic
+      const total = factura.total || factura.Valoare_Totala || 0;
+      const subtotal = factura.subtotal || (total / 1.19) || 0;
       itemsRows = [{
-        title: 'Servicii ' + factura.client_nume,
+        title: 'Servicii ' + client_nume,
         descriere: 'Factură generată automat',
         um: 'buc',
         cantitate: 1,
-        pret: factura.Valoare_Totala || factura.total || 0,
+        pret: subtotal,
         tvapercent: 19,
-        tvavalue: (factura.Valoare_Totala || factura.total || 0) * 0.19
+        tvavalue: total - subtotal
       }];
       console.log('⚠️ [iapp.ro] Folosit item fallback:', itemsRows[0]);
     }
@@ -170,9 +185,9 @@ export async function POST(request: NextRequest) {
     // Construiește payload pentru iapp.ro
     const iappPayload: any = {
       email_responsabil: config.email_responsabil,
-      data_start: factura.Data_Factura?.value || new Date().toISOString().split('T')[0],
+      data_start: factura.data_factura?.value || factura.data_factura || new Date().toISOString().split('T')[0],
       data_termen: '30', // 30 zile termen plată
-      seria: config.serie_default || 'SERIE_TEST',
+      seria: config.serie_default || factura.serie || 'UPA',
       moneda: config.moneda_default || 'RON',
       footer: {
         intocmit_name: config.footer_intocmit_name || 'Administrator'
@@ -192,19 +207,19 @@ export async function POST(request: NextRequest) {
     if (use_v2_api) {
       iappPayload.client = {
         type: 'J', // Juridic
-        cif: factura.client_cui
+        cif: client_cui.replace('RO', '').trim() // ✅ FIX: Remove RO prefix
       };
     } else {
       iappPayload.client = {
         type: 'J',
-        cif: factura.client_cui,
-        nume: factura.client_nume,
-        reg_com: factura.client_reg_com,
-        adresa: factura.client_adresa,
-        tara: factura.client_tara || 'RO',
-        judet: factura.client_judet,
-        oras: factura.client_oras,
-        strada: factura.client_strada
+        cif: client_cui.replace('RO', '').trim(),
+        nume: client_nume,
+        reg_com: clientInfo.reg_com || clientInfo.regCom || '',
+        adresa: clientInfo.adresa || '',
+        tara: clientInfo.tara || 'RO',
+        judet: clientInfo.judet || '',
+        oras: clientInfo.oras || '',
+        strada: clientInfo.strada || ''
       };
     }
 
@@ -255,9 +270,9 @@ export async function POST(request: NextRequest) {
       iapp_serie: responseData.serie || config.serie_default,
       iapp_numar: responseData.numar || null,
       tip_factura,
-      client_cif: factura.client_cui,
-      client_nume: factura.client_nume,
-      valoare_totala: factura.Valoare_Totala,
+      client_cif: client_cui,
+      client_nume: client_nume,
+      valoare_totala: factura.total || factura.Valoare_Totala,
       moneda: config.moneda_default || 'RON',
       status: response.ok ? 'trimisa' : 'error',
       efactura_upload_index: responseData.efactura_upload_index || null,
@@ -265,7 +280,7 @@ export async function POST(request: NextRequest) {
       efactura_mesaj_eroare: responseData.error || null,
       request_json: JSON.stringify(iappPayload),
       response_json: JSON.stringify(responseData),
-      data_emitere: factura.Data_Factura?.value || new Date().toISOString().split('T')[0],
+      data_emitere: factura.data_factura?.value || factura.data_factura || new Date().toISOString().split('T')[0],
       data_transmitere: now,
       data_actualizare: now,
       creat_de: 'system'

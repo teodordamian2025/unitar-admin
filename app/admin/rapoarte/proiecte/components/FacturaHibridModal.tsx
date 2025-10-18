@@ -977,13 +977,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         // Setează și termen plată
         setTermenPlata(setariProcesate.termen_plata_standard || 30);
         
+        // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
+        const serieFactura = (iappConfig?.tip_facturare === 'iapp' && iappConfig?.serie_default)
+          ? iappConfig.serie_default
+          : setariProcesate.serie_facturi;
+
         const { numarComplet } = await getNextInvoiceNumber(
-          setariProcesate.serie_facturi,
+          serieFactura,
           setariProcesate.separator_numerotare,
           setariProcesate.include_an_numerotare,
           setariProcesate.include_luna_numerotare
         );
-        
+
         setNumarFactura(numarComplet);
         showToast(`✅ Număr factură generat: ${numarComplet}`, 'success');
         
