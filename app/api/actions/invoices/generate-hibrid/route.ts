@@ -913,12 +913,31 @@ export async function POST(request: NextRequest) {
     // ✅ PĂSTRAT: Curățare note curs pentru PDF
     const notaCursValutarClean = cleanNonAscii(notaCursValutar);
 
+    // ✅ NOU: Construiește numărul facturii pentru afișare PDF cu seria corectă (UPA pentru iapp, UP pentru ANAF)
+    const serieForDisplay = (tip_facturare === 'iapp' && iappConfig?.serie_default)
+      ? iappConfig.serie_default
+      : (setariFacturare?.serie_facturi || 'INV');
+    const separatorForDisplay = setariFacturare?.separator_numerotare || '-';
+
+    // Extrage numărul din numarFactura (poate avea serie greșită din frontend)
+    let numarForDisplay = numarFactura || '';
+    if (numarForDisplay.includes('-')) {
+      // Split și ia doar ultima parte (numărul)
+      const parts = numarForDisplay.split('-');
+      numarForDisplay = parts[parts.length - 1]; // "UP-1001" -> "1001"
+    }
+
+    // Reconstruiește cu seria corectă
+    const numarFacturaDisplay = `${serieForDisplay}${separatorForDisplay}${numarForDisplay}`;
+
+    console.log(`🔢 [PDF] Număr factură pentru display: "${numarFactura}" -> "${numarFacturaDisplay}" (serie: ${serieForDisplay})`);
+
     const htmlTemplate = `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Factura ${safeInvoiceData.numarFactura}</title>
+        <title>Factura ${numarFacturaDisplay}</title>
         <style>
             * {
                 margin: 0;
@@ -1196,7 +1215,7 @@ export async function POST(request: NextRequest) {
         </div>
 
         <div class="invoice-details">
-            <div class="invoice-number">Factura nr: ${safeInvoiceData.numarFactura}</div>
+            <div class="invoice-number">Factura nr: ${numarFacturaDisplay}</div>
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
                 <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
