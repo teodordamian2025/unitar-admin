@@ -535,7 +535,7 @@ export default function SmartFintechSettingsPage() {
 
               {/* View Dashboard */}
               <button
-                onClick={() => router.push('/admin/financiar/panou-control')}
+                onClick={() => router.push('/admin/tranzactii/dashboard')}
                 style={{
                   padding: '0.875rem 1.5rem',
                   borderRadius: '8px',

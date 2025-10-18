@@ -179,9 +179,12 @@ function mapSmartFintechTransaction(
     tx.remittanceInformationUnstructured || ''
   );
 
+  // Format date pentru BigQuery DATE field (YYYY-MM-DD string)
+  const data_procesare = tx.valueDate || tx.bookingDate;
+
   return {
     transaction_hash,
-    data_procesare: tx.valueDate, // Use valueDate (data procesare efectivă)
+    data_procesare, // DATE în format YYYY-MM-DD
     iban_cont: account.iban,
     nume_cont: account.alias || account.bank,
     sold_initial: undefined, // Smart Fintech nu returnează sold intermediar per tranzacție
