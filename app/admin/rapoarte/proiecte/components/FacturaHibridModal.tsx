@@ -1617,6 +1617,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           },
           sendToAnaf,
           tip_facturare: iappConfig?.tip_facturare || 'anaf_direct', // ✅ TRANSMITE tip_facturare
+          iappConfig: iappConfig ? { // ✅ NOU: Transmite config iapp.ro (serie, moneda, etc.)
+            serie_default: iappConfig.serie_default,
+            moneda_default: iappConfig.moneda_default,
+            auto_transmite_efactura: iappConfig.auto_transmite_efactura
+          } : null,
           cursuriUtilizate: cursuriPentruAPI,
           isEdit,
           isStorno,

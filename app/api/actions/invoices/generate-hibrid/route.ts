@@ -742,6 +742,7 @@ export async function POST(request: NextRequest) {
       setariFacturare,
       sendToAnaf = false,
       tip_facturare = 'anaf_direct', // ✅ NOU: Primește tip_facturare din frontend
+      iappConfig = null, // ✅ NOU: Config iapp.ro cu serie, moneda, etc.
       cursuriUtilizate = {}, // ✅ CORECT: Primește cursurile cu key-ul corect
       isEdit = false,
       isStorno = false,
@@ -758,6 +759,11 @@ export async function POST(request: NextRequest) {
       numarFactura,
       sendToAnaf,
       tip_facturare, // ✅ NOU: Log tip_facturare
+      iappConfig: iappConfig ? { // ✅ NOU: Log iappConfig
+        serie_default: iappConfig.serie_default,
+        moneda_default: iappConfig.moneda_default,
+        auto_transmite: iappConfig.auto_transmite_efactura
+      } : null,
       isEdit,
       isStorno,
       facturaId,
@@ -766,7 +772,7 @@ export async function POST(request: NextRequest) {
         Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') :
         'Niciun curs',
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
-      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed_IAPP'
+      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed_IAPP_Serie'
     });
 
     // ✅ PĂSTRATE: VALIDĂRI EXISTENTE - păstrate identice
@@ -1353,7 +1359,10 @@ export async function POST(request: NextRequest) {
 
         // ✅ FIX: Extragere număr fără seria pentru Edit Mode
         const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
-        const serieFactura = setariFacturare?.serie_facturi || 'INV';
+        // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
+        const serieFactura = (tip_facturare === 'iapp' && iappConfig?.serie_default)
+          ? iappConfig.serie_default
+          : (setariFacturare?.serie_facturi || 'INV');
         const separatorFactura = setariFacturare?.separator_numerotare || '-';
 
         // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
@@ -1497,7 +1506,10 @@ export async function POST(request: NextRequest) {
 
         // ✅ FIX: Extragere număr fără seria pentru coloana numar
         const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
-        const serieFactura = setariFacturare?.serie_facturi || 'INV';
+        // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
+        const serieFactura = (tip_facturare === 'iapp' && iappConfig?.serie_default)
+          ? iappConfig.serie_default
+          : (setariFacturare?.serie_facturi || 'INV');
         const separatorFactura = setariFacturare?.separator_numerotare || '-';
 
         // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
@@ -1632,6 +1644,7 @@ export async function POST(request: NextRequest) {
             const facturaDataForXml = {
               id: currentFacturaId,
               numar: numarFactura || safeInvoiceData.numarFactura,
+              // ✅ Pentru XML (anaf_direct), folosește ÎNTOTDEAUNA seria normală UP
               serie: setariFacturare?.serie_facturi || 'INV',
               data_factura: new Date().toISOString().split('T')[0],
               data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
