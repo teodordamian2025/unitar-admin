@@ -10,36 +10,35 @@
 
 CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.SmartFintechTokens_v2` (
   -- Primary Key
-  id STRING NOT NULL OPTIONS(description="UUID unic pentru configurație Smart Fintech"),
+  id STRING NOT NULL,
 
   -- Credentials (encrypted)
-  client_id STRING OPTIONS(description="Client ID Smart Fintech (plain text)"),
-  client_secret STRING OPTIONS(description="Client Secret Smart Fintech (ENCRYPTED cu ANAF_TOKEN_ENCRYPTION_KEY)"),
+  client_id STRING,
+  client_secret STRING,
 
   -- OAuth Tokens (encrypted)
-  access_token STRING OPTIONS(description="Access token OAuth 2.0 (ENCRYPTED)"),
-  refresh_token STRING OPTIONS(description="Refresh token OAuth 2.0 (ENCRYPTED)"),
-  expires_at TIMESTAMP OPTIONS(description="Data/ora expirare access token"),
+  access_token STRING,
+  refresh_token STRING,
+  expires_at TIMESTAMP,
 
   -- Status & Control
-  is_active BOOL DEFAULT TRUE OPTIONS(description="Flag activ/inactiv (doar o configurație poate fi activă)"),
-  ultima_sincronizare TIMESTAMP OPTIONS(description="Timestamp ultima sincronizare reușită"),
-  ultima_eroare STRING OPTIONS(description="Mesaj ultimei erori (NULL dacă OK)"),
-  numar_conturi INT64 DEFAULT 0 OPTIONS(description="Număr conturi conectate"),
+  is_active BOOL,
+  ultima_sincronizare TIMESTAMP,
+  ultima_eroare STRING,
+  numar_conturi INT64,
 
   -- Audit Fields
-  data_creare TIMESTAMP DEFAULT CURRENT_TIMESTAMP() OPTIONS(description="Data creare configurație"),
-  data_actualizare TIMESTAMP DEFAULT CURRENT_TIMESTAMP() OPTIONS(description="Data ultima modificare"),
-  creat_de STRING OPTIONS(description="UID utilizator creator (admin)"),
+  data_creare TIMESTAMP,
+  data_actualizare TIMESTAMP,
+  creat_de STRING,
 
-  -- Metadata JSON (opțional)
-  metadata JSON OPTIONS(description="Date suplimentare (ex: lista IBAN-uri conectate)")
+  -- Metadata JSON (optional)
+  metadata JSON
 )
 PARTITION BY DATE(data_creare)
-CLUSTER BY (is_active, id)
+CLUSTER BY is_active, id
 OPTIONS(
-  description="Tabel OAuth token management pentru Smart Fintech API - v2 cu partitioning + clustering",
-  labels=[("environment", "production"), ("version", "v2"), ("feature", "smartfintech")]
+  description="Tabel OAuth token management pentru Smart Fintech API - v2 cu partitioning + clustering"
 );
 
 -- Index pentru query rapid token activ
@@ -47,19 +46,22 @@ OPTIONS(
 
 -- Seed configurație inițială (DOAR LA PRIMUL DEPLOY)
 -- NOTĂ: Client Secret va fi criptat de API la prima salvare din UI
-INSERT INTO `hale-mode-464009-i6.PanouControlUnitar.SmartFintechTokens_v2`
-  (id, client_id, client_secret, is_active, data_creare, data_actualizare, creat_de)
-VALUES
-  (
-    'smartfintech_default_001',
-    'ahdJHJM-87844kjkfgf-fgfghf9jnfdf',
-    NULL,  -- Va fi populat din UI (encrypted)
-    TRUE,
-    CURRENT_TIMESTAMP(),
-    CURRENT_TIMESTAMP(),
-    'system_init'
-  )
-ON CONFLICT (id) DO NOTHING;  -- BigQuery folosește INSERT ... ON CONFLICT pentru UPSERT
+-- Folosim MERGE pentru UPSERT (BigQuery nu suportă ON CONFLICT)
+MERGE `hale-mode-464009-i6.PanouControlUnitar.SmartFintechTokens_v2` T
+USING (
+  SELECT
+    'smartfintech_default_001' as id,
+    'ahdJHJM-87844kjkfgf-fgfghf9jnfdf' as client_id,
+    CAST(NULL AS STRING) as client_secret,
+    TRUE as is_active,
+    CURRENT_TIMESTAMP() as data_creare,
+    CURRENT_TIMESTAMP() as data_actualizare,
+    'system_init' as creat_de
+) S
+ON T.id = S.id
+WHEN NOT MATCHED THEN
+  INSERT (id, client_id, client_secret, is_active, data_creare, data_actualizare, creat_de)
+  VALUES (S.id, S.client_id, S.client_secret, S.is_active, S.data_creare, S.data_actualizare, S.creat_de);
 
 -- Verificare creare tabel
 SELECT
