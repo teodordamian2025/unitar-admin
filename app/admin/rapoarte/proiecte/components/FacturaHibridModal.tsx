@@ -1097,17 +1097,18 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           tokenInfo: undefined,
           loading: false
         });
-        setSendToAnaf(false);
-        console.log('❌ Token ANAF invalid sau lipsă');
+        // ✅ NU resetăm sendToAnaf aici - pentru iapp.ro nu avem nevoie de token ANAF
+        // Validarea se face la submit bazat pe tip_facturare
+        console.log('❌ Token ANAF invalid sau lipsă (OK pentru iapp.ro)');
       }
-      
+
     } catch (error) {
       console.error('Error checking ANAF token:', error);
       setAnafTokenStatus({
         hasValidToken: false,
         loading: false
       });
-      setSendToAnaf(false);
+      // ✅ NU resetăm sendToAnaf aici - pentru iapp.ro nu avem nevoie de token ANAF
     } finally {
       setIsCheckingAnafToken(false);
     }
