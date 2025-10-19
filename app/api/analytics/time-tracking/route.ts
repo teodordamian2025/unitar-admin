@@ -134,11 +134,11 @@ export async function GET(request: NextRequest) {
               1
             ) as eficienta_procent,
 
-            -- Distribuție pe priorități
-            ROUND(SUM(CASE WHEN s.prioritate = 'urgent' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_urgent,
-            ROUND(SUM(CASE WHEN s.prioritate = 'ridicata' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_ridicata,
-            ROUND(SUM(CASE WHEN s.prioritate = 'normala' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_normala,
-            ROUND(SUM(CASE WHEN s.prioritate = 'scazuta' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_scazuta
+            -- Distribuție pe priorități (mapare valori reale din DB)
+            ROUND(SUM(CASE WHEN s.prioritate = 'Critică' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_urgent,
+            ROUND(SUM(CASE WHEN s.prioritate = 'Înaltă' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_ridicata,
+            ROUND(SUM(CASE WHEN s.prioritate = 'Medie' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_normala,
+            ROUND(SUM(CASE WHEN s.prioritate = 'Scăzută' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_scazuta
 
           FROM ${TABLE_TIME_TRACKING} tt
           LEFT JOIN ${TABLE_SARCINI} s

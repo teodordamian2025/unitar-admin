@@ -33,12 +33,18 @@ interface OverviewStats {
 }
 
 interface DailyTrend {
-  data_lucru: string;
+  data_lucru: string | { value: string };
   total_ore: number;
   utilizatori_activi: number;
   proiecte_active: number;
   media_ore_per_utilizator: number;
 }
+
+// Helper function to parse BigQuery DATE fields (returns {value: "date"} or string)
+const parseBigQueryDate = (dateField: any): Date => {
+  const dateValue = dateField?.value || dateField;
+  return new Date(dateValue);
+};
 
 interface TeamMember {
   utilizator_uid: string;
@@ -464,19 +470,25 @@ export default function EnhancedTimeTrackingDashboard() {
               data={[
                 {
                   name: 'Total Ore',
-                  data: dailyTrend.map(item => ({
-                    x: new Date(item.data_lucru).getDate() + '/' + (new Date(item.data_lucru).getMonth() + 1),
-                    y: item.total_ore
-                  })),
+                  data: dailyTrend.map(item => {
+                    const date = parseBigQueryDate(item.data_lucru);
+                    return {
+                      x: date.getDate() + '/' + (date.getMonth() + 1),
+                      y: item.total_ore
+                    };
+                  }),
                   color: '#3b82f6',
                   area: true
                 },
                 {
                   name: 'Utilizatori Activi',
-                  data: dailyTrend.map(item => ({
-                    x: new Date(item.data_lucru).getDate() + '/' + (new Date(item.data_lucru).getMonth() + 1),
-                    y: item.utilizatori_activi * 8 // Scalare pentru vizibilitate
-                  })),
+                  data: dailyTrend.map(item => {
+                    const date = parseBigQueryDate(item.data_lucru);
+                    return {
+                      x: date.getDate() + '/' + (date.getMonth() + 1),
+                      y: item.utilizatori_activi * 8 // Scalare pentru vizibilitate
+                    };
+                  }),
                   color: '#10b981'
                 }
               ]}
@@ -754,27 +766,36 @@ export default function EnhancedTimeTrackingDashboard() {
               data={[
                 {
                   name: 'Total Ore',
-                  data: dailyTrend.map(item => ({
-                    x: new Date(item.data_lucru).getDate() + '/' + (new Date(item.data_lucru).getMonth() + 1),
-                    y: item.total_ore
-                  })),
+                  data: dailyTrend.map(item => {
+                    const date = parseBigQueryDate(item.data_lucru);
+                    return {
+                      x: date.getDate() + '/' + (date.getMonth() + 1),
+                      y: item.total_ore
+                    };
+                  }),
                   color: '#3b82f6',
                   area: true
                 },
                 {
                   name: 'Utilizatori Activi',
-                  data: dailyTrend.map(item => ({
-                    x: new Date(item.data_lucru).getDate() + '/' + (new Date(item.data_lucru).getMonth() + 1),
-                    y: item.utilizatori_activi * 8
-                  })),
+                  data: dailyTrend.map(item => {
+                    const date = parseBigQueryDate(item.data_lucru);
+                    return {
+                      x: date.getDate() + '/' + (date.getMonth() + 1),
+                      y: item.utilizatori_activi * 8
+                    };
+                  }),
                   color: '#10b981'
                 },
                 {
                   name: 'Proiecte Active',
-                  data: dailyTrend.map(item => ({
-                    x: new Date(item.data_lucru).getDate() + '/' + (new Date(item.data_lucru).getMonth() + 1),
-                    y: item.proiecte_active * 5
-                  })),
+                  data: dailyTrend.map(item => {
+                    const date = parseBigQueryDate(item.data_lucru);
+                    return {
+                      x: date.getDate() + '/' + (date.getMonth() + 1),
+                      y: item.proiecte_active * 5
+                    };
+                  }),
                   color: '#f59e0b'
                 }
               ]}

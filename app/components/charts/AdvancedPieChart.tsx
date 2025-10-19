@@ -98,13 +98,15 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
   };
 
   // Calculate total for percentage display
-  const total = data.reduce((sum, item) => sum + item.y, 0);
+  const total = data.reduce((sum, item) => sum + (item.y || 0), 0);
 
-  // Prepare data with colors
-  const processedData = data.map((item, index) => ({
-    ...item,
-    fill: item.fill || defaultColors[index % defaultColors.length]
-  }));
+  // Prepare data with colors - filter out zero/invalid values
+  const processedData = data
+    .filter(item => item.y && item.y > 0)
+    .map((item, index) => ({
+      ...item,
+      fill: item.fill || defaultColors[index % defaultColors.length]
+    }));
 
   const formatTooltipLabel = (datum: any) => {
     const percentage = ((datum.y / total) * 100).toFixed(1);
@@ -125,6 +127,9 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
     }
   };
 
+  // Check if we have valid data
+  const hasData = processedData.length > 0 && total > 0;
+
   return (
     <div className={className} style={containerStyle}>
       {title && (
@@ -133,10 +138,26 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
         </div>
       )}
 
-      <div style={contentStyle}>
-        {/* Pie Chart */}
-        <div>
-          <VictoryPie
+      {!hasData ? (
+        <div style={{
+          padding: '3rem 2rem',
+          textAlign: 'center',
+          color: theme === 'dark' ? '#9ca3af' : '#6b7280'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+          <div style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            Nu există date disponibile
+          </div>
+          <div style={{ fontSize: '0.875rem' }}>
+            Nu s-au găsit date pentru perioada selectată
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={contentStyle}>
+            {/* Pie Chart */}
+            <div>
+              <VictoryPie
             data={processedData}
             width={width}
             height={height}
@@ -251,8 +272,8 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
         )}
       </div>
 
-      {/* Summary Stats */}
-      <div style={{
+          {/* Summary Stats */}
+          <div style={{
         marginTop: '1rem',
         padding: '1rem',
         background: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(249, 250, 251, 0.8)',
@@ -271,10 +292,12 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
           fontSize: '0.75rem',
           color: theme === 'dark' ? '#6b7280' : '#9ca3af'
         }}>
-          Cel mai mare: {Math.max(...data.map(d => d.y)).toLocaleString()} |
-          Cel mai mic: {Math.min(...data.map(d => d.y)).toLocaleString()}
+          Cel mai mare: {Math.max(...data.map(d => d.y || 0)).toLocaleString()} |
+          Cel mai mic: {Math.min(...data.map(d => d.y || 0)).toLocaleString()}
         </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
