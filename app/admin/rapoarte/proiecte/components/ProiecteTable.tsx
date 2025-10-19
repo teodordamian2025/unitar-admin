@@ -1069,8 +1069,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   }}>
                     Data Finalizare
                   </th>
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'right',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1080,8 +1080,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   }}>
                     Valoare Estimată
                   </th>
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  <th style={{
+                    padding: '1rem 0.75rem',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Contract
+                  </th>
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'center',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1218,7 +1229,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         }}>
                           {formatDate(proiect.Data_Final)}
                         </td>
-                        <td style={{ 
+                        <td style={{
                           padding: '0.75rem',
                           textAlign: 'right'
                         }}>
@@ -1230,7 +1241,55 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             false
                           )}
                         </td>
-                        <td style={{ 
+                        <td style={{
+                          padding: '0.75rem',
+                          textAlign: 'left'
+                        }}>
+                          {(() => {
+                            const contracte = (proiect as any).contracte || [];
+                            if (contracte.length === 0) {
+                              return (
+                                <span style={{
+                                  color: '#95a5a6',
+                                  fontSize: '12px',
+                                  fontStyle: 'italic'
+                                }}>
+                                  Fără contract
+                                </span>
+                              );
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {contracte.map((contract: any, idx: number) => (
+                                  <div key={contract.ID_Contract || idx} style={{ fontSize: '13px' }}>
+                                    <div style={{
+                                      fontWeight: '600',
+                                      color: '#2c3e50',
+                                      marginBottom: '0.25rem'
+                                    }}>
+                                      📄 {contract.numar_contract}
+                                    </div>
+                                    {contract.anexe && contract.anexe.length > 0 && (
+                                      <div style={{
+                                        fontSize: '11px',
+                                        color: '#7f8c8d',
+                                        paddingLeft: '1rem'
+                                      }}>
+                                        {contract.anexe.map((anexa: any, aIdx: number) => (
+                                          <div key={anexa.ID_Anexa || aIdx}>
+                                            └─ Anexa {anexa.anexa_numar}
+                                            {anexa.anexa_denumire && `: ${anexa.anexa_denumire}`}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td style={{
                           padding: '0.75rem',
                           textAlign: 'center' as const
                         }}>
@@ -1327,7 +1386,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           }}>
                             {formatDate(subproiect.Data_Final)}
                           </td>
-                          <td style={{ 
+                          <td style={{
                             padding: '0.5rem 0.75rem',
                             textAlign: 'right'
                           }}>
@@ -1339,7 +1398,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               true
                             )}
                           </td>
-                          <td style={{ 
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'left'
+                          }}>
+                            <span style={{
+                              color: '#95a5a6',
+                              fontSize: '11px',
+                              fontStyle: 'italic'
+                            }}>
+                              -
+                            </span>
+                          </td>
+                          <td style={{
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center' as const
                           }}>

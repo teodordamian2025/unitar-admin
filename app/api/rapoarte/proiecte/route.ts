@@ -137,8 +137,55 @@ export async function GET(request: NextRequest) {
 
     console.log('📋 PROIECTE API PARAMS:', { search, status, client, page, limit });
 
-    // FIX CRITICAL: Query cu JOIN pentru datele clientului (ca în contracte)
+    // FIX CRITICAL: Query cu JOIN pentru datele clientului + contracte (fără subquery corelat)
     let baseQuery = `
+      WITH contracte_cu_anexe AS (
+        SELECT
+          co.proiect_id,
+          co.ID_Contract,
+          co.serie_contract,
+          co.numar_contract,
+          co.tip_document,
+          co.Data_Semnare,
+          ARRAY_AGG(
+            IF(an.ID_Anexa IS NOT NULL,
+              STRUCT(
+                an.ID_Anexa,
+                an.anexa_numar,
+                an.denumire as anexa_denumire
+              ),
+              NULL
+            )
+            IGNORE NULLS
+            ORDER BY an.anexa_numar
+          ) as anexe
+        FROM \`${PROJECT_ID}.${dataset}.Contracte${tableSuffix}\` co
+        LEFT JOIN \`${PROJECT_ID}.${dataset}.AnexeContract${tableSuffix}\` an
+          ON an.contract_id = co.ID_Contract
+        GROUP BY co.proiect_id, co.ID_Contract, co.serie_contract, co.numar_contract, co.tip_document, co.Data_Semnare
+      ),
+      proiecte_cu_contracte AS (
+        SELECT
+          p.ID_Proiect,
+          ARRAY_AGG(
+            IF(cca.ID_Contract IS NOT NULL,
+              STRUCT(
+                cca.ID_Contract,
+                cca.serie_contract,
+                cca.numar_contract,
+                cca.tip_document,
+                cca.anexe
+              ),
+              NULL
+            )
+            IGNORE NULLS
+            ORDER BY cca.Data_Semnare DESC
+          ) as contracte
+        FROM \`${PROJECT_ID}.${dataset}.${table}\` p
+        LEFT JOIN contracte_cu_anexe cca
+          ON cca.proiect_id = p.ID_Proiect
+        GROUP BY p.ID_Proiect
+      )
       SELECT
         p.*,
         c.id as client_id,
@@ -151,10 +198,13 @@ export async function GET(request: NextRequest) {
         c.telefon as client_telefon,
         c.email as client_email,
         c.banca as client_banca,
-        c.iban as client_iban
+        c.iban as client_iban,
+        COALESCE(pcc.contracte, []) as contracte
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
       LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
+      LEFT JOIN proiecte_cu_contracte pcc
+        ON pcc.ID_Proiect = p.ID_Proiect
     `;
 
     const conditions: string[] = [];
