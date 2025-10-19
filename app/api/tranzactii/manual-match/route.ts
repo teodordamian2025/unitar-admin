@@ -12,7 +12,8 @@ const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
 
 // ✅ Toggle pentru tabele optimizate
-const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+// DEFAULT: Folosește _v2 (migrare completă), doar dacă explicit setată la 'false' folosește tabelele vechi
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES !== 'false';
 const tableSuffix = useV2Tables ? '_v2' : '';
 
 // Configurare BigQuery
@@ -26,9 +27,18 @@ const bigquery = new BigQuery({
 });
 
 const dataset = bigquery.dataset(DATASET);
+
+// ✅ Definire tabele cu suffix dinamic
 const TRANZACTII_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiImportate${tableSuffix}\``;
 const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacuri${tableSuffix}\``;
 const TRANZACTII_BANCARE_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_PROIECTE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_TRANZACTII_MATCHING = `\`${PROJECT_ID}.${DATASET}.TranzactiiMatching${tableSuffix}\``;
 
 console.log(`🔧 [Manual Match] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -413,12 +423,12 @@ async function findEtapeFacturiCandidatesForTransaction(
         p.Denumire as proiect_denumire,
         COALESCE(sp.Denumire, '') as subproiect_denumire
         
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi\` ef
-      INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate\` fg 
+      FROM ${TABLE_ETAPE_FACTURI} ef
+      INNER JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
-      INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+      INNER JOIN ${TABLE_PROIECTE} p
         ON ef.proiect_id = p.ID_Proiect
-      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp
         ON ef.subproiect_id = sp.ID_Subproiect
       WHERE 
         ef.activ = TRUE 
@@ -495,10 +505,10 @@ async function findCheltuieliCandidatesForTransaction(
         p.Denumire as proiect_denumire,
         COALESCE(sp.Denumire, '') as subproiect_denumire
         
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\` pc
-      INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.Proiecte\` p
+      FROM ${TABLE_PROIECTE_CHELTUIELI} pc
+      INNER JOIN ${TABLE_PROIECTE} p
         ON pc.proiect_id = p.ID_Proiect
-      LEFT JOIN \`hale-mode-464009-i6.PanouControlUnitar.Subproiecte\` sp
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp
         ON pc.subproiect_id = sp.ID_Subproiect
       WHERE 
         pc.activ = TRUE 
@@ -577,8 +587,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
           fg.numar as factura_numar,
           fg.client_nume as factura_client_nume,
           fg.client_cui as factura_client_cui
-        FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi\` ef
-        INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate\` fg 
+        FROM ${TABLE_ETAPE_FACTURI} ef
+        INNER JOIN ${TABLE_FACTURI_GENERATE} fg
           ON ef.factura_id = fg.id
         WHERE ef.id = "${matchRequest.target_id}"
       `);
@@ -597,7 +607,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 
     } else if (matchRequest.target_type === 'cheltuiala') {
       const [cheltuieliRows] = await bigquery.query(`
-        SELECT * FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\`
+        SELECT * FROM ${TABLE_PROIECTE_CHELTUIELI}
         WHERE id = "${matchRequest.target_id}"
       `);
 
@@ -676,8 +686,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       END`;
 
       await bigquery.query(`
-        UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi\`
-        SET 
+        UPDATE ${TABLE_ETAPE_FACTURI}
+        SET
           valoare_incasata = ${newValoareIncasata},
           status_incasare = ${newStatus},
           data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
@@ -688,8 +698,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       // Actualizăm și EtapeContract prin etapa_id
       if (targetDetails.etapa_id) {
         await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
-          SET 
+          UPDATE ${TABLE_ETAPE_CONTRACT}
+          SET
             status_incasare = ${newStatus},
             data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
             data_actualizare = CURRENT_TIMESTAMP()
@@ -699,8 +709,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 
     } else if (matchRequest.target_type === 'cheltuiala') {
       await bigquery.query(`
-        UPDATE \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\`
-        SET 
+        UPDATE ${TABLE_PROIECTE_CHELTUIELI}
+        SET
           status_achitare = 'Incasat',
           data_actualizare = CURRENT_TIMESTAMP()
         WHERE id = "${matchRequest.target_id}"
@@ -720,19 +730,46 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 // =================================================================
 
 /**
- * GET - Găsește candidați pentru matching manual
+ * GET - Returnează tranzacții neimperecheate SAU candidați pentru matching manual
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const action = searchParams.get('action');
     const tranzactieId = searchParams.get('tranzactie_id');
     const targetType = searchParams.get('target_type') || 'all'; // 'etape_facturi', 'cheltuieli', 'all'
     const tolerance = parseFloat(searchParams.get('tolerance') || '10');
 
+    // Caz 1: Returnează lista de tranzacții neimperecheate
+    if (status === 'neimperecheate') {
+      const query = `
+        SELECT
+          id, data_procesare, suma, directie, tip_categorie,
+          nume_contrapartida, cui_contrapartida, detalii_tranzactie, status
+        FROM ${TRANZACTII_BANCARE_TABLE}
+        WHERE (matching_tip IS NULL OR matching_tip = 'none')
+          AND status != 'matched'
+        ORDER BY data_procesare DESC
+        LIMIT 100
+      `;
+
+      const [results] = await bigquery.query(query);
+
+      return NextResponse.json({
+        success: true,
+        data: results.map((row: any) => ({
+          ...row,
+          data_procesare: row.data_procesare?.value || row.data_procesare
+        }))
+      });
+    }
+
+    // Caz 2: Returnează candidați pentru o tranzacție specifică
     if (!tranzactieId) {
       return NextResponse.json({
         success: false,
-        error: 'tranzactie_id este obligatoriu'
+        error: 'tranzactie_id este obligatoriu pentru căutare candidați'
       }, { status: 400 });
     }
 
@@ -756,33 +793,26 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 Căutare candidați pentru tranzacția ${tranzactie.suma} RON (${tranzactie.directie})`);
 
-    const result: any = {
-      success: true,
-      tranzactie: tranzactie,
-      candidati: {}
-    };
+    let candidati: any[] = [];
 
     // Căutăm candidații pe baza direcției și target_type
     if (tranzactie.directie === 'in' && (targetType === 'all' || targetType === 'etape_facturi')) {
-      result.candidati.etape_facturi = await findEtapeFacturiCandidatesForTransaction(tranzactie, tolerance);
-      console.log(`📋 Găsiți ${result.candidati.etape_facturi.length} candidați EtapeFacturi`);
+      const etapeCandidati = await findEtapeFacturiCandidatesForTransaction(tranzactie, tolerance);
+      console.log(`📋 Găsiți ${etapeCandidati.length} candidați EtapeFacturi`);
+      candidati = [...candidati, ...etapeCandidati];
     }
 
     if (tranzactie.directie === 'out' && (targetType === 'all' || targetType === 'cheltuieli')) {
-      result.candidati.cheltuieli = await findCheltuieliCandidatesForTransaction(tranzactie, tolerance);
-      console.log(`📋 Găsiți ${result.candidati.cheltuieli.length} candidați Cheltuieli`);
+      const cheltuieliCandidati = await findCheltuieliCandidatesForTransaction(tranzactie, tolerance);
+      console.log(`📋 Găsiți ${cheltuieliCandidati.length} candidați Cheltuieli`);
+      candidati = [...candidati, ...cheltuieliCandidati];
     }
 
-    // Statistici pentru debugging
-    result.stats = {
-      tolerance_used: tolerance,
-      etape_count: result.candidati.etape_facturi?.length || 0,
-      cheltuieli_count: result.candidati.cheltuieli?.length || 0,
-      best_etapa_score: result.candidati.etape_facturi?.[0]?.matching_score || 0,
-      best_cheltuiala_score: result.candidati.cheltuieli?.[0]?.matching_score || 0
-    };
-
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      data: candidati,
+      tranzactie: tranzactie
+    });
 
   } catch (error: any) {
     console.error('❌ Eroare căutare candidați manual matching:', error);
@@ -799,24 +829,34 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const matchRequest: ManualMatchRequest = await request.json();
+    const body = await request.json();
+
+    // Suport pentru ambele formate (vechi și nou)
+    const matchRequest: ManualMatchRequest = {
+      tranzactie_id: body.tranzactie_id,
+      target_type: body.target_type || 'etapa_factura', // default pentru compatibilitate
+      target_id: body.target_id || body.factura_id, // acceptă și factura_id pentru backwards compatibility
+      confidence_manual: body.confidence_manual || 85, // default confidence pentru manual matching
+      notes: body.notes,
+      force_match: body.force_match
+    };
 
     // Validări
-    if (!matchRequest.tranzactie_id || !matchRequest.target_type || !matchRequest.target_id) {
+    if (!matchRequest.tranzactie_id || !matchRequest.target_id) {
       return NextResponse.json({
         success: false,
-        error: 'tranzactie_id, target_type și target_id sunt obligatorii'
+        error: 'tranzactie_id și target_id/factura_id sunt obligatorii'
       }, { status: 400 });
     }
 
-    if (!['etapa_factura', 'cheltuiala'].includes(matchRequest.target_type)) {
+    if (matchRequest.target_type && !['etapa_factura', 'cheltuiala'].includes(matchRequest.target_type)) {
       return NextResponse.json({
         success: false,
         error: 'target_type trebuie să fie "etapa_factura" sau "cheltuiala"'
       }, { status: 400 });
     }
 
-    if (matchRequest.confidence_manual < 1 || matchRequest.confidence_manual > 100) {
+    if (matchRequest.confidence_manual && (matchRequest.confidence_manual < 1 || matchRequest.confidence_manual > 100)) {
       return NextResponse.json({
         success: false,
         error: 'confidence_manual trebuie să fie între 1 și 100'

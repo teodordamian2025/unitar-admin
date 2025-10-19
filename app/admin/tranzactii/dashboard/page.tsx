@@ -137,8 +137,8 @@ const ModernFilterPanel: React.FC<{
 
       {isExpanded && (
         <div className="space-y-4">
-          {/* Toate filtrele pe 2 rânduri compacte */}
-          <div className="grid grid-cols-5 gap-3">
+          {/* Filtre principale pe un singur rând - 5 coloane egale */}
+          <div className="grid grid-cols-5 gap-3" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
             <Input
               type="date"
               label="Data start"
@@ -249,9 +249,9 @@ const ModernFilterPanel: React.FC<{
         </div>
       )}
 
-      {/* Quick filters când e comprimat */}
+      {/* Quick filters când e comprimat - Forțat pe un singur rând */}
       {!isExpanded && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-nowrap overflow-x-auto">
           <Button
             variant="outline"
             size="sm"
@@ -260,7 +260,7 @@ const ModernFilterPanel: React.FC<{
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
-            className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+            className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 whitespace-nowrap"
           >
             ❌ Fără match
           </Button>
@@ -272,7 +272,7 @@ const ModernFilterPanel: React.FC<{
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
-            className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 whitespace-nowrap"
           >
             📈 Încasări
           </Button>
@@ -284,7 +284,7 @@ const ModernFilterPanel: React.FC<{
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
-            className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+            className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 whitespace-nowrap"
           >
             📉 Plăți
           </Button>
@@ -296,7 +296,7 @@ const ModernFilterPanel: React.FC<{
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
-            className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+            className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 whitespace-nowrap"
           >
             🆕 Noi
           </Button>
@@ -755,9 +755,9 @@ const ModernTranzactiiDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Forțat pe 4 coloane egale */}
       {stats && (
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-4 gap-6 mb-8" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
           {statsCards.map((card, index) => (
             <ModernStatCard key={index} {...card} />
           ))}

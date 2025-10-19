@@ -11,7 +11,8 @@ const PROJECT_ID = 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
 
 // ✅ Toggle pentru tabele optimizate cu partitioning + clustering
-const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+// DEFAULT: Folosește _v2 (migrare completă), doar dacă explicit setată la 'false' folosește tabelele vechi
+const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES !== 'false';
 const tableSuffix = useV2Tables ? '_v2' : '';
 
 // ✅ Tabele cu suffix dinamic

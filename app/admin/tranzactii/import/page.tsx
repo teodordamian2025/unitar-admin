@@ -209,7 +209,7 @@ const FormatGuide: React.FC = () => (
     <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
       📋 Format CSV Acceptat
     </h3>
-    <div className="grid grid-cols-2 gap-6 text-sm">
+    <div className="grid grid-cols-2 gap-6 text-sm" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
       <div>
         <h4 className="font-medium text-blue-800 mb-2">Coloane necesare (ordine exactă):</h4>
         <ul className="list-disc list-inside space-y-1 text-blue-700">
