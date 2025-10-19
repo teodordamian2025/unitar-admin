@@ -28,6 +28,79 @@ interface TimeEntry {
   context_display?: string;
 }
 
+// ============ HELPER FUNCTIONS (outside component to avoid re-creation) ============
+
+// Helper pentru formatarea datelor BigQuery DATE objects
+function getDateValue(dateValue: any): Date {
+  if (!dateValue) return new Date();
+
+  const dateString = typeof dateValue === 'object' && dateValue.value
+    ? dateValue.value
+    : dateValue;
+
+  if (!dateString || dateString === 'null' || dateString === 'undefined') {
+    return new Date();
+  }
+
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? new Date() : date;
+}
+
+// Helper pentru conversie ore la formate citibile
+function formatHours(hours: number): string {
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+
+  if (h > 0 && m > 0) {
+    return `${h}h ${m}m`;
+  } else if (h > 0) {
+    return `${h}h`;
+  } else {
+    return `${m}m`;
+  }
+}
+
+// Helper pentru safe number conversion
+function safeNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const num = Number(value);
+  return isNaN(num) || !isFinite(num) ? 0 : num;
+}
+
+// Helper pentru a obține orele dintr-un entry (suportă ambele formate)
+function getHours(entry: TimeEntry): number {
+  // Dacă avem ore_lucrate (format nou), folosim direct
+  if (entry.ore_lucrate !== undefined) {
+    return safeNumber(entry.ore_lucrate);
+  }
+  // Dacă avem duration_minutes (format vechi), convertim la ore
+  if (entry.duration_minutes !== undefined) {
+    return safeNumber(entry.duration_minutes) / 60;
+  }
+  return 0;
+}
+
+function getWeekStart(date: Date): Date {
+  const result = new Date(date);
+  const day = result.getDay();
+  const diff = result.getDate() - day + (day === 0 ? -6 : 1);
+  result.setDate(diff);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function formatDate(dateString: string): string {
+  try {
+    return new Date(dateString).toLocaleDateString('ro-RO', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+  } catch {
+    return dateString;
+  }
+}
+
 interface TimeAnalyticsProps {
   user: User;
   timeEntries: TimeEntry[];
@@ -58,57 +131,6 @@ interface WeeklyStats {
 export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter'>('week');
   const [selectedView, setSelectedView] = useState<'overview' | 'projects' | 'trends'>('overview');
-
-  // Helper pentru formatarea datelor BigQuery DATE objects
-  const getDateValue = (dateValue: any): Date => {
-    if (!dateValue) return new Date();
-
-    const dateString = typeof dateValue === 'object' && dateValue.value
-      ? dateValue.value
-      : dateValue;
-
-    if (!dateString || dateString === 'null' || dateString === 'undefined') {
-      return new Date();
-    }
-
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? new Date() : date;
-  };
-
-  // Helper pentru conversie ore la formate citibile
-  const formatHours = (hours: number): string => {
-    const totalMinutes = Math.round(hours * 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-
-    if (h > 0 && m > 0) {
-      return `${h}h ${m}m`;
-    } else if (h > 0) {
-      return `${h}h`;
-    } else {
-      return `${m}m`;
-    }
-  };
-
-  // Helper pentru safe number conversion
-  const safeNumber = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    const num = Number(value);
-    return isNaN(num) || !isFinite(num) ? 0 : num;
-  };
-
-  // Helper pentru a obține orele dintr-un entry (suportă ambele formate)
-  const getHours = (entry: TimeEntry): number => {
-    // Dacă avem ore_lucrate (format nou), folosim direct
-    if (entry.ore_lucrate !== undefined) {
-      return safeNumber(entry.ore_lucrate);
-    }
-    // Dacă avem duration_minutes (format vechi), convertim la ore
-    if (entry.duration_minutes !== undefined) {
-      return safeNumber(entry.duration_minutes) / 60;
-    }
-    return 0;
-  };
 
   // Calcularea statisticilor zilnice
   const dailyStats = useMemo((): DailyStats[] => {
@@ -199,26 +221,6 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }))
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
   }, [timeEntries]);
-
-  const getWeekStart = (date: Date): Date => {
-    const result = new Date(date);
-    const day = result.getDay();
-    const diff = result.getDate() - day + (day === 0 ? -6 : 1);
-    result.setDate(diff);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  };
-
-  const formatDate = (dateString: string): string => {
-    try {
-      return new Date(dateString).toLocaleDateString('ro-RO', {
-        day: '2-digit',
-        month: '2-digit'
-      });
-    } catch {
-      return dateString;
-    }
-  };
 
   const getCurrentPeriodData = (): DailyStats[] => {
     const now = new Date();
