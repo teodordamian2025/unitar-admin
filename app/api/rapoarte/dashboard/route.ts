@@ -152,12 +152,14 @@ async function getContracteStats() {
 
 async function getFacturiStats() {
   try {
-    // Verifică dacă există tabela FacturiGenerate
+    // Obține toate facturile cu date complete pentru a extrage moneda corectă
     const query = `
       SELECT
-        COUNT(*) as total,
-        SUM(valoare_platita) as valoare_incasata,
-        SUM(total - valoare_platita) as valoare_de_incasat
+        id,
+        status,
+        subtotal,
+        valoare_platita,
+        date_complete_json
       FROM ${TABLE_FACTURI_GENERATE}
       WHERE status != 'anulata'
     `;
@@ -167,17 +169,71 @@ async function getFacturiStats() {
       location: 'EU',
     });
 
-    if (rows.length > 0) {
-      return {
-        total: parseInt(rows[0].total) || 0,
-        valoare_incasata: parseFloat(rows[0].valoare_incasata) || 0,
-        valoare_de_incasat: parseFloat(rows[0].valoare_de_incasat) || 0
-      };
-    }
+    // Grupează facturile pe monede
+    const facturePerMoneda: { [moneda: string]: { neplatite: number, subtotal: number } } = {};
+    let totalFacturi = 0;
 
-    return { total: 0, valoare_incasata: 0, valoare_de_incasat: 0 };
+    rows.forEach((row: any) => {
+      try {
+        totalFacturi++;
+        const datele = row.date_complete_json ? JSON.parse(row.date_complete_json) : null;
+
+        if (!datele || !datele.liniiFactura || datele.liniiFactura.length === 0) {
+          // Fallback: folosește RON dacă nu există date complete
+          const moneda = 'RON';
+          if (!facturePerMoneda[moneda]) {
+            facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
+          }
+
+          const valoareNeplatita = parseFloat(row.subtotal || 0) - parseFloat(row.valoare_platita || 0);
+          if (valoareNeplatita > 0) {
+            facturePerMoneda[moneda].neplatite++;
+            facturePerMoneda[moneda].subtotal += valoareNeplatita;
+          }
+          return;
+        }
+
+        // Extrage moneda din prima linie (toate liniile ar trebui să aibă aceeași monedă)
+        const primaLinie = datele.liniiFactura[0];
+        const moneda = primaLinie.monedaOriginala || 'RON';
+
+        if (!facturePerMoneda[moneda]) {
+          facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
+        }
+
+        // Calculează valoarea neplătită (subtotal - valoare_platita)
+        const subtotal = parseFloat(row.subtotal || 0);
+        const valoarePlatita = parseFloat(row.valoare_platita || 0);
+        const valoareNeplatita = subtotal - valoarePlatita;
+
+        if (valoareNeplatita > 0) {
+          facturePerMoneda[moneda].neplatite++;
+          facturePerMoneda[moneda].subtotal += valoareNeplatita;
+        }
+      } catch (parseError) {
+        console.error('Eroare parsare factură:', row.id, parseError);
+        // Fallback la RON
+        const moneda = 'RON';
+        if (!facturePerMoneda[moneda]) {
+          facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
+        }
+        const valoareNeplatita = parseFloat(row.subtotal || 0) - parseFloat(row.valoare_platita || 0);
+        if (valoareNeplatita > 0) {
+          facturePerMoneda[moneda].neplatite++;
+          facturePerMoneda[moneda].subtotal += valoareNeplatita;
+        }
+      }
+    });
+
+    return {
+      total: totalFacturi,
+      facturePerMoneda: facturePerMoneda,
+      // Backwards compatibility - folosește RON pentru valori vechi
+      valoare_de_incasat: facturePerMoneda['RON']?.subtotal || 0
+    };
+
   } catch (error) {
     console.error('Tabela facturi nu există sau eroare:', error);
-    return { total: 0, valoare_incasata: 0, valoare_de_incasat: 0 };
+    return { total: 0, facturePerMoneda: {}, valoare_de_incasat: 0 };
   }
 }

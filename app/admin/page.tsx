@@ -31,6 +31,7 @@ interface KPIData {
     unpaid: number;
     amount: number;
     overdue: number;
+    facturePerMoneda?: { [moneda: string]: { neplatite: number; subtotal: number } };
   };
   transactions: {
     matched: number;
@@ -136,7 +137,8 @@ export default function AdminPage() {
           invoices: {
             unpaid: facturi?.total || 0,
             amount: facturi?.valoare_de_incasat || 0,
-            overdue: 0 // Va fi calculat din facturile cu termen depășit
+            overdue: 0, // Va fi calculat din facturile cu termen depășit
+            facturePerMoneda: facturi?.facturePerMoneda || {}
           },
           transactions: {
             matched: 0,
@@ -188,17 +190,29 @@ export default function AdminPage() {
           });
         }
 
-        // Alert pentru facturi de incasat
-        if (realKPIData.invoices.amount > 0) {
-          realAlerts.push({
-            id: 'facturi',
-            type: 'warning',
-            title: 'Facturi de incasat',
-            message: `${realKPIData.invoices.amount.toLocaleString('ro-RO')} RON de incasat`,
-            count: realKPIData.invoices.unpaid,
-            action: 'Urmareste',
-            href: '/admin/rapoarte/facturi'
-          });
+        // Alert pentru facturi de incasat - afișare per monedă
+        if (realKPIData.invoices.facturePerMoneda && Object.keys(realKPIData.invoices.facturePerMoneda).length > 0) {
+          const facturePerMoneda = realKPIData.invoices.facturePerMoneda;
+          const monede = Object.keys(facturePerMoneda).filter(m => facturePerMoneda[m].subtotal > 0);
+
+          if (monede.length > 0) {
+            // Construiește mesajul cu toate monedele
+            const mesajMonede = monede.map(moneda =>
+              `${Math.round(facturePerMoneda[moneda].subtotal).toLocaleString('ro-RO')} ${moneda}`
+            ).join(', ');
+
+            const totalFacturiNeplatite = monede.reduce((sum, m) => sum + facturePerMoneda[m].neplatite, 0);
+
+            realAlerts.push({
+              id: 'facturi',
+              type: 'warning',
+              title: 'Facturi de incasat',
+              message: `${totalFacturiNeplatite} ${totalFacturiNeplatite === 1 ? 'factură' : 'facturi'}: ${mesajMonede} (fără TVA)`,
+              count: totalFacturiNeplatite,
+              action: 'Urmareste',
+              href: '/admin/rapoarte/facturi'
+            });
+          }
         }
 
         setKpiData(realKPIData);
@@ -608,14 +622,27 @@ export default function AdminPage() {
             color: '#1f2937',
             marginBottom: '0.25rem'
           }}>
-            {kpiData?.invoices.unpaid} neplătite
+            {kpiData?.invoices.facturePerMoneda ?
+              Object.keys(kpiData.invoices.facturePerMoneda).reduce((sum, m) =>
+                sum + kpiData.invoices.facturePerMoneda![m].neplatite, 0
+              ) : kpiData?.invoices.unpaid || 0
+            } neplătite
           </div>
           <div style={{
             fontSize: '0.9rem',
             color: '#6b7280',
-            marginBottom: '0.5rem'
+            marginBottom: '0.5rem',
+            lineHeight: '1.4'
           }}>
-            {kpiData?.invoices.amount.toLocaleString()} EUR
+            {kpiData?.invoices.facturePerMoneda && Object.keys(kpiData.invoices.facturePerMoneda).length > 0 ?
+              Object.keys(kpiData.invoices.facturePerMoneda)
+                .filter(m => kpiData.invoices.facturePerMoneda![m].subtotal > 0)
+                .map(moneda =>
+                  `${Math.round(kpiData.invoices.facturePerMoneda![moneda].subtotal).toLocaleString()} ${moneda}`
+                ).join(', ')
+              : `${kpiData?.invoices.amount.toLocaleString()} EUR`
+            }
+            <span style={{ fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>(fără TVA)</span>
           </div>
           <p style={{
             margin: 0,
