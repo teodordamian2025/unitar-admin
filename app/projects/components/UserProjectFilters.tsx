@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/projects/components/UserProjectFilters.tsx
-// DATA: 21.09.2025 17:05 (ora României)
+// DATA: 19.10.2025 (ora României)
 // DESCRIERE: Filtre pentru proiecte utilizatori normali - FĂRĂ filtre financiare
-// FUNCȚIONALITATE: Search, status, client, date (exclude valoare min/max)
+// FUNCȚIONALITATE: Search, status, client, date, responsabil dropdown (exclude valoare min/max)
+// MODIFICAT: Filtru responsabil cu dropdown utilizatori din BigQuery (Utilizatori_v2)
 // ==================================================================
 
 'use client';
@@ -25,13 +26,46 @@ interface UserProjectFiltersProps {
   onFilterChange: (filters: Partial<FilterValues>) => void;
 }
 
+interface Utilizator {
+  uid: string;
+  email: string;
+  nume: string;
+  prenume: string;
+  nume_complet?: string;
+  rol: string;
+}
+
 export default function UserProjectFilters({ filters, onFilterChange }: UserProjectFiltersProps) {
   const [localFilters, setLocalFilters] = useState(filters);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [utilizatori, setUtilizatori] = useState<Utilizator[]>([]);
+  const [loadingUtilizatori, setLoadingUtilizatori] = useState(false);
 
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
+
+  // Fetch utilizatori pentru filtrul dropdown
+  useEffect(() => {
+    const loadUtilizatori = async () => {
+      try {
+        setLoadingUtilizatori(true);
+        const response = await fetch('/api/rapoarte/utilizatori');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            setUtilizatori(data.data);
+          }
+        }
+      } catch (error) {
+        console.error('Eroare la încărcarea utilizatorilor:', error);
+      } finally {
+        setLoadingUtilizatori(false);
+      }
+    };
+
+    loadUtilizatori();
+  }, []);
 
   const handleInputChange = (field: keyof FilterValues, value: string) => {
     const newFilters = { ...localFilters, [field]: value };
@@ -274,7 +308,7 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
             />
           </div>
 
-          {/* Responsabil */}
+          {/* Responsabil - DROPDOWN cu utilizatori din BigQuery */}
           <div>
             <label style={{
               display: 'block',
@@ -285,11 +319,10 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
             }}>
               👤 Responsabil
             </label>
-            <input
-              type="text"
+            <select
               value={localFilters.responsabil}
               onChange={(e) => handleInputChange('responsabil', e.target.value)}
-              placeholder="Numele responsabilului..."
+              disabled={loadingUtilizatori}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -298,7 +331,8 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
                 fontSize: '0.875rem',
                 background: 'rgba(255, 255, 255, 0.8)',
                 backdropFilter: 'blur(4px)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                cursor: loadingUtilizatori ? 'wait' : 'pointer'
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = '#3b82f6';
@@ -308,7 +342,19 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
                 e.currentTarget.style.borderColor = 'rgba(209, 213, 219, 0.5)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
-            />
+            >
+              <option value="">
+                {loadingUtilizatori ? 'Se încarcă utilizatori...' : 'Toți responsabilii'}
+              </option>
+              {utilizatori.map((user) => {
+                const numeComplet = user.nume_complet || `${user.nume || ''} ${user.prenume || ''}`.trim() || user.email;
+                return (
+                  <option key={user.uid} value={numeComplet}>
+                    {numeComplet}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           {/* Status predare */}
