@@ -1,8 +1,9 @@
 // ==================================================================
 // CALEA: app/admin/tranzactii/dashboard/page.tsx
-// DATA: 19.09.2025 23:35 (ora României)
+// DATA: 19.09.2025 23:35 (ora României) - Updated 10.19.2025 for grid layout fix
 // DESCRIERE: Dashboard modern tranzacții cu glassmorphism și real-time
 // FUNCȚIONALITATE: Management tranzacții bancare cu auto-matching și filtrare avansată
+// LAYOUT: Stats 4-column grid, Filters 5-column grid, Quick filters inline
 // ==================================================================
 
 'use client';
