@@ -367,7 +367,7 @@ export default function UserDashboard() {
               fontSize: '0.75rem',
               fontWeight: '600'
             }}>
-              {loadingData ? '...' : kpiData?.timeTracking.avgDaily}h/zi
+              {loadingData ? '...' : (kpiData?.timeTracking.avgDaily ?? 0).toFixed(2)}h/zi
             </div>
           </div>
           <h3 style={{
@@ -386,7 +386,7 @@ export default function UserDashboard() {
             color: '#1f2937',
             marginBottom: '0.25rem'
           }}>
-            {loadingData ? '...' : kpiData?.timeTracking.thisWeek}h
+            {loadingData ? '...' : (kpiData?.timeTracking.thisWeek ?? 0).toFixed(2)}h
           </div>
           <div style={{
             fontSize: '0.9rem',
