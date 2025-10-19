@@ -1,26 +1,27 @@
 // ==================================================================
 // CALEA: app/time-tracking/components/TimeAnalytics.tsx
-// DATA: 27.09.2025 15:30 (ora României)
-// DESCRIERE: Analytics personal pentru time tracking fără date financiare - FIX ReferenceError
+// DATA: 19.10.2025 (ora României)
+// DESCRIERE: Analytics personal time tracking - RESCRIERE COMPLETĂ
 // FUNCȚIONALITATE: Grafice, statistici săptămânale/lunare, productivitate
-// MODIFICĂRI: Rezolvat conflict variabilă 'm' în formatTimeDuration
+// FIX: Folosește ore_lucrate din API (nu duration_minutes)
 // ==================================================================
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { User } from 'firebase/auth';
 
 interface TimeEntry {
   id: string;
   project_id?: string;
+  proiect_nume?: string;
   project_name?: string;
   task_description: string;
-  start_time: any;
-  end_time?: any;
-  duration_minutes: number;
-  data_creare: any;
+  data_lucru: any;
+  start_time?: any;
+  ore_lucrate: number; // API returnează ore, nu minute
   status: string;
+  context_display?: string;
 }
 
 interface TimeAnalyticsProps {
@@ -30,22 +31,22 @@ interface TimeAnalyticsProps {
 
 interface DailyStats {
   date: string;
-  totalMinutes: number;
+  totalHours: number;
   sessionsCount: number;
-  projects: Set<string>;
+  projectsCount: number;
 }
 
 interface ProjectStats {
   projectId: string;
   projectName: string;
-  totalMinutes: number;
+  totalHours: number;
   sessionsCount: number;
   percentage: number;
 }
 
 interface WeeklyStats {
   weekStart: string;
-  totalMinutes: number;
+  totalHours: number;
   averagePerDay: number;
   workingDays: number;
 }
@@ -56,21 +57,40 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
 
   // Helper pentru formatarea datelor BigQuery DATE objects
   const getDateValue = (dateValue: any): Date => {
+    if (!dateValue) return new Date();
+
     const dateString = typeof dateValue === 'object' && dateValue.value
       ? dateValue.value
       : dateValue;
 
-    // Fix pentru RangeError: invalid date
     if (!dateString || dateString === 'null' || dateString === 'undefined') {
-      return new Date(); // Returnează data curentă ca fallback
+      return new Date();
     }
 
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return new Date(); // Returnează data curentă pentru date invalide
-    }
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
 
-    return date;
+  // Helper pentru conversie ore la formate citibile
+  const formatHours = (hours: number): string => {
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+
+    if (h > 0 && m > 0) {
+      return `${h}h ${m}m`;
+    } else if (h > 0) {
+      return `${h}h`;
+    } else {
+      return `${m}m`;
+    }
+  };
+
+  // Helper pentru safe number conversion
+  const safeNumber = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    return isNaN(num) || !isFinite(num) ? 0 : num;
   };
 
   // Calcularea statisticilor zilnice
@@ -78,26 +98,21 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     const statsMap = new Map<string, DailyStats>();
 
     timeEntries.forEach(entry => {
-      const date = getDateValue(entry.start_time);
+      const date = getDateValue(entry.data_lucru || entry.start_time);
       const dateKey = date.toISOString().split('T')[0];
 
       if (!statsMap.has(dateKey)) {
         statsMap.set(dateKey, {
           date: dateKey,
-          totalMinutes: 0,
+          totalHours: 0,
           sessionsCount: 0,
-          projects: new Set()
+          projectsCount: 0
         });
       }
 
       const dayStats = statsMap.get(dateKey)!;
-      const safeDuration = entry.duration_minutes || 0;
-      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
-      dayStats.totalMinutes += validDuration;
+      dayStats.totalHours += safeNumber(entry.ore_lucrate);
       dayStats.sessionsCount += 1;
-      if (entry.project_id) {
-        dayStats.projects.add(entry.project_id);
-      }
     });
 
     return Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
@@ -106,67 +121,64 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
   // Calcularea statisticilor pe proiecte
   const projectStats = useMemo((): ProjectStats[] => {
     const statsMap = new Map<string, Omit<ProjectStats, 'percentage'>>();
-    let totalMinutes = 0;
+    let totalHours = 0;
 
     timeEntries.forEach(entry => {
-      const safeDuration = entry.duration_minutes || 0;
-      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
-      totalMinutes += validDuration;
+      const hours = safeNumber(entry.ore_lucrate);
+      totalHours += hours;
+
       const projectKey = entry.project_id || 'no-project';
-      const projectName = entry.project_name || entry.project_id || 'Fără proiect';
+      const projectName = entry.proiect_nume || entry.project_name || entry.context_display || entry.project_id || 'Fără proiect';
 
       if (!statsMap.has(projectKey)) {
         statsMap.set(projectKey, {
           projectId: projectKey,
           projectName: projectName,
-          totalMinutes: 0,
+          totalHours: 0,
           sessionsCount: 0
         });
       }
 
       const projectStat = statsMap.get(projectKey)!;
-      projectStat.totalMinutes += validDuration;
+      projectStat.totalHours += hours;
       projectStat.sessionsCount += 1;
     });
 
     return Array.from(statsMap.values())
       .map(stat => ({
         ...stat,
-        percentage: totalMinutes > 0 ? (stat.totalMinutes / totalMinutes) * 100 : 0
+        percentage: totalHours > 0 ? (stat.totalHours / totalHours) * 100 : 0
       }))
-      .sort((a, b) => b.totalMinutes - a.totalMinutes);
+      .sort((a, b) => b.totalHours - a.totalHours);
   }, [timeEntries]);
 
   // Calcularea statisticilor săptămânale
   const weeklyStats = useMemo((): WeeklyStats[] => {
-    const weekMap = new Map<string, Omit<WeeklyStats, 'averagePerDay'>>();
+    const weekMap = new Map<string, { totalHours: number; workingDays: Set<string> }>();
 
     timeEntries.forEach(entry => {
-      const date = getDateValue(entry.start_time);
+      const date = getDateValue(entry.data_lucru || entry.start_time);
       const weekStart = getWeekStart(date);
       const weekKey = weekStart.toISOString().split('T')[0];
 
       if (!weekMap.has(weekKey)) {
         weekMap.set(weekKey, {
-          weekStart: weekKey,
-          totalMinutes: 0,
+          totalHours: 0,
           workingDays: new Set<string>()
-        } as any);
+        });
       }
 
-      const weekStat = weekMap.get(weekKey)! as any;
-      const safeDuration = entry.duration_minutes || 0;
-      const validDuration = isNaN(safeDuration) ? 0 : Number(safeDuration);
-      weekStat.totalMinutes += validDuration;
+      const weekStat = weekMap.get(weekKey)!;
+      weekStat.totalHours += safeNumber(entry.ore_lucrate);
       weekStat.workingDays.add(date.toISOString().split('T')[0]);
     });
 
-    return Array.from(weekMap.values())
-      .map(week => ({
-        weekStart: week.weekStart,
-        totalMinutes: week.totalMinutes,
-        workingDays: (week as any).workingDays.size,
-        averagePerDay: (week as any).workingDays.size > 0 ? week.totalMinutes / (week as any).workingDays.size : 0
+    return Array.from(weekMap.entries())
+      .map(([weekStart, data]) => ({
+        weekStart,
+        totalHours: data.totalHours,
+        workingDays: data.workingDays.size,
+        averagePerDay: data.workingDays.size > 0 ? data.totalHours / data.workingDays.size : 0
       }))
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
   }, [timeEntries]);
@@ -174,27 +186,24 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
   const getWeekStart = (date: Date): Date => {
     const result = new Date(date);
     const day = result.getDay();
-    const diff = result.getDate() - day + (day === 0 ? -6 : 1); // Monday as first day
+    const diff = result.getDate() - day + (day === 0 ? -6 : 1);
     result.setDate(diff);
     result.setHours(0, 0, 0, 0);
     return result;
   };
 
-  // FIX: Redenumit variabila pentru a evita conflictul
-  const formatTimeDuration = (minutes: number): string => {
-	  const hours = Math.floor(minutes / 60);
-	  const mins = minutes % 60;
-	  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-	};
-
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('ro-RO', {
-      day: '2-digit',
-      month: '2-digit'
-    });
+    try {
+      return new Date(dateString).toLocaleDateString('ro-RO', {
+        day: '2-digit',
+        month: '2-digit'
+      });
+    } catch {
+      return dateString;
+    }
   };
 
-  const getCurrentPeriodData = () => {
+  const getCurrentPeriodData = (): DailyStats[] => {
     const now = new Date();
     const periodStart = new Date();
 
@@ -215,13 +224,13 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
 
   const getOverviewStats = () => {
     const periodData = getCurrentPeriodData();
-    const totalMinutes = periodData.reduce((sum, day) => sum + day.totalMinutes, 0);
+    const totalHours = periodData.reduce((sum, day) => sum + day.totalHours, 0);
     const totalSessions = periodData.reduce((sum, day) => sum + day.sessionsCount, 0);
-    const workingDays = periodData.filter(day => day.totalMinutes > 0).length;
-    const averagePerDay = workingDays > 0 ? totalMinutes / workingDays : 0;
+    const workingDays = periodData.filter(day => day.totalHours > 0).length;
+    const averagePerDay = workingDays > 0 ? totalHours / workingDays : 0;
 
     return {
-      totalMinutes,
+      totalHours,
       totalSessions,
       workingDays,
       averagePerDay,
@@ -230,6 +239,28 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
   };
 
   const overviewStats = getOverviewStats();
+
+  if (timeEntries.length === 0) {
+    return (
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(12px)',
+        borderRadius: '16px',
+        padding: '3rem',
+        textAlign: 'center',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+        <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>
+          Nu există date pentru analytics
+        </h3>
+        <p style={{ color: '#6b7280', margin: 0 }}>
+          Pornește timer-ul pentru a înregistra prima sesiune!
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -279,19 +310,15 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {[
-              { id: 'week', label: '7 zile' },
-              { id: 'month', label: '30 zile' },
-              { id: 'quarter', label: '90 zile' }
-            ].map((period) => (
+            {(['week', 'month', 'quarter'] as const).map((period) => (
               <button
-                key={period.id}
-                onClick={() => setSelectedPeriod(period.id as any)}
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
                 style={{
-                  background: selectedPeriod === period.id ?
+                  background: selectedPeriod === period ?
                     'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' :
                     'rgba(59, 130, 246, 0.1)',
-                  color: selectedPeriod === period.id ? 'white' : '#2563eb',
+                  color: selectedPeriod === period ? 'white' : '#2563eb',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '0.5rem 0.75rem',
@@ -300,7 +327,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                   cursor: 'pointer'
                 }}
               >
-                {period.label}
+                {period === 'week' ? '7 zile' : period === 'month' ? '30 zile' : '90 zile'}
               </button>
             ))}
           </div>
@@ -308,31 +335,24 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
           <div style={{ height: '1.5rem', width: '1px', background: 'rgba(59, 130, 246, 0.2)' }}></div>
 
           <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {[
-              { id: 'overview', label: '📊 Overview', icon: '📊' },
-              { id: 'projects', label: '📁 Proiecte', icon: '📁' },
-              { id: 'trends', label: '📈 Tendințe', icon: '📈' }
-            ].map((view) => (
+            {(['overview', 'projects', 'trends'] as const).map((view) => (
               <button
-                key={view.id}
-                onClick={() => setSelectedView(view.id as any)}
+                key={view}
+                onClick={() => setSelectedView(view)}
                 style={{
-                  background: selectedView === view.id ?
+                  background: selectedView === view ?
                     'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
                     'rgba(16, 185, 129, 0.1)',
-                  color: selectedView === view.id ? 'white' : '#059669',
+                  color: selectedView === view ? 'white' : '#059669',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '0.5rem 0.75rem',
                   fontSize: '0.75rem',
                   fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
+                  cursor: 'pointer'
                 }}
               >
-                {view.icon} {view.label.split(' ')[1]}
+                {view === 'overview' ? '📊 Overview' : view === 'projects' ? '📁 Proiecte' : '📈 Tendințe'}
               </button>
             ))}
           </div>
@@ -358,7 +378,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏱️</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {formatTimeDuration(overviewStats.totalMinutes)}
+                  {formatHours(overviewStats.totalHours)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                   Total timp înregistrat
@@ -403,7 +423,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               }}>
                 <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📊</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {formatTimeDuration(overviewStats.averagePerDay)}
+                  {formatHours(overviewStats.averagePerDay)}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                   Medie pe zi activă
@@ -428,44 +448,47 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               </h4>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(7, 1fr)',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
                 gap: '0.5rem'
               }}>
-                {getCurrentPeriodData().slice(-7).map((day, index) => (
-                  <div
-                    key={day.date}
-                    style={{
-                      textAlign: 'center',
-                      padding: '0.75rem 0.5rem',
-                      borderRadius: '8px',
-                      background: day.totalMinutes > 0 ?
-                        `rgba(59, 130, 246, ${Math.min(day.totalMinutes / 300, 1) * 0.3 + 0.1})` :
-                        'rgba(156, 163, 175, 0.1)',
-                      border: `1px solid ${day.totalMinutes > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(156, 163, 175, 0.2)'}`
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: '#6b7280',
-                      marginBottom: '0.25rem'
-                    }}>
-                      {formatDate(day.date)}
+                {getCurrentPeriodData().slice(-7).map((day) => {
+                  const intensity = Math.min(day.totalHours / 5, 1); // 5 ore = full intensity
+                  return (
+                    <div
+                      key={day.date}
+                      style={{
+                        textAlign: 'center',
+                        padding: '0.75rem 0.5rem',
+                        borderRadius: '8px',
+                        background: day.totalHours > 0 ?
+                          `rgba(59, 130, 246, ${intensity * 0.3 + 0.1})` :
+                          'rgba(156, 163, 175, 0.1)',
+                        border: `1px solid ${day.totalHours > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(156, 163, 175, 0.2)'}`
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: '#6b7280',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {formatDate(day.date)}
+                      </div>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: day.totalHours > 0 ? '#1f2937' : '#9ca3af'
+                      }}>
+                        {day.totalHours > 0 ? formatHours(day.totalHours) : '0m'}
+                      </div>
+                      <div style={{
+                        fontSize: '0.625rem',
+                        color: '#9ca3af'
+                      }}>
+                        {day.sessionsCount} sesiuni
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: day.totalMinutes > 0 ? '#1f2937' : '#9ca3af'
-                    }}>
-                      {day.totalMinutes > 0 ? formatTimeDuration(day.totalMinutes) : '0m'}
-                    </div>
-                    <div style={{
-                      fontSize: '0.625rem',
-                      color: '#9ca3af'
-                    }}>
-                      {day.sessionsCount} sesiuni
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -482,9 +505,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               📁 Timp pe Proiecte
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {projectStats.slice(0, 10).map((projectItem, projectIndex) => (
+              {projectStats.slice(0, 10).map((proj, index) => (
                 <div
-                  key={projectItem.projectId}
+                  key={proj.projectId}
                   style={{
                     background: 'rgba(255, 255, 255, 0.7)',
                     borderRadius: '8px',
@@ -504,34 +527,31 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                         fontWeight: '600',
                         color: '#1f2937'
                       }}>
-                        {projectItem.projectName}
+                        {proj.projectName}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
                         color: '#6b7280'
                       }}>
-                        {projectItem.sessionsCount} sesiuni
+                        {proj.sessionsCount} sesiuni
                       </div>
                     </div>
-                    <div style={{
-                      textAlign: 'right'
-                    }}>
+                    <div style={{ textAlign: 'right' }}>
                       <div style={{
                         fontSize: '0.875rem',
                         fontWeight: '600',
                         color: '#1f2937'
                       }}>
-                        {formatTimeDuration(projectItem.totalMinutes)}
+                        {formatHours(proj.totalHours)}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
                         color: '#6b7280'
                       }}>
-                        {projectItem.percentage.toFixed(1)}%
+                        {proj.percentage.toFixed(1)}%
                       </div>
                     </div>
                   </div>
-                  {/* Progress Bar */}
                   <div style={{
                     width: '100%',
                     height: '4px',
@@ -540,9 +560,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                     overflow: 'hidden'
                   }}>
                     <div style={{
-                      width: `${projectItem.percentage}%`,
+                      width: `${proj.percentage}%`,
                       height: '100%',
-                      background: `hsl(${200 + projectIndex * 30}, 70%, 50%)`,
+                      background: `hsl(${200 + index * 30}, 70%, 50%)`,
                       transition: 'width 0.3s ease'
                     }}></div>
                   </div>
@@ -563,9 +583,9 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
               📈 Tendințe Săptămânale
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {weeklyStats.slice(-8).map((weekItem) => (
+              {weeklyStats.slice(-8).map((week) => (
                 <div
-                  key={weekItem.weekStart}
+                  key={week.weekStart}
                   style={{
                     background: 'rgba(255, 255, 255, 0.7)',
                     borderRadius: '8px',
@@ -583,13 +603,13 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      Săptămâna {formatDate(weekItem.weekStart)}
+                      Săptămâna {formatDate(week.weekStart)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
                       color: '#6b7280'
                     }}>
-                      {weekItem.workingDays} zile active
+                      {week.workingDays} zile active
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
@@ -598,7 +618,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatTimeDuration(weekItem.totalMinutes)}
+                      {formatHours(week.totalHours)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
@@ -613,7 +633,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      {formatTimeDuration(weekItem.averagePerDay)}
+                      {formatHours(week.averagePerDay)}
                     </div>
                     <div style={{
                       fontSize: '0.75rem',
@@ -630,7 +650,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
                     overflow: 'hidden'
                   }}>
                     <div style={{
-                      width: `${Math.min((weekItem.totalMinutes / 2400) * 100, 100)}%`, // 40h as max
+                      width: `${Math.min((week.totalHours / 40) * 100, 100)}%`,
                       height: '100%',
                       background: 'linear-gradient(90deg, #10b981, #059669)',
                       transition: 'width 0.3s ease'
