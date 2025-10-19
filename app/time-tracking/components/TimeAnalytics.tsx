@@ -17,10 +17,14 @@ interface TimeEntry {
   proiect_nume?: string;
   project_name?: string;
   task_description: string;
-  data_lucru: any;
-  start_time?: any;
-  ore_lucrate: number; // API returnează ore, nu minute
+  start_time: any;
+  end_time?: any;
+  data_creare: any;
   status: string;
+  // Support both formats: legacy (duration_minutes) and new (ore_lucrate + data_lucru)
+  duration_minutes?: number; // Legacy format from page.tsx
+  data_lucru?: any;          // New format from API
+  ore_lucrate?: number;      // New format from API (hours)
   context_display?: string;
 }
 
@@ -93,6 +97,19 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     return isNaN(num) || !isFinite(num) ? 0 : num;
   };
 
+  // Helper pentru a obține orele dintr-un entry (suportă ambele formate)
+  const getHours = (entry: TimeEntry): number => {
+    // Dacă avem ore_lucrate (format nou), folosim direct
+    if (entry.ore_lucrate !== undefined) {
+      return safeNumber(entry.ore_lucrate);
+    }
+    // Dacă avem duration_minutes (format vechi), convertim la ore
+    if (entry.duration_minutes !== undefined) {
+      return safeNumber(entry.duration_minutes) / 60;
+    }
+    return 0;
+  };
+
   // Calcularea statisticilor zilnice
   const dailyStats = useMemo((): DailyStats[] => {
     const statsMap = new Map<string, DailyStats>();
@@ -111,7 +128,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }
 
       const dayStats = statsMap.get(dateKey)!;
-      dayStats.totalHours += safeNumber(entry.ore_lucrate);
+      dayStats.totalHours += getHours(entry);
       dayStats.sessionsCount += 1;
     });
 
@@ -124,7 +141,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
     let totalHours = 0;
 
     timeEntries.forEach(entry => {
-      const hours = safeNumber(entry.ore_lucrate);
+      const hours = getHours(entry);
       totalHours += hours;
 
       const projectKey = entry.project_id || 'no-project';
@@ -169,7 +186,7 @@ export default function TimeAnalytics({ user, timeEntries }: TimeAnalyticsProps)
       }
 
       const weekStat = weekMap.get(weekKey)!;
-      weekStat.totalHours += safeNumber(entry.ore_lucrate);
+      weekStat.totalHours += getHours(entry);
       weekStat.workingDays.add(date.toISOString().split('T')[0]);
     });
 
