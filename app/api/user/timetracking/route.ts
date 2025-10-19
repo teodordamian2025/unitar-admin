@@ -128,29 +128,36 @@ export async function GET(request: NextRequest) {
     const params: any = {};
     const types: any = {};
 
-    // Filtrare pe utilizator
-    if (userId && userId !== 'utilizator_curent') {
-      conditions.push('utilizator_uid = @userId');
-      params.userId = userId;
-      types.userId = 'STRING';
+    // ✅ FIX: Filtrare FORȚATĂ pe utilizator (utilizatori normali văd doar propriile înregistrări)
+    // Dacă userId nu este furnizat sau este 'utilizator_curent', returnăm eroare
+    if (!userId || userId === 'utilizator_curent') {
+      return NextResponse.json({
+        success: false,
+        error: 'user_id este obligatoriu pentru a vizualiza înregistrările de timp'
+      }, { status: 400 });
     }
+
+    // ÎNTOTDEAUNA filtrăm pe utilizator pentru securitate
+    conditions.push('tt.utilizator_uid = @userId');
+    params.userId = userId;
+    types.userId = 'STRING';
 
     // Filtrare pe interval de date
     if (startDate) {
-      conditions.push('data_lucru >= @startDate');
+      conditions.push('tt.data_lucru >= @startDate');
       params.startDate = startDate;
       types.startDate = 'DATE';
     }
 
     if (endDate) {
-      conditions.push('data_lucru <= @endDate');
+      conditions.push('tt.data_lucru <= @endDate');
       params.endDate = endDate;
       types.endDate = 'DATE';
     }
 
     // Filtrare pe proiect
     if (projectId) {
-      conditions.push('proiect_id = @projectId');
+      conditions.push('tt.proiect_id = @projectId');
       params.projectId = projectId;
       types.projectId = 'STRING';
     }
@@ -183,10 +190,10 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ USER TIME TRACKING LOADED: ${rows.length} results`);
 
-    // Query pentru total count
+    // Query pentru total count - folosește același alias tt pentru consistență
     let countQuery = `
       SELECT COUNT(*) as total
-      FROM ${TABLE_TIME_TRACKING}
+      FROM ${TABLE_TIME_TRACKING} tt
     `;
 
     if (conditions.length > 0) {

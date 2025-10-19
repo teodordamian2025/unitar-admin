@@ -261,15 +261,15 @@ class TimerSyncManager {
       return;
     }
 
-    console.log('🚀 TimerSync: Starting polling (300s interval - optimized for cost reduction)');
+    console.log('🚀 TimerSync: Starting polling (600s interval - optimized for cost reduction)');
 
     // Check imediat
     this.checkTimer();
 
-    // Apoi la fiecare 300 secunde / 5 minute (OPTIMIZED: reducere 80% requests vs 60s)
+    // Apoi la fiecare 600 secunde / 10 minute (OPTIMIZED: reducere 90% requests vs 60s)
     this.interval = setInterval(() => {
       this.checkTimer();
-    }, 300000); // 300 secunde (5 minute) - economie costuri Vercel/BigQuery
+    }, 600000); // 600 secunde (10 minute) - economie costuri Vercel/BigQuery
   }
 
   // Oprește polling-ul

@@ -88,7 +88,8 @@ function TimeTrackingPage() {
       setLoadingEntries(true);
       const idToken = await user?.getIdToken();
 
-      const response = await fetch('/api/user/timetracking', {
+      // ✅ FIX: Trimite user_id pentru a filtra istoric doar pentru utilizatorul curent
+      const response = await fetch(`/api/user/timetracking?user_id=${user?.uid}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }

@@ -161,10 +161,12 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   // ✅ ACTUALIZARE DIN CONTEXT (elimină duplicate API call)
   useEffect(() => {
     if (contextSession && contextHasActiveSession) {
+      // ✅ FIX: startTime = NOW (când componenta se remontează), pausedTime = timpul deja scurs
+      // Astfel cronometrul local continuă corect de unde a rămas, fără să reseteze la fiecare navigare
       setPersonalTimer({
         isActive: contextSession.status === 'activ',
-        startTime: new Date(contextSession.data_start),
-        pausedTime: 0,
+        startTime: new Date(), // ✅ Timpul curent când componenta se remontează
+        pausedTime: contextSession.elapsed_seconds * 1000, // ✅ Timpul deja scurs de pe server
         elapsedTime: contextSession.elapsed_seconds * 1000,
         projectId: contextSession.proiect_id,
         sarcinaId: contextSession.sarcina_id || 'general',
@@ -172,7 +174,10 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
         sessionId: contextSession.id
       });
 
-      console.log('✅ PersonalTimer: Session loaded from context (NO API call)');
+      console.log('✅ PersonalTimer: Session loaded from context (NO API call)', {
+        elapsed_seconds: contextSession.elapsed_seconds,
+        status: contextSession.status
+      });
     } else if (!contextHasActiveSession) {
       // Reset timer când nu există sesiune activă
       setPersonalTimer({
