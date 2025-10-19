@@ -136,9 +136,9 @@ const ModernFilterPanel: React.FC<{
       </div>
 
       {isExpanded && (
-        <div className="space-y-6">
-          {/* Prima linie - Date și Direcție */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="space-y-4">
+          {/* Toate filtrele pe 2 rânduri compacte */}
+          <div className="grid grid-cols-5 gap-3">
             <Input
               type="date"
               label="Data start"
@@ -151,55 +151,6 @@ const ModernFilterPanel: React.FC<{
               value={filters.data_end}
               onChange={(e) => updateFilter('data_end', e.target.value)}
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Direcție
-              </label>
-              <select
-                value={filters.directie}
-                onChange={(e) => updateFilter('directie', e.target.value)}
-                className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="">Toate</option>
-                <option value="in">📈 Încasări</option>
-                <option value="out">📉 Plăți</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => updateFilter('status', e.target.value)}
-                className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="">Toate</option>
-                <option value="nou">🆕 Nou</option>
-                <option value="matched">✅ Matched</option>
-                <option value="partial">🟡 Parțial</option>
-                <option value="complet">🟢 Complet</option>
-              </select>
-            </div>
-          </div>
-
-          {/* A doua linie - Matching și Sume */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tip Matching
-              </label>
-              <select
-                value={filters.matching_tip}
-                onChange={(e) => updateFilter('matching_tip', e.target.value)}
-                className="w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="">Toate</option>
-                <option value="none">❌ Fără match</option>
-                <option value="auto">🤖 Automat</option>
-                <option value="manual">👤 Manual</option>
-              </select>
-            </div>
             <Input
               type="number"
               label="Confidence min (%)"
@@ -223,17 +174,63 @@ const ModernFilterPanel: React.FC<{
             />
           </div>
 
-          {/* Căutare contrapartidă */}
-          <Input
-            type="text"
-            label="Căutare contrapartidă"
-            value={filters.search_contrapartida}
-            onChange={(e) => updateFilter('search_contrapartida', e.target.value)}
-            placeholder="Nume companie, CUI, sau cuvinte din detalii..."
-          />
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Direcție
+              </label>
+              <select
+                value={filters.directie}
+                onChange={(e) => updateFilter('directie', e.target.value)}
+                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+              >
+                <option value="">Toate</option>
+                <option value="in">📈 Încasări</option>
+                <option value="out">📉 Plăți</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => updateFilter('status', e.target.value)}
+                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+              >
+                <option value="">Toate</option>
+                <option value="nou">🆕 Nou</option>
+                <option value="matched">✅ Matched</option>
+                <option value="partial">🟡 Parțial</option>
+                <option value="complet">🟢 Complet</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tip Matching
+              </label>
+              <select
+                value={filters.matching_tip}
+                onChange={(e) => updateFilter('matching_tip', e.target.value)}
+                className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+              >
+                <option value="">Toate</option>
+                <option value="none">❌ Fără match</option>
+                <option value="auto">🤖 Automat</option>
+                <option value="manual">👤 Manual</option>
+              </select>
+            </div>
+            <Input
+              type="text"
+              label="Căutare contrapartidă"
+              value={filters.search_contrapartida}
+              onChange={(e) => updateFilter('search_contrapartida', e.target.value)}
+              placeholder="Nume, CUI, detalii..."
+            />
+          </div>
 
           {/* Butoane acțiuni */}
-          <div className="flex items-center gap-4 pt-4 border-t border-white/20">
+          <div className="flex items-center gap-4 pt-2 border-t border-white/20">
             <Button
               variant="primary"
               onClick={onApply}
@@ -254,13 +251,14 @@ const ModernFilterPanel: React.FC<{
 
       {/* Quick filters când e comprimat */}
       {!isExpanded && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              onFiltersChange({ ...filters, matching_tip: 'none' });
-              onApply();
+              const newFilters = { ...filters, matching_tip: 'none' };
+              onFiltersChange(newFilters);
+              setTimeout(() => onApply(), 50);
             }}
             className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
           >
@@ -270,8 +268,9 @@ const ModernFilterPanel: React.FC<{
             variant="outline"
             size="sm"
             onClick={() => {
-              onFiltersChange({ ...filters, directie: 'in' });
-              onApply();
+              const newFilters = { ...filters, directie: 'in' };
+              onFiltersChange(newFilters);
+              setTimeout(() => onApply(), 50);
             }}
             className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
           >
@@ -281,8 +280,9 @@ const ModernFilterPanel: React.FC<{
             variant="outline"
             size="sm"
             onClick={() => {
-              onFiltersChange({ ...filters, directie: 'out' });
-              onApply();
+              const newFilters = { ...filters, directie: 'out' };
+              onFiltersChange(newFilters);
+              setTimeout(() => onApply(), 50);
             }}
             className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
           >
@@ -292,8 +292,9 @@ const ModernFilterPanel: React.FC<{
             variant="outline"
             size="sm"
             onClick={() => {
-              onFiltersChange({ ...filters, status: 'nou' });
-              onApply();
+              const newFilters = { ...filters, status: 'nou' };
+              onFiltersChange(newFilters);
+              setTimeout(() => onApply(), 50);
             }}
             className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
           >
@@ -394,8 +395,10 @@ const ModernTransactionTable: React.FC<{
             {transactions.map((transaction, index) => (
               <tr
                 key={transaction.id}
-                className={`border-b border-white/10 hover:bg-white/10 transition-colors ${
-                  index % 2 === 0 ? 'bg-white/5' : ''
+                className={`border-b border-white/10 transition-colors ${
+                  transaction.directie === 'in'
+                    ? 'bg-green-50/30 hover:bg-green-50/50'
+                    : 'bg-red-50/30 hover:bg-red-50/50'
                 }`}
               >
                 <td className="px-6 py-4">
@@ -752,17 +755,9 @@ const ModernTranzactiiDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Live Metrics Integration */}
-      <div className="mb-8">
-        <LiveMetrics
-          showTrends={true}
-          animated={true}
-        />
-      </div>
-
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-4 gap-6 mb-8">
           {statsCards.map((card, index) => (
             <ModernStatCard key={index} {...card} />
           ))}

@@ -144,7 +144,8 @@ function buildWhereClause(filters: FilterParams): string {
     const searchTerm = filters.search_contrapartida.replace(/'/g, "\\'");
     conditions.push(`(
       LOWER(t.nume_contrapartida) LIKE LOWER('%${searchTerm}%') OR
-      LOWER(t.detalii_tranzactie) LIKE LOWER('%${searchTerm}%')
+      LOWER(t.detalii_tranzactie) LIKE LOWER('%${searchTerm}%') OR
+      LOWER(t.cui_contrapartida) LIKE LOWER('%${searchTerm}%')
     )`);
   }
   
