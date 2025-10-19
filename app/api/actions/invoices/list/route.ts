@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     let query = `
       SELECT
         fg.id,
+        fg.serie,
         fg.numar,
         fg.data_factura,
         fg.data_scadenta,
@@ -150,9 +151,10 @@ export async function GET(request: NextRequest) {
       location: 'EU'
     });
     
-    // ✅ DEBUGGING: Verifică că proiect_id este inclus
+    // ✅ DEBUGGING: Verifică că proiect_id și serie sunt incluse
     console.log('🔍 DEBUG: Prima factură returnată:', {
       id: rows[0]?.id,
+      serie: rows[0]?.serie,
       numar: rows[0]?.numar,
       proiect_id: rows[0]?.proiect_id,
       proiect_denumire: rows[0]?.proiect_denumire,

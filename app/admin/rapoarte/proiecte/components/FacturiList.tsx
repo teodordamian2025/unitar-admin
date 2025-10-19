@@ -38,6 +38,7 @@ declare global {
 
 interface Factura {
   id: string;
+  serie: string;
   numar: string;
   data_factura: string | { value: string };
   data_scadenta: string | { value: string };
@@ -156,6 +157,7 @@ export default function FacturiList({
           const searchLower = filters.search.toLowerCase();
           result = result.filter((f: Factura) =>
             f.numar.toLowerCase().includes(searchLower) ||
+            (f.serie && f.serie.toLowerCase().includes(searchLower)) ||
             f.client_nume.toLowerCase().includes(searchLower) ||
             f.proiect_denumire.toLowerCase().includes(searchLower)
           );
@@ -376,8 +378,9 @@ export default function FacturiList({
       const response = await fetch('/api/actions/invoices/regenerate-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           facturaId: factura.id,
+          serie: factura.serie,
           numar: factura.numar
         })
       });
@@ -393,20 +396,22 @@ export default function FacturiList({
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `Factura_${factura.numar}.pdf`;
+        const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+        link.download = `Factura_${numarComplet}.pdf`;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
-        showToast(`Factura ${factura.numar} descarcata cu succes`, 'success');
+
+        showToast(`Factura ${numarComplet} descarcata cu succes`, 'success');
       } else {
         const data = await response.json();
         
         if (data.success && data.htmlContent) {
-          await processPDFOptimized(data.htmlContent, `Factura_${factura.numar}.pdf`);
-          showToast(`PDF regenerat si descarcat pentru factura ${factura.numar}`, 'success');
+          const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+          await processPDFOptimized(data.htmlContent, `Factura_${numarComplet}.pdf`);
+          showToast(`PDF regenerat si descarcat pentru factura ${numarComplet}`, 'success');
         } else {
           throw new Error(data.error || 'Nu s-a putut regenera PDF-ul');
         }
@@ -598,13 +603,14 @@ export default function FacturiList({
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `EFactura_${factura.numar}.xml`;
+        const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+        link.download = `EFactura_${numarComplet}.xml`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
-        showToast(`XML descarcat pentru factura ${factura.numar}`, 'success');
+
+        showToast(`XML descarcat pentru factura ${numarComplet}`, 'success');
       } else {
         throw new Error(data.error || 'XML nu a fost gasit');
       }
@@ -650,7 +656,8 @@ export default function FacturiList({
   const handleRetryANAF = async (factura: Factura) => {
     if (processingActions[factura.id]) return;
 
-    if (!confirm(`Sigur vrei sa reincerci trimiterea facturii ${factura.numar} la ANAF?`)) {
+    const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+    if (!confirm(`Sigur vrei sa reincerci trimiterea facturii ${numarComplet} la ANAF?`)) {
       return;
     }
 
@@ -672,7 +679,7 @@ export default function FacturiList({
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Retry pentru factura ${factura.numar} trimis cu succes la ANAF!`, 'success');
+        showToast(`Retry pentru factura ${numarComplet} trimis cu succes la ANAF!`, 'success');
       } else {
         throw new Error(result.message || 'Retry failed');
       }
@@ -747,14 +754,15 @@ export default function FacturiList({
   };
 
   const handleDeleteFactura = async (factura: Factura) => {
-    if (factura.efactura_enabled && 
-        factura.efactura_status && 
+    if (factura.efactura_enabled &&
+        factura.efactura_status &&
         !['draft', 'error', 'mock_pending', 'mock_generated'].includes(factura.efactura_status)) {
       showToast('Factura a fost trimisa la ANAF si nu poate fi stearsa', 'error');
       return;
     }
 
-    if (!confirm(`Sigur vrei sa stergi factura ${factura.numar}?\n\nAceasta actiune nu poate fi anulata!`)) {
+    const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+    if (!confirm(`Sigur vrei sa stergi factura ${numarComplet}?\n\nAceasta actiune nu poate fi anulata!`)) {
       return;
     }
 
@@ -766,7 +774,7 @@ export default function FacturiList({
       const result = await response.json();
 
       if (result.success) {
-        showToast(`Factura ${factura.numar} a fost stearsa`, 'success');
+        showToast(`Factura ${numarComplet} a fost stearsa`, 'success');
         loadFacturi();
       } else {
         showToast(`${result.error}`, 'error');
@@ -1043,9 +1051,9 @@ export default function FacturiList({
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900 flex items-center gap-2">
-                          {factura.numar}
+                          {factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar}
                           {factura.efactura_enabled && (
-                            <span 
+                            <span
                               className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded flex items-center gap-1"
                               title="Factura cu e-factura ANAF"
                             >
@@ -1157,7 +1165,9 @@ export default function FacturiList({
             
             <div className="p-6">
               <div className="mb-6">
-                <h4 className="font-medium text-gray-900 mb-2">Factura: {currentModalFactura.numar}</h4>
+                <h4 className="font-medium text-gray-900 mb-2">
+                  Factura: {currentModalFactura.serie ? `${currentModalFactura.serie}-${currentModalFactura.numar}` : currentModalFactura.numar}
+                </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Client:</span> {currentModalFactura.client_nume}
@@ -1428,14 +1438,14 @@ function EnhancedActionDropdown({
                 borderBottom: '1px solid #e0e0e0',
                 background: '#f8f9fa'
               }}>
-                <div style={{ 
-                  fontSize: '12px', 
+                <div style={{
+                  fontSize: '12px',
                   fontWeight: '700',
                   color: '#2c3e50',
                   marginBottom: '0.5rem',
                   fontFamily: 'monospace'
                 }}>
-                  {factura.numar}
+                  {factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar}
                 </div>
                 <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                   Status: <span style={{ 

@@ -192,9 +192,9 @@ function cleanNonAscii(text: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { facturaId, numar } = body;
+    const { facturaId, serie, numar } = body;
 
-    console.log('Regenerez PDF pentru factura:', { facturaId, numar });
+    console.log('Regenerez PDF pentru factura:', { facturaId, serie, numar });
 
     if (!facturaId) {
       return NextResponse.json({ error: 'facturaId este obligatoriu' }, { status: 400 });
@@ -218,6 +218,11 @@ export async function POST(request: NextRequest) {
     }
 
     const facturaData = facturaRows[0];
+
+    // Construiește numărul complet (serie + numar)
+    const numarComplet = facturaData.serie
+      ? `${facturaData.serie}-${facturaData.numar}`
+      : (facturaData.numar || numar);
     
     // Parsează datele complete din JSON
     let dateComplete: any = {};
@@ -314,7 +319,7 @@ export async function POST(request: NextRequest) {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Factura ${cleanNonAscii(facturaData.numar || numar)}</title>
+        <title>Factura ${cleanNonAscii(numarComplet)}</title>
         <style>
             * {
                 margin: 0;
@@ -554,7 +559,7 @@ export async function POST(request: NextRequest) {
         </div>
 
         <div class="invoice-details">
-            <div class="invoice-number">Factura nr: ${cleanNonAscii(facturaData.numar || numar)}</div>
+            <div class="invoice-number">Factura nr: ${cleanNonAscii(numarComplet)}</div>
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${formatDateFromBigQuery(facturaData.data_factura)}</div>
                 <div><strong>Proiect:</strong> ${cleanNonAscii(proiectInfo.id || proiectInfo.ID_Proiect || facturaData.proiect_id || 'NECUNOSCUT')}</div>
@@ -683,11 +688,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       htmlContent: htmlTemplate,
-      fileName: `Factura_${cleanNonAscii(facturaData.numar || numar)}.pdf`,
+      fileName: `Factura_${cleanNonAscii(numarComplet)}.pdf`,
       message: 'Template HTML generat pentru regenerare PDF',
       facturaData: {
         id: facturaData.id,
+        serie: facturaData.serie,
         numar: cleanNonAscii(facturaData.numar || numar),
+        numarComplet: cleanNonAscii(numarComplet),
         client: cleanNonAscii(clientInfo.nume),
         total: total,
         contariCount: contariFinale.length,

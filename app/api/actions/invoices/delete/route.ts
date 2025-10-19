@@ -45,6 +45,7 @@ export async function DELETE(request: NextRequest) {
     const checkQuery = `
       SELECT
         id,
+        serie,
         numar,
         efactura_enabled,
         efactura_status,
@@ -68,6 +69,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const factura = checkRows[0];
+
+    // Construiește numărul complet (serie + numar)
+    const numarComplet = factura.serie
+      ? `${factura.serie}-${factura.numar}`
+      : factura.numar;
 
     // Verifică dacă factura a fost stornată
     if (factura.status === 'stornata') {
@@ -99,7 +105,7 @@ export async function DELETE(request: NextRequest) {
       location: 'EU'
     });
 
-    console.log(`✅ Factură ${factura.numar} ștearsă cu succes din FacturiGenerate`);
+    console.log(`✅ Factură ${numarComplet} ștearsă cu succes din FacturiGenerate`);
 
     // Șterge și înregistrarea e-factura dacă există (doar draft/error)
     if (factura.anaf_upload_id) {
@@ -115,7 +121,7 @@ export async function DELETE(request: NextRequest) {
           location: 'EU'
         });
 
-        console.log(`✅ Șters și e-factura draft pentru factura ${factura.numar}`);
+        console.log(`✅ Șters și e-factura draft pentru factura ${numarComplet}`);
       } catch (error) {
         console.log('⚠️ Nu s-a putut șterge e-factura (posibil nu există):', error);
       }
@@ -123,7 +129,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Factura ${factura.numar} a fost ștearsă cu succes`
+      message: `Factura ${numarComplet} a fost ștearsă cu succes`
     });
 
   } catch (error) {

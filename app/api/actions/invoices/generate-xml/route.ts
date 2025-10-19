@@ -280,14 +280,19 @@ async function getFacturaData(facturaId: string) {
 // ✅ EXPORTAT pentru reutilizare în alte API-uri (generate-hibrid)
 export async function generateUBLXml(facturaData: any) {
   try {
-    console.log('🔄 Generating UBL XML for factura:', facturaData.numar);
+    // Construiește numărul complet (serie + numar)
+    const numarComplet = facturaData.serie
+      ? `${facturaData.serie}-${facturaData.numar}`
+      : facturaData.numar;
+
+    console.log('🔄 Generating UBL XML for factura:', numarComplet);
 
     // Parse liniile facturii din JSON
     const liniiFactura = facturaData.dateComplete?.liniiFactura || [];
     const clientInfo = facturaData.dateComplete?.clientInfo || {};
 
     // Generează ID-uri unice pentru factura
-    const invoiceId = facturaData.numar;
+    const invoiceId = numarComplet;
     const uuid = uuidv4();
 
     // Datele furnizorului (UNITAR PROIECT)
