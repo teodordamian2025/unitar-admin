@@ -540,14 +540,14 @@ async function updateProiectStatusFacturare(proiectId: string) {
 
     console.log(`✅ [PROIECT-STATUS] Status calculat pentru proiect ${proiectId}: "${statusProiect}"`);
 
-    // ✅ PASUL 2.5: Citește Data_Start pentru partition key (Proiecte_v2 e partitioned)
+    // ✅ PASUL 2.5: Citește Data_Start și Denumire pentru partition key și afișare (Proiecte_v2 e partitioned)
     const proiectQuery = `
-      SELECT Data_Start
+      SELECT Data_Start, Denumire
       FROM ${TABLE_PROIECTE}
       WHERE ID_Proiect = @proiectId
     `;
 
-    console.log(`🔍 [PROIECT-STATUS] Citesc Data_Start pentru partition key:`, {
+    console.log(`🔍 [PROIECT-STATUS] Citesc Data_Start și Denumire pentru partition key:`, {
       query: proiectQuery,
       proiectId
     });
@@ -567,6 +567,7 @@ async function updateProiectStatusFacturare(proiectId: string) {
     // ✅ Gestionare BigQuery DATE field ca obiect {value: "2025-09-10"}
     const dataStartRaw = proiectRows[0]?.Data_Start;
     const dataStart = dataStartRaw?.value || dataStartRaw;
+    const denumireProiect = proiectRows[0]?.Denumire || proiectId; // ✅ Salvare denumire proiect pentru factură
 
     console.log(`📅 [PROIECT-STATUS] Data_Start găsit pentru partition:`, {
       raw: dataStartRaw,
@@ -784,6 +785,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lipsesc liniile facturii' }, { status: 400 });
     }
 
+    // ✅ NOU: Citește denumirea proiectului pentru afișare în factură
+    console.log(`📋 Citesc denumirea proiectului ${proiectId}...`);
+    let denumireProiectFactura = proiectId; // fallback la ID dacă query-ul eșuează
+
+    try {
+      const proiectQueryDenumire = `
+        SELECT Denumire
+        FROM ${TABLE_PROIECTE}
+        WHERE ID_Proiect = @proiectId
+        LIMIT 1
+      `;
+
+      const [proiectRowsDenumire] = await bigquery.query({
+        query: proiectQueryDenumire,
+        params: { proiectId },
+        types: { proiectId: 'STRING' },
+        location: 'EU'
+      });
+
+      if (proiectRowsDenumire && proiectRowsDenumire.length > 0) {
+        denumireProiectFactura = proiectRowsDenumire[0]?.Denumire || proiectId;
+        console.log(`✅ Denumire proiect găsită: "${denumireProiectFactura}"`);
+      } else {
+        console.log(`⚠️ Nu s-a găsit denumirea pentru proiect ${proiectId}, folosesc ID-ul`);
+      }
+    } catch (errorDenumire) {
+      console.error(`❌ Eroare la citirea denumirii proiectului:`, errorDenumire);
+      // Continuă cu fallback la proiectId
+    }
+
     // ✅ PĂSTRAT: FIX PROBLEMA 4: FOLOSEȘTE DIRECT datele din frontend (STOP recalculare!)
     const liniiFacturaActualizate = liniiFactura; // ← SIMPLU: folosește datele corecte din frontend
     
@@ -897,7 +928,7 @@ export async function POST(request: NextRequest) {
     // ✅ PĂSTRAT: Folosește numărul primit din frontend
     const safeInvoiceData = {
       numarFactura: numarFactura || `INV-${proiectId}-${Date.now()}`,
-      denumireProiect: `${proiectId}`,
+      denumireProiect: denumireProiectFactura, // ✅ FIX: Folosește denumirea reală în loc de ID
       descriere: descrierePrincipala,
       subtotal: Number(subtotal.toFixed(2)),
       tva: Number(totalTva.toFixed(2)),
@@ -1221,7 +1252,6 @@ export async function POST(request: NextRequest) {
             <div class="invoice-number">Factura nr: ${numarFacturaDisplay}</div>
             <div class="invoice-meta">
                 <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
-                <div><strong>Proiect:</strong> ${safeInvoiceData.denumireProiect}</div>
                 ${isEdit ? '<div><strong>Status:</strong> EDITATA</div>' : ''}
                 ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>MODE:</strong> TEST e-Factura</div>' : ''}
