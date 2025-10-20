@@ -200,8 +200,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Sortare și paginare
+    // FIX: Adăugat sortare secundară după ID_Proiect pentru ordine deterministă
+    // ID_Proiect conține timestamp (ex: P2025123) → asigură ordine cronologică consistentă
     baseQuery += `
-      ORDER BY p.Data_Start DESC
+      ORDER BY p.Data_Start DESC, p.ID_Proiect DESC
       LIMIT @limit OFFSET @offset
     `;
 

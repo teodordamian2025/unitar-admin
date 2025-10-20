@@ -328,21 +328,52 @@ export default function ProiectEditModal({
   // Încarcă responsabilii existenți ai proiectului
   const loadResponsabiliProiect = async () => {
     if (!proiect.ID_Proiect) return;
-    
+
     try {
       const response = await fetch(`/api/rapoarte/proiecte-responsabili?proiect_id=${proiect.ID_Proiect}`);
       const data = await response.json();
-      
-      if (data.success && data.data) {
+
+      if (data.success && data.data && data.data.length > 0) {
         const responsabiliFormatati = data.data.map((resp: any) => ({
           uid: resp.responsabil_uid,
           nume_complet: resp.responsabil_nume,
           email: resp.email || '',
           rol_in_proiect: resp.rol_in_proiect || 'Normal'
         }));
-        
+
         setResponsabiliSelectati(responsabiliFormatati);
-        console.log(`Încărcați ${responsabiliFormatati.length} responsabili existenți pentru proiect`);
+        console.log(`Încărcați ${responsabiliFormatati.length} responsabili existenți pentru proiect din ProiecteResponsabili_v2`);
+      } else {
+        // FIX: Dacă nu există responsabili în tabela separată, dar există câmpul Responsabil în Proiecte_v2
+        // creăm un responsabil din câmpul Responsabil pentru a permite editarea proiectului
+        if (proiect.Responsabil && proiect.Responsabil.trim() !== '') {
+          console.log(`⚠️ Nu există responsabili în ProiecteResponsabili_v2, folosesc câmpul Responsabil din Proiecte_v2: "${proiect.Responsabil}"`);
+
+          // Caută utilizatorul după nume în tabela Utilizatori_v2
+          try {
+            const utilizatoriResponse = await fetch(`/api/rapoarte/utilizatori?search=${encodeURIComponent(proiect.Responsabil)}&limit=1`);
+            const utilizatoriData = await utilizatoriResponse.json();
+
+            if (utilizatoriData.success && utilizatoriData.data && utilizatoriData.data.length > 0) {
+              const user = utilizatoriData.data[0];
+              const responsabilFallback: ResponsabilSelectat = {
+                uid: user.uid,
+                nume_complet: `${user.nume} ${user.prenume}`,
+                email: user.email || '',
+                rol_in_proiect: 'Principal'
+              };
+
+              setResponsabiliSelectati([responsabilFallback]);
+              console.log(`✅ Creat responsabil fallback din Utilizatori_v2: ${responsabilFallback.nume_complet} (${responsabilFallback.uid})`);
+            } else {
+              console.warn(`⚠️ Nu s-a găsit utilizator cu numele "${proiect.Responsabil}" în Utilizatori_v2`);
+            }
+          } catch (error) {
+            console.error('Eroare la căutarea utilizatorului pentru fallback:', error);
+          }
+        } else {
+          console.warn(`⚠️ Nu există responsabili nici în ProiecteResponsabili_v2, nici în câmpul Responsabil din Proiecte_v2`);
+        }
       }
     } catch (error) {
       console.error('Eroare la încărcarea responsabililor proiect:', error);
@@ -988,7 +1019,7 @@ export default function ProiectEditModal({
         // ADĂUGAT: Calculează cursul dacă moneda nu e RON
         let cursSubproiect = 1;
         let valoareRonSubproiect = parseFloat(subproiect.valoare) || 0;
-        
+
         if (subproiect.moneda !== 'RON' && subproiect.valoare) {
           try {
             const cursData = await getCursBNRLive(subproiect.moneda, formData.data_curs_valutar);
@@ -999,9 +1030,14 @@ export default function ProiectEditModal({
           }
         }
 
+        // FIX: Include responsabilul principal din SubproiecteResponsabili_v2 în actualizare
+        const responsabiliSubproiect = responsabiliSubproiecte[subproiect.ID_Subproiect!] || [];
+        const responsabilPrincipal = responsabiliSubproiect.find(r => r.rol_in_proiect === 'Principal');
+
         const updateData = {
           id: subproiect.ID_Subproiect,
           Denumire: subproiect.denumire,
+          Responsabil: responsabilPrincipal ? responsabilPrincipal.nume_complet : null,
           Status: subproiect.status,
           Valoare_Estimata: subproiect.valoare ? parseFloat(subproiect.valoare) : null,
           moneda: subproiect.moneda || 'RON',
