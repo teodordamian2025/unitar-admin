@@ -10,6 +10,8 @@ import { google } from 'googleapis';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
 
+// Force dynamic rendering for this route (fixes DynamicServerError)
+export const dynamic = 'force-dynamic';
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {

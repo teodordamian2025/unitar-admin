@@ -11,11 +11,11 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 // ✅ Tabele cu suffix dinamic
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_CLIENTI = `\`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\``;
-const TABLE_CONTRACTE_GENERATE = `\`${PROJECT_ID}.${DATASET}.ContracteGenerate${tableSuffix}\``;
+const TABLE_CONTRACTE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 
 console.log(`🔧 Dashboard API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, ContracteGenerate${tableSuffix}, FacturiGenerate${tableSuffix}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Clienti${tableSuffix}, Contracte${tableSuffix}, FacturiGenerate${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -96,8 +96,7 @@ async function getClientiStats() {
     const query = `
       SELECT
         COUNT(*) as total,
-        COUNTIF(activ = true) as activi,
-        COUNTIF(sincronizat_factureaza = true) as sincronizati
+        COUNTIF(activ = true) as activi
       FROM ${TABLE_CLIENTI}
     `;
 
@@ -110,7 +109,7 @@ async function getClientiStats() {
       return {
         total: parseInt(rows[0].total) || 0,
         activi: parseInt(rows[0].activi) || 0,
-        sincronizati: parseInt(rows[0].sincronizati) || 0
+        sincronizati: 0  // ✅ Removed sincronizat_factureaza column (not in Clienti_v2)
       };
     }
 
@@ -123,12 +122,12 @@ async function getClientiStats() {
 
 async function getContracteStats() {
   try {
-    // Verifică dacă există tabela ContracteGenerate
+    // ✅ Fixed: Using Contracte_v2 instead of ContracteGenerate_v2
     const query = `
       SELECT
         COUNT(*) as total,
         COUNTIF(status = 'generat') as generate
-      FROM ${TABLE_CONTRACTE_GENERATE}
+      FROM ${TABLE_CONTRACTE}
     `;
 
     const [rows] = await bigquery.query({

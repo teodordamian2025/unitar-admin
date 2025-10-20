@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import type { NotificareContext } from '@/lib/notifications/types';
 
+// Force dynamic rendering for this route (fixes DynamicServerError)
+export const dynamic = 'force-dynamic';
+
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
 

@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 
+// Force dynamic rendering for this route (fixes DynamicServerError)
+export const dynamic = 'force-dynamic';
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   credentials: {
