@@ -241,7 +241,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
     
     return [{
-      denumire: `Servicii proiect ${proiect.ID_Proiect}, ${proiect.Denumire}`,
+      denumire: `Servicii proiect ${proiect.Denumire}`, // ✅ FIX: Doar Denumire, fără ID_Proiect
       cantitate: 1,
       pretUnitar: valoareProiect,
       cotaTva: 21,
@@ -740,13 +740,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // NOUĂ: Funcție pentru generarea denumirii standardizate
   const genereazaDenumireEtapa = (etapa: EtapaFacturare): string => {
-    const proiectId = proiect.ID_Proiect;
+    const denumireProiect = proiect.Denumire; // ✅ FIX: Folosește Denumire în loc de ID_Proiect
     const denumireEtapa = etapa.denumire;
-    
+
     if (etapa.tip === 'contract') {
-      return `Servicii proiect ${proiectId}, ${denumireEtapa}, conform contract nr. ${etapa.contract_numar} din ${etapa.contract_data}`;
+      return `Servicii proiect ${denumireProiect}, ${denumireEtapa}, conform contract nr. ${etapa.contract_numar} din ${etapa.contract_data}`;
     } else {
-      return `Servicii proiect ${proiectId}, ${denumireEtapa}, conform anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data}`;
+      return `Servicii proiect ${denumireProiect}, ${denumireEtapa}, conform anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data}`;
     }
   };
 
