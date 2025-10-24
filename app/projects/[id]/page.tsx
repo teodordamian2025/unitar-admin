@@ -44,6 +44,8 @@ interface ProiectDetails {
 
 interface ContractInfo {
   ID_Contract: string;
+  numar_contract?: string;       // ✅ NOU - 24.10.2025
+  serie_contract?: string;        // ✅ NOU - 24.10.2025
   Data_Semnare?: any;
   Status_Contract: string;
   Observatii?: string;
@@ -755,7 +757,9 @@ export default function UserProiectDetailsPage() {
                     background: 'white'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#2c3e50' }}>Contract {contract.ID_Contract}</strong>
+                      <strong style={{ color: '#2c3e50' }}>
+                        {contract.numar_contract || `Contract ${contract.ID_Contract}`}
+                      </strong>
                       <span style={{
                         padding: '0.25rem 0.5rem',
                         background: contract.Status_Contract === 'Semnat' ? '#27ae60' : '#f39c12',
@@ -767,9 +771,11 @@ export default function UserProiectDetailsPage() {
                         {contract.Status_Contract}
                       </span>
                     </div>
-                    {contract.Data_Semnare && (
+                    {(contract.serie_contract || contract.Data_Semnare) && (
                       <p style={{ margin: '0.5rem 0', color: '#7f8c8d', fontSize: '14px' }}>
-                        Semnat: {formatDate(contract.Data_Semnare)}
+                        {contract.serie_contract && <span>Serie: {contract.serie_contract}</span>}
+                        {contract.serie_contract && contract.Data_Semnare && <span> • </span>}
+                        {contract.Data_Semnare && <span>Semnat: {formatDate(contract.Data_Semnare)}</span>}
                       </p>
                     )}
                     {contract.Observatii && (

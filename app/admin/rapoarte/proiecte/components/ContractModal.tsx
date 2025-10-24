@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ProiectData {
@@ -224,7 +224,11 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   const [contractNumber, setContractNumber] = useState<number | null>(null);
   const [contractPreview, setContractPreview] = useState('');
   const [contractPreviewForGeneration, setContractPreviewForGeneration] = useState('');
-  
+
+  // ✅ DEBOUNCING: State local pentru input (actualizare instant fără lag)
+  const [localContractNumber, setLocalContractNumber] = useState('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // NOUĂ LOGICĂ: State pentru numărul contract editabil
   const [isManuallyEdited, setIsManuallyEdited] = useState(false);
   const [contractNumberValidation, setContractNumberValidation] = useState<ContractNumberValidation>({
@@ -270,6 +274,34 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
       });
     }
   }, [isOpen, proiect.ID_Proiect]);
+
+  // ✅ DEBOUNCING: Actualizare preview după 2.5 secunde de inactivitate
+  useEffect(() => {
+    // Cleanup timeout anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Setează nou timeout pentru actualizare
+    debounceTimerRef.current = setTimeout(() => {
+      if (localContractNumber !== contractPreview) {
+        // Actualizează preview-ul și face validarea
+        handleContractNumberChange(localContractNumber);
+      }
+    }, 2500); // 2.5 secunde delay
+
+    // Cleanup la unmount
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [localContractNumber]);
+
+  // ✅ SYNC: Sincronizează localContractNumber cu contractPreview când se schimbă din alt loc
+  useEffect(() => {
+    setLocalContractNumber(contractPreview);
+  }, [contractPreview]);
 
           {/* MODIFICAT: Funcția de generare cu suport pentru numărul custom */}
           {/* Effect pentru recalcularea procentelor contract */}
@@ -1762,8 +1794,8 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
               <div style={{ flex: 1 }}>
                 <input
                   type="text"
-                  value={contractPreview}
-                  onChange={(e) => handleContractNumberChange(e.target.value)}
+                  value={localContractNumber}
+                  onChange={(e) => setLocalContractNumber(e.target.value)}
                   disabled={loading || loadingDelete || validationLoading}
                   placeholder="CONTR-1001-2025"
                   style={{

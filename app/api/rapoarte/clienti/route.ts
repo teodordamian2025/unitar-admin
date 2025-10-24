@@ -241,30 +241,48 @@ export async function PUT(request: NextRequest) {
     // Construire query UPDATE dinamic
     const updateFields: string[] = [];
     const params: any = { id };
+    const types: any = { id: 'STRING' };
 
     // Câmpuri actualizabile
     const allowedFields = [
-      'nume', 'tip_client', 'cui', 'nr_reg_com', 'adresa', 'judet', 'oras', 
-      'cod_postal', 'telefon', 'email', 'banca', 'iban', 'cnp', 'ci_serie', 
+      'nume', 'tip_client', 'cui', 'nr_reg_com', 'adresa', 'judet', 'oras',
+      'cod_postal', 'telefon', 'email', 'banca', 'iban', 'cnp', 'ci_serie',
       'ci_numar', 'ci_eliberata_de', 'ci_eliberata_la', 'observatii'
     ];
+
+    // ✅ Câmpuri de tip DATE care trebuie convertite la null dacă sunt string gol
+    const dateFields = ['ci_eliberata_la'];
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (allowedFields.includes(key) && value !== undefined) {
         updateFields.push(`${key} = @${key}`);
-        params[key] = value;
+
+        // ✅ Convertește string gol la null pentru câmpurile DATE
+        if (dateFields.includes(key) && value === '') {
+          params[key] = null;
+          types[key] = 'DATE'; // ✅ BigQuery necesită tip explicit pentru null
+        } else {
+          params[key] = value;
+          // ✅ Setează tipul pentru toate parametrii
+          if (dateFields.includes(key)) {
+            types[key] = 'DATE';
+          } else {
+            types[key] = 'STRING';
+          }
+        }
       }
     });
 
     if (updateFields.length === 0) {
-      return NextResponse.json({ 
-        error: 'Nu există câmpuri valide de actualizat' 
+      return NextResponse.json({
+        error: 'Nu există câmpuri valide de actualizat'
       }, { status: 400 });
     }
 
     // Adaugă data_actualizare
     updateFields.push('data_actualizare = @data_actualizare');
     params.data_actualizare = new Date().toISOString();
+    types.data_actualizare = 'TIMESTAMP';
 
     const updateQuery = `
       UPDATE ${TABLE_CLIENTI}
@@ -278,6 +296,7 @@ export async function PUT(request: NextRequest) {
     await bigquery.query({
       query: updateQuery,
       params: params,
+      types: types, // ✅ Adăugat types pentru parametrii null
       location: 'EU',
     });
 

@@ -102,12 +102,14 @@ export async function GET(
     const contracteQuery = `
       SELECT
         c.ID_Contract,
+        c.numar_contract,
+        c.serie_contract,
         c.Data_Semnare,
-        c.Status_Contract,
+        c.Status AS Status_Contract,
         c.Observatii
-        -- Exclude: Valoare_Contract, Moneda, etc.
+        -- Exclude: Valoare, Moneda, etc.
       FROM ${CONTRACTE_TABLE} c
-      WHERE c.ID_Proiect = @projectId
+      WHERE c.proiect_id = @projectId
       ORDER BY c.Data_Semnare DESC
     `;
 
