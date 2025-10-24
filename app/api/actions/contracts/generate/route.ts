@@ -1179,20 +1179,16 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
       null;
       
       // Calculează valoarea pentru DB înainte de UPDATE/INSERT
-	let valoarePentruDB = contractInfo.sumaFinala; // fallback la suma în RON
-	if (contractInfo.termenePersonalizate && contractInfo.termenePersonalizate.length > 0) {
-	  // Folosește prima valoare din prima etapă sau suma totală
-	  const primeaEtapa = contractInfo.termenePersonalizate[0];
-	  if (primeaEtapa && primeaEtapa.moneda === 'RON') {
-	    valoarePentruDB = primeaEtapa.valoare || contractInfo.sumaFinala;
-	  }
-	}
+	// CORECTARE: Folosește sumaOriginalaNumeric pentru a păstra valoarea în moneda originală
+	// Aceasta este fie suma în moneda originală (dacă toate etapele au aceeași monedă),
+	// fie suma convertită în RON (dacă sunt monede mixte)
+	let valoarePentruDB = contractInfo.sumaOriginalaNumeric || contractInfo.sumaFinala;
 
     // 1. SALVAREA/ACTUALIZAREA CONTRACTULUI
     if (contractInfo.isEdit && contractInfo.contractExistentId) {
 	  const updateQuery = `
 	    UPDATE ${TABLE_CONTRACTE}
-	    SET 
+	    SET
 	      Valoare = CAST(@valoare AS NUMERIC),
 	      Moneda = @moneda,
 	      curs_valutar = @cursValutar,
@@ -1202,7 +1198,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      data_actualizare = CURRENT_TIMESTAMP(),
 	      continut_json = PARSE_JSON(@continutJson),
 	      Observatii = @observatii,
-	      versiune = versiune + 1
+	      versiune = versiune + 1,
+	      Status = 'Activ'
 	    WHERE ID_Contract = @contractId
 	  `;
 
@@ -1224,6 +1221,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	    observatii: sanitizeStringForBigQuery(contractInfo.observatii)
 	  };
 
+	  console.log(`[CONTRACT-UPDATE] Actualizare contract ${contractInfo.contractExistentId} cu Status = 'Activ' (reactivare după ștergere)`);
+
 	  await bigquery.query({
 	    query: updateQuery,
 	    params: parametriiUpdate,
@@ -1240,7 +1239,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	    },
 	    location: 'EU',
 	  });
-      
+
+	  console.log(`✅ [CONTRACT-UPDATE] Contract ${contractInfo.contractExistentId} actualizat cu succes - Status schimbat la 'Activ'`);
+
     } else {
       const insertQuery = `
         INSERT INTO ${TABLE_CONTRACTE}

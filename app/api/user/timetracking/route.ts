@@ -20,9 +20,10 @@ const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffi
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
 
 console.log(`🔧 User TimeTracking API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}`);
+console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, Utilizatori${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -96,6 +97,8 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     console.log('⏱️ USER TIME TRACKING API PARAMS:', { userId, startDate, endDate, projectId, page, limit });
+    console.log(`📊 Using table: ${TABLE_TIME_TRACKING}`);
+    console.log(`🔧 V2 Tables enabled: ${useV2Tables}`);
 
     // Query pentru time tracking utilizatori normali cu obiective multiple
     let baseQuery = `
@@ -188,7 +191,19 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     });
 
-    console.log(`✅ USER TIME TRACKING LOADED: ${rows.length} results`);
+    console.log(`✅ USER TIME TRACKING LOADED: ${rows.length} results for user_id: ${userId}`);
+    if (rows.length > 0) {
+      console.log('📋 Sample row:', {
+        id: rows[0].id,
+        utilizator_uid: rows[0].utilizator_uid,
+        data_lucru: rows[0].data_lucru,
+        ore_lucrate: rows[0].ore_lucrate,
+        proiect_nume: rows[0].proiect_nume
+      });
+    } else {
+      console.log('⚠️ No data found for user_id:', userId, 'between', startDate, 'and', endDate);
+      console.log('🔍 Debugging: Check if data exists in TimeTracking_v2 table');
+    }
 
     // Query pentru total count - folosește același alias tt pentru consistență
     let countQuery = `
@@ -273,6 +288,38 @@ export async function GET(request: NextRequest) {
       error: 'Eroare la încărcarea înregistrărilor de timp',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });
+  }
+}
+
+// Helper pentru obținere nume utilizator din Utilizatori_v2
+async function getUserFullName(userId: string): Promise<string> {
+  try {
+    const query = `
+      SELECT nume, prenume
+      FROM ${TABLE_UTILIZATORI}
+      WHERE uid = @userId
+      LIMIT 1
+    `;
+
+    const [rows] = await bigquery.query({
+      query,
+      params: { userId },
+      types: { userId: 'STRING' },
+      location: 'EU',
+    });
+
+    if (rows.length > 0) {
+      const { nume, prenume } = rows[0];
+      const fullName = `${nume || ''} ${prenume || ''}`.trim();
+      console.log(`[USER-NAME] Găsit nume pentru ${userId}: ${fullName}`);
+      return fullName || 'Utilizator';
+    }
+
+    console.warn(`[USER-NAME] Nu s-a găsit utilizatorul ${userId} în tabela Utilizatori`);
+    return 'Utilizator';
+  } catch (error) {
+    console.error(`[USER-NAME] Eroare la obținerea numelui pentru ${userId}:`, error);
+    return 'Utilizator';
   }
 }
 
@@ -366,6 +413,10 @@ export async function POST(request: NextRequest) {
       sarcina_id
     });
 
+    // Obține numele real al utilizatorului din Utilizatori_v2
+    const utilizatorNume = await getUserFullName(user_id);
+    console.log(`[TIME-TRACKING-POST] User ${user_id} → Nume: ${utilizatorNume}`);
+
     const dataLucruFormatted = data_lucru ? formatDateLiteral(data_lucru) : 'CURRENT_DATE()';
     const oreCalculate = duration_minutes / 60; // Convertește minutele în ore
 
@@ -380,7 +431,7 @@ export async function POST(request: NextRequest) {
       VALUES (
         '${escapeString(recordId)}',
         '${escapeString(user_id)}',
-        'Utilizator Normal',
+        '${escapeString(utilizatorNume)}',
         ${objectives.proiect_id ? `'${escapeString(objectives.proiect_id)}'` : 'NULL'},
         ${objectives.subproiect_id ? `'${escapeString(objectives.subproiect_id)}'` : 'NULL'},
         ${objectives.sarcina_id ? `'${escapeString(objectives.sarcina_id)}'` : 'NULL'},

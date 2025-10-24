@@ -14,6 +14,7 @@ import ClientNouModal from '../../clienti/components/ClientNouModal';
 import ResponsabilSearch from './ResponsabilSearch';
 import SubcontractantSearch from './SubcontractantSearch';
 import SubcontractantNouModal from './SubcontractantNouModal';
+import { removeDiacritics } from '@/lib/text-utils';
 
 interface ProiectNouModalProps {
   isOpen: boolean;
@@ -505,9 +506,15 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
   };
 
   const handleInputChange = (field: string, value: string) => {
+    // Normalizare automată pentru ID_Proiect, Denumire și Adresa (elimină diacritice)
+    let processedValue = value;
+    if (field === 'ID_Proiect' || field === 'Denumire' || field === 'Adresa') {
+      processedValue = removeDiacritics(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: processedValue
     }));
   };
 

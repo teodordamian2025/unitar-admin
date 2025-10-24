@@ -119,14 +119,19 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
   const [loadingCheck, setLoadingCheck] = useState(true);
   const [subproiecte, setSubproiecte] = useState<SubproiectInfo[]>([]);
   const [proiectComplet, setProiectComplet] = useState<ProiectComplet | null>(null);
-  
+
   // State pentru PV
   const [observatii, setObservatii] = useState('');
   const [denumirePV, setDenumirePV] = useState('');
   const [subproiecteSelectate, setSubproiecteSelectate] = useState<Set<string>>(new Set());
-  
+
   // State pentru preview număr PV
   const [pvPreview, setPvPreview] = useState('');
+
+  // State pentru verificare contract
+  const [contractGasit, setContractGasit] = useState<boolean>(true);
+  const [contractNumar, setContractNumar] = useState<string | null>(null);
+  const [anexeCount, setAnexeCount] = useState<number>(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -134,7 +139,8 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
       Promise.all([
         loadProiectComplet(),
         loadSubproiecte(),
-        previewPVNumber()
+        previewPVNumber(),
+        checkContractStatus()
       ]).finally(() => {
         setLoadingCheck(false);
       });
@@ -176,10 +182,10 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
   const previewPVNumber = async () => {
     try {
       console.log('Apelez API-ul pentru numerotare consecutivă PV...');
-      
+
       const response = await fetch(`/api/setari/contracte/next-number?tipDocument=pv&proiectId=${encodeURIComponent(proiect.ID_Proiect)}`);
       const result = await response.json();
-      
+
       if (result.success) {
         setPvPreview(result.contract_preview);
         console.log('Număr consecutiv pentru PV nou:', result.contract_preview);
@@ -189,10 +195,45 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
     } catch (error) {
       console.error('Eroare la preview numărul PV:', error);
       showToast('Nu s-a putut obține următorul număr de PV', 'error');
-      
+
       const currentYear = new Date().getFullYear();
       const fallbackNumber = 1001;
       setPvPreview(`PV-${fallbackNumber}-${currentYear}`);
+    }
+  };
+
+  // Verificare existență contract pentru proiect
+  const checkContractStatus = async () => {
+    try {
+      console.log('Verificare existență contract pentru proiect:', proiect.ID_Proiect);
+
+      const response = await fetch(`/api/actions/pv/generate?proiect_id=${encodeURIComponent(proiect.ID_Proiect)}`);
+      const result = await response.json();
+
+      if (result.success && result.proiect_test) {
+        const hasContract = result.proiect_test.contract_gasit;
+        const contractNum = result.proiect_test.contract_numar;
+        const anexe = result.proiect_test.anexe_count || 0;
+
+        setContractGasit(hasContract);
+        setContractNumar(contractNum);
+        setAnexeCount(anexe);
+
+        console.log('Status contract pentru PV:', {
+          contract_gasit: hasContract,
+          numar_contract: contractNum,
+          anexe_count: anexe
+        });
+
+        if (!hasContract) {
+          console.warn('⚠️ AVERTISMENT: Proiectul nu are contract generat încă!');
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la verificarea contractului:', error);
+      // Nu afișăm toast pentru a nu suprasolicita utilizatorul
+      // În caz de eroare, presupunem că există contract (optimistic)
+      setContractGasit(true);
     }
   };
 
@@ -529,6 +570,64 @@ export default function ProcesVerbalModal({ proiect, isOpen, onClose, onSuccess 
               {pvPreview}
             </div>
           </div>
+
+          {/* Avertisment lipsă contract - PĂSTRĂM posibilitatea generării PV */}
+          {!contractGasit && (
+            <div style={{
+              background: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '8px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                <div style={{ fontSize: '32px', lineHeight: '1' }}>⚠️</div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#856404', fontSize: '16px', fontWeight: 'bold' }}>
+                    AVERTISMENT: Lipsește Contractul
+                  </h3>
+                  <p style={{ margin: '0 0 0.75rem 0', color: '#856404', fontSize: '14px', lineHeight: '1.5' }}>
+                    Acest proiect nu are încă un contract generat. Este recomandat să generezi mai întâi contractul înainte de procesul verbal de predare-primire.
+                  </p>
+                  <div style={{
+                    background: 'rgba(255, 193, 7, 0.15)',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    color: '#856404',
+                    lineHeight: '1.5'
+                  }}>
+                    <strong>ℹ️ Poți continua generarea PV-ului</strong>, dar în document va apărea:
+                    <span style={{ fontFamily: 'monospace', display: 'block', marginTop: '0.5rem', fontWeight: 'bold' }}>
+                      "LA CONTRACTUL [LIPSĂ CONTRACT - Proiectul nu are încă contract]"
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info contract găsit */}
+          {contractGasit && contractNumar && (
+            <div style={{
+              background: '#d4edda',
+              border: '1px solid #c3e6cb',
+              borderRadius: '8px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1.5rem',
+              fontSize: '14px',
+              color: '#155724',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span style={{ fontSize: '20px' }}>✅</span>
+              <span>
+                Contract găsit: <strong style={{ fontFamily: 'monospace' }}>{contractNumar}</strong>
+                {anexeCount > 0 && <span> (cu {anexeCount} {anexeCount === 1 ? 'anexă' : 'anexe'})</span>}
+              </span>
+            </div>
+          )}
 
           {/* Denumire PV */}
           <div style={{ marginBottom: '1.5rem' }}>

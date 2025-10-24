@@ -8,6 +8,7 @@
 
 import React from 'react';
 import ResponsabilSearch from './ResponsabilSearch';
+import { removeDiacritics } from '@/lib/text-utils';
 
 interface SubproiectModalProps {
   proiectParinte: {
@@ -98,9 +99,15 @@ export default function SubproiectModal({ proiectParinte, isOpen, onClose, onSuc
   const [isLoadingCurs, setIsLoadingCurs] = React.useState(false);
 
   const handleInputChange = (field: string, value: string) => {
+    // Normalizare automată pentru denumire (elimină diacritice)
+    let processedValue = value;
+    if (field === 'denumire') {
+      processedValue = removeDiacritics(value);
+    }
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: processedValue
     }));
   };
 

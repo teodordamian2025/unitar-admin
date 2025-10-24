@@ -50,6 +50,12 @@ export default function TimeReports({ user }: TimeReportsProps) {
     try {
       setLoading(true);
 
+      console.log('[TimeReports] Loading data for user:', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      });
+
       // Calculează perioada bazată pe selecție
       const endDate = new Date();
       const startDate = new Date();
@@ -72,6 +78,12 @@ export default function TimeReports({ user }: TimeReportsProps) {
       const formattedStartDate = startDate.toISOString().split('T')[0];
       const formattedEndDate = endDate.toISOString().split('T')[0];
 
+      console.log('[TimeReports] Fetching data with params:', {
+        user_id: user.uid,
+        start_date: formattedStartDate,
+        end_date: formattedEndDate
+      });
+
       // Încarcă înregistrările de timp
       const timeResponse = await fetch(
         `/api/user/timetracking?user_id=${user.uid}&start_date=${formattedStartDate}&end_date=${formattedEndDate}&limit=100`
@@ -80,13 +92,31 @@ export default function TimeReports({ user }: TimeReportsProps) {
       if (timeResponse.ok) {
         const timeData = await timeResponse.json();
 
+        console.log('[TimeReports] API response:', {
+          success: timeData.success,
+          dataLength: timeData.data?.length || 0,
+          total: timeData.pagination?.total || 0
+        });
+
         if (timeData.success && timeData.data) {
           setTimeEntries(timeData.data);
 
           // Calculează statistici
           calculateStats(timeData.data);
           calculateWeeklyStats(timeData.data);
+        } else {
+          console.warn('[TimeReports] No data returned from API or unsuccessful response');
+          setTimeEntries([]);
+          setTotalStats({
+            totalHours: 0,
+            totalDays: 0,
+            avgHoursPerDay: 0,
+            thisWeekHours: 0
+          });
+          setWeeklyStats([]);
         }
+      } else {
+        console.error('[TimeReports] API request failed:', timeResponse.status, timeResponse.statusText);
       }
     } catch (error) {
       console.error('Eroare la încărcarea datelor timp:', error);

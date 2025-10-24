@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { toast } from 'react-toastify';
 import ClientNouModal from '@/app/admin/rapoarte/clienti/components/ClientNouModal';
 import ResponsabilSearch from '@/app/admin/rapoarte/proiecte/components/ResponsabilSearch';
+import { removeDiacritics } from '@/lib/text-utils';
 
 interface UserProiectNouModalProps {
   isOpen: boolean;
@@ -142,7 +143,13 @@ export default function UserProiectNouModal({ isOpen, onClose, onProiectCreated 
   };
 
   const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Normalizare automată pentru ID_Proiect, Denumire și Adresa (elimină diacritice)
+    let processedValue = value;
+    if (field === 'ID_Proiect' || field === 'Denumire' || field === 'Adresa') {
+      processedValue = removeDiacritics(value);
+    }
+
+    setFormData(prev => ({ ...prev, [field]: processedValue }));
   };
 
   // Handler pentru căutare client
