@@ -290,6 +290,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             proiect_id: item.proiect_id || null,
             subproiect_id: item.subproiect_id || null,
             sarcina_id: item.tip_item === 'sarcina' ? item.item_id : null
+          },
+          // ✅ FIX: Explicit types pentru NULL values
+          types: {
+            proiect_id: 'STRING',
+            subproiect_id: 'STRING',
+            sarcina_id: 'STRING'
           }
         });
 

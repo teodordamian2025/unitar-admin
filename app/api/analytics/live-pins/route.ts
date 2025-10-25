@@ -221,7 +221,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // ✅ ADĂUGAT: Formatare ora start pentru UI
+      // ✅ ADĂUGAT: Formatare ora start pentru UI (timezone România)
       const pin_timestamp_start = row.pin_timestamp_start?.value || null;
       let ora_start_text = 'N/A';
       if (pin_timestamp_start) {
@@ -229,7 +229,8 @@ export async function GET(request: NextRequest) {
         ora_start_text = startDate.toLocaleTimeString('ro-RO', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: false
+          hour12: false,
+          timeZone: 'Europe/Bucharest' // ✅ FIX: Timezone România explicit
         });
       }
 

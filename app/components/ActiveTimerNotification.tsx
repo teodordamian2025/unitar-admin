@@ -443,7 +443,8 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     const startHour = new Date(activePin.pin_timestamp_start).toLocaleTimeString('ro-RO', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
+      timeZone: 'Europe/Bucharest' // ✅ FIX: Timezone România explicit
     });
 
     return (
