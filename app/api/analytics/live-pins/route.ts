@@ -64,6 +64,12 @@ export async function GET(request: NextRequest) {
         p.data_actualizare,
         p.is_pinned,
         p.activ,
+
+        -- ✅ ADĂUGAT: Pin timestamp tracking
+        p.pin_timestamp_start,
+        p.pin_timestamp_stop,
+        p.pin_total_seconds,
+
         -- Date utilizator din tabelul Utilizatori
         u.nume,
         u.prenume,
@@ -100,7 +106,8 @@ export async function GET(request: NextRequest) {
         s_pr_direct.ID_Proiect as sarcina_proiect_direct_id,
         s_pr_direct.Denumire as sarcina_proiect_direct_nume,
 
-        -- Calculare timp de la pin
+        -- ✅ MODIFICAT: Calculare în secunde pentru silent tracking
+        TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), COALESCE(p.pin_timestamp_start, p.data_actualizare), SECOND) as elapsed_seconds,
         TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), p.data_actualizare, MINUTE) as minute_de_la_pin
 
       FROM ${TABLE_PLANIFICATOR_PERSONAL} p
@@ -214,6 +221,18 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // ✅ ADĂUGAT: Formatare ora start pentru UI
+      const pin_timestamp_start = row.pin_timestamp_start?.value || null;
+      let ora_start_text = 'N/A';
+      if (pin_timestamp_start) {
+        const startDate = new Date(pin_timestamp_start);
+        ora_start_text = startDate.toLocaleTimeString('ro-RO', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+      }
+
       return {
         id: row.planificator_id,
         tip_item: row.tip_item,
@@ -233,10 +252,13 @@ export async function GET(request: NextRequest) {
         user_email: row.email || 'unknown@domain.com',
         user_rol: row.rol || 'user',
 
-        // Timing
+        // ✅ TIMING SILENT TRACKING
         data_pin: row.data_actualizare,
         minute_de_la_pin: minute,
         timp_pin_text,
+        pin_timestamp_start: pin_timestamp_start,
+        ora_start_text: ora_start_text,
+        elapsed_seconds: row.elapsed_seconds || 0,
 
         // Context proiect dinamic
         context_proiect,

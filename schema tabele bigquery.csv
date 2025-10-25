@@ -265,6 +265,8 @@ IappConfig_v2,data_creare,TIMESTAMP,NO,11
 IappConfig_v2,data_actualizare,TIMESTAMP,NO,12
 IappConfig_v2,creat_de,STRING,YES,13
 IappConfig_v2,actualizat_de,STRING,YES,14
+IappConfig_v2,sursa_facturi_primite,STRING,YES,15
+IappConfig_v2,auto_download_pdfs_iapp,BOOL,YES,16
 IappFacturiEmise_v2,id,STRING,NO,1
 IappFacturiEmise_v2,factura_id,STRING,NO,2
 IappFacturiEmise_v2,iapp_id_factura,STRING,YES,3
@@ -383,6 +385,9 @@ PlanificatorPersonal_v2,activ,BOOL,YES,10
 PlanificatorPersonal_v2,reminder_enabled,BOOL,YES,11
 PlanificatorPersonal_v2,reminder_days_before,INT64,YES,12
 PlanificatorPersonal_v2,last_notification_sent,TIMESTAMP,YES,13
+PlanificatorPersonal_v2,pin_timestamp_start,TIMESTAMP,YES,14
+PlanificatorPersonal_v2,pin_timestamp_stop,TIMESTAMP,YES,15
+PlanificatorPersonal_v2,pin_total_seconds,INT64,YES,16
 ProcesVerbale_v2,ID_PV,STRING,NO,1
 ProcesVerbale_v2,numar_pv,STRING,NO,2
 ProcesVerbale_v2,serie_pv,STRING,NO,3
@@ -674,6 +679,7 @@ TimeTracking_v2,tip_inregistrare,STRING,YES,8
 TimeTracking_v2,created_at,TIMESTAMP,YES,9
 TimeTracking_v2,proiect_id,STRING,YES,10
 TimeTracking_v2,subproiect_id,STRING,YES,11
+TimeTracking_v2,planificator_item_id,STRING,YES,12
 TranzactiiAccounts_v2,id,STRING,NO,1
 TranzactiiAccounts_v2,iban,STRING,NO,2
 TranzactiiAccounts_v2,nume_banca,STRING,NO,3

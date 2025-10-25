@@ -417,6 +417,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       });
 
       if (response.ok) {
+        const data = await response.json();
         await loadPlanificatorItems();
 
         // CRITICAL FIX: Force refresh context pentru a actualiza live analytics în admin
@@ -425,12 +426,30 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
         console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
 
-        toast.success(currentPinned ? '📌 Pin eliminat' : '📌 Item pin-at!');
+        // ✅ ENHANCED: Toast messages cu info durata la unpin
+        if (currentPinned) {
+          // UNPIN - afișează durata dacă există
+          if (data.duration_minutes && data.duration_minutes >= 1) {
+            toast.success(`📌 Pin eliminat! Timp total: ${data.duration_minutes} minute (${data.duration_hours}h)`);
+          } else {
+            toast.info('📌 Pin eliminat (durată prea scurtă pentru tracking)');
+          }
+        } else {
+          // PIN - informează despre silent tracking
+          toast.success('📌 Pin activat! Timpul începe să fie monitorizat silențios.');
+        }
       } else {
-        toast.error('❌ Eroare la pin/unpin');
+        // ✅ ENHANCED: Error handling pentru limită 8h
+        const errorData = await response.json();
+        if (errorData.error && errorData.error.includes('8 ore')) {
+          toast.error('⏰ Ai atins limita de 8 ore pe zi! Nu poți pin-a item-ul.');
+        } else {
+          toast.error(errorData.error || '❌ Eroare la pin/unpin');
+        }
       }
     } catch (error) {
       console.error('Error toggling pin:', error);
+      toast.error('❌ Eroare la pin/unpin');
     }
   };
 

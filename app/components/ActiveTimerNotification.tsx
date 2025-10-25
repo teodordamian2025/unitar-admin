@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/components/ActiveTimerNotification.tsx
-// DATA: 07.10.2025 (redesign minimalist)
-// DESCRIERE: Notificare minimalistă pentru cronometru activ (înlocuire InvisibleTimerAlert)
+// DATA: 25.10.2025 - ENHANCED: Afișare pin activ (silent tracking)
+// DESCRIERE: Notificare minimalistă pentru cronometru activ + pin activ din Planificator
 // POZIȚIONARE: Sub ultimul buton din sidebar, deasupra logout
 // DESIGN: Calm, informativ, acționabil (nu alarmant)
 // ==================================================================
@@ -27,6 +27,20 @@ interface InvisibleSession {
   descriere_sesiune?: string;
 }
 
+// ✅ ADĂUGAT: Interface pentru pin activ
+interface ActivePin {
+  id: string;
+  utilizator_uid: string;
+  tip_item: 'proiect' | 'subproiect' | 'sarcina';
+  item_id: string;
+  display_name: string;
+  comentariu_personal: string;
+  pin_timestamp_start: string;
+  elapsed_seconds: number;
+  context_proiect: string | null;
+  deadline: string | null;
+}
+
 const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
   userId,
   user,
@@ -38,6 +52,9 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
   const [lastCheckTime, setLastCheckTime] = useState<number>(0);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // ✅ ADĂUGAT: State pentru pin activ
+  const [activePin, setActivePin] = useState<ActivePin | null>(null);
 
   // Obține ID token la mount
   useEffect(() => {
@@ -82,6 +99,37 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
       return undefined;
     }
   }, [userId, idToken, contextHasSession]);
+
+  // ✅ ADĂUGAT: Check pentru pin activ la mount (ZERO POLLING - doar 1 request)
+  useEffect(() => {
+    if (!userId || !idToken) return;
+
+    const checkActivePin = async () => {
+      try {
+        const response = await fetch('/api/user/planificator/active-pin', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.pin) {
+            console.log('📌 ActiveTimerNotification: Found active pin:', data.pin.display_name);
+            setActivePin(data.pin);
+          } else {
+            setActivePin(null);
+          }
+        }
+      } catch (error) {
+        console.error('❌ ActiveTimerNotification: Error checking active pin:', error);
+      }
+    };
+
+    checkActivePin();
+  }, [userId, idToken]);
 
   const checkForInvisibleSessions = async () => {
     if (!userId || !idToken) return;
@@ -208,28 +256,30 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     return elapsed;
   };
 
-  // Nu afișa nimic dacă nu există sesiuni invizibile
-  if (invisibleSessions.length === 0) {
+  // ✅ MODIFICAT: Afișăm fie cronometru activ, fie pin activ
+  if (invisibleSessions.length === 0 && !activePin) {
     return null;
   }
 
-  const session = invisibleSessions[0]; // Afișăm prima sesiune
-  const elapsedSeconds = getElapsedTime(session);
+  // Prioritate: cronometru activ > pin activ
+  if (invisibleSessions.length > 0) {
+    const session = invisibleSessions[0];
+    const elapsedSeconds = getElapsedTime(session);
 
-  return (
-    <>
-      <div
-        style={{
-          margin: '0 1rem 1rem 1rem',
-          padding: '0.875rem',
-          background: 'rgba(16, 185, 129, 0.08)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(16, 185, 129, 0.25)',
-          borderRadius: '12px',
-          fontSize: '0.8125rem',
-          transition: 'all 0.3s ease'
-        }}
-      >
+    return (
+      <>
+        <div
+          style={{
+            margin: '0 1rem 1rem 1rem',
+            padding: '0.875rem',
+            background: 'rgba(16, 185, 129, 0.08)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            borderRadius: '12px',
+            fontSize: '0.8125rem',
+            transition: 'all 0.3s ease'
+          }}
+        >
         {/* Header cu status */}
         <div style={{
           display: 'flex',
@@ -357,33 +407,162 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
         </div>
       </div>
 
-      {/* CSS animations */}
-      <style jsx>{`
-        @keyframes pulse-green {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
+        {/* CSS animations */}
+        <style jsx>{`
+          @keyframes pulse-green {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.6;
+              transform: scale(0.95);
+            }
           }
-          50% {
-            opacity: 0.6;
-            transform: scale(0.95);
-          }
-        }
 
-        @keyframes highlight-pulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          @keyframes highlight-pulse {
+            0% {
+              box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            50% {
+              box-shadow: 0 0 0 20px rgba(16, 185, 129, 0);
+            }
+            100% {
+              box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
           }
-          50% {
-            box-shadow: 0 0 0 20px rgba(16, 185, 129, 0);
+        `}</style>
+      </>
+    );
+  }
+
+  // ✅ ADĂUGAT: Rendering pentru pin activ (când NU există cronometru activ)
+  if (activePin) {
+    const startTime = new Date(activePin.pin_timestamp_start).getTime();
+    const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+    const startHour = new Date(activePin.pin_timestamp_start).toLocaleTimeString('ro-RO', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    return (
+      <>
+        <div
+          style={{
+            margin: '0 1rem 1rem 1rem',
+            padding: '0.875rem',
+            background: 'rgba(59, 130, 246, 0.08)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: '12px',
+            fontSize: '0.8125rem',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          {/* Header cu status */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '0.5rem'
+          }}>
+            <span style={{
+              fontSize: '1.125rem',
+              animation: 'pulse-blue 2s ease-in-out infinite'
+            }}>
+              📌
+            </span>
+            <span style={{
+              fontWeight: '600',
+              color: '#2563eb',
+              fontSize: '0.8125rem',
+              letterSpacing: '0.01em'
+            }}>
+              Pin activ în Planificator
+            </span>
+          </div>
+
+          {/* Info pin */}
+          <div style={{
+            marginBottom: '0.75rem',
+            paddingLeft: '1.625rem'
+          }}>
+            <div style={{
+              fontWeight: '500',
+              color: '#1e40af',
+              fontSize: '0.8125rem',
+              marginBottom: '0.25rem',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {activePin.display_name}
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#3b82f6',
+              opacity: 0.9
+            }}>
+              🕐 Pornit la {startHour}
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#3b82f6',
+              opacity: 0.9,
+              marginTop: '0.125rem'
+            }}>
+              ⏳ {formatTime(elapsedSeconds)}
+            </div>
+            {activePin.comentariu_personal && (
+              <div style={{
+                fontSize: '0.6875rem',
+                color: '#3b82f6',
+                opacity: 0.75,
+                marginTop: '0.25rem',
+                fontStyle: 'italic',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                💭 {activePin.comentariu_personal}
+              </div>
+            )}
+          </div>
+
+          {/* Info despre silent tracking */}
+          <div style={{
+            fontSize: '0.6875rem',
+            color: '#6b7280',
+            opacity: 0.8,
+            fontStyle: 'italic',
+            textAlign: 'center',
+            padding: '0.375rem 0.5rem',
+            background: 'rgba(59, 130, 246, 0.05)',
+            borderRadius: '4px'
+          }}>
+            Silent tracking activ - timpul se înregistrează automat
+          </div>
+        </div>
+
+        {/* CSS animations pentru pin */}
+        <style jsx>{`
+          @keyframes pulse-blue {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.6;
+              transform: scale(0.95);
+            }
           }
-          100% {
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-          }
-        }
-      `}</style>
-    </>
-  );
+        `}</style>
+      </>
+    );
+  }
+
+  return null;
 };
 
 export default ActiveTimerNotification;

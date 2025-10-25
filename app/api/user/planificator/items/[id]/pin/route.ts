@@ -1,8 +1,8 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/items/[id]/pin/route.ts
-// DATA: 02.10.2025 (ora României) - FIXED: Adăugat unpinAll logic
-// DESCRIERE: API pentru pin/unpin items planificator utilizatori normali
-// FUNCȚIONALITATE: Toggle pin status cu validare că item aparține utilizatorului curent + unpinAll
+// DATA: 25.10.2025 (ora României) - ENHANCED: Silent time tracking pentru pin-uri
+// DESCRIERE: API pentru pin/unpin items planificator cu timestamp tracking
+// FUNCȚIONALITATE: Toggle pin status + silent time tracking (start/stop timestamps + TimeTracking insert)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -51,9 +51,48 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     // Verifică că item-ul există și aparține utilizatorului curent
     const checkQuery = `
-      SELECT id, utilizator_uid
-      FROM \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
-      WHERE id = @id AND activ = TRUE
+      SELECT
+        p.id,
+        p.utilizator_uid,
+        p.tip_item,
+        p.item_id,
+        p.pin_timestamp_start,
+
+        -- Display name bazat pe tip_item
+        CASE
+          WHEN p.tip_item = 'proiect' THEN proj.Denumire
+          WHEN p.tip_item = 'subproiect' THEN sub.Denumire
+          WHEN p.tip_item = 'sarcina' THEN sarc.titlu
+          ELSE 'Unknown'
+        END AS display_name,
+
+        -- Proiect ID pentru TimeTracking
+        CASE
+          WHEN p.tip_item = 'proiect' THEN p.item_id
+          WHEN p.tip_item = 'subproiect' THEN sub.ID_Proiect
+          WHEN p.tip_item = 'sarcina' THEN sarc.proiect_id
+          ELSE NULL
+        END AS proiect_id,
+
+        -- Subproiect ID pentru TimeTracking
+        CASE
+          WHEN p.tip_item = 'subproiect' THEN p.item_id
+          WHEN p.tip_item = 'sarcina' THEN sarc.subproiect_id
+          ELSE NULL
+        END AS subproiect_id
+
+      FROM \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\` p
+
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` proj
+        ON p.tip_item = 'proiect' AND p.item_id = proj.ID_Proiect
+
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\` sub
+        ON p.tip_item = 'subproiect' AND p.item_id = sub.ID_Subproiect
+
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\` sarc
+        ON p.tip_item = 'sarcina' AND p.item_id = sarc.id
+
+      WHERE p.id = @id AND p.activ = TRUE
     `;
 
     const [checkRows] = await bigquery.query({
@@ -66,47 +105,207 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    if (checkRows[0].utilizator_uid !== userId) {
-      console.warn(`⚠️ [User Pin API] - Unauthorized: userId=${userId}, owner=${checkRows[0].utilizator_uid}`);
+    const item = checkRows[0];
+
+    if (item.utilizator_uid !== userId) {
+      console.warn(`⚠️ [User Pin API] - Unauthorized: userId=${userId}, owner=${item.utilizator_uid}`);
       return NextResponse.json({ error: 'Unauthorized to modify this item' }, { status: 403 });
     }
 
-    // CRITICAL FIX: Dacă pinează, mai întâi elimină pin-ul de la toate celelalte items
-    // (identic cu logica din admin API)
+    // ✅ LOGICA NOUĂ: PIN (timestamp_start + verificări 8h)
     if (is_pinned) {
-      const unpinAllQuery = `
-        UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
-        SET is_pinned = FALSE, data_actualizare = CURRENT_TIMESTAMP()
-        WHERE utilizator_uid = @userId AND is_pinned = TRUE AND activ = TRUE AND id != @id
+      // Verifică limita de 8 ore pe zi ÎNAINTE de a permite pin-ul
+      const today = new Date().toISOString().split('T')[0];
+      const todayTimeQuery = `
+        SELECT COALESCE(SUM(ore_lucrate), 0) as total_ore
+        FROM \`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\`
+        WHERE utilizator_uid = @userId
+          AND data_lucru = @today
       `;
 
-      const [unpinResult] = await bigquery.query({
+      const [todayTimeRows] = await bigquery.query({
+        query: todayTimeQuery,
+        params: { userId, today }
+      });
+
+      const totalOreToday = todayTimeRows[0]?.total_ore || 0;
+
+      if (totalOreToday >= 8) {
+        console.warn(`⚠️ [User Pin API] - 8h limit reached for userId=${userId}, total_ore=${totalOreToday}`);
+        return NextResponse.json({
+          error: 'Ai atins limita de 8 ore pe zi! Nu poți pin-a item-ul.',
+          total_ore_today: totalOreToday
+        }, { status: 400 });
+      }
+
+      // Verifică dacă mai are alt pin activ (unpinAll logic)
+      const unpinAllQuery = `
+        UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+        SET
+          is_pinned = FALSE,
+          pin_timestamp_stop = CURRENT_TIMESTAMP(),
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE utilizator_uid = @userId
+          AND is_pinned = TRUE
+          AND activ = TRUE
+          AND id != @id
+          AND pin_timestamp_start IS NOT NULL
+          AND pin_timestamp_stop IS NULL
+      `;
+
+      await bigquery.query({
         query: unpinAllQuery,
         params: { userId, id }
       });
 
       console.log(`🔧 [User Pin API] - Unpinned other items for user ${userId}`);
+
+      // Update pin pentru item-ul curent cu timestamp_start
+      const now = new Date().toISOString();
+      const pinQuery = `
+        UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+        SET
+          is_pinned = TRUE,
+          pin_timestamp_start = @timestamp_start,
+          pin_timestamp_stop = NULL,
+          pin_total_seconds = NULL,
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE id = @id AND utilizator_uid = @userId
+      `;
+
+      await bigquery.query({
+        query: pinQuery,
+        params: { id, userId, timestamp_start: now }
+      });
+
+      console.log(`✅ [User Pin API] - Pin activated: itemId=${id}, timestamp=${now}`);
+
+      return NextResponse.json({
+        success: true,
+        is_pinned: true,
+        timestamp_start: now,
+        message: 'Pin activat! Timpul începe să fie monitorizat silențios.',
+        total_ore_today: totalOreToday
+      });
+
+    } else {
+      // ✅ LOGICA NOUĂ: UNPIN (timestamp_stop + calcul durată + insert TimeTracking)
+
+      if (!item.pin_timestamp_start) {
+        return NextResponse.json({
+          error: 'Pin-ul nu are timestamp de start valid!'
+        }, { status: 400 });
+      }
+
+      // Calculează durata
+      const now = new Date();
+      const startTime = new Date(item.pin_timestamp_start.value);
+      const durationMs = now.getTime() - startTime.getTime();
+      const durationSeconds = Math.floor(durationMs / 1000);
+      const durationHours = durationSeconds / 3600;
+      const durationMinutes = Math.round(durationSeconds / 60);
+
+      console.log(`⏱️ [User Pin API] - Unpin duration: ${durationSeconds}s (${durationMinutes} min)`);
+
+      // Update pin cu timestamp_stop
+      const unpinQuery = `
+        UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+        SET
+          is_pinned = FALSE,
+          pin_timestamp_stop = @timestamp_stop,
+          pin_total_seconds = @duration_seconds,
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE id = @id AND utilizator_uid = @userId
+      `;
+
+      await bigquery.query({
+        query: unpinQuery,
+        params: {
+          id,
+          userId,
+          timestamp_stop: now.toISOString(),
+          duration_seconds: durationSeconds
+        }
+      });
+
+      // ✅ CREEAZĂ ÎNREGISTRARE ÎN TimeTracking_v2 (doar dacă > 1 minut)
+      if (durationMinutes >= 1) {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Obține numele utilizatorului
+        const userQuery = `
+          SELECT nume, prenume
+          FROM \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\`
+          WHERE uid = @userId
+          LIMIT 1
+        `;
+        const [userRows] = await bigquery.query({
+          query: userQuery,
+          params: { userId }
+        });
+
+        const userName = userRows.length > 0
+          ? `${userRows[0].prenume || ''} ${userRows[0].nume || ''}`.trim() || 'Unknown'
+          : 'Unknown';
+
+        const timeTrackingQuery = `
+          INSERT INTO \`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\` (
+            id,
+            utilizator_uid,
+            utilizator_nume,
+            data_lucru,
+            ore_lucrate,
+            descriere_lucru,
+            tip_inregistrare,
+            planificator_item_id,
+            proiect_id,
+            subproiect_id,
+            sarcina_id,
+            created_at
+          ) VALUES (
+            GENERATE_UUID(),
+            @userId,
+            @userName,
+            @today,
+            @duration_hours,
+            @descriere,
+            'pin_silent',
+            @itemId,
+            @proiect_id,
+            @subproiect_id,
+            @sarcina_id,
+            CURRENT_TIMESTAMP()
+          )
+        `;
+
+        await bigquery.query({
+          query: timeTrackingQuery,
+          params: {
+            userId,
+            userName,
+            today,
+            duration_hours: durationHours,
+            descriere: `📌 Pin silențios: ${item.display_name}`,
+            itemId: id,
+            proiect_id: item.proiect_id || null,
+            subproiect_id: item.subproiect_id || null,
+            sarcina_id: item.tip_item === 'sarcina' ? item.item_id : null
+          }
+        });
+
+        console.log(`✅ [User Pin API] - TimeTracking saved: ${durationHours.toFixed(2)}h`);
+      } else {
+        console.log(`⚠️ [User Pin API] - Duration too short (${durationMinutes} min), skipping TimeTracking`);
+      }
+
+      return NextResponse.json({
+        success: true,
+        is_pinned: false,
+        duration_minutes: durationMinutes,
+        duration_hours: durationHours.toFixed(2),
+        message: `Pin eliminat! Timp total: ${durationMinutes} minute`
+      });
     }
-
-    // Update pin pentru item-ul curent
-    const updateQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
-      SET is_pinned = @is_pinned, data_actualizare = CURRENT_TIMESTAMP()
-      WHERE id = @id AND utilizator_uid = @userId
-    `;
-
-    const [result] = await bigquery.query({
-      query: updateQuery,
-      params: { id, userId, is_pinned }
-    });
-
-    console.log(`✅ [User Pin API] - Success: itemId=${id}, is_pinned=${is_pinned}`);
-
-    return NextResponse.json({
-      success: true,
-      is_pinned,
-      message: is_pinned ? 'Item pinned successfully' : 'Item unpinned successfully'
-    });
 
   } catch (error) {
     console.error('Error updating pin status:', error);

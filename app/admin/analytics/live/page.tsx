@@ -60,6 +60,9 @@ interface LivePin {
   timp_pin_text: string;
   context_proiect: string;
   detalii_specifice: any;
+  // ✅ ADĂUGAT pentru silent tracking
+  ora_start_text?: string;
+  elapsed_seconds?: number;
 }
 
 interface TimerSession {
@@ -618,11 +621,24 @@ export default function LiveTracking() {
     if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
       return '00:00:00';
     }
-    
+
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ✅ ADĂUGAT: Format pentru durata pin-ului (mai compact)
+  const formatPinDuration = (seconds: number): string => {
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
+      return '0s';
+    }
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
   };
 
   const getStatusColor = (status: string) => {
@@ -748,6 +764,30 @@ export default function LiveTracking() {
               marginTop: '0.25rem'
             }}>
               📁 {pin.context_proiect}
+            </div>
+          )}
+
+          {/* ✅ ADĂUGAT: Afișare ora start pin + elapsed time pentru silent tracking */}
+          {(pin.ora_start_text || pin.elapsed_seconds) && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.75rem',
+              color: '#3b82f6',
+              marginTop: '0.5rem',
+              paddingTop: '0.5rem',
+              borderTop: '1px solid rgba(59, 130, 246, 0.15)',
+              background: 'rgba(59, 130, 246, 0.05)',
+              padding: '0.5rem',
+              borderRadius: '6px'
+            }}>
+              <span style={{ fontWeight: '500' }}>
+                🕐 Pin activat la {pin.ora_start_text || 'N/A'}
+              </span>
+              <span style={{ fontWeight: '600', color: '#2563eb' }}>
+                ⏳ {formatPinDuration(pin.elapsed_seconds || 0)}
+              </span>
             </div>
           )}
         </div>
