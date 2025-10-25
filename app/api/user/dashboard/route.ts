@@ -34,12 +34,22 @@ const bigquery = new BigQuery({
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Loading user dashboard statistics...');
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('user_id');
+
+    if (!userId) {
+      return NextResponse.json({
+        error: 'Missing user_id parameter',
+        success: false
+      }, { status: 400 });
+    }
+
+    console.log(`Loading user dashboard statistics for user: ${userId}...`);
 
     // Obține statistici pentru utilizatori normali - fără date financiare
-    const proiecteStats = await getUserProiecteStats();
-    const timeTrackingStats = await getUserTimeTrackingStats();
-    const sarciniiStats = await getUserSarciniiStats();
+    const proiecteStats = await getUserProiecteStats(userId);
+    const timeTrackingStats = await getUserTimeTrackingStats(userId);
+    const sarciniiStats = await getUserSarciniiStats(userId);
 
     const stats = {
       proiecte: proiecteStats,
@@ -63,22 +73,27 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getUserProiecteStats() {
+async function getUserProiecteStats(userId: string) {
   try {
+    const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+
     const query = `
       SELECT
-        COUNT(*) as total,
-        COUNTIF(Status = 'Activ') as active,
-        COUNTIF(Status = 'Finalizat') as finalizate,
-        COUNTIF(Status = 'Suspendat') as suspendate,
-        COUNTIF(status_predare = 'Predat') as predate,
-        COUNTIF(status_predare = 'Nepredat') as nepredate
-      FROM ${TABLE_PROIECTE}
+        COUNT(DISTINCT p.ID_Proiect) as total,
+        COUNTIF(p.Status = 'Activ') as active,
+        COUNTIF(p.Status = 'Finalizat') as finalizate,
+        COUNTIF(p.Status = 'Suspendat') as suspendate,
+        COUNTIF(p.status_predare = 'Predat') as predate,
+        COUNTIF(p.status_predare = 'Nepredat') as nepredate
+      FROM ${TABLE_PROIECTE} p
+      LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON p.ID_Proiect = pr.proiect_id
+      WHERE p.Responsabil = @userId OR pr.responsabil_uid = @userId
     `;
 
     const [rows] = await bigquery.query({
       query: query,
       location: 'EU',
+      params: { userId }
     });
 
     if (rows.length > 0) {
@@ -99,7 +114,7 @@ async function getUserProiecteStats() {
   }
 }
 
-async function getUserTimeTrackingStats() {
+async function getUserTimeTrackingStats(userId: string) {
   try {
     // Calculează orele săptămânii curente (luni-duminică)
     const query = `
@@ -108,13 +123,15 @@ async function getUserTimeTrackingStats() {
         COUNT(DISTINCT data_lucru) as zile_lucrate,
         COUNT(*) as total_inregistrari
       FROM ${TABLE_TIME_TRACKING}
-      WHERE EXTRACT(WEEK FROM data_lucru) = EXTRACT(WEEK FROM CURRENT_DATE())
+      WHERE utilizator_uid = @userId
+        AND EXTRACT(WEEK FROM data_lucru) = EXTRACT(WEEK FROM CURRENT_DATE())
         AND EXTRACT(YEAR FROM data_lucru) = EXTRACT(YEAR FROM CURRENT_DATE())
     `;
 
     const [rows] = await bigquery.query({
       query: query,
       location: 'EU',
+      params: { userId }
     });
 
     if (rows.length > 0) {
@@ -133,21 +150,26 @@ async function getUserTimeTrackingStats() {
   }
 }
 
-async function getUserSarciniiStats() {
+async function getUserSarciniiStats(userId: string) {
   try {
+    const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
+
     const query = `
       SELECT
-        COUNT(*) as total,
-        COUNTIF(status = 'Neinceput') as neinceput,
-        COUNTIF(status = 'In Progress') as in_progress,
-        COUNTIF(status = 'Finalizat') as finalizate,
-        COUNTIF(prioritate = 'Urgent') as urgente
-      FROM ${TABLE_SARCINI}
+        COUNT(DISTINCT s.id) as total,
+        COUNTIF(s.status = 'Neinceput') as neinceput,
+        COUNTIF(s.status = 'In Progress') as in_progress,
+        COUNTIF(s.status = 'Finalizat') as finalizate,
+        COUNTIF(s.prioritate = 'Urgent') as urgente
+      FROM ${TABLE_SARCINI} s
+      INNER JOIN ${TABLE_SARCINI_RESPONSABILI} sr ON s.id = sr.sarcina_id
+      WHERE sr.responsabil_uid = @userId
     `;
 
     const [rows] = await bigquery.query({
       query: query,
       location: 'EU',
+      params: { userId }
     });
 
     if (rows.length > 0) {

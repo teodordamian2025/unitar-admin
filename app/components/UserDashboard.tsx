@@ -89,7 +89,7 @@ export default function UserDashboard() {
 
       // Conectare la API real pentru utilizatori normali
       console.log('🔄 Loading real user dashboard data...');
-      const response = await fetch('/api/user/dashboard');
+      const response = await fetch(`/api/user/dashboard?user_id=${user?.uid}`);
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
