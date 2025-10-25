@@ -57,6 +57,7 @@ export interface IappConfig {
   parola_api: string; // encrypted
   email_responsabil: string;
   sursa_facturi_primite?: string; // 'iapp' | 'anaf'
+  auto_download_pdfs_iapp?: boolean; // Download automat PDFs în Google Drive
 }
 
 export interface IappFacturaDetalii {
@@ -189,7 +190,7 @@ export function cleanCUI(cui: string): string {
 export async function getIappConfig(): Promise<IappConfig> {
   const query = `
     SELECT cod_firma, parola_api, email_responsabil,
-           tip_facturare, sursa_facturi_primite
+           tip_facturare, sursa_facturi_primite, auto_download_pdfs_iapp
     FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
     WHERE activ = TRUE
     ORDER BY data_creare DESC
@@ -208,7 +209,8 @@ export async function getIappConfig(): Promise<IappConfig> {
     cod_firma: config.cod_firma,
     parola_api: config.parola_api,
     email_responsabil: config.email_responsabil || 'contact@unitarproiect.eu',
-    sursa_facturi_primite: config.sursa_facturi_primite || 'iapp'
+    sursa_facturi_primite: config.sursa_facturi_primite || 'iapp',
+    auto_download_pdfs_iapp: config.auto_download_pdfs_iapp !== false // Default TRUE
   };
 }
 
@@ -406,6 +408,106 @@ export async function fetchFacturaDetails(idSolicitare: string): Promise<IappFac
   console.log(`✅ [iapp.ro] Detalii factură ${data.data.factura?.cbcID || idSolicitare} - ${data.data.continut?.length || 0} articole`);
 
   return data.data;
+}
+
+/**
+ * Download PDF din link iapp.ro
+ * @param pdfUrl URL link PDF din iapp.ro (ex: https://my.iapp.ro/share/spv-furnizori/...)
+ * @returns Buffer cu conținut PDF
+ */
+export async function downloadPdfFromIapp(pdfUrl: string): Promise<Buffer> {
+  console.log(`📥 [iapp.ro] Download PDF: ${pdfUrl.substring(0, 60)}...`);
+
+  const response = await fetch(pdfUrl, {
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; UNITAR-Admin/1.0)',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  console.log(`✅ [iapp.ro] PDF downloaded: ${(buffer.length / 1024).toFixed(2)} KB`);
+
+  return buffer;
+}
+
+/**
+ * Generează nume fișier pentru PDF factură
+ * Pattern: FURNIZOR_SERIE_DATA.pdf
+ * Exemplu: MBO_DRIVE_6992_2025-10-21.pdf
+ */
+export function generatePdfFileName(factura: {
+  nume_emitent: string;
+  serie_numar: string;
+  data_factura: string | { value: string };
+}): string {
+  // Normalize nume emitent (remove spaces, special chars)
+  const numeNormalizat = factura.nume_emitent
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 30); // Max 30 chars
+
+  // Serie număr (clean)
+  const serieNormalizata = String(factura.serie_numar).replace(/[^A-Z0-9-]/gi, '_');
+
+  // Data (YYYY-MM-DD) - handle both string and BigQuery DATE object
+  const dataStr = typeof factura.data_factura === 'object' && factura.data_factura?.value
+    ? factura.data_factura.value
+    : factura.data_factura;
+  const data = String(dataStr).split('T')[0]; // Remove time if exists
+
+  return `${numeNormalizat}_${serieNormalizata}_${data}.pdf`;
+}
+
+/**
+ * Upload PDF în Google Drive folder specific iapp.ro
+ * Structură: Facturi Primite ANAF/iapp.ro/YYYY/MM/
+ * @param pdfBuffer Buffer cu conținut PDF
+ * @param fileName Nume fișier (ex: MBO_DRIVE_6992_2025-10-21.pdf)
+ * @param year An (ex: "2025")
+ * @param month Lună (ex: "10")
+ * @returns Google Drive file ID
+ */
+export async function uploadPdfToIappDrive(
+  pdfBuffer: Buffer,
+  fileName: string,
+  year: string,
+  month: string
+): Promise<string> {
+  const {
+    getRootFacturiFolder,
+    createFolder,
+    uploadFile,
+  } = await import('./google-drive-helper');
+
+  console.log(`💾 [iapp.ro] Upload PDF în Drive: ${fileName}`);
+
+  // 1. Găsește folder rădăcină "Facturi Primite ANAF"
+  const rootFolderId = await getRootFacturiFolder();
+
+  // 2. Creează/găsește folder "iapp.ro"
+  const iappFolderId = await createFolder('iapp.ro', rootFolderId);
+
+  // 3. Creează/găsește folder an (ex: "2025")
+  const yearFolderId = await createFolder(year, iappFolderId);
+
+  // 4. Creează/găsește folder lună (ex: "10")
+  const monthStr = month.padStart(2, '0'); // Ensure "01", "02", etc.
+  const monthFolderId = await createFolder(monthStr, yearFolderId);
+
+  // 5. Upload PDF
+  const result = await uploadFile(fileName, pdfBuffer, 'application/pdf', monthFolderId);
+
+  console.log(`✅ [iapp.ro] PDF salvat în Drive: ${fileName} (ID: ${result.fileId})`);
+
+  return result.fileId;
 }
 
 /**

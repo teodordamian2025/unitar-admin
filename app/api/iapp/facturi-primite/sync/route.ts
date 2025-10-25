@@ -14,6 +14,9 @@ import {
   getDateRange,
   getIappConfig,
   fetchFacturaDetails,
+  downloadPdfFromIapp,
+  generatePdfFileName,
+  uploadPdfToIappDrive,
   type IappFacturaRaspuns
 } from '@/lib/iapp-facturi-primite';
 import { autoAssociate } from '@/lib/facturi-primite-matcher';
@@ -92,6 +95,7 @@ export async function POST(req: NextRequest) {
           facturi_noi: 0,
           facturi_duplicate: 0,
           facturi_salvate: 0,
+          pdfs_descarcate: 0,
           facturi_asociate: 0,
           processingTime: Date.now() - startTime
         }
@@ -125,15 +129,17 @@ export async function POST(req: NextRequest) {
           facturi_noi: 0,
           facturi_duplicate: facturiDuplicate.length,
           facturi_salvate: 0,
+          pdfs_descarcate: 0,
           facturi_asociate: 0,
           processingTime: Date.now() - startTime
         }
       });
     }
 
-    // Step 5: Mapare și fetch detalii complete + insert în BigQuery
+    // Step 5: Mapare și fetch detalii complete + download PDF + insert în BigQuery
     const recordsToInsert: any[] = [];
     const facturiSalvate: string[] = [];
+    let pdfsDescarcate = 0;
 
     for (const factura of facturiNoi) {
       try {
@@ -141,8 +147,9 @@ export async function POST(req: NextRequest) {
         const dbRecord = mapIappFacturaToDatabase(factura);
 
         // Fetch detalii complete (articole + PDF link)
+        let detalii: any = null;
         try {
-          const detalii = await fetchFacturaDetails(String(factura.id_solicitare));
+          detalii = await fetchFacturaDetails(String(factura.id_solicitare));
 
           // Salvează JSON complet în xml_content (pentru afișare detalii în UI)
           dbRecord.xml_content = JSON.stringify(detalii);
@@ -156,6 +163,43 @@ export async function POST(req: NextRequest) {
         } catch (detailError) {
           // Nu e critică eroarea de fetch detalii, continuăm cu datele de bază
           console.warn(`⚠️ [iapp.ro] Nu s-au putut prelua detalii pentru ${factura.factura.serie_numar}:`, detailError);
+        }
+
+        // Download PDF în Google Drive (dacă flag activat)
+        if (config.auto_download_pdfs_iapp && detalii?.pdf) {
+          try {
+            console.log(`📥 [iapp.ro] Start download PDF pentru ${factura.factura.serie_numar}...`);
+
+            // 1. Download PDF
+            const pdfBuffer = await downloadPdfFromIapp(detalii.pdf);
+
+            // 2. Generate filename
+            const fileName = generatePdfFileName({
+              nume_emitent: factura.factura.furnizor_name,
+              serie_numar: String(factura.factura.serie_numar),
+              data_factura: dbRecord.data_factura
+            });
+
+            // 3. Extract year/month pentru folder structure
+            const [year, month] = dbRecord.data_factura.split('-');
+
+            // 4. Upload to Drive
+            const fileId = await uploadPdfToIappDrive(pdfBuffer, fileName, year, month);
+
+            // 5. Save file ID in record
+            dbRecord.google_drive_file_id = fileId;
+
+            pdfsDescarcate++;
+            console.log(`✅ [iapp.ro] PDF salvat: ${fileName} (Drive ID: ${fileId})`);
+
+            // Small delay pentru rate limiting (500ms între download-uri)
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (pdfError) {
+            // Non-critical - continuăm fără PDF
+            console.warn(`⚠️ [iapp.ro] Nu s-a putut descărca PDF pentru ${factura.factura.serie_numar}:`, pdfError);
+          }
+        } else if (!config.auto_download_pdfs_iapp) {
+          console.log(`ℹ️ [iapp.ro] Download PDF dezactivat (flag OFF)`);
         }
 
         recordsToInsert.push(dbRecord);
@@ -207,7 +251,7 @@ export async function POST(req: NextRequest) {
     const processingTime = Date.now() - startTime;
 
     console.log(`✅ [iapp.ro] ========== SYNC COMPLETED (${processingTime}ms) ==========`);
-    console.log(`📊 [iapp.ro] Stats: Total=${facturiIapp.length}, Noi=${facturiNoi.length}, Salvate=${recordsToInsert.length}, Asociate=${facturiAsociate}`);
+    console.log(`📊 [iapp.ro] Stats: Total=${facturiIapp.length}, Noi=${facturiNoi.length}, Salvate=${recordsToInsert.length}, PDFs=${pdfsDescarcate}, Asociate=${facturiAsociate}`);
 
     return NextResponse.json({
       success: true,
@@ -217,6 +261,7 @@ export async function POST(req: NextRequest) {
         facturi_noi: facturiNoi.length,
         facturi_duplicate: facturiDuplicate.length,
         facturi_salvate: recordsToInsert.length,
+        pdfs_descarcate: pdfsDescarcate,
         facturi_asociate: facturiAsociate,
         processingTime
       },

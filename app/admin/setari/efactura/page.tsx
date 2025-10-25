@@ -14,7 +14,8 @@ export default function SetariEFacturaPage() {
     moneda_default: 'RON',
     footer_intocmit_name: 'Administrator UNITAR',
     email_responsabil: 'contact@unitarproiect.eu',
-    sursa_facturi_primite: 'iapp' // 'iapp' sau 'anaf' - pentru facturi primite de la furnizori
+    sursa_facturi_primite: 'iapp', // 'iapp' sau 'anaf' - pentru facturi primite de la furnizori
+    auto_download_pdfs_iapp: true // Download automat PDFs în Google Drive
   });
 
   useEffect(() => {
@@ -377,6 +378,66 @@ export default function SetariEFacturaPage() {
               </div>
             </div>
           </div>
+
+          {/* Toggle: Download automat PDFs (doar pentru iapp.ro) */}
+          {config.sursa_facturi_primite === 'iapp' && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <label className="flex items-start gap-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.auto_download_pdfs_iapp}
+                  onChange={(e) => setConfig({ ...config, auto_download_pdfs_iapp: e.target.checked })}
+                  className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base sm:text-lg font-semibold text-gray-900">
+                      💾 Download automat PDF-uri în Google Drive
+                    </span>
+                    <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
+                      RECOMANDAT
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700">
+                    Salvează automat PDF-urile facturilor primite din iapp.ro în Google Drive
+                    pentru arhivare long-term (minim 5 ani conform legislației).
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-gray-600">
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                      <span>
+                        <strong>Structură organizată:</strong> Facturi Primite ANAF/iapp.ro/YYYY/MM/
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                      <span>
+                        <strong>Backup sigur:</strong> PDFs stocate independent de disponibilitatea iapp.ro
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                      <span>
+                        <strong>Storage estimat:</strong> ~50-200 MB/lună pentru 100 facturi (3-12 GB în 5 ani)
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                      <span>
+                        <strong>Sync automat zilnic:</strong> Cron job la 01:00 GMT (03:00-04:00 AM România)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 bg-white/60 rounded border border-blue-200">
+                    <p className="text-xs text-gray-600">
+                      <strong>💡 Notă:</strong> Link-urile iapp.ro rămân disponibile și dacă această opțiune este dezactivată.
+                      Download-ul automat asigură backup permanent pentru conformitate fiscală.
+                    </p>
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Buttons */}

@@ -1,0 +1,55 @@
+name: iApp Facturi Primite - Sync Zilnic
+
+on:
+  schedule:
+    # Rulează zilnic la 01:00 GMT (03:00-04:00 AM România, în funcție de DST)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Permite trigger manual din GitHub UI
+
+jobs:
+  sync-iapp-facturi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Trigger iApp Facturi Primite Sync
+        run: |
+          echo "🔄 Triggering iApp facturi primite sync..."
+          echo "⏰ Scheduled time: 01:00 GMT (03:00-04:00 AM România)"
+          echo "📅 Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://admin.unitarproiect.eu/api/iapp/facturi-primite/sync \
+            -H "Content-Type: application/json" \
+            -d '{"zile": 7}')
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo ""
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response:"
+          echo "$body" | python3 -m json.tool || echo "$body"
+
+          if [ "$http_code" -eq 200 ]; then
+            echo ""
+            echo "✅ iApp facturi primite sync completed successfully"
+
+            # Parse stats dacă există
+            facturi_noi=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('facturi_noi', 0))" 2>/dev/null || echo "N/A")
+            pdfs_descarcate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('pdfs_descarcate', 0))" 2>/dev/null || echo "N/A")
+
+            echo "📈 Stats: Facturi noi=$facturi_noi, PDFs descărcate=$pdfs_descarcate"
+          else
+            echo ""
+            echo "❌ iApp facturi primite sync failed with status $http_code"
+            exit 1
+          fi
+
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🏁 Workflow completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

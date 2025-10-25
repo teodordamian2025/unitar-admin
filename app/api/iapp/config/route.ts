@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       SELECT id, email_responsabil, activ, tip_facturare,
              auto_transmite_efactura, serie_default, moneda_default,
              footer_intocmit_name, data_creare, data_actualizare,
-             sursa_facturi_primite
+             sursa_facturi_primite, auto_download_pdfs_iapp
       FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
       WHERE activ = TRUE
       ORDER BY data_creare DESC
@@ -81,7 +81,8 @@ export async function GET(request: NextRequest) {
           moneda_default: 'RON',
           footer_intocmit_name: 'Administrator UNITAR',
           email_responsabil: 'contact@unitarproiect.eu',
-          sursa_facturi_primite: 'iapp' // Default: iapp.ro pentru facturi primite
+          sursa_facturi_primite: 'iapp', // Default: iapp.ro pentru facturi primite
+          auto_download_pdfs_iapp: true // Default: download automat PDFs
         },
         isDefault: true
       });
@@ -100,6 +101,7 @@ export async function GET(request: NextRequest) {
         footer_intocmit_name: config.footer_intocmit_name,
         email_responsabil: config.email_responsabil,
         sursa_facturi_primite: config.sursa_facturi_primite || 'iapp', // Fallback pentru backwards compatibility
+        auto_download_pdfs_iapp: config.auto_download_pdfs_iapp !== false, // Default TRUE
         activ: config.activ,
         data_creare: config.data_creare,
         data_actualizare: config.data_actualizare
@@ -130,7 +132,8 @@ export async function PUT(request: NextRequest) {
       moneda_default,
       footer_intocmit_name,
       email_responsabil,
-      sursa_facturi_primite
+      sursa_facturi_primite,
+      auto_download_pdfs_iapp
     } = body;
 
     // Validare
@@ -202,6 +205,7 @@ export async function PUT(request: NextRequest) {
       moneda_default: moneda_default || oldConfig.moneda_default,
       footer_intocmit_name: footer_intocmit_name || oldConfig.footer_intocmit_name,
       sursa_facturi_primite: sursa_facturi_primite || oldConfig.sursa_facturi_primite || 'iapp', // Default: iapp.ro
+      auto_download_pdfs_iapp: auto_download_pdfs_iapp !== undefined ? auto_download_pdfs_iapp : (oldConfig.auto_download_pdfs_iapp !== false), // Default: TRUE
       data_creare: new Date().toISOString(),
       data_actualizare: new Date().toISOString(),
       creat_de: oldConfig.creat_de || 'system',
