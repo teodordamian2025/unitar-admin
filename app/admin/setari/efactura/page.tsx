@@ -18,8 +18,24 @@ export default function SetariEFacturaPage() {
     auto_download_pdfs_iapp: true // Download automat PDFs în Google Drive
   });
 
+  // State pentru Google Drive OAuth token status
+  const [tokenStatus, setTokenStatus] = useState<{
+    status: 'valid' | 'expiring_soon' | 'expired' | 'missing' | 'error' | 'loading';
+    message: string;
+    token_info?: {
+      expires_at: string;
+      zile_ramase: number;
+      ore_ramase: number;
+    };
+    authorize_url?: string;
+  }>({
+    status: 'loading',
+    message: 'Se verifică status token...'
+  });
+
   useEffect(() => {
     fetchConfig();
+    fetchTokenStatus();
   }, []);
 
   const fetchConfig = async () => {
@@ -34,6 +50,34 @@ export default function SetariEFacturaPage() {
       console.error('Error fetching config:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTokenStatus = async () => {
+    try {
+      const response = await fetch('/api/oauth/google-drive/status');
+      const data = await response.json();
+
+      if (data.success) {
+        setTokenStatus({
+          status: data.status,
+          message: data.message,
+          token_info: data.token_info,
+          authorize_url: data.authorize_url
+        });
+      } else {
+        setTokenStatus({
+          status: data.status || 'error',
+          message: data.message || 'Eroare la verificarea token-ului',
+          authorize_url: data.authorize_url
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching token status:', error);
+      setTokenStatus({
+        status: 'error',
+        message: 'Eroare la verificarea statusului token-ului'
+      });
     }
   };
 
@@ -436,6 +480,153 @@ export default function SetariEFacturaPage() {
                   </div>
                 </div>
               </label>
+            </div>
+          )}
+
+          {/* Google Drive OAuth Status (doar când PDFs download activat) */}
+          {config.sursa_facturi_primite === 'iapp' && config.auto_download_pdfs_iapp && (
+            <div className="mt-6 p-4 bg-white rounded-lg border-2 border-gray-200">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
+                    🔐 Status Autentificare Google Drive
+                  </h3>
+
+                  {tokenStatus.status === 'loading' && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span>Se verifică status token...</span>
+                    </div>
+                  )}
+
+                  {tokenStatus.status === 'valid' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-700">Token Valid</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{tokenStatus.message}</p>
+                      {tokenStatus.token_info && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                          <div>Expiră la: {new Date(tokenStatus.token_info.expires_at).toLocaleDateString('ro-RO', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          <div className="mt-1">Zile rămase: {tokenStatus.token_info.zile_ramase}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tokenStatus.status === 'expiring_soon' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium text-yellow-700">Token Expiră Curând</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{tokenStatus.message}</p>
+                      {tokenStatus.token_info && (
+                        <div className="mt-2 p-2 bg-yellow-50 rounded text-xs text-gray-600">
+                          <div>Expiră la: {new Date(tokenStatus.token_info.expires_at).toLocaleDateString('ro-RO', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          <div className="mt-1">Ore rămase: {tokenStatus.token_info.ore_ramase}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {tokenStatus.status === 'expired' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-red-700">Token Expirat</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{tokenStatus.message}</p>
+                      <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-600">
+                        <strong>⚠️ Acțiune necesară:</strong> Token-ul Google Drive a expirat.
+                        PDF-urile nu vor mai putea fi salvate până la reautorizare.
+                      </div>
+                    </div>
+                  )}
+
+                  {tokenStatus.status === 'missing' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                        <span className="text-sm font-medium text-gray-700">Token Lipsă</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{tokenStatus.message}</p>
+                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                        <strong>ℹ️ Configurare necesară:</strong> Trebuie să autorizezi accesul la Google Drive
+                        pentru a activa salvarea automată a PDF-urilor.
+                      </div>
+                    </div>
+                  )}
+
+                  {tokenStatus.status === 'error' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <span className="text-sm font-medium text-red-700">Eroare Verificare</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{tokenStatus.message}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Buton Reautorizare */}
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      if (tokenStatus.authorize_url) {
+                        window.open(tokenStatus.authorize_url, '_blank');
+                        // Refresh status după 30s (timp pentru OAuth flow)
+                        setTimeout(() => fetchTokenStatus(), 30000);
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                      tokenStatus.status === 'expired' || tokenStatus.status === 'missing'
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : tokenStatus.status === 'expiring_soon'
+                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                    disabled={tokenStatus.status === 'loading'}
+                  >
+                    {tokenStatus.status === 'expired' || tokenStatus.status === 'missing'
+                      ? '🔑 Autorizează Google Drive'
+                      : tokenStatus.status === 'expiring_soon'
+                      ? '🔄 Reînnoiește Token'
+                      : '🔄 Reautorizează'}
+                  </button>
+
+                  {/* Button refresh status */}
+                  <button
+                    onClick={fetchTokenStatus}
+                    className="mt-2 w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors"
+                    disabled={tokenStatus.status === 'loading'}
+                  >
+                    🔃 Verifică Status
+                  </button>
+                </div>
+              </div>
+
+              {/* Info helper */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-xs text-gray-600">
+                  <strong>💡 Cum funcționează?</strong> Token-ul OAuth permite aplicației să salveze automat
+                  PDF-urile facturilor primite în Google Drive. Token-ul expiră periodic și necesită reautorizare.
+                  Click pe butonul "Reautorizează" când token-ul expiră sau este aproape să expire.
+                </p>
+              </div>
             </div>
           )}
         </div>
