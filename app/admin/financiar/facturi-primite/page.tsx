@@ -25,22 +25,44 @@ interface FacturaPrimita {
   proiect_denumire?: string;
   subproiect_denumire?: string;
   data_preluare?: string;
+  observatii?: string; // Pentru a detecta sursa (iapp.ro sau ANAF)
 }
 
 export default function FacturiPrimitePage() {
   const [facturi, setFacturi] = useState<FacturaPrimita[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [sursaConfig, setSursaConfig] = useState<'iapp' | 'anaf'>('iapp');
   const [filters, setFilters] = useState({
     search: '',
     status: '',
     asociat: '',
   });
 
+  // Load config pentru sursa facturi primite
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
   // Load facturi
   useEffect(() => {
     loadFacturi();
   }, [filters]);
+
+  async function loadConfig() {
+    try {
+      const response = await fetch('/api/iapp/config');
+      const data = await response.json();
+
+      if (data.success && data.config) {
+        setSursaConfig(data.config.sursa_facturi_primite || 'iapp');
+      }
+    } catch (error) {
+      console.error('Error loading config:', error);
+      // Fallback la iapp dacă nu reușește
+      setSursaConfig('iapp');
+    }
+  }
 
   async function loadFacturi() {
     try {
@@ -74,7 +96,14 @@ export default function FacturiPrimitePage() {
       setSyncing(true);
       toast.loading('Sincronizare în curs...');
 
-      const response = await fetch('/api/anaf/facturi-primite/sync', {
+      // Alege endpoint-ul în funcție de sursa configurată
+      const endpoint = sursaConfig === 'iapp'
+        ? '/api/iapp/facturi-primite/sync'
+        : '/api/anaf/facturi-primite/sync';
+
+      console.log(`🔄 Sincronizare facturi primite din: ${sursaConfig} (${endpoint})`);
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ zile: 7 }),
@@ -83,11 +112,17 @@ export default function FacturiPrimitePage() {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error);
+        throw new Error(result.error || result.details || 'Eroare necunoscută');
       }
 
       toast.dismiss();
-      toast.success(`${result.success_count} facturi procesate!`);
+
+      // Mesaj personalizat în funcție de sursa
+      const mesaj = result.stats
+        ? `✅ ${result.stats.facturi_salvate || 0} facturi noi din ${sursaConfig === 'iapp' ? 'iapp.ro' : 'ANAF'}!`
+        : `✅ Sincronizare completă!`;
+
+      toast.success(mesaj);
 
       // Reload listă
       loadFacturi();
@@ -104,13 +139,18 @@ export default function FacturiPrimitePage() {
       <div className="space-y-6">
         {/* Header cu acțiuni */}
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Facturi Primite ANAF</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Facturi Primite de la Furnizori</h1>
+            <p className="text-sm text-white/60 mt-1">
+              Sursa configurată: <span className="font-semibold text-white">{sursaConfig === 'iapp' ? 'iapp.ro' : 'ANAF Direct'}</span>
+            </p>
+          </div>
           <button
             onClick={handleSync}
             disabled={syncing}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
           >
-            {syncing ? '🔄 Sincronizare...' : '🔄 Sincronizare Manuală'}
+            {syncing ? '🔄 Sincronizare...' : `🔄 Sincronizare ${sursaConfig === 'iapp' ? 'iapp.ro' : 'ANAF'}`}
           </button>
         </div>
 
@@ -152,7 +192,7 @@ export default function FacturiPrimitePage() {
           <div className="text-center py-12 text-white/60">Încărcare...</div>
         ) : facturi.length === 0 ? (
           <div className="text-center py-12 text-white/60">
-            Nu există facturi. Rulează sincronizarea pentru a prelua date din ANAF.
+            Nu există facturi. Rulează sincronizarea pentru a prelua date din {sursaConfig === 'iapp' ? 'iapp.ro' : 'ANAF'}.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -164,52 +204,69 @@ export default function FacturiPrimitePage() {
                   <th className="px-4 py-3 text-left text-white/80 font-medium">CUI</th>
                   <th className="px-4 py-3 text-left text-white/80 font-medium">Data</th>
                   <th className="px-4 py-3 text-right text-white/80 font-medium">Valoare</th>
+                  <th className="px-4 py-3 text-left text-white/80 font-medium">Sursa</th>
                   <th className="px-4 py-3 text-left text-white/80 font-medium">Status</th>
                   <th className="px-4 py-3 text-left text-white/80 font-medium">Asociere</th>
                 </tr>
               </thead>
               <tbody>
-                {facturi.map((factura) => (
-                  <tr key={factura.id} className="border-t border-white/10 hover:bg-white/5">
-                    <td className="px-4 py-3 text-white">{factura.serie_numar || '-'}</td>
-                    <td className="px-4 py-3 text-white">{factura.nume_emitent || '-'}</td>
-                    <td className="px-4 py-3 text-white/60">{factura.cif_emitent || '-'}</td>
-                    <td className="px-4 py-3 text-white/60">
-                      {factura.data_factura ? new Date(factura.data_factura).toLocaleDateString('ro-RO') : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-white">
-                      {factura.valoare_ron?.toFixed(2)} RON
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          factura.status_procesare === 'asociat'
-                            ? 'bg-green-500/20 text-green-300'
-                            : factura.status_procesare === 'procesat'
-                            ? 'bg-blue-500/20 text-blue-300'
-                            : 'bg-yellow-500/20 text-yellow-300'
-                        }`}
-                      >
-                        {factura.status_procesare}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-white/60 text-sm">
-                      {factura.cheltuiala_asociata_id ? (
-                        <>
-                          {factura.asociere_automata ? '🤖 ' : '👤 '}
-                          {factura.proiect_denumire}
-                        </>
-                      ) : (
-                        <button
-                          className="text-blue-400 hover:text-blue-300"
-                          onClick={() => toast('Funcționalitate în dezvoltare')}
+                {facturi.map((factura) => {
+                  // Detectează sursa din observatii
+                  const sursa = factura.observatii?.includes('iapp.ro') ? 'iapp' : 'anaf';
+
+                  return (
+                    <tr key={factura.id} className="border-t border-white/10 hover:bg-white/5">
+                      <td className="px-4 py-3 text-white">{factura.serie_numar || '-'}</td>
+                      <td className="px-4 py-3 text-white">{factura.nume_emitent || '-'}</td>
+                      <td className="px-4 py-3 text-white/60">{factura.cif_emitent || '-'}</td>
+                      <td className="px-4 py-3 text-white/60">
+                        {factura.data_factura ? new Date(factura.data_factura).toLocaleDateString('ro-RO') : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-white">
+                        {factura.valoare_ron?.toFixed(2)} RON
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-semibold ${
+                            sursa === 'iapp'
+                              ? 'bg-purple-500/20 text-purple-300'
+                              : 'bg-orange-500/20 text-orange-300'
+                          }`}
                         >
-                          Asociază →
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {sursa === 'iapp' ? 'iapp.ro' : 'ANAF'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${
+                            factura.status_procesare === 'asociat'
+                              ? 'bg-green-500/20 text-green-300'
+                              : factura.status_procesare === 'procesat'
+                              ? 'bg-blue-500/20 text-blue-300'
+                              : 'bg-yellow-500/20 text-yellow-300'
+                          }`}
+                        >
+                          {factura.status_procesare}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white/60 text-sm">
+                        {factura.cheltuiala_asociata_id ? (
+                          <>
+                            {factura.asociere_automata ? '🤖 ' : '👤 '}
+                            {factura.proiect_denumire}
+                          </>
+                        ) : (
+                          <button
+                            className="text-blue-400 hover:text-blue-300"
+                            onClick={() => toast('Funcționalitate în dezvoltare')}
+                          >
+                            Asociază →
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

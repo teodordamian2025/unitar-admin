@@ -13,7 +13,8 @@ export default function SetariEFacturaPage() {
     serie_default: 'SERIE_TEST',
     moneda_default: 'RON',
     footer_intocmit_name: 'Administrator UNITAR',
-    email_responsabil: 'contact@unitarproiect.eu'
+    email_responsabil: 'contact@unitarproiect.eu',
+    sursa_facturi_primite: 'iapp' // 'iapp' sau 'anaf' - pentru facturi primite de la furnizori
   });
 
   useEffect(() => {
@@ -278,6 +279,105 @@ export default function SetariEFacturaPage() {
             </div>
           </div>
         )}
+
+        {/* Secțiune: Preluare Facturi Primite de la Furnizori */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+            Preluare Facturi Primite de la Furnizori
+          </h2>
+          <p className="text-xs sm:text-sm text-gray-600 mb-4">
+            Alege sursa pentru sincronizarea automată a facturilor primite de la furnizori din SPV ANAF
+          </p>
+
+          <div className="space-y-4">
+            {/* Radio: iapp.ro */}
+            <div
+              className={`relative flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                config.sursa_facturi_primite === 'iapp'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setConfig({ ...config, sursa_facturi_primite: 'iapp' })}
+            >
+              <div className="flex items-center h-5">
+                <input
+                  type="radio"
+                  checked={config.sursa_facturi_primite === 'iapp'}
+                  onChange={() => setConfig({ ...config, sursa_facturi_primite: 'iapp' })}
+                  className="w-5 h-5 text-blue-600 focus:ring-blue-500"
+                />
+              </div>
+              <div className="ml-4 flex-1">
+                <div className="flex items-center flex-wrap">
+                  <label className="text-base sm:text-lg font-medium text-gray-900">
+                    iapp.ro (Recomandat)
+                  </label>
+                  <span className="ml-3 px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
+                    RECOMANDAT
+                  </span>
+                </div>
+                <p className="mt-2 text-xs sm:text-sm text-gray-600">
+                  Sincronizare automată facturi primite prin API iapp.ro - fără OAuth, configurare simplă
+                </p>
+                <ul className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <Check className="w-4 h-4 mr-2 flex-shrink-0 text-green-500" />
+                    Aceleași credențiale ca pentru emitere
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="w-4 h-4 mr-2 flex-shrink-0 text-green-500" />
+                    Sincronizare rapidă (doar metadata JSON)
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="w-4 h-4 mr-2 flex-shrink-0 text-green-500" />
+                    Auto-asociere cu cheltuieli proiecte
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Radio: ANAF Direct */}
+            <div
+              className={`relative flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                config.sursa_facturi_primite === 'anaf'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setConfig({ ...config, sursa_facturi_primite: 'anaf' })}
+            >
+              <div className="flex items-center h-5">
+                <input
+                  type="radio"
+                  checked={config.sursa_facturi_primite === 'anaf'}
+                  onChange={() => setConfig({ ...config, sursa_facturi_primite: 'anaf' })}
+                  className="w-5 h-5 text-blue-600 focus:ring-blue-500"
+                />
+              </div>
+              <div className="ml-4 flex-1">
+                <label className="text-base sm:text-lg font-medium text-gray-900">
+                  ANAF Direct (OAuth)
+                </label>
+                <p className="mt-2 text-xs sm:text-sm text-gray-600">
+                  Descărcare directă din SPV ANAF prin OAuth 2.0 + certificat digital
+                </p>
+                <ul className="mt-2 space-y-1 text-xs sm:text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0 text-yellow-500" />
+                    Necesită configurare OAuth separată
+                  </li>
+                  <li className="flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0 text-yellow-500" />
+                    Descarcă fișiere ZIP/XML/PDF (mai lent)
+                  </li>
+                  <li className="flex items-center">
+                    <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0 text-yellow-500" />
+                    Poate întâmpina erori SPV ANAF
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Buttons */}
         <div className="flex items-center justify-end space-x-4">

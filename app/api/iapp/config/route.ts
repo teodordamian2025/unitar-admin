@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
     const query = `
       SELECT id, email_responsabil, activ, tip_facturare,
              auto_transmite_efactura, serie_default, moneda_default,
-             footer_intocmit_name, data_creare, data_actualizare
+             footer_intocmit_name, data_creare, data_actualizare,
+             sursa_facturi_primite
       FROM \`${PROJECT_ID}.${DATASET}.IappConfig_v2\`
       WHERE activ = TRUE
       ORDER BY data_creare DESC
@@ -79,7 +80,8 @@ export async function GET(request: NextRequest) {
           serie_default: 'SERIE_TEST',
           moneda_default: 'RON',
           footer_intocmit_name: 'Administrator UNITAR',
-          email_responsabil: 'contact@unitarproiect.eu'
+          email_responsabil: 'contact@unitarproiect.eu',
+          sursa_facturi_primite: 'iapp' // Default: iapp.ro pentru facturi primite
         },
         isDefault: true
       });
@@ -97,6 +99,7 @@ export async function GET(request: NextRequest) {
         moneda_default: config.moneda_default,
         footer_intocmit_name: config.footer_intocmit_name,
         email_responsabil: config.email_responsabil,
+        sursa_facturi_primite: config.sursa_facturi_primite || 'iapp', // Fallback pentru backwards compatibility
         activ: config.activ,
         data_creare: config.data_creare,
         data_actualizare: config.data_actualizare
@@ -126,7 +129,8 @@ export async function PUT(request: NextRequest) {
       serie_default,
       moneda_default,
       footer_intocmit_name,
-      email_responsabil
+      email_responsabil,
+      sursa_facturi_primite
     } = body;
 
     // Validare
@@ -134,6 +138,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'Invalid tip_facturare. Must be "iapp" or "anaf_direct"'
+      }, { status: 400 });
+    }
+
+    // Validare sursa_facturi_primite (opțional)
+    if (sursa_facturi_primite && !['iapp', 'anaf'].includes(sursa_facturi_primite)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid sursa_facturi_primite. Must be "iapp" or "anaf"'
       }, { status: 400 });
     }
 
@@ -189,6 +201,7 @@ export async function PUT(request: NextRequest) {
       serie_default: serie_default || oldConfig.serie_default,
       moneda_default: moneda_default || oldConfig.moneda_default,
       footer_intocmit_name: footer_intocmit_name || oldConfig.footer_intocmit_name,
+      sursa_facturi_primite: sursa_facturi_primite || oldConfig.sursa_facturi_primite || 'iapp', // Default: iapp.ro
       data_creare: new Date().toISOString(),
       data_actualizare: new Date().toISOString(),
       creat_de: oldConfig.creat_de || 'system',
@@ -208,7 +221,8 @@ export async function PUT(request: NextRequest) {
         serie_default,
         moneda_default,
         footer_intocmit_name,
-        email_responsabil
+        email_responsabil,
+        sursa_facturi_primite: sursa_facturi_primite || 'iapp'
       }
     });
 
