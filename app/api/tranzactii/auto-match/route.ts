@@ -11,9 +11,9 @@ import crypto from 'crypto';
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
 
-// ✅ Toggle pentru tabele optimizate
-const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
-const tableSuffix = useV2Tables ? '_v2' : '';
+// ✅ Folosim întotdeauna tabele V2 optimizate (migrare completă BigQuery)
+const useV2Tables = true;
+const tableSuffix = '_v2';
 
 // Configurare BigQuery
 const bigquery = new BigQuery({
@@ -307,8 +307,8 @@ async function findEtapeFacturiCandidates(tranzactii: TranzactieCandidat[]): Pro
         fg.total_tva as factura_total_tva,
         fg.total as factura_total
         
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi\` ef
-      INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate\` fg 
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi_v2\` ef
+      INNER JOIN \`hale-mode-464009-i6.PanouControlUnitar.FacturiGenerate_v2\` fg
         ON ef.factura_id = fg.id
       WHERE 
         ef.activ = TRUE 
@@ -345,7 +345,7 @@ async function findCheltuieliCandidates(tranzactii: TranzactieCandidat[]): Promi
         moneda,
         valoare_ron,
         status_achitare
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli\`
+      FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli_v2\`
       WHERE 
         activ = TRUE 
         AND status_achitare IN ('Neincasat', 'Partial')
@@ -607,8 +607,8 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
       END`;
 
       await bigquery.query(`
-        UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi\`
-        SET 
+        UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi_v2\`
+        SET
           valoare_incasata = ${newValoareIncasata},
           status_incasare = ${newStatus},
           data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
@@ -619,7 +619,7 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
       // Actualizăm și EtapeContract prin etapa_id
       if (match.matching_details.etapa_id) {
         await bigquery.query(`
-          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract\`
+          UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract_v2\`
           SET 
             status_incasare = ${newStatus},
             data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,

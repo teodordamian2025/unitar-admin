@@ -223,7 +223,7 @@ export default function FacturiPrimitePage() {
                         {factura.data_factura ? new Date(factura.data_factura).toLocaleDateString('ro-RO') : '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-white">
-                        {factura.valoare_ron?.toFixed(2)} RON
+                        {factura.valoare_ron ? Number(factura.valoare_ron).toFixed(2) : '-'} RON
                       </td>
                       <td className="px-4 py-3">
                         <span
