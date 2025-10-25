@@ -1189,6 +1189,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	  const updateQuery = `
 	    UPDATE ${TABLE_CONTRACTE}
 	    SET
+	      client_id = @clientId,
+	      client_nume = @clientNume,
+	      Denumire_Contract = @denumireContract,
 	      Valoare = CAST(@valoare AS NUMERIC),
 	      Moneda = @moneda,
 	      curs_valutar = @cursValutar,
@@ -1205,6 +1208,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 
 	  const parametriiUpdate = {
 	    contractId: contractInfo.contractExistentId,
+	    clientId: sanitizeStringForBigQuery(contractInfo.proiect.client_id),
+	    clientNume: contractInfo.placeholderData.client.nume,
+	    denumireContract: `Contract ${contractInfo.placeholderData.proiect.denumire}`,
 	    valoare: valoarePentruDB.toString(),
 	    moneda: contractInfo.monedaOriginalaForDB || 'RON',
 	    cursValutar: cursValutarPrincipal,
@@ -1228,6 +1234,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	    params: parametriiUpdate,
 	    types: {
 	      contractId: 'STRING',
+	      clientId: 'STRING',
+	      clientNume: 'STRING',
+	      denumireContract: 'STRING',
 	      valoare: 'STRING',
 	      moneda: 'STRING',
 	      cursValutar: 'NUMERIC',

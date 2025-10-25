@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
       SELECT
         tt.id,
         tt.utilizator_uid,
+        tt.utilizator_nume,
         tt.proiect_id,
         tt.subproiect_id,
         tt.sarcina_id,
@@ -234,20 +235,21 @@ export async function GET(request: NextRequest) {
     // Procesează rezultatele cu context complet - EXCLUDE datele financiare
     const processedData = rows.map((row: any) => ({
       id: row.id,
-      user_id: row.utilizator_uid,
-      project_id: row.proiect_id,
-      subproject_id: row.subproiect_id,
-      task_id: row.sarcina_id,
-      task_description: row.task_description,
+      utilizator_uid: row.utilizator_uid,
+      utilizator_nume: row.utilizator_nume,
+      proiect_id: row.proiect_id,
+      subproiect_id: row.subproiect_id,
+      sarcina_id: row.sarcina_id,
+      sarcina_titlu: row.sarcina_nume,
+      descriere_lucru: row.task_description,
       data_lucru: row.data_lucru,
       ore_lucrate: convertBigQueryNumeric(row.ore_lucrate),
-      status: row.tip_inregistrare,
-      data_creare: row.created_at,
+      tip_inregistrare: row.tip_inregistrare,
+      created_at: row.created_at,
       // Context pentru UI
       tip_obiectiv: row.tip_obiectiv,
       proiect_nume: row.proiect_nume,
       subproiect_nume: row.subproiect_nume,
-      sarcina_nume: row.sarcina_nume,
       // Context complet pentru display
       context_display: [
         row.proiect_nume,

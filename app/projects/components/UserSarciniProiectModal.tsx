@@ -192,14 +192,28 @@ export default function UserSarciniProiectModal({ isOpen, onClose, proiect }: Us
 
   const loadTimeTracking = async () => {
     try {
-      const response = await fetch(`/api/user/timetracking?proiect_id=${proiect.ID_Proiect}`);
+      // FIX: Adăugat user_id ca parametru obligatoriu pentru API-ul utilizatori normali
+      if (!user?.uid) {
+        console.warn('Nu există user_id pentru încărcarea time tracking');
+        setTimeTracking([]);
+        return;
+      }
+
+      const response = await fetch(
+        `/api/user/timetracking?proiect_id=${proiect.ID_Proiect}&user_id=${user.uid}`
+      );
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setTimeTracking(data.timeTracking || []);
+        // API-ul user returnează 'data' nu 'timeTracking'
+        setTimeTracking(data.data || []);
+      } else {
+        console.error('Eroare API time tracking:', data.error);
+        setTimeTracking([]);
       }
     } catch (error) {
       console.error('Eroare la încărcarea time tracking:', error);
+      setTimeTracking([]);
     }
   };
 

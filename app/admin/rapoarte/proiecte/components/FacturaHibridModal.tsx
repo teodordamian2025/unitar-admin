@@ -333,7 +333,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             contract_numar: etapa.numar_contract || contractData.numar_contract,
             contract_data: formatDate(contractData.Data_Semnare) || formatDate(contractData.data_creare),
             etapa_index: etapa.etapa_index,
-            denumire: etapa.denumire,
+            denumire: `Etapa ${etapa.etapa_index}: ${etapa.denumire}`,
             valoare: convertBigQueryNumeric(etapa.valoare),
             moneda: etapa.moneda,
             valoare_ron: convertBigQueryNumeric(etapa.valoare_ron),
@@ -366,7 +366,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             anexa_numar: anexa.anexa_numar,
             anexa_data: formatDate(anexa.data_start) || formatDate(anexa.data_creare),
             etapa_index: anexa.etapa_index,
-            denumire: anexa.denumire,
+            denumire: `Etapa ${anexa.etapa_index}: ${anexa.denumire}`,
             valoare: convertBigQueryNumeric(anexa.valoare),
             moneda: anexa.moneda,
             valoare_ron: convertBigQueryNumeric(anexa.valoare_ron),
@@ -2525,18 +2525,20 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                 {linie.tip === 'etapa_contract' ? 'CONTRACT' : 'ANEXĂ'}
                               </span>
                             )}
-                            <input
-                              type="text"
+                            <textarea
                               value={linie.denumire}
                               onChange={(e) => updateLine(index, 'denumire', e.target.value)}
                               disabled={isLoading}
+                              rows={3}
                               style={{
                                 flex: 1,
                                 padding: '0.5rem',
                                 border: '1px solid #dee2e6',
                                 borderRadius: '4px',
                                 fontSize: '12px',
-                                minWidth: '200px'
+                                minWidth: '200px',
+                                resize: 'vertical',
+                                fontFamily: 'inherit'
                               }}
                               placeholder="Descrierea serviciului..."
                               required
