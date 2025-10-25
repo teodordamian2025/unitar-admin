@@ -13,6 +13,7 @@ import {
   facturaExistaDeja,
   getDateRange,
   getIappConfig,
+  fetchFacturaDetails,
   type IappFacturaRaspuns
 } from '@/lib/iapp-facturi-primite';
 import { autoAssociate } from '@/lib/facturi-primite-matcher';
@@ -130,15 +131,35 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Step 5: Mapare și insert în BigQuery
+    // Step 5: Mapare și fetch detalii complete + insert în BigQuery
     const recordsToInsert: any[] = [];
     const facturiSalvate: string[] = [];
 
     for (const factura of facturiNoi) {
       try {
+        // Mapare de bază
         const dbRecord = mapIappFacturaToDatabase(factura);
+
+        // Fetch detalii complete (articole + PDF link)
+        try {
+          const detalii = await fetchFacturaDetails(String(factura.id_solicitare));
+
+          // Salvează JSON complet în xml_content (pentru afișare detalii în UI)
+          dbRecord.xml_content = JSON.stringify(detalii);
+
+          // Adaugă link PDF în observatii
+          if (detalii.pdf) {
+            dbRecord.observatii = `${dbRecord.observatii}\nPDF: ${detalii.pdf}`;
+          }
+
+          console.log(`✅ [iapp.ro] Detalii: ${factura.factura.furnizor_name} - ${factura.factura.serie_numar} - ${detalii.continut?.length || 0} articole`);
+        } catch (detailError) {
+          // Nu e critică eroarea de fetch detalii, continuăm cu datele de bază
+          console.warn(`⚠️ [iapp.ro] Nu s-au putut prelua detalii pentru ${factura.factura.serie_numar}:`, detailError);
+        }
+
         recordsToInsert.push(dbRecord);
-        facturiSalvate.push(String(factura.factura.serie_numar)); // Convert to string
+        facturiSalvate.push(String(factura.factura.serie_numar));
 
         console.log(`✅ [iapp.ro] Mapat: ${factura.factura.furnizor_name} - ${factura.factura.serie_numar} - ${factura.factura.total}`);
       } catch (error) {

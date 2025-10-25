@@ -59,6 +59,51 @@ export interface IappConfig {
   sursa_facturi_primite?: string; // 'iapp' | 'anaf'
 }
 
+export interface IappFacturaDetalii {
+  id_incarcare: number;
+  id_descarcare: string;
+  pdf: string; // URL direct către PDF
+  factura: {
+    // UBL 2.1 JSON structure
+    cbcID: string; // Număr factură
+    cbcIssueDate: string; // Data emitere
+    cbcDocumentCurrencyCode: string; // Monedă
+    cacAccountingSupplierParty: {
+      cacParty: {
+        cacPartyIdentification: { cbcID: string }; // CUI
+        cacPartyName: { cbcName: string }; // Nume
+        cacPostalAddress: {
+          cbcStreetName: string;
+          cbcCityName: string;
+        };
+      };
+    };
+    cacAccountingCustomerParty: {
+      cacParty: {
+        cacPartyTaxScheme: { cbcCompanyID: string }; // CUI client
+        cacPartyLegalEntity: { cbcRegistrationName: string }; // Nume client
+      };
+    };
+    cacTaxTotal: {
+      cbcTaxAmount: string; // TVA total
+      cacTaxSubtotal: {
+        cbcTaxableAmount: string; // Bază TVA
+        cbcTaxAmount: string; // TVA
+        cacTaxCategory: {
+          cbcPercent: string; // Cotă TVA
+        };
+      };
+    };
+    cacLegalMonetaryTotal: {
+      cbcLineExtensionAmount: string; // Total fără TVA
+      cbcTaxInclusiveAmount: string; // Total cu TVA
+      cbcPayableAmount: string; // De plată
+    };
+    cacInvoiceLine: any | any[]; // Poate fi obiect sau array
+  };
+  continut: any[][]; // Array pre-parsat: [nr, nume, descriere, UM, cant, preț, total, TVA_suma, TVA%]
+}
+
 // =====================================================
 // HELPER FUNCTIONS - Encryption
 // =====================================================
@@ -318,6 +363,49 @@ export async function facturaExistaDeja(idSolicitare: string): Promise<boolean> 
   });
 
   return rows[0]?.count > 0;
+}
+
+/**
+ * Fetch detalii complete factură din iapp.ro (inclusiv articole și link PDF)
+ * @param idSolicitare ID solicitare iapp.ro (din id_mesaj_anaf)
+ * @returns Detalii complete factură cu articole
+ */
+export async function fetchFacturaDetails(idSolicitare: string): Promise<IappFacturaDetalii> {
+  const config = await getIappConfig();
+  const authHeaders = await getIappAuthHeaders();
+
+  console.log(`📋 [iapp.ro] Fetch detalii factură ID: ${idSolicitare}`);
+
+  const response = await fetch('https://api.my.iapp.ro/e-factura/view-furnizori', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders
+    },
+    body: JSON.stringify({
+      email_responsabil: config.email_responsabil,
+      id_incarcare: String(idSolicitare)
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`iapp.ro API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (data.status !== 'SUCCESS') {
+    throw new Error(`iapp.ro API error: ${data.message || 'Unknown error'}`);
+  }
+
+  if (!data.data) {
+    throw new Error('No data in response');
+  }
+
+  console.log(`✅ [iapp.ro] Detalii factură ${data.data.factura?.cbcID || idSolicitare} - ${data.data.continut?.length || 0} articole`);
+
+  return data.data;
 }
 
 /**

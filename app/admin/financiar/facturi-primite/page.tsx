@@ -28,11 +28,28 @@ interface FacturaPrimita {
   observatii?: string; // Pentru a detecta sursa (iapp.ro sau ANAF)
 }
 
+interface FacturaDetalii {
+  pdf?: string;
+  factura: {
+    cbcID: string;
+    cbcIssueDate: string;
+    cbcDocumentCurrencyCode: string;
+    cacLegalMonetaryTotal: {
+      cbcLineExtensionAmount: string;
+      cbcTaxInclusiveAmount: string;
+    };
+  };
+  continut: any[][];
+}
+
 export default function FacturiPrimitePage() {
   const [facturi, setFacturi] = useState<FacturaPrimita[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [sursaConfig, setSursaConfig] = useState<'iapp' | 'anaf'>('iapp');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detalii, setDetalii] = useState<FacturaDetalii | null>(null);
+  const [loadingDetalii, setLoadingDetalii] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -134,6 +151,36 @@ export default function FacturiPrimitePage() {
     }
   }
 
+  async function loadDetalii(facturaId: string) {
+    try {
+      setLoadingDetalii(true);
+
+      const response = await fetch(`/api/iapp/facturi-primite/detalii?factura_id=${facturaId}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Eroare la încărcare detalii');
+      }
+
+      setDetalii(data.detalii);
+    } catch (error: any) {
+      toast.error(`Eroare detalii: ${error.message}`);
+      setDetalii(null);
+    } finally {
+      setLoadingDetalii(false);
+    }
+  }
+
+  function toggleExpand(facturaId: string) {
+    if (expandedId === facturaId) {
+      setExpandedId(null);
+      setDetalii(null);
+    } else {
+      setExpandedId(facturaId);
+      loadDetalii(facturaId);
+    }
+  }
+
   return (
     <ModernLayout>
       <div className="space-y-6">
@@ -213,58 +260,165 @@ export default function FacturiPrimitePage() {
                 {facturi.map((factura) => {
                   // Detectează sursa din observatii
                   const sursa = factura.observatii?.includes('iapp.ro') ? 'iapp' : 'anaf';
+                  const isExpanded = expandedId === factura.id;
 
                   return (
-                    <tr key={factura.id} className="border-t border-white/10 hover:bg-white/5">
-                      <td className="px-4 py-3 text-white">{factura.serie_numar || '-'}</td>
-                      <td className="px-4 py-3 text-white">{factura.nume_emitent || '-'}</td>
-                      <td className="px-4 py-3 text-white/60">{factura.cif_emitent || '-'}</td>
-                      <td className="px-4 py-3 text-white/60">
-                        {factura.data_factura ? new Date(factura.data_factura).toLocaleDateString('ro-RO') : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-white">
-                        {factura.valoare_ron ? Number(factura.valoare_ron).toFixed(2) : '-'} RON
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
-                            sursa === 'iapp'
-                              ? 'bg-purple-500/20 text-purple-300'
-                              : 'bg-orange-500/20 text-orange-300'
-                          }`}
-                        >
-                          {sursa === 'iapp' ? 'iapp.ro' : 'ANAF'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            factura.status_procesare === 'asociat'
-                              ? 'bg-green-500/20 text-green-300'
-                              : factura.status_procesare === 'procesat'
-                              ? 'bg-blue-500/20 text-blue-300'
-                              : 'bg-yellow-500/20 text-yellow-300'
-                          }`}
-                        >
-                          {factura.status_procesare}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-white/60 text-sm">
-                        {factura.cheltuiala_asociata_id ? (
-                          <>
-                            {factura.asociere_automata ? '🤖 ' : '👤 '}
-                            {factura.proiect_denumire}
-                          </>
-                        ) : (
-                          <button
-                            className="text-blue-400 hover:text-blue-300"
-                            onClick={() => toast('Funcționalitate în dezvoltare')}
+                    <>
+                      {/* Rând principal - clickable pentru expand */}
+                      <tr
+                        key={factura.id}
+                        onClick={() => toggleExpand(factura.id)}
+                        className="border-t border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3 text-white">
+                          <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
+                          {factura.serie_numar || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-white">{factura.nume_emitent || '-'}</td>
+                        <td className="px-4 py-3 text-white/60">{factura.cif_emitent || '-'}</td>
+                        <td className="px-4 py-3 text-white/60">
+                          {factura.data_factura ? new Date(factura.data_factura).toLocaleDateString('ro-RO') : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-white">
+                          {factura.valoare_ron ? Number(factura.valoare_ron).toFixed(2) : '-'} RON
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-semibold ${
+                              sursa === 'iapp'
+                                ? 'bg-purple-500/20 text-purple-300'
+                                : 'bg-orange-500/20 text-orange-300'
+                            }`}
                           >
-                            Asociază →
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                            {sursa === 'iapp' ? 'iapp.ro' : 'ANAF'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              factura.status_procesare === 'asociat'
+                                ? 'bg-green-500/20 text-green-300'
+                                : factura.status_procesare === 'procesat'
+                                ? 'bg-blue-500/20 text-blue-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}
+                          >
+                            {factura.status_procesare}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-white/60 text-sm" onClick={(e) => e.stopPropagation()}>
+                          {factura.cheltuiala_asociata_id ? (
+                            <>
+                              {factura.asociere_automata ? '🤖 ' : '👤 '}
+                              {factura.proiect_denumire}
+                            </>
+                          ) : (
+                            <button
+                              className="text-blue-400 hover:text-blue-300"
+                              onClick={() => toast('Funcționalitate în dezvoltare')}
+                            >
+                              Asociază →
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Rând expandabil cu detalii */}
+                      {isExpanded && (
+                        <tr className="bg-white/5 border-t border-white/10">
+                          <td colSpan={8} className="px-4 py-4">
+                            {loadingDetalii ? (
+                              <div className="text-center text-white/60 py-4">Încărcare detalii...</div>
+                            ) : detalii ? (
+                              <div className="space-y-4">
+                                {/* Header cu link PDF */}
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-white font-semibold">Detalii Factură</h3>
+                                  {detalii.pdf && (
+                                    <a
+                                      href={detalii.pdf}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      📄 Descarcă PDF
+                                    </a>
+                                  )}
+                                </div>
+
+                                {/* Tabel articole */}
+                                {detalii.continut && detalii.continut.length > 0 ? (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead>
+                                        <tr className="bg-white/10">
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">Nr</th>
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">Denumire</th>
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">U.M.</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Cantitate</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Preț unitar</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Total</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">TVA</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {detalii.continut.map((articol, idx) => {
+                                          // Format: [nr, nume, descriere, UM, cant, preț_unitar, total, TVA_suma, TVA%]
+                                          const [nr, nume, descriere, um, cant, pret, total, tvaSuma, tvaProcent] = articol;
+                                          return (
+                                            <tr key={idx} className="border-t border-white/10">
+                                              <td className="px-3 py-2 text-white/80 text-sm">{nr}</td>
+                                              <td className="px-3 py-2 text-white text-sm">
+                                                <div className="font-medium">{nume}</div>
+                                                {descriere && descriere !== nume && (
+                                                  <div className="text-white/60 text-xs mt-1">{descriere}</div>
+                                                )}
+                                              </td>
+                                              <td className="px-3 py-2 text-white/60 text-sm">{um}</td>
+                                              <td className="px-3 py-2 text-right text-white/80 text-sm">{cant}</td>
+                                              <td className="px-3 py-2 text-right text-white/80 text-sm">
+                                                {parseFloat(pret).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-white font-medium text-sm">
+                                                {parseFloat(total).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-white/60 text-sm">
+                                                {tvaProcent}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                      <tfoot>
+                                        <tr className="border-t-2 border-white/20 bg-white/5">
+                                          <td colSpan={5} className="px-3 py-2 text-right text-white font-semibold">Total fără TVA:</td>
+                                          <td className="px-3 py-2 text-right text-white font-semibold">
+                                            {parseFloat(detalii.factura.cacLegalMonetaryTotal.cbcLineExtensionAmount).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                          </td>
+                                          <td></td>
+                                        </tr>
+                                        <tr className="bg-white/5">
+                                          <td colSpan={5} className="px-3 py-2 text-right text-white font-semibold">Total cu TVA:</td>
+                                          <td className="px-3 py-2 text-right text-white font-bold text-lg">
+                                            {parseFloat(detalii.factura.cacLegalMonetaryTotal.cbcTaxInclusiveAmount).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                          </td>
+                                          <td></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-white/60 py-4">Nu există articole disponibile</div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-center text-white/60 py-4">Nu s-au putut încărca detaliile</div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   );
                 })}
               </tbody>
