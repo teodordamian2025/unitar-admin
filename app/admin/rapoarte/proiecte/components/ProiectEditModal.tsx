@@ -215,6 +215,7 @@ export default function ProiectEditModal({
   
   // State pentru responsabili multipli
   const [responsabiliSelectati, setResponsabiliSelectati] = useState<ResponsabilSelectat[]>([]);
+  const [responsabiliExistenti, setResponsabiliExistenti] = useState<ResponsabilSelectat[]>([]); // NOU: Pentru tracking responsabili din BD
   const [responsabiliSubproiecte, setResponsabiliSubproiecte] = useState<{[key: string]: ResponsabilSelectat[]}>({});
   
   // State pentru conversii valutare (PĂSTRAT identic)
@@ -343,6 +344,7 @@ export default function ProiectEditModal({
         }));
 
         setResponsabiliSelectati(responsabiliFormatati);
+        setResponsabiliExistenti(responsabiliFormatati); // SALVEAZĂ responsabilii existenți pentru comparare
         console.log(`Încărcați ${responsabiliFormatati.length} responsabili existenți pentru proiect din ProiecteResponsabili_v2`);
       } else {
         // FIX: Dacă nu există responsabili în tabela separată, dar există câmpul Responsabil în Proiecte_v2
@@ -365,6 +367,7 @@ export default function ProiectEditModal({
               };
 
               setResponsabiliSelectati([responsabilFallback]);
+              setResponsabiliExistenti([responsabilFallback]); // SALVEAZĂ responsabilul fallback pentru comparare
               console.log(`✅ Creat responsabil fallback din Utilizatori_v2: ${responsabilFallback.nume_complet} (${responsabilFallback.uid})`);
             } else {
               console.warn(`⚠️ Nu s-a găsit utilizator cu numele "${proiect.Responsabil}" în Utilizatori_v2`);
@@ -876,46 +879,75 @@ export default function ProiectEditModal({
       }
     }
   };
-  // NOU: Funcție pentru salvarea responsabililor în tabela ProiecteResponsabili
+  // MODIFICAT: Funcție pentru sincronizare completă responsabili în tabela ProiecteResponsabili
   const addResponsabiliProiect = async (proiectId: string) => {
-    if (responsabiliSelectati.length === 0) return;
-
     try {
-      for (const responsabil of responsabiliSelectati) {
-        // Verifică dacă responsabilul nu există deja
-        const checkResponse = await fetch(`/api/rapoarte/proiecte-responsabili?proiect_id=${proiectId}`);
-        const existingData = await checkResponse.json();
-        
-        const existaResponsabil = existingData.success && existingData.data.find(
-          (r: any) => r.responsabil_uid === responsabil.uid
-        );
-        
-        if (existaResponsabil) continue; // Skip dacă există deja
-        
-        const responsabilData = {
-          id: `RESP_${proiectId}_${responsabil.uid}_${Date.now()}`,
-          proiect_id: proiectId,
-          responsabil_uid: responsabil.uid,
-          responsabil_nume: responsabil.nume_complet,
-          rol_in_proiect: responsabil.rol_in_proiect,
-          data_atribuire: getRomanianDateTime(),
-          atribuit_de: responsabil.uid
-        };
+      // Încarcă responsabilii existenți din BD
+      const checkResponse = await fetch(`/api/rapoarte/proiecte-responsabili?proiect_id=${proiectId}`);
+      const existingData = await checkResponse.json();
+      const responsabiliDinBD = existingData.success && existingData.data ? existingData.data : [];
 
-        const response = await fetch('/api/rapoarte/proiecte-responsabili', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(responsabilData)
-        });
+      console.log(`🔄 Sincronizare responsabili pentru proiectul ${proiectId}:`);
+      console.log(`   - În BD: ${responsabiliDinBD.length} responsabili`);
+      console.log(`   - Selectați în UI: ${responsabiliSelectati.length} responsabili`);
 
-        const result = await response.json();
-        if (!result.success) {
-          console.error(`Eroare la salvarea responsabilului ${responsabil.nume_complet}:`, result.error);
+      // 1. ȘTERGE responsabilii care au fost eliminați din UI
+      const responsabiliDeSters = responsabiliDinBD.filter((respBD: any) =>
+        !responsabiliSelectati.find(respUI => respUI.uid === respBD.responsabil_uid)
+      );
+
+      for (const respDeSters of responsabiliDeSters) {
+        try {
+          const deleteResponse = await fetch(
+            `/api/rapoarte/proiecte-responsabili?id=${respDeSters.id}`,
+            { method: 'DELETE' }
+          );
+          if (deleteResponse.ok) {
+            console.log(`   ✅ Șters responsabil: ${respDeSters.responsabil_nume}`);
+          }
+        } catch (error) {
+          console.error(`   ❌ Eroare ștergere ${respDeSters.responsabil_nume}:`, error);
         }
       }
-      console.log(`Salvați ${responsabiliSelectati.length} responsabili pentru proiectul ${proiectId}`);
+
+      // 2. ADAUGĂ responsabilii noi care nu existau în BD
+      const responsabiliDeAdaugat = responsabiliSelectati.filter(respUI =>
+        !responsabiliDinBD.find((respBD: any) => respBD.responsabil_uid === respUI.uid)
+      );
+
+      for (const respNou of responsabiliDeAdaugat) {
+        try {
+          const responsabilData = {
+            id: `RESP_${proiectId}_${respNou.uid}_${Date.now()}`,
+            proiect_id: proiectId,
+            responsabil_uid: respNou.uid,
+            responsabil_nume: respNou.nume_complet,
+            rol_in_proiect: respNou.rol_in_proiect,
+            data_atribuire: getRomanianDateTime(),
+            atribuit_de: respNou.uid
+          };
+
+          const response = await fetch('/api/rapoarte/proiecte-responsabili', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(responsabilData)
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            console.log(`   ✅ Adăugat responsabil nou: ${respNou.nume_complet} (${respNou.rol_in_proiect})`);
+          } else {
+            console.error(`   ❌ Eroare adăugare ${respNou.nume_complet}:`, result.error);
+          }
+        } catch (error) {
+          console.error(`   ❌ Eroare adăugare ${respNou.nume_complet}:`, error);
+        }
+      }
+
+      console.log(`✅ Sincronizare completă: șterși ${responsabiliDeSters.length}, adăugați ${responsabiliDeAdaugat.length}`);
+
     } catch (error) {
-      console.error('Eroare la salvarea responsabililor:', error);
+      console.error('❌ Eroare la sincronizarea responsabililor:', error);
     }
   };
 
