@@ -284,15 +284,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             userId,
             userName,
             today,
-            duration_hours: durationHours,
+            duration_hours: durationHours.toFixed(4), // ✅ FIX: Convert to string for NUMERIC type
             descriere: `📌 Pin silențios: ${item.display_name}`,
             itemId: id,
             proiect_id: item.proiect_id || null,
             subproiect_id: item.subproiect_id || null,
             sarcina_id: item.tip_item === 'sarcina' ? item.item_id : null
           },
-          // ✅ FIX: Explicit types pentru NULL values
+          // ✅ FIX: Explicit types pentru NULL values + NUMERIC pentru ore_lucrate
           types: {
+            duration_hours: 'NUMERIC',
             proiect_id: 'STRING',
             subproiect_id: 'STRING',
             sarcina_id: 'STRING'
