@@ -1099,18 +1099,6 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                       📌 ACTIV
                                     </span>
                                   )}
-                                  {activeTimerItemId === item.id && (
-                                    <span style={{
-                                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                      color: 'white',
-                                      fontSize: '0.75rem',
-                                      padding: '0.25rem 0.5rem',
-                                      borderRadius: '6px',
-                                      marginLeft: '0.5rem'
-                                    }}>
-                                      ⏱️ TIMER ACTIV
-                                    </span>
-                                  )}
                                   {item.is_realizat && (
                                     <span style={{
                                       background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
@@ -1136,42 +1124,6 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                     zIndex: 9999,
                                     isolation: 'isolate'
                                   }}>
-                                  {/* Timer button */}
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      activeTimerItemId === item.id ? stopTimer() : startTimer(item);
-                                    }}
-                                    disabled={item.is_pinned && activeTimerItemId !== item.id}
-                                    style={{
-                                      background: activeTimerItemId === item.id
-                                        ? 'rgba(239, 68, 68, 0.1)'
-                                        : (item.is_pinned ? 'rgba(107, 114, 128, 0.1)' : 'rgba(16, 185, 129, 0.1)'),
-                                      border: `1px solid ${activeTimerItemId === item.id
-                                        ? 'rgba(239, 68, 68, 0.2)'
-                                        : (item.is_pinned ? 'rgba(107, 114, 128, 0.2)' : 'rgba(16, 185, 129, 0.2)')}`,
-                                      borderRadius: '6px',
-                                      padding: '0.25rem 0.5rem',
-                                      fontSize: '0.75rem',
-                                      color: activeTimerItemId === item.id
-                                        ? '#dc2626'
-                                        : (item.is_pinned ? '#9ca3af' : '#065f46'),
-                                      cursor: (item.is_pinned && activeTimerItemId !== item.id) ? 'not-allowed' : 'pointer',
-                                      opacity: (item.is_pinned && activeTimerItemId !== item.id) ? 0.6 : 1,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem'
-                                    }}
-                                    title={activeTimerItemId === item.id
-                                      ? "Oprește timer"
-                                      : (item.is_pinned ? "Nu poți porni timer-ul pentru un item pin-at" : "Pornește timer")}
-                                  >
-                                    {activeTimerItemId === item.id ? '⏹️' : '⏱️'}
-                                    <span style={{ fontSize: '0.7rem' }}>
-                                      {activeTimerItemId === item.id ? 'Stop' : 'Start'}
-                                    </span>
-                                  </button>
-
                                   {/* Realizat button */}
                                   <button
                                     onClick={(e) => {
