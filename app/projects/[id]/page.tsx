@@ -54,10 +54,14 @@ interface ContractInfo {
 
 interface FacturaInfo {
   ID_Factura: string;
+  Serie_Factura?: string;
   Numar_Factura: string;
   Data_Emitere: any;
+  Data_Scadenta: any;
   Status_Plata: string;
+  Status_Scadenta: string;
   Subproiect_Asociat?: string;
+  tip_etapa?: string;
   // Removed financial fields
 }
 
@@ -824,27 +828,65 @@ export default function UserProiectDetailsPage() {
                     background: 'white'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#2c3e50' }}>Factura {factura.Numar_Factura}</strong>
+                      <strong style={{ color: '#2c3e50' }}>
+                        Factura {factura.Serie_Factura ? `${factura.Serie_Factura} nr. ${factura.Numar_Factura}` : factura.Numar_Factura}
+                      </strong>
                       <span style={{
-                        padding: '0.25rem 0.5rem',
-                        background: factura.Status_Plata === 'Plătită' ? '#27ae60' :
-                                   factura.Status_Plata === 'Parțial plătită' ? '#f39c12' : '#e74c3c',
-                        color: 'white',
+                        padding: '0.25rem 0.75rem',
                         borderRadius: '12px',
                         fontSize: '12px',
-                        fontWeight: 'bold'
+                        fontWeight: 500,
+                        background: factura.Status_Scadenta === 'Plătită' ? '#d4edda' :
+                                   factura.Status_Scadenta === 'Expirată' ? '#f8d7da' :
+                                   factura.Status_Scadenta === 'Expiră curând' ? '#fff3cd' : '#e3f2fd',
+                        color: factura.Status_Scadenta === 'Plătită' ? '#155724' :
+                               factura.Status_Scadenta === 'Expirată' ? '#721c24' :
+                               factura.Status_Scadenta === 'Expiră curând' ? '#856404' : '#0d47a1'
                       }}>
-                        {factura.Status_Plata}
+                        {factura.Status_Scadenta}
                       </span>
                     </div>
-                    <p style={{ margin: '0.5rem 0', color: '#7f8c8d', fontSize: '14px' }}>
-                      Emisă: {formatDate(factura.Data_Emitere)}
-                    </p>
+
+                    {/* Corespondență cu Subproiect */}
                     {factura.Subproiect_Asociat && (
-                      <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', color: '#3498db' }}>
-                        Subproiect: {factura.Subproiect_Asociat}
-                      </p>
+                      <div style={{
+                        padding: '0.5rem',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        borderRadius: '4px',
+                        marginBottom: '0.5rem',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#3b82f6', fontWeight: 500 }}>📍 Corespondență: </span>
+                        <span style={{ color: '#1f2937' }}>
+                          {factura.tip_etapa === 'contract' ? 'Etapă Contract' : factura.tip_etapa === 'anexa' ? 'Etapă Anexă' : 'Etapă'} →
+                          Subproiect "{factura.Subproiect_Asociat}"
+                        </span>
+                      </div>
                     )}
+
+                    {/* Detalii factura - DAR fără sume */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', fontSize: '14px' }}>
+                      <div>
+                        <span style={{ color: '#6c757d' }}>Data emitere: </span>
+                        <span style={{ fontWeight: 500 }}>{formatDate(factura.Data_Emitere)}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6c757d' }}>Termen: </span>
+                        <span style={{ fontWeight: 500 }}>{formatDate(factura.Data_Scadenta)}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6c757d' }}>Status: </span>
+                        <span style={{
+                          fontWeight: 500,
+                          color: factura.Status_Scadenta === 'Plătită' ? '#27ae60' :
+                                 factura.Status_Scadenta === 'Expirată' ? '#e74c3c' : '#3498db'
+                        }}>
+                          {factura.Status_Scadenta === 'Plătită' ? 'Încasată' :
+                           factura.Status_Scadenta === 'Expirată' ? 'Neîncasată (Expirată)' :
+                           factura.Status_Scadenta === 'Expiră curând' ? 'Neîncasată (Expiră curând)' : 'Neîncasată'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

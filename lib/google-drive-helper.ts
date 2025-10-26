@@ -99,11 +99,38 @@ function decryptToken(encryptedToken: string): string {
 }
 
 /**
- * Inițializare client Google Drive cu OAuth refresh token
+ * Obține service account client (nu necesită OAuth, nu expiră)
+ */
+function getServiceAccountClient() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  return auth;
+}
+
+/**
+ * Inițializare client Google Drive
+ * Folosește service account dacă flag-ul USE_SERVICE_ACCOUNT=true (recomandat pentru cron jobs)
+ * Altfel folosește OAuth refresh token
  */
 export async function getDriveClient() {
-  const auth = await getOAuthClient();
-  return google.drive({ version: 'v3', auth });
+  // Verifică dacă trebuie să folosim service account
+  const useServiceAccount = process.env.USE_SERVICE_ACCOUNT === 'true';
+
+  if (useServiceAccount) {
+    console.log('🔑 [Google Drive] Using service account authentication');
+    const auth = getServiceAccountClient();
+    return google.drive({ version: 'v3', auth });
+  } else {
+    console.log('🔑 [Google Drive] Using OAuth authentication');
+    const auth = await getOAuthClient();
+    return google.drive({ version: 'v3', auth });
+  }
 }
 
 /**

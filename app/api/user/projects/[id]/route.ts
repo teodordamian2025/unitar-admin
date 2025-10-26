@@ -31,6 +31,7 @@ const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\
 const CONTRACTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
 const FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const ETAPE_CONTRACT_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 
 console.log(`🔧 [User Projects ID] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -123,20 +124,36 @@ export async function GET(
       console.warn('Tabelul Contracte nu există sau nu are date:', error);
     }
 
-    // Query pentru facturi - EXCLUDE valorile financiare și plățile
+    // Query pentru facturi - Include detalii complete DAR EXCLUDE valorile financiare
     const facturiQuery = `
       SELECT
-        f.ID_Factura,
-        f.Numar_Factura,
-        f.Data_Emitere,
-        f.Status_Plata,
-        ec.Denumire_Etapa as Subproiect_Asociat
-        -- Exclude: Valoare_Factura, Suma_*, TVA_*, Total_*
-      FROM ${FACTURI_TABLE} f
-      LEFT JOIN ${ETAPE_CONTRACT_TABLE} ec
-        ON f.ID_Etapa = ec.ID_Etapa
-      WHERE f.ID_Proiect = @projectId
-      ORDER BY f.Data_Emitere DESC
+        fg.id as ID_Factura,
+        fg.serie as Serie_Factura,
+        fg.numar as Numar_Factura,
+        fg.data_factura as Data_Emitere,
+        fg.data_scadenta as Data_Scadenta,
+        fg.status as Status_Plata,
+
+        -- Corespondență cu subproiecte (similar cu admin)
+        s.Denumire as Subproiect_Asociat,
+        ef.tip_etapa,
+
+        -- Calcul status scadență (similar cu admin)
+        CASE
+          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expirată'
+          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
+          WHEN (fg.total - COALESCE(fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
+          ELSE 'În regulă'
+        END as Status_Scadenta
+
+        -- EXCLUDE: total, valoare_platita, rest_de_plata (sumele rămân ascunse)
+      FROM ${FACTURI_TABLE} fg
+      LEFT JOIN ${ETAPE_FACTURI_TABLE} ef
+        ON fg.id = ef.factura_id AND ef.activ = true
+      LEFT JOIN ${SUBPROIECTE_TABLE} s
+        ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
+      WHERE fg.proiect_id = @projectId
+      ORDER BY fg.data_factura DESC
     `;
 
     let facturiRows: any[] = [];
@@ -182,15 +199,16 @@ export async function GET(
     }));
 
     const processedFacturi = facturiRows.map((factura: any) => ({
-      ...factura,
-      // Elimină câmpurile financiare
-      Valoare_Factura: undefined,
-      Suma_fara_TVA: undefined,
-      TVA_Valoare: undefined,
-      Total_cu_TVA: undefined,
-      Moneda: undefined,
-      Suma_Incasata: undefined,
-      Suma_Restanta: undefined
+      ID_Factura: factura.ID_Factura,
+      Serie_Factura: factura.Serie_Factura,
+      Numar_Factura: factura.Numar_Factura,
+      Data_Emitere: factura.Data_Emitere,
+      Data_Scadenta: factura.Data_Scadenta,
+      Status_Plata: factura.Status_Plata,
+      Status_Scadenta: factura.Status_Scadenta,
+      Subproiect_Asociat: factura.Subproiect_Asociat,
+      tip_etapa: factura.tip_etapa
+      // EXCLUDE complet toate câmpurile financiare (nu le mapăm deloc)
     }));
 
     return NextResponse.json({
