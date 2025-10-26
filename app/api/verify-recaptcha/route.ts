@@ -8,11 +8,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Token lipsă' }, { status: 400 });
   }
 
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+  // Use GOOGLE_RECAPTCHA_PROJECT_ID for reCAPTCHA (unitar-admin Firebase project)
+  // Different from GOOGLE_CLOUD_PROJECT_ID which is for BigQuery (hale-mode-464009-i6)
+  const projectId = process.env.GOOGLE_RECAPTCHA_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID;
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdhXH4rAAAAAKJQz4M-1dWIJ7VKpdh3SNnLuyxz';
 
   if (!projectId) {
-    return NextResponse.json({ success: false, error: 'Project ID lipsă' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'reCAPTCHA Project ID lipsă' }, { status: 500 });
   }
 
   try {
