@@ -418,7 +418,7 @@ export default function UserProiectNouModal({ isOpen, onClose, onProiectCreated 
                 value={formData.Denumire}
                 onChange={(e) => handleInputChange('Denumire', e.target.value)}
                 style={inputStyle}
-                placeholder="Numele proiectului..."
+                placeholder="Titlul complet al proiectului"
                 required
               />
             </div>

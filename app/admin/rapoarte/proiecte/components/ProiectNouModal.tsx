@@ -285,7 +285,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       
       setFormData(prev => ({
         ...prev,
-        ID_Proiect: `P${new Date().getFullYear()}${String(Date.now()).slice(-3)}`,
+        ID_Proiect: '',
         data_curs_valutar: today,
         Data_Start: today
       }));
@@ -984,7 +984,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                 value={formData.ID_Proiect}
                 onChange={(e) => handleInputChange('ID_Proiect', e.target.value)}
                 disabled={loading}
-                placeholder="P202501"
+                placeholder="Nume folder proiect din pcloud"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -1031,7 +1031,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
               value={formData.Denumire}
               onChange={(e) => handleInputChange('Denumire', e.target.value)}
               disabled={loading}
-              placeholder="Numele proiectului"
+              placeholder="Titlul complet al proiectului"
               style={{
                 width: '100%',
                 padding: '0.75rem',

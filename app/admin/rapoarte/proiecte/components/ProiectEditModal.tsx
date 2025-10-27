@@ -1450,7 +1450,7 @@ export default function ProiectEditModal({
               value={formData.Denumire}
               onChange={(e) => handleInputChange('Denumire', e.target.value)}
               disabled={loading}
-              placeholder="Numele proiectului"
+              placeholder="Titlul complet al proiectului"
               style={{
                 width: '100%',
                 padding: '0.75rem',
