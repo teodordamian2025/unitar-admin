@@ -266,8 +266,8 @@ export async function POST(request: NextRequest) {
         CURRENT_TIMESTAMP(),
         CURRENT_TIMESTAMP(),
         ${zileEstimate},
-        ${oreEstimate},
-        ${timpTotalOre},
+        CAST(${oreEstimate} AS NUMERIC),
+        CAST(${timpTotalOre} AS NUMERIC),
         ${progresProcent},
         ${data.progres_descriere ? `'${escapeString(data.progres_descriere)}'` : 'NULL'}
       )
@@ -417,8 +417,8 @@ export async function PUT(request: NextRequest) {
       const timpTotalOre = (zileEstimate * 8) + oreEstimate;
 
       updateFieldsMap.set('timp_estimat_zile', zileEstimate.toString());
-      updateFieldsMap.set('timp_estimat_ore', oreEstimate.toString());
-      updateFieldsMap.set('timp_estimat_total_ore', timpTotalOre.toString());
+      updateFieldsMap.set('timp_estimat_ore', `CAST(${oreEstimate} AS NUMERIC)`);
+      updateFieldsMap.set('timp_estimat_total_ore', `CAST(${timpTotalOre} AS NUMERIC)`);
     }
 
     // FIXAT: Logică inteligentă pentru status și progres - FĂRĂ DUPLICATE

@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         @progres_procent, @progres_descriere,
         ${sarcinaData.data_scadenta ? '@data_scadenta' : 'NULL'},
         @observatii,
-        @timp_estimat_zile, @timp_estimat_ore, @timp_estimat_total_ore,
+        @timp_estimat_zile, CAST(@timp_estimat_ore AS NUMERIC), CAST(@timp_estimat_total_ore AS NUMERIC),
         @created_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
       )
     `;
@@ -159,16 +159,20 @@ export async function POST(request: NextRequest) {
     if (sarcinaData.responsabili && sarcinaData.responsabili.length > 0) {
       const insertResponsabiliQuery = `
         INSERT INTO ${RESPONSABILI_TABLE}
-        (sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_asignare)
+        (id, sarcina_id, responsabil_uid, responsabil_nume, rol_in_sarcina, data_atribuire, atribuit_de)
         VALUES
       `;
 
       const values = sarcinaData.responsabili.map((_, index: number) =>
-        `(@sarcina_id, @uid_${index}, @nume_${index}, @rol_${index}, CURRENT_TIMESTAMP())`
+        `(@id_${index}, @sarcina_id, @uid_${index}, @nume_${index}, @rol_${index}, CURRENT_TIMESTAMP(), @atribuit_de)`
       ).join(', ');
 
-      const params: any = { sarcina_id: sarcinaData.id };
+      const params: any = {
+        sarcina_id: sarcinaData.id,
+        atribuit_de: sarcinaData.created_by
+      };
       sarcinaData.responsabili.forEach((resp: any, index: number) => {
+        params[`id_${index}`] = `RESP_${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${index}`;
         params[`uid_${index}`] = resp.uid;
         params[`nume_${index}`] = resp.nume_complet;
         params[`rol_${index}`] = resp.rol;
