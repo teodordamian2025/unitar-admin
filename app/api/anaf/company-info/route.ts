@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
   try {
     // Curățare CUI (eliminare RO, spații, etc.)
     const cleanCui = cui.replace(/[^0-9]/g, '');
-    
-    if (cleanCui.length < 6 || cleanCui.length > 10) {
+
+    if (cleanCui.length === 0 || cleanCui.length > 10) {
       return NextResponse.json(
-        { error: 'CUI invalid - trebuie să aibă între 6 și 10 cifre' },
+        { error: 'CUI invalid - trebuie să aibă maxim 10 cifre' },
         { status: 400 }
       );
     }

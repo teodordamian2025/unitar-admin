@@ -634,8 +634,8 @@ export async function PUT(request: NextRequest) {
 
     // Procesare câmpuri de actualizat cu tratament special pentru DATE
     const allowedFields = [
-      'Denumire', 'Client', 'Adresa', 'Descriere', 'Data_Start', 'Data_Final', 
-      'Valoare_Estimata', 'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
+      'Denumire', 'Client', 'Adresa', 'Descriere', 'Data_Start', 'Data_Final',
+      'Status', 'Valoare_Estimata', 'moneda', 'curs_valutar', 'data_curs_valutar', 'valoare_ron',
       'status_predare', 'status_contract', 'status_facturare', 'status_achitare',
       'Responsabil', 'Observatii'
     ];

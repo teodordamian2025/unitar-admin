@@ -155,11 +155,11 @@ export async function POST(request: NextRequest) {
 // ✅ Helper: Căutare în ANAF cu API v9 public - REPARAT COMPLET
 async function searchInANAF(cui: string) {
   const cleanCui = cui.replace(/[^0-9]/g, '');
-  
-  if (cleanCui.length < 6 || cleanCui.length > 10) {
+
+  if (cleanCui.length === 0 || cleanCui.length > 10) {
     return {
       success: false,
-      error: 'CUI invalid - trebuie să aibă între 6 și 10 cifre'
+      error: 'CUI invalid - trebuie să aibă maxim 10 cifre'
     };
   }
   

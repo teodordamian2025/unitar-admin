@@ -595,9 +595,15 @@ export async function PUT(request: NextRequest) {
 
     // Câmpuri permise pentru utilizatori normali (fără valori financiare)
     const allowedFields = [
-      'proiect_id', 'descriere_lucru', 'data_lucru',
-      'ore_lucrate', 'tip_inregistrare'
+      'proiect_id', 'subproiect_id', 'sarcina_id', 'descriere_lucru', 'data_lucru',
+      'ore_lucrate', 'duration_minutes', 'tip_inregistrare'
     ];
+
+    // ✅ Conversie duration_minutes → ore_lucrate (dacă se trimite duration_minutes din UI)
+    if (updateData.duration_minutes !== undefined) {
+      updateData.ore_lucrate = updateData.duration_minutes / 60;
+      delete updateData.duration_minutes;
+    }
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && key !== 'id' && allowedFields.includes(key)) {
@@ -616,9 +622,8 @@ export async function PUT(request: NextRequest) {
       }
     });
 
-    // FORȚEAZĂ valorile financiare să rămână zero
-    updateFields.push('rate_per_hour = 0');
-    updateFields.push('valoare_totala = 0');
+    // ✅ FIX: Șters update pentru coloane inexistente (rate_per_hour, valoare_totala)
+    // Aceste coloane nu există în TimeTracking_v2 - datele financiare sunt excluse pentru utilizatori normali
 
     if (updateFields.length === 0) {
       return NextResponse.json({

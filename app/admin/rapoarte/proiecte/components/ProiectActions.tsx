@@ -330,13 +330,13 @@ export default function ProiectActions({
 
     try {
       const apiEndpoint = proiect.tip === 'subproiect' ? '/api/rapoarte/subproiecte' : '/api/rapoarte/proiecte';
-      
+
       const response = await fetch(apiEndpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: proiect.ID_Proiect, 
-          Status: newStatus 
+        body: JSON.stringify({
+          id: proiect.ID_Proiect,
+          status: newStatus  // FIX: minusculă pentru consistency cu API
         })
       });
 
