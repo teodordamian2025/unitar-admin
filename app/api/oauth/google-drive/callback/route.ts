@@ -1,8 +1,9 @@
 // =====================================================
 // OAuth Flow Google Drive - Step 2: Callback
 // Primește authorization code și salvează refresh token
-// URL: GET /api/oauth/google-drive/callback?code=xxx
+// URL: GET /api/oauth/google-drive/callback?code=xxx&state=xxx
 // Data: 08.10.2025
+// Update: 28.10.2025 - Added state verification for CSRF protection
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,6 +24,7 @@ const bigquery = new BigQuery({
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code');
+    const stateReceived = req.nextUrl.searchParams.get('state');
 
     if (!code) {
       return NextResponse.json(
@@ -30,6 +32,32 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // ✅ CSRF Protection: Verifică state parameter
+    const stateSent = req.cookies.get('google_oauth_state')?.value;
+
+    console.log('🔍 [OAuth Callback] Verifying state parameter...');
+    console.log('   State sent:', stateSent?.substring(0, 8) + '...');
+    console.log('   State received:', stateReceived?.substring(0, 8) + '...');
+
+    if (!stateReceived || !stateSent || stateReceived !== stateSent) {
+      console.error('❌ [OAuth Callback] State mismatch - possible CSRF attack!');
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid state parameter - possible CSRF attack detected',
+          details: {
+            state_received: !!stateReceived,
+            state_sent: !!stateSent,
+            match: stateReceived === stateSent
+          }
+        },
+        { status: 403 }
+      );
+    }
+
+    console.log('✅ [OAuth Callback] State verified successfully');
 
     console.log('📥 Received authorization code, exchanging for tokens...');
 
@@ -83,19 +111,33 @@ export async function GET(req: NextRequest) {
 
     console.log('✅ Refresh token saved to BigQuery!');
 
-    return NextResponse.json({
+    // Crează response și șterge cookie-ul state (nu mai e necesar)
+    const response = NextResponse.json({
       success: true,
       message: '✅ Google Drive OAuth setup complete! Refresh token saved.',
       token_preview: tokens.refresh_token.substring(0, 20) + '...',
       next_step: 'Test: https://admin.unitarproiect.eu/api/test/google-drive',
     });
 
+    // Clear state cookie după verificare cu succes
+    response.cookies.delete('google_oauth_state');
+
+    console.log('🧹 [OAuth Callback] State cookie cleared');
+
+    return response;
+
   } catch (error: any) {
-    console.error('❌ OAuth callback error:', error);
-    return NextResponse.json(
+    console.error('❌ [OAuth Callback] Error:', error);
+
+    // Clear state cookie și în caz de eroare
+    const errorResponse = NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
     );
+
+    errorResponse.cookies.delete('google_oauth_state');
+
+    return errorResponse;
   }
 }
 
