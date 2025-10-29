@@ -72,7 +72,8 @@ const navStructure: NavItem[] = [
       { href: '/admin/tranzactii/dashboard', label: 'Panou', icon: '📊' },
       { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
       { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' },
-      { href: '/admin/financiar/facturi-primite', label: 'Facturi Primite ANAF', icon: '📥' }
+      { href: '/admin/financiar/facturi-primite', label: 'Facturi Primite ANAF', icon: '📥' },
+      { href: '/admin/financiar/facturi-emise', label: 'Facturi Emise ANAF', icon: '📤' }
     ]
   },
   {

@@ -1,0 +1,70 @@
+name: iApp Facturi Emise - Sync Zilnic
+
+on:
+  schedule:
+    # Rulează zilnic la 02:00 GMT (04:00-05:00 AM România, în funcție de DST)
+    # Ora 02:00 GMT = trafic minim pe servere România
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Permite trigger manual din GitHub UI
+
+jobs:
+  sync-iapp-facturi-emise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Trigger iApp Facturi Emise Sync
+        run: |
+          echo "🔄 Triggering iApp facturi EMISE sync..."
+          echo "⏰ Scheduled time: 02:00 GMT (04:00-05:00 AM România)"
+          echo "📅 Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://admin.unitarproiect.eu/api/iapp/facturi-emise/sync \
+            -H "Content-Type: application/json" \
+            -d '{"zile": 7}')
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo ""
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response:"
+          echo "$body" | python3 -m json.tool || echo "$body"
+
+          if [ "$http_code" -eq 200 ]; then
+            echo ""
+            echo "✅ iApp facturi EMISE sync completed successfully"
+
+            # Parse stats dacă există
+            facturi_noi=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('facturi_noi', 0))" 2>/dev/null || echo "N/A")
+            facturi_confirmate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('facturi_confirmate', 0))" 2>/dev/null || echo "N/A")
+            facturi_erori_anaf=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('facturi_erori_anaf', 0))" 2>/dev/null || echo "N/A")
+            zips_descarcate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('zips_descarcate', 0))" 2>/dev/null || echo "N/A")
+
+            echo ""
+            echo "📈 Stats:"
+            echo "   Facturi noi: $facturi_noi"
+            echo "   Confirmate ANAF: $facturi_confirmate"
+            echo "   Erori ANAF: $facturi_erori_anaf"
+            echo "   ZIPs descărcate: $zips_descarcate"
+
+            # Alert dacă sunt erori ANAF
+            if [ "$facturi_erori_anaf" != "0" ] && [ "$facturi_erori_anaf" != "N/A" ]; then
+              echo ""
+              echo "⚠️  WARNING: $facturi_erori_anaf facturi cu erori ANAF găsite!"
+              echo "   Verifică în dashboard: https://admin.unitarproiect.eu/admin/financiar/facturi-emise"
+            fi
+          else
+            echo ""
+            echo "❌ iApp facturi EMISE sync failed with status $http_code"
+            exit 1
+          fi
+
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🏁 Workflow completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
