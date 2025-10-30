@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
+import { getUserIdFromToken } from '@/lib/firebase-admin';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -34,14 +35,15 @@ const bigquery = new BigQuery({
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
+    // Extract user ID from Authorization header
+    const authHeader = request.headers.get('Authorization');
+    const userId = await getUserIdFromToken(authHeader);
 
     if (!userId) {
       return NextResponse.json({
-        error: 'Missing user_id parameter',
+        error: 'Unauthorized - Invalid or missing authentication token',
         success: false
-      }, { status: 400 });
+      }, { status: 401 });
     }
 
     console.log(`Loading user dashboard statistics for user: ${userId}...`);

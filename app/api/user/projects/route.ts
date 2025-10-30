@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
         p.status_contract,
         p.Responsabil,
         p.Observatii,
+        p.progres_procent,
         -- Date client
         c.id as client_id,
         c.nume as client_nume,
@@ -236,6 +237,7 @@ export async function GET(request: NextRequest) {
         s.Data_Final,
         s.status_predare,
         s.status_contract,
+        s.progres_procent,
         p.Client,
         p.Denumire as Proiect_Denumire
       FROM ${TABLE_SUBPROIECTE} s
@@ -323,21 +325,29 @@ export async function GET(request: NextRequest) {
 
     // Procesează rezultatele pentru proiecte - EXCLUDE datele financiare
     const processedProjects = rows.map((row: any) => ({
+      id: row.ID_Proiect,
       ID_Proiect: row.ID_Proiect,
+      nume: row.Denumire,
       Denumire: row.Denumire,
       Client: row.Client,
+      client_nume: row.client_nume || row.Client,
       Adresa: row.Adresa,
       Descriere: row.Descriere,
+      data_start: row.Data_Start,
       Data_Start: row.Data_Start,
+      data_end: row.Data_Final,
       Data_Final: row.Data_Final,
+      status: row.Status,
       Status: row.Status,
       status_predare: row.status_predare,
       status_contract: row.status_contract,
       Responsabil: row.Responsabil,
       Observatii: row.Observatii,
+      progres: convertBigQueryNumeric(row.progres_procent) || 0,
+      progres_procent: convertBigQueryNumeric(row.progres_procent) || 0,
+      tip_proiect: 'Standard',
       // Date client (non-financiare)
       client_id: row.client_id,
-      client_nume: row.client_nume,
       client_cui: row.client_cui,
       client_adresa: row.client_adresa,
       client_telefon: row.client_telefon,
@@ -362,6 +372,8 @@ export async function GET(request: NextRequest) {
       Data_Final: row.Data_Final,
       status_predare: row.status_predare,
       status_contract: row.status_contract,
+      progres: convertBigQueryNumeric(row.progres_procent) || 0,
+      progres_procent: convertBigQueryNumeric(row.progres_procent) || 0,
       Client: row.Client,
       Proiect_Denumire: row.Proiect_Denumire,
       // Pentru compatibilitate UI - setează implicit 0 RON

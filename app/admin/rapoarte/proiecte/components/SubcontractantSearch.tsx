@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface SubcontractantSearchProps {
   onSubcontractantSelected?: (subcontractant: any) => void;
@@ -111,6 +111,10 @@ export default function SubcontractantSearch({
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [anafDataForImport, setAnafDataForImport] = useState<ANAFResult | null>(null);
 
+  // FIX: Debounce timer pentru input greoi
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Încarcă subcontractanți inițiali
   useEffect(() => {
     loadSubcontractanti();
@@ -132,7 +136,14 @@ export default function SubcontractantSearch({
   }, [initialSelectedSubcontractant, subcontractanti]);
 
   const loadSubcontractanti = async (search?: string) => {
+    // FIX: Prevent race conditions - abort previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
     setLoading(true);
+
     try {
       const queryParams = new URLSearchParams();
       if (search && search.trim().length > 0) {
@@ -140,18 +151,31 @@ export default function SubcontractantSearch({
       }
       queryParams.append('limit', '20');
 
-      const response = await fetch(`/api/rapoarte/subcontractanti?${queryParams.toString()}`);
+      const response = await fetch(`/api/rapoarte/subcontractanti?${queryParams.toString()}`, {
+        signal: abortControllerRef.current.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
         setSubcontractanti(data.data || []);
       } else {
-        showToast('Eroare la încărcarea subcontractanților', 'error');
+        console.error('API error:', data.error);
         setSubcontractanti([]);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // FIX: Ignore abort errors (normal când user type rapid)
+      if (error.name === 'AbortError') {
+        console.log('Request aborted (normal behavior)');
+        return;
+      }
+
       console.error('Eroare la încărcarea subcontractanților:', error);
-      showToast('Eroare de conectare', 'error');
+      // Nu mai arăt toast pentru fiecare eroare - era prea intruziv
       setSubcontractanti([]);
     } finally {
       setLoading(false);
@@ -161,30 +185,35 @@ export default function SubcontractantSearch({
   // MODIFICAT: Căutare în ANAF cu verificare existență în BD
   const searchInANAF = async (cui: string) => {
     if (!cui || cui.trim().length < 6) return;
-    
+
     setLoadingAnaf(true);
     try {
       // Primul pas: caută în ANAF
       const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cui.trim())}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const result = await response.json();
 
-      if (result.success) {
+      if (result.success && result.data) {
         const anafData: ANAFResult = {
-          denumire: result.data.denumire,
-          cui: result.data.cui,
-          nrRegCom: result.data.nrRegCom,
-          adresa: result.data.adresa,
-          status: result.data.status,
-          platitorTva: result.data.platitorTva,
-          judet: result.data.judet,
-          oras: result.data.oras,
-          codPostal: result.data.codPostal,
-          telefon: result.data.telefon
+          denumire: result.data.denumire || '',
+          cui: result.data.cui || cui,
+          nrRegCom: result.data.nrRegCom || '',
+          adresa: result.data.adresa || '',
+          status: result.data.status || 'N/A',
+          platitorTva: result.data.platitorTva || 'Nu',
+          judet: result.data.judet || '',
+          oras: result.data.oras || '',
+          codPostal: result.data.codPostal || '',
+          telefon: result.data.telefon || ''
         };
 
         // Al doilea pas: verifică dacă există în BD
         const existingSubcontractant = await checkExistingSubcontractant(anafData.cui);
-        
+
         if (existingSubcontractant) {
           // Există în BD - returnează direct
           setAnafResults([]);
@@ -199,11 +228,12 @@ export default function SubcontractantSearch({
         }
       } else {
         setAnafResults([]);
-        showToast('Nu a fost găsit în ANAF', 'info');
+        // Nu mai arăt toast pentru "not found" - era prea intruziv
+        console.log('CUI nu a fost găsit în ANAF:', cui);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Eroare căutare ANAF:', error);
-      showToast('Eroare la căutarea în ANAF', 'error');
+      // FIX: Nu aruncă toast error - doar log pentru debugging
       setAnafResults([]);
     } finally {
       setLoadingAnaf(false);
@@ -228,16 +258,22 @@ export default function SubcontractantSearch({
 
   // NOU: Import automat din ANAF în BD
   const importFromANAF = async (anafData: ANAFResult) => {
+    // FIX: Validare date înainte de import
+    if (!anafData || !anafData.denumire || !anafData.cui) {
+      showToast('Date ANAF incomplete - nu se poate importa', 'error');
+      return;
+    }
+
     try {
       setLoadingAnaf(true);
-      
+
       const subcontractantData = {
         id: `SUB_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        nume: anafData.denumire,
+        nume: anafData.denumire.trim(),
         tip_client: anafData.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic',
-        cui: anafData.cui,
-        nr_reg_com: anafData.nrRegCom,
-        adresa: anafData.adresa,
+        cui: anafData.cui.trim(),
+        nr_reg_com: anafData.nrRegCom || '',
+        adresa: anafData.adresa || '',
         judet: anafData.judet || '',
         oras: anafData.oras || '',
         cod_postal: anafData.codPostal || '',
@@ -265,11 +301,15 @@ export default function SubcontractantSearch({
         body: JSON.stringify(subcontractantData)
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const result = await response.json();
 
       if (result.success || response.ok) {
         showToast('Subcontractant importat cu succes din ANAF!', 'success');
-        
+
         // Selectează automat subcontractantul importat
         const newSubcontractant: Subcontractant = {
           id: subcontractantData.id,
@@ -285,7 +325,7 @@ export default function SubcontractantSearch({
         setSearchTerm(newSubcontractant.nume);
         setShowImportDialog(false);
         setAnafResults([]);
-        
+
         if (onSubcontractantSelected) {
           onSubcontractantSelected({
             id: newSubcontractant.id,
@@ -300,13 +340,66 @@ export default function SubcontractantSearch({
         console.error('Eroare API:', result);
         showToast(`Eroare la import: ${result.error || 'Eroare necunoscută'}`, 'error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Eroare la importul din ANAF:', error);
-      showToast('Eroare la importul din ANAF', 'error');
+      showToast(`Eroare la importul din ANAF: ${error.message || 'Eroare necunoscută'}`, 'error');
     } finally {
       setLoadingAnaf(false);
     }
   };
+
+  // FIX: Debounce effect pentru căutare - 500ms delay
+  useEffect(() => {
+    // Cleanup previous timer și abort previous request
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Dacă nu este searchTerm, nu face nimic
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      setSearchMode('local');
+      setShowSuggestions(false);
+      setAnafResults([]);
+      setSubcontractanti([]);
+      return;
+    }
+
+    // Detectează dacă este CUI (doar cifre)
+    const isCUI = /^\d+$/.test(searchTerm.trim()) && searchTerm.trim().length >= 6;
+
+    // Setează modul de căutare imediat (pentru UI feedback)
+    if (isCUI) {
+      setSearchMode('anaf');
+      setShowSuggestions(true);
+    } else {
+      setSearchMode('local');
+      setShowSuggestions(searchTerm.trim().length >= 2);
+    }
+
+    // Debounce: așteaptă 500ms înainte de a face request
+    debounceTimerRef.current = setTimeout(() => {
+      if (isCUI && searchTerm.trim().length >= 6) {
+        // Căutare ANAF pentru CUI
+        searchInANAF(searchTerm);
+      } else if (searchTerm.trim().length >= 2) {
+        // Căutare locală pentru text
+        loadSubcontractanti(searchTerm);
+      } else if (searchTerm.trim().length === 0) {
+        // Load all când e gol
+        loadSubcontractanti();
+      }
+    }, 500); // 500ms delay - input devine fluid
+
+    // Cleanup la unmount sau la change
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchTerm]); // Re-run când searchTerm se schimbă
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -314,29 +407,6 @@ export default function SubcontractantSearch({
     setAnafResults([]);
     setShowImportDialog(false);
     setAnafDataForImport(null);
-    
-    // Detectează dacă este CUI (doar cifre)
-    const isCUI = /^\d+$/.test(value.trim()) && value.trim().length >= 6;
-    
-    if (isCUI) {
-      setSearchMode('anaf');
-      setShowSuggestions(true);
-      // Căutare ANAF pentru CUI
-      if (value.trim().length >= 6) {
-        searchInANAF(value);
-      }
-    } else {
-      setSearchMode('local');
-      if (value.trim().length >= 2) {
-        setShowSuggestions(true);
-        loadSubcontractanti(value);
-      } else if (value.trim().length === 0) {
-        setShowSuggestions(true);
-        loadSubcontractanti();
-      } else {
-        setShowSuggestions(false);
-      }
-    }
 
     // Notifică părintele că selecția a fost resetată
     if (onSubcontractantSelected) {
