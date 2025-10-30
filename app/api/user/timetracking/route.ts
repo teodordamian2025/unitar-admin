@@ -599,7 +599,14 @@ export async function PUT(request: NextRequest) {
       'ore_lucrate', 'duration_minutes', 'tip_inregistrare'
     ];
 
-    // ✅ Conversie duration_minutes → ore_lucrate (dacă se trimite duration_minutes din UI)
+    // ✅ Conversie câmpuri din UI → câmpuri BigQuery
+    // task_description → descriere_lucru
+    if (updateData.task_description !== undefined) {
+      updateData.descriere_lucru = updateData.task_description;
+      delete updateData.task_description;
+    }
+
+    // duration_minutes → ore_lucrate (convertește minute în ore)
     if (updateData.duration_minutes !== undefined) {
       updateData.ore_lucrate = updateData.duration_minutes / 60;
       delete updateData.duration_minutes;
@@ -667,8 +674,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    // FIX: Citește id din body JSON (ca la PUT), nu din query params
+    const body = await request.json();
+    const id = body.id;
 
     if (!id) {
       return NextResponse.json({
