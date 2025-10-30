@@ -649,14 +649,12 @@ export async function PUT(request: NextRequest) {
     console.log('=== DEBUG USER TIME TRACKING PUT: Query UPDATE ===');
     console.log(updateQuery);
 
-    const [job] = await bigquery.query({
+    await bigquery.query({
       query: updateQuery,
       location: 'EU',
     });
 
-    // Verifică dacă BigQuery a actualizat vreun rând
-    console.log('=== DEBUG USER TIME TRACKING PUT: BigQuery job stats ===');
-    console.log('Job ID:', job?.id);
+    console.log('=== DEBUG USER TIME TRACKING PUT: Update executat ===');
 
     // Verificare suplimentară - query pentru a vedea dacă înregistrarea există
     const checkQuery = `
