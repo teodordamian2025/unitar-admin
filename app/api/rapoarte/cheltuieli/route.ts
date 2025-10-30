@@ -194,11 +194,35 @@ export async function POST(request: NextRequest) {
       observatii
     } = body;
 
-    // Validări
-    if (!id || !proiect_id || !tip_cheltuiala || !furnizor_nume || !descriere || !valoare) {
-      return NextResponse.json({ 
+    // Validări - verificăm doar câmpurile critice (id, proiect_id, tip_cheltuiala)
+    // Permitem furnizor_nume, descriere și valoare să fie goale inițial
+    if (!id || !proiect_id || !tip_cheltuiala) {
+      return NextResponse.json({
         success: false,
-        error: 'Câmpurile id, proiect_id, tip_cheltuiala, furnizor_nume, descriere și valoare sunt obligatorii' 
+        error: 'Câmpurile id, proiect_id și tip_cheltuiala sunt obligatorii'
+      }, { status: 400 });
+    }
+
+    // Verificăm că furnizor_nume, descriere și valoare există (nu sunt undefined/null)
+    // dar permitem să fie string gol sau 0
+    if (furnizor_nume === undefined || furnizor_nume === null) {
+      return NextResponse.json({
+        success: false,
+        error: 'Câmpul furnizor_nume este obligatoriu (poate fi gol)'
+      }, { status: 400 });
+    }
+
+    if (descriere === undefined || descriere === null) {
+      return NextResponse.json({
+        success: false,
+        error: 'Câmpul descriere este obligatoriu (poate fi gol)'
+      }, { status: 400 });
+    }
+
+    if (valoare === undefined || valoare === null) {
+      return NextResponse.json({
+        success: false,
+        error: 'Câmpul valoare este obligatoriu (poate fi 0)'
       }, { status: 400 });
     }
 
