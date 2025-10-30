@@ -530,3 +530,107 @@ export function getDateRange(zile: number = 7): { startDate: string; endDate: st
     endDate: end.toISOString().split('T')[0]
   };
 }
+
+// =====================================================
+// PDF DOWNLOAD & UPLOAD FUNCTIONS (similar cu facturi primite)
+// =====================================================
+
+/**
+ * Download PDF din link iapp.ro pentru factură emisă
+ * Similar cu downloadPdfFromIapp pentru facturi primite
+ * @param pdfUrl URL link PDF din iapp.ro (ex: https://my.iapp.ro/share/spv-emise/...)
+ * @returns Buffer cu conținut PDF
+ */
+export async function downloadPdfFacturaEmisa(pdfUrl: string): Promise<Buffer> {
+  console.log(`📥 [iapp.ro Emise] Download PDF: ${pdfUrl.substring(0, 60)}...`);
+
+  const response = await fetch(pdfUrl, {
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; UNITAR-Admin/1.0)',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  console.log(`✅ [iapp.ro Emise] PDF downloaded: ${(buffer.length / 1024).toFixed(2)} KB`);
+
+  return buffer;
+}
+
+/**
+ * Generează nume fișier pentru PDF factură emisă
+ * Pattern: SERIE_DATA.pdf (diferit de ZIP care era .zip)
+ * Exemplu: UPA001_2025-10-25.pdf
+ */
+export function generatePdfFileNameEmise(factura: {
+  serie_numar: string | null;
+  data_factura: string | { value: string };
+  id_incarcare: string;
+}): string {
+  // Data (YYYY-MM-DD)
+  const dataStr = typeof factura.data_factura === 'object' && factura.data_factura?.value
+    ? factura.data_factura.value
+    : factura.data_factura;
+  const data = String(dataStr).split('T')[0];
+
+  // Serie (clean)
+  let serieClean = 'UNKNOWN';
+  if (factura.serie_numar) {
+    serieClean = factura.serie_numar.replace(/[^A-Z0-9-]/gi, '_');
+  } else {
+    // Fallback la id_incarcare dacă serie nu e disponibilă
+    serieClean = `ID${factura.id_incarcare}`;
+  }
+
+  return `${serieClean}_${data}.pdf`;
+}
+
+/**
+ * Upload PDF în Google Drive folder specific facturi emise
+ * Structură: Facturi Primite ANAF/Facturi Emise/YYYY/MM/
+ * @param pdfBuffer Buffer cu conținut PDF
+ * @param fileName Nume fișier (ex: UPA001_2025-10-25.pdf)
+ * @param year An (ex: "2025")
+ * @param month Lună (ex: "10")
+ * @returns Google Drive file ID
+ */
+export async function uploadPdfToEmiseDrive(
+  pdfBuffer: Buffer,
+  fileName: string,
+  year: string,
+  month: string
+): Promise<string> {
+  const {
+    getRootFacturiFolder,
+    createFolder,
+    uploadFile,
+  } = await import('./google-drive-helper');
+
+  console.log(`💾 [iapp.ro Emise] Upload PDF în Drive: ${fileName}`);
+
+  // 1. Găsește folder rădăcină "Facturi Primite ANAF"
+  const rootFolderId = await getRootFacturiFolder();
+
+  // 2. Creează/găsește folder "Facturi Emise"
+  const emiseFolderId = await createFolder('Facturi Emise', rootFolderId);
+
+  // 3. Creează/găsește folder an (ex: "2025")
+  const yearFolderId = await createFolder(year, emiseFolderId);
+
+  // 4. Creează/găsește folder lună (ex: "10")
+  const monthStr = month.padStart(2, '0');
+  const monthFolderId = await createFolder(monthStr, yearFolderId);
+
+  // 5. Upload PDF (schimbat de la ZIP la PDF, și mimetype la application/pdf)
+  const result = await uploadFile(fileName, pdfBuffer, 'application/pdf', monthFolderId);
+
+  console.log(`✅ [iapp.ro Emise] PDF salvat în Drive: ${fileName} (ID: ${result.fileId})`);
+
+  return result.fileId;
+}

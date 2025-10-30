@@ -26,6 +26,7 @@ interface FacturaEmisa {
   trimisa_de: string; // Sistem, Extern, User name
   tip_document: string;
   zip_file_id: string | null;
+  pdf_file_id: string | null;
   factura_generata_id: string | null;
   data_preluare: { value: string } | string;
   data_incarcare_anaf: { value: string } | string;
@@ -42,11 +43,28 @@ interface SyncStats {
   facturi_erori: number;
 }
 
+interface FacturaDetalii {
+  pdf?: string;
+  factura: {
+    cbcID: string;
+    cbcIssueDate: string;
+    cbcDocumentCurrencyCode: string;
+    cacLegalMonetaryTotal: {
+      cbcLineExtensionAmount: string;
+      cbcTaxInclusiveAmount: string;
+    };
+  };
+  continut: any[][];
+}
+
 export default function FacturiEmisePage() {
   const [facturi, setFacturi] = useState<FacturaEmisa[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<SyncStats | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detalii, setDetalii] = useState<FacturaDetalii | null>(null);
+  const [loadingDetalii, setLoadingDetalii] = useState(false);
 
   // Filtre
   const [searchTerm, setSearchTerm] = useState('');
@@ -164,6 +182,38 @@ export default function FacturiEmisePage() {
     if (!date) return '-';
     const dateStr = typeof date === 'object' && date?.value ? date.value : String(date);
     return new Date(dateStr).toLocaleDateString('ro-RO');
+  };
+
+  // Load detalii factură
+  const loadDetalii = async (facturaId: string) => {
+    try {
+      setLoadingDetalii(true);
+
+      const response = await fetch(`/api/iapp/facturi-emise/detalii?factura_id=${facturaId}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Eroare la încărcare detalii');
+      }
+
+      setDetalii(data.detalii);
+    } catch (error: any) {
+      toast.error(`Eroare detalii: ${error.message}`);
+      setDetalii(null);
+    } finally {
+      setLoadingDetalii(false);
+    }
+  };
+
+  // Toggle expand
+  const toggleExpand = (facturaId: string) => {
+    if (expandedId === facturaId) {
+      setExpandedId(null);
+      setDetalii(null);
+    } else {
+      setExpandedId(facturaId);
+      loadDetalii(facturaId);
+    }
   };
 
   // Status badge
@@ -334,50 +384,166 @@ export default function FacturiEmisePage() {
                   </td>
                 </tr>
               ) : (
-                facturi.map((factura) => (
-                  <tr key={factura.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3 text-sm text-white font-medium">
-                      {factura.serie_numar || `ID ${factura.id_incarcare}`}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{factura.nume_client}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400 font-mono">{factura.cif_client}</td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{formatDate(factura.data_factura)}</td>
-                    <td className="px-4 py-3 text-sm text-right">
-                      <span className={factura.valoare_totala < 0 ? 'text-red-400' : 'text-green-400'}>
-                        {factura.valoare_totala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {factura.moneda}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(factura.status_anaf)}
-                        {factura.mesaj_anaf && factura.status_anaf === 'EROARE' && (
-                          <button
-                            className="text-xs text-gray-400 hover:text-white"
-                            title={factura.mesaj_anaf}
-                          >
-                            ℹ️
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{factura.trimisa_de}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-2">
-                        {factura.zip_file_id && (
-                          <a
-                            href={`https://drive.google.com/file/d/${factura.zip_file_id}/view`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300"
-                            title="Vezi ZIP în Google Drive"
-                          >
-                            📦
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                facturi.map((factura) => {
+                  const isExpanded = expandedId === factura.id;
+
+                  return (
+                    <>
+                      {/* Rând principal - clickable pentru expand */}
+                      <tr
+                        key={factura.id}
+                        onClick={() => toggleExpand(factura.id)}
+                        className="hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 text-sm text-white font-medium">
+                          <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
+                          {factura.serie_numar || `ID ${factura.id_incarcare}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-300">{factura.nume_client}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400 font-mono">{factura.cif_client}</td>
+                        <td className="px-4 py-3 text-sm text-gray-300">{formatDate(factura.data_factura)}</td>
+                        <td className="px-4 py-3 text-sm text-right">
+                          <span className={factura.valoare_totala < 0 ? 'text-red-400' : 'text-green-400'}>
+                            {factura.valoare_totala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {factura.moneda}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(factura.status_anaf)}
+                            {factura.mesaj_anaf && factura.status_anaf === 'EROARE' && (
+                              <button
+                                className="text-xs text-gray-400 hover:text-white"
+                                title={factura.mesaj_anaf}
+                              >
+                                ℹ️
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-300">{factura.trimisa_de}</td>
+                        <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2">
+                            {factura.pdf_file_id && (
+                              <a
+                                href={`https://drive.google.com/file/d/${factura.pdf_file_id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300"
+                                title="Vezi PDF în Google Drive"
+                              >
+                                📄 PDF
+                              </a>
+                            )}
+                            {factura.zip_file_id && (
+                              <a
+                                href={`https://drive.google.com/file/d/${factura.zip_file_id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-400 hover:text-gray-300"
+                                title="Vezi ZIP în Google Drive"
+                              >
+                                📦 ZIP
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Rând expandabil cu detalii */}
+                      {isExpanded && (
+                        <tr className="bg-white/5 border-t border-white/10">
+                          <td colSpan={8} className="px-4 py-4">
+                            {loadingDetalii ? (
+                              <div className="text-center text-white/60 py-4">Încărcare detalii...</div>
+                            ) : detalii ? (
+                              <div className="space-y-4">
+                                {/* Header cu link PDF */}
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-white font-semibold">Detalii Factură</h3>
+                                  {detalii.pdf && (
+                                    <a
+                                      href={detalii.pdf}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      📄 Descarcă PDF
+                                    </a>
+                                  )}
+                                </div>
+
+                                {/* Tabel articole */}
+                                {detalii.continut && detalii.continut.length > 0 ? (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                      <thead>
+                                        <tr className="bg-white/10">
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">Nr</th>
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">Denumire</th>
+                                          <th className="px-3 py-2 text-left text-white/80 text-sm">U.M.</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Cantitate</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Preț unitar</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">Total</th>
+                                          <th className="px-3 py-2 text-right text-white/80 text-sm">TVA</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {detalii.continut.map((articol, idx) => {
+                                          const [nr, nume, descriere, um, cant, pret, total, tvaSuma, tvaProcent] = articol;
+                                          return (
+                                            <tr key={idx} className="border-t border-white/10">
+                                              <td className="px-3 py-2 text-white/80 text-sm">{nr}</td>
+                                              <td className="px-3 py-2 text-white text-sm">
+                                                <div className="font-medium">{nume}</div>
+                                                {descriere && descriere !== nume && (
+                                                  <div className="text-white/60 text-xs mt-1">{descriere}</div>
+                                                )}
+                                              </td>
+                                              <td className="px-3 py-2 text-white/60 text-sm">{um}</td>
+                                              <td className="px-3 py-2 text-right text-white/80 text-sm">{cant}</td>
+                                              <td className="px-3 py-2 text-right text-white/80 text-sm">
+                                                {parseFloat(pret).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-white font-medium text-sm">
+                                                {parseFloat(total).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-white/60 text-sm">{tvaProcent}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                      <tfoot>
+                                        <tr className="border-t-2 border-white/20 bg-white/5">
+                                          <td colSpan={5} className="px-3 py-2 text-right text-white font-semibold">Total fără TVA:</td>
+                                          <td className="px-3 py-2 text-right text-white font-semibold">
+                                            {parseFloat(detalii.factura.cacLegalMonetaryTotal.cbcLineExtensionAmount).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                          </td>
+                                          <td></td>
+                                        </tr>
+                                        <tr className="bg-white/5">
+                                          <td colSpan={5} className="px-3 py-2 text-right text-white font-semibold">Total cu TVA:</td>
+                                          <td className="px-3 py-2 text-right text-white font-bold text-lg">
+                                            {parseFloat(detalii.factura.cacLegalMonetaryTotal.cbcTaxInclusiveAmount).toFixed(2)} {detalii.factura.cbcDocumentCurrencyCode}
+                                          </td>
+                                          <td></td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-white/60 py-4">Nu există articole disponibile</div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-center text-white/60 py-4">Nu s-au putut încărca detaliile</div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -14,9 +14,9 @@ import {
   getDateRange,
   getIappConfig,
   fetchFacturaEmisaDetails,
-  downloadZipFacturaEmisa,
-  generateZipFileName,
-  uploadZipToEmiseDrive,
+  downloadPdfFacturaEmisa,
+  generatePdfFileNameEmise,
+  uploadPdfToEmiseDrive,
   type IappFacturaEmisaRaspuns
 } from '@/lib/iapp-facturi-emise';
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           facturi_noi: 0,
           facturi_duplicate: 0,
           facturi_salvate: 0,
-          zips_descarcate: 0,
+          pdfs_descarcate: 0,
           facturi_erori_anaf: 0,
           facturi_confirmate: 0,
           processingTime: Date.now() - startTime
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
           facturi_noi: 0,
           facturi_duplicate: facturiDuplicate.length,
           facturi_salvate: 0,
-          zips_descarcate: 0,
+          pdfs_descarcate: 0,
           facturi_erori_anaf: 0,
           facturi_confirmate: 0,
           processingTime: Date.now() - startTime
@@ -137,10 +137,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Step 5: Mapare și fetch detalii + download ZIP + insert în BigQuery
+    // Step 5: Mapare și fetch detalii + download PDF + insert în BigQuery
     const recordsToInsert: any[] = [];
     const facturiSalvate: string[] = [];
-    let zipsDescarcate = 0;
+    let pdfsDescarcate = 0;
     let facturiEroriAnaf = 0;
     let facturiConfirmate = 0;
 
@@ -174,16 +174,16 @@ export async function POST(req: NextRequest) {
           console.warn(`⚠️ [iapp.ro Emise] Nu s-au putut prelua detalii pentru ID ${factura.id_incarcare}:`, detailError);
         }
 
-        // Download ZIP în Google Drive (dacă flag activat)
-        if (config.auto_download_pdfs_iapp && factura.id_descarcare) {
+        // Download PDF în Google Drive (dacă flag activat și PDF disponibil)
+        if (config.auto_download_pdfs_iapp && detalii?.pdf) {
           try {
-            console.log(`📥 [iapp.ro Emise] Start download ZIP pentru ID ${factura.id_incarcare}...`);
+            console.log(`📥 [iapp.ro Emise] Start download PDF pentru ID ${factura.id_incarcare}...`);
 
-            // 1. Download ZIP
-            const zipBuffer = await downloadZipFacturaEmisa(String(factura.id_descarcare));
+            // 1. Download PDF direct din link
+            const pdfBuffer = await downloadPdfFacturaEmisa(detalii.pdf);
 
-            // 2. Generate filename
-            const fileName = generateZipFileName({
+            // 2. Generate filename pentru PDF
+            const fileName = generatePdfFileNameEmise({
               serie_numar: dbRecord.serie_numar,
               data_factura: dbRecord.data_factura,
               id_incarcare: dbRecord.id_incarcare
@@ -192,23 +192,23 @@ export async function POST(req: NextRequest) {
             // 3. Extract year/month pentru folder structure
             const [year, month] = dbRecord.data_factura.split('-');
 
-            // 4. Upload to Drive
-            const fileId = await uploadZipToEmiseDrive(zipBuffer, fileName, year, month);
+            // 4. Upload PDF to Drive
+            const fileId = await uploadPdfToEmiseDrive(pdfBuffer, fileName, year, month);
 
             // 5. Save file ID in record
-            dbRecord.zip_file_id = fileId;
+            dbRecord.pdf_file_id = fileId;
 
-            zipsDescarcate++;
-            console.log(`✅ [iapp.ro Emise] ZIP salvat: ${fileName} (Drive ID: ${fileId})`);
+            pdfsDescarcate++;
+            console.log(`✅ [iapp.ro Emise] PDF salvat: ${fileName} (Drive ID: ${fileId})`);
 
             // Small delay pentru rate limiting (500ms între download-uri)
             await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (zipError) {
-            // Non-critical - continuăm fără ZIP
-            console.warn(`⚠️ [iapp.ro Emise] Nu s-a putut descărca ZIP pentru ID ${factura.id_incarcare}:`, zipError);
+          } catch (pdfError) {
+            // Non-critical - continuăm fără PDF
+            console.warn(`⚠️ [iapp.ro Emise] Nu s-a putut descărca PDF pentru ID ${factura.id_incarcare}:`, pdfError);
           }
         } else if (!config.auto_download_pdfs_iapp) {
-          console.log(`ℹ️ [iapp.ro Emise] Download ZIP dezactivat (flag OFF)`);
+          console.log(`ℹ️ [iapp.ro Emise] Download PDF dezactivat (flag OFF)`);
         }
 
         recordsToInsert.push(dbRecord);
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
     const processingTime = Date.now() - startTime;
 
     console.log(`✅ [iapp.ro Emise] ========== SYNC COMPLETED (${processingTime}ms) ==========`);
-    console.log(`📊 [iapp.ro Emise] Stats: Total=${facturiIapp.length}, Noi=${facturiNoi.length}, Salvate=${recordsToInsert.length}, ZIPs=${zipsDescarcate}`);
+    console.log(`📊 [iapp.ro Emise] Stats: Total=${facturiIapp.length}, Noi=${facturiNoi.length}, Salvate=${recordsToInsert.length}, PDFs=${pdfsDescarcate}`);
     console.log(`   Confirmate=${facturiConfirmate}, Erori ANAF=${facturiEroriAnaf}`);
 
     return NextResponse.json({
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
         facturi_noi: facturiNoi.length,
         facturi_duplicate: facturiDuplicate.length,
         facturi_salvate: recordsToInsert.length,
-        zips_descarcate: zipsDescarcate,
+        pdfs_descarcate: pdfsDescarcate,
         facturi_erori_anaf: facturiEroriAnaf,
         facturi_confirmate: facturiConfirmate,
         processingTime

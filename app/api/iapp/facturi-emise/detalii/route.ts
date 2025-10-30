@@ -1,0 +1,144 @@
+// =====================================================
+// API: Returnare Detalii Factură Emisă
+// URL: GET /api/iapp/facturi-emise/detalii?factura_id=xxx
+// Data: 30.10.2025
+// =====================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@google-cloud/bigquery';
+import { fetchFacturaEmisaDetails } from '@/lib/iapp-facturi-emise';
+
+export const dynamic = 'force-dynamic';
+
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+const bigquery = new BigQuery({
+  projectId: PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+});
+
+/**
+ * GET /api/iapp/facturi-emise/detalii?factura_id=xxx
+ * Returnează detalii complete factură emisă (articole, PDF link)
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const facturaId = searchParams.get('factura_id');
+
+    if (!facturaId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing factura_id parameter'
+      }, { status: 400 });
+    }
+
+    console.log(`📋 [iapp.ro Emise Detalii] Fetch detalii pentru factură ID: ${facturaId}`);
+
+    // Citește factura din BigQuery
+    const query = `
+      SELECT
+        id, id_incarcare, serie_numar, nume_client,
+        xml_content, observatii
+      FROM \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\`
+      WHERE id = @factura_id
+        AND activ = TRUE
+      LIMIT 1
+    `;
+
+    const [rows] = await bigquery.query({
+      query,
+      params: { factura_id: facturaId },
+      location: 'EU'
+    });
+
+    if (rows.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invoice not found'
+      }, { status: 404 });
+    }
+
+    const factura = rows[0];
+
+    // Verifică dacă avem deja detalii salvate în xml_content
+    if (factura.xml_content) {
+      try {
+        const detalii = JSON.parse(factura.xml_content);
+        console.log(`✅ [iapp.ro Emise Detalii] Detalii găsite în DB pentru ${factura.serie_numar}`);
+
+        return NextResponse.json({
+          success: true,
+          source: 'database',
+          detalii
+        });
+      } catch (parseError) {
+        console.warn(`⚠️ [iapp.ro Emise Detalii] Eroare parsare xml_content:`, parseError);
+      }
+    }
+
+    // Dacă nu avem detalii salvate, fetch live din iapp.ro
+    if (factura.id_incarcare) {
+      console.log(`🔄 [iapp.ro Emise Detalii] Fetch live pentru ${factura.serie_numar}`);
+
+      try {
+        const detalii = await fetchFacturaEmisaDetails(factura.id_incarcare);
+
+        // Încercare să salveze detaliile în DB pentru viitor (non-critical)
+        try {
+          const updateQuery = `
+            UPDATE \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\`
+            SET xml_content = @xml_content
+            WHERE id = @factura_id
+          `;
+
+          await bigquery.query({
+            query: updateQuery,
+            params: {
+              factura_id: facturaId,
+              xml_content: JSON.stringify(detalii)
+            },
+            location: 'EU'
+          });
+
+          console.log(`✅ [iapp.ro Emise Detalii] Detalii salvate în DB pentru ${factura.serie_numar}`);
+        } catch (updateError) {
+          // Non-critical - poate fi în streaming buffer
+          console.warn(`⚠️ [iapp.ro Emise Detalii] Nu s-au putut salva detalii în DB (poate streaming buffer):`, updateError);
+        }
+
+        return NextResponse.json({
+          success: true,
+          source: 'live_fetch',
+          detalii
+        });
+      } catch (fetchError) {
+        console.error(`❌ [iapp.ro Emise Detalii] Eroare fetch live:`, fetchError);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to fetch invoice details',
+          details: fetchError instanceof Error ? fetchError.message : 'Unknown error'
+        }, { status: 500 });
+      }
+    }
+
+    // Nu avem id_incarcare sau alte date necesare
+    return NextResponse.json({
+      success: false,
+      error: 'Details not available for this invoice'
+    }, { status: 404 });
+
+  } catch (error: any) {
+    console.error('❌ [iapp.ro Emise Detalii] Error:', error);
+
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch invoice details',
+      details: error.message || 'Unknown error'
+    }, { status: 500 });
+  }
+}
