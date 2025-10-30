@@ -333,6 +333,7 @@ export async function GET(request: NextRequest) {
       sarcina_id: row.sarcina_id,
       sarcina_titlu: row.sarcina_nume,
       descriere_lucru: row.task_description,
+      task_description: row.task_description,  // ✅ Pentru compatibilitate frontend
       data_lucru: row.data_lucru,
       ore_lucrate: convertBigQueryNumeric(row.ore_lucrate),
       tip_inregistrare: row.tip_inregistrare,
@@ -648,16 +649,43 @@ export async function PUT(request: NextRequest) {
     console.log('=== DEBUG USER TIME TRACKING PUT: Query UPDATE ===');
     console.log(updateQuery);
 
-    await bigquery.query({
+    const [job] = await bigquery.query({
       query: updateQuery,
       location: 'EU',
     });
 
-    console.log('=== DEBUG USER TIME TRACKING PUT: Update executat cu succes ===');
+    // Verifică dacă BigQuery a actualizat vreun rând
+    console.log('=== DEBUG USER TIME TRACKING PUT: BigQuery job stats ===');
+    console.log('Job ID:', job?.id);
+
+    // Verificare suplimentară - query pentru a vedea dacă înregistrarea există
+    const checkQuery = `
+      SELECT id, descriere_lucru, ore_lucrate
+      FROM ${TABLE_TIME_TRACKING}
+      WHERE id = '${escapeString(id)}'
+      LIMIT 1
+    `;
+
+    console.log('=== DEBUG USER TIME TRACKING PUT: Verificare după UPDATE ===');
+    const [checkRows] = await bigquery.query({
+      query: checkQuery,
+      location: 'EU',
+    });
+
+    if (checkRows.length === 0) {
+      console.error('⚠️ ATENȚIE: Înregistrarea cu ID', id, 'NU EXISTĂ în tabela TimeTracking_v2!');
+      return NextResponse.json({
+        success: false,
+        error: `Înregistrarea cu ID ${id} nu a fost găsită în baza de date. Posibil provenită din PlanificatorPersonal_v2 (read-only).`
+      }, { status: 404 });
+    }
+
+    console.log('✅ Verificare după UPDATE - înregistrarea există:', checkRows[0]);
 
     return NextResponse.json({
       success: true,
-      message: 'Înregistrare timp actualizată cu succes'
+      message: 'Înregistrare timp actualizată cu succes',
+      data: checkRows[0]
     });
 
   } catch (error) {

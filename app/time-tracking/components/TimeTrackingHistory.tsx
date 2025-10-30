@@ -26,6 +26,7 @@ interface TimeEntry {
   data_lucru?: any;          // Din API real
   status: string;
   context_display?: string;  // Din API real
+  tip_inregistrare?: string; // 'manual' sau 'planificator_pin' - pentru verificare editabilitate
 }
 
 interface TimeTrackingHistoryProps {
@@ -63,6 +64,13 @@ export default function TimeTrackingHistory({
     duration_minutes: 0
   });
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Helper pentru verificare dacă înregistrarea este editabilă
+  const isEditable = (entry: TimeEntry): boolean => {
+    // Doar înregistrările din TimeTracking_v2 (manual) sunt editabile
+    // Cele din PlanificatorPersonal_v2 (planificator_pin) sunt read-only
+    return entry.tip_inregistrare !== 'planificator_pin';
+  };
 
   // Helper pentru formatarea datelor BigQuery DATE objects
   const formatDate = (dateValue: any): string => {
@@ -698,36 +706,57 @@ export default function TimeTrackingHistory({
                           {formatDuration(getDurationMinutes(entry))}
                         </span>
                         <div style={{ display: 'flex', gap: '0.25rem' }}>
-                          <button
-                            onClick={() => handleEdit(entry)}
-                            style={{
-                              background: 'rgba(245, 158, 11, 0.1)',
-                              color: '#92400e',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDelete(entry.id)}
-                            disabled={deleting === entry.id}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              color: '#dc2626',
-                              border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              cursor: deleting === entry.id ? 'not-allowed' : 'pointer',
-                              opacity: deleting === entry.id ? 0.5 : 1
-                            }}
-                          >
-                            {deleting === entry.id ? '⏳' : '🗑️'}
-                          </button>
+                          {isEditable(entry) ? (
+                            <>
+                              <button
+                                onClick={() => handleEdit(entry)}
+                                style={{
+                                  background: 'rgba(245, 158, 11, 0.1)',
+                                  color: '#92400e',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer'
+                                }}
+                                title="Editează înregistrarea"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDelete(entry.id)}
+                                disabled={deleting === entry.id}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  color: '#dc2626',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.25rem 0.5rem',
+                                  fontSize: '0.75rem',
+                                  cursor: deleting === entry.id ? 'not-allowed' : 'pointer',
+                                  opacity: deleting === entry.id ? 0.5 : 1
+                                }}
+                                title="Șterge înregistrarea"
+                              >
+                                {deleting === entry.id ? '⏳' : '🗑️'}
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              style={{
+                                background: 'rgba(156, 163, 175, 0.1)',
+                                color: '#6b7280',
+                                border: '1px solid rgba(156, 163, 175, 0.2)',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.65rem',
+                                fontWeight: '600'
+                              }}
+                              title="Înregistrare din Cronometru Planificator (read-only)"
+                            >
+                              🔒 Read-only
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
