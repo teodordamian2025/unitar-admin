@@ -522,6 +522,7 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const [isManualMatchingOpen, setIsManualMatchingOpen] = useState(false);
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('user');
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
 
   // Starea filtrelor
   const [filters, setFilters] = useState<FilterState>({
@@ -583,6 +584,23 @@ const ModernTranzactiiDashboard: React.FC = () => {
       setIsLoading(false);
     }
   }, [filters, pagination.limit]);
+
+  const loadAvailableBalance = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tranzactii/smartfintech/balance');
+      const data = await response.json();
+
+      if (data.success && data.balance) {
+        setAvailableBalance(data.balance.total);
+      } else {
+        console.warn('⚠️ Sold disponibil nu poate fi încărcat:', data.error);
+        setAvailableBalance(null);
+      }
+    } catch (error) {
+      console.error('❌ Eroare loading available balance:', error);
+      setAvailableBalance(null);
+    }
+  }, []);
 
   // ==================================================================
   // HANDLERS
@@ -665,8 +683,9 @@ const ModernTranzactiiDashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadDashboardData(1);
+      loadAvailableBalance();
     }
-  }, [user, loadDashboardData]);
+  }, [user, loadDashboardData, loadAvailableBalance]);
 
   // ==================================================================
   // COMPUTED VALUES
@@ -675,7 +694,7 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const statsCards = useMemo(() => {
     if (!stats) return [];
 
-    return [
+    const cards = [
       {
         title: 'Total Tranzacții',
         value: stats.totalTransactions.toLocaleString('ro-RO'),
@@ -712,7 +731,24 @@ const ModernTranzactiiDashboard: React.FC = () => {
         trend: 'Review manual necesar'
       }
     ];
-  }, [stats]);
+
+    // Adaugă cardul Sold Disponibil dacă există date
+    if (availableBalance !== null) {
+      cards.push({
+        title: 'Sold Disponibil',
+        value: new Intl.NumberFormat('ro-RO', {
+          style: 'currency',
+          currency: 'RON'
+        }).format(availableBalance),
+        subtitle: 'În conturi bancare',
+        icon: '🏦',
+        color: 'border-l-4 border-teal-500',
+        trend: 'Smart Fintech API'
+      });
+    }
+
+    return cards;
+  }, [stats, availableBalance]);
 
   if (loading) {
     return <LoadingSpinner overlay />;
@@ -756,9 +792,12 @@ const ModernTranzactiiDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards - Forțat pe 4 coloane egale */}
+      {/* Stats Cards - Grid dinamic (4 sau 5 coloane în funcție de sold disponibil) */}
       {stats && (
-        <div className="grid grid-cols-4 gap-6 mb-8" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+        <div
+          className="grid gap-6 mb-8"
+          style={{ gridTemplateColumns: `repeat(${statsCards.length}, minmax(0, 1fr))` }}
+        >
           {statsCards.map((card, index) => (
             <ModernStatCard key={index} {...card} />
           ))}

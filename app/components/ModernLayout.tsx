@@ -68,10 +68,16 @@ const navStructure: NavItem[] = [
     label: 'Panou Financiar',
     icon: '💰',
     children: [
-      { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '💳' },
-      { href: '/admin/tranzactii/dashboard', label: 'Panou', icon: '📊' },
-      { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
-      { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' },
+      {
+        href: '/admin/tranzactii/dashboard',
+        label: 'Tranzactii bancare',
+        icon: '💳',
+        children: [
+          { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '📤' },
+          { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
+          { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' }
+        ]
+      },
       { href: '/admin/financiar/facturi-primite', label: 'Facturi Primite ANAF', icon: '📥' },
       { href: '/admin/financiar/facturi-emise', label: 'Facturi Emise ANAF', icon: '📤' }
     ]
@@ -107,7 +113,13 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
 
   const isParentActive = (item: NavItem) => {
     if (item.children) {
-      return item.children.some(child => isActive(child.href));
+      return item.children.some(child => {
+        // Check nested children too
+        if (child.children) {
+          return child.children.some(nestedChild => isActive(nestedChild.href)) || isActive(child.href);
+        }
+        return isActive(child.href);
+      });
     }
     return isActive(item.href, item.exact);
   };
@@ -277,29 +289,100 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
               {item.children && !sidebarCollapsed && expandedItems.includes(item.href) && (
                 <div style={{ paddingLeft: '1rem', marginBottom: '0.5rem' }}>
                   {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        padding: '0.5rem 1rem',
-                        background: isActive(child.href)
-                          ? 'rgba(59, 130, 246, 0.1)'
-                          : 'transparent',
-                        color: isActive(child.href) ? '#3b82f6' : '#6b7280',
-                        textDecoration: 'none',
-                        borderRadius: '8px',
-                        fontSize: '0.8rem',
-                        fontWeight: '400',
-                        margin: '0.125rem 0.5rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <span style={{ fontSize: '0.9rem' }}>{child.icon}</span>
-                      <span>{child.label}</span>
-                    </Link>
+                    <div key={child.href}>
+                      {/* Child with nested children (3rd level) */}
+                      {child.children ? (
+                        <>
+                          <button
+                            onClick={() => toggleExpanded(child.href)}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              padding: '0.5rem 1rem',
+                              background: isActive(child.href) || child.children.some(nc => isActive(nc.href))
+                                ? 'rgba(59, 130, 246, 0.1)'
+                                : 'transparent',
+                              color: isActive(child.href) || child.children.some(nc => isActive(nc.href)) ? '#3b82f6' : '#6b7280',
+                              textDecoration: 'none',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '0.8rem',
+                              fontWeight: '400',
+                              margin: '0.125rem 0.5rem',
+                              transition: 'all 0.2s ease',
+                              cursor: 'pointer',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <span style={{ fontSize: '0.9rem' }}>{child.icon}</span>
+                            <span style={{ flex: 1 }}>{child.label}</span>
+                            <span style={{
+                              transform: expandedItems.includes(child.href) ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease',
+                              fontSize: '0.7rem'
+                            }}>
+                              ▶
+                            </span>
+                          </button>
+                          {/* Nested children (3rd level) */}
+                          {expandedItems.includes(child.href) && (
+                            <div style={{ paddingLeft: '1.5rem', marginTop: '0.25rem' }}>
+                              {child.children.map((nestedChild) => (
+                                <Link
+                                  key={nestedChild.href}
+                                  href={nestedChild.href}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.4rem 0.75rem',
+                                    background: isActive(nestedChild.href)
+                                      ? 'rgba(59, 130, 246, 0.1)'
+                                      : 'transparent',
+                                    color: isActive(nestedChild.href) ? '#3b82f6' : '#6b7280',
+                                    textDecoration: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '400',
+                                    margin: '0.125rem 0.25rem',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                >
+                                  <span style={{ fontSize: '0.8rem' }}>{nestedChild.icon}</span>
+                                  <span>{nestedChild.label}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Regular child without nested children */
+                        <Link
+                          href={child.href}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: '0.5rem 1rem',
+                            background: isActive(child.href)
+                              ? 'rgba(59, 130, 246, 0.1)'
+                              : 'transparent',
+                            color: isActive(child.href) ? '#3b82f6' : '#6b7280',
+                            textDecoration: 'none',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            fontWeight: '400',
+                            margin: '0.125rem 0.5rem',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.9rem' }}>{child.icon}</span>
+                          <span>{child.label}</span>
+                        </Link>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
