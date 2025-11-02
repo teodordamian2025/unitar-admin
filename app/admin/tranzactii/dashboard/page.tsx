@@ -583,6 +583,8 @@ const ModernTranzactiiDashboard: React.FC = () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pagination.limit.toString(),
+        sort_by: 'data_procesare',
+        sort_order: 'desc', // Cele mai recente sus, cele mai vechi jos
         ...Object.fromEntries(
           Object.entries(filters).filter(([_, value]) => value !== '')
         )
