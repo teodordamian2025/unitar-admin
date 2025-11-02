@@ -393,27 +393,32 @@ const ModernTransactionTable: React.FC<{
             </tr>
           </thead>
           <tbody>
-            {transactions.map((transaction, index) => (
-              <tr
-                key={transaction.id}
-                style={{
-                  backgroundColor: transaction.directie === 'in'
-                    ? 'rgba(240, 253, 244, 0.3)'  // green-50 with 30% opacity
-                    : 'rgba(254, 242, 242, 0.3)', // red-50 with 30% opacity
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = transaction.directie === 'in'
-                    ? 'rgba(240, 253, 244, 0.5)'  // green-50 with 50% opacity (hover)
-                    : 'rgba(254, 242, 242, 0.5)'; // red-50 with 50% opacity (hover)
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = transaction.directie === 'in'
-                    ? 'rgba(240, 253, 244, 0.3)'
-                    : 'rgba(254, 242, 242, 0.3)';
-                }}
-              >
+            {transactions.map((transaction, index) => {
+              // Case-insensitive check pentru directie
+              const isIncasare = transaction.directie?.toLowerCase() === 'in' ||
+                                 transaction.suma > 0;
+
+              return (
+                <tr
+                  key={transaction.id}
+                  style={{
+                    backgroundColor: isIncasare
+                      ? 'rgba(240, 253, 244, 0.3)'  // green-50 with 30% opacity
+                      : 'rgba(254, 242, 242, 0.3)', // red-50 with 30% opacity
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isIncasare
+                      ? 'rgba(240, 253, 244, 0.5)'  // green-50 with 50% opacity (hover)
+                      : 'rgba(254, 242, 242, 0.5)'; // red-50 with 50% opacity (hover)
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = isIncasare
+                      ? 'rgba(240, 253, 244, 0.3)'
+                      : 'rgba(254, 242, 242, 0.3)';
+                  }}
+                >
                 <td className="px-6 py-4">
                   <input
                     type="checkbox"
@@ -430,10 +435,10 @@ const ModernTransactionTable: React.FC<{
                     style={{
                       fontSize: '0.875rem',
                       fontWeight: '600',
-                      color: transaction.directie === 'in' ? '#059669' : '#dc2626' // green-600 / red-600
+                      color: isIncasare ? '#059669' : '#dc2626' // green-600 / red-600
                     }}
                   >
-                    {transaction.directie === 'in' ? '+' : ''}{formatCurrency(transaction.suma)}
+                    {isIncasare ? '+' : ''}{formatCurrency(transaction.suma)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{transaction.tip_categorie}</div>
                 </td>
@@ -501,7 +506,8 @@ const ModernTransactionTable: React.FC<{
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
