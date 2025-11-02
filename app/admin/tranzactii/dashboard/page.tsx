@@ -795,8 +795,13 @@ const ModernTranzactiiDashboard: React.FC = () => {
       {/* Stats Cards - Grid dinamic (4 sau 5 coloane în funcție de sold disponibil) */}
       {stats && (
         <div
-          className="grid gap-6 mb-8"
-          style={{ gridTemplateColumns: `repeat(${statsCards.length}, minmax(0, 1fr))` }}
+          className="gap-6 mb-8"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${statsCards.length}, minmax(0, 1fr))`,
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}
         >
           {statsCards.map((card, index) => (
             <ModernStatCard key={index} {...card} />

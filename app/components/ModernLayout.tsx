@@ -73,6 +73,7 @@ const navStructure: NavItem[] = [
         label: 'Tranzactii bancare',
         icon: '💳',
         children: [
+          { href: '/admin/tranzactii/dashboard', label: 'Dashboard', icon: '📊' },
           { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '📤' },
           { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
           { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' }
