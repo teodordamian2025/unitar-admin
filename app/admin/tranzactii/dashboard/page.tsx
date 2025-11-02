@@ -396,11 +396,23 @@ const ModernTransactionTable: React.FC<{
             {transactions.map((transaction, index) => (
               <tr
                 key={transaction.id}
-                className={`border-b border-white/10 transition-colors ${
-                  transaction.directie === 'in'
-                    ? 'bg-green-50/30 hover:bg-green-50/50'
-                    : 'bg-red-50/30 hover:bg-red-50/50'
-                }`}
+                style={{
+                  backgroundColor: transaction.directie === 'in'
+                    ? 'rgba(240, 253, 244, 0.3)'  // green-50 with 30% opacity
+                    : 'rgba(254, 242, 242, 0.3)', // red-50 with 30% opacity
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = transaction.directie === 'in'
+                    ? 'rgba(240, 253, 244, 0.5)'  // green-50 with 50% opacity (hover)
+                    : 'rgba(254, 242, 242, 0.5)'; // red-50 with 50% opacity (hover)
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = transaction.directie === 'in'
+                    ? 'rgba(240, 253, 244, 0.3)'
+                    : 'rgba(254, 242, 242, 0.3)';
+                }}
               >
                 <td className="px-6 py-4">
                   <input
@@ -414,9 +426,13 @@ const ModernTransactionTable: React.FC<{
                   {formatDate(transaction.data_procesare)}
                 </td>
                 <td className="px-6 py-4">
-                  <div className={`text-sm font-semibold ${
-                    transaction.directie === 'in' ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: transaction.directie === 'in' ? '#059669' : '#dc2626' // green-600 / red-600
+                    }}
+                  >
                     {transaction.directie === 'in' ? '+' : ''}{formatCurrency(transaction.suma)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{transaction.tip_categorie}</div>
