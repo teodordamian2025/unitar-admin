@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         client_secret,
         access_token,
         refresh_token,
-        token_expires_at,
+        expires_at,
         is_active
       FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
       WHERE is_active = TRUE
@@ -56,15 +56,12 @@ export async function GET(request: NextRequest) {
     const [configRows] = await bigquery.query({ query: configQuery });
 
     if (configRows.length === 0) {
-      console.error('❌ [Balance] No active Smart Fintech configuration found');
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Smart Fintech nu este configurat. Mergi la Setări → Smart Fintech API.',
-          balance: null,
-        },
-        { status: 404 }
-      );
+      console.warn('⚠️ [Balance] No active Smart Fintech configuration found. Card will not be displayed.');
+      return NextResponse.json({
+        success: true,
+        balance: null,
+        message: 'Smart Fintech nu este configurat.',
+      });
     }
 
     const config = configRows[0];
@@ -78,20 +75,17 @@ export async function GET(request: NextRequest) {
     let tokens: SmartFintechTokens = {
       access_token: config.access_token ? decryptToken(config.access_token) : '',
       refresh_token: config.refresh_token ? decryptToken(config.refresh_token) : '',
-      expires_at: config.token_expires_at || 0,
+      expires_at: config.expires_at ? new Date(config.expires_at).getTime() : 0,
     };
 
-    // Dacă nu avem token valid, returnăm eroare
+    // Dacă nu avem token valid, returnăm success cu balance null (cardul nu va apărea)
     if (!tokens.access_token || !tokens.refresh_token) {
-      console.error('❌ [Balance] No valid tokens found. Need to authenticate first.');
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Token-uri expirate. Mergi la Setări → Smart Fintech API și reconectează.',
-          balance: null,
-        },
-        { status: 401 }
-      );
+      console.warn('⚠️ [Balance] No valid tokens found. Card will not be displayed.');
+      return NextResponse.json({
+        success: true,
+        balance: null,
+        message: 'Smart Fintech nu este configurat sau token-urile au expirat.',
+      });
     }
 
     // 3. Fetch accounts cu token refresh automat
@@ -108,7 +102,7 @@ export async function GET(request: NextRequest) {
           SET
             access_token = @access_token,
             refresh_token = @refresh_token,
-            token_expires_at = @expires_at,
+            expires_at = TIMESTAMP_MILLIS(@expires_at),
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE id = @id
         `;
@@ -189,13 +183,11 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('❌ [Balance] Error fetching balance:', error);
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Eroare la extragerea soldului disponibil',
-        balance: null,
-      },
-      { status: 500 }
-    );
+    // Returnăm success: true cu balance: null pentru a nu afișa cardul, nu eroare
+    return NextResponse.json({
+      success: true,
+      balance: null,
+      message: 'Nu s-a putut încărca soldul disponibil. Verifică configurația Smart Fintech.',
+    });
   }
 }

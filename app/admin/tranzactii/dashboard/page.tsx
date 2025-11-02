@@ -137,9 +137,9 @@ const ModernFilterPanel: React.FC<{
       </div>
 
       {isExpanded && (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Filtre principale pe un singur rând - 5 coloane egale */}
-          <div className="grid grid-cols-5 gap-3" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.75rem' }}>
             <Input
               type="date"
               label="Data start"
@@ -175,7 +175,7 @@ const ModernFilterPanel: React.FC<{
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem' }}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Direcție
@@ -252,7 +252,7 @@ const ModernFilterPanel: React.FC<{
 
       {/* Quick filters când e comprimat - Forțat pe un singur rând */}
       {!isExpanded && (
-        <div className="flex items-center gap-3 flex-nowrap overflow-x-auto">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
           <Button
             variant="outline"
             size="sm"
