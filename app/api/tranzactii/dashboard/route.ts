@@ -198,10 +198,10 @@ async function getDashboardStats(filters: FilterParams): Promise<DashboardStats>
       WITH TransactionStats AS (
         SELECT
           COUNT(*) as total_transactions,
-          SUM(CASE WHEN t.directie = 'in' THEN 1 ELSE 0 END) as total_incasari,
-          SUM(CASE WHEN t.directie = 'out' THEN 1 ELSE 0 END) as total_plati,
-          SUM(CASE WHEN t.directie = 'in' THEN t.suma ELSE 0 END) as suma_incasari,
-          SUM(CASE WHEN t.directie = 'out' THEN ABS(t.suma) ELSE 0 END) as suma_plati,
+          SUM(CASE WHEN t.directie = 'intrare' THEN 1 ELSE 0 END) as total_incasari,
+          SUM(CASE WHEN t.directie = 'iesire' THEN 1 ELSE 0 END) as total_plati,
+          SUM(CASE WHEN t.directie = 'intrare' THEN t.suma ELSE 0 END) as suma_incasari,
+          SUM(CASE WHEN t.directie = 'iesire' THEN ABS(t.suma) ELSE 0 END) as suma_plati,
           SUM(t.suma) as sold_total,
           SUM(CASE WHEN t.matching_tip IS NOT NULL AND t.matching_tip != 'none' THEN 1 ELSE 0 END) as matched_count,
           AVG(CASE WHEN t.matching_confidence > 0 THEN t.matching_confidence ELSE NULL END) as avg_confidence,
@@ -372,8 +372,8 @@ async function getDailyActivityData(filters: FilterParams): Promise<any[]> {
       SELECT
         DATE(t.data_procesare) as data,
         COUNT(*) as total_tranzactii,
-        SUM(CASE WHEN t.directie = 'in' THEN t.suma ELSE 0 END) as incasari,
-        SUM(CASE WHEN t.directie = 'out' THEN ABS(t.suma) ELSE 0 END) as plati,
+        SUM(CASE WHEN t.directie = 'intrare' THEN t.suma ELSE 0 END) as incasari,
+        SUM(CASE WHEN t.directie = 'iesire' THEN ABS(t.suma) ELSE 0 END) as plati,
         SUM(CASE WHEN t.matching_tip IS NOT NULL AND t.matching_tip != 'none' THEN 1 ELSE 0 END) as matched_count,
         AVG(CASE WHEN t.matching_confidence > 0 THEN t.matching_confidence ELSE NULL END) as avg_confidence
       FROM ${TABLE_TRANZACTII_BANCARE} t

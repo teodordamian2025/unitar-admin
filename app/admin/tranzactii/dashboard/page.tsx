@@ -186,8 +186,8 @@ const ModernFilterPanel: React.FC<{
                 className="w-full px-3 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
               >
                 <option value="">Toate</option>
-                <option value="in">📈 Încasări</option>
-                <option value="out">📉 Plăți</option>
+                <option value="intrare">📈 Încasări</option>
+                <option value="iesire">📉 Plăți</option>
               </select>
             </div>
             <div>
@@ -269,7 +269,7 @@ const ModernFilterPanel: React.FC<{
             variant="outline"
             size="sm"
             onClick={() => {
-              const newFilters = { ...filters, directie: 'in' };
+              const newFilters = { ...filters, directie: 'intrare' };
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
@@ -281,7 +281,7 @@ const ModernFilterPanel: React.FC<{
             variant="outline"
             size="sm"
             onClick={() => {
-              const newFilters = { ...filters, directie: 'out' };
+              const newFilters = { ...filters, directie: 'iesire' };
               onFiltersChange(newFilters);
               setTimeout(() => onApply(), 50);
             }}
@@ -394,8 +394,8 @@ const ModernTransactionTable: React.FC<{
           </thead>
           <tbody>
             {transactions.map((transaction, index) => {
-              // Case-insensitive check pentru directie
-              const isIncasare = transaction.directie?.toLowerCase() === 'in' ||
+              // Check pentru directie (intrare/iesire)
+              const isIncasare = transaction.directie?.toLowerCase() === 'intrare' ||
                                  transaction.suma > 0;
 
               return (
