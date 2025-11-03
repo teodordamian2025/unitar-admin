@@ -741,14 +741,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   // NOUĂ: Funcție pentru generarea denumirii standardizate
+  // ✅ MODIFICAT: Etapa și Contract la început pentru limitare caractere e-factura
   const genereazaDenumireEtapa = (etapa: EtapaFacturare): string => {
     const denumireProiect = proiect.Denumire; // ✅ FIX: Folosește Denumire în loc de ID_Proiect
     const denumireEtapa = etapa.denumire;
 
     if (etapa.tip === 'contract') {
-      return `Servicii proiect ${denumireProiect}, ${denumireEtapa}, conform contract nr. ${etapa.contract_numar} din ${etapa.contract_data}`;
+      return `Servicii, ${denumireEtapa}, cf. contract nr. ${etapa.contract_numar} din ${etapa.contract_data} - ${denumireProiect}`;
     } else {
-      return `Servicii proiect ${denumireProiect}, ${denumireEtapa}, conform anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data}`;
+      return `Servicii, ${denumireEtapa}, cf. anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data} - ${denumireProiect}`;
     }
   };
 
