@@ -1008,6 +1008,8 @@ export async function POST(request: NextRequest) {
             }
             .company-left, .company-right {
                 flex: 1;
+                max-width: 50%;
+                overflow: hidden;
             }
             .company-left h3, .company-right h3 {
                 font-size: 14px;
@@ -1020,6 +1022,9 @@ export async function POST(request: NextRequest) {
             .info-line {
                 margin-bottom: 4px;
                 font-size: 10px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                line-height: 1.4;
             }
             .invoice-details {
                 background: #f8f9fa;
