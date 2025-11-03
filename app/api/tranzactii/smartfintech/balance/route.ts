@@ -1,13 +1,16 @@
 // ==================================================================
 // CALEA: app/api/tranzactii/smartfintech/balance/route.ts
 // DATA: 02.11.2025 (ora României)
+// MODIFICAT: 03.11.2025 - FIX: Adăugată verificare expirare token + fallback la client_credentials
 // DESCRIERE: API pentru extragere sold disponibil din Smart Fintech
 // FUNCȚIONALITATE: GET - returnează sold total din toate conturile
+// FIX: Copiază pattern din sync/route.ts pentru token management robust
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import {
+  authenticateSmartFintech,
   getSmartFintechAccounts,
   withTokenRefresh,
   decryptToken,
@@ -30,6 +33,41 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Update tokens în BigQuery după refresh/reautentificare
+ * Pattern identic cu sync/route.ts
+ */
+async function updateTokensInDB(configId: string, tokens: SmartFintechTokens): Promise<void> {
+  try {
+    const updateQuery = `
+      UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+      SET
+        access_token = @access_token,
+        refresh_token = @refresh_token,
+        expires_at = TIMESTAMP_MILLIS(@expires_at),
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = @id
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: {
+        id: configId,
+        access_token: encryptToken(tokens.access_token),
+        refresh_token: encryptToken(tokens.refresh_token),
+        expires_at: tokens.expires_at,
+      },
+    });
+
+    console.log('✅ [Balance] Tokens updated in BigQuery');
+  } catch (error) {
+    console.error('❌ [Balance] Failed to update tokens:', error);
+    throw error;
+  }
+}
 
 // ==================== GET - Sold disponibil ====================
 
@@ -66,29 +104,51 @@ export async function GET(request: NextRequest) {
 
     const config = configRows[0];
 
-    // 2. Decrypt credentials și tokens
+    // 2. Decrypt credentials
     const credentials: SmartFintechCredentials = {
       client_id: config.client_id,
       client_secret: decryptToken(config.client_secret),
     };
 
-    let tokens: SmartFintechTokens = {
-      access_token: config.access_token ? decryptToken(config.access_token) : '',
-      refresh_token: config.refresh_token ? decryptToken(config.refresh_token) : '',
-      expires_at: config.expires_at ? new Date(config.expires_at).getTime() : 0,
-    };
+    let tokens: SmartFintechTokens;
 
-    // Dacă nu avem token valid, returnăm success cu balance null (cardul nu va apărea)
-    if (!tokens.access_token || !tokens.refresh_token) {
-      console.warn('⚠️ [Balance] No valid tokens found. Card will not be displayed.');
-      return NextResponse.json({
-        success: true,
-        balance: null,
-        message: 'Smart Fintech nu este configurat sau token-urile au expirat.',
+    // 3. Verificare și refresh tokens (PATTERN IDENTIC CU SYNC) - FIX PRINCIPAL
+    // Check dacă avem tokens salvate și dacă sunt valide
+    if (config.access_token && config.refresh_token && config.expires_at) {
+      const expiresAt = new Date(config.expires_at.value || config.expires_at).getTime();
+
+      if (expiresAt > Date.now() + 60000) {
+        // Token valid (mai mult de 1 min până la expirare) → folosește-l direct
+        tokens = {
+          access_token: decryptToken(config.access_token),
+          refresh_token: decryptToken(config.refresh_token),
+          expires_at: expiresAt
+        };
+        console.log('✅ [Balance] Using cached tokens');
+      } else {
+        // Token expirat → reautentificare cu client_credentials (FALLBACK LA SYNC)
+        console.log('🔄 [Balance] Token expired, re-authenticating with client_credentials...');
+        tokens = await authenticateSmartFintech({
+          client_id: credentials.client_id,
+          client_secret: credentials.client_secret
+        });
+
+        // Save new tokens
+        await updateTokensInDB(config.id, tokens);
+      }
+    } else {
+      // Nu avem tokens → autentificare nouă
+      console.log('🔑 [Balance] No cached tokens, authenticating...');
+      tokens = await authenticateSmartFintech({
+        client_id: credentials.client_id,
+        client_secret: credentials.client_secret
       });
+
+      // Save tokens
+      await updateTokensInDB(config.id, tokens);
     }
 
-    // 3. Fetch accounts cu token refresh automat
+    // 4. Fetch accounts cu token refresh automat (backup layer)
     const accounts = await withTokenRefresh(
       tokens,
       credentials,
@@ -121,7 +181,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ [Balance] Fetched ${accounts.length} accounts`);
 
-    // 4. Calculate total balance (sumă RON + conversie pentru alte valute)
+    // 5. Calculate total balance (sumă RON + conversie pentru alte valute)
     let totalBalanceRON = 0;
     const accountBalances: { iban: string; alias: string; amount: number; currency: string }[] = [];
 
@@ -154,7 +214,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`💰 [Balance] Total balance: ${totalBalanceRON.toFixed(2)} RON`);
 
-    // 5. Update ultima_sincronizare în BigQuery
+    // 6. Update ultima_sincronizare în BigQuery
     const updateSyncQuery = `
       UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
       SET

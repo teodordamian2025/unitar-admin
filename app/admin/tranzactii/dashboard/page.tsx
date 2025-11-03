@@ -1,9 +1,10 @@
 // ==================================================================
 // CALEA: app/admin/tranzactii/dashboard/page.tsx
 // DATA: 19.09.2025 23:35 (ora României) - Updated 10.19.2025 for grid layout fix
+// MODIFICAT: 03.11.2025 - FIX: Card Sold Disponibil afișat întotdeauna (chiar cu 0 când API failed)
 // DESCRIERE: Dashboard modern tranzacții cu glassmorphism și real-time
 // FUNCȚIONALITATE: Management tranzacții bancare cu auto-matching și filtrare avansată
-// LAYOUT: Stats 4-column grid, Filters 5-column grid, Quick filters inline
+// LAYOUT: Stats 5-column grid (always), Filters 5-column grid, Quick filters inline
 // ==================================================================
 
 'use client';
@@ -756,20 +757,26 @@ const ModernTranzactiiDashboard: React.FC = () => {
       }
     ];
 
-    // Adaugă cardul Sold Disponibil dacă există date
-    if (availableBalance !== null) {
-      cards.push({
-        title: 'Sold Disponibil',
-        value: new Intl.NumberFormat('ro-RO', {
-          style: 'currency',
-          currency: 'RON'
-        }).format(availableBalance),
-        subtitle: 'În conturi bancare',
-        icon: '🏦',
-        color: 'border-l-4 border-teal-500',
-        trend: 'Smart Fintech API'
-      });
-    }
+    // Adaugă cardul Sold Disponibil ÎNTOTDEAUNA (fix UX: afișează 0 când API failed)
+    cards.push({
+      title: 'Sold Disponibil',
+      value: availableBalance !== null
+        ? new Intl.NumberFormat('ro-RO', {
+            style: 'currency',
+            currency: 'RON'
+          }).format(availableBalance)
+        : '0,00 RON', // Afișează 0 când nu poate încărca
+      subtitle: availableBalance !== null
+        ? 'În conturi bancare'
+        : 'Nu s-a putut încărca', // Mesaj explicativ
+      icon: '🏦',
+      color: availableBalance !== null
+        ? 'border-l-4 border-teal-500'
+        : 'border-l-4 border-gray-400', // Gri când nu e disponibil
+      trend: availableBalance !== null
+        ? 'Smart Fintech API'
+        : 'Verifică configurația' // Hint pentru troubleshooting
+    });
 
     return cards;
   }, [stats, availableBalance]);

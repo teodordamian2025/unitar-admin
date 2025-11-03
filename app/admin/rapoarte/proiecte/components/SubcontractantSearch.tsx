@@ -1,7 +1,9 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubcontractantSearch.tsx
 // DATA: 24.08.2025 19:15 (ora României)
+// MODIFICAT: 03.11.2025 - OPTIMIZAT pentru performanță fluidă (debounce 500ms → 200ms)
 // MODIFICAT: Adăugată salvare automată din ANAF similar cu ANAFClientSearch.tsx
+// OPTIMIZĂRI: Debouncing redus, loading state îmbunătățit, căutare de la 1 caracter
 // PĂSTRATE: Toate funcționalitățile existente de căutare locală și ANAF
 // ==================================================================
 
@@ -136,20 +138,25 @@ export default function SubcontractantSearch({
   }, [initialSelectedSubcontractant, subcontractanti]);
 
   const loadSubcontractanti = async (search?: string) => {
-    // FIX: Prevent race conditions - abort previous request
+    // OPTIMIZAT: Prevent race conditions - abort previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
     abortControllerRef.current = new AbortController();
-    setLoading(true);
+
+    // OPTIMIZAT: Setează loading doar dacă nu avem deja date pentru a evita flickering
+    const shouldSetLoading = subcontractanti.length === 0;
+    if (shouldSetLoading) {
+      setLoading(true);
+    }
 
     try {
       const queryParams = new URLSearchParams();
       if (search && search.trim().length > 0) {
         queryParams.append('search', search.trim());
       }
-      queryParams.append('limit', '20');
+      queryParams.append('limit', '30'); // OPTIMIZAT: 20 → 30 rezultate pentru mai multe opțiuni
 
       const response = await fetch(`/api/rapoarte/subcontractanti?${queryParams.toString()}`, {
         signal: abortControllerRef.current.signal
@@ -168,17 +175,17 @@ export default function SubcontractantSearch({
         setSubcontractanti([]);
       }
     } catch (error: any) {
-      // FIX: Ignore abort errors (normal când user type rapid)
+      // OPTIMIZAT: Ignore abort errors (normal când user type rapid)
       if (error.name === 'AbortError') {
-        console.log('Request aborted (normal behavior)');
-        return;
+        return; // Silent abort - fără log
       }
 
       console.error('Eroare la încărcarea subcontractanților:', error);
-      // Nu mai arăt toast pentru fiecare eroare - era prea intruziv
       setSubcontractanti([]);
     } finally {
-      setLoading(false);
+      if (shouldSetLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -348,7 +355,7 @@ export default function SubcontractantSearch({
     }
   };
 
-  // FIX: Debounce effect pentru căutare - 500ms delay
+  // OPTIMIZAT: Debounce effect pentru căutare - 200ms delay (similar cu clienții)
   useEffect(() => {
     // Cleanup previous timer și abort previous request
     if (debounceTimerRef.current) {
@@ -376,22 +383,22 @@ export default function SubcontractantSearch({
       setShowSuggestions(true);
     } else {
       setSearchMode('local');
-      setShowSuggestions(searchTerm.trim().length >= 2);
+      setShowSuggestions(searchTerm.trim().length >= 1); // OPTIMIZAT: 1 caracter în loc de 2
     }
 
-    // Debounce: așteaptă 500ms înainte de a face request
+    // Debounce: așteaptă 200ms înainte de a face request (OPTIMIZAT: 500ms → 200ms)
     debounceTimerRef.current = setTimeout(() => {
       if (isCUI && searchTerm.trim().length >= 6) {
         // Căutare ANAF pentru CUI
         searchInANAF(searchTerm);
-      } else if (searchTerm.trim().length >= 2) {
+      } else if (searchTerm.trim().length >= 1) { // OPTIMIZAT: 2 → 1 caracter
         // Căutare locală pentru text
         loadSubcontractanti(searchTerm);
       } else if (searchTerm.trim().length === 0) {
         // Load all când e gol
         loadSubcontractanti();
       }
-    }, 500); // 500ms delay - input devine fluid
+    }, 200); // OPTIMIZAT: 200ms delay - input mult mai fluid
 
     // Cleanup la unmount sau la change
     return () => {
