@@ -78,6 +78,8 @@ interface ClientInfo {
   email?: string;
   status?: string;
   platitorTva?: string;
+  tip_client?: 'persoana_fizica' | 'persoana_juridica';
+  cnp?: string;
 }
 
 // Interfață pentru etapele de facturare
@@ -1187,7 +1189,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           judet: clientData.judet,
           localitate: clientData.oras,
           telefon: clientData.telefon,
-          email: clientData.email
+          email: clientData.email,
+          tip_client: clientData.tip_client || 'persoana_juridica',
+          cnp: clientData.cnp || ''
         });
         
         if (clientData.cui) {
@@ -1200,7 +1204,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           denumire: proiect.Client || 'Client din proiect',
           cui: '',
           nrRegCom: '',
-          adresa: 'Adresa client'
+          adresa: 'Adresa client',
+          tip_client: 'persoana_juridica',
+          cnp: ''
         });
         showToast(`ℹ️ Client "${proiect.Client}" nu găsit în BD. Completează manual datele.`, 'info');
       }
@@ -1210,7 +1216,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         denumire: proiect.Client || 'Client din proiect',
         cui: '',
         nrRegCom: '',
-        adresa: 'Adresa client'
+        adresa: 'Adresa client',
+        tip_client: 'persoana_juridica',
+        cnp: ''
       });
       showToast('⚠️ Nu s-au putut prelua datele clientului din BD', 'error');
     } finally {
@@ -1244,7 +1252,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           localitate: anafData.localitate,
           telefon: anafData.telefon,
           status: anafData.status,
-          platitorTva: anafData.platitorTva
+          platitorTva: anafData.platitorTva,
+          tip_client: 'persoana_juridica' // ANAF este doar pentru persoane juridice
         });
         
         showToast('✅ Datele au fost actualizate cu informațiile de la ANAF!', 'success');

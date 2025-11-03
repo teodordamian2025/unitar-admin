@@ -908,21 +908,26 @@ export async function POST(request: NextRequest) {
     // ✅ PĂSTRAT: CLIENT DATA HANDLING - păstrat identic cu suport dual pentru denumire/nume
     const primeaLinie = liniiFacturaActualizate[0];
     const descrierePrincipala = primeaLinie.denumire || 'Servicii de consultanță';
-    
+
+    // ✅ NOU: Suport pentru persoane fizice - folosește CNP în loc de CUI
+    const isPersoanaFizica = clientInfo?.tip_client === 'persoana_fizica';
+
     const safeClientData = clientInfo ? {
       nume: clientInfo.denumire || clientInfo.nume || 'Client din Proiect',
-      cui: clientInfo.cui || 'RO00000000',
-      nr_reg_com: clientInfo.nrRegCom || clientInfo.nr_reg_com || 'J40/0000/2024',
+      cui: isPersoanaFizica ? (clientInfo.cnp || 'CNP necunoscut') : (clientInfo.cui || 'RO00000000'),
+      nr_reg_com: isPersoanaFizica ? '' : (clientInfo.nrRegCom || clientInfo.nr_reg_com || 'J40/0000/2024'),
       adresa: clientInfo.adresa || 'Adresa client',
       telefon: clientInfo.telefon || 'N/A',
-      email: clientInfo.email || 'N/A'
+      email: clientInfo.email || 'N/A',
+      tip_client: clientInfo.tip_client || 'persoana_juridica'
     } : {
       nume: 'Client din Proiect',
       cui: 'RO00000000',
       nr_reg_com: 'J40/0000/2024',
       adresa: 'Adresa client',
       telefon: 'N/A',
-      email: 'N/A'
+      email: 'N/A',
+      tip_client: 'persoana_juridica'
     };
 
     // ✅ PĂSTRAT: Folosește numărul primit din frontend
@@ -1245,8 +1250,8 @@ export async function POST(request: NextRequest) {
             <div class="company-right">
                 <h3>CLIENT</h3>
                 <div class="info-line"><strong>${safeClientData.nume}</strong></div>
-                <div class="info-line">CUI: ${safeClientData.cui}</div>
-                <div class="info-line">Nr. Reg. Com.: ${safeClientData.nr_reg_com}</div>
+                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${safeClientData.cui}</div>
+                ${safeClientData.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${safeClientData.nr_reg_com}</div>` : ''}
                 <div class="info-line">Adresa: ${safeClientData.adresa}</div>
                 <div class="info-line">Telefon: ${safeClientData.telefon}</div>
                 <div class="info-line">Email: ${safeClientData.email}</div>
