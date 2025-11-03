@@ -114,6 +114,16 @@ export default function GanttView() {
     return new Date(normalizedDate);
   };
 
+  // Funcție pentru generare inițiale din nume complet
+  const getInitials = (numeComplet: string): string => {
+    if (!numeComplet) return '';
+    const parts = numeComplet.trim().split(/\s+/);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    // Ia prima literă din fiecare cuvânt (max 2)
+    return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
+  };
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -398,8 +408,9 @@ export default function GanttView() {
     }
   };
 
-  const getTaskIcon = (type: string) => {
-    switch (type) {
+  const getTaskIcon = (task: GanttTask) => {
+    if (task.status === 'finalizata') return '✓';
+    switch (task.type) {
       case 'proiect': return '📁';
       case 'subproiect': return '📂';
       case 'sarcina': return '📋';
@@ -1039,7 +1050,7 @@ export default function GanttView() {
                     )}
 
                     <span style={{ fontSize: '1rem' }}>
-                      {getTaskIcon(task.type)}
+                      {getTaskIcon(task)}
                     </span>
 
                     <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -1050,21 +1061,44 @@ export default function GanttView() {
                         marginBottom: '0.25rem',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis'
+                        textOverflow: 'ellipsis',
+                        textDecoration: task.status === 'finalizata' ? 'line-through' : 'none',
+                        opacity: task.status === 'finalizata' ? 0.7 : 1
                       }}>
                         {task.name}
                       </div>
 
                       {task.resources.length > 0 && (
-                        <div style={{ 
-                          fontSize: '0.75rem', 
-                          color: '#6b7280',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          color: '#6b7280'
                         }}>
-                          👥 {task.resources.slice(0, 2).join(', ')}
-                          {task.resources.length > 2 && ` +${task.resources.length - 2}`}
+                          <span>👥</span>
+                          {task.resources.slice(0, 3).map((resource, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                display: 'inline-block',
+                                padding: '2px 6px',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                color: '#3b82f6'
+                              }}
+                              title={resource}
+                            >
+                              {getInitials(resource)}
+                            </span>
+                          ))}
+                          {task.resources.length > 3 && (
+                            <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                              +{task.resources.length - 3}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1348,10 +1382,15 @@ export default function GanttView() {
               borderRadius: '8px'
             }}>
               <span style={{ fontSize: '2rem' }}>
-                {getTaskIcon(selectedTask.type)}
+                {getTaskIcon(selectedTask)}
               </span>
               <div>
-                <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937' }}>
+                <h3 style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#1f2937',
+                  textDecoration: selectedTask.status === 'finalizata' ? 'line-through' : 'none',
+                  opacity: selectedTask.status === 'finalizata' ? 0.7 : 1
+                }}>
                   {selectedTask.name}
                 </h3>
                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
@@ -1380,13 +1419,43 @@ export default function GanttView() {
 
               <div>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Resursele</h4>
-                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {selectedTask.resources.length > 0 ? (
                     selectedTask.resources.map((resource, index) => (
-                      <div key={index}>👤 {resource}</div>
+                      <div
+                        key={index}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.5rem 0.75rem',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem'
+                        }}
+                        title={resource}
+                      >
+                        <span
+                          style={{
+                            display: 'flex',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: '#3b82f6',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {getInitials(resource)}
+                        </span>
+                        <span style={{ color: '#374151', fontWeight: '500' }}>{resource}</span>
+                      </div>
                     ))
                   ) : (
-                    <div>Niciun responsabil atribuit</div>
+                    <div style={{ color: '#6b7280' }}>Niciun responsabil atribuit</div>
                   )}
                 </div>
               </div>

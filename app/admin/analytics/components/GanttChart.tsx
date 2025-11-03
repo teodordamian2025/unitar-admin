@@ -53,6 +53,16 @@ export default function GanttChart({
   const ganttRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Funcție pentru generare inițiale din nume complet
+  const getInitials = (numeComplet: string): string => {
+    if (!numeComplet) return '';
+    const parts = numeComplet.trim().split(/\s+/);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    // Ia prima literă din fiecare cuvânt (max 2)
+    return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
+  };
+
   useEffect(() => {
     fetchGanttData();
   }, [selectedProjects, viewMode]);
@@ -455,32 +465,56 @@ export default function GanttChart({
 
                 {/* Task icon */}
                 <span style={{ fontSize: '16px' }}>
-                  {task.type === 'proiect' ? '📁' : 
+                  {task.status === 'finalizata' ? '✓' :
+                   task.type === 'proiect' ? '📁' :
                    task.type === 'subproiect' ? '📂' :
                    task.type === 'milestone' ? '🎯' : '📋'}
                 </span>
 
                 {/* Task name și info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ 
+                  <div style={{
                     fontWeight: task.type === 'proiect' ? 'bold' : 'normal',
                     fontSize: task.type === 'proiect' ? '14px' : '13px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    textDecoration: task.status === 'finalizata' ? 'line-through' : 'none',
+                    opacity: task.status === 'finalizata' ? 0.7 : 1
                   }}>
                     {task.name}
                   </div>
                   
                   {showResources && task.resources.length > 0 && (
-                    <div style={{ 
-                      fontSize: '11px', 
-                      color: '#666',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '2px'
                     }}>
-                      👥 {task.resources.join(', ')}
+                      <span style={{ fontSize: '11px' }}>👥</span>
+                      {task.resources.slice(0, 3).map((resource, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 5px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            borderRadius: '3px',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            color: '#3b82f6'
+                          }}
+                          title={resource}
+                        >
+                          {getInitials(resource)}
+                        </span>
+                      ))}
+                      {task.resources.length > 3 && (
+                        <span style={{ fontSize: '10px', color: '#999' }}>
+                          +{task.resources.length - 3}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

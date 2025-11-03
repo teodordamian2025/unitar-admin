@@ -560,7 +560,7 @@ export async function GET(request: NextRequest) {
       : 'WHERE operation_type = "csv_import"';
 
     const query = `
-      SELECT 
+      SELECT
         operation_status,
         records_processed,
         records_success,
@@ -569,7 +569,7 @@ export async function GET(request: NextRequest) {
         processing_time_ms,
         summary_message,
         data_creare
-      FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiSyncLogs\`
+      FROM \`${PROJECT_ID}.${DATASET}.TranzactiiSyncLogs${tableSuffix}\`
       ${whereClause}
       ORDER BY data_creare DESC
       LIMIT 10

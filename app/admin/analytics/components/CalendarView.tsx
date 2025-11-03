@@ -55,6 +55,16 @@ export default function CalendarView({
   const [proiecte, setProiecte] = useState<{id: string, nume: string}[]>([]);
   const [utilizatori, setUtilizatori] = useState<{uid: string, nume: string}[]>([]);
 
+  // Funcție pentru generare inițiale din nume complet
+  const getInitials = (numeComplet: string): string => {
+    if (!numeComplet) return '';
+    const parts = numeComplet.trim().split(/\s+/);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    // Ia prima literă din fiecare cuvânt (max 2)
+    return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
+  };
+
   useEffect(() => {
     fetchCalendarData();
     fetchProiecte();
@@ -456,11 +466,13 @@ export default function CalendarView({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        maxWidth: '100%'
+                        maxWidth: '100%',
+                        textDecoration: event.status === 'finalizata' ? 'line-through' : 'none',
+                        opacity: event.status === 'finalizata' ? 0.7 : 1
                       }}
                       title={`${getEventTypeIcon(event.tip_eveniment)} ${event.titlu} - ${event.proiect_nume}`}
                     >
-                      {getEventTypeIcon(event.tip_eveniment)} {event.titlu.substring(0, 15)}
+                      {event.status === 'finalizata' ? '✓ ' : ''}{getEventTypeIcon(event.tip_eveniment)} {event.titlu.substring(0, 15)}
                       {event.titlu.length > 15 ? '...' : ''}
                     </div>
                   ))}

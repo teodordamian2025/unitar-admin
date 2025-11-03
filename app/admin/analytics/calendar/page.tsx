@@ -92,6 +92,16 @@ export default function CalendarView() {
   const [utilizatori, setUtilizatori] = useState<any[]>([]);
   const [proiecte, setProiecte] = useState<any[]>([]);
 
+  // Funcție pentru generare inițiale din nume complet
+  const getInitials = (numeComplet: string): string => {
+    if (!numeComplet) return '';
+    const parts = numeComplet.trim().split(/\s+/);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    // Ia prima literă din fiecare cuvânt (max 2)
+    return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
+  };
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -1021,10 +1031,12 @@ export default function CalendarView() {
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.25rem'
+                      gap: '0.25rem',
+                      textDecoration: event.status === 'Finalizat' || event.status === 'finalizata' ? 'line-through' : 'none',
+                      opacity: event.status === 'Finalizat' || event.status === 'finalizata' ? 0.7 : 1
                     }}
                   >
-                    <span>{getEventIcon(event.tip_eveniment)}</span>
+                    <span>{event.status === 'Finalizat' || event.status === 'finalizata' ? '✓' : getEventIcon(event.tip_eveniment)}</span>
                     <span>{event.titlu}</span>
                   </div>
                 ))}
@@ -1067,10 +1079,15 @@ export default function CalendarView() {
               borderRadius: '8px'
             }}>
               <span style={{ fontSize: '2rem' }}>
-                {getEventIcon(selectedEvent.tip_eveniment)}
+                {selectedEvent.status === 'Finalizat' || selectedEvent.status === 'finalizata' ? '✓' : getEventIcon(selectedEvent.tip_eveniment)}
               </span>
               <div>
-                <h3 style={{ margin: '0 0 0.25rem 0', color: '#1f2937' }}>
+                <h3 style={{
+                  margin: '0 0 0.25rem 0',
+                  color: '#1f2937',
+                  textDecoration: selectedEvent.status === 'Finalizat' || selectedEvent.status === 'finalizata' ? 'line-through' : 'none',
+                  opacity: selectedEvent.status === 'Finalizat' || selectedEvent.status === 'finalizata' ? 0.7 : 1
+                }}>
                   {selectedEvent.titlu}
                 </h3>
                 <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
@@ -1312,7 +1329,39 @@ export default function CalendarView() {
               </div>
               <div>
                 <strong>Responsabil:</strong><br />
-                {selectedEvent.responsabil_nume || 'Neasignat'}
+                {selectedEvent.responsabil_nume ? (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginTop: '0.25rem'
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: '#3b82f6',
+                        color: 'white',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}
+                      title={selectedEvent.responsabil_nume}
+                    >
+                      {getInitials(selectedEvent.responsabil_nume)}
+                    </span>
+                    <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                      {selectedEvent.responsabil_nume}
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ color: '#9ca3af' }}>Neasignat</span>
+                )}
               </div>
               <div>
                 <strong>Tip Eveniment:</strong><br />
