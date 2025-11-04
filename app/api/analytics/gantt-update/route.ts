@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     switch (taskType) {
       case 'proiect':
         updateQuery = `
-          UPDATE \`${TABLE_PROIECTE}\`
+          UPDATE ${TABLE_PROIECTE}
           SET
             Data_Start = @startDate,
             Data_Final = @endDate
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 
       case 'subproiect':
         updateQuery = `
-          UPDATE \`${TABLE_SUBPROIECTE}\`
+          UPDATE ${TABLE_SUBPROIECTE}
           SET
             Data_Start = @startDate,
             Data_Final = @endDate,
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
       case 'sarcina':
         updateQuery = `
-          UPDATE \`${TABLE_SARCINI}\`
+          UPDATE ${TABLE_SARCINI}
           SET
             data_creare = @startDate,
             data_scadenta = @endDate,
@@ -191,21 +191,21 @@ export async function POST(request: NextRequest) {
       case 'proiect':
         verifyQuery = `
           SELECT ID_Proiect, Data_Start, Data_Final
-          FROM \`${TABLE_PROIECTE}\`
+          FROM ${TABLE_PROIECTE}
           WHERE ID_Proiect = @actualId
         `;
         break;
       case 'subproiect':
         verifyQuery = `
           SELECT ID_Subproiect, Data_Start, Data_Final
-          FROM \`${TABLE_SUBPROIECTE}\`
+          FROM ${TABLE_SUBPROIECTE}
           WHERE ID_Subproiect = @actualId
         `;
         break;
       case 'sarcina':
         verifyQuery = `
           SELECT id, data_creare, data_scadenta
-          FROM \`${TABLE_SARCINI}\`
+          FROM ${TABLE_SARCINI}
           WHERE id = @actualId
         `;
         break;
