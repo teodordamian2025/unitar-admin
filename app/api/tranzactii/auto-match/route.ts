@@ -377,7 +377,7 @@ async function matchIncasariCuEtapeFacturi(
 ): Promise<MatchResult[]> {
   const matches: MatchResult[] = [];
   
-  const incasari = tranzactii.filter(t => t.directie === 'in' && t.suma > 0);
+  const incasari = tranzactii.filter(t => t.directie === 'intrare' && t.suma > 0);
   
   console.log(`🔍 Matching încasări: ${incasari.length} tranzacții cu ${etape.length} etape`);
 
@@ -454,7 +454,7 @@ async function matchPlatiCuCheltuieli(
 ): Promise<MatchResult[]> {
   const matches: MatchResult[] = [];
   
-  const plati = tranzactii.filter(t => t.directie === 'out' && t.suma < 0);
+  const plati = tranzactii.filter(t => t.directie === 'iesire' && t.suma < 0);
   
   console.log(`🔍 Matching plăți: ${plati.length} tranzacții cu ${cheltuieli.length} cheltuieli`);
 
@@ -597,10 +597,10 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
     for (const match of etapeMatches) {
       const sumaIncasata = match.suma_tranzactie;
       const etapaId = match.target_id;
-      
+
       // Calculăm noul status și valoarea încasată
       const newValoareIncasata = `COALESCE(valoare_incasata, 0) + ${sumaIncasata}`;
-      const newStatus = `CASE 
+      const newStatus = `CASE
         WHEN ${newValoareIncasata} >= valoare_ron THEN 'Incasat'
         WHEN ${newValoareIncasata} > 0 THEN 'Partial'
         ELSE 'Neincasat'
@@ -620,12 +620,70 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
       if (match.matching_details.etapa_id) {
         await bigquery.query(`
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract_v2\`
-          SET 
+          SET
             status_incasare = ${newStatus},
             data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Etapa = "${match.matching_details.etapa_id}"
         `);
+      }
+
+      // 🔔 NOTIFICARE ADMIN: Incasare nouă înregistrată
+      try {
+        // Obținem toate datele pentru notificare
+        const [tranzactieRows] = await bigquery.query(`
+          SELECT data_procesare, nume_contrapartida, cui_contrapartida, detalii_tranzactie
+          FROM \`hale-mode-464009-i6.PanouControlUnitar.TranzactiiBancare_v2\`
+          WHERE id = "${match.tranzactie_id}"
+        `);
+
+        const tranzactie = tranzactieRows[0] || {};
+        const dataProc = tranzactie.data_procesare?.value || tranzactie.data_procesare || new Date().toISOString().split('T')[0];
+
+        // Trimitem notificare prin API
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip_notificare: 'factura_achitata',
+            user_id: ['admin'], // Va fi expandat cu toți admins de către API
+            context: {
+              // Date tranzacție
+              suma_tranzactie: Math.abs(sumaIncasata).toFixed(2),
+              data_tranzactie: dataProc,
+
+              // Match details
+              has_match: true,
+              matching_confidence: match.confidence_score.toFixed(0),
+
+              // Date factură
+              factura_id: match.matching_details.factura_id,
+              factura_serie: match.matching_details.factura_serie || '',
+              factura_numar: match.matching_details.factura_numar || '',
+              factura_total: match.suma_target_ron.toFixed(2),
+
+              // Date client
+              client_nume: match.matching_details.client_nume || '',
+              client_cui: match.matching_details.client_cui || '',
+
+              // Date proiect
+              proiect_id: match.matching_details.proiect_id,
+              proiect_denumire: match.matching_details.proiect_denumire || 'N/A',
+
+              // Diferențe
+              diferenta_ron: match.diferenta_ron ? match.diferenta_ron.toFixed(2) : null,
+              diferenta_procent: match.diferenta_procent ? match.diferenta_procent.toFixed(1) : null,
+
+              // Link
+              link_detalii: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/tranzactii/dashboard`
+            }
+          })
+        });
+
+        console.log(`📧 Notificare admin trimisă pentru incasare ${sumaIncasata} RON`);
+      } catch (notifError) {
+        console.error('⚠️ Eroare trimitere notificare (nu blochează matching-ul):', notifError);
+        // Nu aruncăm eroarea - notificarea nu trebuie să blocheze matching-ul
       }
     }
 

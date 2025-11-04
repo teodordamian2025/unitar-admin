@@ -1,10 +1,11 @@
 // ==================================================================
 // CALEA: app/api/tranzactii/smartfintech/balance/route.ts
 // DATA: 02.11.2025 (ora României)
-// MODIFICAT: 03.11.2025 - FIX: Adăugată verificare expirare token + fallback la client_credentials
+// MODIFICAT: 04.11.2025 - Adăugat cache logic în metadata (refresh la 6 ore)
 // DESCRIERE: API pentru extragere sold disponibil din Smart Fintech
-// FUNCȚIONALITATE: GET - returnează sold total din toate conturile
-// FIX: Copiază pattern din sync/route.ts pentru token management robust
+// FUNCȚIONALITATE: GET - returnează sold total din toate conturile (cu cache)
+// CACHE: Salvează în SmartFintechTokens_v2.metadata, valid 6 ore
+// FORCE REFRESH: Query param ?force_refresh=true pentru bypass cache
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -73,7 +74,11 @@ async function updateTokensInDB(configId: string, tokens: SmartFintechTokens): P
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('💰 [Balance] Fetching available balance from Smart Fintech...');
+    // Parse query params
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('force_refresh') === 'true';
+
+    console.log(`💰 [Balance] Fetching available balance (force_refresh=${forceRefresh})...`);
 
     // 1. Încarcă configurația activă din BigQuery
     const configQuery = `
@@ -84,7 +89,8 @@ export async function GET(request: NextRequest) {
         access_token,
         refresh_token,
         expires_at,
-        is_active
+        is_active,
+        metadata
       FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
       WHERE is_active = TRUE
       ORDER BY data_actualizare DESC
@@ -104,7 +110,41 @@ export async function GET(request: NextRequest) {
 
     const config = configRows[0];
 
-    // 2. Decrypt credentials
+    // 2. Check cache în metadata (dacă nu e force refresh)
+    if (!forceRefresh && config.metadata) {
+      // BigQuery might return JSON as object already, no need to parse
+      const metadata = typeof config.metadata === 'string'
+        ? JSON.parse(config.metadata)
+        : config.metadata;
+
+      if (metadata.balance && metadata.balance.lastSync) {
+        const lastSyncTime = new Date(metadata.balance.lastSync).getTime();
+        const now = Date.now();
+        const sixHoursInMs = 6 * 60 * 60 * 1000; // 6 ore în millisecunde
+
+        // Dacă cache-ul e mai nou de 6 ore → returnează din cache
+        if (now - lastSyncTime < sixHoursInMs) {
+          const cacheAgeMinutes = Math.floor((now - lastSyncTime) / 60000);
+          console.log(`✅ [Balance] Returning cached balance (${cacheAgeMinutes} minutes old)`);
+
+          return NextResponse.json({
+            success: true,
+            balance: {
+              total: metadata.balance.total,
+              currency: metadata.balance.currency,
+              accounts: metadata.balance.accounts || [],
+              lastSync: metadata.balance.lastSync,
+              cached: true,
+              cacheAgeMinutes
+            }
+          });
+        } else {
+          console.log('⏰ [Balance] Cache expired (>6 hours), fetching fresh data...');
+        }
+      }
+    }
+
+    // 3. Decrypt credentials
     const credentials: SmartFintechCredentials = {
       client_id: config.client_id,
       client_secret: decryptToken(config.client_secret),
@@ -112,7 +152,7 @@ export async function GET(request: NextRequest) {
 
     let tokens: SmartFintechTokens;
 
-    // 3. Verificare și refresh tokens (PATTERN IDENTIC CU SYNC) - FIX PRINCIPAL
+    // 4. Verificare și refresh tokens (PATTERN IDENTIC CU SYNC) - FIX PRINCIPAL
     // Check dacă avem tokens salvate și dacă sunt valide
     if (config.access_token && config.refresh_token && config.expires_at) {
       const expiresAt = new Date(config.expires_at.value || config.expires_at).getTime();
@@ -148,7 +188,7 @@ export async function GET(request: NextRequest) {
       await updateTokensInDB(config.id, tokens);
     }
 
-    // 4. Fetch accounts cu token refresh automat (backup layer)
+    // 5. Fetch accounts cu token refresh automat (backup layer)
     const accounts = await withTokenRefresh(
       tokens,
       credentials,
@@ -181,7 +221,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ [Balance] Fetched ${accounts.length} accounts`);
 
-    // 5. Calculate total balance (sumă RON + conversie pentru alte valute)
+    // 6. Calculate total balance (sumă RON + conversie pentru alte valute)
     let totalBalanceRON = 0;
     const accountBalances: { iban: string; alias: string; amount: number; currency: string }[] = [];
 
@@ -214,7 +254,43 @@ export async function GET(request: NextRequest) {
 
     console.log(`💰 [Balance] Total balance: ${totalBalanceRON.toFixed(2)} RON`);
 
-    // 6. Update ultima_sincronizare în BigQuery
+    const balanceData = {
+      total: totalBalanceRON,
+      currency: 'RON',
+      accounts: accountBalances,
+      lastSync: new Date().toISOString()
+    };
+
+    // 7. Salvează balance în metadata pentru cache
+    const metadataToSave = {
+      ...(config.metadata || {}),
+      balance: {
+        total: totalBalanceRON,
+        currency: 'RON',
+        accounts: accountBalances,
+        lastSync: balanceData.lastSync
+      }
+    };
+
+    const updateMetadataQuery = `
+      UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+      SET
+        metadata = PARSE_JSON(@metadata),
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = @id
+    `;
+
+    await bigquery.query({
+      query: updateMetadataQuery,
+      params: {
+        id: config.id,
+        metadata: JSON.stringify(metadataToSave)
+      }
+    });
+
+    console.log('✅ [Balance] Saved to metadata cache');
+
+    // 8. Update ultima_sincronizare în BigQuery
     const updateSyncQuery = `
       UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
       SET
@@ -234,11 +310,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       balance: {
-        total: totalBalanceRON,
-        currency: 'RON',
-        accounts: accountBalances,
-        lastSync: new Date().toISOString(),
-      },
+        ...balanceData,
+        cached: false // Fresh data, not from cache
+      }
     });
   } catch (error: any) {
     console.error('❌ [Balance] Error fetching balance:', error);

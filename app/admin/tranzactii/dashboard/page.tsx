@@ -1,10 +1,11 @@
 // ==================================================================
 // CALEA: app/admin/tranzactii/dashboard/page.tsx
 // DATA: 19.09.2025 23:35 (ora României) - Updated 10.19.2025 for grid layout fix
-// MODIFICAT: 03.11.2025 - FIX: Card Sold Disponibil afișat întotdeauna (chiar cu 0 când API failed)
+// MODIFICAT: 04.11.2025 - Adăugat buton refresh manual + cache 6h pentru Sold Disponibil
 // DESCRIERE: Dashboard modern tranzacții cu glassmorphism și real-time
 // FUNCȚIONALITATE: Management tranzacții bancare cu auto-matching și filtrare avansată
 // LAYOUT: Stats 5-column grid (always), Filters 5-column grid, Quick filters inline
+// SOLD: Cache 6 ore (cron sync automat) + buton refresh manual cu force_refresh=true
 // ==================================================================
 
 'use client';
@@ -87,15 +88,38 @@ const ModernStatCard: React.FC<{
   color: string;
   trend?: string;
   onClick?: () => void;
-}> = ({ title, value, subtitle, icon, color, trend, onClick }) => (
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}> = ({ title, value, subtitle, icon, color, trend, onClick, onRefresh, isRefreshing }) => (
   <Card
     variant="default"
-    className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${color}`}
+    className={`p-6 transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-105' : ''} ${color}`}
     onClick={onClick}
   >
     <div className="flex items-center justify-between mb-4">
       <div className="flex-1">
-        <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+          {onRefresh && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRefresh();
+              }}
+              disabled={isRefreshing}
+              className={`ml-2 p-1 rounded-lg transition-all duration-200 ${
+                isRefreshing
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-gray-100 active:scale-95'
+              }`}
+              title="Actualizare sold"
+            >
+              <span className={`text-lg ${isRefreshing ? 'animate-spin inline-block' : ''}`}>
+                🔄
+              </span>
+            </button>
+          )}
+        </div>
         <p className="text-3xl font-bold text-gray-900 mb-2">{value}</p>
         {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
       </div>
@@ -546,6 +570,7 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('user');
   const [availableBalance, setAvailableBalance] = useState<number | null>(null);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
   // Starea filtrelor
   const [filters, setFilters] = useState<FilterState>({
@@ -610,13 +635,21 @@ const ModernTranzactiiDashboard: React.FC = () => {
     }
   }, [filters, pagination.limit]);
 
-  const loadAvailableBalance = useCallback(async () => {
+  const loadAvailableBalance = useCallback(async (forceRefresh: boolean = false) => {
     try {
-      const response = await fetch('/api/tranzactii/smartfintech/balance');
+      const url = forceRefresh
+        ? '/api/tranzactii/smartfintech/balance?force_refresh=true'
+        : '/api/tranzactii/smartfintech/balance';
+
+      const response = await fetch(url);
       const data = await response.json();
 
       if (data.success && data.balance) {
         setAvailableBalance(data.balance.total);
+
+        if (forceRefresh) {
+          toast.success('Sold actualizat cu succes!');
+        }
       } else {
         console.warn('⚠️ Sold disponibil nu poate fi încărcat:', data.error);
         setAvailableBalance(null);
@@ -624,8 +657,20 @@ const ModernTranzactiiDashboard: React.FC = () => {
     } catch (error) {
       console.error('❌ Eroare loading available balance:', error);
       setAvailableBalance(null);
+      if (forceRefresh) {
+        toast.error('Eroare la actualizarea soldului');
+      }
     }
   }, []);
+
+  const handleRefreshBalance = async () => {
+    setIsRefreshingBalance(true);
+    try {
+      await loadAvailableBalance(true);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
 
   // ==================================================================
   // HANDLERS
@@ -719,7 +764,17 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const statsCards = useMemo(() => {
     if (!stats) return [];
 
-    const cards = [
+    const cards: Array<{
+      title: string;
+      value: string | number;
+      subtitle?: string;
+      icon: string;
+      color: string;
+      trend?: string;
+      onClick?: () => void;
+      onRefresh?: () => void;
+      isRefreshing?: boolean;
+    }> = [
       {
         title: 'Total Tranzacții',
         value: stats.totalTransactions.toLocaleString('ro-RO'),
@@ -774,12 +829,14 @@ const ModernTranzactiiDashboard: React.FC = () => {
         ? 'border-l-4 border-teal-500'
         : 'border-l-4 border-gray-400', // Gri când nu e disponibil
       trend: availableBalance !== null
-        ? 'Smart Fintech API'
-        : 'Verifică configurația' // Hint pentru troubleshooting
+        ? 'Smart Fintech API (cache 6h)'
+        : 'Verifică configurația', // Hint pentru troubleshooting
+      onRefresh: handleRefreshBalance,
+      isRefreshing: isRefreshingBalance
     });
 
     return cards;
-  }, [stats, availableBalance]);
+  }, [stats, availableBalance, isRefreshingBalance]);
 
   if (loading) {
     return <LoadingSpinner overlay />;
@@ -835,7 +892,10 @@ const ModernTranzactiiDashboard: React.FC = () => {
           }}
         >
           {statsCards.map((card, index) => (
-            <ModernStatCard key={index} {...card} />
+            <ModernStatCard
+              key={index}
+              {...card}
+            />
           ))}
         </div>
       )}

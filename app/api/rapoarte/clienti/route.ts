@@ -233,8 +233,8 @@ export async function PUT(request: NextRequest) {
     const { id, ...updateData } = body;
 
     if (!id) {
-      return NextResponse.json({ 
-        error: 'ID client necesar pentru actualizare' 
+      return NextResponse.json({
+        error: 'ID client necesar pentru actualizare'
       }, { status: 400 });
     }
 
@@ -293,21 +293,54 @@ export async function PUT(request: NextRequest) {
     console.log('Executing update query:', updateQuery);
     console.log('With params:', params);
 
-    await bigquery.query({
-      query: updateQuery,
-      params: params,
-      types: types, // ✅ Adăugat types pentru parametrii null
-      location: 'EU',
-    });
+    // ✅ Retry logic pentru streaming buffer conflict
+    const maxRetries = 3;
+    let retryCount = 0;
+    let lastError: any = null;
 
-    return NextResponse.json({
-      success: true,
-      message: 'Client actualizat cu succes'
-    });
+    while (retryCount < maxRetries) {
+      try {
+        await bigquery.query({
+          query: updateQuery,
+          params: params,
+          types: types,
+          location: 'EU',
+        });
+
+        // Success - ieși din loop
+        return NextResponse.json({
+          success: true,
+          message: 'Client actualizat cu succes'
+        });
+
+      } catch (err: any) {
+        lastError = err;
+
+        // Check dacă e eroare de streaming buffer
+        const isStreamingBufferError = err.message?.includes('streaming buffer') ||
+                                       err.code === 400 && err.errors?.[0]?.reason === 'invalidQuery';
+
+        if (isStreamingBufferError && retryCount < maxRetries - 1) {
+          retryCount++;
+          const waitTime = retryCount * 2000; // 2s, 4s, 6s
+          console.log(`⏳ Streaming buffer conflict - Retry ${retryCount}/${maxRetries} după ${waitTime}ms`);
+
+          // Așteaptă înainte de retry
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        // Dacă nu e streaming buffer error sau am epuizat retry-urile, aruncă eroarea
+        throw err;
+      }
+    }
+
+    // Dacă am ajuns aici, toate retry-urile au eșuat
+    throw lastError;
 
   } catch (error) {
     console.error('Eroare la actualizarea clientului:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Eroare la actualizarea clientului',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });

@@ -1,6 +1,11 @@
-// Smart Fintech Cron Job for automated transaction sync
+// ==================================================================
+// CALEA: app/api/tranzactii/smartfintech/cron/route.ts
+// DATA: 18.10.2025 (ora României)
+// MODIFICAT: 04.11.2025 - Adăugat sync sold disponibil în metadata
+// DESCRIERE: Smart Fintech Cron Job for automated transaction + balance sync
 // Schedule: Every 6 hours (00:00, 06:00, 12:00, 18:00)
 // Configured in vercel.json
+// ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -77,7 +82,31 @@ export async function GET(request: NextRequest) {
       console.log('[Cron] No new transactions, skipping auto-match');
     }
 
-    // STEP 3: Return summary
+    // STEP 3: Fetch și salvează sold disponibil în metadata
+    console.log('[Cron] Fetching available balance...');
+    let balanceData: any = null;
+
+    try {
+      const balanceResponse = await fetch(`${baseUrl}/api/tranzactii/smartfintech/balance`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      balanceData = await balanceResponse.json();
+
+      if (balanceData?.success && balanceData?.balance) {
+        console.log(`[Cron] Balance fetched: ${balanceData.balance.total} RON`);
+      } else {
+        console.warn('[Cron] Balance fetch failed:', balanceData?.message || balanceData?.error);
+      }
+    } catch (balanceError: any) {
+      console.error('[Cron] Balance fetch error:', balanceError.message);
+      // Nu aruncăm eroare - continuăm chiar dacă balance-ul failed
+    }
+
+    // STEP 4: Return summary
     const duration = Date.now() - startTime;
 
     const summary = {
@@ -90,7 +119,12 @@ export async function GET(request: NextRequest) {
         new_transactions: syncData.data.new_transactions,
         duplicate_transactions: syncData.data.duplicate_transactions
       },
-      auto_match_triggered: syncData.data.new_transactions > 0
+      auto_match_triggered: syncData.data.new_transactions > 0,
+      balance: balanceData?.balance ? {
+        total: balanceData.balance.total,
+        currency: balanceData.balance.currency,
+        lastSync: balanceData.balance.lastSync
+      } : null
     };
 
     console.log(`[SmartFintech Cron] Completed in ${duration}ms`);

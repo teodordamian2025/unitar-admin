@@ -151,16 +151,34 @@ async function getContracteStats() {
 
 async function getFacturiStats() {
   try {
-    // Obține toate facturile cu date complete pentru a extrage moneda corectă
+    // ✅ Query corectată: folosește EtapeFacturi_v2 pentru moneda corectă
+    // Grupează pe monedă și factura_id pentru a calcula valorile corecte
+    const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+
     const query = `
+      WITH FacturiCuMoneda AS (
+        SELECT
+          fg.id,
+          fg.status,
+          fg.subtotal,
+          fg.valoare_platita,
+          ef.moneda,
+          -- Calculează total per factură per monedă (sumă etape)
+          SUM(ef.valoare) as valoare_etape
+        FROM ${TABLE_FACTURI_GENERATE} fg
+        LEFT JOIN ${TABLE_ETAPE_FACTURI} ef ON fg.id = ef.factura_id
+        WHERE fg.status != 'anulata'
+          AND ef.activ = true
+        GROUP BY fg.id, fg.status, fg.subtotal, fg.valoare_platita, ef.moneda
+      )
       SELECT
-        id,
-        status,
-        subtotal,
-        valoare_platita,
-        date_complete_json
-      FROM ${TABLE_FACTURI_GENERATE}
-      WHERE status != 'anulata'
+        moneda,
+        COUNT(DISTINCT id) as numar_facturi,
+        -- Suma valorilor neplatite (folosim valoare_etape care este în moneda originală)
+        SUM(CAST(valoare_etape AS NUMERIC) - COALESCE(CAST(valoare_platita AS NUMERIC), 0)) as total_neplatit
+      FROM FacturiCuMoneda
+      WHERE (CAST(valoare_etape AS NUMERIC) - COALESCE(CAST(valoare_platita AS NUMERIC), 0)) > 0
+      GROUP BY moneda
     `;
 
     const [rows] = await bigquery.query({
@@ -173,59 +191,41 @@ async function getFacturiStats() {
     let totalFacturi = 0;
 
     rows.forEach((row: any) => {
-      try {
-        totalFacturi++;
-        const datele = row.date_complete_json ? JSON.parse(row.date_complete_json) : null;
+      const moneda = row.moneda || 'RON';
+      const numarFacturi = parseInt(row.numar_facturi) || 0;
+      const totalNeplatit = parseFloat(row.total_neplatit) || 0;
 
-        if (!datele || !datele.liniiFactura || datele.liniiFactura.length === 0) {
-          // Fallback: folosește RON dacă nu există date complete
-          const moneda = 'RON';
-          if (!facturePerMoneda[moneda]) {
-            facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
-          }
+      facturePerMoneda[moneda] = {
+        neplatite: numarFacturi,
+        subtotal: totalNeplatit
+      };
 
-          const valoareNeplatita = parseFloat(row.subtotal || 0) - parseFloat(row.valoare_platita || 0);
-          if (valoareNeplatita > 0) {
-            facturePerMoneda[moneda].neplatite++;
-            facturePerMoneda[moneda].subtotal += valoareNeplatita;
-          }
-          return;
-        }
-
-        // Extrage moneda din prima linie (toate liniile ar trebui să aibă aceeași monedă)
-        const primaLinie = datele.liniiFactura[0];
-        const moneda = primaLinie.monedaOriginala || 'RON';
-
-        if (!facturePerMoneda[moneda]) {
-          facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
-        }
-
-        // Calculează valoarea neplătită (subtotal - valoare_platita)
-        const subtotal = parseFloat(row.subtotal || 0);
-        const valoarePlatita = parseFloat(row.valoare_platita || 0);
-        const valoareNeplatita = subtotal - valoarePlatita;
-
-        if (valoareNeplatita > 0) {
-          facturePerMoneda[moneda].neplatite++;
-          facturePerMoneda[moneda].subtotal += valoareNeplatita;
-        }
-      } catch (parseError) {
-        console.error('Eroare parsare factură:', row.id, parseError);
-        // Fallback la RON
-        const moneda = 'RON';
-        if (!facturePerMoneda[moneda]) {
-          facturePerMoneda[moneda] = { neplatite: 0, subtotal: 0 };
-        }
-        const valoareNeplatita = parseFloat(row.subtotal || 0) - parseFloat(row.valoare_platita || 0);
-        if (valoareNeplatita > 0) {
-          facturePerMoneda[moneda].neplatite++;
-          facturePerMoneda[moneda].subtotal += valoareNeplatita;
-        }
-      }
+      totalFacturi += numarFacturi;
     });
 
+    // Verifică dacă există facturi fără etape (edge case)
+    const queryFacturiFaraEtape = `
+      SELECT COUNT(DISTINCT id) as facturi_fara_etape
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      WHERE fg.status != 'anulata'
+        AND NOT EXISTS (
+          SELECT 1 FROM ${TABLE_ETAPE_FACTURI} ef
+          WHERE ef.factura_id = fg.id AND ef.activ = true
+        )
+    `;
+
+    const [rowsFaraEtape] = await bigquery.query({
+      query: queryFacturiFaraEtape,
+      location: 'EU',
+    });
+
+    const facturiFaraEtape = parseInt(rowsFaraEtape[0]?.facturi_fara_etape) || 0;
+    if (facturiFaraEtape > 0) {
+      console.warn(`⚠️ Există ${facturiFaraEtape} facturi fără etape asociate`);
+    }
+
     return {
-      total: totalFacturi,
+      total: totalFacturi + facturiFaraEtape,
       facturePerMoneda: facturePerMoneda,
       // Backwards compatibility - folosește RON pentru valori vechi
       valoare_de_incasat: facturePerMoneda['RON']?.subtotal || 0

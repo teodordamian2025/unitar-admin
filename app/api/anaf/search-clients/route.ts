@@ -337,7 +337,7 @@ async function updateClientInBD(clientId: string, anafData: any) {
   try {
     const updateQuery = `
       UPDATE ${TABLE_CLIENTI}
-      SET 
+      SET
         nume = @nume,
         cui = @cui,
         nr_reg_com = @nr_reg_com,
@@ -352,7 +352,7 @@ async function updateClientInBD(clientId: string, anafData: any) {
         observatii = CONCAT(IFNULL(observatii, ''), ' | Actualizat din ANAF la ', @timestamp)
       WHERE id = @id
     `;
-    
+
     const params = {
       id: clientId,
       nume: anafData.denumire,
@@ -368,30 +368,63 @@ async function updateClientInBD(clientId: string, anafData: any) {
       data_actualizare: new Date().toISOString(),
       timestamp: new Date().toLocaleString('ro-RO')
     };
-    
-    await bigquery.query({
-      query: updateQuery,
-      params,
-      types: {
-        id: 'STRING',
-        nume: 'STRING',
-        cui: 'STRING',
-        nr_reg_com: 'STRING',
-        adresa: 'STRING',
-        judet: 'STRING',
-        oras: 'STRING',
-        cod_postal: 'STRING',
-        telefon: 'STRING',
-        tip_client: 'STRING',
-        activ: 'BOOLEAN',
-        data_actualizare: 'TIMESTAMP',
-        timestamp: 'STRING'
+
+    // ✅ Retry logic pentru streaming buffer conflict
+    const maxRetries = 3;
+    let retryCount = 0;
+    let lastError: any = null;
+
+    while (retryCount < maxRetries) {
+      try {
+        await bigquery.query({
+          query: updateQuery,
+          params,
+          types: {
+            id: 'STRING',
+            nume: 'STRING',
+            cui: 'STRING',
+            nr_reg_com: 'STRING',
+            adresa: 'STRING',
+            judet: 'STRING',
+            oras: 'STRING',
+            cod_postal: 'STRING',
+            telefon: 'STRING',
+            tip_client: 'STRING',
+            activ: 'BOOL', // ✅ FIX: 'BOOL' nu 'BOOLEAN' pentru BigQuery Node.js client
+            data_actualizare: 'TIMESTAMP',
+            timestamp: 'STRING'
+          },
+          location: 'EU'
+        });
+
+        console.log(`Client actualizat cu ID: ${clientId}`);
+        return { clientId };
+
+      } catch (err: any) {
+        lastError = err;
+
+        // Check dacă e eroare de streaming buffer
+        const isStreamingBufferError = err.message?.includes('streaming buffer') ||
+                                       err.code === 400 && err.errors?.[0]?.reason === 'invalidQuery';
+
+        if (isStreamingBufferError && retryCount < maxRetries - 1) {
+          retryCount++;
+          const waitTime = retryCount * 2000; // 2s, 4s, 6s
+          console.log(`⏳ Streaming buffer conflict - Retry ${retryCount}/${maxRetries} după ${waitTime}ms`);
+
+          // Așteaptă înainte de retry
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        // Dacă nu e streaming buffer error sau am epuizat retry-urile, aruncă eroarea
+        throw err;
       }
-    });
-    
-    console.log(`Client actualizat cu ID: ${clientId}`);
-    return { clientId };
-    
+    }
+
+    // Dacă am ajuns aici, toate retry-urile au eșuat
+    throw lastError;
+
   } catch (error) {
     console.error('Eroare update client în BD:', error);
     throw error;

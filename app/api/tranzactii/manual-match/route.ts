@@ -679,7 +679,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     if (matchRequest.target_type === 'etapa_factura') {
       const sumaIncasata = Math.abs(tranzactie.suma);
       const newValoareIncasata = `COALESCE(valoare_incasata, 0) + ${sumaIncasata}`;
-      const newStatus = `CASE 
+      const newStatus = `CASE
         WHEN ${newValoareIncasata} >= valoare_ron THEN 'Incasat'
         WHEN ${newValoareIncasata} > 0 THEN 'Partial'
         ELSE 'Neincasat'
@@ -705,6 +705,63 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Etapa = "${targetDetails.etapa_id}"
         `);
+      }
+
+      // 🔔 NOTIFICARE ADMIN: Incasare nouă înregistrată (MANUAL MATCH)
+      try {
+        const dataProc = tranzactie.data_procesare?.value || tranzactie.data_procesare || new Date().toISOString().split('T')[0];
+
+        // Obținem detalii proiect pentru notificare
+        const [proiectRows] = await bigquery.query(`
+          SELECT Denumire FROM ${TABLE_PROIECTE}
+          WHERE ID_Proiect = "${targetDetails.proiect_id}"
+        `);
+        const proiectDenumire = proiectRows[0]?.Denumire || 'N/A';
+
+        // Trimitem notificare prin API
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip_notificare: 'factura_achitata',
+            user_id: ['admin'], // Va fi expandat cu toți admins de către API
+            context: {
+              // Date tranzacție
+              suma_tranzactie: Math.abs(sumaIncasata).toFixed(2),
+              data_tranzactie: dataProc,
+
+              // Match details
+              has_match: true,
+              matching_confidence: matchRequest.confidence_manual.toFixed(0),
+
+              // Date factură
+              factura_id: targetDetails.factura_id,
+              factura_serie: targetDetails.factura_serie || '',
+              factura_numar: targetDetails.factura_numar || '',
+              factura_total: sumaTargetRon.toFixed(2),
+
+              // Date client
+              client_nume: targetDetails.factura_client_nume || '',
+              client_cui: targetDetails.factura_client_cui || '',
+
+              // Date proiect
+              proiect_id: targetDetails.proiect_id,
+              proiect_denumire: proiectDenumire,
+
+              // Diferențe
+              diferenta_ron: diferentaRon ? diferentaRon.toFixed(2) : null,
+              diferenta_procent: diferentaProcent ? diferentaProcent.toFixed(1) : null,
+
+              // Link
+              link_detalii: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/tranzactii/dashboard`
+            }
+          })
+        });
+
+        console.log(`📧 Notificare admin trimisă pentru incasare manuală ${sumaIncasata} RON`);
+      } catch (notifError) {
+        console.error('⚠️ Eroare trimitere notificare (nu blochează matching-ul):', notifError);
+        // Nu aruncăm eroarea - notificarea nu trebuie să blocheze matching-ul
       }
 
     } else if (matchRequest.target_type === 'cheltuiala') {
@@ -796,13 +853,13 @@ export async function GET(request: NextRequest) {
     let candidati: any[] = [];
 
     // Căutăm candidații pe baza direcției și target_type
-    if (tranzactie.directie === 'in' && (targetType === 'all' || targetType === 'etape_facturi')) {
+    if (tranzactie.directie === 'intrare' && (targetType === 'all' || targetType === 'etape_facturi')) {
       const etapeCandidati = await findEtapeFacturiCandidatesForTransaction(tranzactie, tolerance);
       console.log(`📋 Găsiți ${etapeCandidati.length} candidați EtapeFacturi`);
       candidati = [...candidati, ...etapeCandidati];
     }
 
-    if (tranzactie.directie === 'out' && (targetType === 'all' || targetType === 'cheltuieli')) {
+    if (tranzactie.directie === 'iesire' && (targetType === 'all' || targetType === 'cheltuieli')) {
       const cheltuieliCandidati = await findCheltuieliCandidatesForTransaction(tranzactie, tolerance);
       console.log(`📋 Găsiți ${cheltuieliCandidati.length} candidați Cheltuieli`);
       candidati = [...candidati, ...cheltuieliCandidati];

@@ -363,7 +363,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
         setCandidati(data.candidati || {});
         
         // Setează tab-ul activ pe baza direcției tranzacției
-        if (transaction.directie === 'in') {
+        if (transaction.directie === 'intrare') {
           setActiveTab('etape');
         } else {
           setActiveTab('cheltuieli');
@@ -519,7 +519,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
               </div>
               <div>
                 <span className="text-gray-500">Sumă:</span>
-                <div className={`font-medium ${transaction.directie === 'in' ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`font-medium ${transaction.directie === 'intrare' ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(transaction.suma)}
                 </div>
               </div>

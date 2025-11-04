@@ -1629,7 +1629,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           numarFactura,
           setariFacturare: {
             ...setariFacturare,
-            termen_plata_standard: termenPlata
+            termen_plata_standard: termenPlata || 30
           },
           sendToAnaf,
           tip_facturare: iappConfig?.tip_facturare || 'anaf_direct', // ✅ TRANSMITE tip_facturare
@@ -1877,12 +1877,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px' }}>
                   Termen plată:
                 </div>
-                <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: '600', 
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
                   color: 'white'
                 }}>
-                  {termenPlata} zile
+                  {termenPlata || 30} zile
                 </div>
               </div>
             </div>
@@ -2821,7 +2821,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             <input
               type="number"
               value={termenPlata}
-              onChange={(e) => setTermenPlata(parseInt(e.target.value) || 30)}
+              onChange={(e) => setTermenPlata(parseInt(e.target.value) || 0)}
               disabled={isLoading}
               style={{
                 width: '150px',

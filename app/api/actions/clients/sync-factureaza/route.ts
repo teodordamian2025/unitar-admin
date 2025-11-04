@@ -288,7 +288,7 @@ async function syncClientToBigQuery(factureazaClient: any) {
     location: 'EU',
     types: {
       id: 'STRING',
-      nume: 'STRING', 
+      nume: 'STRING',
       tip_client: 'STRING',
       cui: 'STRING',
       nr_reg_com: 'STRING',
@@ -308,9 +308,9 @@ async function syncClientToBigQuery(factureazaClient: any) {
       ci_eliberata_la: 'DATE',
       data_creare: 'TIMESTAMP',
       data_actualizare: 'TIMESTAMP',
-      activ: 'BOOLEAN',
+      activ: 'BOOL', // ✅ FIX: 'BOOL' nu 'BOOLEAN' pentru BigQuery Node.js client
       id_factureaza: 'STRING',
-      sincronizat_factureaza: 'BOOLEAN',
+      sincronizat_factureaza: 'BOOL', // ✅ FIX: 'BOOL' nu 'BOOLEAN' pentru BigQuery Node.js client
       observatii: 'STRING'
     }
   });
