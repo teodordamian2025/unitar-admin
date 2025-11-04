@@ -949,16 +949,89 @@ export default function GanttView() {
             variant="outline"
             size="sm"
             onClick={() => {
-              const today = new Date();
-              const nextYear = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+              // Găsește cea mai avansată dată din proiecte
+              const dates = ganttData.flatMap(task => {
+                const endDateValue = normalizeDate(task.endDate);
+                return [new Date(endDateValue)];
+              });
+              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+              const startDate = new Date(maxDate);
+              startDate.setMonth(startDate.getMonth() - 1);
+
               setFilters(prev => ({
                 ...prev,
-                start_date: today.toISOString().split('T')[0],
-                end_date: nextYear.toISOString().split('T')[0]
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: maxDate.toISOString().split('T')[0]
               }));
             }}
           >
-            Următor an
+            1 lună
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const dates = ganttData.flatMap(task => {
+                const endDateValue = normalizeDate(task.endDate);
+                return [new Date(endDateValue)];
+              });
+              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+              const startDate = new Date(maxDate);
+              startDate.setMonth(startDate.getMonth() - 3);
+
+              setFilters(prev => ({
+                ...prev,
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: maxDate.toISOString().split('T')[0]
+              }));
+            }}
+          >
+            3 luni
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const dates = ganttData.flatMap(task => {
+                const endDateValue = normalizeDate(task.endDate);
+                return [new Date(endDateValue)];
+              });
+              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+              const startDate = new Date(maxDate);
+              startDate.setMonth(startDate.getMonth() - 6);
+
+              setFilters(prev => ({
+                ...prev,
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: maxDate.toISOString().split('T')[0]
+              }));
+            }}
+          >
+            6 luni
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const dates = ganttData.flatMap(task => {
+                const endDateValue = normalizeDate(task.endDate);
+                return [new Date(endDateValue)];
+              });
+              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+              const startDate = new Date(maxDate);
+              startDate.setFullYear(startDate.getFullYear() - 1);
+
+              setFilters(prev => ({
+                ...prev,
+                start_date: startDate.toISOString().split('T')[0],
+                end_date: maxDate.toISOString().split('T')[0]
+              }));
+            }}
+          >
+            1 an
           </Button>
 
           <Button
