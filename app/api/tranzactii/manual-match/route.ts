@@ -49,7 +49,7 @@ console.log(`🔧 [Manual Match] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 interface TranzactieSource {
   id: string;
   suma: number;
-  data_procesare: string;
+  data_procesare: string | { value: string }; // BigQuery DATE poate returna object sau string
   directie: string;
   nume_contrapartida: string;
   cui_contrapartida: string;
@@ -239,7 +239,8 @@ function calculateEtapaMatchingScore(
   }
 
   // 2. SCOR TIMP (20 puncte max)
-  const tranzactieDate = new Date(tranzactie.data_procesare);
+  const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare;
+  const tranzactieDate = new Date(dataProc);
   const facturaDate = new Date(etapa.factura_data);
   const daysDiff = Math.abs((tranzactieDate.getTime() - facturaDate.getTime()) / (1000 * 60 * 60 * 24));
   
@@ -389,9 +390,12 @@ async function findEtapeFacturiCandidatesForTransaction(
   tolerantaProcent: number = 10 // Mai permisiv pentru manual
 ): Promise<EtapaFacturaCandidat[]> {
   try {
+    // Normalizare date field (BigQuery returnează {value: "2025-08-16"})
+    const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare || new Date().toISOString().split('T')[0];
+
     // Pentru încasări, căutăm etape cu status neincasat/partial
     const query = `
-      SELECT 
+      SELECT
         ef.id,
         ef.factura_id,
         ef.etapa_id,
@@ -407,7 +411,7 @@ async function findEtapeFacturiCandidatesForTransaction(
         ef.procent_din_etapa,
         ef.data_facturare,
         ef.observatii,
-        
+
         -- Date factură
         fg.serie as factura_serie,
         fg.numar as factura_numar,
@@ -418,11 +422,11 @@ async function findEtapeFacturiCandidatesForTransaction(
         fg.subtotal as factura_subtotal,
         fg.total_tva as factura_total_tva,
         fg.total as factura_total,
-        
+
         -- Date proiect
         p.Denumire as proiect_denumire,
         COALESCE(sp.Denumire, '') as subproiect_denumire
-        
+
       FROM ${TABLE_ETAPE_FACTURI} ef
       INNER JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
@@ -430,15 +434,15 @@ async function findEtapeFacturiCandidatesForTransaction(
         ON ef.proiect_id = p.ID_Proiect
       LEFT JOIN ${TABLE_SUBPROIECTE} sp
         ON ef.subproiect_id = sp.ID_Subproiect
-      WHERE 
-        ef.activ = TRUE 
+      WHERE
+        ef.activ = TRUE
         AND fg.status != 'anulata'
         AND ef.status_incasare IN ('Neincasat', 'Partial')
         AND ef.valoare_ron > 0
         AND (ef.valoare_ron - COALESCE(ef.valoare_incasata, 0)) > 0
-        AND fg.data_factura >= DATE_SUB(DATE('${tranzactie.data_procesare}'), INTERVAL 6 MONTH)
-        AND fg.data_factura <= DATE_ADD(DATE('${tranzactie.data_procesare}'), INTERVAL 3 MONTH)
-      ORDER BY 
+        AND fg.data_factura >= DATE_SUB(DATE('${dataProc}'), INTERVAL 6 MONTH)
+        AND fg.data_factura <= DATE_ADD(DATE('${dataProc}'), INTERVAL 3 MONTH)
+      ORDER BY
         ABS(ef.valoare_ron - ${tranzactie.suma}) ASC,
         fg.data_factura DESC
       LIMIT 50
@@ -483,9 +487,12 @@ async function findCheltuieliCandidatesForTransaction(
 ): Promise<CheltuialaCandidat[]> {
   try {
     const sumaPlata = Math.abs(tranzactie.suma);
-    
+
+    // Normalizare date field (BigQuery returnează {value: "2025-08-16"})
+    const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare || new Date().toISOString().split('T')[0];
+
     const query = `
-      SELECT 
+      SELECT
         pc.id,
         pc.proiect_id,
         pc.subproiect_id,
@@ -500,23 +507,23 @@ async function findCheltuieliCandidatesForTransaction(
         pc.status_achitare,
         pc.nr_factura_furnizor,
         pc.data_factura_furnizor,
-        
+
         -- Date proiect
         p.Denumire as proiect_denumire,
         COALESCE(sp.Denumire, '') as subproiect_denumire
-        
+
       FROM ${TABLE_PROIECTE_CHELTUIELI} pc
       INNER JOIN ${TABLE_PROIECTE} p
         ON pc.proiect_id = p.ID_Proiect
       LEFT JOIN ${TABLE_SUBPROIECTE} sp
         ON pc.subproiect_id = sp.ID_Subproiect
-      WHERE 
-        pc.activ = TRUE 
+      WHERE
+        pc.activ = TRUE
         AND pc.status_achitare IN ('Neincasat', 'Partial')
         AND pc.valoare_ron > 0
-        AND pc.data_creare >= DATE_SUB(DATE('${tranzactie.data_procesare}'), INTERVAL 6 MONTH)
-        AND pc.data_creare <= DATE_ADD(DATE('${tranzactie.data_procesare}'), INTERVAL 1 MONTH)
-      ORDER BY 
+        AND pc.data_creare >= DATE_SUB(DATE('${dataProc}'), INTERVAL 6 MONTH)
+        AND pc.data_creare <= DATE_ADD(DATE('${dataProc}'), INTERVAL 1 MONTH)
+      ORDER BY
         ABS(pc.valoare_ron - ${sumaPlata}) ASC,
         pc.data_creare DESC
       LIMIT 50

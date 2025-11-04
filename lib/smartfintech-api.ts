@@ -365,6 +365,11 @@ export async function getSmartFintechTransactions(
 /**
  * Wrapper function care face retry cu refresh token dacă get API returnează 401
  * Usage: await withTokenRefresh(tokens, credentials, () => getSmartFintechAccounts(tokens.access_token))
+ *
+ * Flow:
+ * 1. Try cu access_token cached
+ * 2. Dacă 401 → refresh cu refresh_token
+ * 3. Dacă refresh eșuează → FALLBACK la client_credentials (re-autentificare completă)
  */
 export async function withTokenRefresh<T>(
   currentTokens: SmartFintechTokens,
@@ -379,17 +384,39 @@ export async function withTokenRefresh<T>(
   } catch (error: any) {
     // Dacă e TOKEN_EXPIRED, refresh și retry
     if (error.message === 'TOKEN_EXPIRED') {
-      console.log('🔄 [SmartFintech] Token expired, refreshing...');
+      console.log('🔄 [SmartFintech] Token expired, attempting refresh...');
 
-      const newTokens = await refreshSmartFintechToken(credentials, currentTokens.refresh_token);
+      try {
+        // STEP 1: Încearcă refresh cu refresh_token
+        const newTokens = await refreshSmartFintechToken(credentials, currentTokens.refresh_token);
 
-      // Callback pentru salvare token nou în DB (opțional)
-      if (onTokenRefreshed) {
-        await onTokenRefreshed(newTokens);
+        // Callback pentru salvare token nou în DB (opțional)
+        if (onTokenRefreshed) {
+          await onTokenRefreshed(newTokens);
+        }
+
+        console.log('✅ [SmartFintech] Token refreshed successfully');
+
+        // Retry cu token nou
+        return await apiCall(newTokens.access_token);
+
+      } catch (refreshError: any) {
+        // STEP 2: Dacă refresh eșuează → FALLBACK la client_credentials
+        console.warn('⚠️ [SmartFintech] Refresh failed, falling back to client_credentials re-authentication');
+        console.error('   Refresh error:', refreshError.message);
+
+        const newTokens = await authenticateSmartFintech(credentials);
+
+        // Callback pentru salvare token nou în DB
+        if (onTokenRefreshed) {
+          await onTokenRefreshed(newTokens);
+        }
+
+        console.log('✅ [SmartFintech] Re-authenticated with client_credentials successfully');
+
+        // Retry cu token nou
+        return await apiCall(newTokens.access_token);
       }
-
-      // Retry cu token nou
-      return await apiCall(newTokens.access_token);
 
     } else {
       // Alte erori → throw

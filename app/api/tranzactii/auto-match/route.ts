@@ -39,7 +39,7 @@ console.log(`🔧 [Auto Match] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 interface TranzactieCandidat {
   id: string;
   suma: number;
-  data_procesare: string;
+  data_procesare: string | { value: string }; // BigQuery DATE poate returna object sau string
   nume_contrapartida: string;
   cui_contrapartida: string;
   detalii_tranzactie: string;
@@ -205,7 +205,8 @@ function calculateMatchingScore(
   score += details.suma_score;
 
   // 2. SCOR TIMP (20 puncte max)
-  const tranzactieDate = new Date(tranzactie.data_procesare);
+  const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare;
+  const tranzactieDate = new Date(dataProc);
   const facturaDate = new Date(etapa.factura_data);
   const daysDiff = Math.abs((tranzactieDate.getTime() - facturaDate.getTime()) / (1000 * 60 * 60 * 24));
   
