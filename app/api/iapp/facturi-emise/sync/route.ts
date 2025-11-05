@@ -174,40 +174,48 @@ export async function POST(req: NextRequest) {
           console.warn(`⚠️ [iapp.ro Emise] Nu s-au putut prelua detalii pentru ID ${factura.id_incarcare}:`, detailError);
         }
 
-        // Download PDF în Google Drive (dacă flag activat și PDF disponibil)
-        if (config.auto_download_pdfs_iapp && detalii?.pdf) {
-          try {
-            console.log(`📥 [iapp.ro Emise] Start download PDF pentru ID ${factura.id_incarcare}...`);
+        // Download PDF în Google Drive (dacă flag activat)
+        // FIX 05.11.2025: Folosim factura.pdf din răspunsul listă (ÎNTOTDEAUNA disponibil)
+        // Fallback la detalii.pdf doar dacă factura.pdf lipsește
+        const pdfLink = factura.pdf || detalii?.pdf;
 
-            // 1. Download PDF direct din link
-            const pdfBuffer = await downloadPdfFacturaEmisa(detalii.pdf);
+        if (config.auto_download_pdfs_iapp) {
+          if (!pdfLink) {
+            console.warn(`⚠️ [iapp.ro Emise] PDF link lipsă pentru ID ${factura.id_incarcare} (factura.pdf=${factura.pdf}, detalii?.pdf=${detalii?.pdf})`);
+          } else {
+            try {
+              console.log(`📥 [iapp.ro Emise] Start download PDF pentru ID ${factura.id_incarcare} (source: ${factura.pdf ? 'factura.pdf' : 'detalii.pdf'})...`);
 
-            // 2. Generate filename pentru PDF
-            const fileName = generatePdfFileNameEmise({
-              serie_numar: dbRecord.serie_numar,
-              data_factura: dbRecord.data_factura,
-              id_incarcare: dbRecord.id_incarcare
-            });
+              // 1. Download PDF direct din link
+              const pdfBuffer = await downloadPdfFacturaEmisa(pdfLink);
 
-            // 3. Extract year/month pentru folder structure
-            const [year, month] = dbRecord.data_factura.split('-');
+              // 2. Generate filename pentru PDF
+              const fileName = generatePdfFileNameEmise({
+                serie_numar: dbRecord.serie_numar,
+                data_factura: dbRecord.data_factura,
+                id_incarcare: dbRecord.id_incarcare
+              });
 
-            // 4. Upload PDF to Drive
-            const fileId = await uploadPdfToEmiseDrive(pdfBuffer, fileName, year, month);
+              // 3. Extract year/month pentru folder structure
+              const [year, month] = dbRecord.data_factura.split('-');
 
-            // 5. Save file ID in record
-            dbRecord.pdf_file_id = fileId;
+              // 4. Upload PDF to Drive
+              const fileId = await uploadPdfToEmiseDrive(pdfBuffer, fileName, year, month);
 
-            pdfsDescarcate++;
-            console.log(`✅ [iapp.ro Emise] PDF salvat: ${fileName} (Drive ID: ${fileId})`);
+              // 5. Save file ID in record
+              dbRecord.pdf_file_id = fileId;
 
-            // Small delay pentru rate limiting (500ms între download-uri)
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (pdfError) {
-            // Non-critical - continuăm fără PDF
-            console.warn(`⚠️ [iapp.ro Emise] Nu s-a putut descărca PDF pentru ID ${factura.id_incarcare}:`, pdfError);
+              pdfsDescarcate++;
+              console.log(`✅ [iapp.ro Emise] PDF salvat: ${fileName} (Drive ID: ${fileId})`);
+
+              // Small delay pentru rate limiting (500ms între download-uri)
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (pdfError) {
+              // Non-critical - continuăm fără PDF
+              console.warn(`⚠️ [iapp.ro Emise] Nu s-a putut descărca PDF pentru ID ${factura.id_incarcare}:`, pdfError);
+            }
           }
-        } else if (!config.auto_download_pdfs_iapp) {
+        } else {
           console.log(`ℹ️ [iapp.ro Emise] Download PDF dezactivat (flag OFF)`);
         }
 
