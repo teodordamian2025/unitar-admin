@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     let balanceData: any = null;
 
     try {
-      const balanceResponse = await fetch(`${baseUrl}/api/tranzactii/smartfintech/balance`, {
+      const balanceResponse = await fetch(`${baseUrl}/api/tranzactii/smartfintech/balance?force_refresh=true`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

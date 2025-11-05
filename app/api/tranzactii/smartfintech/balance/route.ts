@@ -14,6 +14,7 @@ import {
   authenticateSmartFintech,
   getSmartFintechAccounts,
   withTokenRefresh,
+  withRetry,
   decryptToken,
   encryptToken,
   SmartFintechTokens,
@@ -122,8 +123,12 @@ export async function GET(request: NextRequest) {
         const now = Date.now();
         const sixHoursInMs = 6 * 60 * 60 * 1000; // 6 ore în millisecunde
 
-        // Dacă cache-ul e mai nou de 6 ore → returnează din cache
-        if (now - lastSyncTime < sixHoursInMs) {
+        // ✅ VALIDARE NOUĂ: Nu returna cache dacă total e invalid (null, undefined, 0, NaN)
+        if (metadata.balance.total == null || metadata.balance.total === 0 || isNaN(metadata.balance.total)) {
+          console.log('⚠️ [Balance] Cache contains invalid total (0, null, or NaN), forcing fresh fetch...');
+          // Continue cu fetch live în loc să returneze cache invalid
+        } else if (now - lastSyncTime < sixHoursInMs) {
+          // Cache valid cu date reale
           const cacheAgeMinutes = Math.floor((now - lastSyncTime) / 60000);
           console.log(`✅ [Balance] Returning cached balance (${cacheAgeMinutes} minutes old)`);
 
@@ -188,35 +193,39 @@ export async function GET(request: NextRequest) {
       await updateTokensInDB(config.id, tokens);
     }
 
-    // 5. Fetch accounts cu token refresh automat (backup layer)
-    const accounts = await withTokenRefresh(
-      tokens,
-      credentials,
-      (accessToken) => getSmartFintechAccounts(accessToken),
-      async (newTokens) => {
-        // Save new tokens în BigQuery
-        console.log('🔄 [Balance] Saving refreshed tokens...');
+    // 5. Fetch accounts cu token refresh automat (backup layer) + retry logic
+    const accounts = await withRetry(
+      () => withTokenRefresh(
+        tokens,
+        credentials,
+        (accessToken) => getSmartFintechAccounts(accessToken),
+        async (newTokens) => {
+          // Save new tokens în BigQuery
+          console.log('🔄 [Balance] Saving refreshed tokens...');
 
-        const updateQuery = `
-          UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
-          SET
-            access_token = @access_token,
-            refresh_token = @refresh_token,
-            expires_at = TIMESTAMP_MILLIS(@expires_at),
-            data_actualizare = CURRENT_TIMESTAMP()
-          WHERE id = @id
-        `;
+          const updateQuery = `
+            UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+            SET
+              access_token = @access_token,
+              refresh_token = @refresh_token,
+              expires_at = TIMESTAMP_MILLIS(@expires_at),
+              data_actualizare = CURRENT_TIMESTAMP()
+            WHERE id = @id
+          `;
 
-        await bigquery.query({
-          query: updateQuery,
-          params: {
-            id: config.id,
-            access_token: encryptToken(newTokens.access_token),
-            refresh_token: encryptToken(newTokens.refresh_token),
-            expires_at: newTokens.expires_at,
-          },
-        });
-      }
+          await bigquery.query({
+            query: updateQuery,
+            params: {
+              id: config.id,
+              access_token: encryptToken(newTokens.access_token),
+              refresh_token: encryptToken(newTokens.refresh_token),
+              expires_at: newTokens.expires_at,
+            },
+          });
+        }
+      ),
+      3, // Max 3 retry-uri
+      2000 // 2s delay între retry-uri
     );
 
     console.log(`✅ [Balance] Fetched ${accounts.length} accounts`);
@@ -317,11 +326,53 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('❌ [Balance] Error fetching balance:', error);
 
-    // Returnăm success: true cu balance: null pentru a nu afișa cardul, nu eroare
+    // ✅ FALLBACK: Dacă există cache vechi (chiar expirat) cu sold valid, returnează-l cu warning
+    try {
+      // Încearcă să citești config din nou pentru metadata actualizat
+      const fallbackQuery = `
+        SELECT metadata
+        FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+        WHERE is_active = TRUE
+        ORDER BY data_actualizare DESC
+        LIMIT 1
+      `;
+
+      const [fallbackRows] = await bigquery.query({ query: fallbackQuery });
+
+      if (fallbackRows.length > 0 && fallbackRows[0].metadata) {
+        const metadata = typeof fallbackRows[0].metadata === 'string'
+          ? JSON.parse(fallbackRows[0].metadata)
+          : fallbackRows[0].metadata;
+
+        if (metadata.balance?.total != null && metadata.balance.total > 0) {
+          console.warn('⚠️ [Balance] Fetch failed, returning stale cache as fallback');
+          return NextResponse.json({
+            success: true,
+            balance: {
+              total: metadata.balance.total,
+              currency: metadata.balance.currency,
+              accounts: metadata.balance.accounts || [],
+              lastSync: metadata.balance.lastSync,
+              cached: true,
+              stale: true, // Flag pentru UI că e cache expirat
+              cacheAgeMinutes: metadata.balance.lastSync
+                ? Math.floor((Date.now() - new Date(metadata.balance.lastSync).getTime()) / 60000)
+                : null
+            },
+            warning: 'Sold din cache (posibil expirat). Eroare la actualizare: ' + error.message
+          });
+        }
+      }
+    } catch (fallbackError) {
+      console.error('❌ [Balance] Fallback to cache also failed:', fallbackError);
+    }
+
+    // Dacă nu există cache valid, returnează null
     return NextResponse.json({
       success: true,
       balance: null,
       message: 'Nu s-a putut încărca soldul disponibil. Verifică configurația Smart Fintech.',
+      error: error.message
     });
   }
 }

@@ -812,25 +812,25 @@ const ModernTranzactiiDashboard: React.FC = () => {
       }
     ];
 
-    // Adaugă cardul Sold Disponibil ÎNTOTDEAUNA (fix UX: afișează 0 când API failed)
+    // Adaugă cardul Sold Disponibil ÎNTOTDEAUNA (fix UX: afișează N/A când API failed)
     cards.push({
       title: 'Sold Disponibil',
-      value: availableBalance !== null
+      value: availableBalance !== null && availableBalance !== undefined
         ? new Intl.NumberFormat('ro-RO', {
             style: 'currency',
             currency: 'RON'
           }).format(availableBalance)
-        : '0,00 RON', // Afișează 0 când nu poate încărca
-      subtitle: availableBalance !== null
+        : 'N/A', // ✅ Afișează "N/A" în loc de "0,00 RON" când nu poate încărca
+      subtitle: availableBalance !== null && availableBalance !== undefined
         ? 'În conturi bancare'
-        : 'Nu s-a putut încărca', // Mesaj explicativ
-      icon: '🏦',
-      color: availableBalance !== null
+        : 'Eroare la încărcare', // ✅ Mesaj clar pentru eroare
+      icon: availableBalance !== null && availableBalance !== undefined ? '🏦' : '⚠️', // ✅ Icon diferit pentru eroare
+      color: availableBalance !== null && availableBalance !== undefined
         ? 'border-l-4 border-teal-500'
-        : 'border-l-4 border-gray-400', // Gri când nu e disponibil
-      trend: availableBalance !== null
+        : 'border-l-4 border-red-400', // ✅ Roșu pentru eroare (mai vizibil decât gri)
+      trend: availableBalance !== null && availableBalance !== undefined
         ? 'Smart Fintech API (cache 6h)'
-        : 'Verifică configurația', // Hint pentru troubleshooting
+        : 'Click 🔄 pentru reîncercare', // ✅ Hint pentru troubleshooting
       onRefresh: handleRefreshBalance,
       isRefreshing: isRefreshingBalance
     });

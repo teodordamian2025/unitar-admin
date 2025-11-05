@@ -425,6 +425,49 @@ export async function withTokenRefresh<T>(
   }
 }
 
+// ==================== HELPER: Retry Logic pentru Network Errors ====================
+
+/**
+ * Wrapper function cu retry logic pentru network errors temporare (timeout, 500, 503, etc.)
+ * Usage: await withRetry(() => apiCall(), maxRetries, delayMs)
+ *
+ * @param fn - Funcția async de executat
+ * @param maxRetries - Număr maxim de retry-uri (default 3)
+ * @param delayMs - Delay în millisecunde între retry-uri (default 2000)
+ * @returns - Rezultatul funcției fn dacă reușește
+ * @throws - Ultima eroare dacă toate retry-urile eșuează
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 2000
+): Promise<T> {
+  let lastError: any;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      console.log(`🔄 [Retry ${i + 1}/${maxRetries}] Attempting operation...`);
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`⚠️ [Retry ${i + 1}/${maxRetries}] Error: ${error.message}`);
+
+      // Dacă e ultima încercare, throw error
+      if (i === maxRetries - 1) {
+        console.error(`❌ [Retry] All ${maxRetries} attempts failed`);
+        throw error;
+      }
+
+      // Așteaptă înainte de retry (exponential backoff)
+      const waitTime = delayMs * (i + 1);
+      console.log(`⏳ [Retry] Waiting ${waitTime}ms before retry ${i + 2}...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+
+  throw lastError;
+}
+
 // ==================== EXPORT ====================
 
 export default {
@@ -433,6 +476,7 @@ export default {
   getSmartFintechAccounts,
   getSmartFintechTransactions,
   withTokenRefresh,
+  withRetry,
   encryptToken,
   decryptToken
 };
