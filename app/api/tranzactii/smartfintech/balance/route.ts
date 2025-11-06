@@ -75,6 +75,15 @@ async function updateTokensInDB(configId: string, tokens: SmartFintechTokens): P
 
 export async function GET(request: NextRequest) {
   try {
+    // SOLUȚIE #4: Debug logs pentru troubleshooting
+    console.log('💰 [Balance] API HIT - Request received at:', new Date().toISOString());
+    console.log('💰 [Balance] Headers:', {
+      'user-agent': request.headers.get('user-agent'),
+      'cache-control': request.headers.get('cache-control'),
+      'if-none-match': request.headers.get('if-none-match'),
+      'if-modified-since': request.headers.get('if-modified-since')
+    });
+
     // Parse query params
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('force_refresh') === 'true';
@@ -102,10 +111,17 @@ export async function GET(request: NextRequest) {
 
     if (configRows.length === 0) {
       console.warn('⚠️ [Balance] No active Smart Fintech configuration found. Card will not be displayed.');
+      // SOLUȚIE #1: No-Cache headers
       return NextResponse.json({
         success: true,
         balance: null,
         message: 'Smart Fintech nu este configurat.',
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
     }
 
@@ -123,15 +139,16 @@ export async function GET(request: NextRequest) {
         const now = Date.now();
         const sixHoursInMs = 6 * 60 * 60 * 1000; // 6 ore în millisecunde
 
-        // ✅ VALIDARE NOUĂ: Nu returna cache dacă total e invalid (null, undefined, 0, NaN)
-        if (metadata.balance.total == null || metadata.balance.total === 0 || isNaN(metadata.balance.total)) {
-          console.log('⚠️ [Balance] Cache contains invalid total (0, null, or NaN), forcing fresh fetch...');
+        // SOLUȚIE #2: Fix validare cache - 0 este valid! (sold poate fi 0 RON real)
+        if (metadata.balance.total == null || isNaN(metadata.balance.total)) {
+          console.log('⚠️ [Balance] Cache contains invalid total (null or NaN), forcing fresh fetch...');
           // Continue cu fetch live în loc să returneze cache invalid
         } else if (now - lastSyncTime < sixHoursInMs) {
           // Cache valid cu date reale
           const cacheAgeMinutes = Math.floor((now - lastSyncTime) / 60000);
           console.log(`✅ [Balance] Returning cached balance (${cacheAgeMinutes} minutes old)`);
 
+          // SOLUȚIE #1: Adaugă No-Cache headers pentru a preveni HTTP 304
           return NextResponse.json({
             success: true,
             balance: {
@@ -141,6 +158,12 @@ export async function GET(request: NextRequest) {
               lastSync: metadata.balance.lastSync,
               cached: true,
               cacheAgeMinutes
+            }
+          }, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0'
             }
           });
         } else {
@@ -316,11 +339,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // SOLUȚIE #1: No-Cache headers pentru fresh data
     return NextResponse.json({
       success: true,
       balance: {
         ...balanceData,
         cached: false // Fresh data, not from cache
+      }
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
   } catch (error: any) {
@@ -346,6 +376,7 @@ export async function GET(request: NextRequest) {
 
         if (metadata.balance?.total != null && metadata.balance.total > 0) {
           console.warn('⚠️ [Balance] Fetch failed, returning stale cache as fallback');
+          // SOLUȚIE #1: No-Cache headers pentru fallback stale cache
           return NextResponse.json({
             success: true,
             balance: {
@@ -360,6 +391,12 @@ export async function GET(request: NextRequest) {
                 : null
             },
             warning: 'Sold din cache (posibil expirat). Eroare la actualizare: ' + error.message
+          }, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
           });
         }
       }
@@ -368,11 +405,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Dacă nu există cache valid, returnează null
+    // SOLUȚIE #1: No-Cache headers pentru error response
     return NextResponse.json({
       success: true,
       balance: null,
       message: 'Nu s-a putut încărca soldul disponibil. Verifică configurația Smart Fintech.',
       error: error.message
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   }
 }

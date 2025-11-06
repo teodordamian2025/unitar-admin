@@ -750,10 +750,11 @@ const ModernTranzactiiDashboard: React.FC = () => {
   // EFFECTS
   // ==================================================================
 
+  // SOLUȚIE #3: Force refresh la load pentru a evita cache vechi
   useEffect(() => {
     if (user) {
       loadDashboardData(1);
-      loadAvailableBalance();
+      loadAvailableBalance(true); // Force refresh la load inițial
     }
   }, [user, loadDashboardData, loadAvailableBalance]);
 
