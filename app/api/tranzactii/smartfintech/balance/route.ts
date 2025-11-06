@@ -8,6 +8,10 @@
 // FORCE REFRESH: Query param ?force_refresh=true pentru bypass cache
 // ==================================================================
 
+// Force Next.js to treat this route as dynamic (uses headers for debug)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import {
