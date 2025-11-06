@@ -647,8 +647,16 @@ const ModernTranzactiiDashboard: React.FC = () => {
       if (data.success && data.balance) {
         setAvailableBalance(data.balance.total);
 
-        if (forceRefresh) {
-          toast.success('Sold actualizat cu succes!');
+        // FIX: Afișează warning dacă balance este stale sau din cache expirat
+        if (data.warning) {
+          toast.warning('Sold din cache expirat: ' + data.warning);
+        } else if (data.balance.stale) {
+          toast.warning('Sold din cache expirat. Apasă 🔄 pentru actualizare.');
+        } else if (forceRefresh) {
+          toast.success(`Sold actualizat cu succes: ${new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(data.balance.total)}`);
+        } else if (data.balance.cached && data.balance.cacheAgeMinutes > 60) {
+          // Cache mai vechi de 1 oră - afișează info subtil
+          console.info(`ℹ️ Sold din cache (${data.balance.cacheAgeMinutes} min vechi)`);
         }
       } else {
         console.warn('⚠️ Sold disponibil nu poate fi încărcat:', data.error);

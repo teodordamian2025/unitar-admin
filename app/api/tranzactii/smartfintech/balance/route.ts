@@ -154,7 +154,8 @@ export async function GET(request: NextRequest) {
             balance: {
               total: metadata.balance.total,
               currency: metadata.balance.currency,
-              accounts: metadata.balance.accounts || [],
+              accounts: metadata.balance.accounts || [], // Poate să lipsească în cache nou
+              accounts_count: metadata.balance.accounts_count || (metadata.balance.accounts?.length || 0),
               lastSync: metadata.balance.lastSync,
               cached: true,
               cacheAgeMinutes
@@ -293,34 +294,40 @@ export async function GET(request: NextRequest) {
       lastSync: new Date().toISOString()
     };
 
-    // 7. Salvează balance în metadata pentru cache
-    const metadataToSave = {
-      ...(config.metadata || {}),
-      balance: {
-        total: totalBalanceRON,
-        currency: 'RON',
-        accounts: accountBalances,
-        lastSync: balanceData.lastSync
-      }
-    };
+    // 7. Salvează balance în metadata pentru cache (TRY ONLY - nu bloca response-ul)
+    // FIX: Reduce metadata size (nu salva accounts array - prea mare pentru BigQuery)
+    try {
+      const metadataToSave = {
+        balance: {
+          total: totalBalanceRON,
+          currency: 'RON',
+          lastSync: balanceData.lastSync,
+          accounts_count: accountBalances.length // Doar count, nu array
+        }
+      };
 
-    const updateMetadataQuery = `
-      UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
-      SET
-        metadata = PARSE_JSON(@metadata),
-        data_actualizare = CURRENT_TIMESTAMP()
-      WHERE id = @id
-    `;
+      const updateMetadataQuery = `
+        UPDATE \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+        SET
+          metadata = PARSE_JSON(@metadata),
+          data_actualizare = CURRENT_TIMESTAMP()
+        WHERE id = @id
+      `;
 
-    await bigquery.query({
-      query: updateMetadataQuery,
-      params: {
-        id: config.id,
-        metadata: JSON.stringify(metadataToSave)
-      }
-    });
+      await bigquery.query({
+        query: updateMetadataQuery,
+        params: {
+          id: config.id,
+          metadata: JSON.stringify(metadataToSave)
+        }
+      });
 
-    console.log('✅ [Balance] Saved to metadata cache');
+      console.log('✅ [Balance] Saved to metadata cache');
+    } catch (metadataError: any) {
+      // ⚠️ IGNORE metadata save error - returnează fresh data oricum!
+      console.warn('⚠️ [Balance] Failed to save metadata (ignored):', metadataError.message);
+      console.warn('   Fresh balance will still be returned to client');
+    }
 
     // 8. Update ultima_sincronizare în BigQuery
     const updateSyncQuery = `
@@ -374,7 +381,8 @@ export async function GET(request: NextRequest) {
           ? JSON.parse(fallbackRows[0].metadata)
           : fallbackRows[0].metadata;
 
-        if (metadata.balance?.total != null && metadata.balance.total > 0) {
+        // FIX: Permite și sold 0 în fallback (nu doar > 0)
+        if (metadata.balance?.total != null && !isNaN(metadata.balance.total)) {
           console.warn('⚠️ [Balance] Fetch failed, returning stale cache as fallback');
           // SOLUȚIE #1: No-Cache headers pentru fallback stale cache
           return NextResponse.json({
@@ -382,7 +390,8 @@ export async function GET(request: NextRequest) {
             balance: {
               total: metadata.balance.total,
               currency: metadata.balance.currency,
-              accounts: metadata.balance.accounts || [],
+              accounts: metadata.balance.accounts || [], // Poate să lipsească în cache nou
+              accounts_count: metadata.balance.accounts_count || (metadata.balance.accounts?.length || 0),
               lastSync: metadata.balance.lastSync,
               cached: true,
               stale: true, // Flag pentru UI că e cache expirat
