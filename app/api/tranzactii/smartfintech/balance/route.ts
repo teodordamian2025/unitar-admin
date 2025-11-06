@@ -91,21 +91,37 @@ export async function GET(request: NextRequest) {
     console.log(`💰 [Balance] Fetching available balance (force_refresh=${forceRefresh})...`);
 
     // 1. Încarcă configurația activă din BigQuery
-    const configQuery = `
-      SELECT
-        id,
-        client_id,
-        client_secret,
-        access_token,
-        refresh_token,
-        expires_at,
-        is_active,
-        metadata
-      FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
-      WHERE is_active = TRUE
-      ORDER BY data_actualizare DESC
-      LIMIT 1
-    `;
+    // HOTFIX: Când force_refresh=true, nu mai citi metadata (poate fi stale din BigQuery cache)
+    const configQuery = forceRefresh
+      ? `
+        SELECT
+          id,
+          client_id,
+          client_secret,
+          access_token,
+          refresh_token,
+          expires_at,
+          is_active
+        FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+        WHERE is_active = TRUE
+        ORDER BY data_actualizare DESC
+        LIMIT 1
+      `
+      : `
+        SELECT
+          id,
+          client_id,
+          client_secret,
+          access_token,
+          refresh_token,
+          expires_at,
+          is_active,
+          metadata
+        FROM \`${PROJECT_ID}.${DATASET}.SmartFintechTokens${tableSuffix}\`
+        WHERE is_active = TRUE
+        ORDER BY data_actualizare DESC
+        LIMIT 1
+      `;
 
     const [configRows] = await bigquery.query({ query: configQuery });
 
@@ -127,7 +143,8 @@ export async function GET(request: NextRequest) {
 
     const config = configRows[0];
 
-    // 2. Check cache în metadata (dacă nu e force refresh)
+    // 2. Check cache în metadata (SKIP complet dacă force refresh)
+    // HOTFIX: force_refresh=true → nu verifică cache, merge direct la fetch fresh
     if (!forceRefresh && config.metadata) {
       // BigQuery might return JSON as object already, no need to parse
       const metadata = typeof config.metadata === 'string'
