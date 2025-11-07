@@ -70,11 +70,11 @@ export default function MatchingPage() {
   const loadTranzactiiNematchate = async () => {
     try {
       setLoadingTranzactii(true);
-      const response = await fetch('/api/tranzactii/dashboard?tip=neimperecheate&limit=50');
+      const response = await fetch('/api/tranzactii/manual-match?status=neimperecheate&limit=500');
       const data = await response.json();
 
-      if (data.success && data.tranzactii) {
-        setTranzactiiNematchate(data.tranzactii.filter((t: TranzactieDetail) => t.status === 'neimperecheat'));
+      if (data.success && data.data) {
+        setTranzactiiNematchate(data.data);
       }
     } catch (error) {
       console.error('Eroare încărcare tranzacții:', error);

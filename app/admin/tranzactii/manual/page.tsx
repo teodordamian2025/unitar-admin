@@ -376,7 +376,7 @@ export default function ManualMatchingPage() {
                           {tranzactie.nume_contrapartida || 'Contrapartidă necunoscută'}
                         </div>
                         <div style={{
-                          background: tranzactie.directie === 'CREDIT'
+                          background: tranzactie.directie === 'intrare'
                             ? 'linear-gradient(135deg, #10b981, #059669)'
                             : 'linear-gradient(135deg, #ef4444, #dc2626)',
                           color: 'white',

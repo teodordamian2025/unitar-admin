@@ -1020,9 +1020,9 @@ const ModernTranzactiiDashboard: React.FC = () => {
       />
 
       {/* Transaction Details Modal */}
-      {selectedTransaction && (
+      {selectedTransaction && !isManualMatchingOpen && (
         <Modal
-          isOpen={!!selectedTransaction}
+          isOpen={!!selectedTransaction && !isManualMatchingOpen}
           onClose={() => setSelectedTransaction(null)}
           title="📄 Detalii Tranzacție"
           size="xl"

@@ -807,6 +807,9 @@ export async function GET(request: NextRequest) {
 
     // Caz 1: Returnează lista de tranzacții neimperecheate
     if (status === 'neimperecheate') {
+      const limit = parseInt(searchParams.get('limit') || '500'); // Crescut de la 100 la 500
+      const offset = parseInt(searchParams.get('offset') || '0');
+
       const query = `
         SELECT
           id, data_procesare, suma, directie, tip_categorie,
@@ -815,7 +818,8 @@ export async function GET(request: NextRequest) {
         WHERE (matching_tip IS NULL OR matching_tip = 'none')
           AND status != 'matched'
         ORDER BY data_procesare DESC
-        LIMIT 100
+        LIMIT ${limit}
+        OFFSET ${offset}
       `;
 
       const [results] = await bigquery.query(query);
@@ -825,7 +829,12 @@ export async function GET(request: NextRequest) {
         data: results.map((row: any) => ({
           ...row,
           data_procesare: row.data_procesare?.value || row.data_procesare
-        }))
+        })),
+        pagination: {
+          limit,
+          offset,
+          count: results.length
+        }
       });
     }
 
