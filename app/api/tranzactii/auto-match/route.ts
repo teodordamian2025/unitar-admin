@@ -337,7 +337,7 @@ async function findCheltuieliCandidates(tranzactii: TranzactieCandidat[]): Promi
 
   try {
     const query = `
-      SELECT 
+      SELECT
         id,
         proiect_id,
         furnizor_nume,
@@ -347,11 +347,11 @@ async function findCheltuieliCandidates(tranzactii: TranzactieCandidat[]): Promi
         valoare_ron,
         status_achitare
       FROM \`hale-mode-464009-i6.PanouControlUnitar.ProiecteCheltuieli_v2\`
-      WHERE 
-        activ = TRUE 
+      WHERE
+        activ = TRUE
         AND status_achitare IN ('Neincasat', 'Partial')
         AND valoare_ron > 0
-        AND data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
+        AND DATE(data_creare) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
       ORDER BY data_creare DESC, valoare_ron DESC
     `;
 
@@ -447,17 +447,20 @@ async function matchIncasariCuEtapeFacturi(
 
 /**
  * Efectuează matching automat pentru plăți cu ProiecteCheltuieli
+ * IMPORTANT: Cheltuielile în BD sunt FĂRĂ TVA, dar tranzacțiile sunt CU TVA
+ * Trebuie să adăugăm TVA la cheltuieli pentru comparație corectă
  */
 async function matchPlatiCuCheltuieli(
   tranzactii: TranzactieCandidat[],
   cheltuieli: CheltuialaCandidat[],
-  tolerantaProcent: number = 3
+  tolerantaProcent: number = 3,
+  cotaTvaStandard: number = 19
 ): Promise<MatchResult[]> {
   const matches: MatchResult[] = [];
-  
+
   const plati = tranzactii.filter(t => t.directie === 'iesire' && t.suma < 0);
-  
-  console.log(`🔍 Matching plăți: ${plati.length} tranzacții cu ${cheltuieli.length} cheltuieli`);
+
+  console.log(`🔍 Matching plăți: ${plati.length} tranzacții cu ${cheltuieli.length} cheltuieli (TVA: ${cotaTvaStandard}%)`);
 
   for (const tranzactie of plati) {
     const sumaPlata = Math.abs(tranzactie.suma);
@@ -465,14 +468,17 @@ async function matchPlatiCuCheltuieli(
     let bestScore = 0;
 
     for (const cheltuiala of cheltuieli) {
-      const diferentaRon = Math.abs(sumaPlata - cheltuiala.valoare_ron);
-      const diferentaProcent = (diferentaRon / cheltuiala.valoare_ron) * 100;
+      // ✅ Calculăm valoarea CU TVA (cheltuielile în BD sunt FĂRĂ TVA)
+      const valoareCuTva = cheltuiala.valoare_ron * (1 + cotaTvaStandard / 100);
+
+      const diferentaRon = Math.abs(sumaPlata - valoareCuTva);
+      const diferentaProcent = (diferentaRon / valoareCuTva) * 100;
 
       if (diferentaProcent > tolerantaProcent) continue;
 
       // Scor simplificat pentru cheltuieli
       let score = 0;
-      
+
       // Scor sumă (60 puncte)
       if (diferentaProcent <= 0.5) score += 60;
       else if (diferentaProcent <= 1) score += 50;
@@ -506,14 +512,17 @@ async function matchPlatiCuCheltuieli(
           matching_algorithm: tranzactie.cui_contrapartida === cheltuiala.furnizor_cui ? 'auto_cui' : 'auto_suma',
           suma_tranzactie: sumaPlata,
           suma_target: cheltuiala.valoare,
-          suma_target_ron: cheltuiala.valoare_ron,
+          suma_target_ron: valoareCuTva, // ✅ Folosim valoarea CU TVA pentru display
           diferenta_ron: diferentaRon,
           diferenta_procent: diferentaProcent,
           moneda_target: cheltuiala.moneda,
           matching_details: {
             proiect_id: cheltuiala.proiect_id,
             furnizor_cui: cheltuiala.furnizor_cui,
-            furnizor_nume: cheltuiala.furnizor_nume
+            furnizor_nume: cheltuiala.furnizor_nume,
+            valoare_fara_tva: cheltuiala.valoare_ron,
+            valoare_cu_tva: valoareCuTva,
+            cota_tva_aplicata: cotaTvaStandard
           }
         };
         bestScore = score;
@@ -522,7 +531,7 @@ async function matchPlatiCuCheltuieli(
 
     if (bestMatch) {
       matches.push(bestMatch);
-      console.log(`✅ Match plată găsit: ${sumaPlata} RON cu cheltuială ${bestMatch.suma_target_ron} RON (${bestMatch.confidence_score}% confidence)`);
+      console.log(`✅ Match plată găsit: ${sumaPlata.toFixed(2)} RON cu cheltuială ${bestMatch.suma_target_ron.toFixed(2)} RON (${bestMatch.confidence_score}% confidence)`);
     }
   }
 
@@ -723,6 +732,23 @@ export async function POST(request: NextRequest) {
     const toleranta = parseFloat(configMap.get('matching_tolerance_percent') || tolerance_percent.toString());
     const minConfidence = parseFloat(configMap.get('auto_match_min_confidence') || min_confidence.toString());
 
+    // ✅ Citim TVA standard din setări facturare (pentru matching cheltuieli)
+    let cotaTvaStandard = 19; // Default TVA România
+    try {
+      const [setariFacturare] = await bigquery.query(`
+        SELECT cota_tva_standard
+        FROM \`hale-mode-464009-i6.PanouControlUnitar.SetariFacturare_v2\`
+        ORDER BY data_actualizare DESC
+        LIMIT 1
+      `);
+      if (setariFacturare.length > 0 && setariFacturare[0].cota_tva_standard) {
+        cotaTvaStandard = parseInt(setariFacturare[0].cota_tva_standard);
+        console.log(`📊 TVA standard citit din setări: ${cotaTvaStandard}%`);
+      }
+    } catch (tvaError) {
+      console.warn('⚠️ Eroare citire TVA din setări, folosim default 19%:', tvaError);
+    }
+
     // Căutăm tranzacțiile fără matching
     const whereClause = account_id ? `AND account_id = "${account_id}"` : '';
     const [tranzactii] = await bigquery.query(`
@@ -766,7 +792,7 @@ export async function POST(request: NextRequest) {
 
     // Efectuăm matching-ul
     const incasariMatches = await matchIncasariCuEtapeFacturi(tranzactii, etapeFacturiCandidates, toleranta);
-    const platiMatches = await matchPlatiCuCheltuieli(tranzactii, cheltuieliCandidates, toleranta);
+    const platiMatches = await matchPlatiCuCheltuieli(tranzactii, cheltuieliCandidates, toleranta, cotaTvaStandard);
 
     // Filtrăm pe confidence minim
     const allMatches = [...incasariMatches, ...platiMatches].filter(
