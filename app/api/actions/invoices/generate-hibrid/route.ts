@@ -141,19 +141,14 @@ async function findContractAndEtapeForProiect(proiectId: string) {
 }
 
 // ✅ MODIFICATĂ: Funcție pentru update statusuri etape cu logică corectă pentru Edit Mode
-async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string, isEdit: boolean = false) {
-  if (!etapeFacturate || etapeFacturate.length === 0) {
-    console.log('📋 [ETAPE-FACTURI] Nu există etape de actualizat');
-    return;
-  }
-
-  console.log(`📋 [ETAPE-FACTURI] Actualizare statusuri pentru ${etapeFacturate.length} etape din factura ${facturaId} (Edit Mode: ${isEdit})`);
+async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string, isEdit: boolean = false, facturaTotal?: number, facturaMoneda?: string) {
+  console.log(`📋 [ETAPE-FACTURI] Actualizare statusuri pentru factura ${facturaId} (Edit Mode: ${isEdit})`);
 
   try {
     // ✅ NOUĂ LOGICĂ: Pentru Edit Mode, dezactivează mai întâi etapele existente
     if (isEdit) {
       console.log('🔄 [EDIT-MODE] Dezactivez etapele existente pentru această factură...');
-      
+
       const deactivateQuery = `
         UPDATE ${TABLE_ETAPE_FACTURI}
         SET
@@ -173,8 +168,12 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       console.log('✅ [EDIT-MODE] Etape existente dezactivate');
     }
 
-    // PASUL 1: Inserare în tabelul EtapeFacturi - QUERY CORECTAT și SIMPLIFICAT
-    const insertPromises = etapeFacturate.map(async (etapa) => {
+    // ✅ CAZUL 1: Facturi cu etape (din contracte/anexe)
+    if (etapeFacturate && etapeFacturate.length > 0) {
+      console.log(`📊 [ETAPE-FACTURI] Inserez ${etapeFacturate.length} etape din contracte/anexe`);
+
+      // PASUL 1: Inserare în tabelul EtapeFacturi - QUERY CORECTAT și SIMPLIFICAT
+      const insertPromises = etapeFacturate.map(async (etapa) => {
       const etapaFacturaId = `EF_${isEdit ? 'EDIT' : 'NEW'}_${facturaId}_${etapa.id}_${Date.now()}`;
 
       console.log(`📊 [DEBUG] Procesez etapa pentru inserare în EtapeFacturi:`, {
@@ -378,6 +377,78 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
     }
 
     console.log(`✅ [ETAPE-FACTURI] Statusuri actualizate cu succes pentru ${etapeFacturate.length} etape (${isEdit ? 'EDIT' : 'NEW'} mode)`);
+
+    // ✅ CAZUL 2: Facturi simple (fără etape din contracte/anexe)
+    } else if (facturaTotal && facturaMoneda) {
+      console.log(`📊 [ETAPE-FACTURI] Inserez factură simplă (fără etape) în EtapeFacturi_v2`);
+      console.log(`📊 [DEBUG] Parametri factură simplă:`, {
+        facturaId,
+        proiectId,
+        valoare: facturaTotal,
+        moneda: facturaMoneda
+      });
+
+      const etapaFacturaId = `EF_SIMPLE_${facturaId}_${Date.now()}`;
+
+      // Insert în EtapeFacturi_v2 cu valori pentru factură simplă
+      const insertQuery = `
+        INSERT INTO ${TABLE_ETAPE_FACTURI}
+        (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
+         valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
+         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+        VALUES (
+          @etapaFacturaId,
+          @proiectId,
+          NULL,
+          NULL,
+          'factura_directa',
+          NULL,
+          @facturaId,
+          @valoare,
+          @moneda,
+          @valoareRon,
+          1.0,
+          DATE(CURRENT_TIMESTAMP()),
+          100.0,
+          DATE(CURRENT_TIMESTAMP()),
+          'Neincasat',
+          0.0,
+          true,
+          1,
+          CURRENT_TIMESTAMP(),
+          'System_Generate_Hibrid'
+        )
+      `;
+
+      await bigquery.query({
+        query: insertQuery,
+        params: {
+          etapaFacturaId,
+          proiectId,
+          facturaId,
+          valoare: facturaTotal,
+          moneda: facturaMoneda,
+          valoareRon: facturaTotal // Pentru facturi simple, presupunem că suma este deja în RON
+        },
+        types: {
+          etapaFacturaId: 'STRING',
+          proiectId: 'STRING',
+          facturaId: 'STRING',
+          valoare: 'NUMERIC',
+          moneda: 'STRING',
+          valoareRon: 'NUMERIC'
+        },
+        location: 'EU'
+      });
+
+      console.log(`✅ [ETAPE-FACTURI] Factură simplă inserată cu succes: ${etapaFacturaId}`);
+
+      // Update status facturare proiect
+      console.log(`📋 [PROIECT-STATUS] Actualizez proiect după factura simplă: ${proiectId}...`);
+      await updateProiectStatusFacturare(proiectId);
+
+      console.log(`✅ [ETAPE-FACTURI] Factură simplă procesată cu succes (NEW mode)`);
+    }
 
   } catch (error) {
     console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor:', error);
@@ -1641,19 +1712,24 @@ export async function POST(request: NextRequest) {
       }
 
       // ✅ NOU: Update statusuri etape după salvarea facturii cu flag isEdit
-      if (etapeFacturate && etapeFacturate.length > 0) {
-        console.log(`📋 [ETAPE-FACTURI] Actualizez statusurile pentru ${etapeFacturate.length} etape ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}...`);
+      // ✅ CAZUL 1: Facturi cu etape (din contracte/anexe)
+      // ✅ CAZUL 2: Facturi simple (fără etape) - inserare în EtapeFacturi_v2
+      console.log(`📋 [ETAPE-FACTURI] Procesare factură: ${etapeFacturate && etapeFacturate.length > 0 ? `${etapeFacturate.length} etape din contracte` : 'factură simplă fără etape'}...`);
 
-        try {
-          await updateEtapeStatusuri(etapeFacturate, currentFacturaId, proiectId, isEdit);
-          console.log(`✅ [ETAPE-FACTURI] Statusuri etape actualizate cu succes ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
-          // ✅ Nota: updateProiectStatusFacturare() se apelează AUTOMAT în updateEtapeStatusuri() după actualizarea subproiectelor + 500ms delay
-        } catch (etapeError) {
-          console.error('❌ [ETAPE-FACTURI] Eroare la actualizarea statusurilor etapelor:', etapeError);
-          // Nu oprește procesul - continuă cu factura generată
-        }
-      } else {
-        console.log('📋 [ETAPE-FACTURI] Nu există etape pentru actualizare statusuri');
+      try {
+        await updateEtapeStatusuri(
+          etapeFacturate,
+          currentFacturaId,
+          proiectId,
+          isEdit,
+          total, // ✅ Suma totală pentru facturi simple
+          'RON'  // ✅ Moneda pentru facturi simple (suma este calculată în RON)
+        );
+        console.log(`✅ [ETAPE-FACTURI] Procesare completă ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
+        // ✅ Nota: updateProiectStatusFacturare() se apelează AUTOMAT în updateEtapeStatusuri() după actualizarea subproiectelor + 500ms delay
+      } catch (etapeError) {
+        console.error('❌ [ETAPE-FACTURI] Eroare la procesare:', etapeError);
+        // Nu oprește procesul - continuă cu factura generată
       }
 
       // ✅ NOTA: Incrementarea numar_curent_facturi s-a mutat ÎNAINTE de salvare (linia ~1540) pentru a preveni race conditions

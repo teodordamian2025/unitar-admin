@@ -816,7 +816,7 @@ export async function GET(request: NextRequest) {
           nume_contrapartida, cui_contrapartida, detalii_tranzactie, status
         FROM ${TRANZACTII_BANCARE_TABLE}
         WHERE (matching_tip IS NULL OR matching_tip = 'none')
-          AND status != 'matched'
+          AND (status IS NULL OR status != 'matched')
         ORDER BY data_procesare DESC
         LIMIT ${limit}
         OFFSET ${offset}

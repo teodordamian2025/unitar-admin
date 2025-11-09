@@ -174,6 +174,7 @@ function extractInvoiceNumbers(text: string): string[] {
 
 /**
  * Calculează confidence score pentru matching
+ * ✅ MODIFICAT 09.11.2025: Scoring dinamic bazat pe disponibilitatea CUI
  */
 function calculateMatchingScore(
   tranzactie: TranzactieCandidat,
@@ -187,20 +188,37 @@ function calculateMatchingScore(
     cui_score: 0,
     nume_score: 0,
     referinta_score: 0,
-    status_score: 0
+    status_score: 0,
+    has_cui: false,
+    scoring_mode: 'standard' // 'standard' (cu CUI) sau 'adjusted' (fără CUI)
   };
 
-  // 1. SCOR SUMĂ (40 puncte max) - cel mai important
+  // ✅ Verificăm dacă avem CUI disponibil pentru ambele părți
+  const hasCUI = Boolean(tranzactie.cui_contrapartida && etapa.factura_client_cui);
+  details.has_cui = hasCUI;
+  details.scoring_mode = hasCUI ? 'standard' : 'adjusted';
+
+  // 1. SCOR SUMĂ (40/45 puncte max) - cel mai important
+  // ✅ Dacă CUI lipsește, creștem importanța sumei la 45p
+  const sumaMax = hasCUI ? 40 : 45;
+  const sumaWeights = {
+    perfect: sumaMax,           // <= 0.5%
+    foarteBun: sumaMax - 5,     // <= 1%
+    bun: sumaMax - 10,          // <= 2%
+    acceptabil: sumaMax - 15,   // <= 3%
+    marginal: sumaMax - 25      // <= 5%
+  };
+
   if (diferentaProcent <= 0.5) {
-    details.suma_score = 40; // Perfect match
+    details.suma_score = sumaWeights.perfect;
   } else if (diferentaProcent <= 1) {
-    details.suma_score = 35; // Foarte bun
+    details.suma_score = sumaWeights.foarteBun;
   } else if (diferentaProcent <= 2) {
-    details.suma_score = 30; // Bun
+    details.suma_score = sumaWeights.bun;
   } else if (diferentaProcent <= 3) {
-    details.suma_score = 25; // Acceptabil
+    details.suma_score = sumaWeights.acceptabil;
   } else if (diferentaProcent <= 5) {
-    details.suma_score = 15; // Marginal
+    details.suma_score = sumaWeights.marginal;
   }
   score += details.suma_score;
 
@@ -226,37 +244,58 @@ function calculateMatchingScore(
   score += details.timp_score;
 
   // 3. SCOR CUI (20 puncte max)
-  if (tranzactie.cui_contrapartida && etapa.factura_client_cui) {
+  if (hasCUI) {
     if (tranzactie.cui_contrapartida === etapa.factura_client_cui) {
       details.cui_score = 20; // CUI perfect match
     }
   }
   score += details.cui_score;
 
-  // 4. SCOR NUME (10 puncte max)
+  // 4. SCOR NUME (10/30 puncte max)
+  // ✅ Dacă CUI lipsește, creștem importanța numelui la 30p
+  const numeMax = hasCUI ? 10 : 30;
   if (tranzactie.nume_contrapartida && etapa.factura_client_nume) {
     const nameSimilarity = levenshteinSimilarity(
       tranzactie.nume_contrapartida,
       etapa.factura_client_nume
     );
-    if (nameSimilarity >= 90) {
-      details.nume_score = 10;
-    } else if (nameSimilarity >= 70) {
-      details.nume_score = 8;
-    } else if (nameSimilarity >= 50) {
-      details.nume_score = 5;
+
+    if (hasCUI) {
+      // Scoring original când avem CUI
+      if (nameSimilarity >= 90) {
+        details.nume_score = 10;
+      } else if (nameSimilarity >= 70) {
+        details.nume_score = 8;
+      } else if (nameSimilarity >= 50) {
+        details.nume_score = 5;
+      }
+    } else {
+      // Scoring mărit când CUI lipsește
+      if (nameSimilarity >= 90) {
+        details.nume_score = 30;
+      } else if (nameSimilarity >= 80) {
+        details.nume_score = 25;
+      } else if (nameSimilarity >= 70) {
+        details.nume_score = 20;
+      } else if (nameSimilarity >= 60) {
+        details.nume_score = 15;
+      } else if (nameSimilarity >= 50) {
+        details.nume_score = 10;
+      }
     }
   }
   score += details.nume_score;
 
-  // 5. SCOR REFERINȚĂ FACTURĂ (5 puncte max)
+  // 5. SCOR REFERINȚĂ FACTURĂ (5/10 puncte max)
+  // ✅ Dacă CUI lipsește, creștem importanța referinței la 10p
+  const refMax = hasCUI ? 5 : 10;
   const tranzactieRefs = extractInvoiceNumbers(tranzactie.detalii_tranzactie);
   const facturaRef = `${etapa.factura_serie}${etapa.factura_numar}`.replace(/\s+/g, '');
-  
+
   if (tranzactieRefs.some(ref => ref === facturaRef || ref === etapa.factura_numar)) {
-    details.referinta_score = 5; // Referință exactă
+    details.referinta_score = refMax; // Referință exactă
   } else if (tranzactieRefs.some(ref => ref.includes(etapa.factura_numar))) {
-    details.referinta_score = 3; // Referință parțială
+    details.referinta_score = Math.round(refMax * 0.6); // Referință parțială (60%)
   }
   score += details.referinta_score;
 
@@ -405,7 +444,10 @@ async function matchIncasariCuEtapeFacturi(
       if (details.cui_score > 0) algorithm = 'auto_cui';
       if (details.referinta_score > 0) algorithm = 'auto_referinta';
 
-      if (score > bestScore && score >= 70) { // Threshold minim 70
+      // ✅ Threshold dinamic: 70% cu CUI, 80% fără CUI
+      const minThreshold = details.has_cui ? 70 : 80;
+
+      if (score > bestScore && score >= minThreshold) {
         bestMatch = {
           tranzactie_id: tranzactie.id,
           target_type: 'etapa_factura',
@@ -438,7 +480,9 @@ async function matchIncasariCuEtapeFacturi(
 
     if (bestMatch) {
       matches.push(bestMatch);
-      console.log(`✅ Match găsit: Tranzacție ${tranzactie.suma} RON cu etapă ${bestMatch.suma_target_ron} RON (${bestMatch.confidence_score}% confidence)`);
+      const scoringMode = bestMatch.matching_details.score_breakdown?.scoring_mode || 'standard';
+      const modeSuffix = scoringMode === 'adjusted' ? ' [FĂRĂ CUI - scoring ajustat]' : '';
+      console.log(`✅ Match găsit: Tranzacție ${tranzactie.suma} RON cu etapă ${bestMatch.suma_target_ron} RON (${bestMatch.confidence_score}% confidence)${modeSuffix}`);
     }
   }
 
@@ -764,7 +808,7 @@ export async function POST(request: NextRequest) {
       WHERE
         (matching_tip IS NULL OR matching_tip = 'none')
         AND processed = FALSE
-        AND status = 'nou'
+        AND (status IS NULL OR status IN ('nou', 'smartfintech'))
         ${whereClause}
       ORDER BY data_procesare DESC, ABS(suma) DESC
       LIMIT 1000

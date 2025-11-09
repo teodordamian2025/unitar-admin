@@ -21,6 +21,7 @@ import {
   type SmartFintechAccount,
   type SmartFintechTransaction
 } from '@/lib/smartfintech-api';
+import { matchCUIFromClienti } from '@/lib/cui-matcher';
 
 // ==================== BIGQUERY CONFIG ====================
 
@@ -92,14 +93,54 @@ function cleanIBAN(iban: string | undefined): string {
 }
 
 /**
- * Extrage CUI din detalii tranzacție (pattern: RO12345678)
+ * Extrage CUI din detalii tranzacție - versiune îmbunătățită
+ * Prioritizează pattern-uri specifice pentru a evita numere facturi/contracte
  */
 function extractCUI(text: string | undefined): string | undefined {
   if (!text) return undefined;
-  const match = text.match(/\b(RO)?(\d{2,10})\b/);
-  if (match) {
-    return match[2]; // Return doar cifre
+
+  // STEP 1: Pattern explicit "Fiscal Registration Number" sau "CUI" sau "CIF"
+  // Acesta are prioritate maximă pentru că e cel mai precis
+  const explicitPatterns = [
+    /(?:Fiscal Registration Number|Payer Fiscal Registration Number|CUI|CIF)[\s:,]+(\d{6,10})/i,
+    /\bCUI[\s:]+RO?(\d{6,10})\b/i,
+    /\bCIF[\s:]+RO?(\d{6,10})\b/i
+  ];
+
+  for (const pattern of explicitPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const cui = match[1];
+      // Validare: CUI România are între 6-10 cifre
+      if (cui.length >= 6 && cui.length <= 10) {
+        console.log(`✅ [extractCUI] CUI găsit prin pattern explicit: ${cui}`);
+        return cui;
+      }
+    }
   }
+
+  // STEP 2: Pattern RO + cifre (8-10 cifre pentru a evita numere mici)
+  // Evităm numerele de 2-4 cifre care sunt facturi/contracte
+  const roPattern = /\bRO(\d{8,10})\b/;
+  const roMatch = text.match(roPattern);
+  if (roMatch && roMatch[1]) {
+    console.log(`✅ [extractCUI] CUI găsit prin pattern RO: ${roMatch[1]}`);
+    return roMatch[1];
+  }
+
+  // STEP 3: Numere izolate de 8-10 cifre (evităm 2-7 cifre = facturi/contracte)
+  // DOAR dacă nu conțin cuvinte cheie "factura", "contract", "UP", "UPA"
+  if (!/factur|contract|UP-|UPA-|nr\.|numar/i.test(text)) {
+    const longNumberPattern = /\b(\d{8,10})\b/;
+    const longMatch = text.match(longNumberPattern);
+    if (longMatch && longMatch[1]) {
+      console.log(`✅ [extractCUI] CUI posibil găsit (număr lung): ${longMatch[1]}`);
+      return longMatch[1];
+    }
+  }
+
+  // Dacă nu găsim nimic valid, returnăm undefined
+  console.log(`⚠️ [extractCUI] Nu s-a găsit CUI valid în: ${text.substring(0, 100)}...`);
   return undefined;
 }
 
@@ -206,6 +247,48 @@ function mapSmartFintechTransaction(
   };
 }
 
+// ==================== CUI ENRICHMENT (matching from Clienti_v2) ====================
+
+/**
+ * Completează CUI-urile lipsă prin matching pe nume din tabelul Clienti_v2
+ * Procesează în batch pentru performanță
+ */
+async function enrichTransactionsWithCUI(transactions: MappedTransaction[]): Promise<MappedTransaction[]> {
+  if (transactions.length === 0) return transactions;
+
+  console.log(`🔍 [CUI Enrichment] Procesez ${transactions.length} tranzacții...`);
+
+  let enriched = 0;
+  let failed = 0;
+
+  // Procesăm fiecare tranzacție care NU are CUI
+  for (const tx of transactions) {
+    if (!tx.cui_contrapartida && tx.nume_contrapartida) {
+      try {
+        // Apelăm matching pe nume din Clienti_v2
+        const match = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+
+        if (match.cui || match.cnp) {
+          // Prioritate: CUI pentru firme, CNP pentru persoane fizice
+          tx.cui_contrapartida = match.cui || match.cnp || undefined;
+          enriched++;
+          console.log(`✅ [CUI Enrichment] CUI găsit pentru "${tx.nume_contrapartida}": ${tx.cui_contrapartida} (${match.confidence}%)`);
+        } else {
+          failed++;
+          console.log(`⚠️ [CUI Enrichment] Nu s-a găsit CUI pentru "${tx.nume_contrapartida}"`);
+        }
+      } catch (error) {
+        failed++;
+        console.error(`❌ [CUI Enrichment] Eroare pentru "${tx.nume_contrapartida}":`, error);
+      }
+    }
+  }
+
+  console.log(`📊 [CUI Enrichment] Completate: ${enriched}, Eșuate: ${failed}, Total: ${transactions.length}`);
+
+  return transactions;
+}
+
 // ==================== DEDUPLICATION (reuse from import-csv) ====================
 
 /**
@@ -268,6 +351,11 @@ async function insertTransactionsToBigQuery(transactions: MappedTransaction[]): 
     referinta_bancii: tx.referinta_bancii || null,
     tip_categorie: tx.categorie ? `${tx.categorie} - ${tx.subcategorie}` : null, // Merge categorie+subcategorie
     directie: tx.directie || null,
+
+    // ✅ Matching fields - set explicit pentru Smart Fintech
+    status: 'smartfintech', // ✅ Status explicit pentru identificare ușoară în UI
+    matching_tip: 'none', // ✅ Inițial fără matching (va fi actualizat de auto-match)
+    processed: false, // ✅ Flag pentru processing status
 
     // Timestamps
     data_creare: bigquery.timestamp(new Date()), // Map to data_creare
@@ -457,6 +545,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📊 [Total] Fetched ${allTransactions.length} transactions from ${accounts.length} accounts`);
+
+    // ==================== STEP 3.5: CUI Enrichment (NEW) ====================
+
+    // ✅ Completăm CUI-urile lipsă prin matching pe nume din Clienti_v2
+    allTransactions = await enrichTransactionsWithCUI(allTransactions);
 
     // ==================== STEP 4: Deduplicate ====================
 
