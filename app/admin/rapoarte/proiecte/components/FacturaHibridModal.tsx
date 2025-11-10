@@ -214,6 +214,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ Helper pentru a curăța nrRegCom pentru persoane fizice
+  const sanitizeClientInfo = (clientData: ClientInfo | null): ClientInfo | null => {
+    if (!clientData) return null;
+
+    // Pentru persoane fizice, nrRegCom trebuie să fie gol
+    if (clientData.tip_client === 'persoana_fizica') {
+      return {
+        ...clientData,
+        nrRegCom: ''
+      };
+    }
+
+    return clientData;
+  };
+
   // Verifică dacă e Edit sau Storno
   const isEdit = proiect._isEdit || false;
   const isStorno = proiect._isStorno || false;
@@ -255,7 +270,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   });
 
   const [observatii, setObservatii] = useState(initialData?.observatii || '');
-  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(initialData?.clientInfo || null);
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(
+    sanitizeClientInfo(initialData?.clientInfo || null)
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingANAF, setIsLoadingANAF] = useState(false);
   const [isLoadingClient, setIsLoadingClient] = useState(false);
@@ -579,7 +596,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   useEffect(() => {
     if (isEdit && initialData) {
       if (initialData.clientInfo) {
-        setClientInfo(initialData.clientInfo);
+        // ✅ FIX: Curăță nrRegCom pentru persoane fizice
+        setClientInfo(sanitizeClientInfo(initialData.clientInfo));
         setCuiInput(initialData.clientInfo.cui || '');
       }
       if (initialData.numarFactura) {
@@ -599,7 +617,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       loadEtape(); // Încarcă etape sau folosește cele din EditFacturaModal
       loadSetariFacturare();
     }
-    
+
     setTimeout(() => {
       checkAnafTokenStatus();
       fetchIappConfig();
@@ -1180,8 +1198,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       
       if (result.success && result.data && result.data.length > 0) {
         const clientData = result.data[0];
-        
-        setClientInfo({
+
+        // ✅ FIX: Curăță nrRegCom pentru persoane fizice
+        setClientInfo(sanitizeClientInfo({
           id: clientData.id,
           denumire: clientData.nume || clientData.denumire,
           cui: clientData.cui || '',
@@ -1193,12 +1212,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           email: clientData.email,
           tip_client: clientData.tip_client || 'persoana_juridica',
           cnp: clientData.cnp || ''
-        });
-        
+        }));
+
         if (clientData.cui) {
           setCuiInput(clientData.cui);
         }
-        
+
         showToast(`✅ Date client preluate din BD: ${clientData.nume || clientData.denumire}`, 'success');
       } else {
         setClientInfo({
@@ -2302,13 +2321,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     type="text"
                     value={clientInfo.nrRegCom}
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
-                    disabled={isLoading}
+                    disabled={isLoading || clientInfo.tip_client === 'persoana_fizica'}
+                    placeholder={clientInfo.tip_client === 'persoana_fizica' ? 'Nu este necesar pentru persoane fizice' : ''}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       border: '1px solid #dee2e6',
                       borderRadius: '6px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      backgroundColor: clientInfo.tip_client === 'persoana_fizica' ? '#f5f5f5' : 'white',
+                      cursor: clientInfo.tip_client === 'persoana_fizica' ? 'not-allowed' : 'text'
                     }}
                   />
                 </div>

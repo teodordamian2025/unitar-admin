@@ -1588,11 +1588,11 @@ export async function POST(request: NextRequest) {
           efacturaEnabled: 'BOOL'
         };
 
-        // Adaugă types doar pentru câmpurile care pot fi null
-        if (params.efacturaStatus !== null) {
+        // ✅ FIX: Adaugă types pentru câmpurile care SUNT null (BigQuery cere explicit types pentru null values)
+        if (params.efacturaStatus === null) {
           types.efacturaStatus = 'STRING';
         }
-        if (params.anafUploadId !== null) {
+        if (params.anafUploadId === null) {
           types.anafUploadId = 'STRING';
         }
 
