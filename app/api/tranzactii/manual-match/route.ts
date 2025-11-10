@@ -208,13 +208,18 @@ function extractInvoiceNumbers(text: string): string[] {
 function calculateEtapaMatchingScore(
   tranzactie: TranzactieSource,
   etapa: any,
-  tolerantaProcent: number = 3
+  tolerantaProcent: number = 3,
+  sumaRamasaCalculata?: number  // ✅ Parametru opțional pentru suma cu TVA
 ): { score: number; reasons: string[]; diferenta_ron: number; diferenta_procent: number } {
   const reasons: string[] = [];
   let score = 0;
 
   // Calculăm suma rămasă de încasat
-  const sumaRamasa = etapa.valoare_ron - (etapa.valoare_incasata || 0);
+  // Dacă avem suma calculată cu TVA, o folosim; altfel calculăm fără TVA (fallback)
+  const sumaRamasa = sumaRamasaCalculata !== undefined
+    ? sumaRamasaCalculata
+    : (etapa.valoare_ron - (etapa.valoare_incasata || 0));
+
   const diferentaRon = Math.abs(tranzactie.suma - sumaRamasa);
   const diferentaProcent = sumaRamasa > 0 ? (diferentaRon / sumaRamasa) * 100 : 100;
 
@@ -451,14 +456,20 @@ async function findEtapeFacturiCandidatesForTransaction(
     `;
 
     const [results] = await bigquery.query(query);
-    
+
     // Calculăm scoring pentru fiecare candidat
     const candidatesWithScore: EtapaFacturaCandidat[] = results.map((row: any) => {
-      const sumaRamasa = row.valoare_ron - (row.valoare_incasata || 0);
+      // ✅ FIX TVA: Calculăm suma rămasă CU TVA (încasările sunt cu TVA inclusă!)
+      // Folosim proporția din total factură (cu TVA) în loc de valoare_ron (fără TVA)
+      const procentDinEtapa = (row.procent_din_etapa || 100) / 100;
+      const sumaDeIncasatCuTVA = parseFloat(row.factura_total || 0) * procentDinEtapa;
+      const sumaRamasa = sumaDeIncasatCuTVA - (parseFloat(row.valoare_incasata || 0));
+
       const { score, reasons, diferenta_ron, diferenta_procent } = calculateEtapaMatchingScore(
-        tranzactie, 
-        row, 
-        tolerantaProcent
+        tranzactie,
+        row,
+        tolerantaProcent,
+        sumaRamasa  // Pasăm suma calculată cu TVA
       );
 
       return {

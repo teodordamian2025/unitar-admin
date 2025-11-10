@@ -88,6 +88,28 @@ interface ManualMatchingModalProps {
 }
 
 // =================================================================
+// HELPER FUNCTIONS
+// =================================================================
+
+/**
+ * Formatează DATE field din BigQuery (poate fi string sau {value: string})
+ */
+const formatDate = (dateStr: string | { value: string } | any): string => {
+  if (!dateStr) return 'N/A';
+  // ✅ FIX: Normalizare DATE field (BigQuery returnează {value: "2025-11-10"})
+  const dateValue = typeof dateStr === 'object' && dateStr?.value ? dateStr.value : dateStr;
+  const date = new Date(dateValue);
+  return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('ro-RO');
+};
+
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('ro-RO', {
+    style: 'currency',
+    currency: 'RON'
+  }).format(amount);
+};
+
+// =================================================================
 // COMPONENTE HELPER
 // =================================================================
 
@@ -132,17 +154,7 @@ const EtapaFacturaCard: React.FC<{
   onSelect: () => void;
   isSelected: boolean;
 }> = ({ candidat, onSelect, isSelected }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ro-RO', {
-      style: 'currency',
-      currency: 'RON'
-    }).format(amount);
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ro-RO');
-  };
-
+  // ✅ Folosim helper-ele globale formatDate și formatCurrency
   return (
     <div 
       onClick={onSelect}
@@ -234,13 +246,7 @@ const CheltuialaCard: React.FC<{
   onSelect: () => void;
   isSelected: boolean;
 }> = ({ candidat, onSelect, isSelected }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ro-RO', {
-      style: 'currency',
-      currency: 'RON'
-    }).format(amount);
-  };
-
+  // ✅ Folosim helper-ul global formatCurrency
   return (
     <div 
       onClick={onSelect}
@@ -515,7 +521,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <span className="text-gray-500">Data:</span>
-                <div className="font-medium">{new Date(transaction.data_procesare).toLocaleDateString('ro-RO')}</div>
+                <div className="font-medium">{formatDate(transaction.data_procesare)}</div>
               </div>
               <div>
                 <span className="text-gray-500">Sumă:</span>
