@@ -30,7 +30,7 @@ const dataset = bigquery.dataset(DATASET);
 
 // ✅ Definire tabele cu suffix dinamic
 const TRANZACTII_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiImportate${tableSuffix}\``;
-const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacuri${tableSuffix}\``;
+const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;  // Corectat typo: EtapeFacuri → EtapeFacturi
 const TRANZACTII_BANCARE_TABLE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
@@ -241,7 +241,9 @@ function calculateEtapaMatchingScore(
   // 2. SCOR TIMP (20 puncte max)
   const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare;
   const tranzactieDate = new Date(dataProc);
-  const facturaDate = new Date(etapa.factura_data);
+  // Normalizare DATE field pentru factura_data (poate fi {value: "..."} din BigQuery)
+  const facturaData = (etapa.factura_data as any)?.value || etapa.factura_data;
+  const facturaDate = new Date(facturaData);
   const daysDiff = Math.abs((tranzactieDate.getTime() - facturaDate.getTime()) / (1000 * 60 * 60 * 24));
   
   if (daysDiff <= 1) {
@@ -866,24 +868,27 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 Căutare candidați pentru tranzacția ${tranzactie.suma} RON (${tranzactie.directie})`);
 
-    let candidati: any[] = [];
+    // Inițializăm structura corectă pentru candidați (obiect cu 2 array-uri)
+    let etapeCandidati: EtapaFacturaCandidat[] = [];
+    let cheltuieliCandidati: CheltuialaCandidat[] = [];
 
     // Căutăm candidații pe baza direcției și target_type
     if (tranzactie.directie === 'intrare' && (targetType === 'all' || targetType === 'etape_facturi')) {
-      const etapeCandidati = await findEtapeFacturiCandidatesForTransaction(tranzactie, tolerance);
+      etapeCandidati = await findEtapeFacturiCandidatesForTransaction(tranzactie, tolerance);
       console.log(`📋 Găsiți ${etapeCandidati.length} candidați EtapeFacturi`);
-      candidati = [...candidati, ...etapeCandidati];
     }
 
     if (tranzactie.directie === 'iesire' && (targetType === 'all' || targetType === 'cheltuieli')) {
-      const cheltuieliCandidati = await findCheltuieliCandidatesForTransaction(tranzactie, tolerance);
+      cheltuieliCandidati = await findCheltuieliCandidatesForTransaction(tranzactie, tolerance);
       console.log(`📋 Găsiți ${cheltuieliCandidati.length} candidați Cheltuieli`);
-      candidati = [...candidati, ...cheltuieliCandidati];
     }
 
     return NextResponse.json({
       success: true,
-      data: candidati,
+      candidati: {
+        etape_facturi: etapeCandidati,
+        cheltuieli: cheltuieliCandidati
+      },
       tranzactie: tranzactie
     });
 
