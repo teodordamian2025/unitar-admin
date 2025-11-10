@@ -121,6 +121,17 @@ export async function POST(request: NextRequest) {
 
     const factura = facturaRows[0];
 
+    // ✅ Validare și curățare număr factură (doar cifre, fără serie)
+    if (factura.numar) {
+      const numarCurat = String(factura.numar).replace(/[^0-9]/g, '');
+
+      if (numarCurat !== String(factura.numar)) {
+        console.warn(`⚠️ [iapp.ro] Număr factură conține caractere non-numerice: "${factura.numar}" → curățat la "${numarCurat}"`);
+      }
+
+      factura.numar = numarCurat || null; // Folosește numărul curățat
+    }
+
     // ✅ Parse date_complete_json pentru date client
     let clientInfo: any = {};
     try {
@@ -134,13 +145,15 @@ export async function POST(request: NextRequest) {
     const client_nume = factura.client_nume || clientInfo.nume || clientInfo.denumire || 'N/A';
     const client_cui = factura.client_cui || clientInfo.cui || 'N/A';
 
+    // ✅ RECOMANDAREA A: Logging îmbunătățit cu indicator număr manual
     console.log('✅ [iapp.ro] Factură găsită:', {
       client_nume,
       client_cui,
       valoare_totala: factura.total || factura.Valoare_Totala,
       data_factura: factura.data_factura?.value || factura.data_factura,
       serie: factura.serie,
-      numar: factura.numar
+      numar: factura.numar,
+      are_numar_manual: !!factura.numar // Indicator pentru debug
     });
 
     // 3. Parse line items din date_complete_json
@@ -190,6 +203,8 @@ export async function POST(request: NextRequest) {
       data_start: factura.data_factura?.value || factura.data_factura || new Date().toISOString().split('T')[0],
       data_termen: '30', // 30 zile termen plată
       seria: config.serie_default || factura.serie || 'UPA',
+      // ✅ NOU: Adaugă numărul facturii dacă există în BD (pentru editare manuală sau numerotare manuală)
+      ...(factura.numar && { numar: factura.numar }),
       moneda: config.moneda_default || 'RON',
       footer: {
         intocmit_name: config.footer_intocmit_name || 'Administrator'
@@ -293,6 +308,20 @@ export async function POST(request: NextRequest) {
     await bigquery.dataset(DATASET).table('IappFacturiEmise_v2').insert(logRecord);
 
     console.log('✅ [iapp.ro] Salvat în BigQuery IappFacturiEmise_v2');
+
+    // ✅ RECOMANDAREA C: Verificare discrepanță numerotare
+    if (factura.numar && responseData.numar && factura.numar !== String(responseData.numar)) {
+      console.warn(`⚠️ [iapp.ro] ⚠️ DISCREPANȚĂ NUMEROTARE DETECTATĂ:`,
+        `\n   → BD (FacturiGenerate_v2): ${factura.numar}`,
+        `\n   → iapp.ro (response): ${responseData.numar}`,
+        `\n   → Factură ID: ${factura_id}`,
+        `\n   → Posibile cauze: iapp a generat număr nou sau există deja acest număr în iapp.ro`
+      );
+      // Optional: Update FacturiGenerate_v2 cu numărul real din iapp
+      // (pentru sincronizare perfectă - dar poate cauza confuzie dacă user a specificat manual)
+    } else if (factura.numar && responseData.numar && factura.numar === String(responseData.numar)) {
+      console.log(`✅ [iapp.ro] ✓ Numerotare CONSISTENTĂ: BD=${factura.numar}, iapp=${responseData.numar}`);
+    }
 
     // 6. Update FacturiGenerate_v2 cu status
     if (response.ok && responseData.id_factura) {
