@@ -320,8 +320,14 @@ export async function generateUBLXml(facturaData: any) {
     doc.ele('cbc:CustomizationID').txt('urn:cen.eu:en16931:2017#compliant#urn:efactura.mfinante.ro:CIUS-RO:1.0.1');
     doc.ele('cbc:ProfileID').txt('urn:fdc:peppol.eu:2017:poacc:billing:01:1.0');
     doc.ele('cbc:ID').txt(invoiceId);
-    doc.ele('cbc:IssueDate').txt(facturaData.data_factura);
-    doc.ele('cbc:DueDate').txt(facturaData.data_scadenta);
+
+    // ✅ FIX: BigQuery returnează DATE fields ca obiecte {value: "2025-08-16"}
+    // Extragem .value dacă există, altfel folosim valoarea directă
+    const dataFactura = facturaData.data_factura?.value || facturaData.data_factura;
+    const dataScadenta = facturaData.data_scadenta?.value || facturaData.data_scadenta;
+
+    doc.ele('cbc:IssueDate').txt(dataFactura);
+    doc.ele('cbc:DueDate').txt(dataScadenta);
     doc.ele('cbc:InvoiceTypeCode').txt('380'); // Commercial invoice
     doc.ele('cbc:DocumentCurrencyCode').txt('RON');
 
