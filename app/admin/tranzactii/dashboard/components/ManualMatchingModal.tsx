@@ -172,8 +172,8 @@ const EtapaFacturaCard: React.FC<{
             <span className="font-medium text-gray-900">
               {candidat.factura_serie} {candidat.factura_numar}
             </span>
-            <span className="text-gray-500 ml-2">
-              {formatDate(candidat.factura_data)}
+            <span className="text-gray-500 ml-1">
+              din {formatDate(candidat.factura_data)}
             </span>
           </div>
         </div>
