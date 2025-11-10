@@ -805,12 +805,13 @@ function cleanNonAscii(text: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      proiectId, 
-      liniiFactura, 
-      observatii, 
+    const {
+      proiectId,
+      liniiFactura,
+      observatii,
       clientInfo,
       numarFactura,
+      manual_number = false, // ✅ NOU: Flag pentru număr manual (nu incrementează counter-ul)
       setariFacturare,
       sendToAnaf = false,
       tip_facturare = 'anaf_direct', // ✅ NOU: Primește tip_facturare din frontend
@@ -1610,7 +1611,8 @@ export async function POST(request: NextRequest) {
         console.log('🔍 NEW MODE: Creez factură nouă în BigQuery cu date exacte din frontend...');
 
         // ✅ FIX CRITICAL: Incrementare număr curent ÎNAINTE de salvare (pentru race condition)
-        if (!isStorno && setariFacturare) {
+        // ✅ MODIFICAT: NU incrementa dacă este număr manual
+        if (!isStorno && setariFacturare && !manual_number) {
           try {
             console.log(`🔢 [NUMEROTARE-PRE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1} ÎNAINTE de salvare...`);
 
@@ -1635,6 +1637,8 @@ export async function POST(request: NextRequest) {
             console.error('❌ [NUMEROTARE-PRE] Eroare la incrementarea numărului curent:', error);
             // Continuăm - factura va folosi numărul deja alocat din frontend
           }
+        } else if (manual_number) {
+          console.log(`⚠️ [NUMEROTARE-PRE] SKIP incrementare counter - număr manual specificat: ${numarFactura}`);
         }
 
         // ✅ FIX: Extragere număr fără seria pentru coloana numar
