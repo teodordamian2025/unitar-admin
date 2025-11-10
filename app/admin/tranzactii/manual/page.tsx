@@ -16,7 +16,7 @@ import RealtimeProvider from '@/app/components/realtime/RealtimeProvider';
 
 interface TranzactieDetail {
   id: string;
-  data_procesare: string;
+  data_procesare: string | { value: string };
   suma: number;
   directie: string;
   tip_categorie: string;
@@ -29,13 +29,20 @@ interface TranzactieDetail {
 interface EtapaFacturaCandidat {
   id: string;
   factura_id: string;
+  factura_serie: string;
   factura_numar: string;
-  factura_suma: number;
-  factura_data: string;
-  client_nume: string;
-  etapa_nume: string;
-  status_facturare: string;
-  confidence_score?: number;
+  factura_total: number;
+  factura_data: string | { value: string };
+  factura_client_nume: string;
+  valoare_ron: number;
+  suma_ramasa: number;
+  status_incasare: string;
+  proiect_denumire: string;
+  subproiect_denumire: string;
+  matching_score?: number;
+  matching_reasons?: string[];
+  diferenta_ron?: number;
+  diferenta_procent?: number;
 }
 
 export default function ManualMatchingPage() {
@@ -385,7 +392,7 @@ export default function ManualMatchingPage() {
                           fontSize: '0.875rem',
                           fontWeight: '600'
                         }}>
-                          {tranzactie.suma.toLocaleString('ro-RO')} RON
+                          {(tranzactie.suma || 0).toLocaleString('ro-RO')} RON
                         </div>
                       </div>
 
@@ -394,7 +401,12 @@ export default function ManualMatchingPage() {
                         fontSize: '0.9rem',
                         marginBottom: '0.5rem'
                       }}>
-                        📅 {new Date(tranzactie.data_procesare).toLocaleDateString('ro-RO')}
+                        📅 {(() => {
+                          const dateValue = typeof tranzactie.data_procesare === 'object' && tranzactie.data_procesare?.value
+                            ? tranzactie.data_procesare.value
+                            : tranzactie.data_procesare;
+                          return new Date(dateValue as string).toLocaleDateString('ro-RO');
+                        })()}
                         {tranzactie.cui_contrapartida && (
                           <span style={{ marginLeft: '1rem' }}>
                             🏢 CUI: {tranzactie.cui_contrapartida}
@@ -507,13 +519,13 @@ export default function ManualMatchingPage() {
                               fontSize: '1.1rem',
                               marginBottom: '0.25rem'
                             }}>
-                              {factura.factura_numar}
+                              {factura.factura_serie ? `${factura.factura_serie}-${factura.factura_numar}` : factura.factura_numar}
                             </div>
                             <div style={{
                               color: '#64748b',
                               fontSize: '0.9rem'
                             }}>
-                              Client: {factura.client_nume}
+                              Client: {factura.factura_client_nume}
                             </div>
                           </div>
                           <div style={{
@@ -524,7 +536,7 @@ export default function ManualMatchingPage() {
                             fontSize: '0.875rem',
                             fontWeight: '600'
                           }}>
-                            {factura.factura_suma.toLocaleString('ro-RO')} RON
+                            {(factura.suma_ramasa || factura.factura_total || 0).toLocaleString('ro-RO')} RON
                           </div>
                         </div>
 
@@ -533,12 +545,17 @@ export default function ManualMatchingPage() {
                           fontSize: '0.85rem',
                           marginBottom: '1rem'
                         }}>
-                          📅 {new Date(factura.factura_data).toLocaleDateString('ro-RO')} |
-                          🏗️ {factura.etapa_nume} |
-                          📊 {factura.status_facturare}
-                          {factura.confidence_score && (
+                          📅 {(() => {
+                            const dateValue = typeof factura.factura_data === 'object' && factura.factura_data?.value
+                              ? factura.factura_data.value
+                              : factura.factura_data;
+                            return new Date(dateValue as string).toLocaleDateString('ro-RO');
+                          })()} |
+                          🏗️ {factura.subproiect_denumire || factura.proiect_denumire} |
+                          📊 {factura.status_incasare}
+                          {factura.matching_score != null && (
                             <span style={{ marginLeft: '1rem', color: '#10b981' }}>
-                              🎯 Match: {Math.round(factura.confidence_score * 100)}%
+                              🎯 Match: {Math.round(factura.matching_score)}%
                             </span>
                           )}
                         </div>

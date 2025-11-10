@@ -16,7 +16,7 @@ import RealtimeProvider from '@/app/components/realtime/RealtimeProvider';
 
 interface TranzactieDetail {
   id: string;
-  data_procesare: string;
+  data_procesare: string | { value: string };
   suma: number;
   directie: string;
   tip_categorie: string;
@@ -29,13 +29,20 @@ interface TranzactieDetail {
 interface EtapaFacturaCandidat {
   id: string;
   factura_id: string;
+  factura_serie: string;
   factura_numar: string;
-  factura_suma: number;
-  factura_data: string;
-  client_nume: string;
-  etapa_nume: string;
-  status_facturare: string;
-  confidence_score?: number;
+  factura_total: number;
+  factura_data: string | { value: string };
+  factura_client_nume: string;
+  valoare_ron: number;
+  suma_ramasa: number;
+  status_incasare: string;
+  proiect_denumire: string;
+  subproiect_denumire: string;
+  matching_score?: number;
+  matching_reasons?: string[];
+  diferenta_ron?: number;
+  diferenta_procent?: number;
 }
 
 export default function MatchingPage() {
@@ -88,20 +95,18 @@ export default function MatchingPage() {
       setLoadingCandidati(true);
       setCandidatiFacuri([]);
 
-      const response = await fetch('/api/tranzactii/manual-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tranzactie_id: tranzactie.id,
-          nume_contrapartida: tranzactie.nume_contrapartida,
-          suma: tranzactie.suma,
-          tip_search: 'advanced'
-        })
-      });
+      // Folosim GET cu query params pentru a căuta candidați
+      const response = await fetch(
+        `/api/tranzactii/manual-match?action=candidates&tranzactie_id=${tranzactie.id}&tolerance=15`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
 
       const data = await response.json();
-      if (data.success && data.candidati) {
-        setCandidatiFacuri(data.candidati);
+      if (data.success && data.data) {
+        setCandidatiFacuri(data.data);
       }
     } catch (error) {
       console.error('Eroare încărcare candidați:', error);
@@ -115,17 +120,20 @@ export default function MatchingPage() {
     loadCandidatiFacuri(tranzactie);
   };
 
-  const handleMatchTranzactie = async (etapaId: string) => {
+  const handleMatchTranzactie = async (facturaId: string) => {
     if (!selectedTranzactie) return;
 
     try {
       const response = await fetch('/api/tranzactii/manual-match', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tranzactie_id: selectedTranzactie.id,
-          etapa_id: etapaId,
-          action: 'match'
+          factura_id: facturaId,
+          target_type: 'etapa_factura',
+          confidence_manual: 85,
+          notes: 'Matching automat din UI',
+          force_match: false
         })
       });
 
@@ -135,10 +143,41 @@ export default function MatchingPage() {
         await loadTranzactiiNematchate();
         setSelectedTranzactie(null);
         setCandidatiFacuri([]);
+
+        // Toast success
+        showToast('Match aplicat cu succes!', 'success');
+      } else {
+        showToast(data.error || 'Eroare la aplicarea matching-ului', 'error');
       }
     } catch (error) {
       console.error('Eroare matching:', error);
+      showToast('Eroare la aplicarea matching-ului', 'error');
     }
+  };
+
+  // Toast system pentru feedback
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${type === 'success' ? '#27ae60' : '#e74c3c'};
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => document.body.removeChild(toast), 300);
+    }, 3000);
   };
 
   if (loading || !user) {
@@ -281,14 +320,19 @@ export default function MatchingPage() {
                         fontWeight: '700',
                         fontSize: '1.1rem'
                       }}>
-                        {tranzactie.directie === 'intrare' ? '+' : '-'}{tranzactie.suma} RON
+                        {tranzactie.directie === 'intrare' ? '+' : '-'}{(tranzactie.suma || 0).toLocaleString('ro-RO')} RON
                       </div>
                       <div style={{
                         fontSize: '0.875rem',
                         color: '#6c757d',
                         marginTop: '0.25rem'
                       }}>
-                        {new Date(tranzactie.data_procesare).toLocaleDateString('ro-RO')}
+                        {(() => {
+                          const dateValue = typeof tranzactie.data_procesare === 'object' && tranzactie.data_procesare?.value
+                            ? tranzactie.data_procesare.value
+                            : tranzactie.data_procesare;
+                          return new Date(dateValue as string).toLocaleDateString('ro-RO');
+                        })()}
                       </div>
                     </div>
                   ))
@@ -366,27 +410,33 @@ export default function MatchingPage() {
                             fontWeight: '600',
                             color: '#2c3e50'
                           }}>
-                            Factura #{candidat.factura_numar}
+                            {candidat.factura_serie ? `${candidat.factura_serie}-${candidat.factura_numar}` : `Factura #${candidat.factura_numar}`}
                           </div>
                           <div style={{
                             color: '#6c757d',
                             fontSize: '0.875rem'
                           }}>
-                            {candidat.client_nume}
+                            {candidat.factura_client_nume}
                           </div>
                         </div>
-                        {candidat.confidence_score && (
+                        {candidat.matching_score != null && (
                           <div style={{
                             padding: '0.25rem 0.5rem',
-                            background: candidat.confidence_score > 80
+                            background: candidat.matching_score > 80
                               ? 'rgba(39, 174, 96, 0.1)'
-                              : 'rgba(243, 156, 18, 0.1)',
-                            color: candidat.confidence_score > 80 ? '#27ae60' : '#f39c12',
+                              : candidat.matching_score > 50
+                              ? 'rgba(243, 156, 18, 0.1)'
+                              : 'rgba(231, 76, 60, 0.1)',
+                            color: candidat.matching_score > 80
+                              ? '#27ae60'
+                              : candidat.matching_score > 50
+                              ? '#f39c12'
+                              : '#e74c3c',
                             borderRadius: '8px',
                             fontSize: '0.75rem',
                             fontWeight: '600'
                           }}>
-                            {candidat.confidence_score}%
+                            {Math.round(candidat.matching_score)}%
                           </div>
                         )}
                       </div>
@@ -396,19 +446,39 @@ export default function MatchingPage() {
                         fontWeight: '700',
                         marginBottom: '0.5rem'
                       }}>
-                        {candidat.factura_suma} RON
+                        {(candidat.suma_ramasa || candidat.factura_total || 0).toLocaleString('ro-RO')} RON rămas
                       </div>
 
                       <div style={{
                         fontSize: '0.875rem',
                         color: '#6c757d',
-                        marginBottom: '1rem'
+                        marginBottom: '0.5rem'
                       }}>
-                        {candidat.etapa_nume} • {new Date(candidat.factura_data).toLocaleDateString('ro-RO')}
+                        📅 {(() => {
+                          const dateValue = typeof candidat.factura_data === 'object' && candidat.factura_data?.value
+                            ? candidat.factura_data.value
+                            : candidat.factura_data;
+                          return new Date(dateValue as string).toLocaleDateString('ro-RO');
+                        })()}
+                        {' • '}
+                        🏗️ {candidat.subproiect_denumire || candidat.proiect_denumire}
                       </div>
 
+                      {candidat.matching_reasons && candidat.matching_reasons.length > 0 && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#64748b',
+                          marginBottom: '1rem',
+                          padding: '0.5rem',
+                          background: 'rgba(255, 255, 255, 0.5)',
+                          borderRadius: '8px'
+                        }}>
+                          {candidat.matching_reasons.slice(0, 2).join(' • ')}
+                        </div>
+                      )}
+
                       <button
-                        onClick={() => handleMatchTranzactie(candidat.id)}
+                        onClick={() => handleMatchTranzactie(candidat.factura_id)}
                         style={{
                           width: '100%',
                           padding: '0.75rem',
