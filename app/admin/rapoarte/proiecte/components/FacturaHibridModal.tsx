@@ -39,6 +39,7 @@ interface FacturaHibridModalProps {
 
 interface LineFactura {
   denumire: string;
+  descriere?: string; // ✅ NOU: Descriere suplimentară pentru articol (trimisă la iapp.ro)
   cantitate: number;
   pretUnitar: number;
   cotaTva: number;
@@ -866,10 +867,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   const addLine = () => {
     // FIX PROBLEMA 1: Linie nouă cu toate câmpurile necesare
-    setLiniiFactura([...liniiFactura, { 
-      denumire: '', 
-      cantitate: 1, 
-      pretUnitar: 0, 
+    setLiniiFactura([...liniiFactura, {
+      denumire: '',
+      descriere: '', // ✅ NOU: Câmp descriere pentru detalii suplimentare (trimis la iapp.ro)
+      cantitate: 1,
+      pretUnitar: 0,
       cotaTva: 21,
       monedaOriginala: 'RON',
       valoareOriginala: 0,
@@ -2646,7 +2648,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                               value={linie.denumire}
                               onChange={(e) => updateLine(index, 'denumire', e.target.value)}
                               disabled={isLoading}
-                              rows={3}
+                              rows={2}
                               style={{
                                 flex: 1,
                                 padding: '0.5rem',
@@ -2657,10 +2659,41 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                                 resize: 'vertical',
                                 fontFamily: 'inherit'
                               }}
-                              placeholder="Descrierea serviciului..."
+                              placeholder="Denumirea serviciului (max 100 caractere pentru ANAF)..."
                               required
                             />
                           </div>
+
+                          {/* ✅ NOU: Câmp Descriere suplimentar (trimis la iapp.ro în câmpul "descriere") */}
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <label style={{
+                              display: 'block',
+                              fontSize: '11px',
+                              color: '#666',
+                              marginBottom: '0.25rem',
+                              fontWeight: 'bold'
+                            }}>
+                              Descriere suplimentară (opțional):
+                            </label>
+                            <textarea
+                              value={linie.descriere || ''}
+                              onChange={(e) => updateLine(index, 'descriere', e.target.value)}
+                              disabled={isLoading}
+                              rows={2}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                resize: 'vertical',
+                                fontFamily: 'inherit',
+                                backgroundColor: '#fafafa'
+                              }}
+                              placeholder="Detalii suplimentare despre proiect, contract, etapă... (fără limită de caractere)"
+                            />
+                          </div>
+
                           {/* Afișează informații suplimentare pentru etape */}
                           {(linie.tip === 'etapa_contract' || linie.tip === 'etapa_anexa') && (
                             <div style={{ fontSize: '10px', color: '#666', marginTop: '0.25rem' }}>
