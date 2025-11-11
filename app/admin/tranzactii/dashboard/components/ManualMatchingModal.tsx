@@ -151,18 +151,49 @@ const ReasonsList: React.FC<{ reasons: string[] }> = ({ reasons }) => (
 
 const EtapaFacturaCard: React.FC<{
   candidat: EtapaFacturaCandidat;
-  onSelect: () => void;
+  onSelect: (event: React.MouseEvent<HTMLDivElement>) => void;
   isSelected: boolean;
 }> = ({ candidat, onSelect, isSelected }) => {
   // ✅ Folosim helper-ele globale formatDate și formatCurrency
+
+  // 🎨 Generare culori în funcție de score (folosim inline styles)
+  const getScoreColors = (score: number): { bg: string; border: string } => {
+    if (score >= 90) return { bg: 'linear-gradient(to bottom right, #f0fdf4, #dcfce7)', border: '#86efac' }; // Verde
+    if (score >= 75) return { bg: 'linear-gradient(to bottom right, #eff6ff, #dbeafe)', border: '#93c5fd' }; // Albastru
+    if (score >= 60) return { bg: 'linear-gradient(to bottom right, #fefce8, #fef9c3)', border: '#fde047' }; // Galben
+    if (score >= 40) return { bg: 'linear-gradient(to bottom right, #fff7ed, #fed7aa)', border: '#fdba74' }; // Portocaliu
+    return { bg: 'linear-gradient(to bottom right, #fef2f2, #fecaca)', border: '#fca5a5' }; // Roșu
+  };
+
+  const colors = getScoreColors(candidat.matching_score);
+
   return (
-    <div 
+    <div
       onClick={onSelect}
-      className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
-        isSelected 
-          ? 'border-blue-500 bg-blue-50 shadow-md' 
-          : 'border-gray-200 bg-white hover:border-gray-300'
-      }`}
+      className="cursor-pointer transition-all duration-200"
+      style={{
+        padding: '1rem',
+        marginBottom: '1rem',
+        borderRadius: '0.75rem',
+        border: isSelected ? '3px solid #2563eb' : `2px solid ${colors.border}`,
+        background: isSelected ? '#eff6ff' : colors.bg,
+        boxShadow: isSelected
+          ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 0 0 4px rgba(37, 99, 235, 0.2)'
+          : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+        transform: isSelected ? 'scale(1.02)' : 'scale(1)'
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'scale(1.01)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'scale(1)';
+        }
+      }}
     >
       {/* Header cu Score */}
       <div className="flex items-center justify-between mb-3">
@@ -243,18 +274,49 @@ const EtapaFacturaCard: React.FC<{
 
 const CheltuialaCard: React.FC<{
   candidat: CheltuialaCandidat;
-  onSelect: () => void;
+  onSelect: (event: React.MouseEvent<HTMLDivElement>) => void;
   isSelected: boolean;
 }> = ({ candidat, onSelect, isSelected }) => {
   // ✅ Folosim helper-ul global formatCurrency
+
+  // 🎨 Generare culori în funcție de score (reutilizăm aceeași logică)
+  const getScoreColors = (score: number): { bg: string; border: string } => {
+    if (score >= 90) return { bg: 'linear-gradient(to bottom right, #f0fdf4, #dcfce7)', border: '#86efac' };
+    if (score >= 75) return { bg: 'linear-gradient(to bottom right, #eff6ff, #dbeafe)', border: '#93c5fd' };
+    if (score >= 60) return { bg: 'linear-gradient(to bottom right, #fefce8, #fef9c3)', border: '#fde047' };
+    if (score >= 40) return { bg: 'linear-gradient(to bottom right, #fff7ed, #fed7aa)', border: '#fdba74' };
+    return { bg: 'linear-gradient(to bottom right, #fef2f2, #fecaca)', border: '#fca5a5' };
+  };
+
+  const colors = getScoreColors(candidat.matching_score);
+
   return (
-    <div 
+    <div
       onClick={onSelect}
-      className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
-        isSelected 
-          ? 'border-blue-500 bg-blue-50 shadow-md' 
-          : 'border-gray-200 bg-white hover:border-gray-300'
-      }`}
+      className="cursor-pointer transition-all duration-200"
+      style={{
+        padding: '1rem',
+        marginBottom: '1rem',
+        borderRadius: '0.75rem',
+        border: isSelected ? '3px solid #2563eb' : `2px solid ${colors.border}`,
+        background: isSelected ? '#eff6ff' : colors.bg,
+        boxShadow: isSelected
+          ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 0 0 4px rgba(37, 99, 235, 0.2)'
+          : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+        transform: isSelected ? 'scale(1.02)' : 'scale(1)'
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'scale(1.01)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'scale(1)';
+        }
+      }}
     >
       {/* Header cu Score */}
       <div className="flex items-center justify-between mb-3">
@@ -352,6 +414,9 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
   const [confidence, setConfidence] = useState(85);
   const [notes, setNotes] = useState('');
   const [forceMatch, setForceMatch] = useState(false);
+  const matchingCardRef = React.useRef<HTMLDivElement>(null);
+  const [selectedCardOffset, setSelectedCardOffset] = React.useState(0);
+  const candidateListRef = React.useRef<HTMLDivElement>(null);
 
   // =================================================================
   // LOAD CANDIDATI
@@ -448,14 +513,21 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
       setConfidence(85);
       setNotes('');
       setForceMatch(false);
+      setSelectedCardOffset(0);
     }
   }, [isOpen, transaction, loadCandidati]);
+
+  // Reset offset când se schimbă tab-ul
+  useEffect(() => {
+    setSelectedCardOffset(0);
+    setSelectedCandidat(null);
+  }, [activeTab]);
 
   // =================================================================
   // HANDLERS
   // =================================================================
 
-  const handleSelectEtapa = (etapa: EtapaFacturaCandidat) => {
+  const handleSelectEtapa = (etapa: EtapaFacturaCandidat, event: React.MouseEvent<HTMLDivElement>) => {
     setSelectedCandidat({
       type: 'etapa_factura',
       id: etapa.id,
@@ -463,9 +535,20 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
     });
     // Auto-ajustare confidence pe baza score-ului
     setConfidence(Math.max(60, Math.min(95, etapa.matching_score)));
+
+    // Calculează poziția cardului selectat față de containerul listei
+    const cardElement = event.currentTarget;
+    const listContainer = candidateListRef.current;
+
+    if (cardElement && listContainer) {
+      const cardRect = cardElement.getBoundingClientRect();
+      const listRect = listContainer.getBoundingClientRect();
+      const offset = cardRect.top - listRect.top + listContainer.scrollTop;
+      setSelectedCardOffset(offset);
+    }
   };
 
-  const handleSelectCheltuiala = (cheltuiala: CheltuialaCandidat) => {
+  const handleSelectCheltuiala = (cheltuiala: CheltuialaCandidat, event: React.MouseEvent<HTMLDivElement>) => {
     setSelectedCandidat({
       type: 'cheltuiala',
       id: cheltuiala.id,
@@ -473,13 +556,22 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
     });
     // Auto-ajustare confidence pe baza score-ului
     setConfidence(Math.max(60, Math.min(95, cheltuiala.matching_score)));
+
+    // Calculează poziția cardului selectat față de containerul listei
+    const cardElement = event.currentTarget;
+    const listContainer = candidateListRef.current;
+
+    if (cardElement && listContainer) {
+      const cardRect = cardElement.getBoundingClientRect();
+      const listRect = listContainer.getBoundingClientRect();
+      const offset = cardRect.top - listRect.top + listContainer.scrollTop;
+      setSelectedCardOffset(offset);
+    }
   };
 
   // =================================================================
   // RENDER
   // =================================================================
-
-  if (!isOpen || !transaction) return null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ro-RO', {
@@ -492,6 +584,8 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
   const cheltuieliCandidati = candidati.cheltuieli || [];
   const hasEtape = etapeCandidati.length > 0;
   const hasCheltuieli = cheltuieliCandidati.length > 0;
+
+  if (!isOpen || !transaction) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -577,11 +671,26 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
           </nav>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
-          
-          {/* Candidati List */}
-          <div className="flex-1 overflow-y-auto p-6">
+        {/* Content - Layout în 2 coloane permanente */}
+        <div
+          style={{
+            flex: 1,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'row'
+          }}
+        >
+
+          {/* Stânga: Candidati List */}
+          <div
+            ref={candidateListRef}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem',
+              borderRight: '1px solid #e5e7eb'
+            }}
+          >
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
@@ -593,7 +702,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div>
                 {activeTab === 'etape' && hasEtape && (
                   <>
                     <div className="text-sm text-gray-600 mb-4">
@@ -603,7 +712,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
                       <EtapaFacturaCard
                         key={etapa.id}
                         candidat={etapa}
-                        onSelect={() => handleSelectEtapa(etapa)}
+                        onSelect={(e) => handleSelectEtapa(etapa, e)}
                         isSelected={selectedCandidat?.type === 'etapa_factura' && selectedCandidat.id === etapa.id}
                       />
                     ))}
@@ -619,7 +728,7 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
                       <CheltuialaCard
                         key={cheltuiala.id}
                         candidat={cheltuiala}
-                        onSelect={() => handleSelectCheltuiala(cheltuiala)}
+                        onSelect={(e) => handleSelectCheltuiala(cheltuiala, e)}
                         isSelected={selectedCandidat?.type === 'cheltuiala' && selectedCandidat.id === cheltuiala.id}
                       />
                     ))}
@@ -654,9 +763,31 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
             )}
           </div>
 
-          {/* Sidebar - Matching Form */}
-          {selectedCandidat && (
-            <div className="w-80 border-l border-gray-200 p-6 bg-gray-50">
+          {/* Dreapta: Sidebar - Matching Form (permanent vizibil) */}
+          <div
+            style={{
+              width: '400px',
+              minWidth: '400px',
+              maxWidth: '400px',
+              padding: '1.5rem',
+              background: '#f9fafb',
+              overflowY: 'auto'
+            }}
+          >
+            {selectedCandidat ? (
+              <div
+                ref={matchingCardRef}
+                style={{
+                  padding: '1.5rem',
+                  marginTop: `${selectedCardOffset}px`,
+                  marginBottom: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '2px solid #3b82f6',
+                  background: 'linear-gradient(to bottom right, #eff6ff, #dbeafe)',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  transition: 'margin-top 0.3s ease-out'
+                }}
+              >
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 ⚙️ Aplicare Matching
               </h3>
@@ -762,8 +893,26 @@ const ManualMatchingModal: React.FC<ManualMatchingModalProps> = ({
                   '✅ Aplică Matching-ul'
                 )}
               </button>
-            </div>
-          )}
+              </div>
+            ) : (
+              /* Placeholder când nimic nu e selectat */
+              <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                <div className="text-6xl mb-4">👈</div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Selectează un candidat
+                </h3>
+                <p className="text-sm text-gray-600 max-w-xs">
+                  Alege o factură sau cheltuială din lista din stânga pentru a aplica matching-ul manual.
+                </p>
+                <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200 max-w-xs">
+                  <div className="text-xs text-gray-500 mb-2">💡 Sfat:</div>
+                  <p className="text-xs text-gray-700">
+                    Cardurile sunt colorate în funcție de scorul de potrivire. Verde = match excelent, Albastru = bun, Galben = acceptabil.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
