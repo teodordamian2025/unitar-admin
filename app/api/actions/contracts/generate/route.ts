@@ -1166,7 +1166,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
     
     const dataSemnare = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
     const dataExpirare = formatDateForBigQuery(
-      typeof dataFinal === 'object' && dataFinal.value ? dataFinal.value : 
+      dataFinal && typeof dataFinal === 'object' && dataFinal.value ? dataFinal.value :
       typeof dataFinal === 'string' ? dataFinal : null
     );
 
