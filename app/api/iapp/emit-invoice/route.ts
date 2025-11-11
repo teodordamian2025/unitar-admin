@@ -95,12 +95,27 @@ export async function POST(request: NextRequest) {
       parolaLength: parola.length
     });
 
-    // 2. Citește datele facturii din FacturiGenerate_v2
-    // ✅ FIX: Nu mai facem JOIN cu Clienti_v2, datele client sunt în date_complete_json și coloane directe
+    // 2. Citește datele facturii din FacturiGenerate_v2 + JOIN cu Clienti_v2
+    // ✅ JOIN cu Clienti_v2 pentru a obține tip_client și toate detaliile (necesar pentru PF)
     const facturaQuery = `
-      SELECT *
-      FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
-      WHERE id = @factura_id
+      SELECT
+        f.*,
+        c.tip_client,
+        c.cnp,
+        c.adresa as client_adresa,
+        c.judet as client_judet,
+        c.oras as client_oras,
+        c.telefon as client_telefon,
+        c.email as client_email,
+        c.banca as client_banca,
+        c.iban as client_iban,
+        c.nr_reg_com as client_reg_com,
+        c.tara as client_tara,
+        c.ci_serie,
+        c.ci_numar
+      FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` f
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.Clienti_v2\` c ON f.client_id = c.id
+      WHERE f.id = @factura_id
     `;
 
     const [facturaRows] = await bigquery.query({
@@ -197,6 +212,23 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ [iapp.ro] Folosit item fallback:', itemsRows[0]);
     }
 
+    // ✅ Detectare automată tip client (Persoană Fizică vs Juridică)
+    const isPersoanaFizica = factura.tip_client === 'persoana_fizica' ||
+                              factura.tip_client === 'PF' ||
+                              factura.tip_client === 'F' ||
+                              !!factura.cnp; // Dacă există CNP, e persoană fizică
+
+    // ✅ Setare dinamică API version în funcție de tip client
+    const useV2Api = !isPersoanaFizica && (use_v2_api !== false); // v2 doar pentru PJ
+
+    console.log('🔍 [iapp.ro] Tip client detectat:', {
+      tip_client: factura.tip_client,
+      cnp: factura.cnp ? '***' + factura.cnp.slice(-4) : null,
+      isPersoanaFizica,
+      useV2Api,
+      apiEndpoint: useV2Api ? '/emite/factura-v2' : '/emite/factura'
+    });
+
     // Construiește payload pentru iapp.ro
     const iappPayload: any = {
       email_responsabil: config.email_responsabil,
@@ -220,37 +252,81 @@ export async function POST(request: NextRequest) {
       }))
     };
 
-    // API v2 (doar CIF) vs v1 (toate datele client)
-    if (use_v2_api) {
+    // ✅ Construire payload client în funcție de tip
+    if (isPersoanaFizica) {
+      // ============================================================
+      // PERSOANĂ FIZICĂ - API v1 cu toate detaliile clientului
+      // ============================================================
+      console.log('👤 [iapp.ro] Client: Persoană Fizică → folosesc /emite/factura (v1)');
+
+      iappPayload.client = {
+        type: 'F', // ⚠️ IMPORTANT: "F" pentru persoană fizică
+        name: client_nume,
+        cif: factura.cnp || 'persoana_fizica', // CNP sau text generic
+        cnp: factura.cnp || '', // CNP obligatoriu pentru PF
+        telefon: factura.client_telefon || '',
+        tara: factura.client_tara || 'Romania',
+        judet: factura.client_judet || '',
+        localitate: factura.client_oras || '',
+        adresa: factura.client_adresa || '',
+        email: factura.client_email || '',
+        // Câmpuri opționale
+        contact: client_nume, // Nume contact (același ca name)
+        banca: factura.client_banca || '',
+        iban: factura.client_iban || '',
+        web: '',
+        extra: factura.ci_serie && factura.ci_numar
+          ? `CI: ${factura.ci_serie} ${factura.ci_numar}`
+          : ''
+      };
+
+      console.log('📋 [iapp.ro] Payload client PF:', JSON.stringify(iappPayload.client, null, 2));
+
+    } else if (useV2Api) {
+      // ============================================================
+      // PERSOANĂ JURIDICĂ - API v2 (doar CUI, date din ANAF)
+      // ============================================================
+      console.log('🏢 [iapp.ro] Client: Persoană Juridică → folosesc /emite/factura-v2');
+
       iappPayload.client = {
         type: 'J', // Juridic
         cif: client_cui.replace('RO', '').trim() // ✅ FIX: Remove RO prefix
       };
+
     } else {
+      // ============================================================
+      // PERSOANĂ JURIDICĂ - API v1 (toate datele client)
+      // ============================================================
+      console.log('🏢 [iapp.ro] Client: Persoană Juridică → folosesc /emite/factura (v1) cu toate datele');
+
       iappPayload.client = {
         type: 'J',
         cif: client_cui.replace('RO', '').trim(),
-        nume: client_nume,
-        reg_com: clientInfo.reg_com || clientInfo.regCom || '',
-        adresa: clientInfo.adresa || '',
-        tara: clientInfo.tara || 'RO',
-        judet: clientInfo.judet || '',
-        oras: clientInfo.oras || '',
-        strada: clientInfo.strada || ''
+        name: client_nume,
+        reg_com: factura.client_reg_com || clientInfo.reg_com || clientInfo.regCom || '',
+        adresa: factura.client_adresa || clientInfo.adresa || '',
+        tara: factura.client_tara || clientInfo.tara || 'RO',
+        judet: factura.client_judet || clientInfo.judet || '',
+        localitate: factura.client_oras || clientInfo.oras || '',
+        telefon: factura.client_telefon || clientInfo.telefon || '',
+        email: factura.client_email || clientInfo.email || '',
+        banca: factura.client_banca || clientInfo.banca || '',
+        iban: factura.client_iban || clientInfo.iban || ''
       };
     }
 
     // 4. Trimite request la iapp.ro
     const apiUrl = tip_factura === 'proforma'
-      ? 'https://api.my.iapp.ro/emite/proforma' + (use_v2_api ? '-v2' : '')
-      : 'https://api.my.iapp.ro/emite/factura' + (use_v2_api ? '-v2' : '');
+      ? 'https://api.my.iapp.ro/emite/proforma' + (useV2Api ? '-v2' : '')
+      : 'https://api.my.iapp.ro/emite/factura' + (useV2Api ? '-v2' : '');
 
     const authHeader = Buffer.from(`${codFirma}:${parola}`).toString('base64');
 
     console.log(`📡 [iapp.ro] ========== SENDING REQUEST ==========`);
     console.log(`📡 [iapp.ro] URL: ${apiUrl}`);
     console.log(`📡 [iapp.ro] Tip factură: ${tip_factura}`);
-    console.log(`📡 [iapp.ro] API version: ${use_v2_api ? 'v2 (doar CIF)' : 'v1 (toate datele)'}`);
+    console.log(`📡 [iapp.ro] Tip client: ${isPersoanaFizica ? 'Persoană Fizică' : 'Persoană Juridică'}`);
+    console.log(`📡 [iapp.ro] API version: ${useV2Api ? 'v2 (doar CIF)' : 'v1 (toate datele)'}`);
     console.log(`📡 [iapp.ro] Auth header length: ${authHeader.length}`);
     console.log(`📡 [iapp.ro] Payload:`, JSON.stringify(iappPayload, null, 2));
 
