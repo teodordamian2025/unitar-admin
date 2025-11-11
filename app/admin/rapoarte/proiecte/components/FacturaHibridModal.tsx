@@ -79,7 +79,7 @@ interface ClientInfo {
   email?: string;
   status?: string;
   platitorTva?: string;
-  tip_client?: 'persoana_fizica' | 'persoana_juridica';
+  tip_client?: 'Fizic' | 'Juridic' | 'Juridic_TVA' | 'persoana_fizica' | 'persoana_juridica';
   cnp?: string;
 }
 
@@ -215,12 +215,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
   };
 
+  // ✅ Helper pentru a verifica dacă clientul este persoană fizică
+  const isPersoanaFizica = (tipClient?: string): boolean => {
+    return tipClient === 'Fizic' || tipClient === 'persoana_fizica';
+  };
+
   // ✅ Helper pentru a curăța nrRegCom pentru persoane fizice
   const sanitizeClientInfo = (clientData: ClientInfo | null): ClientInfo | null => {
     if (!clientData) return null;
 
     // Pentru persoane fizice, nrRegCom trebuie să fie gol
-    if (clientData.tip_client === 'persoana_fizica') {
+    if (isPersoanaFizica(clientData.tip_client)) {
       return {
         ...clientData,
         nrRegCom: ''
@@ -600,7 +605,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       if (initialData.clientInfo) {
         // ✅ FIX: Curăță nrRegCom pentru persoane fizice
         setClientInfo(sanitizeClientInfo(initialData.clientInfo));
-        setCuiInput(initialData.clientInfo.cui || '');
+        // ✅ FIX: Pentru persoane fizice, folosește CNP în loc de CUI
+        setCuiInput(
+          isPersoanaFizica(initialData.clientInfo.tip_client)
+            ? (initialData.clientInfo.cnp || '')
+            : (initialData.clientInfo.cui || '')
+        );
       }
       if (initialData.numarFactura) {
         setNumarFactura(initialData.numarFactura);
@@ -1215,18 +1225,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         setClientInfo(sanitizeClientInfo({
           id: clientData.id,
           denumire: clientData.nume || clientData.denumire,
-          cui: clientData.cui || '',
+          // ✅ FIX: Pentru persoane fizice, folosește CNP în loc de CUI
+          cui: isPersoanaFizica(clientData.tip_client)
+            ? (clientData.cnp || '')
+            : (clientData.cui || ''),
           nrRegCom: clientData.nr_reg_com || '',
           adresa: clientData.adresa || '',
           judet: clientData.judet,
           localitate: clientData.oras,
           telefon: clientData.telefon,
           email: clientData.email,
-          tip_client: clientData.tip_client || 'persoana_juridica',
+          tip_client: clientData.tip_client || 'Juridic',
           cnp: clientData.cnp || ''
         }));
 
-        if (clientData.cui) {
+        // ✅ FIX: Pentru persoane fizice, folosește CNP în loc de CUI
+        if (isPersoanaFizica(clientData.tip_client) && clientData.cnp) {
+          setCuiInput(clientData.cnp);
+        } else if (clientData.cui) {
           setCuiInput(clientData.cui);
         }
 
@@ -1237,7 +1253,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           cui: '',
           nrRegCom: '',
           adresa: 'Adresa client',
-          tip_client: 'persoana_juridica',
+          tip_client: 'Juridic',
           cnp: ''
         });
         showToast(`ℹ️ Client "${proiect.Client}" nu găsit în BD. Completează manual datele.`, 'info');
@@ -1249,7 +1265,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         cui: '',
         nrRegCom: '',
         adresa: 'Adresa client',
-        tip_client: 'persoana_juridica',
+        tip_client: 'Juridic',
         cnp: ''
       });
       showToast('⚠️ Nu s-au putut prelua datele clientului din BD', 'error');
@@ -1285,7 +1301,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           telefon: anafData.telefon,
           status: anafData.status,
           platitorTva: anafData.platitorTva,
-          tip_client: 'persoana_juridica' // ANAF este doar pentru persoane juridice
+          tip_client: anafData.platitorTva === 'Da' ? 'Juridic_TVA' : 'Juridic' // ANAF este doar pentru persoane juridice
         });
         
         showToast('✅ Datele au fost actualizate cu informațiile de la ANAF!', 'success');
@@ -2383,7 +2399,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
-                    CUI *
+                    {isPersoanaFizica(clientInfo.tip_client) ? 'CNP *' : 'CUI *'}
                   </label>
                   <input
                     type="text"
@@ -2408,16 +2424,16 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     type="text"
                     value={clientInfo.nrRegCom}
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
-                    disabled={isLoading || clientInfo.tip_client === 'persoana_fizica'}
-                    placeholder={clientInfo.tip_client === 'persoana_fizica' ? 'Nu este necesar pentru persoane fizice' : ''}
+                    disabled={isLoading || isPersoanaFizica(clientInfo.tip_client)}
+                    placeholder={isPersoanaFizica(clientInfo.tip_client) ? 'Nu este necesar pentru persoane fizice' : ''}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       border: '1px solid #dee2e6',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: clientInfo.tip_client === 'persoana_fizica' ? '#f5f5f5' : 'white',
-                      cursor: clientInfo.tip_client === 'persoana_fizica' ? 'not-allowed' : 'text'
+                      backgroundColor: isPersoanaFizica(clientInfo.tip_client) ? '#f5f5f5' : 'white',
+                      cursor: isPersoanaFizica(clientInfo.tip_client) ? 'not-allowed' : 'text'
                     }}
                   />
                 </div>
