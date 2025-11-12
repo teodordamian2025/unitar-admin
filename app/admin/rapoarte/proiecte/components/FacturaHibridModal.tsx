@@ -1554,7 +1554,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }
 
-    if (!clientInfo.denumire.trim()) {
+    if (!clientInfo?.denumire?.trim()) {
       showToast('Denumirea clientului este obligatorie', 'error');
       return;
     }
@@ -1576,12 +1576,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       // Pentru iapp.ro, nu verificăm token ANAF (iapp.ro gestionează transmiterea)
 
       // Validări comune pentru ambele metode
-      if (!clientInfo.cui || clientInfo.cui === 'RO00000000') {
+      if (!clientInfo?.cui || clientInfo.cui === 'RO00000000') {
         showToast('❌ CUI valid este obligatoriu pentru e-factura', 'error');
         return;
       }
 
-      if (!clientInfo.adresa || clientInfo.adresa === 'Adresa client') {
+      if (!clientInfo?.adresa || clientInfo.adresa === 'Adresa client') {
         showToast('❌ Adresa completă a clientului este obligatorie pentru e-factura', 'error');
         return;
       }
@@ -2384,7 +2384,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </label>
                   <input
                     type="text"
-                    value={clientInfo.denumire}
+                    value={clientInfo.denumire || ''}
                     onChange={(e) => setClientInfo({...clientInfo, denumire: e.target.value})}
                     disabled={isLoading}
                     style={{
@@ -2403,7 +2403,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </label>
                   <input
                     type="text"
-                    value={clientInfo.cui}
+                    value={clientInfo.cui || ''}
                     onChange={(e) => setClientInfo({...clientInfo, cui: e.target.value})}
                     disabled={isLoading}
                     style={{
@@ -2422,7 +2422,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </label>
                   <input
                     type="text"
-                    value={clientInfo.nrRegCom}
+                    value={clientInfo.nrRegCom || ''}
                     onChange={(e) => setClientInfo({...clientInfo, nrRegCom: e.target.value})}
                     disabled={isLoading || isPersoanaFizica(clientInfo.tip_client)}
                     placeholder={isPersoanaFizica(clientInfo.tip_client) ? 'Nu este necesar pentru persoane fizice' : ''}
@@ -2461,7 +2461,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   </label>
                   <input
                     type="text"
-                    value={clientInfo.adresa}
+                    value={clientInfo.adresa || ''}
                     onChange={(e) => setClientInfo({...clientInfo, adresa: e.target.value})}
                     disabled={isLoading}
                     style={{
