@@ -434,10 +434,12 @@ export default function EditFacturaModal({
             nrRegCom: dateComplete.clientInfo.nrRegCom || dateComplete.clientInfo.nr_reg_com || '',
             adresa: dateComplete.clientInfo.adresa || 'Adresa client',
             telefon: dateComplete.clientInfo.telefon || '',
-            email: dateComplete.clientInfo.email || ''
+            email: dateComplete.clientInfo.email || '',
+            tip_client: dateComplete.clientInfo.tip_client || '',  // ✅ ADĂUGAT pentru badge indicator
+            cnp: dateComplete.clientInfo.cnp || ''                 // ✅ ADĂUGAT pentru detectare PF
           };
         }
-        
+
         return {
           id: '',
           denumire: factura.client_nume || 'Client din factură',
@@ -445,7 +447,9 @@ export default function EditFacturaModal({
           nrRegCom: '',
           adresa: 'Adresa client',
           telefon: '',
-          email: ''
+          email: '',
+          tip_client: '',  // ✅ ADĂUGAT pentru badge indicator
+          cnp: ''          // ✅ ADĂUGAT pentru detectare PF
         };
       })();
 
