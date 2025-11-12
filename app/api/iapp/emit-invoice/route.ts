@@ -213,8 +213,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ Detectare automată tip client (Persoană Fizică vs Juridică)
-    // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "fizic", "Juridic", "Juridic_TVA"
-    const isPersoanaFizica = factura.tip_client === 'fizic' ||         // ✅ Valoare corectă din BD
+    // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "Fizic", "Juridic", "Juridic_TVA"
+    const isPersoanaFizica = factura.tip_client === 'Fizic' ||         // ✅ Valoare corectă din BD (F mare)
+                              factura.tip_client === 'fizic' ||         // Backward compatibility (lowercase)
                               factura.tip_client === 'persoana_fizica' || // Backward compatibility
                               factura.tip_client === 'PF' ||
                               factura.tip_client === 'F' ||

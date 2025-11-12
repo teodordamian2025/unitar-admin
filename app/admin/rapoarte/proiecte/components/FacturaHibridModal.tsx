@@ -217,10 +217,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   // ✅ Helper pentru a verifica dacă clientul este persoană fizică
-  // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "fizic", "Juridic", "Juridic_TVA"
+  // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "Fizic", "Juridic", "Juridic_TVA"
   const isPersoanaFizica = (tipClient?: string): boolean => {
-    return tipClient === 'fizic' ||         // ✅ Valoare corectă din BD (lowercase)
-           tipClient === 'Fizic' ||         // Backward compatibility (uppercase)
+    return tipClient === 'Fizic' ||         // ✅ Valoare corectă din BD (F mare)
+           tipClient === 'fizic' ||         // Backward compatibility (lowercase)
            tipClient === 'persoana_fizica' ||
            tipClient === 'PF' ||
            tipClient === 'F';
