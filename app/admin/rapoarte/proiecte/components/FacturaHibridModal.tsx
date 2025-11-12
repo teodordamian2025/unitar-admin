@@ -1763,8 +1763,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 factura_id: facturaId,
-                tip_factura: 'fiscala', // sau 'proforma' dacă e proformă
-                use_v2_api: true // folosește /emite/factura-v2 (doar CIF)
+                tip_factura: 'fiscala' // sau 'proforma' dacă e proformă
+                // ✅ NU trimitem use_v2_api - API-ul detectează automat PF vs PJ
               })
             });
 

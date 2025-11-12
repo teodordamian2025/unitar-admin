@@ -623,29 +623,63 @@ export default function FacturiList({
     if (processingActions[factura.id]) return;
 
     setProcessingActions(prev => ({ ...prev, [factura.id]: true }));
-    
-    try {
-      let xmlResponse = await fetch('/api/actions/invoices/generate-xml', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          facturaId: factura.id,
-          forceRegenerate: false 
-        })
-      });
 
-      let xmlData = await xmlResponse.json();
-      
-      if (!xmlData.success) {
-        throw new Error(xmlData.error || 'Failed to generate XML');
+    try {
+      // ✅ Verifică dacă sistemul folosește iapp.ro
+      const configResponse = await fetch('/api/iapp/config');
+      const configData = await configResponse.json();
+
+      const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+
+      if (configData.success && configData.config?.tip_facturare === 'iapp') {
+        // ✅ Trimite prin iapp.ro (cu auto-detectare PF vs PJ)
+        showToast(`Se trimite factura ${numarComplet} prin iapp.ro...`, 'info');
+
+        const iappResponse = await fetch('/api/iapp/emit-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            factura_id: factura.id,
+            tip_factura: 'fiscala'
+            // ✅ NU trimitem use_v2_api - API-ul detectează automat PF vs PJ
+          })
+        });
+
+        const iappResult = await iappResponse.json();
+
+        if (!iappResult.success) {
+          throw new Error(iappResult.error || 'Failed to emit via iapp.ro');
+        }
+
+        showToast(`✅ Factura ${numarComplet} emisă prin iapp.ro!`, 'success');
+        if (iappResult.efactura_upload_index) {
+          showToast(`📋 Factura a fost transmisă la ANAF e-Factura (Upload ID: ${iappResult.efactura_upload_index})`, 'success');
+        }
+      } else {
+        // ✅ Fallback: sistemul vechi cu XML ANAF
+        let xmlResponse = await fetch('/api/actions/invoices/generate-xml', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            facturaId: factura.id,
+            forceRegenerate: false
+          })
+        });
+
+        let xmlData = await xmlResponse.json();
+
+        if (!xmlData.success) {
+          throw new Error(xmlData.error || 'Failed to generate XML');
+        }
+
+        showToast(`XML generat. Se trimite la ANAF...`, 'info');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        showToast(`Factura ${numarComplet} trimisa la ANAF cu succes!`, 'success');
       }
 
-      showToast(`XML generat. Se trimite la ANAF...`, 'info');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      showToast(`Factura ${factura.numar} trimisa la ANAF cu succes!`, 'success');
       await loadFacturi();
-      
+
     } catch (error) {
       showToast(`Eroare la trimiterea la ANAF: ${error instanceof Error ? error.message : 'Eroare necunoscuta'}`, 'error');
     } finally {
