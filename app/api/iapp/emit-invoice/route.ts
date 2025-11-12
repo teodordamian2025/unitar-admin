@@ -213,7 +213,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ Detectare automată tip client (Persoană Fizică vs Juridică)
-    const isPersoanaFizica = factura.tip_client === 'persoana_fizica' ||
+    // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "fizic", "Juridic", "Juridic_TVA"
+    const isPersoanaFizica = factura.tip_client === 'fizic' ||         // ✅ Valoare corectă din BD
+                              factura.tip_client === 'persoana_fizica' || // Backward compatibility
                               factura.tip_client === 'PF' ||
                               factura.tip_client === 'F' ||
                               !!factura.cnp; // Dacă există CNP, e persoană fizică
@@ -224,6 +226,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 [iapp.ro] Tip client detectat:', {
       tip_client: factura.tip_client,
       cnp: factura.cnp ? '***' + factura.cnp.slice(-4) : null,
+      cui: factura.client_cui ? client_cui : null,
       isPersoanaFizica,
       useV2Api,
       apiEndpoint: useV2Api ? '/emite/factura-v2' : '/emite/factura'

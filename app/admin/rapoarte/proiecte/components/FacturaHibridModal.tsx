@@ -79,7 +79,8 @@ interface ClientInfo {
   email?: string;
   status?: string;
   platitorTva?: string;
-  tip_client?: 'Fizic' | 'Juridic' | 'Juridic_TVA' | 'persoana_fizica' | 'persoana_juridica';
+  // ✅ Valorile reale din Clienti_v2.tip_client: "fizic", "Juridic", "Juridic_TVA"
+  tip_client?: 'fizic' | 'Fizic' | 'Juridic' | 'Juridic_TVA' | 'persoana_fizica' | 'persoana_juridica' | 'PF' | 'F';
   cnp?: string;
 }
 
@@ -216,8 +217,13 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   // ✅ Helper pentru a verifica dacă clientul este persoană fizică
+  // IMPORTANTE: Valorile din Clienti_v2.tip_client sunt: "fizic", "Juridic", "Juridic_TVA"
   const isPersoanaFizica = (tipClient?: string): boolean => {
-    return tipClient === 'Fizic' || tipClient === 'persoana_fizica';
+    return tipClient === 'fizic' ||         // ✅ Valoare corectă din BD (lowercase)
+           tipClient === 'Fizic' ||         // Backward compatibility (uppercase)
+           tipClient === 'persoana_fizica' ||
+           tipClient === 'PF' ||
+           tipClient === 'F';
   };
 
   // ✅ Helper pentru a curăța nrRegCom pentru persoane fizice
@@ -2396,6 +2402,26 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     }}
                     required
                   />
+                  {/* ✅ INDICATOR VIZUAL: Tip client detectat */}
+                  {clientInfo.tip_client && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <span style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        backgroundColor: isPersoanaFizica(clientInfo.tip_client) ? '#e3f2fd' : '#f3e5f5',
+                        color: isPersoanaFizica(clientInfo.tip_client) ? '#1976d2' : '#7b1fa2',
+                        border: `1px solid ${isPersoanaFizica(clientInfo.tip_client) ? '#1976d2' : '#7b1fa2'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}>
+                        {isPersoanaFizica(clientInfo.tip_client) ? '👤 Persoană Fizică' : '🏢 Persoană Juridică'}
+                        {clientInfo.tip_client === 'Juridic_TVA' && ' (Plătitor TVA)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#2c3e50' }}>
