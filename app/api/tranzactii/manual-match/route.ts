@@ -462,8 +462,8 @@ async function findEtapeFacturiCandidatesForTransaction(
       // ✅ FIX TVA: Calculăm suma rămasă CU TVA (încasările sunt cu TVA inclusă!)
       // Folosim proporția din total factură (cu TVA) în loc de valoare_ron (fără TVA)
       const procentDinEtapa = (row.procent_din_etapa || 100) / 100;
-      const sumaDeIncasatCuTVA = parseFloat(row.factura_total || 0) * procentDinEtapa;
-      const sumaRamasa = sumaDeIncasatCuTVA - (parseFloat(row.valoare_incasata || 0));
+      const sumaDeIncasatCuTVA = Number(row.factura_total || 0) * procentDinEtapa;
+      const sumaRamasa = sumaDeIncasatCuTVA - Number(row.valoare_incasata || 0);
 
       const { score, reasons, diferenta_ron, diferenta_procent } = calculateEtapaMatchingScore(
         tranzactie,
@@ -601,12 +601,13 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 
     if (matchRequest.target_type === 'etapa_factura') {
       const [etapeRows] = await bigquery.query(`
-        SELECT 
+        SELECT
           ef.*,
           fg.serie as factura_serie,
           fg.numar as factura_numar,
           fg.client_nume as factura_client_nume,
-          fg.client_cui as factura_client_cui
+          fg.client_cui as factura_client_cui,
+          fg.total as factura_total
         FROM ${TABLE_ETAPE_FACTURI} ef
         INNER JOIN ${TABLE_FACTURI_GENERATE} fg
           ON ef.factura_id = fg.id
@@ -620,7 +621,13 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       const etapa = etapeRows[0];
       targetDetails = etapa;
       sumaTarget = etapa.valoare;
-      sumaTargetRon = etapa.valoare_ron - (etapa.valoare_incasata || 0);
+
+      // ✅ FIX TVA: Calculăm suma rămasă CU TVA (încasările sunt cu TVA inclusă!)
+      // Folosim proporția din total factură (cu TVA) în loc de valoare_ron (fără TVA)
+      const procentDinEtapa = (etapa.procent_din_etapa || 100) / 100;
+      const sumaDeIncasatCuTVA = Number(etapa.factura_total || 0) * procentDinEtapa;
+      sumaTargetRon = sumaDeIncasatCuTVA - Number(etapa.valoare_incasata || 0);
+
       monedaTarget = etapa.moneda;
       cursValutar = etapa.curs_valutar;
       dataCursValutar = etapa.data_curs_valutar;
@@ -698,19 +705,25 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     // Actualizăm target-ul (EtapeFacturi sau ProiecteCheltuieli)
     if (matchRequest.target_type === 'etapa_factura') {
       const sumaIncasata = Math.abs(tranzactie.suma);
-      const newValoareIncasata = `COALESCE(valoare_incasata, 0) + ${sumaIncasata}`;
-      const newStatus = `CASE
-        WHEN ${newValoareIncasata} >= valoare_ron THEN 'Incasat'
-        WHEN ${newValoareIncasata} > 0 THEN 'Partial'
-        ELSE 'Neincasat'
-      END`;
+      // ✅ FIX TVA: Calculăm suma totală cu TVA pentru a determina statusul corect
+      const procentDinEtapaActualizare = (targetDetails.procent_din_etapa || 100) / 100;
+      const sumaTotalaCuTVA = sumaTargetRon + Number(targetDetails.valoare_incasata || 0); // Recalculăm din totalul deja calculat
+      const newValoareIncasata = Number(targetDetails.valoare_incasata || 0) + sumaIncasata;
+
+      // Determinăm statusul bazat pe comparația cu suma CU TVA
+      let newStatus = 'Neincasat';
+      if (newValoareIncasata >= sumaTotalaCuTVA * 0.99) { // toleranță 1% pentru rotunjiri
+        newStatus = 'Incasat';
+      } else if (newValoareIncasata > 0) {
+        newStatus = 'Partial';
+      }
 
       await bigquery.query(`
         UPDATE ${TABLE_ETAPE_FACTURI}
         SET
           valoare_incasata = ${newValoareIncasata},
-          status_incasare = ${newStatus},
-          data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
+          status_incasare = '${newStatus}',
+          data_incasare = ${newStatus === 'Incasat' ? 'CURRENT_DATE()' : 'data_incasare'},
           data_actualizare = CURRENT_TIMESTAMP()
         WHERE id = "${matchRequest.target_id}"
       `);

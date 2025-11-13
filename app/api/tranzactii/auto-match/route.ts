@@ -58,6 +58,7 @@ interface EtapaFacturaCandidat {
   data_curs_valutar: string;
   status_incasare: string;
   valoare_incasata: number;
+  procent_din_etapa: number;
   // Join cu FacturiGenerate
   factura_serie: string;
   factura_numar: string;
@@ -323,7 +324,7 @@ async function findEtapeFacturiCandidates(tranzactii: TranzactieCandidat[]): Pro
   try {
     // Căutăm etapele de factură care pot fi matchate
     const query = `
-      SELECT 
+      SELECT
         ef.id,
         ef.factura_id,
         ef.etapa_id,
@@ -335,7 +336,8 @@ async function findEtapeFacturiCandidates(tranzactii: TranzactieCandidat[]): Pro
         ef.data_curs_valutar,
         ef.status_incasare,
         ef.valoare_incasata,
-        
+        ef.procent_din_etapa,
+
         -- Date factură
         fg.serie as factura_serie,
         fg.numar as factura_numar,
@@ -426,8 +428,12 @@ async function matchIncasariCuEtapeFacturi(
     let bestScore = 0;
 
     for (const etapa of etape) {
-      // Calculăm diferența de sumă în RON
-      const sumaRamasaIncasare = etapa.valoare_ron - (etapa.valoare_incasata || 0);
+      // ✅ FIX TVA: Calculăm diferența de sumă CU TVA (încasările sunt cu TVA inclusă!)
+      // Folosim proporția din total factură (cu TVA) în loc de valoare_ron (fără TVA)
+      const procentDinEtapa = (etapa.procent_din_etapa || 100) / 100;
+      const sumaTotalaCuTVA = Number(etapa.factura_total || 0) * procentDinEtapa;
+      const sumaRamasaIncasare = sumaTotalaCuTVA - Number(etapa.valoare_incasata || 0);
+
       if (sumaRamasaIncasare <= 0) continue; // Etapa deja încasată complet
 
       const diferentaRon = Math.abs(tranzactie.suma - sumaRamasaIncasare);
@@ -471,7 +477,10 @@ async function matchIncasariCuEtapeFacturi(
             client_cui: etapa.factura_client_cui,
             client_nume: etapa.factura_client_nume,
             score_breakdown: details,
-            valoare_ramasa: sumaRamasaIncasare
+            valoare_ramasa: sumaRamasaIncasare,
+            // ✅ Salvăm pentru calculul statusului ulterior
+            factura_total: etapa.factura_total,
+            procent_din_etapa: etapa.procent_din_etapa
           }
         };
         bestScore = score;
@@ -652,20 +661,33 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
       const sumaIncasata = match.suma_tranzactie;
       const etapaId = match.target_id;
 
-      // Calculăm noul status și valoarea încasată
-      const newValoareIncasata = `COALESCE(valoare_incasata, 0) + ${sumaIncasata}`;
-      const newStatus = `CASE
-        WHEN ${newValoareIncasata} >= valoare_ron THEN 'Incasat'
-        WHEN ${newValoareIncasata} > 0 THEN 'Partial'
-        ELSE 'Neincasat'
-      END`;
+      // ✅ FIX TVA: Obținem valoare_incasata curentă și calculăm suma totală cu TVA
+      const [etapaRows] = await bigquery.query(`
+        SELECT valoare_incasata FROM \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi_v2\`
+        WHERE id = "${etapaId}"
+      `);
+
+      const valoareIncasataCurenta = Number(etapaRows[0]?.valoare_incasata || 0);
+      const newValoareIncasata = valoareIncasataCurenta + sumaIncasata;
+
+      // Calculăm suma totală cu TVA pentru comparație
+      const procentDinEtapa = (match.matching_details.procent_din_etapa || 100) / 100;
+      const sumaTotalaCuTVA = Number(match.matching_details.factura_total || 0) * procentDinEtapa;
+
+      // Determinăm statusul bazat pe comparația cu suma CU TVA
+      let newStatus = 'Neincasat';
+      if (newValoareIncasata >= sumaTotalaCuTVA * 0.99) { // toleranță 1% pentru rotunjiri
+        newStatus = 'Incasat';
+      } else if (newValoareIncasata > 0) {
+        newStatus = 'Partial';
+      }
 
       await bigquery.query(`
         UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeFacturi_v2\`
         SET
           valoare_incasata = ${newValoareIncasata},
-          status_incasare = ${newStatus},
-          data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
+          status_incasare = '${newStatus}',
+          data_incasare = ${newStatus === 'Incasat' ? 'CURRENT_DATE()' : 'data_incasare'},
           data_actualizare = CURRENT_TIMESTAMP()
         WHERE id = "${etapaId}"
       `);
@@ -675,8 +697,8 @@ async function applyMatches(matches: MatchResult[], dryRun: boolean = false): Pr
         await bigquery.query(`
           UPDATE \`hale-mode-464009-i6.PanouControlUnitar.EtapeContract_v2\`
           SET
-            status_incasare = ${newStatus},
-            data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
+            status_incasare = '${newStatus}',
+            data_incasare = ${newStatus === 'Incasat' ? 'CURRENT_DATE()' : 'data_incasare'},
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Etapa = "${match.matching_details.etapa_id}"
         `);
