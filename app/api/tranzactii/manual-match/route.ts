@@ -659,6 +659,13 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     }
 
     // Inserăm matching-ul în TranzactiiMatching
+    // ✅ FIX: Conversie corectă tipuri DATE și TIMESTAMP pentru BigQuery
+    const dataCursValutarFormatted = dataCursValutar
+      ? (typeof dataCursValutar === 'object' && (dataCursValutar as any)?.value
+          ? (dataCursValutar as any).value
+          : (typeof dataCursValutar === 'string' ? dataCursValutar.split('T')[0] : null))
+      : null;
+
     const matchingRecord = {
       id: crypto.randomUUID(),
       tranzactie_id: matchRequest.tranzactie_id,
@@ -674,7 +681,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       diferenta_procent: diferentaProcent,
       moneda_target: monedaTarget,
       curs_valutar_folosit: cursValutar,
-      data_curs_valutar: dataCursValutar,
+      data_curs_valutar: dataCursValutarFormatted, // ✅ DATE format: 'YYYY-MM-DD'
       matching_details: {
         notes: matchRequest.notes,
         force_match: matchRequest.force_match,
@@ -682,7 +689,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
         created_by: 'manual_user'
       },
       status: 'active',
-      data_creare: new Date().toISOString(),
+      data_creare: new Date(), // ✅ TIMESTAMP format: Date object (BigQuery convertește automat)
       creat_de: 'manual_matching'
     };
 

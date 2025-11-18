@@ -121,11 +121,14 @@ export default function ManualMatchingPage() {
     setCandidatFacturi([]);
 
     try {
-      const response = await fetch(`/api/tranzactii/manual-match?action=candidates&tranzactie_id=${tranzactie.id}`);
+      const response = await fetch(`/api/tranzactii/manual-match?tranzactie_id=${tranzactie.id}`);
       const result = await response.json();
 
       if (result.success) {
-        setCandidatFacturi(result.data || []);
+        // ✅ FIX: API returnează result.candidati.etape_facturi, nu result.data
+        const facturiCandidati = result.candidati?.etape_facturi || [];
+        setCandidatFacturi(facturiCandidati);
+        console.log(`✅ Găsite ${facturiCandidati.length} facturi candidat pentru tranzacția ${tranzactie.id}`);
       } else {
         console.error('Eroare la încărcarea candidaților:', result.error);
       }
@@ -137,7 +140,7 @@ export default function ManualMatchingPage() {
   };
 
   // Manual match între tranzacție și factură
-  const executeManualMatch = async (tranzactieId: string, facturaId: string) => {
+  const executeManualMatch = async (tranzactieId: string, etapaFacturaId: string) => {
     setProcessing(true);
     try {
       const response = await fetch('/api/tranzactii/manual-match', {
@@ -145,8 +148,10 @@ export default function ManualMatchingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tranzactie_id: tranzactieId,
-          factura_id: facturaId,
-          match_type: 'manual'
+          target_type: 'etapa_factura', // ✅ FIX: Folosim noul format API
+          target_id: etapaFacturaId,
+          confidence_manual: 85,
+          notes: 'Asociere manuală din pagina /admin/tranzactii/manual'
         })
       });
 
@@ -561,7 +566,7 @@ export default function ManualMatchingPage() {
                         </div>
 
                         <button
-                          onClick={() => executeManualMatch(selectedTranzactie.id, factura.factura_id)}
+                          onClick={() => executeManualMatch(selectedTranzactie.id, factura.id)}
                           disabled={processing}
                           style={{
                             background: processing
