@@ -689,7 +689,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
         created_by: 'manual_user'
       },
       status: 'active',
-      data_creare: new Date(), // ✅ TIMESTAMP format: Date object (BigQuery convertește automat)
+      data_creare: new Date().toISOString(), // ✅ FIX: TIMESTAMP format requires ISO string for .insert()
       creat_de: 'manual_matching'
     };
 
