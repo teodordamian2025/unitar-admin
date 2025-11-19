@@ -189,10 +189,14 @@ export async function GET(request: NextRequest) {
     try {
       if (testResults.raw_data.proiect?.Client) {
         const clientQuery = `
-          SELECT * FROM \`${PROJECT_ID}.${DATASET}.Clienti\`
-          WHERE TRIM(LOWER(nume)) = TRIM(LOWER(@clientNume))
-          AND activ = true
-          LIMIT 1
+          WITH LatestVersions AS (
+            SELECT *,
+              ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+            FROM \`${PROJECT_ID}.${DATASET}.Clienti_v2\`
+            WHERE TRIM(LOWER(nume)) = TRIM(LOWER(@clientNume))
+              AND activ = true
+          )
+          SELECT * EXCEPT(rn) FROM LatestVersions WHERE rn = 1 LIMIT 1
         `;
         
         const [clientRows] = await bigquery.query({

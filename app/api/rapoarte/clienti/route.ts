@@ -26,18 +26,27 @@ const bigquery = new BigQuery({
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
-    // Construire query cu filtre
-    let query = `SELECT * FROM ${TABLE_CLIENTI}`;
-    const conditions: string[] = ['activ = true']; // Doar clienții activi
+
+    // ✅ Deduplicare: ia ultima versiune per client (pentru versioning append-only)
+    let query = `
+      WITH LatestVersions AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+        FROM ${TABLE_CLIENTI}
+        WHERE activ = true
+      )
+      SELECT * EXCEPT(rn) FROM LatestVersions WHERE rn = 1
+    `;
+
+    const conditions: string[] = [];
     const params: any = {};
 
     // Filtre
     const search = searchParams.get('search');
     if (search) {
       conditions.push(`(
-        LOWER(nume) LIKE LOWER(@search) OR 
-        LOWER(cui) LIKE LOWER(@search) OR 
+        LOWER(nume) LIKE LOWER(@search) OR
+        LOWER(cui) LIKE LOWER(@search) OR
         LOWER(cnp) LIKE LOWER(@search) OR
         LOWER(email) LIKE LOWER(@search) OR
         LOWER(telefon) LIKE LOWER(@search)
@@ -51,14 +60,22 @@ export async function GET(request: NextRequest) {
       params.tipClient = tipClient;
     }
 
-    // ✅ ELIMINAT: Filtrul sincronizat_factureaza nu mai este necesar
-
-    // Adaugă condiții la query
+    // Adaugă filtre după deduplicare (în WHERE exterior)
     if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+      // Înlocuim SELECT * cu WHERE final
+      query = `
+        WITH LatestVersions AS (
+          SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+          FROM ${TABLE_CLIENTI}
+          WHERE activ = true
+        )
+        SELECT * EXCEPT(rn) FROM LatestVersions
+        WHERE rn = 1 AND ${conditions.join(' AND ')}
+      `;
     }
 
-    // Sortare - ordinea alfabetică în loc de data_creare (care poate fi problematică)
+    // Sortare - ordinea alfabetică
     query += ' ORDER BY nume ASC';
 
     console.log('Executing clienti query:', query);
@@ -78,7 +95,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Eroare la încărcarea clienților:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Eroare la încărcarea clienților',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
     }, { status: 500 });
@@ -228,9 +245,17 @@ function generateInsertQuery(dataset: string, table: string, data: any): string 
 }
 
 export async function PUT(request: NextRequest) {
+  // Declarăm variabilele la nivel de funcție pentru a fi accesibile în catch
+  let clientId: string = '';
+  let clientUpdateData: any = {};
+
   try {
     const body = await request.json();
     const { id, ...updateData } = body;
+
+    // Salvăm pentru fallback
+    clientId = id;
+    clientUpdateData = updateData;
 
     if (!id) {
       return NextResponse.json({
@@ -338,8 +363,90 @@ export async function PUT(request: NextRequest) {
     // Dacă am ajuns aici, toate retry-urile au eșuat
     throw lastError;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Eroare la actualizarea clientului:', error);
+
+    // ✅ FALLBACK: Dacă UPDATE eșuează din cauza streaming buffer, facem INSERT (append-only versioning)
+    const isStreamingBufferError = error?.message?.includes('streaming buffer') ||
+                                   (error?.code === 400 && error?.errors?.[0]?.reason === 'invalidQuery');
+
+    if (isStreamingBufferError) {
+      try {
+        console.log('🔄 Streaming buffer conflict persists - Fallback la INSERT (append-only versioning)');
+
+        // Citim datele existente pentru client
+        const selectQuery = `
+          WITH LatestVersion AS (
+            SELECT *,
+              ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+            FROM ${TABLE_CLIENTI}
+            WHERE id = @id AND activ = true
+          )
+          SELECT * EXCEPT(rn) FROM LatestVersion WHERE rn = 1 LIMIT 1
+        `;
+
+        const [existingRows] = await bigquery.query({
+          query: selectQuery,
+          params: { id: clientId },
+          location: 'EU',
+        });
+
+        if (existingRows.length === 0) {
+          return NextResponse.json({
+            error: 'Client nu a fost găsit pentru actualizare'
+          }, { status: 404 });
+        }
+
+        const existingClient = existingRows[0];
+
+        // Construim datele pentru INSERT (merge existing + updates)
+        const insertData: any = {
+          ...existingClient,
+          ...clientUpdateData,
+          id: clientId, // păstrăm același ID (versioning)
+          data_actualizare: new Date().toISOString(), // timestamp nou
+          activ: true
+        };
+
+        // Handle date fields (remove {value: "..."} objects)
+        if (insertData.data_creare?.value) {
+          insertData.data_creare = insertData.data_creare.value;
+        }
+        if (insertData.ci_eliberata_la?.value) {
+          insertData.ci_eliberata_la = insertData.ci_eliberata_la.value;
+        }
+
+        // Remove row metadata
+        delete insertData.rn;
+
+        // Generează INSERT query
+        const insertQuery = generateInsertQuery(DATASET, `Clienti${tableSuffix}`, insertData);
+
+        console.log('🔄 Executing fallback INSERT:', insertQuery);
+
+        await bigquery.query({
+          query: insertQuery,
+          location: 'EU',
+        });
+
+        console.log('✅ Client actualizat cu succes prin INSERT (streaming buffer workaround)');
+
+        return NextResponse.json({
+          success: true,
+          message: 'Client actualizat cu succes',
+          fallback_used: true // flag pentru debugging
+        });
+
+      } catch (insertError) {
+        console.error('Eroare la fallback INSERT:', insertError);
+        return NextResponse.json({
+          error: 'Eroare la actualizarea clientului (fallback INSERT)',
+          details: insertError instanceof Error ? insertError.message : 'Eroare necunoscută'
+        }, { status: 500 });
+      }
+    }
+
+    // Altă eroare non-streaming-buffer
     return NextResponse.json({
       error: 'Eroare la actualizarea clientului',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'

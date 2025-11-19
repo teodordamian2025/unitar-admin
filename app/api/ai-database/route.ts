@@ -90,9 +90,25 @@ export async function POST(request: NextRequest) {
     } else if (lower.includes('câte proiecte') || lower.includes('numar proiecte')) {
       directQuery = `SELECT COUNT(*) as total_proiecte FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte\``;
     } else if (lower.includes('lista') && lower.includes('client')) {
-      directQuery = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\``;
+      directQuery = `
+        WITH LatestVersions AS (
+          SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti_v2\`
+          WHERE activ = TRUE
+        )
+        SELECT * EXCEPT(rn) FROM LatestVersions WHERE rn = 1
+      `;
     } else if (lower.includes('câți clienți') || lower.includes('numar client')) {
-      directQuery = `SELECT COUNT(*) as total_clienti FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti\``;
+      directQuery = `
+        WITH LatestVersions AS (
+          SELECT *,
+            ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Clienti_v2\`
+          WHERE activ = TRUE
+        )
+        SELECT COUNT(*) as total_clienti FROM LatestVersions WHERE rn = 1
+      `;
     } else if (lower.includes('lista') && lower.includes('contract')) {
       directQuery = `SELECT * FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Contracte\``;
     } else if (lower.includes('tranzacții') || lower.includes('tranzactii')) {

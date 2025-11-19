@@ -142,11 +142,17 @@ export async function matchCUIFromClienti(
 
     console.log(`🔍 [matchCUIFromClienti] Căutare pentru: "${numeContrapartida}" → normalized: "${numeNormalizat}"`);
 
-    // Query Clienti_v2 - iau TOȚI clienții activi (cache-ul este gestionat de BigQuery)
+    // Query Clienti_v2 - iau TOȚI clienții activi (cu deduplicare pentru versioning)
     const query = `
+      WITH LatestVersions AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY id ORDER BY data_actualizare DESC, data_creare DESC) as rn
+        FROM \`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\`
+        WHERE activ = TRUE
+      )
       SELECT id, nume, cui, cnp, tip_client, activ
-      FROM \`${PROJECT_ID}.${DATASET}.Clienti${tableSuffix}\`
-      WHERE activ = TRUE
+      FROM LatestVersions
+      WHERE rn = 1
       ORDER BY data_creare DESC
     `;
 
