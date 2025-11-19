@@ -133,6 +133,43 @@ interface ManualMatchRequest {
 // =================================================================
 
 /**
+ * Normalizează un obiect BigQuery convertind toate DATE/TIMESTAMP fields
+ * de la obiecte {value: "..."} la string-uri simple
+ */
+function normalizeBigQueryObject(obj: any): any {
+  if (!obj) return obj;
+
+  // Dacă e un array, procesăm fiecare element
+  if (Array.isArray(obj)) {
+    return obj.map(item => normalizeBigQueryObject(item));
+  }
+
+  // Dacă e un obiect {value: "..."} (DATE field din BigQuery), returnăm doar valoarea
+  if (obj && typeof obj === 'object' && obj.value && Object.keys(obj).length === 1) {
+    return obj.value;
+  }
+
+  // Dacă e un obiect obișnuit, procesăm recursiv toate proprietățile
+  if (obj && typeof obj === 'object' && !(obj instanceof Date)) {
+    const normalized: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        normalized[key] = normalizeBigQueryObject(obj[key]);
+      }
+    }
+    return normalized;
+  }
+
+  // Pentru Date objects, convertim la ISO string
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+
+  // Pentru primitive values, returnăm ca atare
+  return obj;
+}
+
+/**
  * Calculează similaritatea Levenshtein între două string-uri
  */
 function levenshteinSimilarity(str1: string, str2: string): number {
@@ -671,7 +708,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       tranzactie_id: matchRequest.tranzactie_id,
       target_type: matchRequest.target_type,
       target_id: matchRequest.target_id,
-      target_details: targetDetails,
+      target_details: normalizeBigQueryObject(targetDetails), // ✅ FIX: Normalizare DATE fields din BigQuery
       confidence_score: matchRequest.confidence_manual,
       matching_algorithm: 'manual',
       suma_tranzactie: Math.abs(tranzactie.suma),
