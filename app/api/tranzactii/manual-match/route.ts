@@ -612,6 +612,29 @@ async function findCheltuieliCandidatesForTransaction(
 // =================================================================
 
 /**
+ * Curăță un obiect pentru insert BigQuery - înlocuiește undefined cu null
+ */
+function cleanForBigQuery(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForBigQuery(item));
+  }
+  if (obj && typeof obj === 'object' && !(obj instanceof Date)) {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = cleanForBigQuery(obj[key]);
+        // Doar adăugăm key-ul dacă valoarea nu e null (BigQuery acceptă null explicit sau omitere)
+        cleaned[key] = value;
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
+/**
  * Aplică un matching manual selectat de utilizator
  */
 async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void> {
@@ -633,8 +656,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     let sumaTarget = 0;
     let sumaTargetRon = 0;
     let monedaTarget = 'RON';
-    let cursValutar = 1;
-    let dataCursValutar = new Date().toISOString().split('T')[0];
+    let cursValutar: number | null = null;
+    let dataCursValutar: string | null = null;
 
     if (matchRequest.target_type === 'etapa_factura') {
       const [etapeRows] = await bigquery.query(`
@@ -665,9 +688,13 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       const sumaDeIncasatCuTVA = Number(etapa.factura_total || 0) * procentDinEtapa;
       sumaTargetRon = sumaDeIncasatCuTVA - Number(etapa.valoare_incasata || 0);
 
-      monedaTarget = etapa.moneda;
-      cursValutar = etapa.curs_valutar;
-      dataCursValutar = etapa.data_curs_valutar;
+      monedaTarget = etapa.moneda || 'RON';
+      cursValutar = etapa.curs_valutar ? Number(etapa.curs_valutar) : null;
+      // Normalizare DATE field pentru BigQuery
+      const dataCursRaw = etapa.data_curs_valutar;
+      dataCursValutar = dataCursRaw
+        ? (typeof dataCursRaw === 'object' && dataCursRaw?.value ? dataCursRaw.value : dataCursRaw)
+        : null;
 
     } else if (matchRequest.target_type === 'cheltuiala') {
       const [cheltuieliRows] = await bigquery.query(`
@@ -696,39 +723,38 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     }
 
     // Inserăm matching-ul în TranzactiiMatching
-    // ✅ FIX: Conversie corectă tipuri DATE și TIMESTAMP pentru BigQuery
-    const dataCursValutarFormatted = dataCursValutar
-      ? (typeof dataCursValutar === 'object' && (dataCursValutar as any)?.value
-          ? (dataCursValutar as any).value
-          : (typeof dataCursValutar === 'string' ? dataCursValutar.split('T')[0] : null))
-      : null;
-
-    const matchingRecord = {
+    // ✅ Pregătim recordul cu toate valorile curate (fără undefined)
+    const rawMatchingRecord = {
       id: crypto.randomUUID(),
       tranzactie_id: matchRequest.tranzactie_id,
       target_type: matchRequest.target_type,
       target_id: matchRequest.target_id,
-      target_details: normalizeBigQueryObject(targetDetails), // ✅ FIX: Normalizare DATE fields din BigQuery
-      confidence_score: matchRequest.confidence_manual,
+      target_details: normalizeBigQueryObject(targetDetails), // Normalizare DATE fields din BigQuery
+      confidence_score: Number(matchRequest.confidence_manual),
       matching_algorithm: 'manual',
-      suma_tranzactie: Math.abs(tranzactie.suma),
-      suma_target: sumaTarget,
-      suma_target_ron: sumaTargetRon,
-      diferenta_ron: diferentaRon,
-      diferenta_procent: diferentaProcent,
+      suma_tranzactie: Number(Math.abs(tranzactie.suma)),
+      suma_target: Number(sumaTarget),
+      suma_target_ron: Number(sumaTargetRon),
+      diferenta_ron: Number(diferentaRon),
+      diferenta_procent: Number(diferentaProcent),
       moneda_target: monedaTarget,
-      curs_valutar_folosit: cursValutar,
-      data_curs_valutar: dataCursValutarFormatted, // ✅ DATE format: 'YYYY-MM-DD'
+      curs_valutar_folosit: cursValutar, // poate fi null
+      data_curs_valutar: dataCursValutar, // poate fi null (deja normalizat mai sus)
       matching_details: {
-        notes: matchRequest.notes,
-        force_match: matchRequest.force_match,
-        manual_confidence: matchRequest.confidence_manual,
+        notes: matchRequest.notes || null,
+        force_match: matchRequest.force_match || false,
+        manual_confidence: Number(matchRequest.confidence_manual),
         created_by: 'manual_user'
       },
       status: 'active',
-      data_creare: new Date().toISOString(), // ✅ FIX: TIMESTAMP format requires ISO string for .insert()
+      data_creare: new Date().toISOString(),
       creat_de: 'manual_matching'
     };
+
+    // ✅ CRITICAL FIX: Curăță toate valorile undefined pentru BigQuery
+    const matchingRecord = cleanForBigQuery(rawMatchingRecord);
+
+    console.log('🔍 [DEBUG] Matching record pregătit pentru insert:', JSON.stringify(matchingRecord, null, 2));
 
     // Inserăm în BigQuery
     const matchingTable = dataset.table(`TranzactiiMatching${tableSuffix}`);
