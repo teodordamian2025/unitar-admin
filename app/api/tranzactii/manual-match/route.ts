@@ -133,8 +133,57 @@ interface ManualMatchRequest {
 // =================================================================
 
 /**
- * Normalizează un obiect BigQuery convertind toate DATE/TIMESTAMP fields
- * de la obiecte {value: "..."} la string-uri simple
+ * Verifică dacă un obiect este BigNumber din BigQuery (NUMERIC field)
+ * Format: {s: 1, e: 2, c: [digits]}
+ */
+function isBigNumber(obj: any): boolean {
+  return obj &&
+         typeof obj === 'object' &&
+         obj.hasOwnProperty('s') &&
+         obj.hasOwnProperty('e') &&
+         obj.hasOwnProperty('c') &&
+         Array.isArray(obj.c);
+}
+
+/**
+ * Convertește BigNumber la număr simplu
+ */
+function bigNumberToNumber(bn: any): number {
+  if (!isBigNumber(bn)) return bn;
+
+  // Construim numărul din componente
+  const sign = bn.s;
+  const exp = bn.e;
+  const coeffs = bn.c;
+
+  // Reconstruim numărul
+  let numStr = coeffs.join('');
+
+  // Aplicăm exponentul
+  if (exp >= 0) {
+    // Adăugăm zerouri sau plasăm punctul zecimal
+    const totalDigits = numStr.length;
+    const decimalPos = exp + 1;
+
+    if (decimalPos >= totalDigits) {
+      // Adăugăm zerouri la final
+      numStr = numStr + '0'.repeat(decimalPos - totalDigits);
+    } else if (decimalPos < totalDigits) {
+      // Inserăm punctul zecimal
+      numStr = numStr.slice(0, decimalPos) + '.' + numStr.slice(decimalPos);
+    }
+  } else {
+    // Exponent negativ - număr mic
+    numStr = '0.' + '0'.repeat(Math.abs(exp) - 1) + numStr;
+  }
+
+  const result = parseFloat(numStr) * sign;
+  return result;
+}
+
+/**
+ * Normalizează un obiect BigQuery convertind toate DATE/TIMESTAMP/NUMERIC fields
+ * de la obiecte speciale la valori simple
  */
 function normalizeBigQueryObject(obj: any): any {
   if (!obj) return obj;
@@ -142,6 +191,11 @@ function normalizeBigQueryObject(obj: any): any {
   // Dacă e un array, procesăm fiecare element
   if (Array.isArray(obj)) {
     return obj.map(item => normalizeBigQueryObject(item));
+  }
+
+  // ✅ Dacă e un BigNumber (NUMERIC field din BigQuery), convertim la număr
+  if (isBigNumber(obj)) {
+    return bigNumberToNumber(obj);
   }
 
   // Dacă e un obiect {value: "..."} (DATE field din BigQuery), returnăm doar valoarea
