@@ -777,13 +777,22 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
     }
 
     // Inserăm matching-ul în TranzactiiMatching
+    // ✅ Pregătim obiectele JSON separate (vor fi stringify-ate)
+    const normalizedTargetDetails = normalizeBigQueryObject(targetDetails);
+    const matchingDetailsObject = {
+      notes: matchRequest.notes || null,
+      force_match: matchRequest.force_match || false,
+      manual_confidence: Number(matchRequest.confidence_manual),
+      created_by: 'manual_user'
+    };
+
     // ✅ Pregătim recordul cu toate valorile curate (fără undefined)
     const rawMatchingRecord = {
       id: crypto.randomUUID(),
       tranzactie_id: matchRequest.tranzactie_id,
       target_type: matchRequest.target_type,
       target_id: matchRequest.target_id,
-      target_details: normalizeBigQueryObject(targetDetails), // Normalizare DATE fields din BigQuery
+      target_details: JSON.stringify(normalizedTargetDetails), // ✅ CRITICAL: JSON fields trebuie stringify
       confidence_score: Number(matchRequest.confidence_manual),
       matching_algorithm: 'manual',
       suma_tranzactie: Number(Math.abs(tranzactie.suma)),
@@ -794,12 +803,7 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
       moneda_target: monedaTarget,
       curs_valutar_folosit: cursValutar, // poate fi null
       data_curs_valutar: dataCursValutar, // poate fi null (deja normalizat mai sus)
-      matching_details: {
-        notes: matchRequest.notes || null,
-        force_match: matchRequest.force_match || false,
-        manual_confidence: Number(matchRequest.confidence_manual),
-        created_by: 'manual_user'
-      },
+      matching_details: JSON.stringify(matchingDetailsObject), // ✅ CRITICAL: JSON fields trebuie stringify
       status: 'active',
       data_creare: new Date().toISOString(),
       creat_de: 'manual_matching'
@@ -812,7 +816,27 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
 
     // Inserăm în BigQuery
     const matchingTable = dataset.table(`TranzactiiMatching${tableSuffix}`);
-    await matchingTable.insert([matchingRecord]);
+
+    try {
+      await matchingTable.insert([matchingRecord]);
+    } catch (insertError: any) {
+      // Log detaliat pentru debugging BigQuery errors
+      console.error('❌ [DEBUG] BigQuery insert error details:', {
+        errorName: insertError.name,
+        errorMessage: insertError.message,
+        errors: insertError.errors,
+        response: insertError.response
+      });
+
+      // Log fiecare error individual pentru a vedea ce câmp exact e problematic
+      if (insertError.errors && Array.isArray(insertError.errors)) {
+        insertError.errors.forEach((err: any, idx: number) => {
+          console.error(`❌ [DEBUG] Error ${idx + 1}:`, JSON.stringify(err, null, 2));
+        });
+      }
+
+      throw insertError; // Re-aruncăm eroarea pentru a o prinde în catch-ul exterior
+    }
 
     // Actualizăm tranzacția
     await bigquery.query(`
