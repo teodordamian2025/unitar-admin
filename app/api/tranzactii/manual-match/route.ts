@@ -881,8 +881,8 @@ async function applyManualMatch(matchRequest: ManualMatchRequest): Promise<void>
         await bigquery.query(`
           UPDATE ${TABLE_ETAPE_CONTRACT}
           SET
-            status_incasare = ${newStatus},
-            data_incasare = CASE WHEN ${newStatus} = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
+            status_incasare = '${newStatus}',
+            data_incasare = CASE WHEN '${newStatus}' = 'Incasat' THEN CURRENT_DATE() ELSE data_incasare END,
             data_actualizare = CURRENT_TIMESTAMP()
           WHERE ID_Etapa = "${targetDetails.etapa_id}"
         `);
