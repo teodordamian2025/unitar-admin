@@ -386,10 +386,10 @@ export default function ANAFClientSearch({
             </div>
           </div>
 
-          {/* Butoane acțiuni */}
-          {!searchResult.existsInBD && (
-            <div style={{ 
-              display: 'flex', 
+          {/* Butoane acțiuni - doar când NU suntem în modal */}
+          {!searchResult.existsInBD && !showInModal && (
+            <div style={{
+              display: 'flex',
               gap: '0.75rem',
               paddingTop: '1rem',
               borderTop: '1px solid #e0e0e0'
@@ -412,7 +412,7 @@ export default function ANAFClientSearch({
               >
                 📥 Importă în Baza de Date
               </button>
-              
+
               <button
                 onClick={() => setShowImportDialog(false)}
                 style={{
@@ -430,11 +430,30 @@ export default function ANAFClientSearch({
               </button>
             </div>
           )}
+
+          {/* Info pentru utilizator când suntem în modal */}
+          {!searchResult.existsInBD && showInModal && (
+            <div style={{
+              paddingTop: '1rem',
+              borderTop: '1px solid #e0e0e0'
+            }}>
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(93, 173, 226, 0.1) 100%)',
+                border: '1px solid rgba(52, 152, 219, 0.3)',
+                borderRadius: '8px',
+                padding: '1rem',
+                fontSize: '14px',
+                color: '#2c3e50'
+              }}>
+                💡 <strong>Date încărcate din ANAF</strong> - Completează informațiile lipsă (telefon, email, IBAN, etc.) în formularul de mai jos și salvează clientul.
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Dialog import */}
-      {showImportDialog && searchResult && !searchResult.existsInBD && (
+      {/* Dialog import - doar când NU suntem în modal */}
+      {showImportDialog && searchResult && !searchResult.existsInBD && !showInModal && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%)',
           border: '1px solid rgba(39, 174, 96, 0.3)',
@@ -442,15 +461,15 @@ export default function ANAFClientSearch({
           padding: '1rem',
           marginTop: '1rem'
         }}>
-          <p style={{ 
-            margin: '0 0 1rem 0', 
-            fontSize: '14px', 
+          <p style={{
+            margin: '0 0 1rem 0',
+            fontSize: '14px',
             color: '#2c3e50',
             fontWeight: '500'
           }}>
             💡 <strong>Client găsit în ANAF!</strong> Vrei să îl imporți automat în baza de date?
           </p>
-          
+
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               onClick={() => handleImport()}
@@ -468,7 +487,7 @@ export default function ANAFClientSearch({
             >
               ✅ Da, importă
             </button>
-            
+
             <button
               onClick={() => setShowImportDialog(false)}
               style={{
