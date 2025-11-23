@@ -142,11 +142,17 @@ export async function GET(request: NextRequest) {
       proiecteParams.push({ name: 'endDate', parameterType: { type: 'DATE' }, parameterValue: { value: endDate } });
     }
 
-    const [proiecteRows] = await bigquery.query({
+    const proiecteQueryOptions: any = {
       query: proiecteQuery,
       location: 'EU',
-      params: proiecteParams,
-    });
+    };
+
+    // Only add params if there are any (BigQuery fails if params array is present but empty with named params)
+    if (proiecteParams.length > 0) {
+      proiecteQueryOptions.params = proiecteParams;
+    }
+
+    const [proiecteRows] = await bigquery.query(proiecteQueryOptions);
 
     allTasks = [...proiecteRows];
 
@@ -223,11 +229,16 @@ export async function GET(request: NextRequest) {
       ORDER BY Data_Start ASC
     `;
 
-    const [subproiecteRows] = await bigquery.query({
+    const subproiecteQueryOptions: any = {
       query: subproiecteQuery,
       location: 'EU',
-      params: proiecteParams, // Same params as projects
-    });
+    };
+
+    if (proiecteParams.length > 0) {
+      subproiecteQueryOptions.params = proiecteParams;
+    }
+
+    const [subproiecteRows] = await bigquery.query(subproiecteQueryOptions);
 
     allTasks = [...allTasks, ...subproiecteRows];
 
@@ -304,11 +315,16 @@ export async function GET(request: NextRequest) {
       sarciniParams.push({ name: 'userId', parameterType: { type: 'STRING' }, parameterValue: { value: userId } });
     }
 
-    const [sarciniRows] = await bigquery.query({
+    const sarciniQueryOptions: any = {
       query: sarciniQuery,
       location: 'EU',
-      params: sarciniParams,
-    });
+    };
+
+    if (sarciniParams.length > 0) {
+      sarciniQueryOptions.params = sarciniParams;
+    }
+
+    const [sarciniRows] = await bigquery.query(sarciniQueryOptions);
 
     allTasks = [...allTasks, ...sarciniRows];
 
@@ -351,11 +367,16 @@ export async function GET(request: NextRequest) {
       ORDER BY ec.data_scadenta ASC
     `;
 
-    const [milestonesRows] = await bigquery.query({
+    const milestonesQueryOptions: any = {
       query: milestonesQuery,
       location: 'EU',
-      params: proiecteParams,
-    });
+    };
+
+    if (proiecteParams.length > 0) {
+      milestonesQueryOptions.params = proiecteParams;
+    }
+
+    const [milestonesRows] = await bigquery.query(milestonesQueryOptions);
 
     allTasks = [...allTasks, ...milestonesRows];
 
