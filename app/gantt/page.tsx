@@ -233,289 +233,32 @@ export default function GanttView() {
 
       console.log('[USER GANTT DEBUG] Starting gantt data load...');
 
-      // For normal users, build Gantt tasks from all data sources - IDENTICAL TO ADMIN
-      const [proiecteResponse, subproiecteResponse, sarciniResponse, timeTrackingResponse] = await Promise.all([
-        fetch('/api/rapoarte/proiecte'),
-        fetch('/api/rapoarte/subproiecte'),
-        fetch('/api/rapoarte/sarcini'),
-        fetch('/api/rapoarte/timetracking')
-      ]);
-
-      console.log('[USER GANTT DEBUG] API responses:', {
-        proiecteStatus: proiecteResponse.status,
-        subproiecteStatus: subproiecteResponse.status,
-        sarciniStatus: sarciniResponse.status,
-        timeTrackingStatus: timeTrackingResponse.status
+      // FIX: Use the same API as admin to get all responsabili
+      // This API does JOIN with ProiecteResponsabili, SubproiecteResponsabili, SarciniResponsabili
+      const params = new URLSearchParams({
+        view_mode: timelineSettings.viewMode,
+        include_dependencies: 'true',
+        include_resources: 'true',
+        user_id: user?.uid || ''
       });
 
-      const proiecteData = await proiecteResponse.json();
-      const subproiecteData = await subproiecteResponse.json();
-      const sarciniData = await sarciniResponse.json();
-      const timeTrackingData = await timeTrackingResponse.json();
+      const response = await fetch(`/api/analytics/gantt-data?${params}`);
+      const result = await response.json();
 
-      console.log('[USER GANTT DEBUG] API data:', {
-        proiecteSuccess: proiecteData.success,
-        proiecteDataLength: Array.isArray(proiecteData.data) ? proiecteData.data.length : 'not_array',
-        subproiecteSuccess: subproiecteData.success,
-        subproiecteDataLength: Array.isArray(subproiecteData.data) ? subproiecteData.data.length : 'not_array',
-        sarciniSuccess: sarciniData.success,
-        sarciniDataLength: Array.isArray(sarciniData.data) ? sarciniData.data.length : 'not_array',
-        timeTrackingSuccess: timeTrackingData.success
-      });
+      if (result.success) {
+        const tasks = result.data.map((task: any) => ({
+          ...task,
+          // Handle BigQuery DATE objects {value: "2025-08-16"} or direct strings
+          startDate: normalizeDate(task.startDate),
+          endDate: normalizeDate(task.endDate),
+          isCollapsed: false
+        }));
 
-      // Build Gantt tasks from all sources - IDENTICAL TO ADMIN
-      let tasks: GanttTask[] = [];
-
-      // 1. PROIECTE - PARENT TASKS
-      if (proiecteData.success && Array.isArray(proiecteData.data) && proiecteData.data.length > 0) {
-        console.log('[USER GANTT DEBUG] Processing proiecte for Gantt:', proiecteData.data.length);
-
-        let filteredProiecte = proiecteData.data;
-
-        // Apply filters
-        if (filters.proiect_id) {
-          filteredProiecte = filteredProiecte.filter((p: any) => p.ID_Proiect === filters.proiect_id);
-        }
-        if (filters.proiect_nume) {
-          const searchTerm = filters.proiect_nume.toLowerCase();
-          filteredProiecte = filteredProiecte.filter((p: any) =>
-            p.ID_Proiect?.toLowerCase().includes(searchTerm) ||
-            p.Denumire?.toLowerCase().includes(searchTerm) ||
-            p.Adresa?.toLowerCase().includes(searchTerm) ||
-            p.Client_Nume?.toLowerCase().includes(searchTerm)
-          );
-        }
-        if (filters.responsabil_nume) {
-          filteredProiecte = filteredProiecte.filter((p: any) =>
-            p.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
-          );
-        }
-
-        const ganttProiecte = filteredProiecte.map((p: any, index: number) => {
-          // Handle BigQuery DATE fields with .value property
-          const dataStart = p.Data_Start?.value || p.Data_Start;
-          const dataFinal = p.Data_Final?.value || p.Data_Final;
-
-          // Calculate worked hours from time tracking for this project
-          let workedHours = 0;
-          if (timeTrackingData.success && Array.isArray(timeTrackingData.data)) {
-            workedHours = timeTrackingData.data
-              .filter((t: any) => t.proiect_id === p.ID_Proiect)
-              .reduce((sum: number, t: any) => sum + (t.ore || 0), 0);
-          }
-
-          // FIX CRITICAL: Read progres_procent from database (not Progres)
-          // NULL or 0 returns 0, no fallback to calculation
-          const progress = p.progres_procent !== undefined && p.progres_procent !== null
-            ? Math.max(0, Math.min(100, Math.round(p.progres_procent)))
-            : 0;
-
-          return {
-            id: `proj_${p.ID_Proiect || index}`,
-            name: `${p.ID_Proiect || `proj_${index}`} - ${p.Denumire || 'Proiect'}`,
-            startDate: dataStart || new Date().toISOString().split('T')[0],
-            endDate: dataFinal || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress,
-            type: 'proiect' as const,
-            dependencies: [],
-            resources: p.Responsabil ? [p.Responsabil] : [displayName],
-            priority: index < 2 ? 'urgent' : (index < 4 ? 'ridicata' : 'normala') as any,
-            status: p.Status === 'Finalizat' ? 'finalizata' : (p.Status === 'In Progres' || p.Status === 'Activ' ? 'in_progress' : 'to_do') as any,
-            estimatedHours: 0, // No financial data for normal users
-            workedHours,
-            isCollapsed: false,
-            level: 0
-          };
-        });
-
-        tasks.push(...ganttProiecte);
-        console.log('[USER GANTT DEBUG] Added proiecte Gantt tasks:', ganttProiecte.length);
+        setGanttData(tasks);
+        calculateTimelineRange(tasks);
+      } else {
+        toast.error('Eroare la încărcarea datelor Gantt!');
       }
-
-      // 2. SUBPROIECTE - CHILD TASKS
-      if (subproiecteData.success && Array.isArray(subproiecteData.data) && subproiecteData.data.length > 0) {
-        console.log('[USER GANTT DEBUG] Processing subproiecte for Gantt:', subproiecteData.data.length);
-
-        let filteredSubproiecte = subproiecteData.data;
-
-        // Apply filters
-        if (filters.proiect_id) {
-          filteredSubproiecte = filteredSubproiecte.filter((s: any) => s.ID_Proiect === filters.proiect_id);
-        }
-        if (filters.proiect_nume) {
-          const searchTerm = filters.proiect_nume.toLowerCase();
-          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
-            s.ID_Proiect?.toLowerCase().includes(searchTerm) ||
-            s.Denumire?.toLowerCase().includes(searchTerm) ||
-            s.Proiect_Denumire?.toLowerCase().includes(searchTerm) ||
-            s.Adresa?.toLowerCase().includes(searchTerm)
-          );
-        }
-        if (filters.responsabil_nume) {
-          filteredSubproiecte = filteredSubproiecte.filter((s: any) =>
-            s.Responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase())
-          );
-        }
-
-        const ganttSubproiecte = filteredSubproiecte.map((s: any, index: number) => {
-          // Handle BigQuery DATE fields with .value property
-          const dataStart = s.Data_Start?.value || s.Data_Start;
-          const dataFinal = s.Data_Final?.value || s.Data_Final;
-
-          // FIX CRITICAL: Read progres_procent from database (not Progres)
-          const progress = s.progres_procent !== undefined && s.progres_procent !== null
-            ? Math.max(0, Math.min(100, Math.round(s.progres_procent)))
-            : 0;
-
-          return {
-            id: `subproj_${s.ID_Subproiect || index}`,
-            name: `${s.Denumire || 'Subproiect'} (${s.ID_Proiect || 'proj'})`,
-            startDate: dataStart || new Date().toISOString().split('T')[0],
-            endDate: dataFinal || new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress,
-            type: 'subproiect' as const,
-            parentId: `proj_${s.ID_Proiect}`,
-            dependencies: [],
-            resources: s.Responsabil ? [s.Responsabil] : [displayName],
-            priority: s.Status === 'Activ' ? 'urgent' : 'normala' as any,
-            status: s.Status === 'Finalizat' ? 'finalizata' : (s.Status === 'Activ' ? 'in_progress' : 'to_do') as any,
-            estimatedHours: 0,
-            workedHours: 0,
-            isCollapsed: false,
-            level: 1
-          };
-        });
-
-        tasks.push(...ganttSubproiecte);
-        console.log('[USER GANTT DEBUG] Added subproiecte Gantt tasks:', ganttSubproiecte.length);
-      }
-
-      // 3. SARCINI - LEAF TASKS
-      if (sarciniData.success && Array.isArray(sarciniData.data) && sarciniData.data.length > 0) {
-        console.log('[USER GANTT DEBUG] Processing sarcini for Gantt:', sarciniData.data.length);
-
-        let filteredSarcini = sarciniData.data;
-
-        // Apply filters
-        if (filters.proiect_id) {
-          filteredSarcini = filteredSarcini.filter((s: any) => s.proiect_id === filters.proiect_id);
-        }
-        if (filters.proiect_nume) {
-          const searchTerm = filters.proiect_nume.toLowerCase();
-          filteredSarcini = filteredSarcini.filter((s: any) =>
-            s.proiect_id?.toLowerCase().includes(searchTerm) ||
-            s.titlu?.toLowerCase().includes(searchTerm) ||
-            s.descriere?.toLowerCase().includes(searchTerm)
-          );
-        }
-        if (filters.responsabil_nume) {
-          filteredSarcini = filteredSarcini.filter((s: any) => {
-            const responsabil = s.responsabili && s.responsabili[0] ? s.responsabili[0].responsabil_nume : '';
-            return responsabil?.toLowerCase().includes(filters.responsabil_nume.toLowerCase());
-          });
-        }
-
-        const ganttSarcini = filteredSarcini.map((s: any, index: number) => {
-          // Handle BigQuery DATE fields with .value property
-          const dataScadenta = s.data_scadenta?.value || s.data_scadenta;
-          const dataCreare = s.data_creare?.value || s.data_creare;
-
-          // FIX CRITICAL: Read progres_procent from database (not progres)
-          const progress = s.progres_procent !== undefined && s.progres_procent !== null
-            ? Math.max(0, Math.min(100, Math.round(s.progres_procent)))
-            : 0;
-
-          return {
-            id: `task_${s.id || index}`,
-            name: `${s.titlu || 'Sarcină'} (${s.proiect_id || 'proj'})`,
-            startDate: dataCreare || new Date().toISOString().split('T')[0],
-            endDate: dataScadenta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress,
-            type: 'sarcina' as const,
-            parentId: s.subproiect_id ? `subproj_${s.subproiect_id}` : `proj_${s.proiect_id}`,
-            dependencies: [],
-            resources: s.responsabili && s.responsabili[0] ? [s.responsabili[0].responsabil_nume] : [displayName],
-            priority: s.prioritate?.toLowerCase() || 'normala' as any,
-            status: s.status || 'to_do' as any,
-            estimatedHours: 0,
-            workedHours: 0,
-            isCollapsed: false,
-            level: 2
-          };
-        });
-
-        tasks.push(...ganttSarcini);
-        console.log('[USER GANTT DEBUG] Added sarcini Gantt tasks:', ganttSarcini.length);
-      }
-
-      console.log('[USER GANTT DEBUG] Total Gantt tasks created:', tasks.length);
-
-      // Add mock tasks if no real data for demonstration
-      if (tasks.length === 0) {
-        console.log('[USER GANTT DEBUG] No real data available, using mock data');
-
-        const today = new Date();
-        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const nextMonth = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-        tasks = [
-          {
-            id: 'mock_proj_1',
-            name: 'proj_alpha - Primul meu proiect',
-            startDate: today.toISOString().split('T')[0],
-            endDate: nextMonth.toISOString().split('T')[0],
-            progress: 45,
-            type: 'proiect',
-            dependencies: [],
-            resources: [displayName],
-            priority: 'urgent',
-            status: 'in_progress',
-            estimatedHours: 120,
-            workedHours: 54,
-            isCollapsed: false,
-            level: 0
-          },
-          {
-            id: 'mock_subproj_1',
-            name: 'Faza 1 (proj_alpha)',
-            startDate: today.toISOString().split('T')[0],
-            endDate: nextWeek.toISOString().split('T')[0],
-            progress: 80,
-            type: 'subproiect',
-            parentId: 'mock_proj_1',
-            dependencies: [],
-            resources: [displayName],
-            priority: 'ridicata',
-            status: 'in_progress',
-            estimatedHours: 40,
-            workedHours: 32,
-            isCollapsed: false,
-            level: 1
-          },
-          {
-            id: 'mock_task_1',
-            name: 'Analiza cerințe (proj_alpha)',
-            startDate: today.toISOString().split('T')[0],
-            endDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: 100,
-            type: 'sarcina',
-            parentId: 'mock_subproj_1',
-            dependencies: [],
-            resources: [displayName],
-            priority: 'normala',
-            status: 'finalizata',
-            estimatedHours: 8,
-            workedHours: 8,
-            isCollapsed: false,
-            level: 2
-          }
-        ];
-      }
-
-      console.log('[USER GANTT DEBUG] Final Gantt tasks:', tasks.length, tasks);
-
-      setGanttData(tasks);
-      calculateTimelineRange(tasks);
 
     } catch (error) {
       console.error('Eroare la încărcarea datelor Gantt:', error);
