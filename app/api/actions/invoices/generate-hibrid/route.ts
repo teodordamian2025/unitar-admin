@@ -802,6 +802,17 @@ function cleanNonAscii(text: string): string {
     .replace(/[^\x00-\x7F]/g, '');
 }
 
+// ✅ NOU: Funcție pentru escape HTML entities (PĂSTREAZĂ diacriticele românești)
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -1017,8 +1028,8 @@ export async function POST(request: NextRequest) {
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    // ✅ PĂSTRAT: Curățare note curs pentru PDF
-    const notaCursValutarClean = cleanNonAscii(notaCursValutar);
+    // ✅ NOU: Escape HTML pentru nota cursului valutar (PĂSTREAZĂ diacriticele)
+    const notaCursValutarClean = escapeHtml(notaCursValutar);
 
     // ✅ NOU: Construiește numărul facturii pentru afișare PDF cu seria corectă (UPA pentru iapp, UP pentru ANAF)
     const serieForDisplay = (tip_facturare === 'iapp' && iappConfig?.serie_default)
@@ -1321,12 +1332,12 @@ export async function POST(request: NextRequest) {
             </div>
             <div class="company-right">
                 <h3>CLIENT</h3>
-                <div class="info-line"><strong>${safeClientData.nume}</strong></div>
-                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${safeClientData.cui}</div>
-                ${safeClientData.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${safeClientData.nr_reg_com}</div>` : ''}
-                <div class="info-line">Adresa: ${safeClientData.adresa}</div>
-                <div class="info-line">Telefon: ${safeClientData.telefon}</div>
-                <div class="info-line">Email: ${safeClientData.email}</div>
+                <div class="info-line"><strong>${escapeHtml(safeClientData.nume)}</strong></div>
+                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${escapeHtml(safeClientData.cui)}</div>
+                ${safeClientData.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${escapeHtml(safeClientData.nr_reg_com)}</div>` : ''}
+                <div class="info-line">Adresa: ${escapeHtml(safeClientData.adresa)}</div>
+                <div class="info-line">Telefon: ${escapeHtml(safeClientData.telefon)}</div>
+                <div class="info-line">Email: ${escapeHtml(safeClientData.email)}</div>
             </div>
         </div>
 
@@ -1391,10 +1402,10 @@ export async function POST(request: NextRequest) {
                     <tr>
                         <td class="text-center" style="font-size: 8px;">${index + 1}</td>
                         <td style="font-size: 8px; padding: 2px;">
-                            ${descriereCompleta}
+                            ${escapeHtml(descriereCompleta)}
                             ${linie.tip === 'etapa_contract' ? ' <small style="color: #3498db;">[CONTRACT]</small>' : ''}
                             ${linie.tip === 'etapa_anexa' ? ' <small style="color: #e67e22;">[ANEXĂ]</small>' : ''}
-                            ${linie.descriere ? `<br><span style="font-size: 7px; color: #555; font-style: italic;">${linie.descriere}</span>` : ''}
+                            ${linie.descriere ? `<br><span style="font-size: 7px; color: #555; font-style: italic;">${escapeHtml(linie.descriere)}</span>` : ''}
                         </td>
                         <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
                         <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
@@ -1436,7 +1447,7 @@ export async function POST(request: NextRequest) {
         <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #cce7ff; border-radius: 3px;">
             <div style="font-size: 9px; color: #0c5460;">
                 <strong>Observatii:</strong><br/>
-                ${cleanNonAscii(observatii).replace(/\n/g, '<br/>')}
+                ${escapeHtml(observatii).replace(/\n/g, '<br/>')}
             </div>
         </div>
         ` : ''}
