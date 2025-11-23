@@ -42,10 +42,20 @@ export async function GET(request: NextRequest) {
     const viewMode = searchParams.get('view_mode') || 'weeks';
     const includeDependencies = searchParams.get('include_dependencies') === 'true';
     const includeResources = searchParams.get('include_resources') === 'true';
-    const projectIds = searchParams.get('project_ids')?.split(',');
-    const userId = searchParams.get('user_id');
-    const startDate = searchParams.get('start_date');
-    const endDate = searchParams.get('end_date');
+
+    // Validate and filter empty values
+    const projectIdsRaw = searchParams.get('project_ids');
+    const projectIdsFiltered = projectIdsRaw ? projectIdsRaw.split(',').filter(id => id.trim()) : [];
+    const projectIds = projectIdsFiltered.length > 0 ? projectIdsFiltered : undefined;
+
+    const userIdRaw = searchParams.get('user_id');
+    const userId = userIdRaw && userIdRaw.trim() ? userIdRaw.trim() : undefined;
+
+    const startDateRaw = searchParams.get('start_date');
+    const startDate = startDateRaw && startDateRaw.trim() ? startDateRaw.trim() : undefined;
+
+    const endDateRaw = searchParams.get('end_date');
+    const endDate = endDateRaw && endDateRaw.trim() ? endDateRaw.trim() : undefined;
 
     let allTasks: any[] = [];
 
@@ -147,9 +157,10 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     };
 
-    // Only add params if there are any (BigQuery fails if params array is present but empty with named params)
+    // Only add params if there are any (BigQuery requires parameterMode for named params)
     if (proiecteParams.length > 0) {
       proiecteQueryOptions.params = proiecteParams;
+      proiecteQueryOptions.parameterMode = 'NAMED'; // Required for @parametru syntax
     }
 
     const [proiecteRows] = await bigquery.query(proiecteQueryOptions);
@@ -236,6 +247,7 @@ export async function GET(request: NextRequest) {
 
     if (proiecteParams.length > 0) {
       subproiecteQueryOptions.params = proiecteParams;
+      subproiecteQueryOptions.parameterMode = 'NAMED';
     }
 
     const [subproiecteRows] = await bigquery.query(subproiecteQueryOptions);
@@ -322,6 +334,7 @@ export async function GET(request: NextRequest) {
 
     if (sarciniParams.length > 0) {
       sarciniQueryOptions.params = sarciniParams;
+      sarciniQueryOptions.parameterMode = 'NAMED';
     }
 
     const [sarciniRows] = await bigquery.query(sarciniQueryOptions);
@@ -374,6 +387,7 @@ export async function GET(request: NextRequest) {
 
     if (proiecteParams.length > 0) {
       milestonesQueryOptions.params = proiecteParams;
+      milestonesQueryOptions.parameterMode = 'NAMED';
     }
 
     const [milestonesRows] = await bigquery.query(milestonesQueryOptions);
