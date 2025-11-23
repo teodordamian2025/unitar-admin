@@ -124,6 +124,35 @@ export default function GanttView() {
     return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
   };
 
+  // Funcție pentru generare culoare consistentă per responsabil
+  const getResponsabilColor = (nume: string): { bg: string; text: string; border: string } => {
+    if (!nume) return { bg: 'rgba(59, 130, 246, 0.1)', text: '#3b82f6', border: '#3b82f6' };
+
+    // Hash simplu pentru a genera un index consistent bazat pe nume
+    let hash = 0;
+    for (let i = 0; i < nume.length; i++) {
+      hash = nume.charCodeAt(i) + ((hash << 5) - hash);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+
+    // Paletă de culori distincte pentru responsabili
+    const colors = [
+      { bg: 'rgba(59, 130, 246, 0.1)', text: '#3b82f6', border: '#3b82f6' }, // Albastru
+      { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6', border: '#8b5cf6' }, // Violet
+      { bg: 'rgba(236, 72, 153, 0.1)', text: '#ec4899', border: '#ec4899' }, // Roz
+      { bg: 'rgba(245, 158, 11, 0.1)', text: '#f59e0b', border: '#f59e0b' }, // Portocaliu
+      { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981', border: '#10b981' }, // Verde
+      { bg: 'rgba(6, 182, 212, 0.1)', text: '#06b6d4', border: '#06b6d4' }, // Cyan
+      { bg: 'rgba(239, 68, 68, 0.1)', text: '#ef4444', border: '#ef4444' }, // Roșu
+      { bg: 'rgba(168, 85, 247, 0.1)', text: '#a855f7', border: '#a855f7' }, // Purple
+      { bg: 'rgba(20, 184, 166, 0.1)', text: '#14b8a6', border: '#14b8a6' }, // Teal
+      { bg: 'rgba(251, 146, 60, 0.1)', text: '#fb923c', border: '#fb923c' }, // Amber
+    ];
+
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -1150,23 +1179,26 @@ export default function GanttView() {
                           color: '#6b7280'
                         }}>
                           <span>👥</span>
-                          {task.resources.slice(0, 3).map((resource, idx) => (
-                            <span
-                              key={idx}
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 6px',
-                                background: 'rgba(59, 130, 246, 0.1)',
-                                borderRadius: '4px',
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                color: '#3b82f6'
-                              }}
-                              title={resource}
-                            >
-                              {getInitials(resource)}
-                            </span>
-                          ))}
+                          {task.resources.slice(0, 3).map((resource, idx) => {
+                            const colors = getResponsabilColor(resource);
+                            return (
+                              <span
+                                key={idx}
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '2px 6px',
+                                  background: colors.bg,
+                                  borderRadius: '4px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: '600',
+                                  color: colors.text
+                                }}
+                                title={resource}
+                              >
+                                {getInitials(resource)}
+                              </span>
+                            );
+                          })}
                           {task.resources.length > 3 && (
                             <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
                               +{task.resources.length - 3}

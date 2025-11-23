@@ -62,7 +62,7 @@ const userNavStructure: NavItem[] = [
   },
   {
     href: '/gantt',
-    label: 'Timeline Proiecte',
+    label: 'Gantt',
     icon: '📊'
   },
   {
