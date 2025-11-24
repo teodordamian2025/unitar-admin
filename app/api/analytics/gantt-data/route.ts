@@ -96,12 +96,12 @@ export async function GET(request: NextRequest) {
           ON s.id = tt.sarcina_id
         LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr 
           ON p.ID_Proiect = pr.proiect_id
-        WHERE p.Data_Start IS NOT NULL 
+        WHERE p.Data_Start IS NOT NULL
           AND p.Data_Final IS NOT NULL
           AND p.Status != 'Anulat'
           ${projectIds ? 'AND p.ID_Proiect IN UNNEST(@projectIds)' : ''}
-          ${startDate ? 'AND p.Data_Final >= @startDate' : ''}
-          ${endDate ? 'AND p.Data_Start <= @endDate' : ''}
+          ${startDate ? 'AND CAST(p.Data_Final AS DATE) >= @startDate' : ''}
+          ${endDate ? 'AND CAST(p.Data_Start AS DATE) <= @endDate' : ''}
         GROUP BY p.ID_Proiect, p.Denumire, p.Adresa, p.Data_Start, p.Data_Final,
                  p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil, p.progres_procent
       )
@@ -137,19 +137,16 @@ export async function GET(request: NextRequest) {
       ORDER BY Data_Start ASC
     `;
 
-    const proiecteParams: any[] = [];
+    // Build params object using simplified format (key-value pairs)
+    const proiecteParams: any = {};
     if (projectIds) {
-      proiecteParams.push({ 
-        name: 'projectIds', 
-        parameterType: { type: 'ARRAY', arrayType: { type: 'STRING' } }, 
-        parameterValue: { arrayValues: projectIds.map(id => ({ value: id })) }
-      });
+      proiecteParams.projectIds = projectIds;
     }
     if (startDate) {
-      proiecteParams.push({ name: 'startDate', parameterType: { type: 'DATE' }, parameterValue: { value: startDate } });
+      proiecteParams.startDate = startDate;
     }
     if (endDate) {
-      proiecteParams.push({ name: 'endDate', parameterType: { type: 'DATE' }, parameterValue: { value: endDate } });
+      proiecteParams.endDate = endDate;
     }
 
     const proiecteQueryOptions: any = {
@@ -158,9 +155,13 @@ export async function GET(request: NextRequest) {
     };
 
     // Only add params if there are any (BigQuery requires parameterMode for named params)
-    if (proiecteParams.length > 0) {
+    if (Object.keys(proiecteParams).length > 0) {
       proiecteQueryOptions.params = proiecteParams;
-      proiecteQueryOptions.parameterMode = 'NAMED'; // Required for @parametru syntax
+      proiecteQueryOptions.types = {
+        ...(projectIds ? { projectIds: ['STRING'] } : {}),
+        ...(startDate ? { startDate: 'DATE' } : {}),
+        ...(endDate ? { endDate: 'DATE' } : {})
+      };
     }
 
     const [proiecteRows] = await bigquery.query(proiecteQueryOptions);
@@ -200,13 +201,13 @@ export async function GET(request: NextRequest) {
           ON s.id = tt.sarcina_id
         LEFT JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} spr 
           ON sp.ID_Subproiect = spr.subproiect_id
-        WHERE sp.Data_Start IS NOT NULL 
+        WHERE sp.Data_Start IS NOT NULL
           AND sp.Data_Final IS NOT NULL
           AND sp.Status != 'Anulat'
           AND sp.activ = true
           ${projectIds ? 'AND sp.ID_Proiect IN UNNEST(@projectIds)' : ''}
-          ${startDate ? 'AND sp.Data_Final >= @startDate' : ''}
-          ${endDate ? 'AND sp.Data_Start <= @endDate' : ''}
+          ${startDate ? 'AND CAST(sp.Data_Final AS DATE) >= @startDate' : ''}
+          ${endDate ? 'AND CAST(sp.Data_Start AS DATE) <= @endDate' : ''}
         GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start,
                  sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil, sp.progres_procent
       )
@@ -245,9 +246,14 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     };
 
-    if (proiecteParams.length > 0) {
+    // Reuse same params as proiecte (projectIds, startDate, endDate)
+    if (Object.keys(proiecteParams).length > 0) {
       subproiecteQueryOptions.params = proiecteParams;
-      subproiecteQueryOptions.parameterMode = 'NAMED';
+      subproiecteQueryOptions.types = {
+        ...(projectIds ? { projectIds: ['STRING'] } : {}),
+        ...(startDate ? { startDate: 'DATE' } : {}),
+        ...(endDate ? { endDate: 'DATE' } : {})
+      };
     }
 
     const [subproiecteRows] = await bigquery.query(subproiecteQueryOptions);
@@ -294,8 +300,8 @@ export async function GET(request: NextRequest) {
           AND s.status != 'anulata'
           ${projectIds ? 'AND s.proiect_id IN UNNEST(@projectIds)' : ''}
           ${userId ? 'AND sr.responsabil_uid = @userId' : ''}
-          ${startDate ? 'AND s.data_scadenta >= @startDate' : ''}
-          ${endDate ? 'AND s.data_creare <= @endDate' : ''}
+          ${startDate ? 'AND CAST(s.data_scadenta AS DATE) >= @startDate' : ''}
+          ${endDate ? 'AND CAST(s.data_creare AS DATE) <= @endDate' : ''}
         GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.data_creare,
                  s.data_scadenta, s.status, s.prioritate, s.timp_estimat_total_ore, s.progres_procent
       )
@@ -322,9 +328,10 @@ export async function GET(request: NextRequest) {
       ORDER BY data_creare ASC
     `;
 
-    const sarciniParams = [...proiecteParams];
+    // Build sarcini params (includes proiecte params + userId)
+    const sarciniParams: any = { ...proiecteParams };
     if (userId) {
-      sarciniParams.push({ name: 'userId', parameterType: { type: 'STRING' }, parameterValue: { value: userId } });
+      sarciniParams.userId = userId;
     }
 
     const sarciniQueryOptions: any = {
@@ -332,9 +339,14 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     };
 
-    if (sarciniParams.length > 0) {
+    if (Object.keys(sarciniParams).length > 0) {
       sarciniQueryOptions.params = sarciniParams;
-      sarciniQueryOptions.parameterMode = 'NAMED';
+      sarciniQueryOptions.types = {
+        ...(projectIds ? { projectIds: ['STRING'] } : {}),
+        ...(startDate ? { startDate: 'DATE' } : {}),
+        ...(endDate ? { endDate: 'DATE' } : {}),
+        ...(userId ? { userId: 'STRING' } : {})
+      };
     }
 
     const [sarciniRows] = await bigquery.query(sarciniQueryOptions);
@@ -375,8 +387,8 @@ export async function GET(request: NextRequest) {
       WHERE ec.data_scadenta IS NOT NULL
         AND ec.activ = true
         ${projectIds ? 'AND ec.proiect_id IN UNNEST(@projectIds)' : ''}
-        ${startDate ? 'AND ec.data_scadenta >= @startDate' : ''}
-        ${endDate ? 'AND ec.data_scadenta <= @endDate' : ''}
+        ${startDate ? 'AND CAST(ec.data_scadenta AS DATE) >= @startDate' : ''}
+        ${endDate ? 'AND CAST(ec.data_scadenta AS DATE) <= @endDate' : ''}
       ORDER BY ec.data_scadenta ASC
     `;
 
@@ -385,9 +397,14 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     };
 
-    if (proiecteParams.length > 0) {
+    // Reuse same params as proiecte (projectIds, startDate, endDate)
+    if (Object.keys(proiecteParams).length > 0) {
       milestonesQueryOptions.params = proiecteParams;
-      milestonesQueryOptions.parameterMode = 'NAMED';
+      milestonesQueryOptions.types = {
+        ...(projectIds ? { projectIds: ['STRING'] } : {}),
+        ...(startDate ? { startDate: 'DATE' } : {}),
+        ...(endDate ? { endDate: 'DATE' } : {})
+      };
     }
 
     const [milestonesRows] = await bigquery.query(milestonesQueryOptions);
@@ -500,36 +517,41 @@ export async function PUT(request: NextRequest) {
     }
 
     let updateQuery = '';
-    let updateParams: Array<{
-	  name: string;
-	  parameterType: any;
-	  parameterValue: any;
-	}> = [];
+    let updateParams: any = {};
+    let updateTypes: any = {};
 
     // Construiesc query-ul în funcție de tipul task-ului
     switch (task_type) {
       case 'proiect':
         const setClausesProiect: string[] = [];
-        if (updates.startDate) setClausesProiect.push('Data_Start = @startDate');
-        if (updates.endDate) setClausesProiect.push('Data_Final = @endDate');
+        if (updates.startDate) {
+          setClausesProiect.push('Data_Start = @startDate');
+          updateParams.startDate = updates.startDate;
+          updateTypes.startDate = 'DATE';
+        }
+        if (updates.endDate) {
+          setClausesProiect.push('Data_Final = @endDate');
+          updateParams.endDate = updates.endDate;
+          updateTypes.endDate = 'DATE';
+        }
         if (updates.status) {
           const statusMapping = {
             'to_do': 'Planificat',
-            'in_progress': 'Activ', 
+            'in_progress': 'Activ',
             'finalizata': 'Finalizat',
             'anulata': 'Anulat'
           };
           setClausesProiect.push('Status = @status');
-          updateParams.push({ 
-            name: 'status', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: statusMapping[updates.status as keyof typeof statusMapping] || updates.status }
-          });
+          updateParams.status = statusMapping[updates.status as keyof typeof statusMapping] || updates.status;
+          updateTypes.status = 'STRING';
         }
 
         if (setClausesProiect.length === 0) {
           return NextResponse.json({ error: 'Nu sunt actualizări valide pentru proiect' }, { status: 400 });
         }
+
+        updateParams.taskId = task_id;
+        updateTypes.taskId = 'STRING';
 
         updateQuery = `
           UPDATE ${TABLE_PROIECTE}
@@ -540,22 +562,30 @@ export async function PUT(request: NextRequest) {
 
       case 'subproiect':
         const setClausesSubproiect: string[] = [];
-        if (updates.startDate) setClausesSubproiect.push('Data_Start = @startDate');
-        if (updates.endDate) setClausesSubproiect.push('Data_Final = @endDate');
+        if (updates.startDate) {
+          setClausesSubproiect.push('Data_Start = @startDate');
+          updateParams.startDate = updates.startDate;
+          updateTypes.startDate = 'DATE';
+        }
+        if (updates.endDate) {
+          setClausesSubproiect.push('Data_Final = @endDate');
+          updateParams.endDate = updates.endDate;
+          updateTypes.endDate = 'DATE';
+        }
         if (updates.status) {
           const statusMapping = {
             'to_do': 'Planificat',
             'in_progress': 'Activ',
-            'finalizata': 'Finalizat', 
+            'finalizata': 'Finalizat',
             'anulata': 'Anulat'
           };
           setClausesSubproiect.push('Status = @status');
-          updateParams.push({ 
-            name: 'status', 
-            parameterType: { type: 'STRING' }, 
-            parameterValue: { value: statusMapping[updates.status as keyof typeof statusMapping] || updates.status }
-          });
+          updateParams.status = statusMapping[updates.status as keyof typeof statusMapping] || updates.status;
+          updateTypes.status = 'STRING';
         }
+
+        updateParams.taskId = task_id;
+        updateTypes.taskId = 'STRING';
 
         updateQuery = `
           UPDATE ${TABLE_SUBPROIECTE}
@@ -566,10 +596,29 @@ export async function PUT(request: NextRequest) {
 
       case 'sarcina':
         const setClausesSarcina: string[] = [];
-        if (updates.startDate) setClausesSarcina.push('data_creare = @startDate');
-        if (updates.endDate) setClausesSarcina.push('data_scadenta = @endDate');
-        if (updates.status) setClausesSarcina.push('status = @status');
-        if (updates.priority) setClausesSarcina.push('prioritate = @priority');
+        if (updates.startDate) {
+          setClausesSarcina.push('data_creare = @startDate');
+          updateParams.startDate = updates.startDate;
+          updateTypes.startDate = 'DATE';
+        }
+        if (updates.endDate) {
+          setClausesSarcina.push('data_scadenta = @endDate');
+          updateParams.endDate = updates.endDate;
+          updateTypes.endDate = 'DATE';
+        }
+        if (updates.status) {
+          setClausesSarcina.push('status = @status');
+          updateParams.status = updates.status;
+          updateTypes.status = 'STRING';
+        }
+        if (updates.priority) {
+          setClausesSarcina.push('prioritate = @priority');
+          updateParams.priority = updates.priority;
+          updateTypes.priority = 'STRING';
+        }
+
+        updateParams.taskId = task_id;
+        updateTypes.taskId = 'STRING';
 
         updateQuery = `
           UPDATE ${TABLE_SARCINI}
@@ -580,56 +629,30 @@ export async function PUT(request: NextRequest) {
 
       case 'milestone':
         const milestoneId = task_id.replace('milestone_', '');
+        if (updates.endDate) {
+          updateParams.endDate = updates.endDate;
+          updateTypes.endDate = 'DATE';
+        }
+        updateParams.taskId = milestoneId;
+        updateTypes.taskId = 'STRING';
+
         updateQuery = `
           UPDATE ${TABLE_ETAPE_CONTRACT}
           SET data_scadenta = @endDate
           WHERE ID_Etapa = @taskId
         `;
-        updateParams.push({ 
-          name: 'taskId', 
-          parameterType: { type: 'STRING' }, 
-          parameterValue: { value: milestoneId }
-        });
         break;
 
       default:
         return NextResponse.json({ error: 'Tip task invalid' }, { status: 400 });
     }
 
-    // Adaug parametrii comuni
-    if (updates.startDate && task_type !== 'milestone') {
-      updateParams.push({ 
-        name: 'startDate', 
-        parameterType: { type: 'DATE' }, 
-        parameterValue: { value: updates.startDate }
-      });
-    }
-    if (updates.endDate) {
-      updateParams.push({ 
-        name: 'endDate', 
-        parameterType: { type: 'DATE' }, 
-        parameterValue: { value: updates.endDate }
-      });
-    }
-    if (updates.priority && task_type === 'sarcina') {
-      updateParams.push({ 
-        name: 'priority', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: updates.priority }
-      });
-    }
-    if (task_type !== 'milestone') {
-      updateParams.push({ 
-        name: 'taskId', 
-        parameterType: { type: 'STRING' }, 
-        parameterValue: { value: task_id }
-      });
-    }
-
+    // Execute the update query with simplified params format
     await bigquery.query({
       query: updateQuery,
       location: 'EU',
       params: updateParams,
+      types: updateTypes
     });
 
     return NextResponse.json({
