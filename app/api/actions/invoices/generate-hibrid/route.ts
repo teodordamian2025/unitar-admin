@@ -1028,8 +1028,8 @@ export async function POST(request: NextRequest) {
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    // ✅ NOU: Escape HTML pentru nota cursului valutar (PĂSTREAZĂ diacriticele)
-    const notaCursValutarClean = escapeHtml(notaCursValutar);
+    // ✅ FIX DIACRITICE: Curăță caracterele non-ASCII pentru nota cursului valutar
+    const notaCursValutarClean = cleanNonAscii(notaCursValutar);
 
     // ✅ NOU: Construiește numărul facturii pentru afișare PDF cu seria corectă (UPA pentru iapp, UP pentru ANAF)
     const serieForDisplay = (tip_facturare === 'iapp' && iappConfig?.serie_default)
@@ -1332,12 +1332,12 @@ export async function POST(request: NextRequest) {
             </div>
             <div class="company-right">
                 <h3>CLIENT</h3>
-                <div class="info-line"><strong>${escapeHtml(safeClientData.nume)}</strong></div>
-                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${escapeHtml(safeClientData.cui)}</div>
-                ${safeClientData.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${escapeHtml(safeClientData.nr_reg_com)}</div>` : ''}
-                <div class="info-line">Adresa: ${escapeHtml(safeClientData.adresa)}</div>
-                <div class="info-line">Telefon: ${escapeHtml(safeClientData.telefon)}</div>
-                <div class="info-line">Email: ${escapeHtml(safeClientData.email)}</div>
+                <div class="info-line"><strong>${cleanNonAscii(safeClientData.nume)}</strong></div>
+                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${cleanNonAscii(safeClientData.cui)}</div>
+                ${safeClientData.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${cleanNonAscii(safeClientData.nr_reg_com)}</div>` : ''}
+                <div class="info-line">Adresa: ${cleanNonAscii(safeClientData.adresa)}</div>
+                <div class="info-line">Telefon: ${cleanNonAscii(safeClientData.telefon)}</div>
+                <div class="info-line">Email: ${cleanNonAscii(safeClientData.email)}</div>
             </div>
         </div>
 
@@ -1402,10 +1402,10 @@ export async function POST(request: NextRequest) {
                     <tr>
                         <td class="text-center" style="font-size: 8px;">${index + 1}</td>
                         <td style="font-size: 8px; padding: 2px;">
-                            ${escapeHtml(descriereCompleta)}
+                            ${cleanNonAscii(descriereCompleta)}
                             ${linie.tip === 'etapa_contract' ? ' <small style="color: #3498db;">[CONTRACT]</small>' : ''}
-                            ${linie.tip === 'etapa_anexa' ? ' <small style="color: #e67e22;">[ANEXĂ]</small>' : ''}
-                            ${linie.descriere ? `<br><span style="font-size: 7px; color: #555; font-style: italic;">${escapeHtml(linie.descriere)}</span>` : ''}
+                            ${linie.tip === 'etapa_anexa' ? ' <small style="color: #e67e22;">[ANEXA]</small>' : ''}
+                            ${linie.descriere ? `<br><span style="font-size: 7px; color: #555; font-style: italic;">${cleanNonAscii(linie.descriere)}</span>` : ''}
                         </td>
                         <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
                         <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
@@ -1447,7 +1447,7 @@ export async function POST(request: NextRequest) {
         <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #cce7ff; border-radius: 3px;">
             <div style="font-size: 9px; color: #0c5460;">
                 <strong>Observatii:</strong><br/>
-                ${escapeHtml(observatii).replace(/\n/g, '<br/>')}
+                ${cleanNonAscii(observatii).replace(/\n/g, '<br/>')}
             </div>
         </div>
         ` : ''}

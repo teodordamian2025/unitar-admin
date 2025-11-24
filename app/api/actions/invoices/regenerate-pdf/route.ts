@@ -604,6 +604,9 @@ export async function POST(request: NextRequest) {
                         <td style="font-size: 8px; padding: 2px;">
                             ${descriereCompleta}
                             ${linie.tip === 'subproiect' ? ' <small style="color: #3498db;">[SUB]</small>' : ''}
+                            ${linie.tip === 'etapa_contract' ? ' <small style="color: #3498db;">[CONTRACT]</small>' : ''}
+                            ${linie.tip === 'etapa_anexa' ? ' <small style="color: #e67e22;">[ANEXA]</small>' : ''}
+                            ${linie.descriere ? `<br><span style="font-size: 7px; color: #555; font-style: italic;">${cleanNonAscii(linie.descriere)}</span>` : ''}
                         </td>
                         <td class="text-center" style="font-size: 8px;">${safeFixed(cantitate)}</td>
                         <td class="text-right" style="font-size: 8px;">${safeFixed(pretUnitar)}</td>
