@@ -366,8 +366,10 @@ export default function EditFacturaModal({
       }
 
       // Pregătește liniile facturii cu TVA 21% implicit
+      // ✅ MODIFICAT 29.11.2025: Separat titlu și descriere
       let liniiFacturaPregatite = dateComplete.liniiFactura || [{
-        denumire: proiectInfo.denumire || factura.proiect_denumire || 'Servicii',
+        denumire: 'Servicii', // ✅ Doar "Servicii" în titlu
+        descriere: proiectInfo.denumire || factura.proiect_denumire || '', // ✅ Denumirea proiectului în descriere
         cantitate: 1,
         pretUnitar: factura.subtotal,
         cotaTva: factura.total_tva > 0 ? 21 : 0,

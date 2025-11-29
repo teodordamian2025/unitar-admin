@@ -269,8 +269,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       valoareProiect = convertBigQueryNumeric(proiect.valoare_ron);
     }
     
+    // ✅ MODIFICAT 29.11.2025: Separat titlu și descriere
     return [{
-      denumire: `Servicii proiect ${proiect.Denumire}`, // ✅ FIX: Doar Denumire, fără ID_Proiect
+      denumire: 'Servicii', // ✅ Doar "Servicii" în titlu
+      descriere: proiect.Denumire || '', // ✅ Denumirea proiectului în descriere suplimentară
       cantitate: 1,
       pretUnitar: valoareProiect,
       cotaTva: 21,
@@ -777,16 +779,30 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   // NOUĂ: Funcție pentru generarea denumirii standardizate
-  // ✅ MODIFICAT: Etapa și Contract la început pentru limitare caractere e-factura
-  const genereazaDenumireEtapa = (etapa: EtapaFacturare): string => {
+  // ✅ MODIFICAT 29.11.2025: Separă titlu și descriere
+  // - Titlul conține doar referința servicii/etapă/contract
+  // - Descrierea conține denumirea proiectului
+  const genereazaArticolEtapa = (etapa: EtapaFacturare): { titlu: string; descriere: string } => {
     const denumireProiect = proiect.Denumire; // ✅ FIX: Folosește Denumire în loc de ID_Proiect
     const denumireEtapa = etapa.denumire;
 
+    let titlu: string;
     if (etapa.tip === 'contract') {
-      return `Servicii, ${denumireEtapa}, cf. contract nr. ${etapa.contract_numar} din ${etapa.contract_data} - ${denumireProiect}`;
+      titlu = `Servicii, ${denumireEtapa}, cf. contract nr. ${etapa.contract_numar} din ${etapa.contract_data}`;
     } else {
-      return `Servicii, ${denumireEtapa}, cf. anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data} - ${denumireProiect}`;
+      titlu = `Servicii, ${denumireEtapa}, cf. anexa nr. ${etapa.anexa_numar} la contract nr. ${etapa.contract_numar} din ${etapa.anexa_data}`;
     }
+
+    return {
+      titlu,
+      descriere: denumireProiect
+    };
+  };
+
+  // Backward compatibility wrapper
+  const genereazaDenumireEtapa = (etapa: EtapaFacturare): string => {
+    const { titlu } = genereazaArticolEtapa(etapa);
+    return titlu;
   };
 
   // MODIFICATĂ: addEtapaToFactura cu refresh automat după adăugare
@@ -825,8 +841,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }
 
+    // ✅ MODIFICAT 29.11.2025: Folosește noul format cu titlu și descriere separate
+    const { titlu, descriere } = genereazaArticolEtapa(etapa);
+
     const nouaLinie: LineFactura = {
-      denumire: genereazaDenumireEtapa(etapa),
+      denumire: titlu,
+      descriere: descriere, // ✅ NOU: Denumirea proiectului în descriere suplimentară
       cantitate: 1,
       pretUnitar: valoareEtapa,
       cotaTva: 21,
@@ -883,9 +903,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   const addLine = () => {
     // FIX PROBLEMA 1: Linie nouă cu toate câmpurile necesare
+    // ✅ MODIFICAT 29.11.2025: Pre-populează cu "Servicii" și denumirea proiectului
+    // pentru proiectele fără contract
     setLiniiFactura([...liniiFactura, {
-      denumire: '',
-      descriere: '', // ✅ NOU: Câmp descriere pentru detalii suplimentare (trimis la iapp.ro)
+      denumire: 'Servicii',
+      descriere: proiect.Denumire || '', // ✅ NOU: Denumirea proiectului în descriere suplimentară
       cantitate: 1,
       pretUnitar: 0,
       cotaTva: 21,
