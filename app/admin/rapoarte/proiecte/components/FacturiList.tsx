@@ -1,7 +1,7 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/FacturiList.tsx
-// DATA: 17.08.2025 15:30
-// FIX COMPLET: Lucide-react icons + Dropdown logic IDENTIC cu ProiectActions
+// DATA: 29.11.2025 - Adăugat coloană "Status Încasări"
+// MODIFICAT: Adăugat coloană dedicată pentru status încasări similar cu contracte
 // PĂSTRATE: TOATE funcționalitățile existente
 // ==================================================================
 
@@ -325,7 +325,7 @@ export default function FacturiList({
     );
   };
 
-  // Scadenta badge cu Lucide icons  
+  // Scadenta badge cu Lucide icons
   const getScadentaBadge = (statusScadenta: string, zile: number) => {
     const scadentaConfig = {
       'Expirata': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle },
@@ -333,20 +333,144 @@ export default function FacturiList({
       'Platita': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle },
       'In regula': { bg: 'bg-gray-100', text: 'text-gray-800', icon: Clock }
     };
-    
-    const config = scadentaConfig[statusScadenta as keyof typeof scadentaConfig] || 
+
+    const config = scadentaConfig[statusScadenta as keyof typeof scadentaConfig] ||
       { bg: 'bg-gray-100', text: 'text-gray-800', icon: AlertCircle };
-    
+
     const IconComponent = config.icon;
-    
+
     return (
-      <span 
+      <span
         className={`px-2 py-1 rounded text-xs font-medium ${config.bg} ${config.text} flex items-center gap-1`}
         title={`${zile} zile pana la scadenta`}
       >
         <IconComponent size={12} />
         {statusScadenta}
       </span>
+    );
+  };
+
+  // NOU: Status încasări - similar cu contractele
+  const getStatusIncasari = (factura: Factura) => {
+    const total = factura.total || 0;
+    const platit = factura.valoare_platita || 0;
+    const rest = factura.rest_de_plata || (total - platit);
+
+    // Calculează procentul plătit
+    const procentPlatit = total > 0 ? (platit / total) * 100 : 0;
+
+    let statusText = '';
+    let statusColor = '';
+    let bgColor = '';
+    let IconComponent = Clock;
+
+    if (total <= 0) {
+      return (
+        <div style={{
+          fontSize: '11px',
+          color: '#95a5a6',
+          fontStyle: 'italic',
+          textAlign: 'center'
+        }}>
+          -
+        </div>
+      );
+    }
+
+    if (rest <= 0 || platit >= total) {
+      // Încasat complet
+      statusText = 'Încasat complet';
+      statusColor = '#27ae60';
+      bgColor = 'rgba(39, 174, 96, 0.1)';
+      IconComponent = CheckCircle;
+    } else if (platit > 0) {
+      // Încasat parțial
+      statusText = 'Încasat parțial';
+      statusColor = '#f39c12';
+      bgColor = 'rgba(243, 156, 18, 0.1)';
+      IconComponent = Clock;
+    } else {
+      // Neîncasat
+      statusText = 'Neîncasat';
+      statusColor = '#e74c3c';
+      bgColor = 'rgba(231, 76, 60, 0.1)';
+      IconComponent = XCircle;
+    }
+
+    return (
+      <div style={{
+        fontSize: '11px',
+        lineHeight: '1.4',
+        textAlign: 'center'
+      }}>
+        {/* Badge status */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 8px',
+          borderRadius: '12px',
+          backgroundColor: bgColor,
+          color: statusColor,
+          fontWeight: '600',
+          marginBottom: '4px'
+        }}>
+          <IconComponent size={12} />
+          {statusText}
+        </div>
+
+        {/* Detalii sume */}
+        {platit > 0 && (
+          <div style={{
+            color: '#27ae60',
+            fontWeight: '500',
+            marginTop: '2px'
+          }}>
+            Plătit: {formatCurrency(platit)}
+          </div>
+        )}
+
+        {rest > 0 && (
+          <div style={{
+            color: '#e74c3c',
+            fontWeight: '500'
+          }}>
+            Rest: {formatCurrency(rest)}
+          </div>
+        )}
+
+        {/* Bara de progres pentru încasare parțială */}
+        {platit > 0 && rest > 0 && (
+          <div style={{
+            marginTop: '4px',
+            height: '4px',
+            backgroundColor: '#e0e0e0',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            width: '100%',
+            maxWidth: '80px',
+            margin: '4px auto 0'
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.min(procentPlatit, 100)}%`,
+              backgroundColor: procentPlatit >= 50 ? '#27ae60' : '#f39c12',
+              borderRadius: '2px',
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+        )}
+
+        {platit > 0 && rest > 0 && (
+          <div style={{
+            fontSize: '10px',
+            color: '#7f8c8d',
+            marginTop: '2px'
+          }}>
+            {procentPlatit.toFixed(0)}% încasat
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1050,6 +1174,9 @@ export default function FacturiList({
                     Valoare
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">
+                    Status Încasări
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">
@@ -1118,16 +1245,10 @@ export default function FacturiList({
                         <div className="font-semibold text-gray-900">
                           {formatCurrency(factura.total)}
                         </div>
-                        {factura.valoare_platita > 0 && (
-                          <div className="text-xs text-green-600">
-                            Platit: {formatCurrency(factura.valoare_platita)}
-                          </div>
-                        )}
-                        {factura.rest_de_plata > 0 && (
-                          <div className="text-xs text-orange-600">
-                            Rest: {formatCurrency(factura.rest_de_plata)}
-                          </div>
-                        )}
+                      </td>
+                      {/* NOU: Coloana Status Încasări */}
+                      <td className="px-4 py-3 text-center" style={{ minWidth: '120px' }}>
+                        {getStatusIncasari(factura)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {getStatusBadge(factura)}

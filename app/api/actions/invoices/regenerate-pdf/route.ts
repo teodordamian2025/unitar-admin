@@ -251,8 +251,12 @@ export async function POST(request: NextRequest) {
       nr_reg_com: 'N/A',
       adresa: 'Adresa necunoscuta',
       telefon: 'N/A',
-      email: 'N/A'
+      email: 'N/A',
+      tip_client: 'persoana_juridica'
     };
+
+    // Detectează dacă clientul este persoană fizică
+    const isPersoanaFizica = clientInfo.tip_client === 'persoana_fizica';
 
     const liniiFactura = dateComplete.liniiFactura || [{
       denumire: 'Servicii facturate',
@@ -550,8 +554,8 @@ export async function POST(request: NextRequest) {
             <div class="company-right">
                 <h3>CLIENT</h3>
                 <div class="info-line"><strong>${cleanNonAscii(clientInfo.nume)}</strong></div>
-                <div class="info-line">CUI: ${cleanNonAscii(clientInfo.cui)}</div>
-                <div class="info-line">Nr. Reg. Com.: ${cleanNonAscii(clientInfo.nr_reg_com)}</div>
+                <div class="info-line">${isPersoanaFizica ? 'CNP' : 'CUI'}: ${cleanNonAscii(clientInfo.cui)}</div>
+                ${!isPersoanaFizica && clientInfo.nr_reg_com ? `<div class="info-line">Nr. Reg. Com.: ${cleanNonAscii(clientInfo.nr_reg_com)}</div>` : ''}
                 <div class="info-line">Adresa: ${cleanNonAscii(clientInfo.adresa)}</div>
                 <div class="info-line">Telefon: ${cleanNonAscii(clientInfo.telefon)}</div>
                 <div class="info-line">Email: ${cleanNonAscii(clientInfo.email)}</div>

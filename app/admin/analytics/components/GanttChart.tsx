@@ -479,8 +479,8 @@ export default function GanttChart({
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    textDecoration: task.status === 'finalizata' ? 'line-through' : 'none',
-                    opacity: task.status === 'finalizata' ? 0.7 : 1
+                    textDecoration: (task.status === 'finalizata' || (task.type === 'sarcina' && task.progress === 100)) ? 'line-through' : 'none',
+                    opacity: (task.status === 'finalizata' || (task.type === 'sarcina' && task.progress === 100)) ? 0.7 : 1
                   }}>
                     {task.name}
                   </div>

@@ -1164,8 +1164,8 @@ export default function GanttView() {
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        textDecoration: task.status === 'finalizata' ? 'line-through' : 'none',
-                        opacity: task.status === 'finalizata' ? 0.7 : 1
+                        textDecoration: (task.status === 'finalizata' || (task.type === 'sarcina' && task.progress === 100)) ? 'line-through' : 'none',
+                        opacity: (task.status === 'finalizata' || (task.type === 'sarcina' && task.progress === 100)) ? 0.7 : 1
                       }}>
                         {task.name}
                       </div>
@@ -1493,8 +1493,8 @@ export default function GanttView() {
                 <h3 style={{
                   margin: '0 0 0.5rem 0',
                   color: '#1f2937',
-                  textDecoration: selectedTask.status === 'finalizata' ? 'line-through' : 'none',
-                  opacity: selectedTask.status === 'finalizata' ? 0.7 : 1
+                  textDecoration: (selectedTask.status === 'finalizata' || (selectedTask.type === 'sarcina' && selectedTask.progress === 100)) ? 'line-through' : 'none',
+                  opacity: (selectedTask.status === 'finalizata' || (selectedTask.type === 'sarcina' && selectedTask.progress === 100)) ? 0.7 : 1
                 }}>
                   {selectedTask.name}
                 </h3>
