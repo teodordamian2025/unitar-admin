@@ -9,23 +9,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Download, 
-  Edit, 
-  RotateCcw, 
-  Upload, 
-  RefreshCw, 
-  Info, 
-  Trash2, 
+import {
+  Download,
+  Edit,
+  RotateCcw,
+  Upload,
+  RefreshCw,
+  Info,
+  Trash2,
   ChevronDown,
   FileText,
   Send,
   AlertCircle,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  Receipt
 } from 'lucide-react';
 import EditFacturaModal from './EditFacturaModal';
+import ChitantaModal from './ChitantaModal';
 
 // Declare global pentru jsPDF
 declare global {
@@ -118,6 +120,10 @@ export default function FacturiList({
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
   const [editMode, setEditMode] = useState<'edit' | 'storno'>('edit');
+
+  // State pentru modal chitanta
+  const [showChitantaModal, setShowChitantaModal] = useState(false);
+  const [selectedFacturaChitanta, setSelectedFacturaChitanta] = useState<Factura | null>(null);
 
   useEffect(() => {
     loadFacturi();
@@ -901,7 +907,7 @@ export default function FacturiList({
     setShowEditModal(false);
     setSelectedFactura(null);
     loadFacturi();
-    
+
     if (action === 'updated') {
       showToast('Factura actualizata cu succes', 'success');
     } else if (action === 'cancelled') {
@@ -909,6 +915,30 @@ export default function FacturiList({
     } else if (action === 'reversed') {
       showToast('Factura de stornare creata cu succes', 'success');
     }
+  };
+
+  // Handler pentru deschiderea modalului de chitanta
+  const handleChitanta = (factura: Factura) => {
+    setSelectedFacturaChitanta(factura);
+    setShowChitantaModal(true);
+  };
+
+  // Handler pentru succes chitanta
+  const handleChitantaSuccess = (chitantaData: any) => {
+    setShowChitantaModal(false);
+    setSelectedFacturaChitanta(null);
+    loadFacturi();
+
+    const numarChitanta = chitantaData.chitanta?.serie
+      ? `${chitantaData.chitanta.serie}-${chitantaData.chitanta.numar}`
+      : chitantaData.chitanta?.numar || '';
+
+    showToast(
+      `Chitanta ${numarChitanta} emisa cu succes!\n` +
+      `Valoare incasata: ${chitantaData.chitanta?.valoare_incasata?.toLocaleString('ro-RO')} lei\n` +
+      `Rest de plata: ${chitantaData.factura?.rest_de_plata?.toLocaleString('ro-RO')} lei`,
+      'success'
+    );
   };
 
   const handleDeleteFactura = async (factura: Factura) => {
@@ -1266,9 +1296,11 @@ export default function FacturiList({
                           canEdit={canEdit}
                           canDelete={canDelete}
                           canStorno={canStorno}
+                          canChitanta={factura.status !== 'stornata' && factura.rest_de_plata > 0}
                           onDownload={() => handleDownload(factura)}
                           onEdit={() => handleEditFactura(factura, 'edit')}
                           onStorno={() => handleEditFactura(factura, 'storno')}
+                          onChitanta={() => handleChitanta(factura)}
                           onDownloadXML={() => handleDownloadXML(factura)}
                           onSendToANAF={() => handleSendToANAF(factura)}
                           onRetryANAF={() => handleRetryANAF(factura)}
@@ -1297,6 +1329,19 @@ export default function FacturiList({
           }}
           onSuccess={handleEditSuccess}
           mode={editMode}
+        />
+      )}
+
+      {/* Modal pentru chitanta - NOU */}
+      {showChitantaModal && selectedFacturaChitanta && (
+        <ChitantaModal
+          factura={selectedFacturaChitanta}
+          isOpen={showChitantaModal}
+          onClose={() => {
+            setShowChitantaModal(false);
+            setSelectedFacturaChitanta(null);
+          }}
+          onSuccess={handleChitantaSuccess}
         />
       )}
 
@@ -1386,9 +1431,11 @@ interface EnhancedActionDropdownProps {
   canEdit: boolean;
   canDelete: boolean;
   canStorno: boolean;
+  canChitanta: boolean; // NOU: permite emitere chitanta
   onDownload: () => void;
   onEdit: () => void;
   onStorno: () => void;
+  onChitanta: () => void; // NOU: handler chitanta
   onDownloadXML: () => void;
   onSendToANAF: () => void;
   onRetryANAF: () => void;
@@ -1402,9 +1449,11 @@ function EnhancedActionDropdown({
   canEdit,
   canDelete,
   canStorno,
+  canChitanta,
   onDownload,
   onEdit,
   onStorno,
+  onChitanta,
   onDownloadXML,
   onSendToANAF,
   onRetryANAF,
@@ -1458,9 +1507,10 @@ function EnhancedActionDropdown({
 	  const baseHeight = 120; // Header + padding
 	  const actionHeight = 45; // Înălțime per acțiune
 	  let actionsCount = 1; // PDF download mereu prezent
-	  
+
 	  if (canEdit) actionsCount++;
 	  if (canStorno) actionsCount++;
+	  if (canChitanta) actionsCount++; // Chitanta
 	  if (factura.efactura_enabled) {
 	    actionsCount += 2; // Divider + detalii
 	    if (factura.efactura_status === 'draft' || factura.efactura_status === 'sent' || 
@@ -1723,6 +1773,44 @@ function EnhancedActionDropdown({
                   >
                     {loading === 'storno' ? <Clock size={16} /> : <RotateCcw size={16} />}
                     Storno
+                  </button>
+                )}
+
+                {/* Chitanta - NOU */}
+                {canChitanta && (
+                  <button
+                    onClick={() => handleActionClick('chitanta', onChitanta)}
+                    disabled={loading === 'chitanta'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: loading === 'chitanta' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      color: '#2c3e50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => {
+                      if (loading !== 'chitanta') {
+                        e.currentTarget.style.background = '#27ae6015';
+                        e.currentTarget.style.color = '#27ae60';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    {loading === 'chitanta' ? <Clock size={16} /> : <Receipt size={16} />}
+                    Chitanta
                   </button>
                 )}
 
