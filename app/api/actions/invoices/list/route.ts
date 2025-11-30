@@ -45,8 +45,21 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
-    
+
+    // ✅ FIX 29.11.2025: Citim valoare_incasata din EtapeFacturi_v2 (sursa corectă pentru încasări)
+    // Aceasta este sursa de adevăr pentru încasări, actualizată când tranzacțiile sunt imperecheate
     let query = `
+      WITH incasari_facturi AS (
+        -- Agregăm încasările din EtapeFacturi pentru fiecare factură
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat,
+          MAX(data_incasare) as ultima_data_incasare,
+          MAX(status_incasare) as status_incasare_ef
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      )
       SELECT
         fg.id,
         fg.serie,
@@ -58,7 +71,11 @@ export async function GET(request: NextRequest) {
         fg.subtotal,
         fg.total_tva,
         fg.total,
-        fg.valoare_platita,
+
+        -- ✅ FIX: Folosim valoarea încasată din EtapeFacturi (sursa corectă)
+        -- Fallback la valoare_platita din FacturiGenerate pentru facturi fără etape
+        COALESCE(inc.total_incasat, fg.valoare_platita, 0) as valoare_platita,
+
         fg.status,
         fg.data_creare,
         fg.data_actualizare,
@@ -78,6 +95,10 @@ export async function GET(request: NextRequest) {
         ef.etapa_id,
         ef.anexa_id,
 
+        -- ✅ FIX: Date încasare din EtapeFacturi
+        inc.ultima_data_incasare as data_incasare,
+        inc.status_incasare_ef,
+
         -- ✅ Câmpuri e-factura
         fg.efactura_enabled,
         fg.efactura_status,
@@ -89,14 +110,15 @@ export async function GET(request: NextRequest) {
           ELSE false
         END as efactura_mock_mode,
 
-        -- Calcule utile
-        (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+        -- ✅ FIX: Calcule utile folosind valoare_incasata din EtapeFacturi
+        (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
 
+        -- ✅ FIX: Status scadență bazat pe încasările reale din EtapeFacturi
         CASE
-          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expirată'
-          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
-          WHEN (fg.total - COALESCE(fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
+          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirată'
+          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
+          WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
           ELSE 'În regulă'
         END as status_scadenta
 
@@ -107,6 +129,8 @@ export async function GET(request: NextRequest) {
         ON fg.id = ef.factura_id AND ef.activ = true
       LEFT JOIN ${TABLE_SUBPROIECTE} s
         ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
+      LEFT JOIN incasari_facturi inc
+        ON fg.id = inc.factura_id
       WHERE 1=1
     `;
     
