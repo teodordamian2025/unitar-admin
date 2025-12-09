@@ -1184,7 +1184,33 @@ export default function ProiectEditModal({
     setLoading(true);
 
     try {
-      // Validări
+      // CRITICAL: Validare că ID-ul proiectului există și este valid
+      // Aceasta previne ștergerea accidentală dacă ID-ul s-a pierdut din state
+      if (!formData.ID_Proiect || formData.ID_Proiect.trim() === '') {
+        console.error('❌ EROARE CRITICĂ: ID_Proiect este gol sau invalid!');
+        console.error('formData.ID_Proiect:', formData.ID_Proiect);
+        console.error('proiect original:', proiect);
+        toast.error('Eroare critică: ID-ul proiectului este invalid. Închideți și redeschideți formularul.');
+        setLoading(false);
+        return;
+      }
+
+      // Log pentru debugging - afișează ID-ul folosit
+      console.log('=== DEBUG handleSubmit: Începe actualizarea proiectului ===');
+      console.log('ID Proiect din formData:', formData.ID_Proiect);
+      console.log('ID Proiect din props:', proiect?.ID_Proiect);
+      console.log('Client vechi (din props):', proiect?.Client);
+      console.log('Client nou (din form):', formData.Client);
+
+      // Verificare suplimentară: ID-ul din formData trebuie să corespundă cu cel din props
+      if (proiect?.ID_Proiect && formData.ID_Proiect !== proiect.ID_Proiect) {
+        console.error('⚠️ AVERTISMENT: ID-ul din formData nu corespunde cu cel din props!');
+        console.error('Acest lucru nu ar trebui să se întâmple niciodată.');
+        // Folosim ID-ul original din props pentru siguranță
+        console.log('Se folosește ID-ul original din props:', proiect.ID_Proiect);
+      }
+
+      // Validări standard
       if (!formData.Denumire.trim()) {
         toast.error('Denumirea proiectului este obligatorie');
         setLoading(false);
@@ -1225,9 +1251,21 @@ export default function ProiectEditModal({
 
       toast.info('Se actualizează proiectul...');
 
+      // Folosește ID-ul din props ca fallback pentru siguranță maximă
+      const proiectId = formData.ID_Proiect || proiect?.ID_Proiect;
+
+      if (!proiectId) {
+        console.error('❌ EROARE CRITICĂ: Nu s-a putut determina ID-ul proiectului!');
+        toast.error('Eroare critică: Nu s-a putut identifica proiectul. Contactați administratorul.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('=== DEBUG: Se trimite UPDATE pentru proiectul:', proiectId);
+
       // Pregătește datele pentru actualizare
       const updateData = {
-        id: formData.ID_Proiect,
+        id: proiectId,
         Denumire: formData.Denumire.trim(),
         Client: formData.Client.trim(),
         Adresa: formData.Adresa.trim() || null,
@@ -1260,24 +1298,27 @@ export default function ProiectEditModal({
       const result = await response.json();
 
       if (result.success || response.ok) {
-        // Actualizează responsabilii
-        await addResponsabiliProiect(formData.ID_Proiect);
-        
+        console.log('✅ Proiect actualizat cu succes în BigQuery');
+
+        // Actualizează responsabilii (folosind proiectId consistent)
+        await addResponsabiliProiect(proiectId);
+
         // Actualizează subproiectele
         await updateSubproiecteExistente();
         await deleteSubproiecte();
-        await addSubproiecte(formData.ID_Proiect, updateData.Data_Start, updateData.Data_Final);
-        
+        await addSubproiecte(proiectId, updateData.Data_Start, updateData.Data_Final);
+
         // Actualizează cheltuielile
         await updateCheltuieliExistente();
         await deleteCheltuieli();
-        await addCheltuieli(formData.ID_Proiect);
-        
+        await addCheltuieli(proiectId);
+
+        console.log('✅ Toate componentele actualizate cu succes');
         toast.success('Proiect actualizat cu succes cu toate componentele!');
         onProiectUpdated();
         onClose();
       } else {
-        console.error('Eroare API:', result);
+        console.error('❌ Eroare API la actualizarea proiectului:', result);
         toast.error(`Eroare: ${result.error || 'Eroare necunoscută'}`);
       }
     } catch (error) {

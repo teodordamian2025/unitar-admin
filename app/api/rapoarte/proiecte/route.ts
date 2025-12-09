@@ -615,15 +615,39 @@ export async function PUT(request: NextRequest) {
     const { id, status, ...updateData } = body;
 
     if (!id) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
-        error: 'ID proiect necesar pentru actualizare' 
+        error: 'ID proiect necesar pentru actualizare'
       }, { status: 400 });
     }
 
     console.log('=== DEBUG PUT: Date primite pentru actualizare ===');
     console.log('ID:', id);
     console.log('Update data:', updateData);
+
+    // VERIFICARE PRE-UPDATE: Verifică că proiectul există înainte de actualizare
+    const checkBeforeQuery = `
+      SELECT ID_Proiect, Denumire, Client
+      FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      WHERE ID_Proiect = '${escapeString(id)}'
+    `;
+
+    const [checkBeforeRows] = await bigquery.query({
+      query: checkBeforeQuery,
+      location: 'EU',
+    });
+
+    console.log('=== DEBUG PUT: Verificare pre-update ===');
+    console.log('Proiecte găsite înainte de update:', checkBeforeRows.length);
+    if (checkBeforeRows.length > 0) {
+      console.log('Proiect existent:', checkBeforeRows[0]);
+    } else {
+      console.log('⚠️ ATENȚIE: Proiectul NU există în baza de date!');
+      return NextResponse.json({
+        success: false,
+        error: `Proiectul cu ID "${id}" nu a fost găsit în baza de date`
+      }, { status: 404 });
+    }
 
     // Construire query UPDATE dinamic cu DATE literale
     const updateFields: string[] = [];
@@ -674,12 +698,40 @@ export async function PUT(request: NextRequest) {
     console.log('=== DEBUG PUT: Query UPDATE cu DATE literale ===');
     console.log(updateQuery);
 
-    await bigquery.query({
+    const [updateResult] = await bigquery.query({
       query: updateQuery,
       location: 'EU',
     });
 
-    console.log('=== DEBUG PUT: Update executat cu succes ===');
+    console.log('=== DEBUG PUT: Update executat ===');
+    console.log('Rezultat update:', updateResult);
+
+    // VERIFICARE POST-UPDATE: Verifică că proiectul încă există după actualizare
+    const checkAfterQuery = `
+      SELECT ID_Proiect, Denumire, Client
+      FROM \`${PROJECT_ID}.${dataset}.${table}\`
+      WHERE ID_Proiect = '${escapeString(id)}'
+    `;
+
+    const [checkAfterRows] = await bigquery.query({
+      query: checkAfterQuery,
+      location: 'EU',
+    });
+
+    console.log('=== DEBUG PUT: Verificare post-update ===');
+    console.log('Proiecte găsite după update:', checkAfterRows.length);
+    if (checkAfterRows.length > 0) {
+      console.log('Proiect actualizat:', checkAfterRows[0]);
+      console.log('✅ Proiect verificat - există în baza de date');
+    } else {
+      console.log('❌ EROARE CRITICĂ: Proiectul a DISPĂRUT după update!');
+      return NextResponse.json({
+        success: false,
+        error: 'Eroare critică: Proiectul a dispărut după actualizare. Contactați administratorul.'
+      }, { status: 500 });
+    }
+
+    console.log('=== DEBUG PUT: Update completat cu succes ===');
 
     return NextResponse.json({
       success: true,
