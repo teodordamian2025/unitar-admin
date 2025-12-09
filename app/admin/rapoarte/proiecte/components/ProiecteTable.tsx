@@ -179,11 +179,19 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
-  // State variables - PĂSTRATE identic + ADĂUGAT state pentru PV
+  // State variables - PĂSTRATE identic + ADĂUGAT state pentru PV + PAGINARE
   const [proiecte, setProiecte] = useState<Proiect[]>([]);
   const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // State pentru paginare
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0
+  });
   
   const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
   const [loadingCursuri, setLoadingCursuri] = useState(false);
@@ -198,8 +206,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  // Toate useEffect-urile - PĂSTRATE identic
+  // Toate useEffect-urile - PĂSTRATE identic + reset paginare la schimbarea filtrelor
   useEffect(() => {
+    // Reset la pagina 1 când se schimbă filtrele
+    setPagination(prev => ({ ...prev, page: 1 }));
     loadData();
   }, [searchParams, refreshTrigger]);
 
@@ -329,7 +339,7 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   };
 
-  const loadProiecte = async () => {
+  const loadProiecte = async (page: number = pagination.page) => {
     try {
       const queryParams = new URLSearchParams();
       if (searchParams) {
@@ -339,6 +349,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           }
         });
       }
+
+      // Adaugă parametrii de paginare
+      queryParams.append('page', page.toString());
+      queryParams.append('limit', pagination.limit.toString());
 
       const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
       if (!response.ok) {
@@ -363,6 +377,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           tip: 'proiect' as const
         }));
         setProiecte(proiecteFormatate);
+
+        // Actualizează informațiile de paginare
+        if (data.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            page: data.pagination.page || prev.page,
+            total: data.pagination.total || 0,
+            totalPages: data.pagination.totalPages || 0
+          }));
+        }
       } else {
         throw new Error(data.error || 'Eroare la încărcarea proiectelor');
       }
@@ -412,6 +436,63 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
     showToast('Date actualizate!', 'success');
+  };
+
+  // Handler pentru schimbarea paginii
+  const handlePageChange = async (newPage: number) => {
+    try {
+      setLoading(true);
+
+      const queryParams = new URLSearchParams();
+      if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+          if (value && key !== 'invoice_status' && key !== 'project_id') {
+            queryParams.append(key, value);
+          }
+        });
+      }
+
+      queryParams.append('page', newPage.toString());
+      queryParams.append('limit', pagination.limit.toString());
+
+      console.log('🔄 Admin - Changing page to:', newPage, 'params:', queryParams.toString());
+
+      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const proiecteFormatate = (data.data || []).map((p: any) => ({
+          ...p,
+          Data_Start: p.Data_Start?.value || p.Data_Start,
+          Data_Final: p.Data_Final?.value || p.Data_Final,
+          data_curs_valutar: p.data_curs_valutar?.value || p.data_curs_valutar,
+          tip: 'proiect' as const
+        }));
+        setProiecte(proiecteFormatate);
+
+        setPagination(prev => ({
+          ...prev,
+          page: newPage,
+          total: data.pagination?.total || prev.total,
+          totalPages: data.pagination?.totalPages || prev.totalPages
+        }));
+
+        // Scroll to top of table
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        throw new Error(data.error || 'Eroare la încărcarea proiectelor');
+      }
+    } catch (error) {
+      console.error('❌ Error changing page:', error);
+      showToast('Eroare la schimbarea paginii!', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleShowFacturaModal = (proiect: any) => {
@@ -876,14 +957,19 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         zIndex: 10
       }}>
         <div>
-          <h3 style={{ 
-            margin: 0, 
+          <h3 style={{
+            margin: 0,
             color: '#2c3e50',
             fontSize: '1.4rem',
             fontWeight: '600'
           }}>
-            📋 Proiecte găsite: {proiecte.length} 
+            📋 Proiecte găsite: {pagination.total > 0 ? pagination.total : proiecte.length}
             {subproiecte.length > 0 && ` (+ ${subproiecte.length} subproiecte)`}
+            {pagination.totalPages > 1 && (
+              <span style={{ fontSize: '0.9rem', fontWeight: '500', color: '#6b7280', marginLeft: '0.5rem' }}>
+                (pagina {pagination.page}/{pagination.totalPages})
+              </span>
+            )}
           </h3>
           <p style={{ 
             margin: '0.5rem 0 0 0', 
@@ -1526,6 +1612,157 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   <br/>
                   (Console log pentru debugging - doar proiecte principale)
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Controale Paginare */}
+          {pagination.totalPages > 1 && (
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'rgba(248, 249, 250, 0.9)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                fontWeight: '500'
+              }}>
+                Pagina {pagination.page} din {pagination.totalPages}
+                <span style={{ marginLeft: '0.5rem', color: '#9ca3af' }}>
+                  ({pagination.total} proiecte total)
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {/* Buton Prima Pagină */}
+                <button
+                  onClick={() => handlePageChange(1)}
+                  disabled={pagination.page <= 1}
+                  style={{
+                    background: pagination.page <= 1 ? 'rgba(156, 163, 175, 0.3)' : 'rgba(59, 130, 246, 0.1)',
+                    color: pagination.page <= 1 ? '#9ca3af' : '#2563eb',
+                    border: '1px solid ' + (pagination.page <= 1 ? 'rgba(156, 163, 175, 0.2)' : 'rgba(59, 130, 246, 0.2)'),
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Prima pagină"
+                >
+                  ⟪
+                </button>
+
+                {/* Buton Anterior */}
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                  style={{
+                    background: pagination.page <= 1 ? 'rgba(156, 163, 175, 0.3)' : 'rgba(59, 130, 246, 0.1)',
+                    color: pagination.page <= 1 ? '#9ca3af' : '#2563eb',
+                    border: '1px solid ' + (pagination.page <= 1 ? 'rgba(156, 163, 175, 0.2)' : 'rgba(59, 130, 246, 0.2)'),
+                    borderRadius: '8px',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  ← Anterior
+                </button>
+
+                {/* Indicator pagini */}
+                <div style={{
+                  display: 'flex',
+                  gap: '0.25rem',
+                  alignItems: 'center'
+                }}>
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        style={{
+                          background: pageNum === pagination.page
+                            ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                            : 'rgba(255, 255, 255, 0.8)',
+                          color: pageNum === pagination.page ? 'white' : '#4b5563',
+                          border: pageNum === pagination.page
+                            ? 'none'
+                            : '1px solid rgba(209, 213, 219, 0.5)',
+                          borderRadius: '8px',
+                          padding: '0.5rem 0.75rem',
+                          fontSize: '0.875rem',
+                          fontWeight: pageNum === pagination.page ? '700' : '500',
+                          cursor: 'pointer',
+                          minWidth: '36px',
+                          transition: 'all 0.2s ease',
+                          boxShadow: pageNum === pagination.page
+                            ? '0 2px 8px rgba(59, 130, 246, 0.3)'
+                            : 'none'
+                        }}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Buton Următor */}
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages}
+                  style={{
+                    background: pagination.page >= pagination.totalPages ? 'rgba(156, 163, 175, 0.3)' : 'rgba(59, 130, 246, 0.1)',
+                    color: pagination.page >= pagination.totalPages ? '#9ca3af' : '#2563eb',
+                    border: '1px solid ' + (pagination.page >= pagination.totalPages ? 'rgba(156, 163, 175, 0.2)' : 'rgba(59, 130, 246, 0.2)'),
+                    borderRadius: '8px',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Următor →
+                </button>
+
+                {/* Buton Ultima Pagină */}
+                <button
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={pagination.page >= pagination.totalPages}
+                  style={{
+                    background: pagination.page >= pagination.totalPages ? 'rgba(156, 163, 175, 0.3)' : 'rgba(59, 130, 246, 0.1)',
+                    color: pagination.page >= pagination.totalPages ? '#9ca3af' : '#2563eb',
+                    border: '1px solid ' + (pagination.page >= pagination.totalPages ? 'rgba(156, 163, 175, 0.2)' : 'rgba(59, 130, 246, 0.2)'),
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Ultima pagină"
+                >
+                  ⟫
+                </button>
               </div>
             </div>
           )}
