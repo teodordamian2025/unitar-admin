@@ -420,23 +420,52 @@ export default function GanttView() {
   };
 
   const generateTimelineHeaders = () => {
-    const headers: Date[] = [];
+    const headers: { date: Date; leftPercent: number; widthPercent: number }[] = [];
     const current = new Date(timelineSettings.startDate);
     const end = timelineSettings.endDate;
+    const totalDuration = end.getTime() - timelineSettings.startDate.getTime();
+
+    if (totalDuration <= 0) return headers;
 
     while (current <= end) {
-      headers.push(new Date(current));
+      const headerStart = new Date(current);
+
+      // Calculăm data de sfârșit a acestui header
+      let headerEnd: Date;
       switch (timelineSettings.viewMode) {
         case 'days':
+          headerEnd = new Date(current);
+          headerEnd.setDate(headerEnd.getDate() + 1);
           current.setDate(current.getDate() + 1);
           break;
         case 'weeks':
+          headerEnd = new Date(current);
+          headerEnd.setDate(headerEnd.getDate() + 7);
           current.setDate(current.getDate() + 7);
           break;
         case 'months':
+          headerEnd = new Date(current);
+          headerEnd.setMonth(headerEnd.getMonth() + 1);
           current.setMonth(current.getMonth() + 1);
           break;
+        default:
+          headerEnd = new Date(current);
+          headerEnd.setDate(headerEnd.getDate() + 1);
+          current.setDate(current.getDate() + 1);
       }
+
+      // Calculăm poziția și lățimea ca procente (exact ca barele de task)
+      const leftPercent = Math.max(0, ((headerStart.getTime() - timelineSettings.startDate.getTime()) / totalDuration) * 100);
+
+      // Limităm sfârșitul la end date pentru ultimul header
+      const effectiveEnd = headerEnd.getTime() > end.getTime() ? end.getTime() : headerEnd.getTime();
+      const widthPercent = Math.max(0, ((effectiveEnd - headerStart.getTime()) / totalDuration) * 100);
+
+      headers.push({
+        date: headerStart,
+        leftPercent,
+        widthPercent
+      });
     }
 
     return headers;
@@ -1149,30 +1178,37 @@ export default function GanttView() {
                 background: 'rgba(243, 244, 246, 0.9)',
                 position: 'relative'
               }}>
-                <div style={{
-                  display: 'flex',
-                  height: '100%'
-                }}>
-                  {timelineHeaders.map((date, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        flex: 1,
-                        padding: '1rem 0.5rem',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: '#374151',
-                        textAlign: 'center',
-                        borderRight: index < timelineHeaders.length - 1 ? '1px solid rgba(229, 231, 235, 0.5)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {formatDate(date)}
-                    </div>
-                  ))}
-                </div>
+                {timelineHeaders.map((header, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      position: 'absolute',
+                      left: `${header.leftPercent}%`,
+                      width: `${header.widthPercent}%`,
+                      height: '100%',
+                      padding: '1rem 0.25rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      textAlign: 'center',
+                      borderRight: index < timelineHeaders.length - 1 ? '1px solid rgba(229, 231, 235, 0.5)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <span style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: header.widthPercent < 5 ? '0.65rem' : '0.75rem'
+                    }}>
+                      {formatDate(header.date)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1306,6 +1342,23 @@ export default function GanttView() {
                       background: 'white'
                     }}
                   >
+                    {/* Grid lines - sincronizate cu header-urile */}
+                    {timelineHeaders.map((header, headerIndex) => (
+                      <div
+                        key={`grid-${headerIndex}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${header.leftPercent}%`,
+                          top: 0,
+                          bottom: 0,
+                          width: '1px',
+                          background: 'rgba(229, 231, 235, 0.5)',
+                          pointerEvents: 'none',
+                          zIndex: 0
+                        }}
+                      />
+                    ))}
+
                     {/* Start Date Label */}
                     {(() => {
                       const position = calculateTaskPosition(task);
