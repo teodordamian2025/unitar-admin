@@ -24,10 +24,12 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  Receipt
+  Receipt,
+  Banknote
 } from 'lucide-react';
 import EditFacturaModal from './EditFacturaModal';
 import ChitantaModal from './ChitantaModal';
+import IncasareModal from './IncasareModal';
 
 // Declare global pentru jsPDF
 declare global {
@@ -124,6 +126,10 @@ export default function FacturiList({
   // State pentru modal chitanta
   const [showChitantaModal, setShowChitantaModal] = useState(false);
   const [selectedFacturaChitanta, setSelectedFacturaChitanta] = useState<Factura | null>(null);
+
+  // State pentru modal încasare
+  const [showIncasareModal, setShowIncasareModal] = useState(false);
+  const [selectedFacturaIncasare, setSelectedFacturaIncasare] = useState<Factura | null>(null);
 
   useEffect(() => {
     loadFacturi();
@@ -941,6 +947,31 @@ export default function FacturiList({
     );
   };
 
+  // Handler pentru deschiderea modalului de încasare
+  const handleIncasare = (factura: Factura) => {
+    setSelectedFacturaIncasare(factura);
+    setShowIncasareModal(true);
+  };
+
+  // Handler pentru succes încasare
+  const handleIncasareSuccess = (incasareData: any) => {
+    setShowIncasareModal(false);
+    setSelectedFacturaIncasare(null);
+    loadFacturi();
+
+    const numarFactura = incasareData.factura?.numar_complet || '';
+    const valoareIncasata = incasareData.incasare?.valoare || 0;
+    const restNou = incasareData.factura?.rest_de_plata_nou || 0;
+
+    showToast(
+      `Încasare înregistrată cu succes!\n` +
+      `Factură: ${numarFactura}\n` +
+      `Valoare încasată: ${valoareIncasata.toLocaleString('ro-RO')} lei\n` +
+      `Rest de plată: ${restNou.toLocaleString('ro-RO')} lei`,
+      'success'
+    );
+  };
+
   const handleDeleteFactura = async (factura: Factura) => {
     if (factura.efactura_enabled &&
         factura.efactura_status &&
@@ -1297,10 +1328,12 @@ export default function FacturiList({
                           canDelete={canDelete}
                           canStorno={canStorno}
                           canChitanta={factura.status !== 'stornata' && factura.rest_de_plata > 0}
+                          canIncasare={factura.status !== 'stornata' && factura.rest_de_plata > 0}
                           onDownload={() => handleDownload(factura)}
                           onEdit={() => handleEditFactura(factura, 'edit')}
                           onStorno={() => handleEditFactura(factura, 'storno')}
                           onChitanta={() => handleChitanta(factura)}
+                          onIncasare={() => handleIncasare(factura)}
                           onDownloadXML={() => handleDownloadXML(factura)}
                           onSendToANAF={() => handleSendToANAF(factura)}
                           onRetryANAF={() => handleRetryANAF(factura)}
@@ -1342,6 +1375,19 @@ export default function FacturiList({
             setSelectedFacturaChitanta(null);
           }}
           onSuccess={handleChitantaSuccess}
+        />
+      )}
+
+      {/* Modal pentru încasare - NOU 09.12.2025 */}
+      {showIncasareModal && selectedFacturaIncasare && (
+        <IncasareModal
+          factura={selectedFacturaIncasare}
+          isOpen={showIncasareModal}
+          onClose={() => {
+            setShowIncasareModal(false);
+            setSelectedFacturaIncasare(null);
+          }}
+          onSuccess={handleIncasareSuccess}
         />
       )}
 
@@ -1432,10 +1478,12 @@ interface EnhancedActionDropdownProps {
   canDelete: boolean;
   canStorno: boolean;
   canChitanta: boolean; // NOU: permite emitere chitanta
+  canIncasare: boolean; // NOU: permite marcare încasare
   onDownload: () => void;
   onEdit: () => void;
   onStorno: () => void;
   onChitanta: () => void; // NOU: handler chitanta
+  onIncasare: () => void; // NOU: handler încasare
   onDownloadXML: () => void;
   onSendToANAF: () => void;
   onRetryANAF: () => void;
@@ -1450,10 +1498,12 @@ function EnhancedActionDropdown({
   canDelete,
   canStorno,
   canChitanta,
+  canIncasare,
   onDownload,
   onEdit,
   onStorno,
   onChitanta,
+  onIncasare,
   onDownloadXML,
   onSendToANAF,
   onRetryANAF,
@@ -1811,6 +1861,44 @@ function EnhancedActionDropdown({
                   >
                     {loading === 'chitanta' ? <Clock size={16} /> : <Receipt size={16} />}
                     Chitanta
+                  </button>
+                )}
+
+                {/* Încasare - NOU 09.12.2025 */}
+                {canIncasare && (
+                  <button
+                    onClick={() => handleActionClick('incasare', onIncasare)}
+                    disabled={loading === 'incasare'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: loading === 'incasare' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      color: '#2c3e50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => {
+                      if (loading !== 'incasare') {
+                        e.currentTarget.style.background = '#3498db15';
+                        e.currentTarget.style.color = '#3498db';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    {loading === 'incasare' ? <Clock size={16} /> : <Banknote size={16} />}
+                    Marcheaza Incasare
                   </button>
                 )}
 
