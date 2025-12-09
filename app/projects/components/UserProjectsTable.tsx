@@ -137,8 +137,50 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+  const handlePageChange = async (newPage: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Construire query string cu filtrele + noua pagină
+      const queryParams = new URLSearchParams({
+        ...searchParams,
+        page: newPage.toString(),
+        limit: pagination.limit.toString()
+      });
+
+      console.log('🔄 Changing page to:', newPage, 'params:', queryParams.toString());
+
+      const response = await fetch(`/api/user/projects?${queryParams.toString()}`);
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown API error');
+      }
+
+      console.log('✅ Page changed - projects loaded:', result.data?.length || 0);
+
+      setProjects(result.data || []);
+      setSubprojects(result.subprojecte || []);
+      setPagination(prev => ({
+        ...prev,
+        page: newPage,
+        total: result.pagination?.total || 0,
+        totalPages: result.pagination?.totalPages || 0
+      }));
+
+    } catch (error) {
+      console.error('❌ Error changing page:', error);
+      setError(error instanceof Error ? error.message : 'Eroare necunoscută');
+      toast.error('Eroare la schimbarea paginii!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Helper functions pentru gestionarea subproiectelor
