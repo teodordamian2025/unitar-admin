@@ -444,11 +444,11 @@ export async function POST(request: NextRequest) {
           diferenta_ron, diferenta_procent, moneda_target,
           matching_details, status, data_creare, creat_de
         ) VALUES (
-          @id, @tranzactieId, 'factura', @facturaId, @targetDetails,
+          @id, @tranzactieId, 'factura', @facturaId, PARSE_JSON(@targetDetails),
           100, 'manual_factura_match',
           @sumaIncasata, @totalFactura, @totalFactura,
           @diferentaRon, @diferentaProcent, 'RON',
-          @matchingDetails, 'active', CURRENT_TIMESTAMP(), @userId
+          PARSE_JSON(@matchingDetails), 'active', CURRENT_TIMESTAMP(), @userId
         )
       `;
 
