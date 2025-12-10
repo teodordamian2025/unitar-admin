@@ -353,7 +353,7 @@ export async function POST(request: NextRequest) {
         facturaId: factura_id
       },
       types: {
-        valoarePlatita: 'FLOAT64',
+        valoarePlatita: 'NUMERIC',
         status: 'STRING',
         dataIncasare: 'STRING',
         facturaId: 'STRING'
@@ -395,7 +395,7 @@ export async function POST(request: NextRequest) {
       types: {
         statusIncasare: 'STRING',
         dataIncasare: 'STRING',
-        sumaProrata: 'FLOAT64',
+        sumaProrata: 'NUMERIC',
         observatiiText: 'STRING',
         userId: 'STRING',
         facturaId: 'STRING'
@@ -481,10 +481,10 @@ export async function POST(request: NextRequest) {
           tranzactieId: 'STRING',
           facturaId: 'STRING',
           targetDetails: 'STRING',
-          sumaIncasata: 'FLOAT64',
-          totalFactura: 'FLOAT64',
-          diferentaRon: 'FLOAT64',
-          diferentaProcent: 'FLOAT64',
+          sumaIncasata: 'NUMERIC',
+          totalFactura: 'NUMERIC',
+          diferentaRon: 'NUMERIC',
+          diferentaProcent: 'NUMERIC',
           matchingDetails: 'STRING',
           userId: 'STRING'
         },
