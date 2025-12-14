@@ -111,8 +111,15 @@ const convertBigQueryNumeric = (value: any): number => {
 };
 
 // Helper function pentru validare și escape SQL (PĂSTRAT)
+// FIX 14.12.2025: Adăugat escape pentru newline și alte caractere speciale
+// pentru a evita eroarea "Unclosed string literal" în BigQuery
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first
+    .replace(/'/g, "''")     // Escape single quotes
+    .replace(/\n/g, '\\n')   // Escape newlines
+    .replace(/\r/g, '\\r')   // Escape carriage returns
+    .replace(/\t/g, '\\t');  // Escape tabs
 };
 
 // Helper function pentru formatare DATE pentru BigQuery (PĂSTRAT)
