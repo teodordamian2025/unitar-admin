@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Download,
@@ -109,6 +109,10 @@ export default function FacturiList({
     perioada: '30'
   });
 
+  // State local pentru input-ul de căutare (fără debounce)
+  const [searchInput, setSearchInput] = useState('');
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [customPeriod, setCustomPeriod] = useState({
     dataStart: '',
@@ -131,6 +135,27 @@ export default function FacturiList({
   const [showIncasareModal, setShowIncasareModal] = useState(false);
   const [selectedFacturaIncasare, setSelectedFacturaIncasare] = useState<Factura | null>(null);
 
+  // ✅ FIX PERFORMANȚĂ: Debounce pentru search input (500ms)
+  useEffect(() => {
+    // Curăță timeout-ul anterior
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    // Setează un nou timeout pentru a actualiza filtrul după 500ms
+    searchDebounceRef.current = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }));
+    }, 500);
+
+    // Cleanup la unmount
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchInput]);
+
+  // Încarcă facturile când se schimbă filtrele (dar nu searchInput direct)
   useEffect(() => {
     loadFacturi();
   }, [proiectId, clientId, filters, customPeriod]);
@@ -157,14 +182,14 @@ export default function FacturiList({
       
       if (data.success) {
         let result = data.facturi;
-        
+
         result = result.map((f: any) => ({
           ...f,
           data_factura_formatted: formatDateSafe(f.data_factura),
           data_scadenta_formatted: formatDateSafe(f.data_scadenta),
           data_creare_formatted: formatDateSafe(f.data_creare)
         }));
-        
+
         if (filters.search) {
           const searchLower = filters.search.toLowerCase();
           result = result.filter((f: Factura) =>
@@ -174,14 +199,15 @@ export default function FacturiList({
             f.proiect_denumire.toLowerCase().includes(searchLower)
           );
         }
-        
+
         if (filters.scadenta) {
           result = result.filter((f: Factura) => f.status_scadenta === filters.scadenta);
         }
-        
+
         setFacturi(result);
-        await loadEFacturaDetails(result.filter((f: Factura) => f.efactura_enabled));
-        
+        // ✅ FIX PERFORMANȚĂ: NU mai încărcăm detaliile e-factura automat (N+1 problem)
+        // Detaliile se încarcă lazy, doar când user-ul cere (click pe "Detalii e-factura")
+
       } else {
         throw new Error(data.error);
       }
@@ -1004,8 +1030,34 @@ export default function FacturiList({
     }
   };
 
-  const showEFacturaDetailsModal = (factura: Factura) => {
+  // ✅ FIX PERFORMANȚĂ: Încarcă detaliile e-factura lazy (doar la click)
+  const showEFacturaDetailsModal = async (factura: Factura) => {
     setShowEFacturaModal(factura.id);
+
+    // Verifică dacă detaliile sunt deja încărcate
+    if (!eFacturaDetails[factura.id]) {
+      try {
+        const response = await fetch(`/api/actions/invoices/efactura-details?facturaId=${factura.id}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setEFacturaDetails(prev => ({
+            ...prev,
+            [factura.id]: {
+              xmlId: data.xmlId,
+              anafStatus: data.status,
+              errorMessage: data.errorMessage,
+              dataUpload: data.dataUpload,
+              dataValidare: data.dataValidare,
+              retryCount: data.retryCount,
+              timeline: data.timeline || []
+            }
+          }));
+        }
+      } catch (error) {
+        console.warn(`Could not load e-factura details for ${factura.id}:`, error);
+      }
+    }
   };
 
   // Toast system cu Z-index compatibil cu modalele externe - IDENTIC cu ProiectActions
@@ -1114,8 +1166,8 @@ export default function FacturiList({
               <input
                 type="text"
                 placeholder="Cauta dupa numar, client sau proiect..."
-                value={filters.search}
-                onChange={(e) => setFilters({...filters, search: e.target.value})}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded text-sm"
               />
               <select
@@ -1209,7 +1261,10 @@ export default function FacturiList({
           </div>
           {(filters.search || filters.status || filters.scadenta) && (
             <button
-              onClick={() => setFilters({search: '', status: '', scadenta: '', perioada: '30'})}
+              onClick={() => {
+                setSearchInput('');
+                setFilters({search: '', status: '', scadenta: '', perioada: '30'});
+              }}
               className="mt-2 text-blue-600 underline"
             >
               Reseteaza filtrele

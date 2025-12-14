@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // ✅ FIX 29.11.2025: Citim valoare_incasata din EtapeFacturi_v2 (sursa corectă pentru încasări)
-    // Aceasta este sursa de adevăr pentru încasări, actualizată când tranzacțiile sunt imperecheate
+    // ✅ FIX PERFORMANȚĂ 14.12.2025: Query unic cu COUNT(*) OVER() pentru a elimina al doilea query
+    // Aceasta reduce timpul de răspuns cu ~50% (un singur round-trip la BigQuery)
     let query = `
       WITH incasari_facturi AS (
         -- Agregăm încasările din EtapeFacturi pentru fiecare factură
@@ -59,104 +59,112 @@ export async function GET(request: NextRequest) {
         FROM ${TABLE_ETAPE_FACTURI}
         WHERE activ = true AND factura_id IS NOT NULL
         GROUP BY factura_id
-      )
-      SELECT
-        fg.id,
-        fg.serie,
-        fg.numar,
-        fg.data_factura,
-        fg.data_scadenta,
-        fg.client_nume,
-        fg.client_cui,
-        fg.subtotal,
-        fg.total_tva,
-        fg.total,
+      ),
+      facturi_filtrate AS (
+        SELECT
+          fg.id,
+          fg.serie,
+          fg.numar,
+          fg.data_factura,
+          fg.data_scadenta,
+          fg.client_nume,
+          fg.client_cui,
+          fg.subtotal,
+          fg.total_tva,
+          fg.total,
 
-        -- ✅ FIX: Folosim valoarea încasată din EtapeFacturi (sursa corectă)
-        -- Fallback la valoare_platita din FacturiGenerate pentru facturi fără etape
-        COALESCE(inc.total_incasat, fg.valoare_platita, 0) as valoare_platita,
+          -- ✅ FIX: Folosim valoarea încasată din EtapeFacturi (sursa corectă)
+          COALESCE(inc.total_incasat, fg.valoare_platita, 0) as valoare_platita,
 
-        fg.status,
-        fg.data_creare,
-        fg.data_actualizare,
-        fg.date_complete_json, -- ✅ ADĂUGAT: Pentru datele complete
+          fg.status,
+          fg.data_creare,
+          fg.data_actualizare,
+          fg.date_complete_json,
 
-        -- ✅ CRUCIAL: Include proiect_id din BigQuery pentru Edit/Storno
-        fg.proiect_id,
+          -- ✅ CRUCIAL: Include proiect_id din BigQuery pentru Edit/Storno
+          fg.proiect_id,
 
-        -- ✅ Date proiect din JOIN
-        p.Denumire as proiect_denumire,
-        p.Status as proiect_status,
+          -- ✅ Date proiect din JOIN
+          p.Denumire as proiect_denumire,
+          p.Status as proiect_status,
 
-        -- ✅ NOU: Corespondențe cu Subproiecte și Etape (04.10.2025)
-        ef.subproiect_id,
-        s.Denumire as subproiect_denumire,
-        ef.tip_etapa,
-        ef.etapa_id,
-        ef.anexa_id,
+          -- ✅ Corespondențe cu Subproiecte și Etape
+          ef.subproiect_id,
+          s.Denumire as subproiect_denumire,
+          ef.tip_etapa,
+          ef.etapa_id,
+          ef.anexa_id,
 
-        -- ✅ FIX: Date încasare din EtapeFacturi
-        inc.ultima_data_incasare as data_incasare,
-        inc.status_incasare_ef,
+          -- ✅ Date încasare din EtapeFacturi
+          inc.ultima_data_incasare as data_incasare,
+          inc.status_incasare_ef,
 
-        -- ✅ Câmpuri e-factura
-        fg.efactura_enabled,
-        fg.efactura_status,
-        fg.anaf_upload_id,
+          -- ✅ Câmpuri e-factura
+          fg.efactura_enabled,
+          fg.efactura_status,
+          fg.anaf_upload_id,
 
-        -- ✅ Mock mode indicator
-        CASE
-          WHEN fg.efactura_status = 'mock_pending' THEN true
-          ELSE false
-        END as efactura_mock_mode,
+          -- ✅ Mock mode indicator
+          CASE
+            WHEN fg.efactura_status = 'mock_pending' THEN true
+            ELSE false
+          END as efactura_mock_mode,
 
-        -- ✅ FIX: Calcule utile folosind valoare_incasata din EtapeFacturi
-        (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
-        DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
+          -- ✅ Calcule utile
+          (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
+          DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
 
-        -- ✅ FIX: Status scadență bazat pe încasările reale din EtapeFacturi
-        CASE
-          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirată'
-          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
-          WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
-          ELSE 'În regulă'
-        END as status_scadenta
+          -- ✅ Status scadență
+          CASE
+            WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirată'
+            WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
+            WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
+            ELSE 'În regulă'
+          END as status_scadenta
 
-      FROM ${TABLE_FACTURI_GENERATE} fg
-      LEFT JOIN ${TABLE_PROIECTE} p
-        ON fg.proiect_id = p.ID_Proiect
-      LEFT JOIN ${TABLE_ETAPE_FACTURI} ef
-        ON fg.id = ef.factura_id AND ef.activ = true
-      LEFT JOIN ${TABLE_SUBPROIECTE} s
-        ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
-      LEFT JOIN incasari_facturi inc
-        ON fg.id = inc.factura_id
-      WHERE 1=1
+        FROM ${TABLE_FACTURI_GENERATE} fg
+        LEFT JOIN ${TABLE_PROIECTE} p
+          ON fg.proiect_id = p.ID_Proiect
+        LEFT JOIN ${TABLE_ETAPE_FACTURI} ef
+          ON fg.id = ef.factura_id AND ef.activ = true
+        LEFT JOIN ${TABLE_SUBPROIECTE} s
+          ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
+        LEFT JOIN incasari_facturi inc
+          ON fg.id = inc.factura_id
+        WHERE 1=1
     `;
-    
+
     const params: any = {};
     const types: any = {};
-    
+
     if (proiectId) {
       query += ' AND fg.proiect_id = @proiectId';
       params.proiectId = proiectId;
       types.proiectId = 'STRING';
     }
-    
+
     if (clientId) {
       query += ' AND fg.client_id = @clientId';
       params.clientId = clientId;
       types.clientId = 'STRING';
     }
-    
+
     if (status) {
       query += ' AND fg.status = @status';
       params.status = status;
       types.status = 'STRING';
     }
-    
-    query += ' ORDER BY fg.data_creare DESC';
-    
+
+    // ✅ FIX PERFORMANȚĂ: Închide CTE și adaugă COUNT(*) OVER() pentru total count într-un singur query
+    query += `
+      )
+      SELECT
+        *,
+        COUNT(*) OVER() as total_count
+      FROM facturi_filtrate
+      ORDER BY data_creare DESC
+    `;
+
     if (limit > 0) {
       query += ` LIMIT @limit OFFSET @offset`;
       params.limit = limit;
@@ -164,67 +172,37 @@ export async function GET(request: NextRequest) {
       types.limit = 'INT64';
       types.offset = 'INT64';
     }
-    
-    console.log('📋 Query facturi cu proiect_id:', query);
-    console.log('📋 Params:', params);
-    
+
+    console.log('📋 Query facturi optimizat (single query)');
+
     const [rows] = await bigquery.query({
       query,
       params,
       types,
       location: 'EU'
     });
-    
-    // ✅ DEBUGGING: Verifică că proiect_id și serie sunt incluse
-    console.log('🔍 DEBUG: Prima factură returnată:', {
-      id: rows[0]?.id,
-      serie: rows[0]?.serie,
-      numar: rows[0]?.numar,
-      proiect_id: rows[0]?.proiect_id,
-      proiect_denumire: rows[0]?.proiect_denumire,
-      are_date_complete_json: !!rows[0]?.date_complete_json
-    });
-    
-    // Query pentru total count (pentru paginare)
-    let countQuery = `
-      SELECT COUNT(*) as total_count
-      FROM ${TABLE_FACTURI_GENERATE} fg
-      WHERE 1=1
-    `;
-    
-    const countParams: any = {};
-    const countTypes: any = {};
-    
-    if (proiectId) {
-      countQuery += ' AND fg.proiect_id = @proiectId';
-      countParams.proiectId = proiectId;
-      countTypes.proiectId = 'STRING';
+
+    // ✅ Extrage total_count din primul row (sau 0 dacă nu sunt rezultate)
+    const totalCount = rows.length > 0 ? (rows[0].total_count || 0) : 0;
+
+    // ✅ Curăță total_count din rezultate (nu e nevoie în frontend)
+    const cleanRows = rows.map(({ total_count, ...rest }: any) => rest);
+
+    // ✅ DEBUGGING: Verifică prima factură
+    if (cleanRows.length > 0) {
+      console.log('🔍 DEBUG: Prima factură returnată:', {
+        id: cleanRows[0]?.id,
+        serie: cleanRows[0]?.serie,
+        numar: cleanRows[0]?.numar,
+        proiect_id: cleanRows[0]?.proiect_id,
+        proiect_denumire: cleanRows[0]?.proiect_denumire,
+        are_date_complete_json: !!cleanRows[0]?.date_complete_json
+      });
     }
-    
-    if (clientId) {
-      countQuery += ' AND fg.client_id = @clientId';
-      countParams.clientId = clientId;
-      countTypes.clientId = 'STRING';
-    }
-    
-    if (status) {
-      countQuery += ' AND fg.status = @status';
-      countParams.status = status;
-      countTypes.status = 'STRING';
-    }
-    
-    const [countRows] = await bigquery.query({
-      query: countQuery,
-      params: countParams,
-      types: countTypes,
-      location: 'EU'
-    });
-    
-    const totalCount = countRows[0]?.total_count || 0;
-    
+
     return NextResponse.json({
       success: true,
-      facturi: rows,
+      facturi: cleanRows,
       pagination: {
         total: parseInt(totalCount),
         limit,
@@ -232,11 +210,11 @@ export async function GET(request: NextRequest) {
         hasMore: (offset + limit) < parseInt(totalCount)
       }
     });
-    
+
   } catch (error) {
     console.error('Eroare preluare facturi:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Eroare la preluarea facturilor',
         details: error instanceof Error ? error.message : 'Eroare necunoscută'
       },
