@@ -998,7 +998,7 @@ export async function POST(request: NextRequest) {
     const safeClientData = clientInfo ? {
       nume: clientInfo.denumire || clientInfo.nume || 'Client din Proiect',
       cui: isPersoanaFizica ? (clientInfo.cnp || 'CNP necunoscut') : (clientInfo.cui || 'RO00000000'),
-      nr_reg_com: isPersoanaFizica ? '' : (clientInfo.nrRegCom || clientInfo.nr_reg_com || 'J40/0000/2024'),
+      nr_reg_com: isPersoanaFizica ? '' : (clientInfo.nrRegCom || clientInfo.nr_reg_com || ''),
       adresa: clientInfo.adresa || 'Adresa client',
       telefon: clientInfo.telefon || 'N/A',
       email: clientInfo.email || 'N/A',
@@ -1006,7 +1006,7 @@ export async function POST(request: NextRequest) {
     } : {
       nume: 'Client din Proiect',
       cui: 'RO00000000',
-      nr_reg_com: 'J40/0000/2024',
+      nr_reg_com: '',
       adresa: 'Adresa client',
       telefon: 'N/A',
       email: 'N/A',
