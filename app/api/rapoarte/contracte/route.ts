@@ -227,33 +227,29 @@ const calculateFacturareStatus = (factureData: any[]): { status: string, display
   };
 };
 
-// NOU: Încărcarea facturilor directe pentru contract (fără etape/anexe)
+// NOU: Încărcarea facturilor directe pentru contract (din EtapeFacturi_v2 cu tip_etapa='factura_directa')
+// FIX 16.12.2025: Query modificat pentru a lua din EtapeFacturi_v2 în loc să excludă facturile cu înregistrări
 const loadFacturiDirecteContract = async (proiectId: string) => {
   try {
     const facturiDirecteQuery = `
       SELECT
-        fg.id as factura_id,
+        ef.factura_id,
         fg.serie,
         fg.numar,
-        fg.total as valoare,
-        'RON' as moneda,
-        fg.data_factura as data_facturare,
-        fg.data_plata as data_incasare,
-        fg.valoare_platita as valoare_incasata,
+        ef.valoare,
+        ef.moneda,
+        ef.data_facturare,
+        ef.data_incasare,
+        ef.valoare_incasata,
+        ef.status_incasare,
         fg.status as status_factura,
-        CASE
-          WHEN COALESCE(fg.valoare_platita, 0) = 0 THEN 'Neincasat'
-          WHEN COALESCE(fg.valoare_platita, 0) >= fg.total THEN 'Incasat complet'
-          ELSE 'Incasat partial'
-        END as status_incasare
-      FROM ${TABLE_FACTURI_GENERATE} fg
-      WHERE fg.proiect_id = '${proiectId}'
-        AND fg.id NOT IN (
-          SELECT DISTINCT factura_id
-          FROM ${TABLE_ETAPE_FACTURI}
-          WHERE activ = true AND factura_id IS NOT NULL
-        )
-      ORDER BY fg.data_factura DESC
+        ef.activ
+      FROM ${TABLE_ETAPE_FACTURI} ef
+      JOIN ${TABLE_FACTURI_GENERATE} fg ON ef.factura_id = fg.id
+      WHERE ef.proiect_id = '${proiectId}'
+        AND ef.tip_etapa = 'factura_directa'
+        AND ef.activ = true
+      ORDER BY ef.data_facturare DESC
     `;
 
     const [facturiRows] = await bigquery.query({
@@ -272,7 +268,7 @@ const loadFacturiDirecteContract = async (proiectId: string) => {
       valoare_incasata: row.valoare_incasata,
       status_incasare: row.status_incasare,
       status_factura: row.status_factura,
-      activ: true
+      activ: row.activ
     }));
   } catch (error) {
     console.error(`[CONTRACTE] Eroare la încărcarea facturilor directe pentru proiectul ${proiectId}:`, error);
