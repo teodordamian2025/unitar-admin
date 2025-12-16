@@ -144,7 +144,8 @@ export async function GET(request: NextRequest) {
 
     console.log('📋 PROIECTE API PARAMS:', { search, status, client, page, limit });
 
-    // FIX CRITICAL: Query cu JOIN pentru datele clientului + contracte (fără subquery corelat)
+    // FIX CRITICAL: Query cu JOIN pentru datele clientului + contracte + facturi directe
+    // MODIFICAT 16.12.2025: Adăugat CTE pentru facturi directe (tip_etapa = 'factura_directa')
     let baseQuery = `
       WITH contracte_cu_anexe AS (
         SELECT
@@ -192,6 +193,37 @@ export async function GET(request: NextRequest) {
         LEFT JOIN contracte_cu_anexe cca
           ON cca.proiect_id = p.ID_Proiect
         GROUP BY p.ID_Proiect
+      ),
+      -- NOU: CTE pentru facturi directe (fără contract)
+      facturi_directe AS (
+        SELECT
+          ef.proiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              ef.id as etapa_factura_id,
+              ef.factura_id,
+              CONCAT(fg.serie, '-', fg.numar) as numar_factura,
+              fg.serie as factura_serie,
+              fg.numar as factura_numar,
+              ef.valoare,
+              ef.moneda,
+              ef.valoare_ron,
+              ef.status_incasare,
+              ef.data_facturare,
+              ef.data_incasare,
+              ef.valoare_incasata,
+              fg.data_factura,
+              fg.data_scadenta,
+              fg.total as factura_total
+            )
+            ORDER BY ef.data_facturare DESC
+          ) as facturi
+        FROM \`${PROJECT_ID}.${dataset}.EtapeFacturi${tableSuffix}\` ef
+        JOIN \`${PROJECT_ID}.${dataset}.FacturiGenerate${tableSuffix}\` fg
+          ON ef.factura_id = fg.id
+        WHERE ef.tip_etapa = 'factura_directa'
+          AND ef.activ = true
+        GROUP BY ef.proiect_id
       )
       SELECT
         p.*,
@@ -206,12 +238,15 @@ export async function GET(request: NextRequest) {
         c.email as client_email,
         c.banca as client_banca,
         c.iban as client_iban,
-        COALESCE(pcc.contracte, []) as contracte
+        COALESCE(pcc.contracte, []) as contracte,
+        COALESCE(fd.facturi, []) as facturi_directe
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
       LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
       LEFT JOIN proiecte_cu_contracte pcc
         ON pcc.ID_Proiect = p.ID_Proiect
+      LEFT JOIN facturi_directe fd
+        ON fd.proiect_id = p.ID_Proiect
     `;
 
     const conditions: string[] = [];

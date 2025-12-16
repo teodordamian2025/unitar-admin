@@ -1333,45 +1333,120 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         }}>
                           {(() => {
                             const contracte = (proiect as any).contracte || [];
-                            if (contracte.length === 0) {
+                            const facturiDirecte = (proiect as any).facturi_directe || [];
+
+                            // Dacă există contracte, le afișăm
+                            if (contracte.length > 0) {
                               return (
-                                <span style={{
-                                  color: '#95a5a6',
-                                  fontSize: '12px',
-                                  fontStyle: 'italic'
-                                }}>
-                                  Fără contract
-                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                  {contracte.map((contract: any, idx: number) => (
+                                    <div key={contract.ID_Contract || idx} style={{ fontSize: '13px' }}>
+                                      <div style={{
+                                        fontWeight: '600',
+                                        color: '#2c3e50',
+                                        marginBottom: '0.25rem'
+                                      }}>
+                                        📄 {contract.numar_contract}
+                                      </div>
+                                      {contract.anexe && contract.anexe.length > 0 && (
+                                        <div style={{
+                                          fontSize: '11px',
+                                          color: '#7f8c8d',
+                                          paddingLeft: '1rem'
+                                        }}>
+                                          {contract.anexe.map((anexa: any, aIdx: number) => (
+                                            <div key={anexa.ID_Anexa || aIdx}>
+                                              └─ Anexa {anexa.anexa_numar}
+                                              {anexa.anexa_denumire && `: ${anexa.anexa_denumire}`}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               );
                             }
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {contracte.map((contract: any, idx: number) => (
-                                  <div key={contract.ID_Contract || idx} style={{ fontSize: '13px' }}>
-                                    <div style={{
-                                      fontWeight: '600',
-                                      color: '#2c3e50',
-                                      marginBottom: '0.25rem'
-                                    }}>
-                                      📄 {contract.numar_contract}
-                                    </div>
-                                    {contract.anexe && contract.anexe.length > 0 && (
-                                      <div style={{
-                                        fontSize: '11px',
-                                        color: '#7f8c8d',
-                                        paddingLeft: '1rem'
+
+                            // Dacă NU există contracte dar există facturi directe, le afișăm
+                            if (facturiDirecte.length > 0) {
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                  {facturiDirecte.map((factura: any, idx: number) => {
+                                    const statusIncasare = factura.status_incasare || 'Neincasat';
+                                    const isIncasat = statusIncasare === 'Incasat' || statusIncasare === 'Încasat';
+                                    const isPartial = statusIncasare === 'Partial' || statusIncasare === 'Parțial';
+
+                                    // Formatare valoare
+                                    const valoare = ensureNumber(factura.valoare);
+                                    const valoareRon = ensureNumber(factura.valoare_ron);
+                                    const moneda = factura.moneda || 'RON';
+
+                                    return (
+                                      <div key={factura.factura_id || idx} style={{
+                                        fontSize: '12px',
+                                        padding: '0.5rem',
+                                        background: 'rgba(52, 152, 219, 0.08)',
+                                        borderRadius: '8px',
+                                        borderLeft: `3px solid ${isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'}`
                                       }}>
-                                        {contract.anexe.map((anexa: any, aIdx: number) => (
-                                          <div key={anexa.ID_Anexa || aIdx}>
-                                            └─ Anexa {anexa.anexa_numar}
-                                            {anexa.anexa_denumire && `: ${anexa.anexa_denumire}`}
-                                          </div>
-                                        ))}
+                                        <div style={{
+                                          fontWeight: '600',
+                                          color: '#2c3e50',
+                                          marginBottom: '0.25rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.5rem'
+                                        }}>
+                                          <span>🧾 {factura.numar_factura}</span>
+                                          <span style={{
+                                            fontSize: '10px',
+                                            padding: '2px 6px',
+                                            borderRadius: '10px',
+                                            background: isIncasat ? 'rgba(39, 174, 96, 0.15)' : isPartial ? 'rgba(243, 156, 18, 0.15)' : 'rgba(231, 76, 60, 0.15)',
+                                            color: isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c',
+                                            fontWeight: '600'
+                                          }}>
+                                            {isIncasat ? '✅ Încasat' : isPartial ? '⏳ Parțial' : '⏳ Neîncasat'}
+                                          </span>
+                                        </div>
+                                        <div style={{
+                                          fontSize: '11px',
+                                          color: '#7f8c8d',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '2px'
+                                        }}>
+                                          <span style={{ fontWeight: '600', color: '#3498db' }}>
+                                            💰 {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: moneda }).format(valoare)}
+                                            {moneda !== 'RON' && valoareRon > 0 && (
+                                              <span style={{ color: '#7f8c8d', fontWeight: '400' }}>
+                                                {' '}(≈{new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(valoareRon)})
+                                              </span>
+                                            )}
+                                          </span>
+                                          {factura.data_facturare && (
+                                            <span>
+                                              📅 {new Date(factura.data_facturare?.value || factura.data_facturare).toLocaleDateString('ro-RO')}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }
+
+                            // Dacă nu există nici contracte, nici facturi directe
+                            return (
+                              <span style={{
+                                color: '#95a5a6',
+                                fontSize: '12px',
+                                fontStyle: 'italic'
+                              }}>
+                                Fără contract
+                              </span>
                             );
                           })()}
                         </td>
