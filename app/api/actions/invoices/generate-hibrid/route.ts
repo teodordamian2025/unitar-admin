@@ -1624,9 +1624,10 @@ export async function POST(request: NextRequest) {
 
         // ✅ FIX CRITICAL: Incrementare număr curent ÎNAINTE de salvare (pentru race condition)
         // ✅ MODIFICAT: NU incrementa dacă este număr manual
-        if (!isStorno && setariFacturare && !manual_number) {
+        // ✅ FIX BUG STORNO 16.12.2025: Incrementează și pentru storno - facturile storno folosesc numere reale din secvență
+        if (setariFacturare && !manual_number) {
           try {
-            console.log(`🔢 [NUMEROTARE-PRE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1} ÎNAINTE de salvare...`);
+            console.log(`🔢 [NUMEROTARE-PRE] Incrementez numar_curent_facturi din ${setariFacturare.numar_curent_facturi || 0} la ${(setariFacturare.numar_curent_facturi || 0) + 1} ÎNAINTE de salvare... ${isStorno ? '(STORNO)' : ''}`);
 
             const TABLE_SETARI_FACTURARE = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
 
