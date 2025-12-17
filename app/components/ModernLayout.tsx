@@ -80,7 +80,8 @@ const navStructure: NavItem[] = [
         ]
       },
       { href: '/admin/financiar/facturi-primite', label: 'Facturi Primite ANAF', icon: '📥' },
-      { href: '/admin/financiar/facturi-emise', label: 'Facturi Emise ANAF', icon: '📤' }
+      { href: '/admin/financiar/facturi-emise', label: 'Facturi Emise ANAF', icon: '📤' },
+      { href: '/admin/financiar/propuneri-incasari', label: 'Propuneri Încasări', icon: '⚡' }
     ]
   },
   {

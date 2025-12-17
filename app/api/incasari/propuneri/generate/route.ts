@@ -1,0 +1,396 @@
+// =================================================================
+// API: Generare Propuneri Încasări Automate
+// POST /api/incasari/propuneri/generate
+// Generat: 2025-12-17
+// =================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { BigQuery } from '@google-cloud/bigquery';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+  TranzactieCandidat,
+  FacturaCandidat,
+  ConfigurarePropuneri,
+  GeneratePropuneriResult
+} from '@/lib/incasari-propuneri/types';
+
+import {
+  calculateMatchScore,
+  findBestMatch,
+  determineMatchingAlgorithm,
+  isAutoApprovable,
+  DEFAULT_CONFIG
+} from '@/lib/incasari-propuneri/matcher';
+
+import { extractDate } from '@/lib/incasari-propuneri/extractor';
+
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
+const DATASET = 'PanouControlUnitar';
+
+const bigquery = new BigQuery({
+  projectId: PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+});
+
+/**
+ * Citește configurările din BigQuery
+ */
+async function getConfig(): Promise<ConfigurarePropuneri> {
+  try {
+    const [rows] = await bigquery.query(`
+      SELECT config_key, config_value
+      FROM \`${PROJECT_ID}.${DATASET}.TranzactiiSyncConfig\`
+      WHERE category = 'incasari_propuneri'
+    `);
+
+    const config = { ...DEFAULT_CONFIG };
+
+    for (const row of rows) {
+      switch (row.config_key) {
+        case 'propuneri_auto_approve_threshold':
+          config.auto_approve_threshold = parseFloat(row.config_value);
+          break;
+        case 'propuneri_min_score':
+          config.min_score = parseFloat(row.config_value);
+          break;
+        case 'propuneri_expirare_zile':
+          config.expirare_zile = parseInt(row.config_value);
+          break;
+        case 'propuneri_notificare_enabled':
+          config.notificare_enabled = row.config_value === 'true';
+          break;
+        case 'propuneri_referinta_score':
+          config.referinta_score = parseInt(row.config_value);
+          break;
+        case 'propuneri_cui_score':
+          config.cui_score = parseInt(row.config_value);
+          break;
+        case 'propuneri_suma_score':
+          config.suma_score = parseInt(row.config_value);
+          break;
+      }
+    }
+
+    return config;
+  } catch (error) {
+    console.warn('⚠️ Eroare citire config, folosim default:', error);
+    return DEFAULT_CONFIG;
+  }
+}
+
+/**
+ * Verifică dacă tabelul IncasariPropuneri_v2 există
+ */
+async function tableExists(): Promise<boolean> {
+  try {
+    await bigquery.query(`SELECT 1 FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` LIMIT 1`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Obține tranzacțiile candidate pentru matching
+ */
+async function getTranzactiiCandidate(limit: number = 500, checkExisting: boolean = true): Promise<TranzactieCandidat[]> {
+  // Verificăm dacă tabelul propuneri există (pentru a exclude cele cu propuneri pending)
+  const propuneriTableExists = checkExisting ? await tableExists() : false;
+
+  const excludeClause = propuneriTableExists
+    ? `AND NOT EXISTS (
+        SELECT 1 FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
+        WHERE p.tranzactie_id = t.id AND p.status = 'pending'
+      )`
+    : '';
+
+  const [rows] = await bigquery.query(`
+    SELECT
+      t.id,
+      t.suma,
+      t.data_procesare,
+      t.nume_contrapartida,
+      t.cui_contrapartida,
+      t.detalii_tranzactie,
+      t.referinta_bancii,
+      t.directie,
+      t.status,
+      t.matching_tip
+    FROM \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\` t
+    WHERE
+      t.directie = 'intrare'
+      AND t.suma > 100
+      AND (t.matching_tip IS NULL OR t.matching_tip = 'none')
+      AND (t.status IS NULL OR t.status != 'matched')
+      AND t.data_procesare >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+      ${excludeClause}
+    ORDER BY t.data_procesare DESC, t.suma DESC
+    LIMIT ${limit}
+  `);
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    suma: parseFloat(row.suma) || 0,
+    data_procesare: row.data_procesare,
+    nume_contrapartida: row.nume_contrapartida,
+    cui_contrapartida: row.cui_contrapartida,
+    detalii_tranzactie: row.detalii_tranzactie,
+    referinta_bancii: row.referinta_bancii,
+    directie: row.directie,
+    status: row.status,
+    matching_tip: row.matching_tip
+  }));
+}
+
+/**
+ * Obține facturile candidate pentru matching
+ */
+async function getFacturiCandidate(): Promise<FacturaCandidat[]> {
+  const [rows] = await bigquery.query(`
+    SELECT
+      fg.id,
+      fg.serie,
+      fg.numar,
+      fg.total,
+      fg.valoare_platita,
+      (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+      fg.client_cui,
+      fg.client_nume,
+      fg.data_factura,
+      fg.status,
+      fg.proiect_id
+    FROM \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg
+    WHERE
+      fg.status NOT IN ('platita', 'anulata', 'storno', 'stornata')
+      AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
+      AND fg.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
+    ORDER BY fg.data_factura DESC
+  `);
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    serie: row.serie,
+    numar: row.numar,
+    total: parseFloat(row.total) || 0,
+    valoare_platita: parseFloat(row.valoare_platita) || 0,
+    rest_de_plata: parseFloat(row.rest_de_plata) || 0,
+    client_cui: row.client_cui,
+    client_nume: row.client_nume,
+    data_factura: row.data_factura,
+    status: row.status,
+    proiect_id: row.proiect_id
+  }));
+}
+
+/**
+ * Salvează propunerile în BigQuery
+ */
+async function savePropuneri(propuneri: any[]): Promise<void> {
+  if (propuneri.length === 0) return;
+
+  // Verificăm dacă tabelul există
+  const exists = await tableExists();
+  if (!exists) {
+    throw new Error(
+      'Tabelul IncasariPropuneri_v2 nu există. ' +
+      'Rulați scriptul SQL: scripts/incasari-propuneri-create-table.sql în BigQuery Console.'
+    );
+  }
+
+  const table = bigquery.dataset(DATASET).table('IncasariPropuneri_v2');
+
+  // BigQuery insert în batch
+  await table.insert(propuneri);
+}
+
+/**
+ * Trimite notificare admin despre propuneri noi
+ */
+async function sendNotification(stats: { total: number; auto: number; review: number }): Promise<void> {
+  if (stats.total === 0) return;
+
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+    await fetch(`${baseUrl}/api/notifications/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tip_notificare: 'incasari_propuneri_noi',
+        user_id: ['admin'],
+        context: {
+          count: stats.total.toString(),
+          auto_count: stats.auto.toString(),
+          review_count: stats.review.toString(),
+          link_detalii: `${baseUrl}/admin/financiar/propuneri-incasari`
+        }
+      })
+    });
+
+    console.log(`📧 Notificare trimisă: ${stats.total} propuneri noi`);
+  } catch (error) {
+    console.error('⚠️ Eroare trimitere notificare:', error);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const {
+      dry_run = false,
+      limit = 500,
+      send_notification = true
+    } = body;
+
+    console.log(`🔍 Începe generare propuneri (dry_run: ${dry_run}, limit: ${limit})`);
+
+    // 1. Citim configurarea
+    const config = await getConfig();
+    console.log(`⚙️ Config: threshold=${config.auto_approve_threshold}%, min_score=${config.min_score}%`);
+
+    // 2. Obținem candidații
+    const tranzactii = await getTranzactiiCandidate(limit);
+    const facturi = await getFacturiCandidate();
+
+    console.log(`📊 Candidați: ${tranzactii.length} tranzacții, ${facturi.length} facturi`);
+
+    if (tranzactii.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'Nu există tranzacții noi pentru procesare',
+        propuneri_generate: 0,
+        propuneri_auto_approvable: 0,
+        propuneri_review: 0,
+        tranzactii_procesate: 0
+      });
+    }
+
+    // 3. Procesăm fiecare tranzacție
+    const propuneri: any[] = [];
+    let autoApprovable = 0;
+    let reviewNeeded = 0;
+
+    for (const tranzactie of tranzactii) {
+      const match = findBestMatch(tranzactie, facturi, config);
+
+      if (match) {
+        const { factura, score } = match;
+        const isAuto = isAutoApprovable(score, config);
+
+        if (isAuto) autoApprovable++;
+        else reviewNeeded++;
+
+        const dataTranzactie = extractDate(tranzactie.data_procesare);
+        const diferentaRon = Math.abs(tranzactie.suma - factura.rest_de_plata);
+        const diferentaProcent = score.details.suma_diferenta_procent;
+
+        propuneri.push({
+          id: uuidv4(),
+          tranzactie_id: tranzactie.id,
+          factura_id: factura.id,
+          etapa_factura_id: null,
+
+          score: score.total,
+          auto_approvable: isAuto,
+
+          suma_tranzactie: tranzactie.suma,
+          suma_factura: factura.total,
+          rest_de_plata: factura.rest_de_plata,
+          diferenta_ron: diferentaRon,
+          diferenta_procent: diferentaProcent,
+
+          matching_algorithm: determineMatchingAlgorithm(score),
+          referinta_gasita: score.details.referinta_gasita,
+          matching_details: JSON.stringify(score),
+
+          status: 'pending',
+          motiv_respingere: null,
+
+          factura_serie: factura.serie,
+          factura_numar: factura.numar,
+          factura_client_nume: factura.client_nume,
+          factura_client_cui: factura.client_cui,
+
+          tranzactie_data: dataTranzactie,
+          tranzactie_contrapartida: tranzactie.nume_contrapartida,
+          tranzactie_cui: tranzactie.cui_contrapartida,
+          tranzactie_detalii: (tranzactie.detalii_tranzactie || '').substring(0, 500),
+
+          data_creare: new Date().toISOString(),
+          creat_de: 'auto_generate'
+        });
+
+        console.log(`✅ Propunere: ${tranzactie.suma.toFixed(2)} RON → ${factura.serie || ''}-${factura.numar} (${score.total}%${isAuto ? ' AUTO' : ''})`);
+      }
+    }
+
+    // 4. Salvăm propunerile (dacă nu e dry_run)
+    if (!dry_run && propuneri.length > 0) {
+      await savePropuneri(propuneri);
+      console.log(`💾 Salvate ${propuneri.length} propuneri`);
+
+      // 5. Trimitem notificare
+      if (send_notification && config.notificare_enabled) {
+        await sendNotification({
+          total: propuneri.length,
+          auto: autoApprovable,
+          review: reviewNeeded
+        });
+      }
+    }
+
+    const result: GeneratePropuneriResult = {
+      success: true,
+      propuneri_generate: propuneri.length,
+      propuneri_auto_approvable: autoApprovable,
+      propuneri_review: reviewNeeded,
+      tranzactii_procesate: tranzactii.length
+    };
+
+    return NextResponse.json({
+      ...result,
+      message: dry_run
+        ? `Preview: ${propuneri.length} propuneri ar fi generate`
+        : `${propuneri.length} propuneri generate cu succes`,
+      propuneri: dry_run ? propuneri.map(p => ({
+        tranzactie_id: p.tranzactie_id,
+        factura_id: p.factura_id,
+        factura_ref: `${p.factura_serie || ''}-${p.factura_numar}`,
+        suma_tranzactie: p.suma_tranzactie,
+        rest_de_plata: p.rest_de_plata,
+        score: p.score,
+        auto_approvable: p.auto_approvable,
+        referinta_gasita: p.referinta_gasita,
+        matching_algorithm: p.matching_algorithm
+      })) : undefined
+    });
+
+  } catch (error: any) {
+    console.error('❌ Eroare generare propuneri:', error);
+
+    return NextResponse.json({
+      success: false,
+      error: error.message || 'Eroare la generarea propunerilor',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
+  }
+}
+
+// GET pentru preview (dry_run)
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const limit = parseInt(searchParams.get('limit') || '100');
+
+  // Redirectăm către POST cu dry_run=true
+  const mockRequest = new NextRequest(request.url, {
+    method: 'POST',
+    body: JSON.stringify({ dry_run: true, limit, send_notification: false }),
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  return POST(mockRequest);
+}
