@@ -58,6 +58,7 @@ interface Factura {
   rest_de_plata: number;
   status: string;
   status_scadenta: string;
+  status_incasari: string; // NOU: incasat_complet | incasat_partial | neincasat
   zile_pana_scadenta: number;
   data_creare: string | { value: string };
   efactura_enabled?: boolean;
@@ -106,6 +107,7 @@ export default function FacturiList({
     status: '',
     search: '',
     scadenta: '',
+    statusIncasari: '', // NOU: incasat_complet | incasat_partial | neincasat
     perioada: '30'
   });
 
@@ -202,6 +204,11 @@ export default function FacturiList({
 
         if (filters.scadenta) {
           result = result.filter((f: Factura) => f.status_scadenta === filters.scadenta);
+        }
+
+        // NOU: Filtru Status Încasări
+        if (filters.statusIncasari) {
+          result = result.filter((f: Factura) => f.status_incasari === filters.statusIncasari);
         }
 
         setFacturi(result);
@@ -1196,7 +1203,21 @@ export default function FacturiList({
                 <option value="In regula">In regula</option>
                 <option value="Platita">Platite</option>
               </select>
-              
+            </div>
+
+            {/* NOU: Rând 2 de filtre - Status Încasări și Perioada */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select
+                value={filters.statusIncasari}
+                onChange={(e) => setFilters({...filters, statusIncasari: e.target.value})}
+                className="px-3 py-2 border border-gray-300 rounded text-sm"
+              >
+                <option value="">Toate încasările</option>
+                <option value="incasat_complet">Încasat complet</option>
+                <option value="incasat_partial">Încasat parțial</option>
+                <option value="neincasat">Neîncasat</option>
+              </select>
+
               <select
                 value={filters.perioada}
                 onChange={(e) => {
@@ -1259,11 +1280,11 @@ export default function FacturiList({
               'Nu exista facturi generate'
             }
           </div>
-          {(filters.search || filters.status || filters.scadenta) && (
+          {(filters.search || filters.status || filters.scadenta || filters.statusIncasari) && (
             <button
               onClick={() => {
                 setSearchInput('');
-                setFilters({search: '', status: '', scadenta: '', perioada: '30'});
+                setFilters({search: '', status: '', scadenta: '', statusIncasari: '', perioada: '30'});
               }}
               className="mt-2 text-blue-600 underline"
             >

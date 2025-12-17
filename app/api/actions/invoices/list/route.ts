@@ -114,13 +114,20 @@ export async function GET(request: NextRequest) {
           (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
           DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
 
-          -- ✅ Status scadență
+          -- ✅ Status scadență (fără diacritice pentru match cu frontend filters)
           CASE
-            WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirată'
-            WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
-            WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
-            ELSE 'În regulă'
-          END as status_scadenta
+            WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirata'
+            WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expira curand'
+            WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Platita'
+            ELSE 'In regula'
+          END as status_scadenta,
+
+          -- ✅ Status încasări (pentru filtru frontend)
+          CASE
+            WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 OR COALESCE(inc.total_incasat, fg.valoare_platita, 0) >= fg.total THEN 'incasat_complet'
+            WHEN COALESCE(inc.total_incasat, fg.valoare_platita, 0) > 0 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'incasat_partial'
+            ELSE 'neincasat'
+          END as status_incasari
 
         FROM ${TABLE_FACTURI_GENERATE} fg
         LEFT JOIN ${TABLE_PROIECTE} p
