@@ -117,10 +117,26 @@ async function notificareTrimisaRecent(
 
 // =====================================================
 // GET: Verifică termene apropiate ȘI DEPĂȘITE
+// Apelat de GitHub Actions cron zilnic la 07:00 GMT
 // =====================================================
 
 export async function GET(request: NextRequest) {
   try {
+    // Verificare autorizare cron (GitHub Actions trimite CRON_SECRET)
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+
+    // În production, verificăm header Authorization
+    if (process.env.NODE_ENV === 'production' && cronSecret) {
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        console.error('[Notifications Cron] Unauthorized - invalid cron secret');
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const dryRun = searchParams.get('dry_run') === 'true';
     const zileAvans = parseInt(searchParams.get('zile_avans') || '7');

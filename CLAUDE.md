@@ -225,7 +225,7 @@ Comprehensive error handling with:
 # 📧 SISTEM NOTIFICĂRI MODERN - 05.10.2025
 
 **DATA START**: 05.10.2025 (ora României)
-**STATUS**: 🔄 ÎN IMPLEMENTARE
+**STATUS**: ✅ COMPLET (Actualizat 18.12.2025 - Cron GitHub Actions adăugat)
 **OBIECTIV**: Sistem complet de notificări email + UI cu configurare admin și smart grouping
 
 ## 📊 ARHITECTURĂ SISTEM NOTIFICĂRI
@@ -341,7 +341,8 @@ POST - Creare setare nouă
 
 #### **5. /api/notifications/cron** - Verificări periodice
 ```typescript
-// Rulează zilnic (Vercel Cron)
+// Rulează zilnic prin GitHub Actions (07:00 GMT = 09:00-10:00 România)
+// Workflow: .github/workflows/notifications-cron.yml
 // 1. Check termene apropiate (proiecte/subproiecte/sarcini)
 // 2. Check facturi scadență aproape
 // 3. Check termene depășite
@@ -473,7 +474,7 @@ if (sarcina.responsabil_id !== creator_id) {
 }
 ```
 
-#### **Cron zilnic** (Vercel Cron `/api/notifications/cron`):
+#### **Cron zilnic** (GitHub Actions `/api/notifications/cron`):
 ```typescript
 // Verifică termene apropiate (3, 7, 14 zile)
 const proiecteAproape = await bigquery.query(`
@@ -686,7 +687,7 @@ app/
 **Hooks în API-uri (IMPLEMENTATE):**
 - ✅ Hook în `/api/rapoarte/proiecte` POST - Notify responsabil la atribuire proiect
 - ✅ Hook în `/api/rapoarte/sarcini` POST - Notify responsabili la creare sarcină (exclude creator)
-- ✅ Cron job `/api/notifications/cron` - Verificare termene apropiate (proiecte + sarcini)
+- ✅ Cron job `/api/notifications/cron` - **GitHub Actions zilnic 07:00 GMT** (`.github/workflows/notifications-cron.yml`)
 - ✅ Pagină `/admin/setari/notificari` - UI configurare setări pentru admin
 
 **NotificationBell în layout-uri (IMPLEMENTATE):**

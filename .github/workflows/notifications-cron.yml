@@ -1,0 +1,78 @@
+name: Notifications Termene - Cron Job
+
+on:
+  schedule:
+    # Rulează zilnic la 07:00 GMT (09:00-10:00 AM România, în funcție de DST)
+    # Ora 07:00 GMT = început program lucru România
+    - cron: '0 7 * * *'
+  workflow_dispatch: # Permite trigger manual din GitHub UI
+
+jobs:
+  check-termene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger Notifications Cron - Check Termene
+        run: |
+          echo "🔔 Triggering notifications cron - verificare termene..."
+          echo "⏰ Scheduled time: 07:00 GMT (09:00-10:00 AM România)"
+          echo "📅 Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://admin.unitarproiect.eu/api/notifications/cron?zile_avans=7" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo ""
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response:"
+          echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
+
+          if [ "$http_code" -eq 200 ]; then
+            echo ""
+            echo "✅ Notifications cron completed successfully"
+
+            # Parse stats dacă există
+            proiecte_apropiate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('proiecte_apropiate', 0))" 2>/dev/null || echo "N/A")
+            proiecte_depasite=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('proiecte_depasite', 0))" 2>/dev/null || echo "N/A")
+            subproiecte_apropiate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('subproiecte_apropiate', 0))" 2>/dev/null || echo "N/A")
+            subproiecte_depasite=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('subproiecte_depasite', 0))" 2>/dev/null || echo "N/A")
+            sarcini_apropiate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('sarcini_apropiate', 0))" 2>/dev/null || echo "N/A")
+            sarcini_depasite=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('stats', {}).get('sarcini_depasite', 0))" 2>/dev/null || echo "N/A")
+            notificari_trimise=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('notificari_trimise', 0))" 2>/dev/null || echo "N/A")
+
+            echo ""
+            echo "📈 Stats termene:"
+            echo "   📁 Proiecte apropiate: $proiecte_apropiate"
+            echo "   ⚠️  Proiecte depășite: $proiecte_depasite"
+            echo "   📂 Subproiecte apropiate: $subproiecte_apropiate"
+            echo "   ⚠️  Subproiecte depășite: $subproiecte_depasite"
+            echo "   ✅ Sarcini apropiate: $sarcini_apropiate"
+            echo "   ⚠️  Sarcini depășite: $sarcini_depasite"
+            echo ""
+            echo "📧 Notificări trimise: $notificari_trimise"
+
+            # Alert dacă sunt multe termene depășite
+            total_depasite=$((${proiecte_depasite:-0} + ${subproiecte_depasite:-0} + ${sarcini_depasite:-0}))
+            if [ "$total_depasite" -gt 5 ] 2>/dev/null; then
+              echo ""
+              echo "🚨 WARNING: $total_depasite termene depășite în total!"
+              echo "   Verifică în dashboard: https://admin.unitarproiect.eu/admin/rapoarte/proiecte"
+            fi
+          else
+            echo ""
+            echo "❌ Notifications cron failed with status $http_code"
+            exit 1
+          fi
+
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🏁 Workflow completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

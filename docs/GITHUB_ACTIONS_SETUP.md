@@ -49,6 +49,15 @@ openssl rand -hex 32
 - **Purpose**: Sincronizare automată tranzacții bancare
 - **Auth**: Requires `CRON_SECRET` header
 
+### Notifications Termene (NOU - 18.12.2025)
+**File**: `.github/workflows/notifications-cron.yml`
+- **Schedule**: Zilnic la 07:00 GMT (`0 7 * * *`) - 09:00-10:00 AM România
+- **Endpoint**: `GET /api/notifications/cron?zile_avans=7`
+- **Purpose**: Verificare termene apropiate/depășite și trimitere notificări
+- **Auth**: Requires `CRON_SECRET` header
+- **Verifică**: Proiecte, subproiecte, sarcini cu termene în următoarele 7 zile sau depășite
+- **Anti-spam**: Nu trimite notificare dacă a trimis aceeași în ultimele 24h
+
 ### ~~ANAF Retry Invoices~~ (DEZACTIVAT - 18.10.2025)
 **Motiv**: E-factura acum folosește integrare externă cu iapp.ro, cron-ul ANAF nu mai este necesar.
 
