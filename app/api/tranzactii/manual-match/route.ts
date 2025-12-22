@@ -1,12 +1,27 @@
 // =================================================================
 // API MANUAL MATCHING CU CANDIDATI INTELIGENTI
 // Generat: 18 septembrie 2025, 00:15 (Romania)
+// Actualizat: 22 decembrie 2025 - Scoring unificat
 // Cale: app/api/tranzactii/manual-match/route.ts
 // =================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
+
+// Import scoring unificat
+import {
+  calculateUnifiedMatchScore,
+  convertEtapaToFacturaInput,
+  convertCheltuialaToFacturaInput,
+  CONFIG_MANUAL_MATCH,
+  DEFAULT_SCORING_CONFIG,
+  getScoreBadge,
+  generateMatchDescription,
+  type TranzactieInput,
+  type FacturaInput,
+  type UnifiedMatchScore
+} from '@/lib/matching/scoring';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -295,184 +310,86 @@ function extractInvoiceNumbers(text: string): string[] {
 
 /**
  * Calculează matching score pentru etape facturi
+ * ✅ ACTUALIZAT 22.12.2025: Folosește scoring unificat din /lib/matching/scoring.ts
+ * Algoritm bazat pe Propuneri Automate (prioritizează referința facturii)
  */
 function calculateEtapaMatchingScore(
   tranzactie: TranzactieSource,
   etapa: any,
   tolerantaProcent: number = 3,
   sumaRamasaCalculata?: number  // ✅ Parametru opțional pentru suma cu TVA
-): { score: number; reasons: string[]; diferenta_ron: number; diferenta_procent: number } {
-  const reasons: string[] = [];
-  let score = 0;
+): { score: number; reasons: string[]; diferenta_ron: number; diferenta_procent: number; unifiedScore?: UnifiedMatchScore } {
+  // Convertim la formatul unificat
+  const tranzactieInput: TranzactieInput = {
+    id: tranzactie.id,
+    suma: tranzactie.suma,
+    data_procesare: tranzactie.data_procesare,
+    nume_contrapartida: tranzactie.nume_contrapartida,
+    cui_contrapartida: tranzactie.cui_contrapartida,
+    detalii_tranzactie: tranzactie.detalii_tranzactie,
+    directie: tranzactie.directie
+  };
 
-  // Calculăm suma rămasă de încasat
-  // Dacă avem suma calculată cu TVA, o folosim; altfel calculăm fără TVA (fallback)
-  const sumaRamasa = sumaRamasaCalculata !== undefined
-    ? sumaRamasaCalculata
-    : (etapa.valoare_ron - (etapa.valoare_incasata || 0));
-
-  const diferentaRon = Math.abs(tranzactie.suma - sumaRamasa);
-  const diferentaProcent = sumaRamasa > 0 ? (diferentaRon / sumaRamasa) * 100 : 100;
-
-  // 1. SCOR SUMĂ (50 puncte max)
-  if (diferentaProcent <= 0.5) {
-    score += 50;
-    reasons.push('🎯 Sumă perfectă (±0.5%)');
-  } else if (diferentaProcent <= 1) {
-    score += 45;
-    reasons.push('✅ Sumă foarte bună (±1%)');
-  } else if (diferentaProcent <= 2) {
-    score += 40;
-    reasons.push('✅ Sumă bună (±2%)');
-  } else if (diferentaProcent <= tolerantaProcent) {
-    score += 30;
-    reasons.push(`⚠️ Sumă acceptabilă (±${tolerantaProcent}%)`);
-  } else if (diferentaProcent <= 5) {
-    score += 15;
-    reasons.push('⚠️ Sumă marginală (±5%)');
-  } else {
-    reasons.push('❌ Diferență mare de sumă');
+  // Creăm FacturaInput cu suma calculată dacă e disponibilă
+  const facturaInput = convertEtapaToFacturaInput(etapa);
+  if (sumaRamasaCalculata !== undefined) {
+    facturaInput.rest_de_plata = sumaRamasaCalculata;
   }
 
-  // 2. SCOR TIMP (20 puncte max)
-  const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare;
-  const tranzactieDate = new Date(dataProc);
-  // Normalizare DATE field pentru factura_data (poate fi {value: "..."} din BigQuery)
-  const facturaData = (etapa.factura_data as any)?.value || etapa.factura_data;
-  const facturaDate = new Date(facturaData);
-  const daysDiff = Math.abs((tranzactieDate.getTime() - facturaDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (daysDiff <= 1) {
-    score += 20;
-    reasons.push('⏰ Timing perfect (1 zi)');
-  } else if (daysDiff <= 3) {
-    score += 18;
-    reasons.push('⏰ Timing foarte bun (3 zile)');
-  } else if (daysDiff <= 7) {
-    score += 15;
-    reasons.push('⏰ Timing bun (1 săptămână)');
-  } else if (daysDiff <= 15) {
-    score += 12;
-    reasons.push('⏰ Timing acceptabil (2 săptămâni)');
-  } else if (daysDiff <= 30) {
-    score += 8;
-    reasons.push('⏰ Timing marginal (1 lună)');
-  } else {
-    reasons.push('❌ Timing slab (>1 lună)');
-  }
+  // Calculăm scorul unificat cu config pentru manual-match (threshold mai permisiv)
+  const unifiedScore = calculateUnifiedMatchScore(
+    tranzactieInput,
+    facturaInput,
+    { ...CONFIG_MANUAL_MATCH, enable_logging: true }
+  );
 
-  // 3. SCOR CUI (15 puncte max)
-  if (tranzactie.cui_contrapartida && etapa.factura_client_cui) {
-    if (tranzactie.cui_contrapartida === etapa.factura_client_cui) {
-      score += 15;
-      reasons.push('🆔 CUI perfect match');
-    }
-  }
-
-  // 4. SCOR NUME (10 puncte max)
-  if (tranzactie.nume_contrapartida && etapa.factura_client_nume) {
-    const nameSimilarity = levenshteinSimilarity(
-      tranzactie.nume_contrapartida,
-      etapa.factura_client_nume
-    );
-    if (nameSimilarity >= 90) {
-      score += 10;
-      reasons.push('👤 Nume perfect match');
-    } else if (nameSimilarity >= 70) {
-      score += 8;
-      reasons.push('👤 Nume foarte similar');
-    } else if (nameSimilarity >= 50) {
-      score += 5;
-      reasons.push('👤 Nume similar');
-    }
-  }
-
-  // 5. SCOR REFERINȚĂ FACTURĂ (5 puncte max)
-  const tranzactieRefs = extractInvoiceNumbers(tranzactie.detalii_tranzactie);
-  const facturaRef = `${etapa.factura_serie}${etapa.factura_numar}`.replace(/\s+/g, '');
-  
-  if (tranzactieRefs.some(ref => ref === facturaRef || ref === etapa.factura_numar)) {
-    score += 5;
-    reasons.push('📄 Referință factură exactă');
-  } else if (tranzactieRefs.some(ref => ref.includes(etapa.factura_numar))) {
-    score += 3;
-    reasons.push('📄 Referință factură parțială');
-  }
-
-  return { 
-    score: Math.min(score, 100), 
-    reasons, 
-    diferenta_ron: diferentaRon,
-    diferenta_procent: diferentaProcent
+  return {
+    score: unifiedScore.total,
+    reasons: unifiedScore.matching_reasons,
+    diferenta_ron: unifiedScore.details.suma_diferenta_ron,
+    diferenta_procent: unifiedScore.details.suma_diferenta_procent,
+    unifiedScore
   };
 }
 
 /**
  * Calculează matching score pentru cheltuieli
+ * ✅ ACTUALIZAT 22.12.2025: Folosește scoring unificat
  */
 function calculateCheltuialaMatchingScore(
   tranzactie: TranzactieSource,
   cheltuiala: any,
-  tolerantaProcent: number = 3
-): { score: number; reasons: string[]; diferenta_ron: number; diferenta_procent: number } {
-  const reasons: string[] = [];
-  let score = 0;
-  
+  tolerantaProcent: number = 3,
+  cotaTvaStandard: number = 19
+): { score: number; reasons: string[]; diferenta_ron: number; diferenta_procent: number; unifiedScore?: UnifiedMatchScore } {
   const sumaPlata = Math.abs(tranzactie.suma);
-  const diferentaRon = Math.abs(sumaPlata - cheltuiala.valoare_ron);
-  const diferentaProcent = (diferentaRon / cheltuiala.valoare_ron) * 100;
 
-  // 1. SCOR SUMĂ (60 puncte max)
-  if (diferentaProcent <= 0.5) {
-    score += 60;
-    reasons.push('🎯 Sumă perfectă (±0.5%)');
-  } else if (diferentaProcent <= 1) {
-    score += 55;
-    reasons.push('✅ Sumă foarte bună (±1%)');
-  } else if (diferentaProcent <= 2) {
-    score += 50;
-    reasons.push('✅ Sumă bună (±2%)');
-  } else if (diferentaProcent <= tolerantaProcent) {
-    score += 40;
-    reasons.push(`⚠️ Sumă acceptabilă (±${tolerantaProcent}%)`);
-  } else if (diferentaProcent <= 5) {
-    score += 25;
-    reasons.push('⚠️ Sumă marginală (±5%)');
-  } else {
-    reasons.push('❌ Diferență mare de sumă');
-  }
+  // Convertim la formatul unificat
+  const tranzactieInput: TranzactieInput = {
+    id: tranzactie.id,
+    suma: sumaPlata,
+    data_procesare: tranzactie.data_procesare,
+    nume_contrapartida: tranzactie.nume_contrapartida,
+    cui_contrapartida: tranzactie.cui_contrapartida,
+    detalii_tranzactie: tranzactie.detalii_tranzactie,
+    directie: tranzactie.directie
+  };
 
-  // 2. SCOR CUI FURNIZOR (25 puncte max)
-  if (tranzactie.cui_contrapartida && cheltuiala.furnizor_cui) {
-    if (tranzactie.cui_contrapartida === cheltuiala.furnizor_cui) {
-      score += 25;
-      reasons.push('🆔 CUI furnizor perfect match');
-    }
-  }
+  const facturaInput = convertCheltuialaToFacturaInput(cheltuiala, cotaTvaStandard);
 
-  // 3. SCOR NUME FURNIZOR (15 puncte max)
-  if (tranzactie.nume_contrapartida && cheltuiala.furnizor_nume) {
-    const similarity = levenshteinSimilarity(
-      tranzactie.nume_contrapartida,
-      cheltuiala.furnizor_nume
-    );
-    if (similarity >= 80) {
-      score += 15;
-      reasons.push('👤 Nume furnizor perfect match');
-    } else if (similarity >= 60) {
-      score += 10;
-      reasons.push('👤 Nume furnizor similar');
-    } else if (similarity >= 40) {
-      score += 5;
-      reasons.push('👤 Nume furnizor parțial similar');
-    }
-  }
+  // Calculăm scorul unificat cu config pentru manual-match
+  const unifiedScore = calculateUnifiedMatchScore(
+    tranzactieInput,
+    facturaInput,
+    { ...CONFIG_MANUAL_MATCH, enable_logging: true }
+  );
 
-  return { 
-    score: Math.min(score, 100), 
-    reasons, 
-    diferenta_ron: diferentaRon,
-    diferenta_procent: diferentaProcent
+  return {
+    score: unifiedScore.total,
+    reasons: unifiedScore.matching_reasons,
+    diferenta_ron: unifiedScore.details.suma_diferenta_ron,
+    diferenta_procent: unifiedScore.details.suma_diferenta_procent,
+    unifiedScore
   };
 }
 

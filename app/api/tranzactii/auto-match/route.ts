@@ -1,12 +1,24 @@
 // =================================================================
 // API AUTO-MATCHING TRANZACTII CU ETAPEFACTURI
 // Generat: 17 septembrie 2025, 23:55 (Romania)
+// Actualizat: 22 decembrie 2025 - Scoring unificat
 // Cale: app/api/tranzactii/auto-match/route.ts
 // =================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import crypto from 'crypto';
+
+// Import scoring unificat
+import {
+  calculateUnifiedMatchScore,
+  convertEtapaToFacturaInput,
+  convertCheltuialaToFacturaInput,
+  CONFIG_AUTO_MATCH,
+  DEFAULT_SCORING_CONFIG,
+  type TranzactieInput,
+  type UnifiedMatchScore
+} from '@/lib/matching/scoring';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -175,140 +187,66 @@ function extractInvoiceNumbers(text: string): string[] {
 
 /**
  * Calculează confidence score pentru matching
- * ✅ MODIFICAT 09.11.2025: Scoring dinamic bazat pe disponibilitatea CUI
+ * ✅ ACTUALIZAT 22.12.2025: Folosește scoring unificat din /lib/matching/scoring.ts
+ * Algoritm bazat pe Propuneri Automate (prioritizează referința facturii)
  */
 function calculateMatchingScore(
   tranzactie: TranzactieCandidat,
   etapa: EtapaFacturaCandidat,
   diferentaProcent: number
-): { score: number; details: any } {
-  let score = 0;
+): { score: number; details: any; unifiedScore?: UnifiedMatchScore } {
+  // Convertim la formatul unificat
+  const tranzactieInput: TranzactieInput = {
+    id: tranzactie.id,
+    suma: tranzactie.suma,
+    data_procesare: tranzactie.data_procesare,
+    nume_contrapartida: tranzactie.nume_contrapartida,
+    cui_contrapartida: tranzactie.cui_contrapartida,
+    detalii_tranzactie: tranzactie.detalii_tranzactie,
+    directie: tranzactie.directie
+  };
+
+  const facturaInput = convertEtapaToFacturaInput(etapa);
+
+  // Calculăm scorul unificat cu config pentru auto-match
+  const unifiedScore = calculateUnifiedMatchScore(
+    tranzactieInput,
+    facturaInput,
+    { ...CONFIG_AUTO_MATCH, enable_logging: true }
+  );
+
+  // Convertim la formatul vechi pentru compatibilitate
   const details: any = {
-    suma_score: 0,
-    timp_score: 0,
-    cui_score: 0,
-    nume_score: 0,
-    referinta_score: 0,
-    status_score: 0,
-    has_cui: false,
-    scoring_mode: 'standard' // 'standard' (cu CUI) sau 'adjusted' (fără CUI)
+    // Scoruri pe factori
+    suma_score: unifiedScore.suma_score,
+    timp_score: unifiedScore.timp_score,
+    cui_score: unifiedScore.cui_score,
+    referinta_score: unifiedScore.referinta_score,
+    nume_score: 0, // Nu mai avem separat, e inclus în CUI logic
+    status_score: 0, // Nu mai avem separat
+
+    // Detalii matching
+    has_cui: unifiedScore.details.cui_match || Boolean(tranzactie.cui_contrapartida && etapa.factura_client_cui),
+    scoring_mode: unifiedScore.details.scoring_mode,
+
+    // Detalii referință (nou)
+    referinta_gasita: unifiedScore.details.referinta_gasita,
+    referinta_confidence: unifiedScore.details.referinta_confidence,
+
+    // Detalii sumă
+    suma_diferenta_procent: unifiedScore.details.suma_diferenta_procent,
+    suma_diferenta_ron: unifiedScore.details.suma_diferenta_ron,
+
+    // Matching reasons pentru UI
+    matching_reasons: unifiedScore.matching_reasons,
+    matching_algorithm: unifiedScore.matching_algorithm
   };
 
-  // ✅ Verificăm dacă avem CUI disponibil pentru ambele părți
-  const hasCUI = Boolean(tranzactie.cui_contrapartida && etapa.factura_client_cui);
-  details.has_cui = hasCUI;
-  details.scoring_mode = hasCUI ? 'standard' : 'adjusted';
-
-  // 1. SCOR SUMĂ (40/45 puncte max) - cel mai important
-  // ✅ Dacă CUI lipsește, creștem importanța sumei la 45p
-  const sumaMax = hasCUI ? 40 : 45;
-  const sumaWeights = {
-    perfect: sumaMax,           // <= 0.5%
-    foarteBun: sumaMax - 5,     // <= 1%
-    bun: sumaMax - 10,          // <= 2%
-    acceptabil: sumaMax - 15,   // <= 3%
-    marginal: sumaMax - 25      // <= 5%
+  return {
+    score: unifiedScore.total,
+    details,
+    unifiedScore // Păstrăm scorul complet pentru acces ulterior
   };
-
-  if (diferentaProcent <= 0.5) {
-    details.suma_score = sumaWeights.perfect;
-  } else if (diferentaProcent <= 1) {
-    details.suma_score = sumaWeights.foarteBun;
-  } else if (diferentaProcent <= 2) {
-    details.suma_score = sumaWeights.bun;
-  } else if (diferentaProcent <= 3) {
-    details.suma_score = sumaWeights.acceptabil;
-  } else if (diferentaProcent <= 5) {
-    details.suma_score = sumaWeights.marginal;
-  }
-  score += details.suma_score;
-
-  // 2. SCOR TIMP (20 puncte max)
-  const dataProc = (tranzactie.data_procesare as any)?.value || tranzactie.data_procesare;
-  const tranzactieDate = new Date(dataProc);
-  const facturaDate = new Date(etapa.factura_data);
-  const daysDiff = Math.abs((tranzactieDate.getTime() - facturaDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (daysDiff <= 1) {
-    details.timp_score = 20; // Același/următoarea zi
-  } else if (daysDiff <= 3) {
-    details.timp_score = 18; // În 3 zile
-  } else if (daysDiff <= 7) {
-    details.timp_score = 15; // În săptămână
-  } else if (daysDiff <= 15) {
-    details.timp_score = 12; // În 2 săptămâni
-  } else if (daysDiff <= 30) {
-    details.timp_score = 8; // În lună
-  } else if (daysDiff <= 60) {
-    details.timp_score = 4; // În 2 luni
-  }
-  score += details.timp_score;
-
-  // 3. SCOR CUI (20 puncte max)
-  if (hasCUI) {
-    if (tranzactie.cui_contrapartida === etapa.factura_client_cui) {
-      details.cui_score = 20; // CUI perfect match
-    }
-  }
-  score += details.cui_score;
-
-  // 4. SCOR NUME (10/30 puncte max)
-  // ✅ Dacă CUI lipsește, creștem importanța numelui la 30p
-  const numeMax = hasCUI ? 10 : 30;
-  if (tranzactie.nume_contrapartida && etapa.factura_client_nume) {
-    const nameSimilarity = levenshteinSimilarity(
-      tranzactie.nume_contrapartida,
-      etapa.factura_client_nume
-    );
-
-    if (hasCUI) {
-      // Scoring original când avem CUI
-      if (nameSimilarity >= 90) {
-        details.nume_score = 10;
-      } else if (nameSimilarity >= 70) {
-        details.nume_score = 8;
-      } else if (nameSimilarity >= 50) {
-        details.nume_score = 5;
-      }
-    } else {
-      // Scoring mărit când CUI lipsește
-      if (nameSimilarity >= 90) {
-        details.nume_score = 30;
-      } else if (nameSimilarity >= 80) {
-        details.nume_score = 25;
-      } else if (nameSimilarity >= 70) {
-        details.nume_score = 20;
-      } else if (nameSimilarity >= 60) {
-        details.nume_score = 15;
-      } else if (nameSimilarity >= 50) {
-        details.nume_score = 10;
-      }
-    }
-  }
-  score += details.nume_score;
-
-  // 5. SCOR REFERINȚĂ FACTURĂ (5/10 puncte max)
-  // ✅ Dacă CUI lipsește, creștem importanța referinței la 10p
-  const refMax = hasCUI ? 5 : 10;
-  const tranzactieRefs = extractInvoiceNumbers(tranzactie.detalii_tranzactie);
-  const facturaRef = `${etapa.factura_serie}${etapa.factura_numar}`.replace(/\s+/g, '');
-
-  if (tranzactieRefs.some(ref => ref === facturaRef || ref === etapa.factura_numar)) {
-    details.referinta_score = refMax; // Referință exactă
-  } else if (tranzactieRefs.some(ref => ref.includes(etapa.factura_numar))) {
-    details.referinta_score = Math.round(refMax * 0.6); // Referință parțială (60%)
-  }
-  score += details.referinta_score;
-
-  // 6. SCOR STATUS (5 puncte max)
-  if (etapa.status_incasare === 'Neincasat') {
-    details.status_score = 5; // Perfect pentru matching
-  } else if (etapa.status_incasare === 'Partial') {
-    details.status_score = 3; // Poate fi completat
-  }
-  score += details.status_score;
-
-  return { score: Math.min(score, 100), details };
 }
 
 // =================================================================
@@ -442,16 +380,20 @@ async function matchIncasariCuEtapeFacturi(
       // Verificăm dacă diferența este în toleranță
       if (diferentaProcent > tolerantaProcent) continue;
 
-      // Calculăm confidence score
-      const { score, details } = calculateMatchingScore(tranzactie, etapa, diferentaProcent);
+      // Calculăm confidence score folosind scoring-ul unificat
+      const { score, details, unifiedScore } = calculateMatchingScore(tranzactie, etapa, diferentaProcent);
 
-      // Determinăm algoritmul de matching
-      let algorithm = 'auto_suma';
-      if (details.cui_score > 0) algorithm = 'auto_cui';
-      if (details.referinta_score > 0) algorithm = 'auto_referinta';
+      // Determinăm algoritmul de matching din scorul unificat
+      let algorithm = details.matching_algorithm || 'auto_suma';
+      if (algorithm === 'necunoscut') {
+        // Fallback la logica veche
+        if (details.cui_score > 0) algorithm = 'auto_cui';
+        if (details.referinta_score > 0) algorithm = 'auto_referinta';
+      }
 
-      // ✅ Threshold dinamic: 70% cu CUI, 80% fără CUI
-      const minThreshold = details.has_cui ? 70 : 80;
+      // ✅ ACTUALIZAT 22.12.2025: Threshold unificat 75% (din CONFIG_AUTO_MATCH)
+      // Scoringul nou prioritizează referința (60p) + CUI (25p) + sumă (15p)
+      const minThreshold = CONFIG_AUTO_MATCH.min_score || 75;
 
       if (score > bestScore && score >= minThreshold) {
         bestMatch = {
@@ -500,8 +442,8 @@ async function matchIncasariCuEtapeFacturi(
 
 /**
  * Efectuează matching automat pentru plăți cu ProiecteCheltuieli
+ * ✅ ACTUALIZAT 22.12.2025: Folosește scoring unificat
  * IMPORTANT: Cheltuielile în BD sunt FĂRĂ TVA, dar tranzacțiile sunt CU TVA
- * Trebuie să adăugăm TVA la cheltuieli pentru comparație corectă
  */
 async function matchPlatiCuCheltuieli(
   tranzactii: TranzactieCandidat[],
@@ -529,40 +471,35 @@ async function matchPlatiCuCheltuieli(
 
       if (diferentaProcent > tolerantaProcent) continue;
 
-      // Scor simplificat pentru cheltuieli
-      let score = 0;
+      // ✅ Folosim scoring unificat pentru cheltuieli
+      const tranzactieInput: TranzactieInput = {
+        id: tranzactie.id,
+        suma: sumaPlata, // Folosim suma absolută
+        data_procesare: tranzactie.data_procesare,
+        nume_contrapartida: tranzactie.nume_contrapartida,
+        cui_contrapartida: tranzactie.cui_contrapartida,
+        detalii_tranzactie: tranzactie.detalii_tranzactie,
+        directie: tranzactie.directie
+      };
 
-      // Scor sumă (60 puncte)
-      if (diferentaProcent <= 0.5) score += 60;
-      else if (diferentaProcent <= 1) score += 50;
-      else if (diferentaProcent <= 2) score += 40;
-      else if (diferentaProcent <= 3) score += 30;
+      const facturaInput = convertCheltuialaToFacturaInput(cheltuiala, cotaTvaStandard);
 
-      // Scor CUI furnizor (25 puncte)
-      if (tranzactie.cui_contrapartida && cheltuiala.furnizor_cui) {
-        if (tranzactie.cui_contrapartida === cheltuiala.furnizor_cui) {
-          score += 25;
-        }
-      }
+      const unifiedScore = calculateUnifiedMatchScore(
+        tranzactieInput,
+        facturaInput,
+        { ...CONFIG_AUTO_MATCH, enable_logging: true }
+      );
 
-      // Scor nume furnizor (15 puncte)
-      if (tranzactie.nume_contrapartida && cheltuiala.furnizor_nume) {
-        const similarity = levenshteinSimilarity(
-          tranzactie.nume_contrapartida,
-          cheltuiala.furnizor_nume
-        );
-        if (similarity >= 80) score += 15;
-        else if (similarity >= 60) score += 10;
-        else if (similarity >= 40) score += 5;
-      }
+      const score = unifiedScore.total;
+      const minThreshold = CONFIG_AUTO_MATCH.min_score || 75;
 
-      if (score > bestScore && score >= 60) { // Threshold mai mic pentru plăți
+      if (score > bestScore && score >= minThreshold) { // Threshold unificat 75%
         bestMatch = {
           tranzactie_id: tranzactie.id,
           target_type: 'cheltuiala',
           target_id: cheltuiala.id,
           confidence_score: score,
-          matching_algorithm: tranzactie.cui_contrapartida === cheltuiala.furnizor_cui ? 'auto_cui' : 'auto_suma',
+          matching_algorithm: unifiedScore.matching_algorithm, // ✅ Din scoring unificat
           suma_tranzactie: sumaPlata,
           suma_target: cheltuiala.valoare,
           suma_target_ron: valoareCuTva, // ✅ Folosim valoarea CU TVA pentru display
@@ -575,7 +512,15 @@ async function matchPlatiCuCheltuieli(
             furnizor_nume: cheltuiala.furnizor_nume,
             valoare_fara_tva: cheltuiala.valoare_ron,
             valoare_cu_tva: valoareCuTva,
-            cota_tva_aplicata: cotaTvaStandard
+            cota_tva_aplicata: cotaTvaStandard,
+            // ✅ Adăugăm detalii din scoring unificat
+            score_breakdown: {
+              referinta_score: unifiedScore.referinta_score,
+              cui_score: unifiedScore.cui_score,
+              suma_score: unifiedScore.suma_score,
+              timp_score: unifiedScore.timp_score
+            },
+            matching_reasons: unifiedScore.matching_reasons
           }
         };
         bestScore = score;
@@ -584,7 +529,7 @@ async function matchPlatiCuCheltuieli(
 
     if (bestMatch) {
       matches.push(bestMatch);
-      console.log(`✅ Match plată găsit: ${sumaPlata.toFixed(2)} RON cu cheltuială ${bestMatch.suma_target_ron.toFixed(2)} RON (${bestMatch.confidence_score}% confidence)`);
+      console.log(`✅ Match plată găsit: ${sumaPlata.toFixed(2)} RON cu cheltuială ${bestMatch.suma_target_ron.toFixed(2)} RON (${bestMatch.confidence_score}% confidence, ${bestMatch.matching_algorithm})`);
     }
   }
 
