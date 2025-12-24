@@ -21,7 +21,7 @@ import {
   type SmartFintechAccount,
   type SmartFintechTransaction
 } from '@/lib/smartfintech-api';
-import { matchCUIFromClienti } from '@/lib/cui-matcher';
+import { matchCUIFromClienti, isValidRomanianCUI, normalizeCUI } from '@/lib/cui-matcher';
 
 // ==================== BIGQUERY CONFIG ====================
 
@@ -95,41 +95,56 @@ function cleanIBAN(iban: string | undefined): string {
 /**
  * Extrage CUI din detalii tranzacție - versiune îmbunătățită
  * Prioritizează pattern-uri specifice pentru a evita numere facturi/contracte
+ *
+ * ACTUALIZAT: Acceptă CUI-uri cu 2-10 cifre pentru pattern-uri EXPLICITE (ex: "CUI 566")
+ * Firmele vechi din România pot avea CUI-uri foarte scurte (ex: Electromontaj S.A. - CUI 566)
  */
 function extractCUI(text: string | undefined): string | undefined {
   if (!text) return undefined;
 
   // STEP 1: Pattern explicit "Fiscal Registration Number" sau "CUI" sau "CIF"
   // Acesta are prioritate maximă pentru că e cel mai precis
+  // ✅ ACTUALIZAT: Acceptăm 2-10 cifre pentru pattern-uri explicite (suport CUI-uri vechi scurte)
   const explicitPatterns = [
-    /(?:Fiscal Registration Number|Payer Fiscal Registration Number|CUI|CIF)[\s:,]+(\d{6,10})/i,
-    /\bCUI[\s:]+RO?(\d{6,10})\b/i,
-    /\bCIF[\s:]+RO?(\d{6,10})\b/i
+    /(?:Fiscal Registration Number|Payer Fiscal Registration Number|CUI|CIF)[\s:,]+(\d{2,10})/i,
+    /\bCUI[\s:]+RO?(\d{2,10})\b/i,
+    /\bCIF[\s:]+RO?(\d{2,10})\b/i
   ];
 
   for (const pattern of explicitPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       const cui = match[1];
-      // Validare: CUI România are între 6-10 cifre
-      if (cui.length >= 6 && cui.length <= 10) {
+      // Validare: CUI România are între 2-10 cifre (firme vechi pot avea 2-3 cifre)
+      if (cui.length >= 2 && cui.length <= 10) {
+        // Excludem numere care par a fi ani (1900-2099)
+        if (cui.length === 4 && /^(19|20)\d{2}$/.test(cui)) {
+          console.log(`⚠️ [extractCUI] Număr care pare an ignorat: ${cui}`);
+          continue;
+        }
         console.log(`✅ [extractCUI] CUI găsit prin pattern explicit: ${cui}`);
         return cui;
       }
     }
   }
 
-  // STEP 2: Pattern RO + cifre (8-10 cifre pentru a evita numere mici)
-  // Evităm numerele de 2-4 cifre care sunt facturi/contracte
-  const roPattern = /\bRO(\d{8,10})\b/;
+  // STEP 2: Pattern RO + cifre (2-10 cifre pentru suport CUI-uri scurte cu prefix RO)
+  const roPattern = /\bRO(\d{2,10})\b/;
   const roMatch = text.match(roPattern);
   if (roMatch && roMatch[1]) {
-    console.log(`✅ [extractCUI] CUI găsit prin pattern RO: ${roMatch[1]}`);
-    return roMatch[1];
+    const cui = roMatch[1];
+    // Excludem ani
+    if (cui.length === 4 && /^(19|20)\d{2}$/.test(cui)) {
+      console.log(`⚠️ [extractCUI] RO + an ignorat: RO${cui}`);
+    } else {
+      console.log(`✅ [extractCUI] CUI găsit prin pattern RO: ${roMatch[1]}`);
+      return roMatch[1];
+    }
   }
 
-  // STEP 3: Numere izolate de 8-10 cifre (evităm 2-7 cifre = facturi/contracte)
+  // STEP 3: Numere izolate de 8-10 cifre (păstrăm strict pentru fallback)
   // DOAR dacă nu conțin cuvinte cheie "factura", "contract", "UP", "UPA"
+  // NU acceptăm numere scurte aici pentru a evita false positives
   if (!/factur|contract|UP-|UPA-|nr\.|numar/i.test(text)) {
     const longNumberPattern = /\b(\d{8,10})\b/;
     const longMatch = text.match(longNumberPattern);
@@ -139,8 +154,7 @@ function extractCUI(text: string | undefined): string | undefined {
     }
   }
 
-  // Dacă nu găsim nimic valid, returnăm undefined
-  console.log(`⚠️ [extractCUI] Nu s-a găsit CUI valid în: ${text.substring(0, 100)}...`);
+  // Dacă nu găsim nimic valid, returnăm undefined (NU logăm - prea mult noise)
   return undefined;
 }
 
@@ -189,7 +203,7 @@ function getTransactionDirection(amount: number): 'intrare' | 'iesire' {
  * 1. account_id_smartfintech pentru tracking sursa
  * 2. referinta_bancii (transactionId)
  * 3. exchange_rate (dacă există)
- * 4. CUI extraction din creditorName/debtorName + remittanceInfo
+ * 4. CUI se extrage în enrichTransactionsWithCUI() - PRIORITIZEAZĂ Clienti_v2
  */
 function mapSmartFintechTransaction(
   tx: SmartFintechTransaction,
@@ -207,9 +221,9 @@ function mapSmartFintechTransaction(
     ? (tx.creditorName || tx.companyName || 'Necunoscut')
     : (tx.debtorName || tx.companyName || 'Necunoscut');
 
-  // Extract CUI din nume contrapartida sau detalii
-  const cui_contrapartida = extractCUI(nume_contrapartida) ||
-                            extractCUI(tx.remittanceInformationUnstructured);
+  // ⚠️ NU extragem CUI aici - se face în enrichTransactionsWithCUI()
+  // pentru a PRIORITIZA match-ul din Clienti_v2 peste extragerea din text
+  // Astfel evităm atribuirea CUI-urilor greșite din detalii_tranzactie
 
   // Build transaction hash pentru deduplicare
   const transaction_hash = generateTransactionHash(
@@ -236,7 +250,7 @@ function mapSmartFintechTransaction(
     directie,
     iban_contrapartida: iban_contrapartida || undefined,
     nume_contrapartida,
-    cui_contrapartida,
+    cui_contrapartida: undefined,  // Se va seta în enrichTransactionsWithCUI()
     detalii_tranzactie: tx.remittanceInformationUnstructured || tx.smartTransactionDetails || '',
     categorie,
     subcategorie,
@@ -247,46 +261,99 @@ function mapSmartFintechTransaction(
   };
 }
 
-// ==================== CUI ENRICHMENT (matching from Clienti_v2) ====================
+// ==================== CUI ENRICHMENT (PRIORITIZEAZĂ Clienti_v2) ====================
 
 /**
- * Completează CUI-urile lipsă prin matching pe nume din tabelul Clienti_v2
- * Procesează în batch pentru performanță
+ * Completează CUI-urile prin matching pe nume din tabelul Clienti_v2
+ * PRIORITATE: 1) Clienti_v2 matching, 2) extractCUI din text (cu validare)
+ *
+ * Rezolvă problema: CUI-uri greșite extrase din detalii_tranzactie
+ * Exemplu: Electromontaj S.A. (CUI 566) primea CUI-uri din descrierea plății
  */
 async function enrichTransactionsWithCUI(transactions: MappedTransaction[]): Promise<MappedTransaction[]> {
   if (transactions.length === 0) return transactions;
 
-  console.log(`🔍 [CUI Enrichment] Procesez ${transactions.length} tranzacții...`);
+  console.log(`🔍 [CUI Enrichment v2] Procesez ${transactions.length} tranzacții...`);
+  console.log(`📋 [CUI Enrichment v2] PRIORITATE: 1) Clienti_v2, 2) extractCUI (cu validare)`);
 
-  let enriched = 0;
+  let fromClienti = 0;
+  let fromText = 0;
   let failed = 0;
 
-  // Procesăm fiecare tranzacție care NU are CUI
+  // Procesăm TOATE tranzacțiile (nu doar cele fără CUI)
   for (const tx of transactions) {
-    if (!tx.cui_contrapartida && tx.nume_contrapartida) {
-      try {
-        // Apelăm matching pe nume din Clienti_v2
-        const match = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+    if (!tx.nume_contrapartida || tx.nume_contrapartida === 'Necunoscut') {
+      failed++;
+      continue;
+    }
 
-        if (match.cui || match.cnp) {
-          // Prioritate: CUI pentru firme, CNP pentru persoane fizice
-          tx.cui_contrapartida = match.cui || match.cnp || undefined;
-          enriched++;
-          console.log(`✅ [CUI Enrichment] CUI găsit pentru "${tx.nume_contrapartida}": ${tx.cui_contrapartida} (${match.confidence}%)`);
-        } else {
-          failed++;
-          console.log(`⚠️ [CUI Enrichment] Nu s-a găsit CUI pentru "${tx.nume_contrapartida}"`);
-        }
-      } catch (error) {
-        failed++;
-        console.error(`❌ [CUI Enrichment] Eroare pentru "${tx.nume_contrapartida}":`, error);
+    try {
+      // PASUL 1: Încearcă ÎNTÂI matching pe nume din Clienti_v2
+      const match = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+
+      if (match.cui || match.cnp) {
+        // ✅ GĂSIT în Clienti_v2 - folosim acest CUI (prioritate maximă)
+        tx.cui_contrapartida = match.cui || match.cnp || undefined;
+        fromClienti++;
+        console.log(`✅ [CUI Enrichment v2] Clienti_v2 match: "${tx.nume_contrapartida}" → CUI: ${tx.cui_contrapartida} (${match.confidence}%)`);
+        continue;  // Nu mai căutăm în text
       }
+
+      // PASUL 2: Fallback - extrage CUI din text (cu validare strictă)
+      const cuiFromText = extractCUIWithValidation(tx.nume_contrapartida, tx.detalii_tranzactie);
+
+      if (cuiFromText) {
+        tx.cui_contrapartida = cuiFromText;
+        fromText++;
+        console.log(`📝 [CUI Enrichment v2] Text extraction: "${tx.nume_contrapartida}" → CUI: ${cuiFromText}`);
+      } else {
+        failed++;
+        console.log(`⚠️ [CUI Enrichment v2] Fără CUI: "${tx.nume_contrapartida}"`);
+      }
+
+    } catch (error) {
+      failed++;
+      console.error(`❌ [CUI Enrichment v2] Eroare pentru "${tx.nume_contrapartida}":`, error);
     }
   }
 
-  console.log(`📊 [CUI Enrichment] Completate: ${enriched}, Eșuate: ${failed}, Total: ${transactions.length}`);
+  console.log(`📊 [CUI Enrichment v2] Rezultate:`);
+  console.log(`   └─ Din Clienti_v2: ${fromClienti}`);
+  console.log(`   └─ Din text: ${fromText}`);
+  console.log(`   └─ Fără CUI: ${failed}`);
+  console.log(`   └─ Total: ${transactions.length}`);
 
   return transactions;
+}
+
+/**
+ * Extrage CUI din text cu VALIDARE STRICTĂ
+ * - Acceptă CUI-uri de 2-10 cifre (pentru firme vechi ca Electromontaj cu CUI 566)
+ * - Validează că CUI-ul extras este într-un format românesc valid
+ * - Evită extragerea numerelor de facturi/contracte/ani ca CUI
+ */
+function extractCUIWithValidation(numeContrapartida: string, detaliiTranzactie?: string): string | undefined {
+  // Încercăm să extragem CUI din text
+  const cuiFromName = extractCUI(numeContrapartida);
+  const cuiFromDetails = extractCUI(detaliiTranzactie);
+
+  // Prioritizează CUI din nume (mai probabil să aparțină contrapartidei)
+  const extractedCUI = cuiFromName || cuiFromDetails;
+
+  if (!extractedCUI) {
+    return undefined;
+  }
+
+  // Normalizează CUI
+  const normalized = normalizeCUI(extractedCUI);
+
+  // Validare format CUI românesc
+  if (!isValidRomanianCUI(normalized)) {
+    console.log(`⚠️ [extractCUIWithValidation] CUI invalid respins: "${extractedCUI}"`);
+    return undefined;
+  }
+
+  return normalized;
 }
 
 // ==================== DEDUPLICATION (reuse from import-csv) ====================

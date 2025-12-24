@@ -50,6 +50,43 @@ interface ClientRecord {
 // ==================================================================
 
 /**
+ * Validează dacă un CUI românesc are format corect
+ * CUI-uri românești pot avea între 2-10 cifre (firme vechi pot avea CUI-uri scurte, ex: 566)
+ * Nu validează cifra de control, doar formatul numeric
+ *
+ * @param cui - CUI de validat (poate avea prefix RO)
+ * @returns true dacă formatul e valid
+ */
+export function isValidRomanianCUI(cui: string | null | undefined): boolean {
+  if (!cui) return false;
+
+  // Normalizează: remove prefix RO și spații
+  const normalized = cui.toString().toUpperCase().replace(/^RO/, '').replace(/\s+/g, '').trim();
+
+  // CUI românesc: 2-10 cifre (firmele foarte vechi pot avea 2-3 cifre)
+  // Nu acceptăm 1 cifră (prea scurt) sau >10 cifre (invalid)
+  if (!/^\d{2,10}$/.test(normalized)) {
+    return false;
+  }
+
+  // Excludem numere care sunt evident altceva (anii, numere de facturi comune)
+  // Numere de 4 cifre care încep cu 19 sau 20 sunt probabil ani
+  if (normalized.length === 4 && /^(19|20)\d{2}$/.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Normalizează CUI pentru comparație (elimină prefix RO și spații)
+ */
+export function normalizeCUI(cui: string | null | undefined): string {
+  if (!cui) return '';
+  return cui.toString().toUpperCase().replace(/^RO/, '').replace(/\s+/g, '').trim();
+}
+
+/**
  * Calculează similaritatea Levenshtein între două string-uri
  * Returnează valoare între 0-100 (100 = match perfect)
  */
@@ -185,11 +222,14 @@ export async function matchCUIFromClienti(
         bestScore = similarity;
 
         // Prioritate: CUI pentru firme, CNP pentru persoane fizice
-        const cuiValue = client.cui ? client.cui.replace(/^RO/, '') : null;
+        const cuiValue = client.cui ? normalizeCUI(client.cui) : null;
         const cnpValue = client.cnp || null;
 
+        // Validare CUI - acceptăm doar CUI-uri cu format valid
+        const cuiValid = isValidRomanianCUI(cuiValue);
+
         bestMatch = {
-          cui: cuiValue,
+          cui: cuiValid ? cuiValue : null,  // Returnăm null dacă CUI-ul e invalid
           cnp: cnpValue,
           confidence: similarity,
           client_id: client.id,
@@ -197,7 +237,11 @@ export async function matchCUIFromClienti(
           tip_client: client.tip_client
         };
 
-        console.log(`✅ [matchCUIFromClienti] Match găsit: "${client.nume}" (${similarity}%) - CUI: ${cuiValue}, CNP: ${cnpValue}`);
+        if (!cuiValid && cuiValue) {
+          console.log(`⚠️ [matchCUIFromClienti] CUI invalid ignorat: "${cuiValue}" pentru "${client.nume}"`);
+        }
+
+        console.log(`✅ [matchCUIFromClienti] Match găsit: "${client.nume}" (${similarity}%) - CUI: ${cuiValid ? cuiValue : 'INVALID'}, CNP: ${cnpValue}`);
       }
     }
 
@@ -236,5 +280,7 @@ export async function matchCUIFromClienti(
 export default {
   matchCUIFromClienti,
   levenshteinSimilarity,
-  normalizeCompanyName
+  normalizeCompanyName,
+  isValidRomanianCUI,
+  normalizeCUI
 };
