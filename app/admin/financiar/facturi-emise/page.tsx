@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import ModernLayout from '@/app/components/ModernLayout';
 
 interface FacturaEmisa {
   id: string;
@@ -231,7 +232,8 @@ export default function FacturiEmisePage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <ModernLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -574,7 +576,8 @@ export default function FacturiEmisePage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ModernLayout>
   );
 }
 
