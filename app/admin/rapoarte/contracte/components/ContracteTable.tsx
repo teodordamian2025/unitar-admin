@@ -290,10 +290,14 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   // NOU: State pentru expand/collapse contracte cu etape/anexe
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
 
+  // FIX: Serializare searchParams pentru comparare stabilă în useEffect (evită race condition)
+  const searchParamsString = JSON.stringify(searchParams || {});
+
   // UseEffect-uri pentru încărcarea datelor
+  // FIX: Folosim searchParamsString în loc de searchParams pentru a evita re-fetch-uri multiple
   useEffect(() => {
     loadData();
-  }, [searchParams, refreshTrigger]);
+  }, [searchParamsString, refreshTrigger]);
 
   useEffect(() => {
     if (contracte.length > 0) {

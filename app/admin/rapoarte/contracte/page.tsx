@@ -7,7 +7,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
@@ -46,8 +46,14 @@ export default function ContractePage() {
   });
 
   // Convertește filtrele în searchParams pentru ContracteTable
-  const tableSearchParams = Object.fromEntries(
-    Object.entries(filters).filter(([_, value]) => value !== '')
+  // FIX: useMemo pentru a evita recrearea obiectului la fiecare render (race condition fix)
+  const tableSearchParams = useMemo(() =>
+    Object.fromEntries(
+      Object.entries(filters).filter(([_, value]) => value !== '')
+    ),
+    [filters.search, filters.status, filters.client, filters.proiect_id,
+     filters.data_creare_start, filters.data_creare_end,
+     filters.valoare_min, filters.valoare_max]
   );
 
   const handleFilterChange = (newFilters: FilterValues) => {
