@@ -11,6 +11,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  calculateUnifiedMatchScore,
+  TranzactieInput,
+  FacturaInput,
+  CONFIG_MANUAL_MATCH,
+  generateMatchDescription,
+  getScoreBadge
+} from '@/lib/matching/scoring';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -58,6 +66,7 @@ export async function GET(request: NextRequest) {
     const facturaQuery = `
       SELECT
         id, serie, numar, total, valoare_platita, client_cui, client_nume,
+        data_factura,
         (total - COALESCE(valoare_platita, 0)) as rest_de_plata
       FROM ${TABLE_FACTURI}
       WHERE id = @facturaId
@@ -83,8 +92,9 @@ export async function GET(request: NextRequest) {
     const clientNume = factura.client_nume || '';
 
     // Căutăm tranzacții bancare neimperecheate de tip "intrare" (încasări)
-    const minSuma = restDePlata * (1 - toleranta / 100);
-    const maxSuma = restDePlata * (1 + toleranta / 100);
+    // Folosim toleranță mai mare pentru filtrare inițială, apoi scoring unificat
+    const minSuma = restDePlata * (1 - Math.max(toleranta, 20) / 100);
+    const maxSuma = restDePlata * (1 + Math.max(toleranta, 20) / 100);
 
     const tranzactiiQuery = `
       SELECT
@@ -98,24 +108,7 @@ export async function GET(request: NextRequest) {
         t.detalii_tranzactie,
         t.status,
         t.matching_tip,
-        t.referinta_bancii,
-        -- Calculăm un scor de matching
-        CASE
-          WHEN t.cui_contrapartida = @clientCui AND @clientCui != '' THEN 40
-          ELSE 0
-        END +
-        CASE
-          WHEN @clientNume != '' AND LOWER(t.nume_contrapartida) LIKE LOWER(CONCAT('%', @clientNume, '%')) THEN 20
-          WHEN @clientNume != '' AND LOWER(t.detalii_tranzactie) LIKE LOWER(CONCAT('%', @clientNume, '%')) THEN 10
-          ELSE 0
-        END +
-        CASE
-          WHEN @restDePlata > 0 AND ABS(t.suma - @restDePlata) / @restDePlata <= 0.01 THEN 40
-          WHEN @restDePlata > 0 AND ABS(t.suma - @restDePlata) / @restDePlata <= 0.02 THEN 35
-          WHEN @restDePlata > 0 AND ABS(t.suma - @restDePlata) / @restDePlata <= 0.05 THEN 25
-          WHEN @restDePlata > 0 AND ABS(t.suma - @restDePlata) / @restDePlata <= 0.10 THEN 15
-          ELSE 0
-        END as matching_score
+        t.referinta_bancii
       FROM ${TABLE_TRANZACTII_BANCARE} t
       WHERE
         t.directie = 'intrare'
@@ -124,24 +117,19 @@ export async function GET(request: NextRequest) {
         AND t.suma BETWEEN @minSuma AND @maxSuma
         AND t.data_procesare >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
       ORDER BY
-        matching_score DESC,
         ABS(t.suma - @restDePlata) ASC,
         t.data_procesare DESC
-      LIMIT 50
+      LIMIT 100
     `;
 
     const [tranzactii] = await bigquery.query({
       query: tranzactiiQuery,
       params: {
-        clientCui,
-        clientNume,
         restDePlata,
         minSuma,
         maxSuma
       },
       types: {
-        clientCui: 'STRING',
-        clientNume: 'STRING',
         restDePlata: 'FLOAT64',
         minSuma: 'FLOAT64',
         maxSuma: 'FLOAT64'
@@ -149,17 +137,71 @@ export async function GET(request: NextRequest) {
       location: 'EU'
     });
 
-    // Normalizăm datele pentru frontend
-    const tranzactiiNormalizate = tranzactii.map((t: any) => ({
-      ...t,
-      data_procesare: t.data_procesare?.value || t.data_procesare,
-      suma: parseFloat(t.suma) || 0,
-      matching_score: parseInt(t.matching_score) || 0,
-      diferenta: Math.abs((parseFloat(t.suma) || 0) - restDePlata),
-      diferenta_procent: restDePlata > 0
-        ? Math.abs(((parseFloat(t.suma) || 0) - restDePlata) / restDePlata * 100)
-        : 0
-    }));
+    // Construim obiectul FacturaInput pentru scoring unificat
+    const facturaInput: FacturaInput = {
+      id: factura.id,
+      serie: factura.serie || null,
+      numar: factura.numar || '',
+      total: parseFloat(factura.total) || 0,
+      rest_de_plata: restDePlata,
+      client_cui: factura.client_cui || null,
+      client_nume: factura.client_nume || '',
+      data_factura: factura.data_factura?.value || factura.data_factura || new Date().toISOString().split('T')[0]
+    };
+
+    // Calculăm scorul unificat pentru fiecare tranzacție
+    const tranzactiiNormalizate = tranzactii.map((t: any) => {
+      const tranzactieInput: TranzactieInput = {
+        id: t.id,
+        suma: parseFloat(t.suma) || 0,
+        data_procesare: t.data_procesare,
+        nume_contrapartida: t.nume_contrapartida || null,
+        cui_contrapartida: t.cui_contrapartida || null,
+        detalii_tranzactie: t.detalii_tranzactie || null,
+        directie: t.directie
+      };
+
+      // Calculăm scorul cu algoritmul unificat (min_score mai mic pentru a afișa mai multe opțiuni)
+      const scoreResult = calculateUnifiedMatchScore(tranzactieInput, facturaInput, {
+        ...CONFIG_MANUAL_MATCH,
+        min_score: 30 // Afișăm și scoruri mai mici pentru selecție manuală
+      });
+
+      const sumaTranzactie = parseFloat(t.suma) || 0;
+      const badge = getScoreBadge(scoreResult.total);
+
+      return {
+        ...t,
+        data_procesare: t.data_procesare?.value || t.data_procesare,
+        suma: sumaTranzactie,
+        matching_score: scoreResult.total,
+        diferenta: Math.abs(sumaTranzactie - restDePlata),
+        diferenta_procent: restDePlata > 0
+          ? Math.abs((sumaTranzactie - restDePlata) / restDePlata * 100)
+          : 0,
+        // Detalii scoring unificat
+        scoring_details: {
+          referinta_score: scoreResult.referinta_score,
+          cui_score: scoreResult.cui_score,
+          suma_score: scoreResult.suma_score,
+          timp_score: scoreResult.timp_score,
+          referinta_gasita: scoreResult.details.referinta_gasita,
+          referinta_confidence: scoreResult.details.referinta_confidence,
+          cui_match: scoreResult.details.cui_match,
+          matching_algorithm: scoreResult.matching_algorithm,
+          matching_description: generateMatchDescription(scoreResult)
+        },
+        badge_label: badge.label,
+        badge_color: badge.color,
+        badge_bg: badge.bgColor
+      };
+    });
+
+    // Sortăm după scor descrescător
+    tranzactiiNormalizate.sort((a: any, b: any) => b.matching_score - a.matching_score);
+
+    // Limităm la 50 rezultate
+    const tranzactiiFiltrate = tranzactiiNormalizate.slice(0, 50);
 
     return NextResponse.json({
       success: true,
@@ -173,12 +215,14 @@ export async function GET(request: NextRequest) {
         client_cui: factura.client_cui,
         client_nume: factura.client_nume
       },
-      tranzactii: tranzactiiNormalizate,
+      tranzactii: tranzactiiFiltrate,
       metadata: {
         toleranta,
         min_suma: minSuma,
         max_suma: maxSuma,
-        total_results: tranzactiiNormalizate.length
+        total_results: tranzactiiFiltrate.length,
+        scoring_algorithm: 'unified_v2',
+        note: 'Scoring unificat cu extragere referințe din detalii tranzacție'
       }
     });
 

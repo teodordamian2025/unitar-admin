@@ -34,9 +34,10 @@ const FACTURA_PATTERNS: Array<{
     name: 'factura_serie_nr'
   },
 
-  // "UPA-1037" sau "UPA 1037" sau "UPRO-001234" (serie + număr explicit)
+  // "UPA-1037" sau "UPA 1037" sau "UPA1037" sau "UPRO-001234" (serie + număr explicit)
+  // Separator opțional pentru a acoperi și cazuri precum "UPA1053" (fără separator)
   {
-    pattern: /\b(UPA|UPRO)[-\s](\d{2,})\b/gi,
+    pattern: /\b(UPA|UPRO)[-\s]?(\d{2,})\b/gi,
     extractor: (m) => ({ serie: m[1].toUpperCase(), numar: m[2] }),
     confidence: 'exact',
     name: 'serie_numar_direct'
@@ -82,6 +83,15 @@ const FACTURA_PATTERNS: Array<{
     extractor: (m) => ({ serie: null, numar: m[1] }),
     confidence: 'partial',
     name: 'cv_ff_fara_serie'
+  },
+
+  // "FF 1051" sau "FF1051" sau "/ROC/FF 1051/22.12.2025" (factură fiscală fără C/V prefix)
+  // Acoperă cazuri din extrase bancare unde FF apare singur urmat de număr
+  {
+    pattern: /\bF{2}\s*(\d{3,})(?:\/|\b)/gi,
+    extractor: (m) => ({ serie: null, numar: m[1] }),
+    confidence: 'partial',
+    name: 'ff_numar_singur'
   },
 
   // "cval fact 1037" sau "cval factura 1037" (fără serie)
