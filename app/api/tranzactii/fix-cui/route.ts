@@ -182,10 +182,13 @@ export async function POST(request: NextRequest) {
       directie = 'iesire',
       dry_run = false,
       limit = 500,
-      min_confidence = 85
+      min_confidence = 85,
+      months = 6  // Interval în luni (default 6, max 24)
     } = body;
 
-    console.log(`🔧 [Fix CUI] Aplicare corectări: directie=${directie}, dry_run=${dry_run}, limit=${limit}`);
+    const intervalMonths = Math.min(Math.max(1, months), 24); // Clamp 1-24
+
+    console.log(`🔧 [Fix CUI] Aplicare corectări: directie=${directie}, dry_run=${dry_run}, limit=${limit}, months=${intervalMonths}`);
 
     // Query tranzacții pentru fix
     const query = `
@@ -200,7 +203,7 @@ export async function POST(request: NextRequest) {
         directie = @directie
         AND nume_contrapartida IS NOT NULL
         AND nume_contrapartida != 'Necunoscut'
-        AND data_procesare >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+        AND data_procesare >= DATE_SUB(CURRENT_DATE(), INTERVAL ${intervalMonths} MONTH)
       ORDER BY data_procesare DESC
       LIMIT @limit
     `;
