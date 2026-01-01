@@ -141,10 +141,42 @@ const ModernFilterPanel: React.FC<{
   isLoading: boolean;
 }> = ({ filters, onFiltersChange, onReset, onApply, isLoading }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  // Local state for search input with debouncing
+  const [localSearch, setLocalSearch] = useState(filters.search_contrapartida);
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Sync local search with parent filters when filters change externally (e.g., reset)
+  React.useEffect(() => {
+    setLocalSearch(filters.search_contrapartida);
+  }, [filters.search_contrapartida]);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
     onFiltersChange({ ...filters, [key]: value });
   };
+
+  // Debounced search handler
+  const handleSearchChange = (value: string) => {
+    setLocalSearch(value);
+
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer to update parent state after 500ms of no typing
+    debounceTimerRef.current = setTimeout(() => {
+      onFiltersChange({ ...filters, search_contrapartida: value });
+    }, 500);
+  };
+
+  // Cleanup timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Card variant="default" className="p-6 mb-6">
@@ -249,8 +281,8 @@ const ModernFilterPanel: React.FC<{
             <Input
               type="text"
               label="Căutare contrapartidă"
-              value={filters.search_contrapartida}
-              onChange={(e) => updateFilter('search_contrapartida', e.target.value)}
+              value={localSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Nume, CUI, detalii..."
             />
           </div>

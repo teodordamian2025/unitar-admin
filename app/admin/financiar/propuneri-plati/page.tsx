@@ -326,32 +326,62 @@ export default function PropuneriPlatiPage() {
             </div>
           </div>
 
-          {/* Statistici */}
+          {/* Statistici - Modern Card Grid */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-6">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-gray-800">{stats.pending}</div>
-                <div className="text-sm text-gray-600">În așteptare</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-gray-400 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">În așteptare</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">{stats.pending}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">⏳</div>
+                </div>
               </div>
-              <div className="bg-green-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-green-600">{stats.auto_approvable}</div>
-                <div className="text-sm text-gray-600">Auto-aprobabile</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-green-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Auto-aprobabile</p>
+                    <p className="text-3xl font-bold text-green-600 mt-1">{stats.auto_approvable}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">🤖</div>
+                </div>
               </div>
-              <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-yellow-600">{stats.review_needed}</div>
-                <div className="text-sm text-gray-600">Necesită review</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-yellow-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Necesită review</p>
+                    <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.review_needed}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">👁️</div>
+                </div>
               </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-blue-600">{stats.approved}</div>
-                <div className="text-sm text-gray-600">Aprobate</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aprobate</p>
+                    <p className="text-3xl font-bold text-blue-600 mt-1">{stats.approved}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">✅</div>
+                </div>
               </div>
-              <div className="bg-red-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-                <div className="text-sm text-gray-600">Respinse</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-red-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Respinse</p>
+                    <p className="text-3xl font-bold text-red-600 mt-1">{stats.rejected}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">❌</div>
+                </div>
               </div>
-              <div className="bg-gray-100 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-gray-500">{stats.expired}</div>
-                <div className="text-sm text-gray-600">Expirate</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-gray-300 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Expirate</p>
+                    <p className="text-3xl font-bold text-gray-500 mt-1">{stats.expired}</p>
+                  </div>
+                  <div className="text-2xl opacity-70">🕐</div>
+                </div>
               </div>
             </div>
           )}
@@ -426,15 +456,15 @@ export default function PropuneriPlatiPage() {
 
         {/* Secțiune Auto-Aprobabile */}
         {!loading && statusFilter === 'pending' && autoApprovable.length > 0 && (
-          <div className="space-y-3">
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl shadow-lg p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-500" />
               Auto-Aprobabile ({autoApprovable.length})
               <span className="text-sm font-normal text-gray-500">— Score ≥85%, pot fi aprobate fără verificare</span>
             </h2>
 
-            <div className="space-y-3">
-              {autoApprovable.map(p => (
+            <div className="space-y-4">
+              {autoApprovable.map((p, idx) => (
                 <PropunereCard
                   key={p.id}
                   propunere={p}
@@ -444,6 +474,7 @@ export default function PropuneriPlatiPage() {
                   onApprove={() => handleApprove(p.id)}
                   onReject={() => handleReject(p.id)}
                   getScoreBadge={getScoreBadge}
+                  index={idx}
                 />
               ))}
             </div>
@@ -452,15 +483,15 @@ export default function PropuneriPlatiPage() {
 
         {/* Secțiune Review Needed */}
         {!loading && statusFilter === 'pending' && reviewNeeded.length > 0 && (
-          <div className="space-y-3">
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl shadow-lg p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-yellow-500" />
               Necesită Verificare ({reviewNeeded.length})
               <span className="text-sm font-normal text-gray-500">— Score &lt;85%, verificați înainte de aprobare</span>
             </h2>
 
-            <div className="space-y-3">
-              {reviewNeeded.map(p => (
+            <div className="space-y-4">
+              {reviewNeeded.map((p, idx) => (
                 <PropunereCard
                   key={p.id}
                   propunere={p}
@@ -470,6 +501,7 @@ export default function PropuneriPlatiPage() {
                   onApprove={() => handleApprove(p.id)}
                   onReject={() => handleReject(p.id)}
                   getScoreBadge={getScoreBadge}
+                  index={idx}
                 />
               ))}
             </div>
@@ -478,8 +510,8 @@ export default function PropuneriPlatiPage() {
 
         {/* Toate propunerile (pentru status != pending) */}
         {!loading && statusFilter !== 'pending' && propuneri.length > 0 && (
-          <div className="space-y-3">
-            {propuneri.map(p => (
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl shadow-lg p-6 space-y-4">
+            {propuneri.map((p, idx) => (
               <PropunereCard
                 key={p.id}
                 propunere={p}
@@ -490,6 +522,7 @@ export default function PropuneriPlatiPage() {
                 onReject={() => handleReject(p.id)}
                 getScoreBadge={getScoreBadge}
                 showActions={p.status === 'pending'}
+                index={idx}
               />
             ))}
           </div>
@@ -497,15 +530,15 @@ export default function PropuneriPlatiPage() {
 
         {/* Propuneri invalide */}
         {!loading && invalid.length > 0 && (
-          <div className="space-y-3">
+          <div className="bg-gray-100/60 backdrop-blur-sm rounded-xl shadow-lg p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-400 flex items-center gap-2">
               <XCircle className="w-5 h-5" />
               Expirate/Invalide ({invalid.length})
               <span className="text-sm font-normal">— Target/tranzacție deja procesată</span>
             </h2>
 
-            <div className="opacity-50 space-y-3">
-              {invalid.slice(0, 5).map(p => (
+            <div className="opacity-60 space-y-4">
+              {invalid.slice(0, 5).map((p, idx) => (
                 <PropunereCard
                   key={p.id}
                   propunere={p}
@@ -516,6 +549,7 @@ export default function PropuneriPlatiPage() {
                   onReject={() => {}}
                   getScoreBadge={getScoreBadge}
                   showActions={false}
+                  index={idx}
                 />
               ))}
             </div>
@@ -549,8 +583,9 @@ function PropunereCard({
   onApprove,
   onReject,
   getScoreBadge,
-  showActions = true
-}: PropunereCardProps) {
+  showActions = true,
+  index = 0
+}: PropunereCardProps & { index?: number }) {
   const scoreBadge = getScoreBadge(propunere.score);
 
   // Determine target display info
@@ -561,8 +596,11 @@ function PropunereCard({
     ? propunere.factura_serie_numar || 'N/A'
     : `${propunere.proiect_denumire || 'N/A'}${propunere.subproiect_denumire ? ` / ${propunere.subproiect_denumire}` : ''}`;
 
+  // Alternating row colors for better visual separation
+  const bgColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50/70';
+
   return (
-    <div className={`bg-white rounded-xl shadow-md border ${propunere.auto_approvable ? 'border-green-200' : 'border-gray-200'} overflow-hidden`}>
+    <div className={`${bgColor} rounded-xl shadow-md border-2 ${propunere.auto_approvable ? 'border-green-300 hover:border-green-400' : 'border-gray-200 hover:border-gray-300'} overflow-hidden transition-all duration-200 hover:shadow-lg`}>
       {/* Header */}
       <div
         className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
