@@ -21,7 +21,7 @@ import {
   type SmartFintechAccount,
   type SmartFintechTransaction
 } from '@/lib/smartfintech-api';
-import { matchCUIFromClienti, isValidRomanianCUI, normalizeCUI } from '@/lib/cui-matcher';
+import { matchCUIFromClienti, matchCUIFromFurnizori, isValidRomanianCUI, normalizeCUI } from '@/lib/cui-matcher';
 
 // ==================== BIGQUERY CONFIG ====================
 
@@ -261,22 +261,27 @@ function mapSmartFintechTransaction(
   };
 }
 
-// ==================== CUI ENRICHMENT (PRIORITIZEAZĂ Clienti_v2) ====================
+// ==================== CUI ENRICHMENT (BAZAT PE DIRECȚIE) ====================
 
 /**
- * Completează CUI-urile prin matching pe nume din tabelul Clienti_v2
- * PRIORITATE: 1) Clienti_v2 matching, 2) extractCUI din text (cu validare)
+ * Completează CUI-urile prin matching pe nume din tabelele corespunzătoare:
+ *
+ * - INTRARE (încasări): Clienti_v2 → apoi extractCUI fallback
+ * - IEȘIRE (plăți):     FacturiPrimiteANAF_v2 → Clienti_v2 → extractCUI fallback
  *
  * Rezolvă problema: CUI-uri greșite extrase din detalii_tranzactie
- * Exemplu: Electromontaj S.A. (CUI 566) primea CUI-uri din descrierea plății
+ * Exemplu: La plăți, furnizorii nu sunt în Clienti_v2 ci în FacturiPrimiteANAF_v2
  */
 async function enrichTransactionsWithCUI(transactions: MappedTransaction[]): Promise<MappedTransaction[]> {
   if (transactions.length === 0) return transactions;
 
-  console.log(`🔍 [CUI Enrichment v2] Procesez ${transactions.length} tranzacții...`);
-  console.log(`📋 [CUI Enrichment v2] PRIORITATE: 1) Clienti_v2, 2) extractCUI (cu validare)`);
+  console.log(`🔍 [CUI Enrichment v3] Procesez ${transactions.length} tranzacții...`);
+  console.log(`📋 [CUI Enrichment v3] LOGICĂ:`);
+  console.log(`   └─ INTRARE: Clienti_v2 → extractCUI`);
+  console.log(`   └─ IEȘIRE: FacturiPrimiteANAF_v2 → Clienti_v2 → extractCUI`);
 
   let fromClienti = 0;
+  let fromFurnizori = 0;
   let fromText = 0;
   let failed = 0;
 
@@ -288,36 +293,63 @@ async function enrichTransactionsWithCUI(transactions: MappedTransaction[]): Pro
     }
 
     try {
-      // PASUL 1: Încearcă ÎNTÂI matching pe nume din Clienti_v2
-      const match = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+      const isPlata = tx.directie === 'iesire';
 
-      if (match.cui || match.cnp) {
-        // ✅ GĂSIT în Clienti_v2 - folosim acest CUI (prioritate maximă)
-        tx.cui_contrapartida = match.cui || match.cnp || undefined;
-        fromClienti++;
-        console.log(`✅ [CUI Enrichment v2] Clienti_v2 match: "${tx.nume_contrapartida}" → CUI: ${tx.cui_contrapartida} (${match.confidence}%)`);
-        continue;  // Nu mai căutăm în text
+      if (isPlata) {
+        // ========== PLĂȚI (ieșire) ==========
+        // PASUL 1: Încearcă ÎNTÂI matching din FacturiPrimiteANAF_v2 (furnizori)
+        const matchFurnizor = await matchCUIFromFurnizori(tx.nume_contrapartida, 85);
+
+        if (matchFurnizor.cui) {
+          tx.cui_contrapartida = matchFurnizor.cui;
+          fromFurnizori++;
+          console.log(`✅ [CUI v3] Furnizor match: "${tx.nume_contrapartida}" → CUI: ${tx.cui_contrapartida} (${matchFurnizor.confidence}%)`);
+          continue;
+        }
+
+        // PASUL 2: Fallback - caută în Clienti_v2 (poate fi și client)
+        const matchClient = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+
+        if (matchClient.cui || matchClient.cnp) {
+          tx.cui_contrapartida = matchClient.cui || matchClient.cnp || undefined;
+          fromClienti++;
+          console.log(`✅ [CUI v3] Client fallback: "${tx.nume_contrapartida}" → CUI: ${tx.cui_contrapartida} (${matchClient.confidence}%)`);
+          continue;
+        }
+
+      } else {
+        // ========== ÎNCASĂRI (intrare) ==========
+        // PASUL 1: Încearcă ÎNTÂI matching din Clienti_v2
+        const matchClient = await matchCUIFromClienti(tx.nume_contrapartida, 85);
+
+        if (matchClient.cui || matchClient.cnp) {
+          tx.cui_contrapartida = matchClient.cui || matchClient.cnp || undefined;
+          fromClienti++;
+          console.log(`✅ [CUI v3] Client match: "${tx.nume_contrapartida}" → CUI: ${tx.cui_contrapartida} (${matchClient.confidence}%)`);
+          continue;
+        }
       }
 
-      // PASUL 2: Fallback - extrage CUI din text (cu validare strictă)
+      // PASUL FINAL: Fallback - extrage CUI din text (cu validare strictă)
       const cuiFromText = extractCUIWithValidation(tx.nume_contrapartida, tx.detalii_tranzactie);
 
       if (cuiFromText) {
         tx.cui_contrapartida = cuiFromText;
         fromText++;
-        console.log(`📝 [CUI Enrichment v2] Text extraction: "${tx.nume_contrapartida}" → CUI: ${cuiFromText}`);
+        console.log(`📝 [CUI v3] Text extraction: "${tx.nume_contrapartida}" → CUI: ${cuiFromText}`);
       } else {
         failed++;
-        console.log(`⚠️ [CUI Enrichment v2] Fără CUI: "${tx.nume_contrapartida}"`);
+        console.log(`⚠️ [CUI v3] Fără CUI: "${tx.nume_contrapartida}" (${tx.directie})`);
       }
 
     } catch (error) {
       failed++;
-      console.error(`❌ [CUI Enrichment v2] Eroare pentru "${tx.nume_contrapartida}":`, error);
+      console.error(`❌ [CUI v3] Eroare pentru "${tx.nume_contrapartida}":`, error);
     }
   }
 
-  console.log(`📊 [CUI Enrichment v2] Rezultate:`);
+  console.log(`📊 [CUI Enrichment v3] Rezultate:`);
+  console.log(`   └─ Din Furnizori (FacturiPrimite): ${fromFurnizori}`);
   console.log(`   └─ Din Clienti_v2: ${fromClienti}`);
   console.log(`   └─ Din text: ${fromText}`);
   console.log(`   └─ Fără CUI: ${failed}`);

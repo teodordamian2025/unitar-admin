@@ -274,11 +274,145 @@ export async function matchCUIFromClienti(
 }
 
 // ==================================================================
+// MATCHING CUI FROM FURNIZORI (FacturiPrimiteANAF_v2)
+// ==================================================================
+
+export interface FurnizorMatchResult {
+  cui: string | null;
+  confidence: number;
+  furnizor_nume: string | null;
+  factura_id: string | null;
+}
+
+/**
+ * Găsește CUI pentru un furnizor prin matching în FacturiPrimiteANAF_v2
+ * Folosit pentru tranzacții de tip PLATĂ (ieșire) unde contrapartida e furnizor
+ *
+ * @param numeContrapartida - Numele furnizorului din tranzacție
+ * @param minConfidence - Threshold minim pentru similaritate (default 85%)
+ * @returns FurnizorMatchResult cu CUI găsit și confidence score
+ */
+export async function matchCUIFromFurnizori(
+  numeContrapartida: string,
+  minConfidence: number = 85
+): Promise<FurnizorMatchResult> {
+
+  if (!numeContrapartida || numeContrapartida.trim().length < 3) {
+    return {
+      cui: null,
+      confidence: 0,
+      furnizor_nume: null,
+      factura_id: null
+    };
+  }
+
+  try {
+    // Normalizare nume input
+    const numeNormalizat = normalizeCompanyName(numeContrapartida);
+
+    console.log(`🔍 [matchCUIFromFurnizori] Căutare pentru: "${numeContrapartida}" → normalized: "${numeNormalizat}"`);
+
+    // Query FacturiPrimiteANAF_v2 - iau toți furnizorii unici cu CUI valid
+    // Selectăm distinct pe cif_emitent (fără GROUP BY pentru a evita problema ORDER BY)
+    const query = `
+      WITH FurnizoriUnici AS (
+        SELECT
+          cif_emitent,
+          nume_emitent,
+          id as factura_id,
+          ROW_NUMBER() OVER (PARTITION BY cif_emitent ORDER BY data_preluare DESC) as rn
+        FROM \`${PROJECT_ID}.${DATASET}.FacturiPrimiteANAF${tableSuffix}\`
+        WHERE activ = TRUE
+          AND cif_emitent IS NOT NULL
+          AND cif_emitent != ''
+          AND nume_emitent IS NOT NULL
+      )
+      SELECT cif_emitent, nume_emitent, factura_id
+      FROM FurnizoriUnici
+      WHERE rn = 1
+    `;
+
+    const [furnizori] = await bigquery.query({ query, location: 'EU' });
+
+    console.log(`📊 [matchCUIFromFurnizori] Găsiți ${furnizori.length} furnizori unici în FacturiPrimiteANAF_v2`);
+
+    if (furnizori.length === 0) {
+      console.log(`⚠️ [matchCUIFromFurnizori] Nu există furnizori în baza de date`);
+      return {
+        cui: null,
+        confidence: 0,
+        furnizor_nume: null,
+        factura_id: null
+      };
+    }
+
+    // Calcul similaritate pentru fiecare furnizor
+    let bestMatch: FurnizorMatchResult | null = null;
+    let bestScore = 0;
+
+    // Cache pentru a evita procesarea aceluiași CIF de mai multe ori
+    const processedCifs = new Set<string>();
+
+    for (const furnizor of furnizori as any[]) {
+      const cifEmitent = normalizeCUI(furnizor.cif_emitent);
+
+      // Skip dacă am procesat deja acest CIF
+      if (processedCifs.has(cifEmitent)) continue;
+      processedCifs.add(cifEmitent);
+
+      const numeFurnizor = normalizeCompanyName(furnizor.nume_emitent);
+      const similarity = levenshteinSimilarity(numeNormalizat, numeFurnizor);
+
+      if (similarity > bestScore && similarity >= minConfidence) {
+        // Validare CUI
+        if (!isValidRomanianCUI(cifEmitent)) {
+          console.log(`⚠️ [matchCUIFromFurnizori] CUI invalid ignorat: "${cifEmitent}" pentru "${furnizor.nume_emitent}"`);
+          continue;
+        }
+
+        bestScore = similarity;
+        bestMatch = {
+          cui: cifEmitent,
+          confidence: similarity,
+          furnizor_nume: furnizor.nume_emitent,
+          factura_id: furnizor.factura_id
+        };
+
+        console.log(`✅ [matchCUIFromFurnizori] Match găsit: "${furnizor.nume_emitent}" (${similarity}%) - CUI: ${cifEmitent}`);
+      }
+    }
+
+    if (bestMatch) {
+      console.log(`🎯 [matchCUIFromFurnizori] Best match: "${bestMatch.furnizor_nume}" (${bestMatch.confidence}%) → CUI: ${bestMatch.cui}`);
+      return bestMatch;
+    } else {
+      console.log(`❌ [matchCUIFromFurnizori] Nu s-a găsit match cu confidence >= ${minConfidence}%`);
+      return {
+        cui: null,
+        confidence: 0,
+        furnizor_nume: null,
+        factura_id: null
+      };
+    }
+
+  } catch (error) {
+    console.error('❌ [matchCUIFromFurnizori] Eroare:', error);
+    return {
+      cui: null,
+      confidence: 0,
+      furnizor_nume: null,
+      factura_id: null
+    };
+  }
+}
+
+// ==================================================================
 // EXPORT
 // ==================================================================
 
 export default {
   matchCUIFromClienti,
+  matchCUIFromFurnizori,
   levenshteinSimilarity,
   normalizeCompanyName,
   isValidRomanianCUI,
