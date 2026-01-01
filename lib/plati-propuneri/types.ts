@@ -140,6 +140,12 @@ export interface MatchScorePlati {
     cui_tranzactie: string;
     cui_target: string;
 
+    // Name matching (pentru cazuri când CUI lipsește sau e incorect)
+    name_match: boolean;
+    name_similarity: number;       // 0-1 (0=nicio potrivire, 1=identice)
+    nume_tranzactie: string;       // nume_contrapartida din tranzacție
+    nume_target: string;           // furnizor_nume din target
+
     // Valoare
     suma_plata: number;            // Valoarea absolută a plății
     suma_target: number;           // Valoarea target (cu TVA)

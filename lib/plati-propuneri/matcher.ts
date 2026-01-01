@@ -60,6 +60,106 @@ export function cuiMatch(cui1: string | null | undefined, cui2: string | null | 
 }
 
 /**
+ * Normalizează nume pentru comparație
+ * - Lowercase
+ * - Elimină forme juridice (SRL, SA, PFA, II, etc.)
+ * - Elimină caractere speciale și diacritice
+ * - Elimină spații multiple
+ */
+export function normalizeName(name: string | null | undefined): string {
+  if (!name) return '';
+
+  let normalized = name.toLowerCase();
+
+  // Elimină forme juridice comune românești
+  const juridicalForms = [
+    'srl', 's\\.r\\.l\\.', 's\\.r\\.l',
+    'sa', 's\\.a\\.', 's\\.a',
+    'pfa', 'p\\.f\\.a\\.', 'p\\.f\\.a',
+    'ii', 'i\\.i\\.',
+    'if', 'i\\.f\\.',
+    'sca', 's\\.c\\.a\\.',
+    'ong', 'o\\.n\\.g\\.',
+    'scs', 's\\.c\\.s\\.',
+    'snc', 's\\.n\\.c\\.',
+    'sc', 's\\.c\\.'
+  ];
+
+  for (const form of juridicalForms) {
+    normalized = normalized.replace(new RegExp(`\\b${form}\\b`, 'gi'), '');
+  }
+
+  // Elimină diacritice românești
+  normalized = normalized
+    .replace(/ă/g, 'a')
+    .replace(/â/g, 'a')
+    .replace(/î/g, 'i')
+    .replace(/ș/g, 's')
+    .replace(/ş/g, 's')
+    .replace(/ț/g, 't')
+    .replace(/ţ/g, 't');
+
+  // Elimină caractere speciale, păstrăm doar litere și cifre
+  normalized = normalized.replace(/[^a-z0-9]/g, ' ');
+
+  // Elimină spații multiple și trim
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+
+  return normalized;
+}
+
+/**
+ * Calculează similaritatea între două nume (0-1)
+ * Folosește Jaccard similarity pe cuvinte
+ */
+export function calculateNameSimilarity(name1: string | null | undefined, name2: string | null | undefined): number {
+  const normalized1 = normalizeName(name1);
+  const normalized2 = normalizeName(name2);
+
+  if (!normalized1 || !normalized2) return 0;
+
+  // Dacă sunt identice după normalizare
+  if (normalized1 === normalized2) return 1;
+
+  // Split în cuvinte
+  const words1 = new Set(normalized1.split(' ').filter(w => w.length >= 2));
+  const words2 = new Set(normalized2.split(' ').filter(w => w.length >= 2));
+
+  if (words1.size === 0 || words2.size === 0) return 0;
+
+  // Jaccard similarity: intersection / union
+  const words1Array = Array.from(words1);
+  const words2Array = Array.from(words2);
+
+  const intersection = new Set(words1Array.filter(w => words2.has(w)));
+  const union = new Set([...words1Array, ...words2Array]);
+
+  const jaccardSimilarity = intersection.size / union.size;
+
+  // Bonus dacă toate cuvintele dintr-un set sunt în celălalt (subset match)
+  const subset1In2 = words1Array.every(w => words2.has(w));
+  const subset2In1 = words2Array.every(w => words1.has(w));
+
+  if (subset1In2 || subset2In1) {
+    return Math.max(jaccardSimilarity, 0.85); // Minim 85% dacă e subset complet
+  }
+
+  return jaccardSimilarity;
+}
+
+/**
+ * Verifică dacă două nume sunt suficient de similare pentru a fi considerate match
+ * Threshold implicit: 60% similaritate
+ */
+export function nameMatch(
+  name1: string | null | undefined,
+  name2: string | null | undefined,
+  threshold: number = 0.60
+): boolean {
+  return calculateNameSimilarity(name1, name2) >= threshold;
+}
+
+/**
  * Normalizează număr factură pentru comparație
  * Ex: "X-123" → "X123", "X/123" → "X123", " X 123 " → "X123"
  */
@@ -184,6 +284,10 @@ export function calculateMatchScorePlati(
 ): MatchScorePlati {
   const matchingReasons: string[] = [];
 
+  // Calculăm name similarity înainte de inițializare
+  const nameSimilarity = calculateNameSimilarity(tranzactie.nume_contrapartida, target.furnizor_nume);
+  const isNameMatch = nameSimilarity >= 0.60;
+
   // Inițializare scor
   const score: MatchScorePlati = {
     total: 0,
@@ -195,6 +299,10 @@ export function calculateMatchScorePlati(
       cui_match: false,
       cui_tranzactie: normalizeCUI(tranzactie.cui_contrapartida),
       cui_target: normalizeCUI(target.furnizor_cui),
+      name_match: isNameMatch,
+      name_similarity: nameSimilarity,
+      nume_tranzactie: tranzactie.nume_contrapartida || '',
+      nume_target: target.furnizor_nume || '',
       suma_plata: Math.abs(tranzactie.suma),
       suma_target: target.valoare_cu_tva,
       diferenta_ron: 0,
@@ -214,11 +322,37 @@ export function calculateMatchScorePlati(
   const sumaPlata = Math.abs(tranzactie.suma);
   const sumaTarget = target.valoare_cu_tva;
 
-  // ==================== 1. SCOR CUI (35p default) ====================
-  if (cuiMatch(tranzactie.cui_contrapartida, target.furnizor_cui)) {
+  // ==================== 1. SCOR CUI / NUME (35p default) ====================
+  // Prioritate: CUI exact > Nume exact > Nume parțial
+  //
+  // NOTĂ: cui_contrapartida din tranzacție poate fi incorect (extras din nr factură)
+  // Deci dacă CUI nu match-uiește dar NUMELE se potrivește, acordăm puncte
+  // pentru că target.furnizor_cui (din FacturiPrimiteANAF_v2) este corect
+
+  const cuiMatches = cuiMatch(tranzactie.cui_contrapartida, target.furnizor_cui);
+
+  if (cuiMatches) {
+    // CUI exact match - punctaj maxim
     score.cui_score = config.cui_score;
     score.details.cui_match = true;
     matchingReasons.push(`CUI furnizor: ${score.details.cui_target} (+${score.cui_score}p)`);
+  } else if (nameSimilarity >= 0.85) {
+    // Nume foarte similar (≥85%) - acordăm punctaj CUI maxim
+    // Logică: Dacă numele se potrivesc aproape perfect, CUI din target e cel corect
+    score.cui_score = config.cui_score;
+    score.details.cui_match = false; // CUI-urile nu sunt egale tehnic
+    score.details.name_match = true;
+    matchingReasons.push(`Nume furnizor: ${(nameSimilarity * 100).toFixed(0)}% similar (+${score.cui_score}p)`);
+  } else if (nameSimilarity >= 0.60) {
+    // Nume parțial similar (60-84%) - acordăm punctaj parțial
+    const partialScore = Math.round(config.cui_score * 0.7); // 70% din punctaj
+    score.cui_score = partialScore;
+    score.details.cui_match = false;
+    score.details.name_match = true;
+    matchingReasons.push(`Nume parțial: ${(nameSimilarity * 100).toFixed(0)}% similar (+${partialScore}p)`);
+  } else {
+    // Nici CUI nici nume nu se potrivesc
+    matchingReasons.push(`Fără potrivire CUI/nume`);
   }
 
   // ==================== 2. SCOR VALOARE (35p default) ====================
@@ -303,10 +437,15 @@ export function calculateMatchScorePlati(
     (score.cui_score > 0 || score.referinta_score > 0);
 
   // Determinare algoritm de matching
+  // Distingem între CUI match și NAME match pentru claritate
+  const hasCuiMatch = score.details.cui_match;
+  const hasNameMatch = score.details.name_match && !score.details.cui_match;
+  const identifierType = hasCuiMatch ? 'cui' : (hasNameMatch ? 'nume' : '');
+
   if (score.cui_score > 0 && score.referinta_score > 0) {
-    score.details.matching_algorithm = 'cui_referinta_valoare';
+    score.details.matching_algorithm = `${identifierType}_referinta_valoare`;
   } else if (score.cui_score > 0 && score.valoare_score > 0) {
-    score.details.matching_algorithm = 'cui_valoare';
+    score.details.matching_algorithm = `${identifierType}_valoare`;
   } else if (score.referinta_score > 0 && score.valoare_score > 0) {
     score.details.matching_algorithm = 'referinta_valoare';
   } else if (score.valoare_score > 0) {
@@ -425,7 +564,11 @@ export function generateMatchDescriptionPlati(score: MatchScorePlati): string {
   const parts: string[] = [];
 
   if (score.cui_score > 0) {
-    parts.push('CUI ✓');
+    if (score.details.cui_match) {
+      parts.push('CUI ✓');
+    } else if (score.details.name_match) {
+      parts.push(`Nume ${(score.details.name_similarity * 100).toFixed(0)}% ✓`);
+    }
   }
 
   if (score.referinta_score > 0) {
