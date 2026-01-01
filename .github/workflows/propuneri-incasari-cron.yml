@@ -1,0 +1,69 @@
+name: Propuneri Incasari - Cron Job
+
+on:
+  schedule:
+    # Rulează zilnic la 07:10 GMT (09:10-10:10 AM România, în funcție de DST)
+    # După notifications cron (07:00 GMT)
+    - cron: '10 7 * * *'
+  workflow_dispatch: # Permite trigger manual din GitHub UI
+
+jobs:
+  generate-propuneri-incasari:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Trigger Propuneri Incasari Generate
+        run: |
+          echo "🔄 Triggering propuneri încasări generate..."
+          echo "⏰ Scheduled time: 07:10 GMT (09:10-10:10 AM România)"
+          echo "📅 Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://admin.unitarproiect.eu/api/incasari/propuneri/generate \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -d '{"dry_run": false, "send_notification": true}')
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo ""
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response:"
+          echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
+
+          if [ "$http_code" -eq 200 ]; then
+            echo ""
+            echo "✅ Propuneri încasări generate successfully"
+
+            # Parse stats dacă există
+            propuneri_generate=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('propuneri_generate', 0))" 2>/dev/null || echo "N/A")
+            auto_approvable=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('propuneri_auto_approvable', 0))" 2>/dev/null || echo "N/A")
+            review_needed=$(echo "$body" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('propuneri_review', 0))" 2>/dev/null || echo "N/A")
+
+            echo ""
+            echo "📈 Stats propuneri încasări:"
+            echo "   📋 Propuneri generate: $propuneri_generate"
+            echo "   ✅ Auto-aprobabile: $auto_approvable"
+            echo "   👀 Necesită review: $review_needed"
+
+            # Alert dacă sunt multe propuneri noi
+            if [ "${propuneri_generate:-0}" -gt 0 ] 2>/dev/null; then
+              echo ""
+              echo "🔔 $propuneri_generate propuneri noi de verificat!"
+              echo "   Accesează: https://admin.unitarproiect.eu/admin/financiar/propuneri-incasari"
+            fi
+          else
+            echo ""
+            echo "❌ Propuneri încasări generate failed with status $http_code"
+            exit 1
+          fi
+
+      - name: Health Check Summary
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🏁 Workflow completed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

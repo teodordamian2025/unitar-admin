@@ -542,8 +542,8 @@ async function findCheltuieliCandidatesForTransaction(
         pc.activ = TRUE
         AND pc.status_achitare IN ('Neincasat', 'Partial')
         AND pc.valoare_ron > 0
-        AND pc.data_creare >= DATE_SUB(DATE('${dataProc}'), INTERVAL 6 MONTH)
-        AND pc.data_creare <= DATE_ADD(DATE('${dataProc}'), INTERVAL 1 MONTH)
+        AND DATE(pc.data_creare) >= DATE_SUB(DATE('${dataProc}'), INTERVAL 6 MONTH)
+        AND DATE(pc.data_creare) <= DATE_ADD(DATE('${dataProc}'), INTERVAL 1 MONTH)
       ORDER BY
         ABS(pc.valoare_ron - ${sumaPlata}) ASC,
         pc.data_creare DESC

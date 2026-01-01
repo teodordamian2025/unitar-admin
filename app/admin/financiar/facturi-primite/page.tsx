@@ -1,7 +1,7 @@
 // =====================================================
 // PAGINĂ ADMIN: Facturi Primite ANAF
 // URL: /admin/financiar/facturi-primite
-// Data: 08.10.2025
+// Data: 08.10.2025 (Updated: 2026-01-01)
 // =====================================================
 
 'use client';
@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import ModernLayout from '@/app/components/ModernLayout';
+import { X, Loader2, CheckCircle, Building2, Search } from 'lucide-react';
 
 interface FacturaPrimita {
   id: string;
@@ -26,6 +27,26 @@ interface FacturaPrimita {
   subproiect_denumire?: string;
   data_preluare?: string;
   observatii?: string; // Pentru a detecta sursa (iapp.ro sau ANAF)
+}
+
+interface CheltuialaMatch {
+  id: string;
+  proiect_id: string;
+  proiect_denumire: string;
+  subproiect_id?: string;
+  subproiect_denumire?: string;
+  tip_cheltuiala: string;
+  furnizor_cui?: string;
+  furnizor_nume?: string;
+  descriere?: string;
+  valoare: number;
+  moneda: string;
+  valoare_ron: number;
+  status_achitare: string;
+  nr_factura_furnizor?: string;
+  data_factura_furnizor?: string;
+  score: number;
+  matching_reasons: string[];
 }
 
 interface FacturaDetalii {
@@ -55,6 +76,13 @@ export default function FacturiPrimitePage() {
     status: '',
     asociat: '',
   });
+
+  // State pentru modal asociere
+  const [associateModalOpen, setAssociateModalOpen] = useState(false);
+  const [selectedFactura, setSelectedFactura] = useState<FacturaPrimita | null>(null);
+  const [matchSuggestions, setMatchSuggestions] = useState<CheltuialaMatch[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [associating, setAssociating] = useState(false);
 
   // Load config pentru sursa facturi primite
   useEffect(() => {
@@ -179,6 +207,78 @@ export default function FacturiPrimitePage() {
       setExpandedId(facturaId);
       loadDetalii(facturaId);
     }
+  }
+
+  // Deschide modal asociere
+  async function openAssociateModal(factura: FacturaPrimita) {
+    setSelectedFactura(factura);
+    setAssociateModalOpen(true);
+    setMatchSuggestions([]);
+    setLoadingMatches(true);
+
+    try {
+      const response = await fetch(`/api/anaf/facturi-primite/associate?factura_id=${factura.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMatchSuggestions(data.matches || []);
+      } else {
+        toast.error(data.error || 'Eroare la căutare sugestii');
+      }
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    } finally {
+      setLoadingMatches(false);
+    }
+  }
+
+  // Închide modal
+  function closeAssociateModal() {
+    setAssociateModalOpen(false);
+    setSelectedFactura(null);
+    setMatchSuggestions([]);
+  }
+
+  // Efectuează asocierea
+  async function handleAssociate(cheltuialaId: string) {
+    if (!selectedFactura) return;
+
+    try {
+      setAssociating(true);
+
+      const response = await fetch('/api/anaf/facturi-primite/associate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          factura_id: selectedFactura.id,
+          cheltuiala_id: cheltuialaId,
+          user_id: 'admin', // TODO: Get from auth context
+          observatii: 'Asociere manuală din pagina Facturi Primite',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Factură asociată cu succes!');
+        closeAssociateModal();
+        loadFacturi(); // Reload lista
+      } else {
+        toast.error(data.error || 'Eroare la asociere');
+      }
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    } finally {
+      setAssociating(false);
+    }
+  }
+
+  // Get score badge color
+  function getScoreBadge(score: number) {
+    if (score >= 80) return 'bg-green-500/20 text-green-300';
+    if (score >= 60) return 'bg-yellow-500/20 text-yellow-300';
+    if (score >= 40) return 'bg-orange-500/20 text-orange-300';
+    return 'bg-red-500/20 text-red-300';
   }
 
   return (
@@ -311,12 +411,14 @@ export default function FacturiPrimitePage() {
                             <>
                               {factura.asociere_automata ? '🤖 ' : '👤 '}
                               {factura.proiect_denumire}
+                              {factura.subproiect_denumire && ` / ${factura.subproiect_denumire}`}
                             </>
                           ) : (
                             <button
-                              className="text-blue-400 hover:text-blue-300"
-                              onClick={() => toast('Funcționalitate în dezvoltare')}
+                              className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                              onClick={() => openAssociateModal(factura)}
                             >
+                              <Search className="w-3 h-3" />
                               Asociază →
                             </button>
                           )}
@@ -423,6 +525,141 @@ export default function FacturiPrimitePage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Modal Asociere Cheltuială */}
+        {associateModalOpen && selectedFactura && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
+              {/* Header Modal */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Asociază Factură cu Cheltuială</h2>
+                  <p className="text-sm text-white/60 mt-1">
+                    {selectedFactura.serie_numar} • {selectedFactura.nume_emitent} •{' '}
+                    {selectedFactura.valoare_ron?.toFixed(2)} RON
+                  </p>
+                </div>
+                <button
+                  onClick={closeAssociateModal}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-white/60" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 py-4 overflow-y-auto max-h-[60vh]">
+                {loadingMatches ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+                    <span className="ml-3 text-white/60">Se caută cheltuieli potrivite...</span>
+                  </div>
+                ) : matchSuggestions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Building2 className="w-12 h-12 text-white/30 mx-auto mb-4" />
+                    <p className="text-white/60">Nu au fost găsite cheltuieli potrivite</p>
+                    <p className="text-sm text-white/40 mt-2">
+                      Verificați dacă există o cheltuială înregistrată pentru acest furnizor (CUI: {selectedFactura.cif_emitent})
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-white/60 mb-4">
+                      {matchSuggestions.length} cheltuieli potrivite găsite. Selectați una pentru asociere:
+                    </p>
+                    {matchSuggestions.map((match) => (
+                      <div
+                        key={match.id}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-4 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            {/* Proiect + Score */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(match.score)}`}>
+                                {match.score}%
+                              </span>
+                              <span className="font-medium text-white">
+                                {match.proiect_denumire}
+                              </span>
+                              {match.subproiect_denumire && (
+                                <span className="text-white/60">/ {match.subproiect_denumire}</span>
+                              )}
+                            </div>
+
+                            {/* Detalii cheltuială */}
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-white/50">Furnizor:</span>{' '}
+                                <span className="text-white">{match.furnizor_nume || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="text-white/50">CUI:</span>{' '}
+                                <span className="text-white">{match.furnizor_cui || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="text-white/50">Valoare:</span>{' '}
+                                <span className="text-white">{match.valoare_ron?.toFixed(2)} RON</span>
+                              </div>
+                              <div>
+                                <span className="text-white/50">Status:</span>{' '}
+                                <span className={`${match.status_achitare === 'Incasat' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {match.status_achitare}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Descriere */}
+                            {match.descriere && (
+                              <p className="text-xs text-white/50 mt-2 line-clamp-2">
+                                {match.descriere}
+                              </p>
+                            )}
+
+                            {/* Matching reasons */}
+                            {match.matching_reasons && match.matching_reasons.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {match.matching_reasons.slice(0, 3).map((reason, idx) => (
+                                  <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
+                                    {reason}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Buton asociere */}
+                          <button
+                            onClick={() => handleAssociate(match.id)}
+                            disabled={associating}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                          >
+                            {associating ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-4 h-4" />
+                            )}
+                            Asociază
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-white/10 flex justify-end">
+                <button
+                  onClick={closeAssociateModal}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                >
+                  Închide
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
