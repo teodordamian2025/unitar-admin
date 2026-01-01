@@ -733,9 +733,9 @@ function PropunereCard({
               <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">
                 Algoritm: {propunere.matching_algorithm || 'N/A'}
               </span>
-              {propunere.diferenta_procent !== null && (
+              {propunere.diferenta_procent != null && (
                 <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">
-                  Diferență: {propunere.diferenta_procent.toFixed(1)}% ({propunere.diferenta_ron?.toFixed(2) || '0'} RON)
+                  Diferență: {Number(propunere.diferenta_procent).toFixed(1)}% ({propunere.diferenta_ron != null ? Number(propunere.diferenta_ron).toFixed(2) : '0'} RON)
                 </span>
               )}
               {propunere.referinta_gasita && (
