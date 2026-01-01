@@ -132,18 +132,38 @@ export function levenshteinSimilarity(str1: string, str2: string): number {
 
 /**
  * Normalizează numele firmei/persoanei pentru comparație
- * Remove: SRL, SA, SNC, PFA, II, IF, spații multiple, caractere speciale
+ * Remove: SRL, SA, SNC, PFA, II, IF, IFN, orașe, spații multiple, caractere speciale
  */
 export function normalizeCompanyName(name: string): string {
   if (!name) return '';
 
-  return name
-    .toUpperCase()
-    .replace(/\b(S\.?R\.?L\.?|S\.?A\.?|S\.?N\.?C\.?|P\.?F\.?A\.?|I\.?I\.?|I\.?F\.?)\b/g, '') // Remove entitate juridică
-    .replace(/\b(SRL|SA|SNC|PFA|II|IF)\b/g, '') // Remove fără puncte
-    .replace(/[^\w\s]/g, ' ') // Remove caractere speciale
-    .replace(/\s+/g, ' ') // Remove spații multiple
+  let normalized = name.toUpperCase();
+
+  // Remove forme juridice (inclusiv IFN - Instituție Financiară Nebancară)
+  normalized = normalized
+    .replace(/\b(S\.?R\.?L\.?|S\.?A\.?|S\.?N\.?C\.?|P\.?F\.?A\.?|I\.?I\.?|I\.?F\.?|I\.?F\.?N\.?|S\.?C\.?A\.?|S\.?C\.?S\.?|S\.?C\.?)\b/g, '')
+    .replace(/\b(SRL|SA|SNC|PFA|II|IF|IFN|SCA|SCS|SC|LTD|LLC|GMBH|AG|PLC|INC|CORP|SPA|SAS|SARL)\b/g, '');
+
+  // Normalizare spații ÎNAINTE de a căuta orașe
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+
+  // Remove orașe comune românești de la final
+  const cities = [
+    'BUCURESTI', 'CLUJ', 'TIMISOARA', 'IASI', 'CONSTANTA', 'CRAIOVA', 'BRASOV',
+    'GALATI', 'PLOIESTI', 'ORADEA', 'BRAILA', 'ARAD', 'PITESTI', 'SIBIU',
+    'BACAU', 'TARGU MURES', 'BAIA MARE', 'BUZAU', 'BOTOSANI', 'SATU MARE'
+  ];
+  for (const city of cities) {
+    normalized = normalized.replace(new RegExp(`\\s+${city}$`, 'g'), '');
+  }
+
+  // Remove caractere speciale și normalizare spații
+  normalized = normalized
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
+
+  return normalized;
 }
 
 // ==================================================================

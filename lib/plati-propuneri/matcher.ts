@@ -62,8 +62,9 @@ export function cuiMatch(cui1: string | null | undefined, cui2: string | null | 
 /**
  * Normalizează nume pentru comparație
  * - Lowercase
- * - Elimină forme juridice (SRL, SA, PFA, II, etc.)
+ * - Elimină forme juridice (SRL, SA, PFA, II, IFN, etc.)
  * - Elimină caractere speciale și diacritice
+ * - Elimină orașe comune de la final
  * - Elimină spații multiple
  */
 export function normalizeName(name: string | null | undefined): string {
@@ -71,22 +72,42 @@ export function normalizeName(name: string | null | undefined): string {
 
   let normalized = name.toLowerCase();
 
-  // Elimină forme juridice comune românești
+  // Elimină forme juridice comune românești (inclusiv IFN - Instituție Financiară Nebancară)
   const juridicalForms = [
-    'srl', 's\\.r\\.l\\.', 's\\.r\\.l',
-    'sa', 's\\.a\\.', 's\\.a',
-    'pfa', 'p\\.f\\.a\\.', 'p\\.f\\.a',
-    'ii', 'i\\.i\\.',
-    'if', 'i\\.f\\.',
-    'sca', 's\\.c\\.a\\.',
-    'ong', 'o\\.n\\.g\\.',
-    'scs', 's\\.c\\.s\\.',
-    'snc', 's\\.n\\.c\\.',
-    'sc', 's\\.c\\.'
+    // Forme cu puncte
+    's\\.r\\.l\\.?', 's\\.a\\.?', 'p\\.f\\.a\\.?', 'i\\.i\\.?', 'i\\.f\\.?',
+    's\\.c\\.a\\.?', 'o\\.n\\.g\\.?', 's\\.c\\.s\\.?', 's\\.n\\.c\\.?', 's\\.c\\.?',
+    'i\\.f\\.n\\.?',
+    // Forme fără puncte
+    'srl', 'sa', 'pfa', 'ii', 'if', 'sca', 'ong', 'scs', 'snc', 'sc',
+    'ifn',  // Instituție Financiară Nebancară
+    'ltd', 'llc', 'gmbh', 'ag', 'plc', 'inc', 'corp',  // Forme internaționale
+    'spa', 'sas', 'sarl'  // Forme italiene/franceze
   ];
 
   for (const form of juridicalForms) {
+    // Elimină forma juridică fie la final, fie ca cuvânt separat
     normalized = normalized.replace(new RegExp(`\\b${form}\\b`, 'gi'), '');
+  }
+
+  // Normalizare spații ÎNAINTE de a căuta orașe (pentru că formele juridice pot lăsa spații multiple)
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+
+  // Elimină orașe comune românești de la final
+  // Pattern: "FIRMA SRL BUCUREȘTI" → "FIRMA"
+  const cities = [
+    'bucuresti', 'cluj', 'timisoara', 'iasi', 'constanta', 'craiova', 'brasov',
+    'galati', 'ploiesti', 'oradea', 'braila', 'arad', 'pitesti', 'sibiu',
+    'bacau', 'targu mures', 'baia mare', 'buzau', 'botosani', 'satu mare',
+    'ramnicu valcea', 'suceava', 'piatra neamt', 'drobeta turnu severin',
+    'targu jiu', 'targoviste', 'focsani', 'tulcea', 'resita', 'alba iulia',
+    // Variante fără diacritice și prescurtate
+    'buc', 'bv', 'cj', 'tm', 'is', 'ct', 'dj', 'gl', 'ph', 'bh', 'ar', 'sb'
+  ];
+
+  // Elimină orașe de la final
+  for (const city of cities) {
+    normalized = normalized.replace(new RegExp(`\\s+${city}$`, 'gi'), '');
   }
 
   // Elimină diacritice românești
@@ -162,10 +183,12 @@ export function nameMatch(
 /**
  * Normalizează număr factură pentru comparație
  * Ex: "X-123" → "X123", "X/123" → "X123", " X 123 " → "X123"
+ * Ex: "811, 26464" → "81126464"
  */
 export function normalizeInvoiceNumber(number: string | null | undefined): string {
   if (!number) return '';
-  return number.toUpperCase().replace(/[-\/\s]/g, '').trim();
+  // Eliminăm: liniuțe, slash-uri, spații, virgule, puncte
+  return number.toUpperCase().replace(/[-\/\s,\.]/g, '').trim();
 }
 
 // =================================================================
@@ -180,6 +203,8 @@ const REFERINTA_PATTERNS: Array<{
   regex: RegExp;
   confidence: 'exact' | 'partial' | 'inferred';
   extractSerie: boolean;
+  // Special flag pentru pattern-uri care capturează numere separate prin virgulă/spațiu
+  concatenateGroups?: boolean;
 }> = [
   // Pattern-uri EXACTE cu serie
   { regex: /FACTURA\s+(?:SERIA\s+)?([A-Z]{1,4})\s*(?:NR\.?\s*)?(\d+)/gi, confidence: 'exact', extractSerie: true },
@@ -188,10 +213,16 @@ const REFERINTA_PATTERNS: Array<{
   { regex: /PLATA\s+(?:FACTURA\s+)?([A-Z]{1,4})[-\s]?(\d+)/gi, confidence: 'exact', extractSerie: true },
   { regex: /C\.?V\.?\s*(?:FACTURA\s+)?([A-Z]{1,4})[-\s]?(\d+)/gi, confidence: 'exact', extractSerie: true },
 
+  // Pattern-uri SPECIALE pentru format "Nr facturii XXX, YYYY" (ex: "811, 26464" → "81126464")
+  // Capturează două grupuri de cifre separate prin virgulă/spațiu și le concatenează
+  { regex: /NR\.?\s*FACTURI[I]?\s+(\d{2,})[,\s]+(\d{2,})/gi, confidence: 'exact', extractSerie: false, concatenateGroups: true },
+  { regex: /FACTURA\s+(\d{2,})[,\s]+(\d{2,})/gi, confidence: 'exact', extractSerie: false, concatenateGroups: true },
+
   // Pattern-uri PARȚIALE (doar număr, fără serie)
   { regex: /FACTURA\s+(?:NR\.?\s*)?(\d{2,})/gi, confidence: 'partial', extractSerie: false },
   { regex: /FACT\.?\s*(?:NR\.?\s*)?(\d{2,})/gi, confidence: 'partial', extractSerie: false },
   { regex: /PLATA\s+(?:NR\.?\s*)?(\d{3,})/gi, confidence: 'partial', extractSerie: false },
+  { regex: /NR\.?\s*FACTURI[I]?\s+(\d{3,})/gi, confidence: 'partial', extractSerie: false },
   { regex: /NR\.?\s*(\d{3,})/gi, confidence: 'partial', extractSerie: false },
 
   // Pattern-uri INFERRED (mai puțin sigure)
@@ -216,7 +247,10 @@ export function extractReferinteFacturi(detalii: string | null): ReferintaFactur
       let serie: string | null = null;
       let numar: string;
 
-      if (pattern.extractSerie && match[2]) {
+      if (pattern.concatenateGroups && match[2]) {
+        // Special: concatenăm grupurile de cifre (ex: "811, 26464" → "81126464")
+        numar = match[1] + match[2];
+      } else if (pattern.extractSerie && match[2]) {
         serie = match[1];
         numar = match[2];
       } else {
