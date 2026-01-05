@@ -116,6 +116,7 @@ export function calculateMatchScore(
       data_factura_furnizor: extractDateString(cheltuiala.data_factura_furnizor) || undefined,
       nr_factura_furnizor: cheltuiala.nr_factura_furnizor,
       descriere: cheltuiala.descriere,
+      status_achitare: cheltuiala.status_achitare,
     },
   };
 }

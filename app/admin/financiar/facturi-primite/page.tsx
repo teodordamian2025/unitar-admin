@@ -29,24 +29,33 @@ interface FacturaPrimita {
   observatii?: string; // Pentru a detecta sursa (iapp.ro sau ANAF)
 }
 
+// Interface matching backend MatchResult structure
 interface CheltuialaMatch {
-  id: string;
+  cheltuiala_id: string;
   proiect_id: string;
-  proiect_denumire: string;
+  proiect_denumire?: string;
   subproiect_id?: string;
   subproiect_denumire?: string;
-  tip_cheltuiala: string;
-  furnizor_cui?: string;
-  furnizor_nume?: string;
-  descriere?: string;
-  valoare: number;
-  moneda: string;
-  valoare_ron: number;
-  status_achitare: string;
-  nr_factura_furnizor?: string;
-  data_factura_furnizor?: string;
-  score: number;
-  matching_reasons: string[];
+  score_total: number; // 0-1 format
+  score_cui: number;
+  score_valoare: number;
+  score_data: number;
+  score_numar: number;
+  cui_match: boolean;
+  valoare_diff_percent: number;
+  data_diff_days: number;
+  numar_match: boolean;
+  cheltuiala: {
+    furnizor_nume: string;
+    furnizor_cui: string;
+    valoare: number;
+    valoare_ron: number;
+    moneda: string;
+    data_factura_furnizor?: string;
+    nr_factura_furnizor?: string;
+    descriere?: string;
+    status_achitare?: string;
+  };
 }
 
 interface FacturaDetalii {
@@ -538,7 +547,7 @@ export default function FacturiPrimitePage() {
                   <h2 className="text-lg font-semibold text-white">Asociază Factură cu Cheltuială</h2>
                   <p className="text-sm text-white/60 mt-1">
                     {selectedFactura.serie_numar} • {selectedFactura.nume_emitent} •{' '}
-                    {selectedFactura.valoare_ron?.toFixed(2)} RON
+                    {selectedFactura.valoare_ron != null ? Number(selectedFactura.valoare_ron).toFixed(2) : '-'} RON
                   </p>
                 </div>
                 <button
@@ -569,83 +578,99 @@ export default function FacturiPrimitePage() {
                     <p className="text-sm text-white/60 mb-4">
                       {matchSuggestions.length} cheltuieli potrivite găsite. Selectați una pentru asociere:
                     </p>
-                    {matchSuggestions.map((match) => (
-                      <div
-                        key={match.id}
-                        className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-4 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            {/* Proiect + Score */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(match.score)}`}>
-                                {match.score}%
-                              </span>
-                              <span className="font-medium text-white">
-                                {match.proiect_denumire}
-                              </span>
-                              {match.subproiect_denumire && (
-                                <span className="text-white/60">/ {match.subproiect_denumire}</span>
+                    {matchSuggestions.map((match) => {
+                      // Calculate score as percentage (0-100)
+                      const scorePercent = Math.round(match.score_total * 100);
+
+                      // Build matching reasons from score components
+                      const matchingReasons: string[] = [];
+                      if (match.cui_match) matchingReasons.push('CUI potrivit');
+                      if (match.score_valoare > 0) matchingReasons.push('Valoare similară');
+                      if (match.score_data > 0) matchingReasons.push('Dată apropiată');
+                      if (match.numar_match) matchingReasons.push('Nr. factură potrivit');
+
+                      return (
+                        <div
+                          key={match.cheltuiala_id}
+                          className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-4 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              {/* Proiect + Score */}
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(scorePercent)}`}>
+                                  {scorePercent}%
+                                </span>
+                                <span className="font-medium text-white">
+                                  {match.proiect_denumire}
+                                </span>
+                                {match.subproiect_denumire && (
+                                  <span className="text-white/60">/ {match.subproiect_denumire}</span>
+                                )}
+                              </div>
+
+                              {/* Detalii cheltuială */}
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <span className="text-white/50">Furnizor:</span>{' '}
+                                  <span className="text-white">{match.cheltuiala?.furnizor_nume || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-white/50">CUI:</span>{' '}
+                                  <span className="text-white">{match.cheltuiala?.furnizor_cui || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-white/50">Valoare:</span>{' '}
+                                  <span className="text-white">
+                                    {match.cheltuiala?.valoare_ron != null
+                                      ? Number(match.cheltuiala.valoare_ron).toFixed(2)
+                                      : '-'} RON
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-white/50">Status:</span>{' '}
+                                  <span className={`${match.cheltuiala?.status_achitare === 'Incasat' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                    {match.cheltuiala?.status_achitare || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Descriere */}
+                              {match.cheltuiala?.descriere && (
+                                <p className="text-xs text-white/50 mt-2 line-clamp-2">
+                                  {match.cheltuiala.descriere}
+                                </p>
+                              )}
+
+                              {/* Matching reasons */}
+                              {matchingReasons.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {matchingReasons.slice(0, 3).map((reason, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
+                                      {reason}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </div>
 
-                            {/* Detalii cheltuială */}
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <span className="text-white/50">Furnizor:</span>{' '}
-                                <span className="text-white">{match.furnizor_nume || 'N/A'}</span>
-                              </div>
-                              <div>
-                                <span className="text-white/50">CUI:</span>{' '}
-                                <span className="text-white">{match.furnizor_cui || 'N/A'}</span>
-                              </div>
-                              <div>
-                                <span className="text-white/50">Valoare:</span>{' '}
-                                <span className="text-white">{match.valoare_ron?.toFixed(2)} RON</span>
-                              </div>
-                              <div>
-                                <span className="text-white/50">Status:</span>{' '}
-                                <span className={`${match.status_achitare === 'Incasat' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                  {match.status_achitare}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Descriere */}
-                            {match.descriere && (
-                              <p className="text-xs text-white/50 mt-2 line-clamp-2">
-                                {match.descriere}
-                              </p>
-                            )}
-
-                            {/* Matching reasons */}
-                            {match.matching_reasons && match.matching_reasons.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {match.matching_reasons.slice(0, 3).map((reason, idx) => (
-                                  <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
-                                    {reason}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                            {/* Buton asociere */}
+                            <button
+                              onClick={() => handleAssociate(match.cheltuiala_id)}
+                              disabled={associating}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                            >
+                              {associating ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4" />
+                              )}
+                              Asociază
+                            </button>
                           </div>
-
-                          {/* Buton asociere */}
-                          <button
-                            onClick={() => handleAssociate(match.id)}
-                            disabled={associating}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
-                          >
-                            {associating ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <CheckCircle className="w-4 h-4" />
-                            )}
-                            Asociază
-                          </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

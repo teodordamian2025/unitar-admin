@@ -151,6 +151,7 @@ export interface MatchResult {
     data_factura_furnizor?: string;
     nr_factura_furnizor?: string;
     descriere?: string;
+    status_achitare?: string;
   };
 }
 
