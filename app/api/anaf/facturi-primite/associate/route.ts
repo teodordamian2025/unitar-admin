@@ -85,6 +85,11 @@ export async function POST(req: NextRequest) {
       const matchingId = crypto.randomUUID();
       const sumaPlata = Math.abs(tranzactie.suma);
 
+      const targetDetails = JSON.stringify({
+        serie_numar: factura.serie_numar,
+        furnizor: factura.nume_emitent
+      }).replace(/'/g, "''");
+
       await bigquery.query(`
         INSERT INTO \`${PROJECT_ID}.${DATASET}.TranzactiiMatching_v2\`
         (id, tranzactie_id, target_type, target_id, target_details, confidence_score,
@@ -92,7 +97,7 @@ export async function POST(req: NextRequest) {
          diferenta_procent, moneda_target, status, validated_by, data_creare, creat_de)
         VALUES
         ('${matchingId}', '${tranzactie_id}', 'factura_primita', '${factura_id}',
-         '${JSON.stringify({ serie_numar: factura.serie_numar, furnizor: factura.nume_emitent }).replace(/'/g, "''")}',
+         PARSE_JSON('${targetDetails}'),
          ${score || 100}, 'manual_associate', ${sumaPlata},
          ${parseFloat(factura.valoare_totala || factura.valoare_ron || 0)},
          ${parseFloat(factura.valoare_ron || factura.valoare_totala || 0)},
