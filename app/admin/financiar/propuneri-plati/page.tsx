@@ -326,61 +326,68 @@ export default function PropuneriPlatiPage() {
             </div>
           </div>
 
-          {/* Statistici - Horizontal Row */}
+          {/* Statistici - Horizontal Row (inline style grid ca la dashboard) */}
           {stats && (
-            <div className="flex flex-wrap gap-3 mt-6">
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-gray-400 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">În așteptare</p>
-                    <p className="text-2xl font-bold text-gray-800">{stats.pending}</p>
+            <div
+              className="mt-6"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+                gap: '1rem'
+              }}
+            >
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-gray-400 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">În așteptare</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{stats.pending}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">⏳</div>
+                  <div className="text-2xl opacity-70">⏳</div>
                 </div>
               </div>
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-green-500 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Auto-aprobabile</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.auto_approvable}</p>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-green-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Auto-aprobabile</p>
+                    <p className="text-2xl font-bold text-green-600 mt-1">{stats.auto_approvable}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">🤖</div>
+                  <div className="text-2xl opacity-70">🤖</div>
                 </div>
               </div>
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-yellow-500 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Necesită review</p>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.review_needed}</p>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-yellow-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Necesită review</p>
+                    <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.review_needed}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">👁️</div>
+                  <div className="text-2xl opacity-70">👁️</div>
                 </div>
               </div>
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Aprobate</p>
-                    <p className="text-2xl font-bold text-blue-600">{stats.approved}</p>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aprobate</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">{stats.approved}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">✅</div>
+                  <div className="text-2xl opacity-70">✅</div>
                 </div>
               </div>
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-red-500 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Respinse</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-red-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Respinse</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{stats.rejected}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">❌</div>
+                  <div className="text-2xl opacity-70">❌</div>
                 </div>
               </div>
-              <div className="flex-1 min-w-[140px] bg-white/90 backdrop-blur-sm rounded-xl p-3 border-l-4 border-gray-300 shadow-sm hover:shadow-md transition-all duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">Expirate</p>
-                    <p className="text-2xl font-bold text-gray-500">{stats.expired}</p>
+              <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-gray-300 shadow-sm hover:shadow-md transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Expirate</p>
+                    <p className="text-2xl font-bold text-gray-500 mt-1">{stats.expired}</p>
                   </div>
-                  <div className="text-xl opacity-70 flex-shrink-0">🕐</div>
+                  <div className="text-2xl opacity-70">🕐</div>
                 </div>
               </div>
             </div>
