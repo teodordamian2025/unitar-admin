@@ -281,7 +281,7 @@ export default function FacturiPrimitePage() {
     setActiveTab('tranzactii');
   }
 
-  // Efectuează asocierea
+  // Efectuează asocierea cu cheltuială
   async function handleAssociate(cheltuialaId: string) {
     if (!selectedFactura) return;
 
@@ -303,6 +303,40 @@ export default function FacturiPrimitePage() {
 
       if (data.success) {
         toast.success('Factură asociată cu succes!');
+        closeAssociateModal();
+        loadFacturi(); // Reload lista
+      } else {
+        toast.error(data.error || 'Eroare la asociere');
+      }
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    } finally {
+      setAssociating(false);
+    }
+  }
+
+  // Efectuează asocierea cu tranzacție bancară
+  async function handleAssociateTranzactie(tranzactieId: string, score: number) {
+    if (!selectedFactura) return;
+
+    try {
+      setAssociating(true);
+
+      const response = await fetch('/api/anaf/facturi-primite/associate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          factura_id: selectedFactura.id,
+          tranzactie_id: tranzactieId,
+          user_id: 'admin', // TODO: Get from auth context
+          score: Math.round(score * 100),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Factură asociată cu tranzacția bancară!');
         closeAssociateModal();
         loadFacturi(); // Reload lista
       } else {
@@ -635,7 +669,7 @@ export default function FacturiPrimitePage() {
                   ) : (
                     <div className="space-y-3">
                       <p className="text-sm text-white/60 mb-4">
-                        {tranzactiiMatches.length} tranzacții bancare potrivite. Acestea pot fi asociate din pagina Propuneri Plăți.
+                        {tranzactiiMatches.length} tranzacții bancare potrivite. Selectați una pentru asociere:
                       </p>
                       {tranzactiiMatches.map((trx) => {
                         const scorePercent = Math.round(trx.score_total * 100);
@@ -700,15 +734,19 @@ export default function FacturiPrimitePage() {
                                 )}
                               </div>
 
-                              {/* Info - nu putem asocia direct, trebuie prin propuneri-plati */}
-                              <div className="text-right">
-                                <span className="text-xs text-white/40 block">
-                                  Folosiți Propuneri Plăți
-                                </span>
-                                <span className="text-xs text-white/40 block">
-                                  pentru asociere
-                                </span>
-                              </div>
+                              {/* Buton Asociază */}
+                              <button
+                                onClick={() => handleAssociateTranzactie(trx.tranzactie_id, trx.score_total)}
+                                disabled={associating}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                              >
+                                {associating ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-4 h-4" />
+                                )}
+                                Asociază
+                              </button>
                             </div>
                           </div>
                         );
