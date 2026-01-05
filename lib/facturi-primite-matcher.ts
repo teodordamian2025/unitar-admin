@@ -1,11 +1,41 @@
 // =====================================================
-// AUTO-MATCH LOGIC: Facturi Primite → Cheltuieli Proiecte
+// AUTO-MATCH LOGIC: Facturi Primite → Cheltuieli Proiecte & Tranzacții Bancare
 // Algoritm scoring pentru asociere automată/semiautomată
-// Data: 08.10.2025
+// Data: 08.10.2025 (Updated: 2026-01-05)
 // =====================================================
 
 import { BigQuery } from '@google-cloud/bigquery';
 import type { FacturaPrimita, MatchResult } from './facturi-primite-types';
+import {
+  normalizeCUI,
+  cuiMatch,
+  calculateNameSimilarity,
+  extractReferinteFacturi,
+  referintaMatchesTarget,
+  extractDate as extractDatePlati,
+  daysDifference
+} from './plati-propuneri/matcher';
+
+// Interface pentru match-uri cu tranzacții bancare
+export interface TranzactieMatch {
+  tranzactie_id: string;
+  data_procesare: string;
+  suma: number;
+  nume_contrapartida: string;
+  cui_contrapartida: string;
+  detalii_tranzactie: string;
+  iban_contrapartida?: string;
+  score_total: number;
+  score_cui: number;
+  score_valoare: number;
+  score_referinta: number;
+  score_data: number;
+  cui_match: boolean;
+  name_match: boolean;
+  name_similarity: number;
+  referinta_gasita?: string;
+  matching_reasons: string[];
+}
 
 const bigquery = new BigQuery({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
@@ -130,7 +160,7 @@ export async function findMatches(
   minScore: number = 0.5
 ): Promise<MatchResult[]> {
   try {
-    // Query cheltuieli neasociate din ultimele 90 zile
+    // Query cheltuieli neasociate din ultimele 365 zile (extins de la 90)
     const query = `
       SELECT
         ch.id,
@@ -165,17 +195,30 @@ export async function findMatches(
       LEFT JOIN \`PanouControlUnitar.Subproiecte_v2\` sp ON ch.subproiect_id = sp.ID_Subproiect
       WHERE ch.activ = TRUE
         AND (ch.status_facturare IS NULL OR ch.status_facturare != 'asociat')
-        AND ch.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
+        AND ch.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY)
       ORDER BY ch.data_creare DESC
     `;
 
     const [rows] = await bigquery.query(query);
 
+    console.log(`📊 [findMatches] Factura CUI: ${factura.cif_emitent}, Nume: ${factura.nume_emitent}, Valoare: ${factura.valoare_ron}`);
+    console.log(`📊 [findMatches] Cheltuieli găsite în DB: ${rows.length}`);
+
     // Calculează scor pentru fiecare cheltuială
-    const matches = rows
-      .map(cheltuiala => calculateMatchScore(factura, cheltuiala))
+    const allScores = rows.map(cheltuiala => calculateMatchScore(factura, cheltuiala));
+
+    // Log top 5 scores pentru debugging
+    const topScores = [...allScores].sort((a, b) => b.score_total - a.score_total).slice(0, 5);
+    console.log(`📊 [findMatches] Top 5 scoruri (înainte de filter):`);
+    topScores.forEach((m, i) => {
+      console.log(`   ${i + 1}. Score: ${(m.score_total * 100).toFixed(0)}% - ${m.cheltuiala.furnizor_nume || 'N/A'} (CUI: ${m.cheltuiala.furnizor_cui || 'N/A'}) - ${m.cheltuiala.valoare_ron} RON`);
+    });
+
+    const matches = allScores
       .filter(match => match.score_total >= minScore)
       .sort((a, b) => b.score_total - a.score_total);
+
+    console.log(`📊 [findMatches] Matches după filter (score >= ${minScore * 100}%): ${matches.length}`);
 
     return matches;
 
@@ -364,4 +407,168 @@ function extractDateString(field: any): string | null | undefined {
  */
 function normalizeInvoiceNumber(number: string): string {
   return number.toUpperCase().replace(/[-\/\s]/g, '').trim();
+}
+
+// =====================================================
+// CĂUTARE TRANZACȚII BANCARE PENTRU FACTURĂ
+// =====================================================
+
+/**
+ * Găsește tranzacții bancare care se potrivesc cu factura
+ * Folosește algoritmul similar cu propuneri-plati
+ */
+export async function findTranzactiiMatches(
+  factura: FacturaPrimita,
+  minScore: number = 0.5
+): Promise<TranzactieMatch[]> {
+  try {
+    // Query tranzacții de tip plată (suma negativă) din ultimele 90 zile
+    const query = `
+      SELECT
+        tb.id,
+        tb.data_procesare,
+        tb.suma,
+        tb.nume_contrapartida,
+        tb.cui_contrapartida,
+        tb.detalii_tranzactie,
+        tb.iban_contrapartida,
+        tb.status,
+        tb.matching_tip
+      FROM \`PanouControlUnitar.TranzactiiBancare_v2\` tb
+      WHERE tb.suma < 0
+        AND (tb.matching_tip IS NULL OR tb.matching_tip = 'none')
+        AND tb.status != 'matched'
+        AND tb.data_procesare >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+      ORDER BY tb.data_procesare DESC
+      LIMIT 500
+    `;
+
+    const [rows] = await bigquery.query(query);
+
+    console.log(`📊 [findTranzactiiMatches] Factura: ${factura.serie_numar}, CUI: ${factura.cif_emitent}, Valoare: ${factura.valoare_ron}`);
+    console.log(`📊 [findTranzactiiMatches] Tranzacții bancare găsite: ${rows.length}`);
+
+    const facturaValoare = parseFloat(String(factura.valoare_ron || factura.valoare_totala || 0));
+    const facturaDataStr = extractDateString(factura.data_factura);
+
+    // Calculează scor pentru fiecare tranzacție
+    const matches: TranzactieMatch[] = [];
+
+    for (const trx of rows) {
+      const matchingReasons: string[] = [];
+      let score_cui = 0;
+      let score_valoare = 0;
+      let score_referinta = 0;
+      let score_data = 0;
+
+      const trxSuma = Math.abs(trx.suma);
+      const trxDataStr = extractDatePlati(trx.data_procesare);
+      const nameSimilarity = calculateNameSimilarity(trx.nume_contrapartida, factura.nume_emitent);
+
+      // 1. CUI Match (35 puncte)
+      const isCuiMatch = cuiMatch(trx.cui_contrapartida, factura.cif_emitent);
+      const isNameMatch = nameSimilarity >= 0.60;
+
+      if (isCuiMatch) {
+        score_cui = 35;
+        matchingReasons.push(`CUI: ${normalizeCUI(factura.cif_emitent)} (+35p)`);
+      } else if (nameSimilarity >= 0.85) {
+        score_cui = 35;
+        matchingReasons.push(`Nume: ${Math.round(nameSimilarity * 100)}% similar (+35p)`);
+      } else if (nameSimilarity >= 0.60) {
+        score_cui = Math.round(35 * 0.7);
+        matchingReasons.push(`Nume parțial: ${Math.round(nameSimilarity * 100)}% (+${score_cui}p)`);
+      }
+
+      // 2. Valoare Match (35 puncte)
+      if (facturaValoare > 0 && trxSuma > 0) {
+        const diferenta = Math.abs(trxSuma - facturaValoare);
+        const diferentaProcent = (diferenta / facturaValoare) * 100;
+
+        if (diferentaProcent <= 0.5) {
+          score_valoare = 35;
+          matchingReasons.push(`Sumă perfectă: ±${diferentaProcent.toFixed(2)}% (+35p)`);
+        } else if (diferentaProcent <= 1) {
+          score_valoare = Math.round(35 * 0.9);
+          matchingReasons.push(`Sumă foarte bună: ±${diferentaProcent.toFixed(2)}% (+${score_valoare}p)`);
+        } else if (diferentaProcent <= 2) {
+          score_valoare = Math.round(35 * 0.8);
+          matchingReasons.push(`Sumă bună: ±${diferentaProcent.toFixed(2)}% (+${score_valoare}p)`);
+        } else if (diferentaProcent <= 5) {
+          score_valoare = Math.round(35 * 0.6);
+          matchingReasons.push(`Sumă acceptabilă: ±${diferentaProcent.toFixed(2)}% (+${score_valoare}p)`);
+        } else if (diferentaProcent <= 10) {
+          score_valoare = Math.round(35 * 0.4);
+          matchingReasons.push(`Sumă marginală: ±${diferentaProcent.toFixed(2)}% (+${score_valoare}p)`);
+        }
+      }
+
+      // 3. Referință factură în detalii (20 puncte)
+      const referinte = extractReferinteFacturi(trx.detalii_tranzactie);
+      let referintaGasita: string | undefined;
+
+      for (const ref of referinte) {
+        if (referintaMatchesTarget(ref, factura.serie_numar || '')) {
+          score_referinta = 20;
+          referintaGasita = ref.serie ? `${ref.serie}-${ref.numar}` : ref.numar;
+          matchingReasons.push(`Referință: ${referintaGasita} (+20p)`);
+          break;
+        }
+      }
+
+      // 4. Data Match (10 puncte)
+      const zileDiferenta = daysDifference(trxDataStr, facturaDataStr || null);
+
+      if (zileDiferenta <= 7) {
+        score_data = 10;
+        matchingReasons.push(`Timing: ${zileDiferenta} zile (+10p)`);
+      } else if (zileDiferenta <= 14) {
+        score_data = 7;
+        matchingReasons.push(`Timing: ${zileDiferenta} zile (+7p)`);
+      } else if (zileDiferenta <= 30) {
+        score_data = 4;
+        matchingReasons.push(`Timing: ${zileDiferenta} zile (+4p)`);
+      }
+
+      // Calculează scor total (max 100)
+      const scoreTotal = Math.min(score_cui + score_valoare + score_referinta + score_data, 100);
+
+      // Filtrează după scor minim
+      if (scoreTotal >= minScore * 100) {
+        matches.push({
+          tranzactie_id: trx.id,
+          data_procesare: trxDataStr || '',
+          suma: trxSuma,
+          nume_contrapartida: trx.nume_contrapartida || '',
+          cui_contrapartida: trx.cui_contrapartida || '',
+          detalii_tranzactie: trx.detalii_tranzactie || '',
+          iban_contrapartida: trx.iban_contrapartida,
+          score_total: scoreTotal / 100, // Normalizăm la 0-1
+          score_cui,
+          score_valoare,
+          score_referinta,
+          score_data,
+          cui_match: isCuiMatch,
+          name_match: isNameMatch,
+          name_similarity: nameSimilarity,
+          referinta_gasita: referintaGasita,
+          matching_reasons: matchingReasons
+        });
+      }
+    }
+
+    // Sortează după scor descrescător
+    matches.sort((a, b) => b.score_total - a.score_total);
+
+    console.log(`📊 [findTranzactiiMatches] Match-uri tranzacții (score >= ${minScore * 100}%): ${matches.length}`);
+    if (matches.length > 0) {
+      console.log(`   Top match: ${matches[0].nume_contrapartida} - ${(matches[0].score_total * 100).toFixed(0)}% - ${matches[0].suma} RON`);
+    }
+
+    return matches;
+
+  } catch (error: any) {
+    console.error('❌ Eroare la căutare tranzacții:', error.message);
+    throw error;
+  }
 }

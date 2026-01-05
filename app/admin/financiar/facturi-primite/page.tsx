@@ -58,6 +58,27 @@ interface CheltuialaMatch {
   };
 }
 
+// Interface pentru tranzacții bancare match
+interface TranzactieMatch {
+  tranzactie_id: string;
+  data_procesare: string;
+  suma: number;
+  nume_contrapartida: string;
+  cui_contrapartida: string;
+  detalii_tranzactie: string;
+  iban_contrapartida?: string;
+  score_total: number;
+  score_cui: number;
+  score_valoare: number;
+  score_referinta: number;
+  score_data: number;
+  cui_match: boolean;
+  name_match: boolean;
+  name_similarity: number;
+  referinta_gasita?: string;
+  matching_reasons: string[];
+}
+
 interface FacturaDetalii {
   pdf?: string;
   factura: {
@@ -90,8 +111,10 @@ export default function FacturiPrimitePage() {
   const [associateModalOpen, setAssociateModalOpen] = useState(false);
   const [selectedFactura, setSelectedFactura] = useState<FacturaPrimita | null>(null);
   const [matchSuggestions, setMatchSuggestions] = useState<CheltuialaMatch[]>([]);
+  const [tranzactiiMatches, setTranzactiiMatches] = useState<TranzactieMatch[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [associating, setAssociating] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tranzactii' | 'cheltuieli'>('tranzactii');
 
   // Load config pentru sursa facturi primite
   useEffect(() => {
@@ -223,6 +246,8 @@ export default function FacturiPrimitePage() {
     setSelectedFactura(factura);
     setAssociateModalOpen(true);
     setMatchSuggestions([]);
+    setTranzactiiMatches([]);
+    setActiveTab('tranzactii'); // Default la tranzacții
     setLoadingMatches(true);
 
     try {
@@ -231,6 +256,12 @@ export default function FacturiPrimitePage() {
 
       if (data.success) {
         setMatchSuggestions(data.matches || []);
+        setTranzactiiMatches(data.tranzactii || []);
+
+        // Dacă nu avem tranzacții dar avem cheltuieli, switch la tab cheltuieli
+        if ((data.tranzactii?.length || 0) === 0 && (data.matches?.length || 0) > 0) {
+          setActiveTab('cheltuieli');
+        }
       } else {
         toast.error(data.error || 'Eroare la căutare sugestii');
       }
@@ -246,6 +277,8 @@ export default function FacturiPrimitePage() {
     setAssociateModalOpen(false);
     setSelectedFactura(null);
     setMatchSuggestions([]);
+    setTranzactiiMatches([]);
+    setActiveTab('tranzactii');
   }
 
   // Efectuează asocierea
@@ -558,120 +591,232 @@ export default function FacturiPrimitePage() {
                 </button>
               </div>
 
+              {/* Tabs */}
+              <div className="flex border-b border-white/10">
+                <button
+                  onClick={() => setActiveTab('tranzactii')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'tranzactii'
+                      ? 'text-blue-400 border-b-2 border-blue-400'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  Tranzacții Bancare ({tranzactiiMatches.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('cheltuieli')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'cheltuieli'
+                      ? 'text-blue-400 border-b-2 border-blue-400'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  Cheltuieli Proiecte ({matchSuggestions.length})
+                </button>
+              </div>
+
               {/* Content */}
               <div className="px-6 py-4 overflow-y-auto max-h-[60vh]">
                 {loadingMatches ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-                    <span className="ml-3 text-white/60">Se caută cheltuieli potrivite...</span>
+                    <span className="ml-3 text-white/60">Se caută potriviri...</span>
                   </div>
-                ) : matchSuggestions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Building2 className="w-12 h-12 text-white/30 mx-auto mb-4" />
-                    <p className="text-white/60">Nu au fost găsite cheltuieli potrivite</p>
-                    <p className="text-sm text-white/40 mt-2">
-                      Verificați dacă există o cheltuială înregistrată pentru acest furnizor (CUI: {selectedFactura.cif_emitent})
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-white/60 mb-4">
-                      {matchSuggestions.length} cheltuieli potrivite găsite. Selectați una pentru asociere:
-                    </p>
-                    {matchSuggestions.map((match) => {
-                      // Calculate score as percentage (0-100)
-                      const scorePercent = Math.round(match.score_total * 100);
+                ) : activeTab === 'tranzactii' ? (
+                  /* Tab Tranzacții Bancare */
+                  tranzactiiMatches.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Building2 className="w-12 h-12 text-white/30 mx-auto mb-4" />
+                      <p className="text-white/60">Nu au fost găsite tranzacții bancare potrivite</p>
+                      <p className="text-sm text-white/40 mt-2">
+                        Verificați dacă există o plată pentru acest furnizor (CUI: {selectedFactura.cif_emitent})
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-white/60 mb-4">
+                        {tranzactiiMatches.length} tranzacții bancare potrivite. Acestea pot fi asociate din pagina Propuneri Plăți.
+                      </p>
+                      {tranzactiiMatches.map((trx) => {
+                        const scorePercent = Math.round(trx.score_total * 100);
 
-                      // Build matching reasons from score components
-                      const matchingReasons: string[] = [];
-                      if (match.cui_match) matchingReasons.push('CUI potrivit');
-                      if (match.score_valoare > 0) matchingReasons.push('Valoare similară');
-                      if (match.score_data > 0) matchingReasons.push('Dată apropiată');
-                      if (match.numar_match) matchingReasons.push('Nr. factură potrivit');
+                        return (
+                          <div
+                            key={trx.tranzactie_id}
+                            className="bg-white/5 border border-white/10 rounded-lg p-4"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                {/* Score + Data */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(scorePercent)}`}>
+                                    {scorePercent}%
+                                  </span>
+                                  <span className="text-white/60 text-sm">
+                                    {trx.data_procesare ? new Date(trx.data_procesare).toLocaleDateString('ro-RO') : '-'}
+                                  </span>
+                                </div>
 
-                      return (
-                        <div
-                          key={match.cheltuiala_id}
-                          className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-4 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              {/* Proiect + Score */}
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(scorePercent)}`}>
-                                  {scorePercent}%
-                                </span>
-                                <span className="font-medium text-white">
-                                  {match.proiect_denumire}
-                                </span>
-                                {match.subproiect_denumire && (
-                                  <span className="text-white/60">/ {match.subproiect_denumire}</span>
+                                {/* Detalii tranzacție */}
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-white/50">Beneficiar:</span>{' '}
+                                    <span className="text-white">{trx.nume_contrapartida || 'N/A'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/50">CUI:</span>{' '}
+                                    <span className="text-white">{trx.cui_contrapartida || 'N/A'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/50">Sumă:</span>{' '}
+                                    <span className="text-white font-medium">
+                                      {trx.suma != null ? Number(trx.suma).toFixed(2) : '-'} RON
+                                    </span>
+                                  </div>
+                                  {trx.referinta_gasita && (
+                                    <div>
+                                      <span className="text-white/50">Referință:</span>{' '}
+                                      <span className="text-green-400">{trx.referinta_gasita}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Detalii tranzacție (prescurtat) */}
+                                {trx.detalii_tranzactie && (
+                                  <p className="text-xs text-white/40 mt-2 line-clamp-2">
+                                    {trx.detalii_tranzactie}
+                                  </p>
+                                )}
+
+                                {/* Matching reasons */}
+                                {trx.matching_reasons && trx.matching_reasons.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {trx.matching_reasons.slice(0, 4).map((reason, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs">
+                                        {reason}
+                                      </span>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Detalii cheltuială */}
-                              <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                  <span className="text-white/50">Furnizor:</span>{' '}
-                                  <span className="text-white">{match.cheltuiala?.furnizor_nume || 'N/A'}</span>
-                                </div>
-                                <div>
-                                  <span className="text-white/50">CUI:</span>{' '}
-                                  <span className="text-white">{match.cheltuiala?.furnizor_cui || 'N/A'}</span>
-                                </div>
-                                <div>
-                                  <span className="text-white/50">Valoare:</span>{' '}
-                                  <span className="text-white">
-                                    {match.cheltuiala?.valoare_ron != null
-                                      ? Number(match.cheltuiala.valoare_ron).toFixed(2)
-                                      : '-'} RON
+                              {/* Info - nu putem asocia direct, trebuie prin propuneri-plati */}
+                              <div className="text-right">
+                                <span className="text-xs text-white/40 block">
+                                  Folosiți Propuneri Plăți
+                                </span>
+                                <span className="text-xs text-white/40 block">
+                                  pentru asociere
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (
+                  /* Tab Cheltuieli Proiecte */
+                  matchSuggestions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Building2 className="w-12 h-12 text-white/30 mx-auto mb-4" />
+                      <p className="text-white/60">Nu au fost găsite cheltuieli potrivite</p>
+                      <p className="text-sm text-white/40 mt-2">
+                        Verificați dacă există o cheltuială înregistrată pentru acest furnizor (CUI: {selectedFactura.cif_emitent})
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-white/60 mb-4">
+                        {matchSuggestions.length} cheltuieli potrivite găsite. Selectați una pentru asociere:
+                      </p>
+                      {matchSuggestions.map((match) => {
+                        const scorePercent = Math.round(match.score_total * 100);
+                        const matchingReasons: string[] = [];
+                        if (match.cui_match) matchingReasons.push('CUI potrivit');
+                        if (match.score_valoare > 0) matchingReasons.push('Valoare similară');
+                        if (match.score_data > 0) matchingReasons.push('Dată apropiată');
+                        if (match.numar_match) matchingReasons.push('Nr. factură potrivit');
+
+                        return (
+                          <div
+                            key={match.cheltuiala_id}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-4 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getScoreBadge(scorePercent)}`}>
+                                    {scorePercent}%
                                   </span>
-                                </div>
-                                <div>
-                                  <span className="text-white/50">Status:</span>{' '}
-                                  <span className={`${match.cheltuiala?.status_achitare === 'Incasat' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                    {match.cheltuiala?.status_achitare || 'N/A'}
+                                  <span className="font-medium text-white">
+                                    {match.proiect_denumire}
                                   </span>
+                                  {match.subproiect_denumire && (
+                                    <span className="text-white/60">/ {match.subproiect_denumire}</span>
+                                  )}
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-white/50">Furnizor:</span>{' '}
+                                    <span className="text-white">{match.cheltuiala?.furnizor_nume || 'N/A'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/50">CUI:</span>{' '}
+                                    <span className="text-white">{match.cheltuiala?.furnizor_cui || 'N/A'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/50">Valoare:</span>{' '}
+                                    <span className="text-white">
+                                      {match.cheltuiala?.valoare_ron != null
+                                        ? Number(match.cheltuiala.valoare_ron).toFixed(2)
+                                        : '-'} RON
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-white/50">Status:</span>{' '}
+                                    <span className={`${match.cheltuiala?.status_achitare === 'Incasat' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                      {match.cheltuiala?.status_achitare || 'N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {match.cheltuiala?.descriere && (
+                                  <p className="text-xs text-white/50 mt-2 line-clamp-2">
+                                    {match.cheltuiala.descriere}
+                                  </p>
+                                )}
+
+                                {matchingReasons.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {matchingReasons.slice(0, 3).map((reason, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
+                                        {reason}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
 
-                              {/* Descriere */}
-                              {match.cheltuiala?.descriere && (
-                                <p className="text-xs text-white/50 mt-2 line-clamp-2">
-                                  {match.cheltuiala.descriere}
-                                </p>
-                              )}
-
-                              {/* Matching reasons */}
-                              {matchingReasons.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {matchingReasons.slice(0, 3).map((reason, idx) => (
-                                    <span key={idx} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">
-                                      {reason}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                              <button
+                                onClick={() => handleAssociate(match.cheltuiala_id)}
+                                disabled={associating}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                              >
+                                {associating ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-4 h-4" />
+                                )}
+                                Asociază
+                              </button>
                             </div>
-
-                            {/* Buton asociere */}
-                            <button
-                              onClick={() => handleAssociate(match.cheltuiala_id)}
-                              disabled={associating}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
-                            >
-                              {associating ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <CheckCircle className="w-4 h-4" />
-                              )}
-                              Asociază
-                            </button>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
 

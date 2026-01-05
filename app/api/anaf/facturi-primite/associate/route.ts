@@ -1,11 +1,11 @@
 // =====================================================
-// API: Asociere Manuală Factură → Cheltuială
+// API: Asociere Manuală Factură → Cheltuială / Tranzacție
 // URL: POST /api/anaf/facturi-primite/associate
-// Data: 08.10.2025
+// Data: 08.10.2025 (Updated: 2026-01-05)
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { manualAssociate, findMatches } from '@/lib/facturi-primite-matcher';
+import { manualAssociate, findMatches, findTranzactiiMatches } from '@/lib/facturi-primite-matcher';
 import type { AssociateInvoiceRequest } from '@/lib/facturi-primite-types';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET /api/anaf/facturi-primite/associate?factura_id=xxx
- * Returnează sugestii de match-uri pentru o factură
+ * Returnează sugestii de match-uri pentru o factură (cheltuieli + tranzacții)
  */
 export async function GET(req: NextRequest) {
   try {
@@ -99,12 +99,21 @@ export async function GET(req: NextRequest) {
 
     const factura = rows[0];
 
-    // Găsește match-uri (threshold 50%)
-    const matches = await findMatches(factura, 0.5);
+    // Găsește match-uri în paralel (threshold 50%)
+    const [cheltuieliMatches, tranzactiiMatches] = await Promise.all([
+      findMatches(factura, 0.5),
+      findTranzactiiMatches(factura, 0.5)
+    ]);
 
     return NextResponse.json({
       success: true,
-      matches,
+      matches: cheltuieliMatches, // Pentru compatibilitate cu UI-ul existent
+      tranzactii: tranzactiiMatches, // Nou: tranzacții bancare găsite
+      summary: {
+        cheltuieli_count: cheltuieliMatches.length,
+        tranzactii_count: tranzactiiMatches.length,
+        total_matches: cheltuieliMatches.length + tranzactiiMatches.length
+      }
     });
 
   } catch (error: any) {
