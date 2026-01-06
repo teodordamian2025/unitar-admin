@@ -25,6 +25,7 @@ interface SarciniProiectModalProps {
     Status: string;
     tip?: 'proiect' | 'subproiect';
   };
+  defaultTab?: 'sarcini' | 'comentarii' | 'timetracking';  // ✅ NOU: Tab inițial opțional
 }
 
 interface Sarcina {
@@ -125,8 +126,8 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
-export default function SarciniProiectModal({ isOpen, onClose, proiect }: SarciniProiectModalProps) {
-  const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('sarcini');
+export default function SarciniProiectModal({ isOpen, onClose, proiect, defaultTab = 'sarcini' }: SarciniProiectModalProps) {
+  const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>(defaultTab);
   const [loading, setLoading] = useState(false);
   
   // Hook Firebase pentru utilizatorul autentificat
@@ -256,6 +257,13 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect }: Sarcin
       </div>
     );
   };
+  // ✅ NOU: Sincronizare activeTab cu defaultTab când se deschide modalul
+  useEffect(() => {
+    if (isOpen && defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [isOpen, defaultTab]);
+
   useEffect(() => {
     if (isOpen) {
       loadData();

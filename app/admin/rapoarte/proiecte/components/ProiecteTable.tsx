@@ -15,6 +15,7 @@ import SubproiectModal from './SubproiectModal';
 import ProiectEditModal from './ProiectEditModal';
 import ContractModal from './ContractModal';
 import ProcesVerbalModal from './ProcesVerbalModal';  // ✅ NOU: Import ProcesVerbalModal
+import SarciniProiectModal from './SarciniProiectModal';  // ✅ NOU: Import pentru comentarii
 
 // Interfețe PĂSTRATE identic
 interface Proiect {
@@ -39,6 +40,14 @@ interface Proiect {
   Adresa?: string;
   Descriere?: string;
   Observatii?: string;
+  // Comentarii info
+  comentarii_count?: number;
+  ultimul_comentariu_data?: string;
+  ultim_comentariu?: {
+    autor_nume: string;
+    comentariu: string;
+    data_comentariu: string | { value: string };
+  };
 }
 
 interface Subproiect {
@@ -203,7 +212,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [selectedProiect, setSelectedProiect] = useState<any>(null);
   const [showContractModal, setShowContractModal] = useState(false);
   const [showPVModal, setShowPVModal] = useState(false);  // ✅ NOU: State pentru PV Modal
-  
+  const [showComentariiModal, setShowComentariiModal] = useState(false);  // ✅ NOU: State pentru Comentarii Modal
+  const [comentariiDefaultTab, setComentariiDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('comentarii');
+
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   // Toate useEffect-urile - PĂSTRATE identic + reset paginare la schimbarea filtrelor
@@ -582,6 +593,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   // ✅ NOU: Handler pentru PV Close
   const handleClosePVModal = () => {
     setShowPVModal(false);
+    setSelectedProiect(null);
+  };
+
+  // ✅ NOU: Handler pentru Comentarii Modal
+  const handleShowComentariiModal = (proiect: any) => {
+    setSelectedProiect(proiect);
+    setComentariiDefaultTab('comentarii');
+    setShowComentariiModal(true);
+  };
+
+  const handleCloseComentariiModal = () => {
+    setShowComentariiModal(false);
     setSelectedProiect(null);
   };
 
@@ -1186,6 +1209,17 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
+                    💬 Comentarii
+                  </th>
+                  <th style={{
+                    padding: '1rem 0.75rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
                     Acțiuni
                   </th>
                 </tr>
@@ -1450,6 +1484,114 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             );
                           })()}
                         </td>
+                        {/* ✅ NOU: Coloana Comentarii */}
+                        <td style={{
+                          padding: '0.75rem',
+                          textAlign: 'center'
+                        }}>
+                          {(() => {
+                            const count = proiect.comentarii_count || 0;
+                            const ultimComentariu = proiect.ultim_comentariu;
+
+                            if (count === 0) {
+                              return (
+                                <button
+                                  onClick={() => handleShowComentariiModal(proiect)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px dashed #bdc3c7',
+                                    borderRadius: '12px',
+                                    padding: '0.5rem 0.75rem',
+                                    cursor: 'pointer',
+                                    color: '#95a5a6',
+                                    fontSize: '12px',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  title="Adaugă comentariu"
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.borderColor = '#3498db';
+                                    e.currentTarget.style.color = '#3498db';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.borderColor = '#bdc3c7';
+                                    e.currentTarget.style.color = '#95a5a6';
+                                  }}
+                                >
+                                  + Adaugă
+                                </button>
+                              );
+                            }
+
+                            // Formatează data ultimului comentariu
+                            let dataFormatata = '';
+                            if (ultimComentariu?.data_comentariu) {
+                              const dataStr = typeof ultimComentariu.data_comentariu === 'object'
+                                ? ultimComentariu.data_comentariu.value
+                                : ultimComentariu.data_comentariu;
+                              try {
+                                const data = new Date(dataStr);
+                                if (!isNaN(data.getTime())) {
+                                  dataFormatata = data.toLocaleDateString('ro-RO', {
+                                    day: '2-digit',
+                                    month: 'short'
+                                  });
+                                }
+                              } catch (e) { /* ignore */ }
+                            }
+
+                            // Truncează comentariul pentru tooltip
+                            const comentariuPreview = ultimComentariu?.comentariu
+                              ? (ultimComentariu.comentariu.length > 100
+                                  ? ultimComentariu.comentariu.substring(0, 100) + '...'
+                                  : ultimComentariu.comentariu)
+                              : '';
+
+                            const tooltipText = ultimComentariu
+                              ? `${ultimComentariu.autor_nume}${dataFormatata ? ` (${dataFormatata})` : ''}: ${comentariuPreview}`
+                              : `${count} comentarii`;
+
+                            return (
+                              <button
+                                onClick={() => handleShowComentariiModal(proiect)}
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)',
+                                  border: '1px solid rgba(52, 152, 219, 0.3)',
+                                  borderRadius: '12px',
+                                  padding: '0.5rem 0.75rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                title={tooltipText}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(52, 152, 219, 0.2) 0%, rgba(52, 152, 219, 0.1) 100%)';
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              >
+                                <span style={{
+                                  fontSize: '14px'
+                                }}>
+                                  💬
+                                </span>
+                                <span style={{
+                                  fontSize: '13px',
+                                  fontWeight: '600',
+                                  color: '#3498db'
+                                }}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })()}
+                        </td>
                         <td style={{
                           padding: '0.75rem',
                           textAlign: 'center' as const
@@ -1571,11 +1713,47 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               -
                             </span>
                           </td>
+                          {/* ✅ NOU: Coloana Comentarii pentru subproiecte */}
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center'
+                          }}>
+                            <button
+                              onClick={() => handleShowComentariiModal({
+                                ID_Proiect: subproiect.ID_Subproiect,
+                                Denumire: subproiect.Denumire,
+                                Client: subproiect.Client || proiect.Client,
+                                Status: subproiect.Status,
+                                tip: 'subproiect' as const
+                              })}
+                              style={{
+                                background: 'transparent',
+                                border: '1px dashed rgba(52, 152, 219, 0.3)',
+                                borderRadius: '10px',
+                                padding: '0.3rem 0.6rem',
+                                cursor: 'pointer',
+                                color: '#7f8c8d',
+                                fontSize: '11px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              title="Vezi comentarii subproiect"
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.borderColor = '#3498db';
+                                e.currentTarget.style.color = '#3498db';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(52, 152, 219, 0.3)';
+                                e.currentTarget.style.color = '#7f8c8d';
+                              }}
+                            >
+                              💬 Vezi
+                            </button>
+                          </td>
                           <td style={{
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center' as const
                           }}>
-                            <ProiectActions 
+                            <ProiectActions
                               proiect={{
                                 ID_Proiect: subproiect.ID_Subproiect,
                                 Denumire: subproiect.Denumire,
@@ -1907,6 +2085,18 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
             isOpen={showPVModal}
             onClose={handleClosePVModal}
             onSuccess={handlePVSuccess}
+          />
+        </div>
+      )}
+
+      {/* ✅ NOU: Modal pentru Comentarii - deschide direct pe tab-ul comentarii */}
+      {showComentariiModal && selectedProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <SarciniProiectModal
+            proiect={selectedProiect}
+            isOpen={showComentariiModal}
+            onClose={handleCloseComentariiModal}
+            defaultTab={comentariiDefaultTab}
           />
         </div>
       )}

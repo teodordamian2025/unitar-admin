@@ -146,8 +146,22 @@ export async function GET(request: NextRequest) {
 
     // FIX CRITICAL: Query cu JOIN pentru datele clientului + contracte + facturi directe
     // MODIFICAT 16.12.2025: Adăugat CTE pentru facturi directe (tip_etapa = 'factura_directa')
+    // MODIFICAT 06.01.2026: Adăugat CTE pentru count comentarii per proiect
     let baseQuery = `
-      WITH contracte_cu_anexe AS (
+      WITH comentarii_count AS (
+        SELECT
+          proiect_id,
+          COUNT(*) as total_comentarii,
+          MAX(data_comentariu) as ultimul_comentariu_data,
+          ARRAY_AGG(
+            STRUCT(autor_nume, comentariu, data_comentariu)
+            ORDER BY data_comentariu DESC
+            LIMIT 1
+          )[SAFE_OFFSET(0)] as ultim_comentariu
+        FROM \`${PROJECT_ID}.${dataset}.ProiectComentarii${tableSuffix}\`
+        GROUP BY proiect_id
+      ),
+      contracte_cu_anexe AS (
         SELECT
           co.proiect_id,
           co.ID_Contract,
@@ -239,7 +253,11 @@ export async function GET(request: NextRequest) {
         c.banca as client_banca,
         c.iban as client_iban,
         COALESCE(pcc.contracte, []) as contracte,
-        COALESCE(fd.facturi, []) as facturi_directe
+        COALESCE(fd.facturi, []) as facturi_directe,
+        -- Comentarii info
+        COALESCE(cc.total_comentarii, 0) as comentarii_count,
+        cc.ultimul_comentariu_data,
+        cc.ultim_comentariu
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
       LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
@@ -247,6 +265,8 @@ export async function GET(request: NextRequest) {
         ON pcc.ID_Proiect = p.ID_Proiect
       LEFT JOIN facturi_directe fd
         ON fd.proiect_id = p.ID_Proiect
+      LEFT JOIN comentarii_count cc
+        ON cc.proiect_id = p.ID_Proiect
     `;
 
     const conditions: string[] = [];

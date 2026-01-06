@@ -178,6 +178,94 @@ export async function POST(request: NextRequest) {
 
     console.log(`Comentariu ${id} adăugat cu succes pentru proiectul ${proiect_id}`);
 
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare către responsabilii proiectului
+    try {
+      // 1. Determină tabelul corect în funcție de tip_proiect
+      const isSubproiect = tip_proiect === 'subproiect';
+      const tableProiecte = isSubproiect ? `Subproiecte${tableSuffix}` : `Proiecte${tableSuffix}`;
+      const idColumn = isSubproiect ? 'ID_Subproiect' : 'ID_Proiect';
+
+      // 2. Caută responsabilul și denumirea proiectului
+      const proiectQuery = `
+        SELECT Responsabil, Denumire
+        FROM \`${PROJECT_ID}.${DATASET}.${tableProiecte}\`
+        WHERE ${idColumn} = @proiect_id
+        LIMIT 1
+      `;
+
+      const [proiectRows] = await bigquery.query({
+        query: proiectQuery,
+        params: { proiect_id },
+        location: 'EU',
+      });
+
+      if (proiectRows.length > 0) {
+        const proiectData = proiectRows[0];
+        const responsabilNume = proiectData.Responsabil;
+        const proiectDenumire = proiectData.Denumire;
+
+        // 3. Găsește UID-ul responsabilului din Utilizatori
+        if (responsabilNume) {
+          const tableUtilizatori = `Utilizatori${tableSuffix}`;
+          const utilizatorQuery = `
+            SELECT uid, nume, prenume, email
+            FROM \`${PROJECT_ID}.${DATASET}.${tableUtilizatori}\`
+            WHERE CONCAT(nume, ' ', prenume) = @responsabil
+              OR CONCAT(prenume, ' ', nume) = @responsabil
+              OR nume = @responsabil
+              OR prenume = @responsabil
+            LIMIT 1
+          `;
+
+          const [utilizatorRows] = await bigquery.query({
+            query: utilizatorQuery,
+            params: { responsabil: responsabilNume },
+            location: 'EU',
+          });
+
+          if (utilizatorRows.length > 0) {
+            const responsabilUser = utilizatorRows[0];
+
+            // 4. Nu trimite notificare dacă responsabilul este autorul comentariului
+            if (responsabilUser.uid !== autor_uid) {
+              // Construiește URL-ul pentru notificare
+              const baseUrl = request.url.split('/api/')[0];
+
+              const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  tip_notificare: 'comentariu_nou',
+                  user_id: responsabilUser.uid,
+                  context: {
+                    proiect_id: proiect_id,
+                    proiect_denumire: proiectDenumire,
+                    sarcina_titlu: proiectDenumire, // Template-ul folosește sarcina_titlu
+                    comentator_name: autor_nume,
+                    comentariu_text: comentariu.length > 200 ? comentariu.substring(0, 200) + '...' : comentariu,
+                    tip_comentariu: tip_comentariu,
+                    user_name: `${responsabilUser.nume} ${responsabilUser.prenume}`,
+                    user_prenume: responsabilUser.prenume,
+                    link_detalii: `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
+                  }
+                })
+              });
+
+              const notifyResult = await notifyResponse.json();
+              console.log(`✅ Notificare comentariu trimisă către UID: ${responsabilUser.uid}`, notifyResult);
+            } else {
+              console.log(`⏭️ Skip notificare - autorul comentariului este și responsabilul proiectului`);
+            }
+          } else {
+            console.warn(`⚠️ Nu s-a găsit utilizator cu numele "${responsabilNume}" în Utilizatori`);
+          }
+        }
+      }
+    } catch (notifyError) {
+      console.error('⚠️ Eroare la trimitere notificare comentariu (non-blocking):', notifyError);
+      // Nu blocăm adăugarea comentariului dacă notificarea eșuează
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Comentariu adăugat cu succes',
@@ -186,7 +274,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Eroare la adăugarea comentariului:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: false,
       error: 'Eroare la adăugarea comentariului',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
