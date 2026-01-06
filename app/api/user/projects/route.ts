@@ -103,7 +103,21 @@ export async function GET(request: NextRequest) {
     console.log('📋 USER PROJECTS API PARAMS:', { search, status, client, page, limit });
 
     // Query pentru utilizatori normali - FĂRĂ date financiare
+    // MODIFICAT 06.01.2026: Adăugat CTE pentru count comentarii per proiect
     let baseQuery = `
+      WITH comentarii_count AS (
+        SELECT
+          proiect_id,
+          COUNT(*) as total_comentarii,
+          MAX(data_comentariu) as ultimul_comentariu_data,
+          ARRAY_AGG(
+            STRUCT(autor_nume, comentariu, data_comentariu)
+            ORDER BY data_comentariu DESC
+            LIMIT 1
+          )[SAFE_OFFSET(0)] as ultim_comentariu
+        FROM \`${PROJECT_ID}.${DATASET}.ProiectComentarii${tableSuffix}\`
+        GROUP BY proiect_id
+      )
       SELECT
         p.ID_Proiect,
         p.Denumire,
@@ -124,10 +138,16 @@ export async function GET(request: NextRequest) {
         c.cui as client_cui,
         c.adresa as client_adresa,
         c.telefon as client_telefon,
-        c.email as client_email
+        c.email as client_email,
+        -- Comentarii info
+        COALESCE(cc.total_comentarii, 0) as comentarii_count,
+        cc.ultimul_comentariu_data,
+        cc.ultim_comentariu
       FROM ${TABLE_PROIECTE} p
       LEFT JOIN ${TABLE_CLIENTI} c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
+      LEFT JOIN comentarii_count cc
+        ON cc.proiect_id = p.ID_Proiect
     `;
 
     const conditions: string[] = [];
@@ -359,6 +379,10 @@ export async function GET(request: NextRequest) {
       client_adresa: row.client_adresa,
       client_telefon: row.client_telefon,
       client_email: row.client_email,
+      // Comentarii info
+      comentarii_count: convertBigQueryNumeric(row.comentarii_count) || 0,
+      ultimul_comentariu_data: row.ultimul_comentariu_data,
+      ultim_comentariu: row.ultim_comentariu,
       // Pentru compatibilitate UI - setează implicit 0 RON
       Valoare_Estimata: 0,
       valoare_ron: 0,

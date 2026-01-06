@@ -10,6 +10,8 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
 import UserSarciniProiectModal from './UserSarciniProiectModal';
 
 interface Project {
@@ -30,6 +32,14 @@ interface Project {
   client_cui?: string;
   client_telefon?: string;
   client_email?: string;
+  // Comentarii info
+  comentarii_count?: number;
+  ultimul_comentariu_data?: string;
+  ultim_comentariu?: {
+    autor_nume: string;
+    comentariu: string;
+    data_comentariu: string | { value: string };
+  };
 }
 
 interface Subproject {
@@ -73,6 +83,9 @@ const getStatusIcon = (status: string): string => {
 
 export default function UserProjectsTable({ searchParams }: UserProjectsTableProps) {
   const router = useRouter();
+  // ✅ Firebase Auth pentru user curent
+  const [user] = useAuthState(auth);
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [subprojects, setSubprojects] = useState<Subproject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +93,12 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [showSarciniModal, setShowSarciniModal] = useState(false);
   const [selectedProiectForSarcini, setSelectedProiectForSarcini] = useState<any>(null);
+  const [showComentariiModal, setShowComentariiModal] = useState(false);
+  const [selectedProiectForComentarii, setSelectedProiectForComentarii] = useState<any>(null);
+
+  // ✅ NOU: State pentru comentarii necitite per proiect
+  const [necititePerProiect, setNecititePerProiect] = useState<Record<string, number>>({});
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -90,6 +109,27 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
   useEffect(() => {
     loadProjects();
   }, [searchParams]);
+
+  // ✅ NOU: Preluare comentarii necitite când se încarcă proiectele sau user-ul se schimbă
+  useEffect(() => {
+    const loadNecitite = async () => {
+      if (!user?.uid || projects.length === 0) return;
+
+      try {
+        const response = await fetch(`/api/comentarii/mark-read?user_id=${user.uid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setNecititePerProiect(data.data.necitite_per_proiect || {});
+          }
+        }
+      } catch (error) {
+        console.error('Eroare la preluarea comentariilor necitite:', error);
+      }
+    };
+
+    loadNecitite();
+  }, [user?.uid, projects.length]);
 
   const loadProjects = async () => {
     try {
@@ -203,6 +243,35 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
   const handleOpenSarcini = (proiectData: any) => {
     setSelectedProiectForSarcini(proiectData);
     setShowSarciniModal(true);
+  };
+
+  // ✅ NOU: Handler pentru modalul de comentarii - marchează comentariile ca citite
+  const handleOpenComentarii = async (proiectData: any) => {
+    setSelectedProiectForComentarii(proiectData);
+    setShowComentariiModal(true);
+
+    // Marchează comentariile ca citite când se deschide modalul
+    if (user?.uid && proiectData.ID_Proiect) {
+      try {
+        await fetch('/api/comentarii/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.uid,
+            proiect_id: proiectData.ID_Proiect
+          })
+        });
+
+        // Actualizează local count-ul de necitite
+        setNecititePerProiect(prev => {
+          const newState = { ...prev };
+          delete newState[proiectData.ID_Proiect];
+          return newState;
+        });
+      } catch (error) {
+        console.error('Eroare la marcarea comentariilor ca citite:', error);
+      }
+    }
   };
 
   const handleNavigateToDetails = (projectId: string) => {
@@ -443,6 +512,7 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
               <th style={thStyle}>Data Final</th>
               <th style={thStyle}>Status</th>
               <th style={thStyle}>Predare</th>
+              <th style={{...thStyle, textAlign: 'center'}}>💬 Comentarii</th>
               <th style={thStyle}>Acțiuni</th>
             </tr>
           </thead>
@@ -568,6 +638,158 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                     </td>
                     <td style={tdStyle}>
                       {getStatusPredare(project.status_predare || 'Nepredat')}
+                    </td>
+                    {/* ✅ NOU: Coloana Comentarii cu badge necitite */}
+                    <td style={{...tdStyle, textAlign: 'center'}}>
+                      {(() => {
+                        const count = project.comentarii_count || 0;
+                        const necitite = necititePerProiect[project.ID_Proiect] || 0;
+                        const ultimComentariu = project.ultim_comentariu;
+
+                        if (count === 0) {
+                          return (
+                            <button
+                              onClick={() => handleOpenComentarii({
+                                ID_Proiect: project.ID_Proiect,
+                                Denumire: project.Denumire,
+                                Client: project.Client,
+                                Status: project.Status,
+                                tip: 'proiect'
+                              })}
+                              style={{
+                                background: 'transparent',
+                                border: '1px dashed #bdc3c7',
+                                borderRadius: '12px',
+                                padding: '0.5rem 0.75rem',
+                                cursor: 'pointer',
+                                color: '#95a5a6',
+                                fontSize: '12px',
+                                transition: 'all 0.2s ease'
+                              }}
+                              title="Adaugă comentariu"
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.borderColor = '#3498db';
+                                e.currentTarget.style.color = '#3498db';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.borderColor = '#bdc3c7';
+                                e.currentTarget.style.color = '#95a5a6';
+                              }}
+                            >
+                              + Adaugă
+                            </button>
+                          );
+                        }
+
+                        // Formatează data ultimului comentariu
+                        let dataFormatata = '';
+                        if (ultimComentariu?.data_comentariu) {
+                          const dataStr = typeof ultimComentariu.data_comentariu === 'object'
+                            ? ultimComentariu.data_comentariu.value
+                            : ultimComentariu.data_comentariu;
+                          try {
+                            const data = new Date(dataStr);
+                            if (!isNaN(data.getTime())) {
+                              dataFormatata = data.toLocaleDateString('ro-RO', {
+                                day: '2-digit',
+                                month: 'short'
+                              });
+                            }
+                          } catch (e) { /* ignore */ }
+                        }
+
+                        // Truncează comentariul pentru tooltip
+                        const comentariuPreview = ultimComentariu?.comentariu
+                          ? (ultimComentariu.comentariu.length > 100
+                              ? ultimComentariu.comentariu.substring(0, 100) + '...'
+                              : ultimComentariu.comentariu)
+                          : '';
+
+                        const tooltipText = necitite > 0
+                          ? `${necitite} comentarii necitite! ${ultimComentariu ? `Ultimul: ${ultimComentariu.autor_nume}` : ''}`
+                          : ultimComentariu
+                            ? `${ultimComentariu.autor_nume}${dataFormatata ? ` (${dataFormatata})` : ''}: ${comentariuPreview}`
+                            : `${count} comentarii`;
+
+                        // Dacă sunt comentarii necitite, afișează cu stil roșu/evidențiat
+                        const hasUnread = necitite > 0;
+
+                        return (
+                          <button
+                            onClick={() => handleOpenComentarii({
+                              ID_Proiect: project.ID_Proiect,
+                              Denumire: project.Denumire,
+                              Client: project.Client,
+                              Status: project.Status,
+                              tip: 'proiect'
+                            })}
+                            style={{
+                              background: hasUnread
+                                ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.15) 0%, rgba(231, 76, 60, 0.08) 100%)'
+                                : 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)',
+                              border: hasUnread
+                                ? '1px solid rgba(231, 76, 60, 0.4)'
+                                : '1px solid rgba(52, 152, 219, 0.3)',
+                              borderRadius: '12px',
+                              padding: '0.5rem 0.75rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              transition: 'all 0.2s ease',
+                              position: 'relative' as const
+                            }}
+                            title={tooltipText}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = hasUnread
+                                ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.25) 0%, rgba(231, 76, 60, 0.15) 100%)'
+                                : 'linear-gradient(135deg, rgba(52, 152, 219, 0.2) 0%, rgba(52, 152, 219, 0.1) 100%)';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = hasUnread
+                                ? '0 4px 12px rgba(231, 76, 60, 0.3)'
+                                : '0 4px 12px rgba(52, 152, 219, 0.2)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = hasUnread
+                                ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.15) 0%, rgba(231, 76, 60, 0.08) 100%)'
+                                : 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            <span style={{ fontSize: '14px' }}>💬</span>
+                            <span style={{
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              color: hasUnread ? '#e74c3c' : '#3498db'
+                            }}>
+                              {count}
+                            </span>
+                            {/* Badge roșu pentru necitite */}
+                            {hasUnread && (
+                              <span style={{
+                                position: 'absolute' as const,
+                                top: '-6px',
+                                right: '-6px',
+                                background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                                color: 'white',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                minWidth: '18px',
+                                height: '18px',
+                                borderRadius: '9px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 6px rgba(231, 76, 60, 0.4)',
+                                animation: 'pulse 2s infinite'
+                              }}>
+                                {necitite}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </td>
                     <td style={tdStyle}>
                       <button
@@ -715,6 +937,42 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                           {subproject.status_predare === 'Predat' ? '📦' : '⏳'} {subproject.status_predare || 'Nepredat'}
                         </span>
                       </td>
+                      {/* ✅ NOU: Coloana Comentarii pentru subproiecte */}
+                      <td style={{
+                        padding: '0.5rem 0.75rem',
+                        textAlign: 'center'
+                      }}>
+                        <button
+                          onClick={() => handleOpenComentarii({
+                            ID_Proiect: subproject.ID_Subproiect,
+                            Denumire: subproject.Denumire,
+                            Client: subproject.Client || project.Client,
+                            Status: subproject.Status,
+                            tip: 'subproiect'
+                          })}
+                          style={{
+                            background: 'transparent',
+                            border: '1px dashed #bdc3c7',
+                            borderRadius: '10px',
+                            padding: '0.3rem 0.6rem',
+                            cursor: 'pointer',
+                            color: '#95a5a6',
+                            fontSize: '11px',
+                            transition: 'all 0.2s ease'
+                          }}
+                          title="Adaugă comentariu la subproiect"
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = '#3498db';
+                            e.currentTarget.style.color = '#3498db';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = '#bdc3c7';
+                            e.currentTarget.style.color = '#95a5a6';
+                          }}
+                        >
+                          + Adaugă
+                        </button>
+                      </td>
                       <td style={{
                         padding: '0.5rem 0.75rem'
                       }}>
@@ -805,6 +1063,19 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
             setSelectedProiectForSarcini(null);
           }}
           proiect={selectedProiectForSarcini}
+        />
+      )}
+
+      {/* ✅ NOU: Modal pentru comentarii - deschide direct pe tab-ul comentarii */}
+      {showComentariiModal && selectedProiectForComentarii && (
+        <UserSarciniProiectModal
+          isOpen={showComentariiModal}
+          onClose={() => {
+            setShowComentariiModal(false);
+            setSelectedProiectForComentarii(null);
+          }}
+          proiect={selectedProiectForComentarii}
+          defaultTab="comentarii"
         />
       )}
     </div>

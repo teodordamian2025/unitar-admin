@@ -80,6 +80,7 @@ interface UserSarciniProiectModalProps {
   isOpen: boolean;
   onClose: () => void;
   proiect: ProiectData;
+  defaultTab?: 'sarcini' | 'comentarii' | 'timetracking';  // ✅ NOU: Tab inițial opțional
 }
 
 // Progress Bar Component - IDENTIC cu admin
@@ -110,9 +111,9 @@ const ProgressBar: React.FC<{ procent: number }> = ({ procent }) => {
   );
 };
 
-export default function UserSarciniProiectModal({ isOpen, onClose, proiect }: UserSarciniProiectModalProps) {
+export default function UserSarciniProiectModal({ isOpen, onClose, proiect, defaultTab = 'sarcini' }: UserSarciniProiectModalProps) {
   const [user, firebaseLoading, firebaseError] = useAuthState(auth);
-  const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('sarcini');
+  const [activeTab, setActiveTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>(defaultTab);
   const [loading, setLoading] = useState(false);
   const [utilizatorCurent, setUtilizatorCurent] = useState<UtilizatorCurent | null>(null);
   const [loadingUtilizator, setLoadingUtilizator] = useState(true);
@@ -132,6 +133,13 @@ export default function UserSarciniProiectModal({ isOpen, onClose, proiect }: Us
   // States pentru timetracking
   const [timeTracking, setTimeTracking] = useState<TimeTrackingEntry[]>([]);
   const [showTimeModal, setShowTimeModal] = useState(false);
+
+  // ✅ NOU: Sincronizare activeTab cu defaultTab când se deschide modalul
+  useEffect(() => {
+    if (isOpen && defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [isOpen, defaultTab]);
 
   useEffect(() => {
     if (isOpen && user) {

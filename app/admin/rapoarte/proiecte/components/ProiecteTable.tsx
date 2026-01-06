@@ -8,6 +8,8 @@
 'use client';
 
 import { useState, useEffect, Fragment } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/lib/firebaseConfig';
 import ProiectActions from './ProiectActions';
 import ProiectNouModal from './ProiectNouModal';
 import FacturaHibridModal from './FacturaHibridModal';
@@ -188,6 +190,9 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 };
 
 export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
+  // ✅ Firebase Auth pentru user curent
+  const [user] = useAuthState(auth);
+
   // State variables - PĂSTRATE identic + ADĂUGAT state pentru PV + PAGINARE
   const [proiecte, setProiecte] = useState<Proiect[]>([]);
   const [subproiecte, setSubproiecte] = useState<Subproiect[]>([]);
@@ -201,10 +206,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     total: 0,
     totalPages: 0
   });
-  
+
   const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
   const [loadingCursuri, setLoadingCursuri] = useState(false);
-  
+
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showSubproiectModal, setShowSubproiectModal] = useState(false);
@@ -215,6 +220,9 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
   const [showComentariiModal, setShowComentariiModal] = useState(false);  // ✅ NOU: State pentru Comentarii Modal
   const [comentariiDefaultTab, setComentariiDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('comentarii');
 
+  // ✅ NOU: State pentru comentarii necitite per proiect
+  const [necititePerProiect, setNecititePerProiect] = useState<Record<string, number>>({});
+
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   // Toate useEffect-urile - PĂSTRATE identic + reset paginare la schimbarea filtrelor
@@ -223,6 +231,27 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     setPagination(prev => ({ ...prev, page: 1 }));
     loadData();
   }, [searchParams, refreshTrigger]);
+
+  // ✅ NOU: Preluare comentarii necitite când se încarcă proiectele sau user-ul se schimbă
+  useEffect(() => {
+    const loadNecitite = async () => {
+      if (!user?.uid || proiecte.length === 0) return;
+
+      try {
+        const response = await fetch(`/api/comentarii/mark-read?user_id=${user.uid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setNecititePerProiect(data.data.necitite_per_proiect || {});
+          }
+        }
+      } catch (error) {
+        console.error('Eroare la preluarea comentariilor necitite:', error);
+      }
+    };
+
+    loadNecitite();
+  }, [user?.uid, proiecte.length, refreshTrigger]);
 
   useEffect(() => {
     if (proiecte.length > 0 && subproiecte.length > 0) {
@@ -596,11 +625,34 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     setSelectedProiect(null);
   };
 
-  // ✅ NOU: Handler pentru Comentarii Modal
-  const handleShowComentariiModal = (proiect: any) => {
+  // ✅ NOU: Handler pentru Comentarii Modal - marchează comentariile ca citite
+  const handleShowComentariiModal = async (proiect: any) => {
     setSelectedProiect(proiect);
     setComentariiDefaultTab('comentarii');
     setShowComentariiModal(true);
+
+    // Marchează comentariile ca citite când se deschide modalul
+    if (user?.uid && proiect.ID_Proiect) {
+      try {
+        await fetch('/api/comentarii/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.uid,
+            proiect_id: proiect.ID_Proiect
+          })
+        });
+
+        // Actualizează local count-ul de necitite
+        setNecititePerProiect(prev => {
+          const newState = { ...prev };
+          delete newState[proiect.ID_Proiect];
+          return newState;
+        });
+      } catch (error) {
+        console.error('Eroare la marcarea comentariilor ca citite:', error);
+      }
+    }
   };
 
   const handleCloseComentariiModal = () => {
@@ -1484,13 +1536,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             );
                           })()}
                         </td>
-                        {/* ✅ NOU: Coloana Comentarii */}
+                        {/* ✅ NOU: Coloana Comentarii cu badge necitite */}
                         <td style={{
                           padding: '0.75rem',
                           textAlign: 'center'
                         }}>
                           {(() => {
                             const count = proiect.comentarii_count || 0;
+                            const necitite = necititePerProiect[proiect.ID_Proiect] || 0;
                             const ultimComentariu = proiect.ultim_comentariu;
 
                             if (count === 0) {
@@ -1546,48 +1599,84 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                                   : ultimComentariu.comentariu)
                               : '';
 
-                            const tooltipText = ultimComentariu
-                              ? `${ultimComentariu.autor_nume}${dataFormatata ? ` (${dataFormatata})` : ''}: ${comentariuPreview}`
-                              : `${count} comentarii`;
+                            const tooltipText = necitite > 0
+                              ? `${necitite} comentarii necitite! ${ultimComentariu ? `Ultimul: ${ultimComentariu.autor_nume}` : ''}`
+                              : ultimComentariu
+                                ? `${ultimComentariu.autor_nume}${dataFormatata ? ` (${dataFormatata})` : ''}: ${comentariuPreview}`
+                                : `${count} comentarii`;
+
+                            // Dacă sunt comentarii necitite, afișează cu stil roșu/evidențiat
+                            const hasUnread = necitite > 0;
 
                             return (
                               <button
                                 onClick={() => handleShowComentariiModal(proiect)}
                                 style={{
-                                  background: 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)',
-                                  border: '1px solid rgba(52, 152, 219, 0.3)',
+                                  background: hasUnread
+                                    ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.15) 0%, rgba(231, 76, 60, 0.08) 100%)'
+                                    : 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)',
+                                  border: hasUnread
+                                    ? '1px solid rgba(231, 76, 60, 0.4)'
+                                    : '1px solid rgba(52, 152, 219, 0.3)',
                                   borderRadius: '12px',
                                   padding: '0.5rem 0.75rem',
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '0.4rem',
-                                  transition: 'all 0.2s ease'
+                                  transition: 'all 0.2s ease',
+                                  position: 'relative' as const
                                 }}
                                 title={tooltipText}
                                 onMouseOver={(e) => {
-                                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(52, 152, 219, 0.2) 0%, rgba(52, 152, 219, 0.1) 100%)';
+                                  e.currentTarget.style.background = hasUnread
+                                    ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.25) 0%, rgba(231, 76, 60, 0.15) 100%)'
+                                    : 'linear-gradient(135deg, rgba(52, 152, 219, 0.2) 0%, rgba(52, 152, 219, 0.1) 100%)';
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.2)';
+                                  e.currentTarget.style.boxShadow = hasUnread
+                                    ? '0 4px 12px rgba(231, 76, 60, 0.3)'
+                                    : '0 4px 12px rgba(52, 152, 219, 0.2)';
                                 }}
                                 onMouseOut={(e) => {
-                                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)';
+                                  e.currentTarget.style.background = hasUnread
+                                    ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.15) 0%, rgba(231, 76, 60, 0.08) 100%)'
+                                    : 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)';
                                   e.currentTarget.style.transform = 'translateY(0)';
                                   e.currentTarget.style.boxShadow = 'none';
                                 }}
                               >
-                                <span style={{
-                                  fontSize: '14px'
-                                }}>
+                                <span style={{ fontSize: '14px' }}>
                                   💬
                                 </span>
                                 <span style={{
                                   fontSize: '13px',
                                   fontWeight: '600',
-                                  color: '#3498db'
+                                  color: hasUnread ? '#e74c3c' : '#3498db'
                                 }}>
                                   {count}
                                 </span>
+                                {/* Badge roșu pentru necitite */}
+                                {hasUnread && (
+                                  <span style={{
+                                    position: 'absolute' as const,
+                                    top: '-6px',
+                                    right: '-6px',
+                                    background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: '700',
+                                    minWidth: '18px',
+                                    height: '18px',
+                                    borderRadius: '9px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 6px rgba(231, 76, 60, 0.4)',
+                                    animation: 'pulse 2s infinite'
+                                  }}>
+                                    {necitite}
+                                  </span>
+                                )}
                               </button>
                             );
                           })()}
@@ -1728,25 +1817,25 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               })}
                               style={{
                                 background: 'transparent',
-                                border: '1px dashed rgba(52, 152, 219, 0.3)',
+                                border: '1px dashed #bdc3c7',
                                 borderRadius: '10px',
                                 padding: '0.3rem 0.6rem',
                                 cursor: 'pointer',
-                                color: '#7f8c8d',
+                                color: '#95a5a6',
                                 fontSize: '11px',
                                 transition: 'all 0.2s ease'
                               }}
-                              title="Vezi comentarii subproiect"
+                              title="Adaugă comentariu la subproiect"
                               onMouseOver={(e) => {
                                 e.currentTarget.style.borderColor = '#3498db';
                                 e.currentTarget.style.color = '#3498db';
                               }}
                               onMouseOut={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(52, 152, 219, 0.3)';
-                                e.currentTarget.style.color = '#7f8c8d';
+                                e.currentTarget.style.borderColor = '#bdc3c7';
+                                e.currentTarget.style.color = '#95a5a6';
                               }}
                             >
-                              💬 Vezi
+                              + Adaugă
                             </button>
                           </td>
                           <td style={{
