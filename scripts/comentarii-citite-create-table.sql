@@ -14,10 +14,10 @@ CREATE TABLE IF NOT EXISTS `hale-mode-464009-i6.PanouControlUnitar.ComentariiCit
   proiect_id STRING NOT NULL,                -- ID proiect/subproiect pentru filtrare rapidă
 
   -- Metadata
-  data_citire TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),  -- Când a fost citit
+  data_citire TIMESTAMP NOT NULL,            -- Când a fost citit (setat la INSERT cu CURRENT_TIMESTAMP())
 
   -- Partition key (pentru optimizare queries)
-  data_creare DATE NOT NULL DEFAULT CURRENT_DATE()
+  data_creare DATE NOT NULL                  -- Setat la INSERT cu CURRENT_DATE()
 )
 PARTITION BY data_creare
 CLUSTER BY user_id, proiect_id

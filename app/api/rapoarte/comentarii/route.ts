@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
         if (responsabilNume) {
           const tableUtilizatori = `Utilizatori${tableSuffix}`;
           const utilizatorQuery = `
-            SELECT uid, nume, prenume, email
+            SELECT uid, nume, prenume, email, rol
             FROM \`${PROJECT_ID}.${DATASET}.${tableUtilizatori}\`
             WHERE CONCAT(nume, ' ', prenume) = @responsabil
               OR CONCAT(prenume, ' ', nume) = @responsabil
@@ -231,6 +231,12 @@ export async function POST(request: NextRequest) {
               // Construiește URL-ul pentru notificare
               const baseUrl = request.url.split('/api/')[0];
 
+              // Determină link-ul corect în funcție de rolul utilizatorului
+              const isAdmin = responsabilUser.rol === 'admin';
+              const linkDetalii = isAdmin
+                ? `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
+                : `${baseUrl}/projects?search=${encodeURIComponent(proiect_id)}`;
+
               const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -246,7 +252,7 @@ export async function POST(request: NextRequest) {
                     tip_comentariu: tip_comentariu,
                     user_name: `${responsabilUser.nume} ${responsabilUser.prenume}`,
                     user_prenume: responsabilUser.prenume,
-                    link_detalii: `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
+                    link_detalii: linkDetalii
                   }
                 })
               });
