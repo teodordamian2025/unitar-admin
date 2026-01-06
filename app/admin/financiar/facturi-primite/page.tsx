@@ -444,11 +444,26 @@ export default function FacturiPrimitePage() {
                       <tr
                         key={factura.id}
                         onClick={() => toggleExpand(factura.id)}
-                        className={`border-t border-white/10 cursor-pointer transition-colors ${
-                          factura.status_procesare === 'asociat'
-                            ? 'bg-green-500/15 hover:bg-green-500/25'
-                            : 'hover:bg-white/5'
-                        }`}
+                        className="border-t border-white/10 cursor-pointer transition-colors"
+                        style={{
+                          backgroundColor: factura.status_procesare === 'asociat'
+                            ? 'rgba(34, 197, 94, 0.15)'  // green-500 cu 15% opacity
+                            : undefined
+                        }}
+                        onMouseEnter={(e) => {
+                          if (factura.status_procesare === 'asociat') {
+                            e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.25)';
+                          } else {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (factura.status_procesare === 'asociat') {
+                            e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
+                          } else {
+                            e.currentTarget.style.backgroundColor = '';
+                          }
+                        }}
                       >
                         <td className="px-4 py-3 text-white">
                           <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
