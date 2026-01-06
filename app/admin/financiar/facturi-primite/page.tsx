@@ -444,7 +444,11 @@ export default function FacturiPrimitePage() {
                       <tr
                         key={factura.id}
                         onClick={() => toggleExpand(factura.id)}
-                        className="border-t border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+                        className={`border-t border-white/10 cursor-pointer transition-colors ${
+                          factura.status_procesare === 'asociat'
+                            ? 'bg-green-500/15 hover:bg-green-500/25'
+                            : 'hover:bg-white/5'
+                        }`}
                       >
                         <td className="px-4 py-3 text-white">
                           <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
