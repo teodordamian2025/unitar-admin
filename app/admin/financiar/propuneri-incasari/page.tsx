@@ -314,14 +314,21 @@ export default function PropuneriIncasariPage() {
             </div>
           </div>
 
-          {/* Statistici - Modern Card Grid */}
+          {/* Statistici - Horizontal Row (inline style grid ca la dashboard) */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-6">
+            <div
+              className="mt-6"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                gap: '1rem'
+              }}
+            >
               <div className="bg-white/90 backdrop-blur-sm rounded-xl p-4 border-l-4 border-gray-400 shadow-sm hover:shadow-md transition-all duration-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">În așteptare</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">{stats.pending}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">{stats.pending}</p>
                   </div>
                   <div className="text-2xl opacity-70">⏳</div>
                 </div>
@@ -330,7 +337,7 @@ export default function PropuneriIncasariPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Auto-aprobabile</p>
-                    <p className="text-3xl font-bold text-green-600 mt-1">{stats.auto_approvable}</p>
+                    <p className="text-2xl font-bold text-green-600 mt-1">{stats.auto_approvable}</p>
                   </div>
                   <div className="text-2xl opacity-70">🤖</div>
                 </div>
@@ -339,7 +346,7 @@ export default function PropuneriIncasariPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Necesită review</p>
-                    <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.review_needed}</p>
+                    <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.review_needed}</p>
                   </div>
                   <div className="text-2xl opacity-70">👁️</div>
                 </div>
@@ -348,7 +355,7 @@ export default function PropuneriIncasariPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aprobate</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-1">{stats.approved}</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">{stats.approved}</p>
                   </div>
                   <div className="text-2xl opacity-70">✅</div>
                 </div>
@@ -357,7 +364,7 @@ export default function PropuneriIncasariPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Respinse</p>
-                    <p className="text-3xl font-bold text-red-600 mt-1">{stats.rejected}</p>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{stats.rejected}</p>
                   </div>
                   <div className="text-2xl opacity-70">❌</div>
                 </div>
