@@ -18,6 +18,7 @@ import ProiectEditModal from './ProiectEditModal';
 import ContractModal from './ContractModal';
 import ProcesVerbalModal from './ProcesVerbalModal';  // ✅ NOU: Import ProcesVerbalModal
 import SarciniProiectModal from './SarciniProiectModal';  // ✅ NOU: Import pentru comentarii
+import AddResponsabilButton from '@/app/components/AddResponsabilButton';  // ✅ NOU: Import pentru adaugare rapida responsabil
 
 // Interfețe PĂSTRATE identic
 interface Proiect {
@@ -1350,20 +1351,31 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             </div>
                           </div>
                         </td>
-                        <td style={{ 
+                        <td style={{
                           padding: '0.75rem',
                           color: '#2c3e50'
                         }}>
                           <div style={{ fontWeight: '600', fontSize: '14px' }}>{proiect.Client}</div>
-                          {proiect.Responsabil && (
-                            <div style={{ 
-                              fontSize: '12px', 
-                              color: '#7f8c8d',
-                              marginTop: '0.25rem'
-                            }}>
-                              👤 {proiect.Responsabil}
-                            </div>
-                          )}
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#7f8c8d',
+                            marginTop: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            flexWrap: 'wrap'
+                          }}>
+                            {proiect.Responsabil && (
+                              <span>👤 {proiect.Responsabil}</span>
+                            )}
+                            <AddResponsabilButton
+                              entityType="proiect"
+                              entityId={proiect.ID_Proiect}
+                              onResponsabilAdded={() => loadProiecte()}
+                              existingResponsabili={proiect.Responsabil ? [{ uid: '', nume_complet: proiect.Responsabil }] : []}
+                              buttonSize="small"
+                            />
+                          </div>
                         </td>
                         <td style={{ 
                           padding: '0.75rem',
@@ -1729,20 +1741,31 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               {subproiect.Denumire}
                             </div>
                           </td>
-                          <td style={{ 
+                          <td style={{
                             padding: '0.5rem 0.75rem',
                             color: '#2c3e50'
                           }}>
                             <div style={{ fontSize: '13px', fontWeight: '500' }}>{subproiect.Client || proiect.Client}</div>
-                            {subproiect.Responsabil && (
-                              <div style={{ 
-                                fontSize: '11px', 
-                                color: '#7f8c8d',
-                                marginTop: '0.25rem'
-                              }}>
-                                👤 {subproiect.Responsabil}
-                              </div>
-                            )}
+                            <div style={{
+                              fontSize: '11px',
+                              color: '#7f8c8d',
+                              marginTop: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              flexWrap: 'wrap'
+                            }}>
+                              {subproiect.Responsabil && (
+                                <span>👤 {subproiect.Responsabil}</span>
+                              )}
+                              <AddResponsabilButton
+                                entityType="subproiect"
+                                entityId={subproiect.ID_Subproiect}
+                                onResponsabilAdded={() => loadProiecte()}
+                                existingResponsabili={subproiect.Responsabil ? [{ uid: '', nume_complet: subproiect.Responsabil }] : []}
+                                buttonSize="small"
+                              />
+                            </div>
                           </td>
                           <td style={{ 
                             padding: '0.5rem 0.75rem',

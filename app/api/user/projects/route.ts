@@ -457,7 +457,8 @@ export async function POST(request: NextRequest) {
       status_predare = 'Nepredat',
       status_contract = 'Nu e cazul',
       Responsabil,
-      Observatii
+      Observatii,
+      responsabili_multipli // Array de responsabili selectati din UI
     } = body;
 
     // Validări
@@ -514,6 +515,40 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('=== DEBUG USER BACKEND: Insert executat cu succes (zero RON) ===');
+
+    // Salvare responsabili multipli in ProiecteResponsabili_v2
+    if (responsabili_multipli && Array.isArray(responsabili_multipli) && responsabili_multipli.length > 0) {
+      console.log(`=== DEBUG USER BACKEND: Salvare ${responsabili_multipli.length} responsabili ===`);
+
+      const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+
+      for (const resp of responsabili_multipli) {
+        const respId = `PR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const insertRespQuery = `
+          INSERT INTO ${TABLE_PROIECTE_RESPONSABILI}
+          (id, proiect_id, responsabil_uid, responsabil_nume, rol_in_proiect, data_atribuire)
+          VALUES (
+            '${escapeString(respId)}',
+            '${escapeString(ID_Proiect)}',
+            '${escapeString(resp.uid)}',
+            '${escapeString(resp.nume_complet)}',
+            '${escapeString(resp.rol_in_proiect || 'Normal')}',
+            CURRENT_TIMESTAMP()
+          )
+        `;
+
+        try {
+          await bigquery.query({
+            query: insertRespQuery,
+            location: 'EU',
+          });
+          console.log(`Responsabil ${resp.nume_complet} adaugat la proiect ${ID_Proiect}`);
+        } catch (respError) {
+          console.error(`Eroare la adaugarea responsabilului ${resp.nume_complet}:`, respError);
+          // Continuam cu urmatorii responsabili chiar daca unul esueaza
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

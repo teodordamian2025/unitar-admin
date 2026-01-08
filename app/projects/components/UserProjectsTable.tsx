@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import UserSarciniProiectModal from './UserSarciniProiectModal';
+import AddResponsabilButton from '@/app/components/AddResponsabilButton';
 
 interface Project {
   ID_Proiect: string;
@@ -616,15 +617,26 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                             CUI: {project.client_cui}
                           </div>
                         )}
-                        {project.Responsabil && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#7f8c8d',
-                            marginTop: '0.25rem'
-                          }}>
-                            👤 {project.Responsabil}
-                          </div>
-                        )}
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#7f8c8d',
+                          marginTop: '0.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          flexWrap: 'wrap'
+                        }}>
+                          {project.Responsabil && (
+                            <span>👤 {project.Responsabil}</span>
+                          )}
+                          <AddResponsabilButton
+                            entityType="proiect"
+                            entityId={project.ID_Proiect}
+                            onResponsabilAdded={loadProjects}
+                            existingResponsabili={project.Responsabil ? [{ uid: '', nume_complet: project.Responsabil }] : []}
+                            buttonSize="small"
+                          />
+                        </div>
                       </div>
                     </td>
                     <td style={tdStyle}>
@@ -879,15 +891,26 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                         <div style={{ fontSize: '13px', fontWeight: '500' }}>
                           {subproject.Client || project.Client}
                         </div>
-                        {subproject.Responsabil && (
-                          <div style={{
-                            fontSize: '11px',
-                            color: '#7f8c8d',
-                            marginTop: '0.25rem'
-                          }}>
-                            👤 {subproject.Responsabil}
-                          </div>
-                        )}
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#7f8c8d',
+                          marginTop: '0.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          flexWrap: 'wrap'
+                        }}>
+                          {subproject.Responsabil && (
+                            <span>👤 {subproject.Responsabil}</span>
+                          )}
+                          <AddResponsabilButton
+                            entityType="subproiect"
+                            entityId={subproject.ID_Subproiect}
+                            onResponsabilAdded={loadProjects}
+                            existingResponsabili={subproject.Responsabil ? [{ uid: '', nume_complet: subproject.Responsabil }] : []}
+                            buttonSize="small"
+                          />
+                        </div>
                       </td>
                       <td style={{
                         padding: '0.5rem 0.75rem',
