@@ -32,6 +32,7 @@ const TABLE_FACTURI = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_TRANZACTII_BANCARE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
 const TABLE_TRANZACTII_MATCHING = `\`${PROJECT_ID}.${DATASET}.TranzactiiMatching${tableSuffix}\``;
+const TABLE_FACTURI_EMISE_ANAF = `\`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF${tableSuffix}\``;
 
 console.log(`🔧 Incasare API - Tables Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -404,6 +405,41 @@ export async function POST(request: NextRequest) {
       },
       location: 'EU'
     });
+
+    // === SINCRONIZARE FacturiEmiseANAF_v2 (dacă există legătura) ===
+    // Actualizăm toate facturile din ANAF care au factura_generata_id = factura_id
+    const statusAchitare = newStatus === 'platita' ? 'Incasat' :
+                          (valoarePlatitaNoua > 0 ? 'Partial' : 'Neincasat');
+
+    const updateAnafQuery = `
+      UPDATE ${TABLE_FACTURI_EMISE_ANAF}
+      SET
+        valoare_platita = @valoarePlatita,
+        status_achitare = @statusAchitare,
+        data_ultima_plata = CASE WHEN @valoarePlatita > 0 THEN CURRENT_TIMESTAMP() ELSE data_ultima_plata END,
+        matched_tranzactie_id = CASE WHEN @tranzactieId IS NOT NULL THEN @tranzactieId ELSE matched_tranzactie_id END,
+        matching_tip = CASE WHEN @tranzactieId IS NOT NULL THEN 'sync_facturi_generate' ELSE matching_tip END
+      WHERE factura_generata_id = @facturaId
+    `;
+
+    await bigquery.query({
+      query: updateAnafQuery,
+      params: {
+        valoarePlatita: valoarePlatitaNoua,
+        statusAchitare,
+        tranzactieId: tranzactie_id || null,
+        facturaId: factura_id
+      },
+      types: {
+        valoarePlatita: 'NUMERIC',
+        statusAchitare: 'STRING',
+        tranzactieId: 'STRING',
+        facturaId: 'STRING'
+      },
+      location: 'EU'
+    });
+
+    console.log(`📝 [Incasare] Sincronizat FacturiEmiseANAF_v2 pentru factura_generata_id=${factura_id}`);
 
     // === ACTUALIZARE ETAPE FACTURI ===
     const statusIncasare = newStatus === 'platita' ? 'Incasat' :

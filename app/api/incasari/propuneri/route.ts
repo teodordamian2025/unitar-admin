@@ -347,6 +347,19 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
         data_actualizare = CURRENT_TIMESTAMP()
       WHERE factura_id = '${propunere.factura_id}' AND activ = TRUE
     `);
+
+    // Sincronizam si FacturiEmiseANAF_v2 (daca exista legatura prin factura_generata_id)
+    await bigquery.query(`
+      UPDATE \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\`
+      SET
+        valoare_platita = ${nouaValoarePlatita},
+        status_achitare = '${newStatusAchitare}',
+        data_ultima_plata = CURRENT_TIMESTAMP(),
+        matched_tranzactie_id = '${propunere.tranzactie_id}',
+        matching_tip = 'sync_propunere_aprobata'
+      WHERE factura_generata_id = '${propunere.factura_id}'
+    `);
+    console.log(`📝 [Propuneri] Sincronizat FacturiEmiseANAF_v2 pentru factura_generata_id=${propunere.factura_id}`);
   }
 
   // 3. Actualizam tranzactia bancara
