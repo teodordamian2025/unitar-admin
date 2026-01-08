@@ -154,8 +154,6 @@ function UserProjectsPage() {
   return (
     <UserLayout user={user} displayName={displayName} userRole={userRole}>
       <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
         padding: '0 1rem'
       }}>
         {/* Header */}

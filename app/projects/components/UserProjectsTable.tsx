@@ -502,19 +502,21 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
       <div style={{ overflowX: 'auto' }}>
         <table style={{
           width: '100%',
-          borderCollapse: 'collapse'
+          minWidth: '1100px',
+          borderCollapse: 'collapse',
+          tableLayout: 'fixed'
         }}>
           <thead>
             <tr style={{ background: 'rgba(249, 250, 251, 0.8)' }}>
-              <th style={thStyle}>Proiect / Subproiect</th>
-              <th style={thStyle}>Denumire</th>
-              <th style={thStyle}>Client & Responsabil</th>
-              <th style={thStyle}>Data Început</th>
-              <th style={thStyle}>Data Final</th>
-              <th style={thStyle}>Status</th>
-              <th style={thStyle}>Predare</th>
-              <th style={{...thStyle, textAlign: 'center'}}>💬 Comentarii</th>
-              <th style={thStyle}>Acțiuni</th>
+              <th style={{...thStyle, width: '140px'}}>Proiect / Subproiect</th>
+              <th style={{...thStyle, width: '180px'}}>Denumire</th>
+              <th style={{...thStyle, width: '180px'}}>Client & Responsabil</th>
+              <th style={{...thStyle, width: '100px'}}>Data Început</th>
+              <th style={{...thStyle, width: '100px'}}>Data Final</th>
+              <th style={{...thStyle, width: '90px'}}>Status</th>
+              <th style={{...thStyle, width: '90px'}}>Predare</th>
+              <th style={{...thStyle, width: '100px', textAlign: 'center'}}>💬 Comentarii</th>
+              <th style={{...thStyle, width: '120px'}}>Acțiuni</th>
             </tr>
           </thead>
           <tbody>
@@ -1119,7 +1121,9 @@ const tdStyle: React.CSSProperties = {
   padding: '1rem',
   fontSize: '0.875rem',
   color: '#1f2937',
-  verticalAlign: 'top'
+  verticalAlign: 'top',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
 };
 
 const paginationButtonStyle: React.CSSProperties = {
