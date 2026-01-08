@@ -163,6 +163,68 @@ export async function POST(request: NextRequest) {
 
     console.log(`Responsabil ${responsabil_nume} adăugat la subproiectul ${subproiect_id}`);
 
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare către responsabilul adăugat
+    // FIX 08.01.2026: Notificare pentru responsabili normali, nu doar principal
+    try {
+      // Obține detalii subproiect și proiect părinte
+      const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+      const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+
+      const detailsQuery = `
+        SELECT
+          sp.Denumire as subproiect_denumire,
+          sp.Data_Final as subproiect_deadline,
+          sp.ID_Proiect as proiect_id,
+          p.Denumire as proiect_denumire,
+          p.Client as proiect_client
+        FROM ${SUBPROIECTE_TABLE} sp
+        LEFT JOIN ${PROIECTE_TABLE} p ON sp.ID_Proiect = p.ID_Proiect
+        WHERE sp.ID_Subproiect = @subproiectId
+      `;
+
+      const [detailRows] = await bigquery.query({
+        query: detailsQuery,
+        params: { subproiectId: subproiect_id },
+        types: { subproiectId: 'STRING' },
+        location: 'EU',
+      });
+
+      if (detailRows.length > 0) {
+        const details = detailRows[0];
+        const dataFinal = details.subproiect_deadline?.value || details.subproiect_deadline;
+
+        // Trimite notificare
+        const baseUrl = request.url.split('/api/')[0];
+        await fetch(`${baseUrl}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip_notificare: 'subproiect_atribuit',
+            user_id: responsabil_uid,
+            context: {
+              subproiect_id: subproiect_id,
+              subproiect_denumire: details.subproiect_denumire,
+              proiect_id: details.proiect_id,
+              proiect_denumire: details.proiect_denumire,
+              proiect_client: details.proiect_client,
+              proiect_deadline: dataFinal || '',
+              user_name: responsabil_nume,
+              user_prenume: responsabil_nume.split(' ')[0],
+              data_atribuire: new Date().toISOString().split('T')[0],
+              termen_realizare: dataFinal || 'Nespecificat',
+              rol_in_subproiect: rol_in_subproiect,
+              link_detalii: `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(details.proiect_id)}`
+            }
+          })
+        });
+
+        console.log(`✅ Notificare trimisă către responsabil ${responsabil_nume} (${responsabil_uid}) pentru subproiect ${subproiect_id}`);
+      }
+    } catch (notifyError) {
+      console.error('⚠️ Eroare la trimitere notificare (non-blocking):', notifyError);
+      // Nu blocăm adăugarea responsabilului dacă notificarea eșuează
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Responsabil adăugat cu succes la subproiect',

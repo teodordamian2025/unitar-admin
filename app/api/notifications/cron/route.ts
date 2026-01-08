@@ -22,6 +22,9 @@ const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\
 const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
 const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
 const TABLE_NOTIFICARI = `\`${PROJECT_ID}.${DATASET}.Notificari${tableSuffix}\``;
+const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
+const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
+const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\``;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -159,25 +162,67 @@ export async function GET(request: NextRequest) {
     // ============================================
     // 1. PROIECTE CU TERMENE APROPIATE
     // ============================================
+    // FIX 08.01.2026: Rezolvare corectă a UID-urilor din Utilizatori_v2 + ProiecteResponsabili_v2
+    // Responsabil în Proiecte_v2 este un NUME (ex: "Ionescu Mihai"), nu un UID!
+    // Trebuie să facem JOIN cu Utilizatori_v2 pentru a găsi UID-ul corect
 
     const proiecteApropiateQuery = `
-      SELECT
-        ID_Proiect as id,
-        Denumire as denumire,
-        Client as client,
-        Data_Final as data_final,
-        Responsabil as responsabil_uid,
-        progres_procent
-      FROM ${TABLE_PROIECTE}
-      WHERE Data_Final IS NOT NULL
-        AND Data_Final BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
-        AND Status = 'Activ'
-        AND (progres_procent IS NULL OR progres_procent < 100)
+      WITH proiecte_apropiate AS (
+        SELECT
+          p.ID_Proiect as id,
+          p.Denumire as denumire,
+          p.Client as client,
+          p.Data_Final as data_final,
+          p.Responsabil as responsabil_nume,
+          p.progres_procent
+        FROM ${TABLE_PROIECTE} p
+        WHERE p.Data_Final IS NOT NULL
+          AND p.Data_Final BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
+          AND p.Status = 'Activ'
+          AND (p.progres_procent IS NULL OR p.progres_procent < 100)
+      ),
+      -- Obține UID-ul responsabilului principal din Utilizatori
+      responsabil_principal AS (
+        SELECT
+          pa.id,
+          pa.denumire,
+          pa.client,
+          pa.data_final,
+          pa.responsabil_nume,
+          pa.progres_procent,
+          u.uid as responsabil_uid,
+          CONCAT(u.nume, ' ', u.prenume) as user_name
+        FROM proiecte_apropiate pa
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON (
+          CONCAT(u.nume, ' ', u.prenume) = pa.responsabil_nume
+          OR CONCAT(u.prenume, ' ', u.nume) = pa.responsabil_nume
+          OR u.nume = pa.responsabil_nume
+        )
+        WHERE u.uid IS NOT NULL
+      ),
+      -- Adaugă și responsabilii din ProiecteResponsabili_v2
+      responsabili_aditionali AS (
+        SELECT
+          pa.id,
+          pa.denumire,
+          pa.client,
+          pa.data_final,
+          pr.responsabil_nume,
+          pa.progres_procent,
+          pr.responsabil_uid,
+          pr.responsabil_nume as user_name
+        FROM proiecte_apropiate pa
+        INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pa.id
+      )
+      -- Combină ambele surse, eliminând duplicatele
+      SELECT DISTINCT * FROM responsabil_principal
+      UNION DISTINCT
+      SELECT DISTINCT * FROM responsabili_aditionali
     `;
 
     const [proiecteApropiate] = await bigquery.query({ query: proiecteApropiateQuery });
     stats.proiecte_apropiate = proiecteApropiate.length;
-    console.log(`📊 Proiecte cu termene apropiate: ${proiecteApropiate.length}`);
+    console.log(`📊 Proiecte cu termene apropiate: ${proiecteApropiate.length} (responsabili unici)`);
 
     for (const proiect of proiecteApropiate) {
       if (!proiect.responsabil_uid) continue;
@@ -203,45 +248,82 @@ export async function GET(request: NextRequest) {
         proiect_client: proiect.client,
         proiect_deadline: dataFinal || '',
         zile_ramase: zileRamase,
-        user_name: proiect.responsabil_uid,
+        user_name: proiect.user_name || proiect.responsabil_nume, // FIX: Folosește numele utilizatorului
         link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${proiect.id}`,
       };
 
       const result = await trimitereNotificare(
         baseUrl,
         'termen_proiect_aproape',
-        proiect.responsabil_uid,
+        proiect.responsabil_uid, // Acum este UID-ul real din Utilizatori_v2
         context,
         dryRun
       );
 
       if (result.success) {
-        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Proiect aproape: ${proiect.denumire} (${zileRamase} zile)`);
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Proiect aproape: ${proiect.denumire} - ${proiect.user_name} (${zileRamase} zile)`);
       }
     }
 
     // ============================================
     // 2. PROIECTE CU TERMENE DEPĂȘITE
     // ============================================
+    // FIX 08.01.2026: Rezolvare corectă a UID-urilor (la fel ca proiecte apropiate)
 
     const proiecteDepasiteQuery = `
-      SELECT
-        ID_Proiect as id,
-        Denumire as denumire,
-        Client as client,
-        Data_Final as data_final,
-        Responsabil as responsabil_uid,
-        progres_procent
-      FROM ${TABLE_PROIECTE}
-      WHERE Data_Final IS NOT NULL
-        AND Data_Final < CURRENT_DATE()
-        AND Status = 'Activ'
-        AND (progres_procent IS NULL OR progres_procent < 100)
+      WITH proiecte_depasite AS (
+        SELECT
+          p.ID_Proiect as id,
+          p.Denumire as denumire,
+          p.Client as client,
+          p.Data_Final as data_final,
+          p.Responsabil as responsabil_nume,
+          p.progres_procent
+        FROM ${TABLE_PROIECTE} p
+        WHERE p.Data_Final IS NOT NULL
+          AND p.Data_Final < CURRENT_DATE()
+          AND p.Status = 'Activ'
+          AND (p.progres_procent IS NULL OR p.progres_procent < 100)
+      ),
+      responsabil_principal AS (
+        SELECT
+          pd.id,
+          pd.denumire,
+          pd.client,
+          pd.data_final,
+          pd.responsabil_nume,
+          pd.progres_procent,
+          u.uid as responsabil_uid,
+          CONCAT(u.nume, ' ', u.prenume) as user_name
+        FROM proiecte_depasite pd
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON (
+          CONCAT(u.nume, ' ', u.prenume) = pd.responsabil_nume
+          OR CONCAT(u.prenume, ' ', u.nume) = pd.responsabil_nume
+          OR u.nume = pd.responsabil_nume
+        )
+        WHERE u.uid IS NOT NULL
+      ),
+      responsabili_aditionali AS (
+        SELECT
+          pd.id,
+          pd.denumire,
+          pd.client,
+          pd.data_final,
+          pr.responsabil_nume,
+          pd.progres_procent,
+          pr.responsabil_uid,
+          pr.responsabil_nume as user_name
+        FROM proiecte_depasite pd
+        INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pd.id
+      )
+      SELECT DISTINCT * FROM responsabil_principal
+      UNION DISTINCT
+      SELECT DISTINCT * FROM responsabili_aditionali
     `;
 
     const [proiecteDepasite] = await bigquery.query({ query: proiecteDepasiteQuery });
     stats.proiecte_depasite = proiecteDepasite.length;
-    console.log(`📊 Proiecte cu termene depășite: ${proiecteDepasite.length}`);
+    console.log(`📊 Proiecte cu termene depășite: ${proiecteDepasite.length} (responsabili unici)`);
 
     for (const proiect of proiecteDepasite) {
       if (!proiect.responsabil_uid) continue;
@@ -267,48 +349,87 @@ export async function GET(request: NextRequest) {
         proiect_client: proiect.client,
         proiect_deadline: dataFinal || '',
         zile_intarziere: zileIntarziere,
-        user_name: proiect.responsabil_uid,
+        user_name: proiect.user_name || proiect.responsabil_nume, // FIX: Folosește numele utilizatorului
         link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${proiect.id}`,
       };
 
       const result = await trimitereNotificare(
         baseUrl,
         'termen_proiect_depasit',
-        proiect.responsabil_uid,
+        proiect.responsabil_uid, // Acum este UID-ul real
         context,
         dryRun
       );
 
       if (result.success) {
-        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Proiect DEPĂȘIT: ${proiect.denumire} (${zileIntarziere} zile întârziere)`);
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Proiect DEPĂȘIT: ${proiect.denumire} - ${proiect.user_name} (${zileIntarziere} zile întârziere)`);
       }
     }
 
     // ============================================
     // 3. SUBPROIECTE CU TERMENE APROPIATE
     // ============================================
+    // FIX 08.01.2026: Rezolvare corectă a UID-urilor din Utilizatori_v2 + SubproiecteResponsabili_v2
 
     const subproiecteApropiateQuery = `
-      SELECT
-        sp.ID_Subproiect as id,
-        sp.Denumire as denumire,
-        sp.ID_Proiect as proiect_id,
-        sp.Data_Final as data_final,
-        sp.Responsabil as responsabil_uid,
-        sp.progres_procent,
-        p.Denumire as proiect_denumire
-      FROM ${TABLE_SUBPROIECTE} sp
-      LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
-      WHERE sp.Data_Final IS NOT NULL
-        AND sp.Data_Final BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
-        AND sp.Status = 'Activ'
-        AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
-        AND sp.activ = true
+      WITH subproiecte_apropiate AS (
+        SELECT
+          sp.ID_Subproiect as id,
+          sp.Denumire as denumire,
+          sp.ID_Proiect as proiect_id,
+          sp.Data_Final as data_final,
+          sp.Responsabil as responsabil_nume,
+          sp.progres_procent,
+          p.Denumire as proiect_denumire
+        FROM ${TABLE_SUBPROIECTE} sp
+        LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
+        WHERE sp.Data_Final IS NOT NULL
+          AND sp.Data_Final BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
+          AND sp.Status = 'Activ'
+          AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
+          AND sp.activ = true
+      ),
+      responsabil_principal AS (
+        SELECT
+          sa.id,
+          sa.denumire,
+          sa.proiect_id,
+          sa.data_final,
+          sa.responsabil_nume,
+          sa.progres_procent,
+          sa.proiect_denumire,
+          u.uid as responsabil_uid,
+          CONCAT(u.nume, ' ', u.prenume) as user_name
+        FROM subproiecte_apropiate sa
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON (
+          CONCAT(u.nume, ' ', u.prenume) = sa.responsabil_nume
+          OR CONCAT(u.prenume, ' ', u.nume) = sa.responsabil_nume
+          OR u.nume = sa.responsabil_nume
+        )
+        WHERE u.uid IS NOT NULL
+      ),
+      responsabili_aditionali AS (
+        SELECT
+          sa.id,
+          sa.denumire,
+          sa.proiect_id,
+          sa.data_final,
+          sr.responsabil_nume,
+          sa.progres_procent,
+          sa.proiect_denumire,
+          sr.responsabil_uid,
+          sr.responsabil_nume as user_name
+        FROM subproiecte_apropiate sa
+        INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sa.id
+      )
+      SELECT DISTINCT * FROM responsabil_principal
+      UNION DISTINCT
+      SELECT DISTINCT * FROM responsabili_aditionali
     `;
 
     const [subproiecteApropiate] = await bigquery.query({ query: subproiecteApropiateQuery });
     stats.subproiecte_apropiate = subproiecteApropiate.length;
-    console.log(`📊 Subproiecte cu termene apropiate: ${subproiecteApropiate.length}`);
+    console.log(`📊 Subproiecte cu termene apropiate: ${subproiecteApropiate.length} (responsabili unici)`);
 
     for (const subproiect of subproiecteApropiate) {
       if (!subproiect.responsabil_uid) continue;
@@ -335,48 +456,87 @@ export async function GET(request: NextRequest) {
         proiect_denumire: subproiect.proiect_denumire,
         proiect_deadline: dataFinal || '',
         zile_ramase: zileRamase,
-        user_name: subproiect.responsabil_uid,
+        user_name: subproiect.user_name || subproiect.responsabil_nume, // FIX: Folosește numele utilizatorului
         link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${subproiect.proiect_id}`,
       };
 
       const result = await trimitereNotificare(
         baseUrl,
         'termen_subproiect_aproape',
-        subproiect.responsabil_uid,
+        subproiect.responsabil_uid, // Acum este UID-ul real
         context,
         dryRun
       );
 
       if (result.success) {
-        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Subproiect aproape: ${subproiect.denumire} (${zileRamase} zile)`);
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Subproiect aproape: ${subproiect.denumire} - ${subproiect.user_name} (${zileRamase} zile)`);
       }
     }
 
     // ============================================
     // 4. SUBPROIECTE CU TERMENE DEPĂȘITE
     // ============================================
+    // FIX 08.01.2026: Rezolvare corectă a UID-urilor
 
     const subproiecteDepasiteQuery = `
-      SELECT
-        sp.ID_Subproiect as id,
-        sp.Denumire as denumire,
-        sp.ID_Proiect as proiect_id,
-        sp.Data_Final as data_final,
-        sp.Responsabil as responsabil_uid,
-        sp.progres_procent,
-        p.Denumire as proiect_denumire
-      FROM ${TABLE_SUBPROIECTE} sp
-      LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
-      WHERE sp.Data_Final IS NOT NULL
-        AND sp.Data_Final < CURRENT_DATE()
-        AND sp.Status = 'Activ'
-        AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
-        AND sp.activ = true
+      WITH subproiecte_depasite AS (
+        SELECT
+          sp.ID_Subproiect as id,
+          sp.Denumire as denumire,
+          sp.ID_Proiect as proiect_id,
+          sp.Data_Final as data_final,
+          sp.Responsabil as responsabil_nume,
+          sp.progres_procent,
+          p.Denumire as proiect_denumire
+        FROM ${TABLE_SUBPROIECTE} sp
+        LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
+        WHERE sp.Data_Final IS NOT NULL
+          AND sp.Data_Final < CURRENT_DATE()
+          AND sp.Status = 'Activ'
+          AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
+          AND sp.activ = true
+      ),
+      responsabil_principal AS (
+        SELECT
+          sd.id,
+          sd.denumire,
+          sd.proiect_id,
+          sd.data_final,
+          sd.responsabil_nume,
+          sd.progres_procent,
+          sd.proiect_denumire,
+          u.uid as responsabil_uid,
+          CONCAT(u.nume, ' ', u.prenume) as user_name
+        FROM subproiecte_depasite sd
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON (
+          CONCAT(u.nume, ' ', u.prenume) = sd.responsabil_nume
+          OR CONCAT(u.prenume, ' ', u.nume) = sd.responsabil_nume
+          OR u.nume = sd.responsabil_nume
+        )
+        WHERE u.uid IS NOT NULL
+      ),
+      responsabili_aditionali AS (
+        SELECT
+          sd.id,
+          sd.denumire,
+          sd.proiect_id,
+          sd.data_final,
+          sr.responsabil_nume,
+          sd.progres_procent,
+          sd.proiect_denumire,
+          sr.responsabil_uid,
+          sr.responsabil_nume as user_name
+        FROM subproiecte_depasite sd
+        INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sd.id
+      )
+      SELECT DISTINCT * FROM responsabil_principal
+      UNION DISTINCT
+      SELECT DISTINCT * FROM responsabili_aditionali
     `;
 
     const [subproiecteDepasite] = await bigquery.query({ query: subproiecteDepasiteQuery });
     stats.subproiecte_depasite = subproiecteDepasite.length;
-    console.log(`📊 Subproiecte cu termene depășite: ${subproiecteDepasite.length}`);
+    console.log(`📊 Subproiecte cu termene depășite: ${subproiecteDepasite.length} (responsabili unici)`);
 
     for (const subproiect of subproiecteDepasite) {
       if (!subproiect.responsabil_uid) continue;
@@ -403,20 +563,20 @@ export async function GET(request: NextRequest) {
         proiect_denumire: subproiect.proiect_denumire,
         proiect_deadline: dataFinal || '',
         zile_intarziere: zileIntarziere,
-        user_name: subproiect.responsabil_uid,
+        user_name: subproiect.user_name || subproiect.responsabil_nume, // FIX: Folosește numele utilizatorului
         link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${subproiect.proiect_id}`,
       };
 
       const result = await trimitereNotificare(
         baseUrl,
         'termen_subproiect_depasit',
-        subproiect.responsabil_uid,
+        subproiect.responsabil_uid, // Acum este UID-ul real
         context,
         dryRun
       );
 
       if (result.success) {
-        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Subproiect DEPĂȘIT: ${subproiect.denumire} (${zileIntarziere} zile întârziere)`);
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Subproiect DEPĂȘIT: ${subproiect.denumire} - ${subproiect.user_name} (${zileIntarziere} zile întârziere)`);
       }
     }
 

@@ -162,6 +162,58 @@ export async function POST(request: NextRequest) {
 
     console.log(`Responsabil ${responsabil_nume} adăugat la proiectul ${proiect_id}`);
 
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare către responsabilul adăugat
+    // FIX 08.01.2026: Notificare pentru responsabili normali, nu doar principal
+    try {
+      // Obține detalii proiect
+      const proiectQuery = `
+        SELECT Denumire, Client, Data_Final, Descriere
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.Proiecte${tableSuffix}\`
+        WHERE ID_Proiect = @proiectId
+      `;
+
+      const [proiectRows] = await bigquery.query({
+        query: proiectQuery,
+        params: { proiectId: proiect_id },
+        types: { proiectId: 'STRING' },
+        location: 'EU',
+      });
+
+      if (proiectRows.length > 0) {
+        const proiect = proiectRows[0];
+        const dataFinal = proiect.Data_Final?.value || proiect.Data_Final;
+
+        // Trimite notificare
+        const baseUrl = request.url.split('/api/')[0];
+        await fetch(`${baseUrl}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tip_notificare: 'proiect_atribuit',
+            user_id: responsabil_uid,
+            context: {
+              proiect_id: proiect_id,
+              proiect_denumire: proiect.Denumire,
+              proiect_client: proiect.Client,
+              proiect_descriere: proiect.Descriere || '',
+              proiect_deadline: dataFinal || '',
+              user_name: responsabil_nume,
+              user_prenume: responsabil_nume.split(' ')[0], // Prima parte a numelui
+              data_atribuire: new Date().toISOString().split('T')[0],
+              termen_realizare: dataFinal || 'Nespecificat',
+              rol_in_proiect: rol_in_proiect,
+              link_detalii: `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
+            }
+          })
+        });
+
+        console.log(`✅ Notificare trimisă către responsabil ${responsabil_nume} (${responsabil_uid}) pentru proiect ${proiect_id}`);
+      }
+    } catch (notifyError) {
+      console.error('⚠️ Eroare la trimitere notificare (non-blocking):', notifyError);
+      // Nu blocăm adăugarea responsabilului dacă notificarea eșuează
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Responsabil adăugat cu succes la proiect',
