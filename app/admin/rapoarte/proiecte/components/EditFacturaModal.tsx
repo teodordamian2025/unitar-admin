@@ -378,12 +378,13 @@ export default function EditFacturaModal({
         cursValutar: proiectInfo.curs_valutar || 1
       }];
 
-      // Pentru STORNO, inversează valorile
+      // Pentru STORNO, inversează valorile (inclusiv valoareOriginala pentru a păstra semnul la recalculare cursuri)
       if (mode === 'storno') {
-        addDebugLog('Inversez valorile pentru STORNO');
+        addDebugLog('Inversez valorile pentru STORNO (inclusiv valoareOriginala)');
         liniiFacturaPregatite = liniiFacturaPregatite.map((linie: any) => ({
           ...linie,
           pretUnitar: -Math.abs(linie.pretUnitar || 0),
+          valoareOriginala: -Math.abs(linie.valoareOriginala || linie.pretUnitar || 0), // ✅ FIX: Negăm și valoareOriginala pentru a păstra semnul negativ la recalculare cursuri
           cantitate: Math.abs(linie.cantitate || 1),
           denumire: linie.denumire.startsWith('STORNO:') ? linie.denumire : `STORNO: ${linie.denumire}`
         }));
