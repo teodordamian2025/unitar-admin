@@ -51,15 +51,44 @@ const formatDateLiteral = (dateString: string | null): string => {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
+
+    // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii subproiect (Principal, Normal, Observator)
     let query = `
-      SELECT 
+      WITH responsabili_subproiect AS (
+        SELECT
+          sr.subproiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              sr.responsabil_uid,
+              sr.responsabil_nume,
+              sr.rol_in_subproiect as rol_in_proiect,
+              u.prenume,
+              u.nume
+            )
+            ORDER BY
+              CASE sr.rol_in_subproiect
+                WHEN 'Principal' THEN 1
+                WHEN 'Normal' THEN 2
+                WHEN 'Observator' THEN 3
+                ELSE 4
+              END,
+              sr.data_atribuire ASC
+          ) as responsabili
+        FROM \`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\` sr
+        LEFT JOIN \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\` u
+          ON sr.responsabil_uid = u.uid
+        GROUP BY sr.subproiect_id
+      )
+      SELECT
         s.*,
         p.Client,
-        p.Denumire as Proiect_Denumire
+        p.Denumire as Proiect_Denumire,
+        COALESCE(rs.responsabili, []) as responsabili_toti
       FROM ${SUBPROIECTE_TABLE} s
-      LEFT JOIN ${PROIECTE_TABLE} p 
+      LEFT JOIN ${PROIECTE_TABLE} p
         ON s.ID_Proiect = p.ID_Proiect
+      LEFT JOIN responsabili_subproiect rs
+        ON rs.subproiect_id = s.ID_Subproiect
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
     

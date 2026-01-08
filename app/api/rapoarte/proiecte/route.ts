@@ -147,8 +147,34 @@ export async function GET(request: NextRequest) {
     // FIX CRITICAL: Query cu JOIN pentru datele clientului + contracte + facturi directe
     // MODIFICAT 16.12.2025: Adăugat CTE pentru facturi directe (tip_etapa = 'factura_directa')
     // MODIFICAT 06.01.2026: Adăugat CTE pentru count comentarii per proiect
+    // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii proiect (Principal, Normal, Observator)
     let baseQuery = `
-      WITH comentarii_count AS (
+      WITH responsabili_proiect AS (
+        SELECT
+          pr.proiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              pr.responsabil_uid,
+              pr.responsabil_nume,
+              pr.rol_in_proiect,
+              u.prenume,
+              u.nume
+            )
+            ORDER BY
+              CASE pr.rol_in_proiect
+                WHEN 'Principal' THEN 1
+                WHEN 'Normal' THEN 2
+                WHEN 'Observator' THEN 3
+                ELSE 4
+              END,
+              pr.data_atribuire ASC
+          ) as responsabili
+        FROM \`${PROJECT_ID}.${dataset}.ProiecteResponsabili${tableSuffix}\` pr
+        LEFT JOIN \`${PROJECT_ID}.${dataset}.Utilizatori${tableSuffix}\` u
+          ON pr.responsabil_uid = u.uid
+        GROUP BY pr.proiect_id
+      ),
+      comentarii_count AS (
         SELECT
           proiect_id,
           COUNT(*) as total_comentarii,
@@ -257,7 +283,9 @@ export async function GET(request: NextRequest) {
         -- Comentarii info
         COALESCE(cc.total_comentarii, 0) as comentarii_count,
         cc.ultimul_comentariu_data,
-        cc.ultim_comentariu
+        cc.ultim_comentariu,
+        -- Responsabili proiect (Principal, Normal, Observator)
+        COALESCE(rp.responsabili, []) as responsabili_toti
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
       LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
@@ -267,6 +295,8 @@ export async function GET(request: NextRequest) {
         ON fd.proiect_id = p.ID_Proiect
       LEFT JOIN comentarii_count cc
         ON cc.proiect_id = p.ID_Proiect
+      LEFT JOIN responsabili_proiect rp
+        ON rp.proiect_id = p.ID_Proiect
     `;
 
     const conditions: string[] = [];

@@ -20,7 +20,16 @@ import ProcesVerbalModal from './ProcesVerbalModal';  // ✅ NOU: Import ProcesV
 import SarciniProiectModal from './SarciniProiectModal';  // ✅ NOU: Import pentru comentarii
 import AddResponsabilButton from '@/app/components/AddResponsabilButton';  // ✅ NOU: Import pentru adaugare rapida responsabil
 
-// Interfețe PĂSTRATE identic
+// Interfața pentru responsabil din API
+interface ResponsabilInfo {
+  responsabil_uid: string;
+  responsabil_nume: string;
+  rol_in_proiect: 'Principal' | 'Normal' | 'Observator';
+  prenume?: string;
+  nume?: string;
+}
+
+// Interfețe PĂSTRATE identic + MODIFICAT 08.01.2026: Adăugat responsabili_toti
 interface Proiect {
   ID_Proiect: string;
   Denumire: string;
@@ -51,6 +60,8 @@ interface Proiect {
     comentariu: string;
     data_comentariu: string | { value: string };
   };
+  // Responsabili (Principal, Normal, Observator) - MODIFICAT 08.01.2026
+  responsabili_toti?: ResponsabilInfo[];
 }
 
 interface Subproiect {
@@ -72,6 +83,8 @@ interface Subproiect {
   status_achitare?: string;
   Client?: string;
   Proiect_Denumire?: string;
+  // Responsabili (Principal, Normal, Observator) - MODIFICAT 08.01.2026
+  responsabili_toti?: ResponsabilInfo[];
 }
 
 interface ProiecteTableProps {
@@ -87,6 +100,96 @@ interface CursuriLive {
     error?: string;
   };
 }
+
+// MODIFICAT 08.01.2026: Helper pentru formatarea responsabililor
+// Afișează toți responsabilii: Principal primul, apoi Normal, apoi Observator
+// Dacă nu au loc, folosește inițiale (P. Nume)
+const formatResponsabiliDisplay = (
+  responsabiliToti: ResponsabilInfo[] | undefined,
+  responsabilPrincipal: string | undefined,
+  useInitials: boolean = false
+): { display: JSX.Element; tooltip: string } => {
+  // Dacă nu avem responsabili_toti dar avem Responsabil din tabelul principal
+  if (!responsabiliToti || responsabiliToti.length === 0) {
+    if (responsabilPrincipal) {
+      return {
+        display: <span>👤 {responsabilPrincipal}</span>,
+        tooltip: responsabilPrincipal
+      };
+    }
+    return {
+      display: <span style={{ color: '#95a5a6', fontStyle: 'italic' }}>Nespecificat</span>,
+      tooltip: 'Fără responsabil'
+    };
+  }
+
+  // Formatează numele: folosește inițiale dacă sunt mulți
+  const formatName = (r: ResponsabilInfo) => {
+    // Preferă prenume + nume din Utilizatori_v2 dacă există
+    if (r.prenume && r.nume) {
+      if (useInitials) {
+        return `${r.prenume.charAt(0)}. ${r.nume}`;
+      }
+      return `${r.prenume} ${r.nume}`;
+    }
+    // Altfel folosește responsabil_nume
+    if (useInitials && r.responsabil_nume) {
+      const parts = r.responsabil_nume.split(' ');
+      if (parts.length >= 2) {
+        return `${parts[0].charAt(0)}. ${parts.slice(1).join(' ')}`;
+      }
+    }
+    return r.responsabil_nume || 'Necunoscut';
+  };
+
+  // Icon-uri pentru roluri
+  const getRoleIcon = (rol: string) => {
+    switch (rol) {
+      case 'Principal': return '👤';
+      case 'Normal': return '👥';
+      case 'Observator': return '👁️';
+      default: return '👤';
+    }
+  };
+
+  // Culori pentru roluri
+  const getRoleColor = (rol: string) => {
+    switch (rol) {
+      case 'Principal': return '#2c3e50';
+      case 'Normal': return '#3498db';
+      case 'Observator': return '#95a5a6';
+      default: return '#7f8c8d';
+    }
+  };
+
+  // Tooltip cu toate numele complete
+  const tooltipText = responsabiliToti
+    .map(r => `${getRoleIcon(r.rol_in_proiect)} ${r.responsabil_nume || `${r.prenume} ${r.nume}`} (${r.rol_in_proiect})`)
+    .join('\n');
+
+  // Display element
+  const displayElement = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {responsabiliToti.map((r, idx) => (
+        <span
+          key={r.responsabil_uid || idx}
+          style={{
+            color: getRoleColor(r.rol_in_proiect),
+            fontSize: r.rol_in_proiect === 'Principal' ? '12px' : '11px',
+            fontWeight: r.rol_in_proiect === 'Principal' ? '600' : '400',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px'
+          }}
+        >
+          {getRoleIcon(r.rol_in_proiect)} {formatName(r)}
+        </span>
+      ))}
+    </div>
+  );
+
+  return { display: displayElement, tooltip: tooltipText };
+};
 
 // FIX PRINCIPAL: Funcție helper pentru validări sigure
 const ensureNumber = (value: any, defaultValue: number = 0): number => {
@@ -1356,23 +1459,39 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           color: '#2c3e50'
                         }}>
                           <div style={{ fontWeight: '600', fontSize: '14px' }}>{proiect.Client}</div>
+                          {/* MODIFICAT 08.01.2026: Afișează toți responsabilii (Principal, Normal, Observator) */}
                           <div style={{
                             fontSize: '12px',
                             color: '#7f8c8d',
                             marginTop: '0.25rem',
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'flex-start',
                             gap: '0.5rem',
                             flexWrap: 'wrap'
                           }}>
-                            {proiect.Responsabil && (
-                              <span>👤 {proiect.Responsabil}</span>
-                            )}
+                            {(() => {
+                              const { display, tooltip } = formatResponsabiliDisplay(
+                                proiect.responsabili_toti,
+                                proiect.Responsabil,
+                                (proiect.responsabili_toti?.length || 0) > 3 // Folosește inițiale dacă sunt mai mult de 3
+                              );
+                              return (
+                                <div title={tooltip} style={{ cursor: 'default' }}>
+                                  {display}
+                                </div>
+                              );
+                            })()}
                             <AddResponsabilButton
                               entityType="proiect"
                               entityId={proiect.ID_Proiect}
                               onResponsabilAdded={() => loadProiecte()}
-                              existingResponsabili={proiect.Responsabil ? [{ uid: '', nume_complet: proiect.Responsabil }] : []}
+                              existingResponsabili={
+                                proiect.responsabili_toti?.map(r => ({
+                                  uid: r.responsabil_uid,
+                                  nume_complet: r.responsabil_nume || `${r.prenume} ${r.nume}`
+                                })) ||
+                                (proiect.Responsabil ? [{ uid: '', nume_complet: proiect.Responsabil }] : [])
+                              }
                               buttonSize="small"
                             />
                           </div>
@@ -1746,23 +1865,39 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             color: '#2c3e50'
                           }}>
                             <div style={{ fontSize: '13px', fontWeight: '500' }}>{subproiect.Client || proiect.Client}</div>
+                            {/* MODIFICAT 08.01.2026: Afișează toți responsabilii subproiect (Principal, Normal, Observator) */}
                             <div style={{
                               fontSize: '11px',
                               color: '#7f8c8d',
                               marginTop: '0.25rem',
                               display: 'flex',
-                              alignItems: 'center',
+                              alignItems: 'flex-start',
                               gap: '0.5rem',
                               flexWrap: 'wrap'
                             }}>
-                              {subproiect.Responsabil && (
-                                <span>👤 {subproiect.Responsabil}</span>
-                              )}
+                              {(() => {
+                                const { display, tooltip } = formatResponsabiliDisplay(
+                                  subproiect.responsabili_toti,
+                                  subproiect.Responsabil,
+                                  (subproiect.responsabili_toti?.length || 0) > 3 // Folosește inițiale dacă sunt mai mult de 3
+                                );
+                                return (
+                                  <div title={tooltip} style={{ cursor: 'default' }}>
+                                    {display}
+                                  </div>
+                                );
+                              })()}
                               <AddResponsabilButton
                                 entityType="subproiect"
                                 entityId={subproiect.ID_Subproiect}
                                 onResponsabilAdded={() => loadProiecte()}
-                                existingResponsabili={subproiect.Responsabil ? [{ uid: '', nume_complet: subproiect.Responsabil }] : []}
+                                existingResponsabili={
+                                  subproiect.responsabili_toti?.map(r => ({
+                                    uid: r.responsabil_uid,
+                                    nume_complet: r.responsabil_nume || `${r.prenume} ${r.nume}`
+                                  })) ||
+                                  (subproiect.Responsabil ? [{ uid: '', nume_complet: subproiect.Responsabil }] : [])
+                                }
                                 buttonSize="small"
                               />
                             </div>

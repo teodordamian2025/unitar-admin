@@ -104,8 +104,34 @@ export async function GET(request: NextRequest) {
 
     // Query pentru utilizatori normali - FĂRĂ date financiare
     // MODIFICAT 06.01.2026: Adăugat CTE pentru count comentarii per proiect
+    // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii proiect (Principal, Normal, Observator)
     let baseQuery = `
-      WITH comentarii_count AS (
+      WITH responsabili_proiect AS (
+        SELECT
+          pr.proiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              pr.responsabil_uid,
+              pr.responsabil_nume,
+              pr.rol_in_proiect,
+              u.prenume,
+              u.nume
+            )
+            ORDER BY
+              CASE pr.rol_in_proiect
+                WHEN 'Principal' THEN 1
+                WHEN 'Normal' THEN 2
+                WHEN 'Observator' THEN 3
+                ELSE 4
+              END,
+              pr.data_atribuire ASC
+          ) as responsabili
+        FROM \`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\` pr
+        LEFT JOIN \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\` u
+          ON pr.responsabil_uid = u.uid
+        GROUP BY pr.proiect_id
+      ),
+      comentarii_count AS (
         SELECT
           proiect_id,
           COUNT(*) as total_comentarii,
@@ -142,12 +168,16 @@ export async function GET(request: NextRequest) {
         -- Comentarii info
         COALESCE(cc.total_comentarii, 0) as comentarii_count,
         cc.ultimul_comentariu_data,
-        cc.ultim_comentariu
+        cc.ultim_comentariu,
+        -- Responsabili proiect (Principal, Normal, Observator)
+        COALESCE(rp.responsabili, []) as responsabili_toti
       FROM ${TABLE_PROIECTE} p
       LEFT JOIN ${TABLE_CLIENTI} c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
       LEFT JOIN comentarii_count cc
         ON cc.proiect_id = p.ID_Proiect
+      LEFT JOIN responsabili_proiect rp
+        ON rp.proiect_id = p.ID_Proiect
     `;
 
     const conditions: string[] = [];
@@ -253,7 +283,33 @@ export async function GET(request: NextRequest) {
     console.log(`✅ USER PROJECTS LOADED: ${rows.length} results`);
 
     // Query pentru subproiecte - FĂRĂ date financiare, similar cu admin
+    // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii subproiect (Principal, Normal, Observator)
     let subproiecteQuery = `
+      WITH responsabili_subproiect AS (
+        SELECT
+          sr.subproiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              sr.responsabil_uid,
+              sr.responsabil_nume,
+              sr.rol_in_subproiect as rol_in_proiect,
+              u.prenume,
+              u.nume
+            )
+            ORDER BY
+              CASE sr.rol_in_subproiect
+                WHEN 'Principal' THEN 1
+                WHEN 'Normal' THEN 2
+                WHEN 'Observator' THEN 3
+                ELSE 4
+              END,
+              sr.data_atribuire ASC
+          ) as responsabili
+        FROM \`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\` sr
+        LEFT JOIN \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\` u
+          ON sr.responsabil_uid = u.uid
+        GROUP BY sr.subproiect_id
+      )
       SELECT
         s.ID_Subproiect,
         s.ID_Proiect,
@@ -266,10 +322,13 @@ export async function GET(request: NextRequest) {
         s.status_contract,
         s.progres_procent,
         p.Client,
-        p.Denumire as Proiect_Denumire
+        p.Denumire as Proiect_Denumire,
+        COALESCE(rs.responsabili, []) as responsabili_toti
       FROM ${TABLE_SUBPROIECTE} s
       LEFT JOIN ${TABLE_PROIECTE} p
         ON s.ID_Proiect = p.ID_Proiect
+      LEFT JOIN responsabili_subproiect rs
+        ON rs.subproiect_id = s.ID_Subproiect
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
 
@@ -383,6 +442,8 @@ export async function GET(request: NextRequest) {
       comentarii_count: convertBigQueryNumeric(row.comentarii_count) || 0,
       ultimul_comentariu_data: row.ultimul_comentariu_data,
       ultim_comentariu: row.ultim_comentariu,
+      // Responsabili proiect (Principal, Normal, Observator) - MODIFICAT 08.01.2026
+      responsabili_toti: row.responsabili_toti || [],
       // Pentru compatibilitate UI - setează implicit 0 RON
       Valoare_Estimata: 0,
       valoare_ron: 0,
@@ -407,6 +468,8 @@ export async function GET(request: NextRequest) {
       progres_procent: convertBigQueryNumeric(row.progres_procent) || 0,
       Client: row.Client,
       Proiect_Denumire: row.Proiect_Denumire,
+      // Responsabili subproiect (Principal, Normal, Observator) - MODIFICAT 08.01.2026
+      responsabili_toti: row.responsabili_toti || [],
       // Pentru compatibilitate UI - setează implicit 0 RON
       Valoare_Estimata: 0,
       valoare_ron: 0,
