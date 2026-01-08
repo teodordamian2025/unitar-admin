@@ -23,9 +23,10 @@ const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsa
 const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\``;
 const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
 const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
+const TABLE_PROIECT_COMENTARII = `\`${PROJECT_ID}.${DATASET}.ProiectComentarii${tableSuffix}\``;
 
 console.log(`🔧 Gantt Data API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}`);
+console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}, ProiectComentarii${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -75,26 +76,26 @@ export async function GET(request: NextRequest) {
 
           -- ✅ CITEȘTE DIRECT din Proiecte_v2.progres_procent (05.10.2025)
           COALESCE(p.progres_procent, 0) as progress_from_column,
-          
+
           -- Ore estimate și lucrate
           SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
           SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
-          
+
           -- Count subproiecte și sarcini
           COUNT(DISTINCT sp.ID_Subproiect) as subproiecte_count,
           COUNT(DISTINCT s.id) as sarcini_count,
-          
+
           -- Responsabili (agregat)
           STRING_AGG(DISTINCT COALESCE(pr.responsabil_nume, p.Responsabil), ', ') as all_responsabili
-          
+
         FROM ${TABLE_PROIECTE} p
-        LEFT JOIN ${TABLE_SUBPROIECTE} sp 
+        LEFT JOIN ${TABLE_SUBPROIECTE} sp
           ON p.ID_Proiect = sp.ID_Proiect AND sp.activ = true
-        LEFT JOIN ${TABLE_SARCINI} s 
+        LEFT JOIN ${TABLE_SARCINI} s
           ON p.ID_Proiect = s.proiect_id
-        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt
           ON s.id = tt.sarcina_id
-        LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr 
+        LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr
           ON p.ID_Proiect = pr.proiect_id
         WHERE p.Data_Start IS NOT NULL
           AND p.Data_Final IS NOT NULL
@@ -104,37 +105,48 @@ export async function GET(request: NextRequest) {
           ${endDate ? 'AND CAST(p.Data_Start AS DATE) <= @endDate' : ''}
         GROUP BY p.ID_Proiect, p.Denumire, p.Adresa, p.Data_Start, p.Data_Final,
                  p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil, p.progres_procent
+      ),
+      -- ✅ Adaugă count comentarii per proiect
+      comentarii_stats AS (
+        SELECT
+          proiect_id,
+          COUNT(*) as comentarii_count
+        FROM ${TABLE_PROIECT_COMENTARII}
+        WHERE tip_proiect = 'proiect'
+        GROUP BY proiect_id
       )
       SELECT
-        ID_Proiect as id,
-        CONCAT(ID_Proiect, ' - ', Denumire) as name,
-        Adresa,
-        Data_Start as startDate,
-        Data_Final as endDate,
-        progress_from_column as progress,
+        ps.ID_Proiect as id,
+        CONCAT(ps.ID_Proiect, ' - ', ps.Denumire) as name,
+        ps.Adresa,
+        ps.Data_Start as startDate,
+        ps.Data_Final as endDate,
+        ps.progress_from_column as progress,
         'proiect' as type,
         NULL as parentId,
         ARRAY<STRING>[] as dependencies,
-        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(all_responsabili, ',')) as r WHERE r != '') as resources,
-        CASE 
-          WHEN DATE_DIFF(Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
-          WHEN DATE_DIFF(Data_Final, CURRENT_DATE(), DAY) <= 30 THEN 'ridicata'
+        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(ps.all_responsabili, ',')) as r WHERE r != '') as resources,
+        CASE
+          WHEN DATE_DIFF(ps.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
+          WHEN DATE_DIFF(ps.Data_Final, CURRENT_DATE(), DAY) <= 30 THEN 'ridicata'
           ELSE 'normala'
         END as priority,
-        CASE 
-          WHEN Status = 'Activ' THEN 'in_progress'
-          WHEN Status = 'Finalizat' THEN 'finalizata'
-          WHEN Status = 'Suspendat' THEN 'anulata'
+        CASE
+          WHEN ps.Status = 'Activ' THEN 'in_progress'
+          WHEN ps.Status = 'Finalizat' THEN 'finalizata'
+          WHEN ps.Status = 'Suspendat' THEN 'anulata'
           ELSE 'to_do'
         END as status,
-        total_estimated_hours as estimatedHours,
-        total_worked_hours as workedHours,
+        ps.total_estimated_hours as estimatedHours,
+        ps.total_worked_hours as workedHours,
         false as isCollapsed,
         0 as level,
-        subproiecte_count,
-        sarcini_count
-      FROM project_stats
-      ORDER BY Data_Start ASC
+        ps.subproiecte_count,
+        ps.sarcini_count,
+        COALESCE(cs.comentarii_count, 0) as comentarii_count
+      FROM project_stats ps
+      LEFT JOIN comentarii_stats cs ON ps.ID_Proiect = cs.proiect_id
+      ORDER BY ps.Data_Start ASC
     `;
 
     // Build params object using simplified format (key-value pairs)
@@ -183,23 +195,23 @@ export async function GET(request: NextRequest) {
 
           -- ✅ CITEȘTE DIRECT din Subproiecte_v2.progres_procent (05.10.2025)
           COALESCE(sp.progres_procent, 0) as progress_from_column,
-          
+
           -- Ore
           SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
           SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
-          
+
           -- Count sarcini
           COUNT(DISTINCT s.id) as sarcini_count,
-          
+
           -- Responsabili
           STRING_AGG(DISTINCT COALESCE(spr.responsabil_nume, sp.Responsabil), ', ') as all_responsabili
-          
+
         FROM ${TABLE_SUBPROIECTE} sp
-        LEFT JOIN ${TABLE_SARCINI} s 
+        LEFT JOIN ${TABLE_SARCINI} s
           ON sp.ID_Subproiect = s.proiect_id AND s.tip_proiect = 'subproiect'
-        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
+        LEFT JOIN ${TABLE_TIME_TRACKING} tt
           ON s.id = tt.sarcina_id
-        LEFT JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} spr 
+        LEFT JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} spr
           ON sp.ID_Subproiect = spr.subproiect_id
         WHERE sp.Data_Start IS NOT NULL
           AND sp.Data_Final IS NOT NULL
@@ -210,35 +222,46 @@ export async function GET(request: NextRequest) {
           ${endDate ? 'AND CAST(sp.Data_Start AS DATE) <= @endDate' : ''}
         GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start,
                  sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil, sp.progres_procent
+      ),
+      -- ✅ Adaugă count comentarii per subproiect
+      comentarii_stats AS (
+        SELECT
+          proiect_id,
+          COUNT(*) as comentarii_count
+        FROM ${TABLE_PROIECT_COMENTARII}
+        WHERE tip_proiect = 'subproiect'
+        GROUP BY proiect_id
       )
       SELECT
-        ID_Subproiect as id,
-        Denumire as name,
-        Data_Start as startDate,
-        Data_Final as endDate,
-        progress_from_column as progress,
+        ss.ID_Subproiect as id,
+        ss.Denumire as name,
+        ss.Data_Start as startDate,
+        ss.Data_Final as endDate,
+        ss.progress_from_column as progress,
         'subproiect' as type,
-        ID_Proiect as parentId,
+        ss.ID_Proiect as parentId,
         ARRAY<STRING>[] as dependencies,
-        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(all_responsabili, ',')) as r WHERE r != '') as resources,
-        CASE 
-          WHEN DATE_DIFF(Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
-          WHEN DATE_DIFF(Data_Final, CURRENT_DATE(), DAY) <= 15 THEN 'ridicata'
+        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(ss.all_responsabili, ',')) as r WHERE r != '') as resources,
+        CASE
+          WHEN DATE_DIFF(ss.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
+          WHEN DATE_DIFF(ss.Data_Final, CURRENT_DATE(), DAY) <= 15 THEN 'ridicata'
           ELSE 'normala'
         END as priority,
-        CASE 
-          WHEN Status = 'Activ' THEN 'in_progress'
-          WHEN Status = 'Finalizat' THEN 'finalizata'
-          WHEN Status = 'Suspendat' THEN 'anulata'
+        CASE
+          WHEN ss.Status = 'Activ' THEN 'in_progress'
+          WHEN ss.Status = 'Finalizat' THEN 'finalizata'
+          WHEN ss.Status = 'Suspendat' THEN 'anulata'
           ELSE 'to_do'
         END as status,
-        total_estimated_hours as estimatedHours,
-        total_worked_hours as workedHours,
+        ss.total_estimated_hours as estimatedHours,
+        ss.total_worked_hours as workedHours,
         false as isCollapsed,
         1 as level,
-        sarcini_count
-      FROM subproject_stats
-      ORDER BY Data_Start ASC
+        ss.sarcini_count,
+        COALESCE(cs.comentarii_count, 0) as comentarii_count
+      FROM subproject_stats ss
+      LEFT JOIN comentarii_stats cs ON ss.ID_Subproiect = cs.proiect_id
+      ORDER BY ss.Data_Start ASC
     `;
 
     const subproiecteQueryOptions: any = {

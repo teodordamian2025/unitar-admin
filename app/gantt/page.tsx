@@ -15,6 +15,7 @@ import UserLayout from '@/app/components/user/UserLayout';
 import { Card, Button, Alert, LoadingSpinner, Modal } from '@/app/components/ui';
 import { toast } from 'react-toastify';
 import DatePickerPopup from '@/app/components/user/DatePickerPopup';
+import SarciniProiectModal from '@/app/admin/rapoarte/proiecte/components/SarciniProiectModal';
 
 interface GanttTask {
   id: string;
@@ -32,6 +33,13 @@ interface GanttTask {
   workedHours?: number;
   isCollapsed: boolean;
   level: number;
+  // Comentarii info
+  comentarii_count?: number;
+  ultim_comentariu?: {
+    autor_nume: string;
+    comentariu: string;
+    data_comentariu: string | { value: string };
+  };
 }
 
 interface TimelineSettings {
@@ -85,6 +93,11 @@ export default function GanttView() {
     position: { x: 0, y: 0 }
   });
   const [savingChanges, setSavingChanges] = useState(false);
+
+  // State pentru Comentarii Modal
+  const [showComentariiModal, setShowComentariiModal] = useState(false);
+  const [comentariiProiect, setComentariiProiect] = useState<any>(null);
+  const [comentariiDefaultTab, setComentariiDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('comentarii');
 
   // Filters
   const [filters, setFilters] = useState({
@@ -391,6 +404,37 @@ export default function GanttView() {
   // FUNCȚIA PENTRU ANULAREA EDITĂRII
   const handleDateCancel = () => {
     setDateEditState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Handler pentru deschiderea modalului de comentarii
+  const handleShowComentariiModal = (task: GanttTask) => {
+    // Determină ID-ul proiectului sau subproiectului
+    let proiectId = task.id;
+    let proiectDenumire = task.name;
+    let tipProiect: 'proiect' | 'subproiect' = 'proiect';
+
+    if (task.type === 'subproiect') {
+      tipProiect = 'subproiect';
+    } else if (task.type === 'sarcina') {
+      // Pentru sarcini, folosim parentId (care poate fi proiect sau subproiect)
+      proiectId = task.parentId || task.id;
+      tipProiect = 'proiect'; // sau subproiect, depinde de structura
+    }
+
+    setComentariiProiect({
+      ID_Proiect: proiectId,
+      Denumire: proiectDenumire,
+      Client: '',
+      Status: task.status,
+      tip: tipProiect
+    });
+    setComentariiDefaultTab('comentarii');
+    setShowComentariiModal(true);
+  };
+
+  const handleCloseComentariiModal = () => {
+    setShowComentariiModal(false);
+    setComentariiProiect(null);
   };
 
   const calculateTimelineRange = (tasks: GanttTask[]) => {
@@ -1145,7 +1189,7 @@ export default function GanttView() {
               overflow: 'hidden'
             }}
           >
-            {/* HEADER SINCRONIZAT - IDENTICAL TO ADMIN */}
+            {/* HEADER SINCRONIZAT */}
             <div style={{
               display: 'flex',
               position: 'sticky',
@@ -1154,6 +1198,24 @@ export default function GanttView() {
               background: 'white',
               borderBottom: '2px solid #e5e7eb'
             }}>
+              {/* Comentarii Header */}
+              <div style={{
+                width: '80px',
+                minWidth: '80px',
+                maxWidth: '80px',
+                height: `${HEADER_HEIGHT}px`,
+                padding: '0.5rem',
+                fontWeight: '600',
+                color: '#374151',
+                background: 'rgba(243, 244, 246, 0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRight: '1px solid #e5e7eb',
+                fontSize: '0.75rem'
+              }}>
+                💬
+              </div>
               {/* Task List Header */}
               <div style={{
                 width: '350px',
@@ -1171,7 +1233,7 @@ export default function GanttView() {
                 Proiectele și Sarcinile Mele
               </div>
 
-              {/* Timeline Header */}
+              {/* Timeline Header - Date afișate vertical pentru vizibilitate mai bună */}
               <div style={{
                 flex: 1,
                 height: `${HEADER_HEIGHT}px`,
@@ -1200,10 +1262,13 @@ export default function GanttView() {
                     }}
                   >
                     <span style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      writingMode: header.widthPercent < 8 ? 'vertical-rl' : 'horizontal-tb',
+                      textOrientation: header.widthPercent < 8 ? 'mixed' : 'mixed',
+                      transform: header.widthPercent < 8 ? 'rotate(180deg)' : 'none',
+                      fontSize: header.widthPercent < 5 ? '0.6rem' : '0.7rem',
+                      lineHeight: '1.2',
                       whiteSpace: 'nowrap',
-                      fontSize: header.widthPercent < 5 ? '0.65rem' : '0.75rem'
+                      maxHeight: header.widthPercent < 8 ? '55px' : 'none'
                     }}>
                       {formatDate(header.date)}
                     </span>
@@ -1212,7 +1277,7 @@ export default function GanttView() {
               </div>
             </div>
 
-            {/* BODY CONTENT CU CLICK HANDLERS PENTRU EDITARE DATE - IDENTICAL TO ADMIN */}
+            {/* BODY CONTENT CU CLICK HANDLERS PENTRU EDITARE DATE */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {visibleTasks.map((task, index) => (
                 <div
@@ -1224,6 +1289,67 @@ export default function GanttView() {
                     background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.8)' : 'rgba(249, 250, 251, 0.5)'
                   }}
                 >
+                  {/* Coloana Comentarii */}
+                  <div
+                    style={{
+                      width: '80px',
+                      minWidth: '80px',
+                      maxWidth: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRight: '1px solid #e5e7eb'
+                    }}
+                  >
+                    {(task.type === 'proiect' || task.type === 'subproiect') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShowComentariiModal(task);
+                        }}
+                        style={{
+                          background: task.comentarii_count && task.comentarii_count > 0
+                            ? 'linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%)'
+                            : 'transparent',
+                          border: task.comentarii_count && task.comentarii_count > 0
+                            ? '1px solid rgba(52, 152, 219, 0.3)'
+                            : '1px dashed #bdc3c7',
+                          borderRadius: '8px',
+                          padding: '0.35rem 0.5rem',
+                          cursor: 'pointer',
+                          color: task.comentarii_count && task.comentarii_count > 0 ? '#3498db' : '#95a5a6',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title={task.comentarii_count && task.comentarii_count > 0
+                          ? `${task.comentarii_count} comentarii`
+                          : 'Adaugă comentariu'}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.borderColor = '#3498db';
+                          e.currentTarget.style.color = '#3498db';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.borderColor = task.comentarii_count && task.comentarii_count > 0
+                            ? 'rgba(52, 152, 219, 0.3)'
+                            : '#bdc3c7';
+                          e.currentTarget.style.color = task.comentarii_count && task.comentarii_count > 0
+                            ? '#3498db'
+                            : '#95a5a6';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        💬
+                        {task.comentarii_count && task.comentarii_count > 0 && (
+                          <span>{task.comentarii_count}</span>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   {/* Task Info */}
                   <div
                     style={{
@@ -1702,6 +1828,18 @@ export default function GanttView() {
           </div>
         )}
       </Modal>
+
+      {/* Modal pentru Comentarii - deschide direct pe tab-ul comentarii */}
+      {showComentariiModal && comentariiProiect && (
+        <div style={{ zIndex: 50000 }}>
+          <SarciniProiectModal
+            proiect={comentariiProiect}
+            isOpen={showComentariiModal}
+            onClose={handleCloseComentariiModal}
+            defaultTab={comentariiDefaultTab}
+          />
+        </div>
+      )}
     </UserLayout>
   );
 }
