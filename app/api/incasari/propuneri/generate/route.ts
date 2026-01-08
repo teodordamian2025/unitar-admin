@@ -147,9 +147,9 @@ async function getTranzactiiCandidate(limit: number = 500, checkExisting: boolea
 }
 
 /**
- * Obține facturile candidate pentru matching
+ * Obtine facturile candidate pentru matching din FacturiGenerate_v2
  */
-async function getFacturiCandidate(): Promise<FacturaCandidat[]> {
+async function getFacturiGenerateCandidate(): Promise<FacturaCandidat[]> {
   const [rows] = await bigquery.query(`
     SELECT
       fg.id,
@@ -182,8 +182,88 @@ async function getFacturiCandidate(): Promise<FacturaCandidat[]> {
     client_nume: row.client_nume,
     data_factura: row.data_factura,
     status: row.status,
-    proiect_id: row.proiect_id
+    proiect_id: row.proiect_id,
+    sursa: 'facturi_generate' as const
   }));
+}
+
+/**
+ * Obtine facturile externe din FacturiEmiseANAF_v2 (care nu au link la FacturiGenerate)
+ */
+async function getFacturiEmiseExterneCandidate(): Promise<FacturaCandidat[]> {
+  const [rows] = await bigquery.query(`
+    SELECT
+      fe.id,
+      fe.serie_numar,
+      COALESCE(fe.valoare_ron, fe.valoare_totala) as total,
+      COALESCE(fe.valoare_platita, 0) as valoare_platita,
+      COALESCE(fe.valoare_ron, fe.valoare_totala) - COALESCE(fe.valoare_platita, 0) as rest_de_plata,
+      fe.cif_client as client_cui,
+      fe.nume_client as client_nume,
+      fe.data_factura,
+      COALESCE(fe.status_achitare, 'Neincasat') as status,
+      fe.factura_generata_id
+    FROM \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\` fe
+    WHERE
+      fe.activ = TRUE
+      -- Doar facturi externe care NU au link la FacturiGenerate_v2
+      AND fe.factura_generata_id IS NULL
+      -- Doar neachitate sau partial achitate
+      AND COALESCE(fe.status_achitare, 'Neincasat') != 'Incasat'
+      AND (COALESCE(fe.valoare_ron, fe.valoare_totala) - COALESCE(fe.valoare_platita, 0)) > 0
+      AND fe.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
+      -- Doar facturi, nu note credit negative
+      AND COALESCE(fe.valoare_ron, fe.valoare_totala) > 0
+    ORDER BY fe.data_factura DESC
+  `);
+
+  return rows.map((row: any) => {
+    // Parsam serie si numar din serie_numar
+    let serie: string | null = null;
+    let numar: string = '';
+    if (row.serie_numar) {
+      const parts = row.serie_numar.split(/[-\/]/);
+      if (parts.length >= 2) {
+        serie = parts[0];
+        numar = parts.slice(1).join('-');
+      } else {
+        numar = row.serie_numar;
+      }
+    }
+
+    return {
+      id: row.id,
+      serie,
+      numar,
+      total: parseFloat(row.total) || 0,
+      valoare_platita: parseFloat(row.valoare_platita) || 0,
+      rest_de_plata: parseFloat(row.rest_de_plata) || 0,
+      client_cui: row.client_cui,
+      client_nume: row.client_nume,
+      data_factura: row.data_factura,
+      status: row.status,
+      proiect_id: null,
+      sursa: 'facturi_emise_anaf' as const,
+      factura_emisa_id: row.id
+    };
+  });
+}
+
+/**
+ * Obtine toate facturile candidate pentru matching (ambele surse)
+ */
+async function getFacturiCandidate(): Promise<FacturaCandidat[]> {
+  const [facturiGenerate, facturiEmise] = await Promise.all([
+    getFacturiGenerateCandidate(),
+    getFacturiEmiseExterneCandidate()
+  ]);
+
+  // Combinam ambele surse
+  const toateFacturile = [...facturiGenerate, ...facturiEmise];
+
+  console.log(`📊 [Propuneri] Facturi candidate: ${facturiGenerate.length} din FacturiGenerate + ${facturiEmise.length} externe din FacturiEmiseANAF = ${toateFacturile.length} total`);
+
+  return toateFacturile;
 }
 
 /**
@@ -288,6 +368,10 @@ export async function POST(request: NextRequest) {
         const diferentaRon = Math.abs(tranzactie.suma - factura.rest_de_plata);
         const diferentaProcent = score.details.suma_diferenta_procent;
 
+        // Determinam sursa facturii
+        const facturaSursa = factura.sursa || 'facturi_generate';
+        const facturaEmisaId = factura.factura_emisa_id || null;
+
         propuneri.push({
           id: uuidv4(),
           tranzactie_id: tranzactie.id,
@@ -314,6 +398,9 @@ export async function POST(request: NextRequest) {
           factura_numar: factura.numar,
           factura_client_nume: factura.client_nume,
           factura_client_cui: factura.client_cui,
+          // Camp nou pentru sursa facturii
+          factura_sursa: facturaSursa,
+          factura_emisa_id: facturaEmisaId,
 
           tranzactie_data: dataTranzactie,
           tranzactie_contrapartida: tranzactie.nume_contrapartida,
@@ -324,7 +411,8 @@ export async function POST(request: NextRequest) {
           creat_de: 'auto_generate'
         });
 
-        console.log(`✅ Propunere: ${tranzactie.suma.toFixed(2)} RON → ${factura.serie || ''}-${factura.numar} (${score.total}%${isAuto ? ' AUTO' : ''})`);
+        const sursaLabel = facturaSursa === 'facturi_emise_anaf' ? ' [EXTERN]' : '';
+        console.log(`✅ Propunere: ${tranzactie.suma.toFixed(2)} RON → ${factura.serie || ''}-${factura.numar} (${score.total}%${isAuto ? ' AUTO' : ''}${sursaLabel})`);
       }
     }
 

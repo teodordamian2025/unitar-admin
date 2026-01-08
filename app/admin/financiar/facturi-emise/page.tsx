@@ -1,15 +1,17 @@
 'use client';
 
 // =====================================================
-// PAGINĂ ADMIN: Facturi EMISE ANAF (iapp.ro)
-// Vizualizare facturi emise în ANAF prin iapp.ro
+// PAGINA ADMIN: Facturi EMISE ANAF (iapp.ro)
+// Vizualizare facturi emise in ANAF prin iapp.ro
 // URL: /admin/financiar/facturi-emise
 // Data: 29.10.2025
+// Actualizat: 08.01.2026 - Adaugat status achitare si actiuni incasare
 // =====================================================
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import ModernLayout from '@/app/components/ModernLayout';
+import IncasareEmiseModal from './components/IncasareEmiseModal';
 
 interface FacturaEmisa {
   id: string;
@@ -32,6 +34,13 @@ interface FacturaEmisa {
   data_preluare: { value: string } | string;
   data_incarcare_anaf: { value: string } | string;
   observatii: string;
+  // Campuri status achitare
+  valoare_platita: number;
+  status_achitare: string; // Neincasat, Partial, Incasat
+  rest_de_plata: number;
+  data_ultima_plata?: { value: string } | string | null;
+  matched_tranzactie_id?: string | null;
+  matching_tip?: string | null;
 }
 
 interface SyncStats {
@@ -66,6 +75,10 @@ export default function FacturiEmisePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detalii, setDetalii] = useState<FacturaDetalii | null>(null);
   const [loadingDetalii, setLoadingDetalii] = useState(false);
+
+  // Modal incasare
+  const [incasareModalOpen, setIncasareModalOpen] = useState(false);
+  const [selectedFacturaForIncasare, setSelectedFacturaForIncasare] = useState<FacturaEmisa | null>(null);
 
   // Filtre
   const [searchTerm, setSearchTerm] = useState('');
@@ -217,7 +230,7 @@ export default function FacturiEmisePage() {
     }
   };
 
-  // Status badge
+  // Status badge ANAF
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'CONFIRMAT':
@@ -229,6 +242,63 @@ export default function FacturiEmisePage() {
       default:
         return <span className="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">{status}</span>;
     }
+  };
+
+  // Status badge Achitare
+  const getStatusAchitareBadge = (factura: FacturaEmisa) => {
+    const status = factura.status_achitare || 'Neincasat';
+    const valoareRon = parseFloat(String(factura.valoare_ron)) || parseFloat(String(factura.valoare_totala)) || 0;
+    const platit = parseFloat(String(factura.valoare_platita)) || 0;
+    const rest = parseFloat(String(factura.rest_de_plata)) || (valoareRon - platit);
+    const procent = valoareRon > 0 ? Math.round((platit / valoareRon) * 100) : 0;
+
+    if (status === 'Incasat' || rest <= 0) {
+      return (
+        <div className="flex flex-col items-start">
+          <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
+            ✓ Incasat
+          </span>
+          <span className="text-xs text-gray-500 mt-1">
+            {platit.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+          </span>
+        </div>
+      );
+    } else if (status === 'Partial' || platit > 0) {
+      return (
+        <div className="flex flex-col items-start">
+          <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex items-center gap-1">
+            ⏳ Partial {procent}%
+          </span>
+          <span className="text-xs text-gray-500 mt-1">
+            Rest: {rest.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+          </span>
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex flex-col items-start">
+          <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+            ✗ Neincasat
+          </span>
+          <span className="text-xs text-gray-500 mt-1">
+            {valoareRon.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+          </span>
+        </div>
+      );
+    }
+  };
+
+  // Handler pentru deschidere modal incasare
+  const handleOpenIncasareModal = (factura: FacturaEmisa) => {
+    setSelectedFacturaForIncasare(factura);
+    setIncasareModalOpen(true);
+  };
+
+  // Handler pentru success incasare
+  const handleIncasareSuccess = (data: any) => {
+    toast.success(`Incasare de ${data.incasare.valoare.toFixed(2)} RON inregistrata cu succes!`);
+    fetchFacturi(); // Reincarcam datele
+    fetchStats();
   };
 
   return (
@@ -359,39 +429,41 @@ export default function FacturiEmisePage() {
           <table className="w-full">
             <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Serie/Număr</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Serie/Numar</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Client</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">CUI</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Data</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase">Valoare</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status Achitare</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status ANAF</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Trimisă De</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Acțiuni</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Trimisa De</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Actiuni</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent" />
-                      Se încarcă facturile...
+                      Se incarca facturile...
                     </div>
                   </td>
                 </tr>
               ) : facturi.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                    Nu există facturi în această perioadă
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    Nu exista facturi in aceasta perioada
                   </td>
                 </tr>
               ) : (
                 facturi.map((factura) => {
                   const isExpanded = expandedId === factura.id;
+                  const restDePlata = parseFloat(String(factura.rest_de_plata)) || 0;
 
                   return (
                     <>
-                      {/* Rând principal - clickable pentru expand */}
+                      {/* Rand principal - clickable pentru expand */}
                       <tr
                         key={factura.id}
                         onClick={() => toggleExpand(factura.id)}
@@ -409,6 +481,9 @@ export default function FacturiEmisePage() {
                             {factura.valoare_totala.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} {factura.moneda}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+                          {getStatusAchitareBadge(factura)}
+                        </td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex items-center gap-2">
                             {getStatusBadge(factura.status_anaf)}
@@ -424,16 +499,26 @@ export default function FacturiEmisePage() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-300">{factura.trimisa_de}</td>
                         <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-center">
+                            {/* Buton Incasare - doar daca mai este rest de plata */}
+                            {restDePlata > 0 && (
+                              <button
+                                onClick={() => handleOpenIncasareModal(factura)}
+                                className="px-2 py-1 text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 rounded border border-green-600/30 transition-all"
+                                title="Marcheaza incasare"
+                              >
+                                💰 Incasare
+                              </button>
+                            )}
                             {factura.pdf_file_id && (
                               <a
                                 href={`https://drive.google.com/file/d/${factura.pdf_file_id}/view`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-400 hover:text-blue-300"
-                                title="Vezi PDF în Google Drive"
+                                title="Vezi PDF in Google Drive"
                               >
-                                📄 PDF
+                                📄
                               </a>
                             )}
                             {factura.zip_file_id && (
@@ -442,19 +527,19 @@ export default function FacturiEmisePage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-gray-400 hover:text-gray-300"
-                                title="Vezi ZIP în Google Drive"
+                                title="Vezi ZIP in Google Drive"
                               >
-                                📦 ZIP
+                                📦
                               </a>
                             )}
                           </div>
                         </td>
                       </tr>
 
-                      {/* Rând expandabil cu detalii */}
+                      {/* Rand expandabil cu detalii */}
                       {isExpanded && (
                         <tr className="bg-white/5 border-t border-white/10">
-                          <td colSpan={8} className="px-4 py-4">
+                          <td colSpan={9} className="px-4 py-4">
                             {loadingDetalii ? (
                               <div className="text-center text-white/60 py-4">Încărcare detalii...</div>
                             ) : detalii ? (
@@ -577,11 +662,24 @@ export default function FacturiEmisePage() {
         )}
       </div>
       </div>
+
+      {/* Modal Incasare */}
+      {selectedFacturaForIncasare && (
+        <IncasareEmiseModal
+          factura={selectedFacturaForIncasare}
+          isOpen={incasareModalOpen}
+          onClose={() => {
+            setIncasareModalOpen(false);
+            setSelectedFacturaForIncasare(null);
+          }}
+          onSuccess={handleIncasareSuccess}
+        />
+      )}
     </ModernLayout>
   );
 }
 
-// Helper: Data start default (90 zile în urmă)
+// Helper: Data start default (90 zile in urma)
 function getDefaultStartDate(): string {
   const date = new Date();
   date.setDate(date.getDate() - 90);

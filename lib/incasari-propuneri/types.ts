@@ -96,6 +96,9 @@ export interface FacturaCandidat {
   data_factura: string | { value: string };
   status: string;
   proiect_id: string | null;
+  // Camp pentru identificare sursa factura
+  sursa?: 'facturi_generate' | 'facturi_emise_anaf';
+  factura_emisa_id?: string; // ID din FacturiEmiseANAF_v2 pentru facturi externe
 }
 
 export interface PropuneriStats {

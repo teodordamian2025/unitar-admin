@@ -262,19 +262,24 @@ async function approveMultiple(ids: string[], userId: string, userName: string) 
 }
 
 /**
- * Aprobă o singură propunere și aplică încasarea
+ * Aproba o singura propunere si aplica incasarea
+ * Suporta atat facturi din FacturiGenerate_v2 cat si din FacturiEmiseANAF_v2
  */
 async function approveSingle(propunereId: string, userId: string, userName: string) {
-  // 1. Obținem propunerea cu detalii
+  // 1. Obtinem propunerea cu detalii (incl. sursa)
   const [propuneriRows] = await bigquery.query(`
-    SELECT p.*, fg.total as factura_total, fg.valoare_platita as factura_platita_existenta
+    SELECT p.*,
+      COALESCE(fg.total, fe.valoare_ron, fe.valoare_totala) as factura_total,
+      COALESCE(fg.valoare_platita, fe.valoare_platita, 0) as factura_platita_existenta,
+      COALESCE(p.factura_sursa, 'facturi_generate') as factura_sursa_calc
     FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
     LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg ON p.factura_id = fg.id
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\` fe ON p.factura_id = fe.id
     WHERE p.id = '${propunereId}'
   `);
 
   if (propuneriRows.length === 0) {
-    throw new Error('Propunerea nu a fost găsită');
+    throw new Error('Propunerea nu a fost gasita');
   }
 
   const propunere = propuneriRows[0];
@@ -287,29 +292,64 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
   const facturaTotal = parseFloat(propunere.factura_total) || 0;
   const facturaPlatita = parseFloat(propunere.factura_platita_existenta) || 0;
   const nouaValoarePlatita = facturaPlatita + sumaTranzactie;
+  const facturaSursa = propunere.factura_sursa_calc || propunere.factura_sursa || 'facturi_generate';
 
-  // Calculăm noul status
+  // Calculam noul status
   let newFacturaStatus = 'activa';
+  let newStatusAchitare = 'Neincasat';
   if (nouaValoarePlatita >= facturaTotal * 0.99) {
     newFacturaStatus = 'platita';
+    newStatusAchitare = 'Incasat';
   } else if (nouaValoarePlatita > 0) {
     newFacturaStatus = 'partial_platita';
+    newStatusAchitare = 'Partial';
   }
 
   const dataTranzactie = propunere.tranzactie_data?.value || propunere.tranzactie_data || new Date().toISOString().split('T')[0];
 
-  // 2. Actualizăm factura
-  await bigquery.query(`
-    UPDATE \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
-    SET
-      valoare_platita = ${nouaValoarePlatita},
-      status = '${newFacturaStatus}',
-      data_plata = ${newFacturaStatus === 'platita' ? `TIMESTAMP('${dataTranzactie}')` : 'data_plata'},
-      data_actualizare = CURRENT_TIMESTAMP()
-    WHERE id = '${propunere.factura_id}'
-  `);
+  // 2. Actualizam factura in functie de sursa
+  if (facturaSursa === 'facturi_emise_anaf') {
+    // Factura externa din FacturiEmiseANAF_v2
+    await bigquery.query(`
+      UPDATE \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\`
+      SET
+        valoare_platita = ${nouaValoarePlatita},
+        status_achitare = '${newStatusAchitare}',
+        data_ultima_plata = CURRENT_TIMESTAMP(),
+        matched_tranzactie_id = '${propunere.tranzactie_id}',
+        matching_tip = 'auto_propunere'
+      WHERE id = '${propunere.factura_id}'
+    `);
+    console.log(`📝 [Propuneri] Actualizat FacturiEmiseANAF_v2: ${propunere.factura_id}`);
+  } else {
+    // Factura interna din FacturiGenerate_v2
+    await bigquery.query(`
+      UPDATE \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\`
+      SET
+        valoare_platita = ${nouaValoarePlatita},
+        status = '${newFacturaStatus}',
+        data_plata = ${newFacturaStatus === 'platita' ? `TIMESTAMP('${dataTranzactie}')` : 'data_plata'},
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = '${propunere.factura_id}'
+    `);
 
-  // 3. Actualizăm tranzacția bancară
+    // Actualizam si EtapeFacturi pentru facturi interne
+    const statusIncasare = newFacturaStatus === 'platita' ? 'Incasat' :
+      (nouaValoarePlatita > 0 ? 'Partial' : 'Neincasat');
+
+    await bigquery.query(`
+      UPDATE \`${PROJECT_ID}.${DATASET}.EtapeFacturi_v2\`
+      SET
+        status_incasare = '${statusIncasare}',
+        data_incasare = ${statusIncasare === 'Incasat' ? `DATE('${dataTranzactie}')` : 'data_incasare'},
+        valoare_incasata = COALESCE(valoare_incasata, 0) + ${sumaTranzactie},
+        observatii = CONCAT(COALESCE(observatii, ''), '\\n[${new Date().toISOString().split('T')[0]}] Incasare automata: ${sumaTranzactie.toFixed(2)} RON (propunere #${propunereId.substring(0, 8)})'),
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE factura_id = '${propunere.factura_id}' AND activ = TRUE
+    `);
+  }
+
+  // 3. Actualizam tranzactia bancara
   await bigquery.query(`
     UPDATE \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\`
     SET
@@ -323,23 +363,10 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
     WHERE id = '${propunere.tranzactie_id}'
   `);
 
-  // 4. Actualizăm EtapeFacturi
-  const statusIncasare = newFacturaStatus === 'platita' ? 'Incasat' :
-    (nouaValoarePlatita > 0 ? 'Partial' : 'Neincasat');
-
-  await bigquery.query(`
-    UPDATE \`${PROJECT_ID}.${DATASET}.EtapeFacturi_v2\`
-    SET
-      status_incasare = '${statusIncasare}',
-      data_incasare = ${statusIncasare === 'Incasat' ? `DATE('${dataTranzactie}')` : 'data_incasare'},
-      valoare_incasata = COALESCE(valoare_incasata, 0) + ${sumaTranzactie},
-      observatii = CONCAT(COALESCE(observatii, ''), '\\n[${new Date().toISOString().split('T')[0]}] Încasare automată: ${sumaTranzactie.toFixed(2)} RON (propunere #${propunereId.substring(0, 8)})'),
-      data_actualizare = CURRENT_TIMESTAMP()
-    WHERE factura_id = '${propunere.factura_id}' AND activ = TRUE
-  `);
-
   // 5. Inserăm în TranzactiiMatching_v2
   const matchingId = uuidv4();
+  const targetType = facturaSursa === 'facturi_emise_anaf' ? 'factura_emisa_anaf' : 'factura';
+
   await bigquery.query(`
     INSERT INTO \`${PROJECT_ID}.${DATASET}.TranzactiiMatching_v2\` (
       id, tranzactie_id, target_type, target_id, target_details,
@@ -350,12 +377,13 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
     ) VALUES (
       '${matchingId}',
       '${propunere.tranzactie_id}',
-      'factura',
+      '${targetType}',
       '${propunere.factura_id}',
       JSON '${JSON.stringify({
     serie: propunere.factura_serie,
     numar: propunere.factura_numar,
-    client_nume: propunere.factura_client_nume
+    client_nume: propunere.factura_client_nume,
+    sursa: facturaSursa
   })}',
       ${propunere.score},
       '${propunere.matching_algorithm || 'auto_propunere'}',
@@ -368,7 +396,8 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
       JSON '${JSON.stringify({
     propunere_id: propunereId,
     approved_by: userName || userId || 'system',
-    referinta_gasita: propunere.referinta_gasita
+    referinta_gasita: propunere.referinta_gasita,
+    factura_sursa: facturaSursa
   })}',
       'active',
       CURRENT_TIMESTAMP(),
@@ -386,7 +415,8 @@ async function approveSingle(propunereId: string, userId: string, userName: stri
     WHERE id = '${propunereId}'
   `);
 
-  console.log(`✅ Propunere ${propunereId} aprobată: ${sumaTranzactie.toFixed(2)} RON → ${propunere.factura_serie || ''}-${propunere.factura_numar}`);
+  const sursaLabel = facturaSursa === 'facturi_emise_anaf' ? '[ANAF Externa]' : '[Generata]';
+  console.log(`✅ Propunere ${propunereId} aprobată: ${sumaTranzactie.toFixed(2)} RON → ${propunere.factura_serie || ''}-${propunere.factura_numar} ${sursaLabel}`);
 }
 
 /**

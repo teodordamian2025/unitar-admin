@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Query principal
+    // Query principal - include campuri pentru status achitare
     const query = `
       SELECT
         id,
@@ -124,10 +124,19 @@ export async function GET(req: NextRequest) {
         trimisa_de,
         tip_document,
         zip_file_id,
+        pdf_file_id,
         factura_generata_id,
         data_preluare,
         data_incarcare_anaf,
-        observatii
+        observatii,
+        -- Campuri status achitare
+        COALESCE(valoare_platita, 0) as valoare_platita,
+        COALESCE(status_achitare, 'Neincasat') as status_achitare,
+        data_ultima_plata,
+        matched_tranzactie_id,
+        matching_tip,
+        -- Rest de plata calculat
+        COALESCE(valoare_ron, valoare_totala) - COALESCE(valoare_platita, 0) as rest_de_plata
       FROM \`${FACTURI_EMISE_TABLE}\`
       WHERE ${whereClause}
       ORDER BY ${orderBy} ${orderDir.toUpperCase()}
