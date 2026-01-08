@@ -584,6 +584,12 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const updateCurs = (moneda: string, cursNou: number) => {
+    // ✅ FIX STORNARE: Nu permitem modificarea cursului pentru storno
+    if (isStorno) {
+      console.log('↩️ STORNO: Modificarea cursului nu este permisă - păstrăm valorile originale');
+      return;
+    }
+
     setCursuri(prev => ({
       ...prev,
       [moneda]: {
@@ -593,8 +599,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
     }));
 
-    setLiniiFactura(prev => prev.map(linie => 
-      linie.monedaOriginala === moneda 
+    setLiniiFactura(prev => prev.map(linie =>
+      linie.monedaOriginala === moneda
         ? { ...linie, cursValutar: cursNou, pretUnitar: (linie.valoareOriginala || 0) * cursNou }
         : linie
     ));
@@ -653,16 +659,23 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   }, [dataCursPersonalizata, etapeDisponibile.length, liniiFactura.length]);
 
   // Effect pentru recalcularea liniilor când se schimbă cursurile
+  // ✅ FIX STORNARE: Nu recalculăm cursurile pentru stornări - păstrăm valorile identice cu factura originală
   useEffect(() => {
+    // Pentru STORNO, NU recalculăm - păstrăm cursul și valorile din factura originală
+    if (isStorno) {
+      console.log('↩️ STORNO: Skip recalculare cursuri - păstrăm valorile originale ale facturii');
+      return;
+    }
+
     console.log('🔄 Recalculez liniile facturii cu cursurile actualizate...');
-    
+
     setLiniiFactura(prev => prev.map((linie, index) => {
       if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
         const cursNou = cursuri[linie.monedaOriginala]?.curs;
-        
+
         if (cursNou && cursNou !== linie.cursValutar) {
           const pretUnitarNou = linie.valoareOriginala * cursNou;
-          
+
           console.log(`📊 Linia ${index}: ${linie.denumire}`, {
             moneda: linie.monedaOriginala,
             valoare_originala: linie.valoareOriginala,
@@ -671,7 +684,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
             pret_vechi: linie.pretUnitar?.toFixed(2),
             pret_nou: pretUnitarNou.toFixed(2)
           });
-          
+
           return {
             ...linie,
             cursValutar: cursNou,
@@ -681,18 +694,25 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
       return linie;
     }));
-  }, [cursuri]);
+  }, [cursuri, isStorno]);
 
   // FIX PROBLEME 1-3: updateLine cu logică completă pentru valoare/monedă/curs
+  // ✅ FIX STORNARE: Blocăm modificările de valoare/monedă/curs pentru storno
   const updateLine = (index: number, field: keyof LineFactura, value: string | number) => {
+    // Pentru STORNO, blocăm modificările de valoare, monedă și curs (trebuie să rămână identice cu factura originală)
+    if (isStorno && (field === 'valoareOriginala' || field === 'monedaOriginala' || field === 'cursValutar' || field === 'pretUnitar')) {
+      console.log(`↩️ STORNO: Modificarea câmpului ${field} nu este permisă - păstrăm valorile originale ale facturii`);
+      return;
+    }
+
     console.log(`🔧 UPDATE linia ${index}, câmpul ${field} = ${value}`);
-    
+
     const newLines = [...liniiFactura];
     const linieCurenta = { ...newLines[index] };
-    
+
     // Update direct pentru câmpul specificat
     (linieCurenta as any)[field] = value;
-    
+
     // FIX PROBLEMA 1: Logică specială pentru valoareOriginala
     if (field === 'valoareOriginala') {
       const novaValoare = Number(value) || 0;
@@ -1356,32 +1376,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   // SIMPLIFICAT: calculateTotals cu cursuri din state
+  // ✅ FIX STORNARE: Pentru storno NU recalculăm cu cursuri noi - păstrăm valorile originale
   const calculateTotals = () => {
     let subtotal = 0;
     let totalTva = 0;
-    
+
     liniiFactura.forEach(linie => {
       const cantitate = Number(linie.cantitate) || 0;
       let pretUnitar = Number(linie.pretUnitar) || 0;
-      
-      // Recalculează cu cursul din state dacă există
-      if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+
+      // Recalculează cu cursul din state DOAR pentru facturi noi/edit, NU pentru storno
+      // Pentru STORNO păstrăm pretUnitar așa cum este (valoarea negativă din factura originală)
+      if (!isStorno && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
         const curs = cursuri[linie.monedaOriginala];
         if (curs) {
           pretUnitar = linie.valoareOriginala * curs.curs;
         }
       }
-      
+
       const cotaTva = Number(linie.cotaTva) || 0;
       const valoare = cantitate * pretUnitar;
       const tva = valoare * (cotaTva / 100);
-      
+
       subtotal += valoare;
       totalTva += tva;
     });
-    
+
     const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
-    
+
     return {
       subtotal: safeFixed(subtotal),
       totalTva: safeFixed(totalTva),
@@ -2672,16 +2694,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                 <tbody>
                   {liniiFactura.map((linie, index) => {
                     const cantitate = Number(linie.cantitate) || 0;
-                    
+
                     // Calculează pretul unitar cu cursul din state
+                    // ✅ FIX STORNARE: Pentru storno NU recalculăm - păstrăm valorile originale
                     let pretUnitar = Number(linie.pretUnitar) || 0;
-                    if (linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+                    if (!isStorno && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
                       const curs = cursuri[linie.monedaOriginala];
                       if (curs) {
                         pretUnitar = linie.valoareOriginala * curs.curs;
                       }
                     }
-                    
+
                     const cotaTva = Number(linie.cotaTva) || 0;
                     const valoare = cantitate * pretUnitar;
                     const tva = valoare * (cotaTva / 100);
