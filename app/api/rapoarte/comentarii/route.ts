@@ -178,16 +178,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`Comentariu ${id} adăugat cu succes pentru proiectul ${proiect_id}`);
 
-    // ✅ HOOK NOTIFICĂRI: Trimite notificare către responsabilii proiectului
+    // ✅ HOOK NOTIFICĂRI: Trimite notificare către TOȚI responsabilii proiectului
+    // FIX 08.01.2026: Include și responsabilii din ProiecteResponsabili_v2/SubproiecteResponsabili_v2
+    // și trimite EMAIL, nu doar notificare în clopotel
     try {
-      // 1. Determină tabelul corect în funcție de tip_proiect
       const isSubproiect = tip_proiect === 'subproiect';
       const tableProiecte = isSubproiect ? `Subproiecte${tableSuffix}` : `Proiecte${tableSuffix}`;
+      const tableResponsabili = isSubproiect ? `SubproiecteResponsabili${tableSuffix}` : `ProiecteResponsabili${tableSuffix}`;
       const idColumn = isSubproiect ? 'ID_Subproiect' : 'ID_Proiect';
+      const idColumnResponsabili = isSubproiect ? 'subproiect_id' : 'proiect_id';
+      const tableUtilizatori = `Utilizatori${tableSuffix}`;
 
-      // 2. Caută responsabilul și denumirea proiectului
+      // 1. Obține denumirea proiectului
       const proiectQuery = `
-        SELECT Responsabil, Denumire
+        SELECT Denumire, Responsabil
         FROM \`${PROJECT_ID}.${DATASET}.${tableProiecte}\`
         WHERE ${idColumn} = @proiect_id
         LIMIT 1
@@ -199,76 +203,119 @@ export async function POST(request: NextRequest) {
         location: 'EU',
       });
 
-      if (proiectRows.length > 0) {
+      if (proiectRows.length === 0) {
+        console.warn(`⚠️ Proiect/Subproiect ${proiect_id} nu a fost găsit`);
+      } else {
         const proiectData = proiectRows[0];
-        const responsabilNume = proiectData.Responsabil;
         const proiectDenumire = proiectData.Denumire;
+        const responsabilPrincipalNume = proiectData.Responsabil;
 
-        // 3. Găsește UID-ul responsabilului din Utilizatori
-        if (responsabilNume) {
-          const tableUtilizatori = `Utilizatori${tableSuffix}`;
-          const utilizatorQuery = `
-            SELECT uid, nume, prenume, email, rol
-            FROM \`${PROJECT_ID}.${DATASET}.${tableUtilizatori}\`
-            WHERE CONCAT(nume, ' ', prenume) = @responsabil
-              OR CONCAT(prenume, ' ', nume) = @responsabil
-              OR nume = @responsabil
-              OR prenume = @responsabil
-            LIMIT 1
-          `;
+        // 2. Obține TOȚI responsabilii: din tabelul principal + din tabelul responsabili
+        // Query cu UNION pentru a combina:
+        // - Responsabilul principal din Proiecte/Subproiecte (rezolvat prin nume)
+        // - Responsabilii din ProiecteResponsabili/SubproiecteResponsabili (deja au UID)
+        const allResponsabiliQuery = `
+          WITH responsabil_principal AS (
+            SELECT
+              u.uid as responsabil_uid,
+              u.nume,
+              u.prenume,
+              u.email,
+              u.rol
+            FROM \`${PROJECT_ID}.${DATASET}.${tableUtilizatori}\` u
+            WHERE (
+              CONCAT(u.nume, ' ', u.prenume) = @responsabil_principal
+              OR CONCAT(u.prenume, ' ', u.nume) = @responsabil_principal
+              OR u.nume = @responsabil_principal
+            )
+            AND @responsabil_principal IS NOT NULL
+          ),
+          responsabili_tabel AS (
+            SELECT
+              r.responsabil_uid,
+              u.nume,
+              u.prenume,
+              u.email,
+              u.rol
+            FROM \`${PROJECT_ID}.${DATASET}.${tableResponsabili}\` r
+            INNER JOIN \`${PROJECT_ID}.${DATASET}.${tableUtilizatori}\` u
+              ON r.responsabil_uid = u.uid
+            WHERE r.${idColumnResponsabili} = @proiect_id
+          )
+          SELECT DISTINCT responsabil_uid, nume, prenume, email, rol
+          FROM responsabil_principal
+          UNION DISTINCT
+          SELECT DISTINCT responsabil_uid, nume, prenume, email, rol
+          FROM responsabili_tabel
+        `;
 
-          const [utilizatorRows] = await bigquery.query({
-            query: utilizatorQuery,
-            params: { responsabil: responsabilNume },
-            location: 'EU',
-          });
+        const [allResponsabili] = await bigquery.query({
+          query: allResponsabiliQuery,
+          params: {
+            proiect_id,
+            responsabil_principal: responsabilPrincipalNume || null,
+          },
+          location: 'EU',
+        });
 
-          if (utilizatorRows.length > 0) {
-            const responsabilUser = utilizatorRows[0];
+        console.log(`📧 Găsiți ${allResponsabili.length} responsabili pentru notificare comentariu`);
 
-            // 4. Nu trimite notificare dacă responsabilul este autorul comentariului
-            if (responsabilUser.uid !== autor_uid) {
-              // Construiește URL-ul pentru notificare
-              const baseUrl = request.url.split('/api/')[0];
+        // 3. Trimite notificare către fiecare responsabil (excluzând autorul)
+        const baseUrl = request.url.split('/api/')[0];
+        let notificariTrimise = 0;
 
-              // Determină link-ul corect în funcție de rolul utilizatorului
-              const isAdmin = responsabilUser.rol === 'admin';
-              const linkDetalii = isAdmin
-                ? `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
-                : `${baseUrl}/projects?search=${encodeURIComponent(proiect_id)}`;
+        for (const responsabil of allResponsabili) {
+          // Skip dacă responsabilul este autorul comentariului
+          if (responsabil.responsabil_uid === autor_uid) {
+            console.log(`⏭️ Skip notificare - ${responsabil.nume} ${responsabil.prenume} este autorul comentariului`);
+            continue;
+          }
 
-              const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  tip_notificare: 'comentariu_nou',
-                  user_id: responsabilUser.uid,
-                  context: {
-                    proiect_id: proiect_id,
-                    proiect_denumire: proiectDenumire,
-                    sarcina_titlu: proiectDenumire, // Template-ul folosește sarcina_titlu
-                    comentator_name: autor_nume,
-                    comentariu_text: comentariu.length > 200 ? comentariu.substring(0, 200) + '...' : comentariu,
-                    tip_comentariu: tip_comentariu,
-                    user_name: `${responsabilUser.nume} ${responsabilUser.prenume}`,
-                    user_prenume: responsabilUser.prenume,
-                    link_detalii: linkDetalii
-                  }
-                })
-              });
+          // Determină link-ul corect în funcție de rolul utilizatorului
+          const isAdmin = responsabil.rol === 'admin';
+          const linkDetalii = isAdmin
+            ? `${baseUrl}/admin/rapoarte/proiecte?search=${encodeURIComponent(proiect_id)}`
+            : `${baseUrl}/projects?search=${encodeURIComponent(proiect_id)}`;
 
-              const notifyResult = await notifyResponse.json();
-              console.log(`✅ Notificare comentariu trimisă către UID: ${responsabilUser.uid}`, notifyResult);
+          try {
+            const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tip_notificare: 'comentariu_nou',
+                user_id: responsabil.responsabil_uid,
+                force_email: true, // ✅ Forțează trimiterea email-ului
+                context: {
+                  proiect_id: proiect_id,
+                  proiect_denumire: proiectDenumire,
+                  sarcina_titlu: proiectDenumire,
+                  comentator_name: autor_nume,
+                  comentariu_text: comentariu.length > 200 ? comentariu.substring(0, 200) + '...' : comentariu,
+                  tip_comentariu: tip_comentariu,
+                  tip_proiect: tip_proiect,
+                  user_name: `${responsabil.nume} ${responsabil.prenume}`,
+                  user_prenume: responsabil.prenume,
+                  link_detalii: linkDetalii
+                }
+              })
+            });
+
+            const notifyResult = await notifyResponse.json();
+            if (notifyResult.success) {
+              notificariTrimise++;
+              console.log(`✅ Notificare comentariu trimisă către ${responsabil.nume} ${responsabil.prenume} (${responsabil.responsabil_uid})`);
             } else {
-              console.log(`⏭️ Skip notificare - autorul comentariului este și responsabilul proiectului`);
+              console.warn(`⚠️ Eroare notificare pentru ${responsabil.responsabil_uid}:`, notifyResult);
             }
-          } else {
-            console.warn(`⚠️ Nu s-a găsit utilizator cu numele "${responsabilNume}" în Utilizatori`);
+          } catch (singleNotifyError) {
+            console.error(`⚠️ Eroare la trimitere notificare către ${responsabil.responsabil_uid}:`, singleNotifyError);
           }
         }
+
+        console.log(`📬 Total notificări comentariu trimise: ${notificariTrimise}/${allResponsabili.length - (allResponsabili.some((r: any) => r.responsabil_uid === autor_uid) ? 1 : 0)}`);
       }
     } catch (notifyError) {
-      console.error('⚠️ Eroare la trimitere notificare comentariu (non-blocking):', notifyError);
+      console.error('⚠️ Eroare la trimitere notificări comentariu (non-blocking):', notifyError);
       // Nu blocăm adăugarea comentariului dacă notificarea eșuează
     }
 
