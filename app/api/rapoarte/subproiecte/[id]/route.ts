@@ -90,15 +90,15 @@ export async function PUT(
 
     console.log('🔷 UPDATE Subproiect:', { subproiectId, body });
 
-    // Validare: acceptăm status_predare, status_contract sau progres_procent
-    const allowedFields = ['status_predare', 'status_contract', 'progres_procent'];
+    // Validare: acceptăm status_predare, status_contract, progres_procent sau Status (09.01.2026)
+    const allowedFields = ['status_predare', 'status_contract', 'progres_procent', 'Status'];
     const fieldToUpdate = Object.keys(body).find(key => allowedFields.includes(key));
 
     if (!fieldToUpdate) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Doar status_predare, status_contract sau progres_procent pot fi actualizate prin acest endpoint'
+          error: 'Doar status_predare, status_contract, progres_procent sau Status pot fi actualizate prin acest endpoint'
         },
         { status: 400 }
       );
@@ -106,10 +106,11 @@ export async function PUT(
 
     const newValue = body[fieldToUpdate];
 
-    // Validare valori permise pentru statusuri
+    // Validare valori permise pentru statusuri (09.01.2026: adăugat Status)
     const validValues: { [key: string]: string[] } = {
       status_predare: ['Nepredat', 'Predat'],
-      status_contract: ['Nu e cazul', 'Nesemnat', 'Semnat']
+      status_contract: ['Nu e cazul', 'Nesemnat', 'Semnat'],
+      Status: ['Activ', 'Planificat', 'Suspendat', 'Finalizat']
     };
 
     // Validare specială pentru progres_procent (0-100)
