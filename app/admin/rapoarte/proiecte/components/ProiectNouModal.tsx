@@ -2013,6 +2013,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
                     >
                       <option value="Planificat">Planificat</option>
                       <option value="Activ">Activ</option>
+                      <option value="Suspendat">Suspendat</option>
                       <option value="Finalizat">Finalizat</option>
                     </select>
                   </div>

@@ -1345,6 +1345,24 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   }}>
                     Valoare Estimată
                   </th>
+                  {/* NOU 09.01.2026: Coloana Predare cu titlu vertical */}
+                  <th style={{
+                    padding: '0.5rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'mixed',
+                    transform: 'rotate(180deg)',
+                    height: '70px',
+                    width: '45px',
+                    verticalAlign: 'bottom'
+                  }}>
+                    Predat
+                  </th>
                   <th style={{
                     padding: '1rem 0.75rem',
                     textAlign: 'left',
@@ -1543,6 +1561,30 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             proiect.curs_valutar,
                             false
                           )}
+                        </td>
+                        {/* NOU 09.01.2026: Coloana Predare cu badge Da/Nu */}
+                        <td style={{
+                          padding: '0.5rem',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            background: proiect.status_predare === 'Predat'
+                              ? 'rgba(39, 174, 96, 0.15)'
+                              : 'rgba(243, 156, 18, 0.15)',
+                            color: proiect.status_predare === 'Predat'
+                              ? '#27ae60'
+                              : '#f39c12',
+                            border: `1px solid ${proiect.status_predare === 'Predat' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(243, 156, 18, 0.3)'}`
+                          }}>
+                            {proiect.status_predare === 'Predat' ? '✓ Da' : '✗ Nu'}
+                          </span>
                         </td>
                         <td style={{
                           padding: '0.75rem',
@@ -1947,6 +1989,30 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               subproiect.curs_valutar,
                               true
                             )}
+                          </td>
+                          {/* NOU 09.01.2026: Coloana Predare pentru subproiecte */}
+                          <td style={{
+                            padding: '0.5rem',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              background: subproiect.status_predare === 'Predat'
+                                ? 'rgba(39, 174, 96, 0.15)'
+                                : 'rgba(243, 156, 18, 0.15)',
+                              color: subproiect.status_predare === 'Predat'
+                                ? '#27ae60'
+                                : '#f39c12',
+                              border: `1px solid ${subproiect.status_predare === 'Predat' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(243, 156, 18, 0.3)'}`
+                            }}>
+                              {subproiect.status_predare === 'Predat' ? '✓ Da' : '✗ Nu'}
+                            </span>
                           </td>
                           <td style={{
                             padding: '0.5rem 0.75rem',

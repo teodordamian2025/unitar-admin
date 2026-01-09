@@ -442,6 +442,36 @@ export default function ProiectDetailsPage() {
     }
   };
 
+  // NOU 09.01.2026: Handler pentru actualizare Status proiect
+  const handleProiectStatusChange = async (field: 'Status' | 'status_predare', value: string) => {
+    if (!proiectId) return;
+
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(field === 'Status' ? 'Status proiect actualizat!' : 'Status predare actualizat!', { autoClose: 2000 });
+        // Actualizează local state-ul
+        setProiect(prev => prev ? { ...prev, [field]: value } : null);
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare');
+      }
+    } catch (error) {
+      console.error(`Eroare la actualizarea ${field}:`, error);
+      toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  };
+
   // NOU: Handler pentru actualizare progres proiect - DOAR API SAVE (04.10.2025 - Refactored cu debouncing)
   const handleProiectProgresSave = async (value: number) => {
     if (!proiectId) return;
@@ -1267,7 +1297,84 @@ export default function ProiectDetailsPage() {
           <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50' }}>
             🚀 Acțiuni Rapide
           </h3>
-          
+
+          {/* NOU 09.01.2026: Dropdown-uri Status și Predare */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0.75rem',
+            marginBottom: '1rem',
+            padding: '1rem',
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef'
+          }}>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#495057',
+                marginBottom: '0.5rem'
+              }}>
+                📊 Status Proiect
+              </label>
+              <select
+                value={proiect.Status || 'Activ'}
+                onChange={(e) => handleProiectStatusChange('Status', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #ced4da',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  background: 'white',
+                  cursor: 'pointer',
+                  color: proiect.Status === 'Activ' ? '#28a745'
+                    : proiect.Status === 'Finalizat' ? '#6f42c1'
+                    : proiect.Status === 'Suspendat' ? '#fd7e14'
+                    : '#6c757d'
+                }}
+              >
+                <option value="Activ">🟢 Activ</option>
+                <option value="Planificat">📋 Planificat</option>
+                <option value="Suspendat">⏸️ Suspendat</option>
+                <option value="Finalizat">✅ Finalizat</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#495057',
+                marginBottom: '0.5rem'
+              }}>
+                📦 Status Predare
+              </label>
+              <select
+                value={proiect.status_predare || 'Nepredat'}
+                onChange={(e) => handleProiectStatusChange('status_predare', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #ced4da',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  background: 'white',
+                  cursor: 'pointer',
+                  color: proiect.status_predare === 'Predat' ? '#28a745' : '#fd7e14'
+                }}
+              >
+                <option value="Nepredat">⏳ Nepredat</option>
+                <option value="Predat">✅ Predat</option>
+              </select>
+            </div>
+          </div>
+
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <button
               onClick={() => setShowContractModal(true)}

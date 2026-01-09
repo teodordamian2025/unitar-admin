@@ -2510,6 +2510,7 @@ export default function ProiectEditModal({
                     >
                       <option value="Planificat">Planificat</option>
                       <option value="Activ">Activ</option>
+                      <option value="Suspendat">Suspendat</option>
                       <option value="Finalizat">Finalizat</option>
                     </select>
                   </div>
