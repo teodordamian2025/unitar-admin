@@ -84,11 +84,15 @@ export default function UserProiectDetailsPage() {
   const [localProgresProiect, setLocalProgresProiect] = useState<number>(0);
   const [isSavingProgresProiect, setIsSavingProgresProiect] = useState(false);
   const [localStatusPredareProiect, setLocalStatusPredareProiect] = useState<string>('Nepredat');
+  // NOU 09.01.2026: State pentru Status proiect (Activ, Planificat, Suspendat, Finalizat)
+  const [localStatusProiect, setLocalStatusProiect] = useState<string>('Activ');
 
   const [localProgresSubproiecte, setLocalProgresSubproiecte] = useState<Record<string, number>>({});
   const [savingProgresSubproiect, setSavingProgresSubproiect] = useState<string | null>(null);
   const [localStatusPredareSubproiecte, setLocalStatusPredareSubproiecte] = useState<Record<string, string>>({});
   const [savingStatusSubproiect, setSavingStatusSubproiect] = useState<string | null>(null);
+  // NOU 09.01.2026: State pentru Status subproiecte
+  const [localStatusSubproiecte, setLocalStatusSubproiecte] = useState<Record<string, string>>({});
 
   // Debounced values - trigger API call după 800ms fără schimbări
   const debouncedProgresProiect = useDebounce(localProgresProiect, 800);
@@ -163,22 +167,28 @@ export default function UserProiectDetailsPage() {
     if (proiect) {
       setLocalProgresProiect(proiect.progres_procent ?? 0);
       setLocalStatusPredareProiect(proiect.status_predare || 'Nepredat');
+      // NOU 09.01.2026: Sincronizare Status proiect
+      setLocalStatusProiect(proiect.Status || 'Activ');
     }
-  }, [proiect?.progres_procent, proiect?.status_predare]);
+  }, [proiect?.progres_procent, proiect?.status_predare, proiect?.Status]);
 
   // NOU: Sincronizare local state cu subproiecte când se încarcă (04.10.2025)
   useEffect(() => {
     if (subproiecte.length > 0) {
       const newProgres: Record<string, number> = {};
+      const newStatusPredare: Record<string, string> = {};
+      // NOU 09.01.2026: Status subproiecte
       const newStatus: Record<string, string> = {};
       subproiecte.forEach(sub => {
         // FIX: Folosim ID_Subproiect pentru indexare, nu ID_Proiect
         const subId = sub.ID_Subproiect || sub.ID_Proiect;
         newProgres[subId] = sub.progres_procent ?? 0;
-        newStatus[subId] = sub.status_predare || 'Nepredat';
+        newStatusPredare[subId] = sub.status_predare || 'Nepredat';
+        newStatus[subId] = sub.Status || 'Activ';
       });
       setLocalProgresSubproiecte(newProgres);
-      setLocalStatusPredareSubproiecte(newStatus);
+      setLocalStatusPredareSubproiecte(newStatusPredare);
+      setLocalStatusSubproiecte(newStatus);
     }
   }, [subproiecte]);
 
@@ -325,6 +335,67 @@ export default function UserProiectDetailsPage() {
       console.error('Eroare la actualizarea statusului predare:', error);
       toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
       setLocalStatusPredareProiect(proiect?.status_predare || 'Nepredat');
+    }
+  };
+
+  // NOU 09.01.2026: Handler pentru actualizare Status proiect (Activ, Planificat, Suspendat, Finalizat)
+  const handleStatusProiectChange = async (value: string) => {
+    if (!projectId) return;
+
+    setLocalStatusProiect(value); // Update optimist
+
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Status: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Status proiect actualizat!', { autoClose: 2000 });
+        setProiect(prev => prev ? { ...prev, Status: value } : null);
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare status');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea statusului proiect:', error);
+      toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      setLocalStatusProiect(proiect?.Status || 'Activ');
+    }
+  };
+
+  // NOU 09.01.2026: Handler pentru actualizare Status subproiect
+  const handleStatusSubproiectChange = async (subproiectId: string, value: string) => {
+    setLocalStatusSubproiecte(prev => ({ ...prev, [subproiectId]: value })); // Update optimist
+
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Status: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Status subproiect actualizat!', { autoClose: 2000 });
+        setSubproiecte(prev => prev.map(sub =>
+          (sub.ID_Subproiect || sub.ID_Proiect) === subproiectId
+            ? { ...sub, Status: value }
+            : sub
+        ));
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare status');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea statusului subproiect:', error);
+      toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
+      setLocalStatusSubproiecte(prev => ({ ...prev, [subproiectId]: currentSub?.Status || 'Activ' }));
     }
   };
 
@@ -523,11 +594,11 @@ export default function UserProiectDetailsPage() {
             )}
           </div>
 
-          {/* NOU: Progres, Status Predare și Proces Verbal - Layout 3 coloane (05.10.2025) */}
+          {/* NOU: Progres, Status Proiect, Status Predare și Proces Verbal - Layout 4 coloane (09.01.2026) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr auto auto', // 50% | 25% | 25%
-            gap: '2rem',
+            gridTemplateColumns: '1fr auto auto auto', // Progres | Status | Predare | PV
+            gap: '1.5rem',
             marginTop: '2rem',
             padding: '1.5rem',
             background: 'rgba(52, 152, 219, 0.05)',
@@ -605,8 +676,36 @@ export default function UserProiectDetailsPage() {
               )}
             </div>
 
-            {/* Coloana 2: Status Predare (25%) */}
-            <div style={{ minWidth: '200px' }}>
+            {/* NOU 09.01.2026: Coloana 2: Status Proiect */}
+            <div style={{ minWidth: '150px' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: '#3498db' }}>📊 Status Proiect</h4>
+              <select
+                value={localStatusProiect}
+                onChange={(e) => handleStatusProiectChange(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  background: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  color: localStatusProiect === 'Activ' ? '#27ae60'
+                    : localStatusProiect === 'Finalizat' ? '#6f42c1'
+                    : localStatusProiect === 'Suspendat' ? '#fd7e14'
+                    : '#6c757d'
+                }}
+              >
+                <option value="Activ">🟢 Activ</option>
+                <option value="Planificat">📋 Planificat</option>
+                <option value="Suspendat">⏸️ Suspendat</option>
+                <option value="Finalizat">✅ Finalizat</option>
+              </select>
+            </div>
+
+            {/* Coloana 3: Status Predare */}
+            <div style={{ minWidth: '150px' }}>
               <h4 style={{ margin: '0 0 1rem 0', color: '#f39c12' }}>📦 Status Predare</h4>
               <select
                 value={localStatusPredareProiect}
@@ -621,13 +720,13 @@ export default function UserProiectDetailsPage() {
                   cursor: 'pointer'
                 }}
               >
-                <option value="Nepredat">Nepredat</option>
-                <option value="Predat">Predat</option>
+                <option value="Nepredat">⏳ Nepredat</option>
+                <option value="Predat">✅ Predat</option>
               </select>
             </div>
 
-            {/* Coloana 3: Proces Verbal (25%) - NOU */}
-            <div style={{ minWidth: '200px' }}>
+            {/* Coloana 4: Proces Verbal */}
+            <div style={{ minWidth: '150px' }}>
               <h4 style={{ margin: '0 0 1rem 0', color: '#27ae60' }}>📋 Proces Verbal</h4>
               <button
                 onClick={() => setShowPVModal(true)}
@@ -939,11 +1038,11 @@ export default function UserProiectDetailsPage() {
                     </p>
                   </div>
 
-                  {/* Grid 3 coloane: Progres | Status Predare | Acțiuni */}
+                  {/* Grid 4 coloane: Progres | Status | Status Predare | Acțiuni (09.01.2026) */}
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 200px 120px',
-                    gap: '1rem',
+                    gridTemplateColumns: '1fr 140px 140px 100px',
+                    gap: '0.75rem',
                     alignItems: 'center'
                   }}>
                     {/* Coloana 1: Progres */}
@@ -1003,10 +1102,40 @@ export default function UserProiectDetailsPage() {
                       </div>
                     </div>
 
-                    {/* Coloana 2: Status Predare */}
+                    {/* NOU 09.01.2026: Coloana 2: Status Subproiect */}
                     <div>
                       <div style={{ marginBottom: '0.5rem' }}>
-                        <strong style={{ fontSize: '13px', color: '#f39c12' }}>Status Predare:</strong>
+                        <strong style={{ fontSize: '13px', color: '#3498db' }}>Status:</strong>
+                      </div>
+                      <select
+                        value={localStatusSubproiecte[subId] || 'Activ'}
+                        onChange={(e) => handleStatusSubproiectChange(subId, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          background: 'white',
+                          cursor: 'pointer',
+                          fontWeight: '500',
+                          color: localStatusSubproiecte[subId] === 'Activ' ? '#27ae60'
+                            : localStatusSubproiecte[subId] === 'Finalizat' ? '#6f42c1'
+                            : localStatusSubproiecte[subId] === 'Suspendat' ? '#fd7e14'
+                            : '#6c757d'
+                        }}
+                      >
+                        <option value="Activ">🟢 Activ</option>
+                        <option value="Planificat">📋 Planificat</option>
+                        <option value="Suspendat">⏸️ Suspendat</option>
+                        <option value="Finalizat">✅ Finalizat</option>
+                      </select>
+                    </div>
+
+                    {/* Coloana 3: Status Predare */}
+                    <div>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong style={{ fontSize: '13px', color: '#f39c12' }}>Predare:</strong>
                       </div>
                       <select
                         value={localStatusPredareSubproiecte[subId] || 'Nepredat'}
@@ -1022,19 +1151,19 @@ export default function UserProiectDetailsPage() {
                           padding: '0.5rem',
                           border: '1px solid #ddd',
                           borderRadius: '4px',
-                          fontSize: '13px',
+                          fontSize: '12px',
                           background: savingStatusSubproiect === subId ? '#f0f0f0' : 'white',
                           cursor: savingStatusSubproiect === subId ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        <option value="Nepredat">Nepredat</option>
-                        <option value="Predat">Predat</option>
+                        <option value="Nepredat">⏳ Nepredat</option>
+                        <option value="Predat">✅ Predat</option>
                       </select>
                     </div>
 
-                    {/* Coloana 3: Acțiuni */}
+                    {/* Coloana 4: Acțiuni */}
                     <div>
-                      {subproiect.Status === 'Activ' && (
+                      {(localStatusSubproiecte[subId] || subproiect.Status) === 'Activ' && (
                         <button
                           onClick={() => handleOpenSarcini(subproiect)}
                           style={{
