@@ -939,16 +939,13 @@ export default function ProiectDetailsPage() {
 
                 <div style={{ display: 'grid', gap: '0.75rem' }}>
                   {subproiecte.map((sub) => (
-                    <div key={sub.ID_Subproiect} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1.3fr 0.7fr',
-                      gap: '0.75rem',
-                      alignItems: 'center',
-                      padding: '0.75rem',
-                      background: 'rgba(59, 130, 246, 0.05)',
-                      borderRadius: '6px',
-                      border: '1px solid rgba(59, 130, 246, 0.1)'
-                    }}>
+                    <div
+                      key={sub.ID_Subproiect}
+                      className="grid grid-cols-[2fr_1.3fr_0.7fr] gap-3 items-center p-3 rounded-md"
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.05)',
+                        border: '1px solid rgba(59, 130, 246, 0.1)'
+                      }}>
                       <div>
                         <div style={{ fontWeight: 500, color: '#2c3e50' }}>{sub.Denumire}</div>
                         <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem' }}>
