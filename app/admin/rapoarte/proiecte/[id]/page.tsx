@@ -941,7 +941,7 @@ export default function ProiectDetailsPage() {
                   {subproiecte.map((sub) => (
                     <div key={sub.ID_Subproiect} style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 1.5fr 1fr',
+                      gridTemplateColumns: '2fr 1.3fr 0.7fr',
                       gap: '0.75rem',
                       alignItems: 'center',
                       padding: '0.75rem',
