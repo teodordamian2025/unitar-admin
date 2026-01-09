@@ -984,6 +984,92 @@ export default function ProiectEditModal({
     }
   };
 
+  // NOU: Funcție pentru sincronizare completă responsabili la subproiecte existente
+  // Similar cu addResponsabiliProiect, dar pentru SubproiecteResponsabili_v2
+  const syncResponsabiliSubproiecteExistente = async () => {
+    // Procesăm doar subproiectele existente care nu sunt marcate pentru ștergere
+    const subproiecteExistente = formData.subproiecte.filter(s => s.isExisting && !s.isDeleted);
+
+    for (const subproiect of subproiecteExistente) {
+      const subproiectId = subproiect.ID_Subproiect;
+      if (!subproiectId) continue;
+
+      try {
+        // 1. Încarcă responsabilii existenți din BD pentru acest subproiect
+        const checkResponse = await fetch(`/api/rapoarte/subproiecte-responsabili?subproiect_id=${subproiectId}`);
+        const existingData = await checkResponse.json();
+        const responsabiliDinBD = existingData.success && existingData.data ? existingData.data : [];
+
+        // 2. Obține responsabilii selectați în UI pentru acest subproiect
+        const responsabiliSelectatiSubproiect = responsabiliSubproiecte[subproiectId] || [];
+
+        console.log(`🔄 Sincronizare responsabili pentru subproiectul ${subproiectId}:`);
+        console.log(`   - În BD: ${responsabiliDinBD.length} responsabili`);
+        console.log(`   - Selectați în UI: ${responsabiliSelectatiSubproiect.length} responsabili`);
+
+        // 3. ȘTERGE responsabilii care au fost eliminați din UI
+        const responsabiliDeSters = responsabiliDinBD.filter((respBD: any) =>
+          !responsabiliSelectatiSubproiect.find(respUI => respUI.uid === respBD.responsabil_uid)
+        );
+
+        for (const respDeSters of responsabiliDeSters) {
+          try {
+            const deleteResponse = await fetch(
+              `/api/rapoarte/subproiecte-responsabili?id=${respDeSters.id}`,
+              { method: 'DELETE' }
+            );
+            if (deleteResponse.ok) {
+              console.log(`   ✅ Șters responsabil din subproiect: ${respDeSters.responsabil_nume}`);
+            }
+          } catch (error) {
+            console.error(`   ❌ Eroare ștergere ${respDeSters.responsabil_nume}:`, error);
+          }
+        }
+
+        // 4. ADAUGĂ responsabilii noi care nu existau în BD
+        const responsabiliDeAdaugat = responsabiliSelectatiSubproiect.filter(respUI =>
+          !responsabiliDinBD.find((respBD: any) => respBD.responsabil_uid === respUI.uid)
+        );
+
+        for (const respNou of responsabiliDeAdaugat) {
+          try {
+            const responsabilData = {
+              id: `RESP_SUB_${subproiectId}_${respNou.uid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              subproiect_id: subproiectId,
+              responsabil_uid: respNou.uid,
+              responsabil_nume: respNou.nume_complet,
+              rol_in_subproiect: respNou.rol_in_proiect || 'Normal',
+              data_atribuire: getRomanianDateTime(),
+              atribuit_de: respNou.uid
+            };
+
+            const response = await fetch('/api/rapoarte/subproiecte-responsabili', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(responsabilData)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+              console.log(`   ✅ Adăugat responsabil nou: ${respNou.nume_complet} (${respNou.rol_in_proiect})`);
+            } else {
+              // Ignorăm eroarea dacă responsabilul există deja (poate fi din alt flux)
+              if (!result.error?.includes('deja atribuit')) {
+                console.error(`   ⚠️ Eroare adăugare ${respNou.nume_complet}:`, result.error);
+              }
+            }
+          } catch (error) {
+            console.error(`   ❌ Eroare adăugare ${respNou.nume_complet}:`, error);
+          }
+        }
+
+        console.log(`✅ Subproiect ${subproiectId}: șterși ${responsabiliDeSters.length}, adăugați ${responsabiliDeAdaugat.length}`);
+      } catch (error) {
+        console.error(`❌ Eroare la sincronizarea responsabililor pentru subproiectul ${subproiectId}:`, error);
+      }
+    }
+  };
+
   // Funcția pentru adăugarea cheltuielilor
   const addCheltuieli = async (proiectId: string) => {
     for (const cheltuiala of formData.cheltuieli.filter(c => !c.isExisting && !c.isDeleted)) {
@@ -1305,6 +1391,8 @@ export default function ProiectEditModal({
 
         // Actualizează subproiectele
         await updateSubproiecteExistente();
+        // NOU: Sincronizează responsabilii pentru subproiectele existente
+        await syncResponsabiliSubproiecteExistente();
         await deleteSubproiecte();
         await addSubproiecte(proiectId, updateData.Data_Start, updateData.Data_Final);
 
