@@ -941,7 +941,7 @@ export default function ProiectDetailsPage() {
                   {subproiecte.map((sub) => (
                     <div key={sub.ID_Subproiect} style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                      gridTemplateColumns: '2fr 1.5fr 1fr',
                       gap: '0.75rem',
                       alignItems: 'center',
                       padding: '0.75rem',
@@ -968,7 +968,7 @@ export default function ProiectDetailsPage() {
                             padding: '0.5rem',
                             border: '1px solid #ddd',
                             borderRadius: '4px',
-                            fontSize: '13px',
+                            fontSize: '14px',
                             background: 'white'
                           }}
                         >
@@ -977,29 +977,7 @@ export default function ProiectDetailsPage() {
                         </select>
                       </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
-                          Contract
-                        </label>
-                        <select
-                          value={sub.status_contract || 'Nu e cazul'}
-                          onChange={(e) => handleSubproiectStatusUpdate(sub.ID_Subproiect, 'status_contract', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            background: 'white'
-                          }}
-                        >
-                          <option value="Nu e cazul">Nu e cazul</option>
-                          <option value="Nesemnat">Nesemnat</option>
-                          <option value="Semnat">Semnat</option>
-                        </select>
-                      </div>
-
-                      {/* NOU: Coloană Progres Subproiect (04.10.2025) */}
+                      {/* Coloană Progres Subproiect */}
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
                           Progres
