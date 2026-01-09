@@ -608,6 +608,43 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
     }));
   };
 
+  // NOU: Funcție pentru salvarea responsabililor subproiectelor în SubproiecteResponsabili_v2
+  // Rezolvă inconsistența: ProiectNouModal salva doar în câmpul legacy Responsabil din Subproiecte_v2
+  const addResponsabiliSubproiect = async (subproiectId: string, responsabili: ResponsabilSelectat[]) => {
+    if (responsabili.length === 0) return;
+
+    try {
+      for (const responsabil of responsabili) {
+        const responsabilData = {
+          id: `RESP_SUB_${subproiectId}_${responsabil.uid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          subproiect_id: subproiectId,
+          responsabil_uid: responsabil.uid,
+          responsabil_nume: responsabil.nume_complet,
+          rol_in_subproiect: responsabil.rol_in_proiect, // În ProiectNouModal, interfața folosește rol_in_proiect
+          data_atribuire: new Date().toISOString(),
+          atribuit_de: responsabil.uid
+        };
+
+        const response = await fetch('/api/rapoarte/subproiecte-responsabili', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(responsabilData)
+        });
+
+        const result = await response.json();
+        if (!result.success) {
+          // Ignorăm eroarea dacă responsabilul există deja (poate fi din alt flux)
+          if (!result.error?.includes('deja atribuit')) {
+            console.error(`Eroare la salvarea responsabilului ${responsabil.nume_complet}:`, result.error);
+          }
+        }
+      }
+      console.log(`✅ Salvați ${responsabili.length} responsabili pentru subproiectul ${subproiectId} în SubproiecteResponsabili_v2`);
+    } catch (error) {
+      console.error('Eroare la salvarea responsabililor subproiect:', error);
+    }
+  };
+
   // PĂSTRAT: Funcțiile pentru adăugarea subproiectelor și cheltuielilor cu cursuri BNR
   const addSubproiecte = async (proiectId: string, dataStart: string | null, dataFinal: string | null) => {
     console.log(`Începe adăugarea subproiectelor pentru ${proiectId}`);
@@ -662,9 +699,13 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
         });
         
         const result = await response.json();
-        
+
         if (result.success) {
-          console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes`);
+          // NOU: Salvează responsabilii în SubproiecteResponsabili_v2 (nu doar în câmpul legacy Responsabil)
+          if (responsabiliSubproiect.length > 0) {
+            await addResponsabiliSubproiect(subproiectData.ID_Subproiect, responsabiliSubproiect);
+          }
+          console.log(`Subproiect "${subproiect.denumire}" adăugat cu succes cu ${responsabiliSubproiect.length} responsabili`);
         } else {
           console.error(`Eroare la subproiect ${subproiect.denumire}:`, result);
           toast.error(`Eroare la adăugarea subproiectului "${subproiect.denumire}": ${result.error}`);
