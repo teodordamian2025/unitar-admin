@@ -45,6 +45,9 @@ interface PropunereIncasare {
   factura_numar: string;
   factura_client_nume: string;
   factura_client_cui: string | null;
+  // Sursa facturii: facturi_generate (interne) sau facturi_emise_anaf (externe)
+  factura_sursa?: 'facturi_generate' | 'facturi_emise_anaf';
+  factura_emisa_id?: string | null;
   tranzactie_data: string;
   tranzactie_contrapartida: string | null;
   tranzactie_cui: string | null;
@@ -605,6 +608,11 @@ function PropunereCard({
                   AUTO
                 </span>
               )}
+              {propunere.factura_sursa === 'facturi_emise_anaf' && (
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                  EXTERN
+                </span>
+              )}
               {propunere.referinta_gasita && (
                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
                   REF: {propunere.referinta_gasita}
@@ -691,8 +699,13 @@ function PropunereCard({
 
             {/* Detalii Factură */}
             <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
                 📄 Factură
+                {propunere.factura_sursa === 'facturi_emise_anaf' && (
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                    ANAF Extern
+                  </span>
+                )}
               </h4>
               <div className="space-y-1 text-sm">
                 <p><span className="text-gray-500">Serie-Număr:</span> <strong>{facturaRef}</strong></p>

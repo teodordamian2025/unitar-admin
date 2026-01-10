@@ -53,18 +53,22 @@ export async function GET(request: NextRequest) {
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Query principal
+    // Query principal - suportă atât facturi interne (FacturiGenerate) cât și externe (FacturiEmiseANAF)
     const [propuneri] = await bigquery.query(`
       SELECT
         p.*,
-        -- Date suplimentare factură
+        -- Date suplimentare factură internă (FacturiGenerate_v2)
         fg.status as factura_status_curent,
         fg.valoare_platita as factura_valoare_platita_curent,
+        -- Date suplimentare factură externă (FacturiEmiseANAF_v2)
+        fe.status_achitare as factura_anaf_status_curent,
+        fe.valoare_platita as factura_anaf_valoare_platita_curent,
         -- Date suplimentare tranzacție
         tb.status as tranzactie_status_curent,
         tb.matching_tip as tranzactie_matching_curent
       FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
-      LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg ON p.factura_id = fg.id
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg ON p.factura_id = fg.id AND COALESCE(p.factura_sursa, 'facturi_generate') = 'facturi_generate'
+      LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\` fe ON p.factura_id = fe.id AND p.factura_sursa = 'facturi_emise_anaf'
       LEFT JOIN \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\` tb ON p.tranzactie_id = tb.id
       WHERE ${whereClause}
       ORDER BY
@@ -76,23 +80,42 @@ export async function GET(request: NextRequest) {
     `);
 
     // Normalizăm datele
-    const propuneriNormalizate = propuneri.map((p: any) => ({
-      ...p,
-      score: parseFloat(p.score) || 0,
-      suma_tranzactie: parseFloat(p.suma_tranzactie) || 0,
-      suma_factura: parseFloat(p.suma_factura) || 0,
-      rest_de_plata: parseFloat(p.rest_de_plata) || 0,
-      diferenta_ron: parseFloat(p.diferenta_ron) || 0,
-      diferenta_procent: parseFloat(p.diferenta_procent) || 0,
-      tranzactie_data: p.tranzactie_data?.value || p.tranzactie_data,
-      data_creare: p.data_creare,
-      matching_details: typeof p.matching_details === 'string'
-        ? JSON.parse(p.matching_details)
-        : p.matching_details,
-      // Flag pentru validitate (tranzacția/factura nu au fost deja procesate)
-      is_valid: (p.factura_status_curent !== 'platita' && p.factura_status_curent !== 'anulata') &&
-        (p.tranzactie_matching_curent === null || p.tranzactie_matching_curent === 'none')
-    }));
+    const propuneriNormalizate = propuneri.map((p: any) => {
+      // Determinăm validitatea în funcție de sursa facturii
+      const facturaSursa = p.factura_sursa || 'facturi_generate';
+      let facturaValida = true;
+
+      if (facturaSursa === 'facturi_emise_anaf') {
+        // Pentru facturi externe, verificăm status_achitare
+        facturaValida = p.factura_anaf_status_curent !== 'Incasat';
+      } else {
+        // Pentru facturi interne, verificăm status
+        facturaValida = p.factura_status_curent !== 'platita' &&
+                        p.factura_status_curent !== 'anulata' &&
+                        p.factura_status_curent !== 'storno' &&
+                        p.factura_status_curent !== 'stornata';
+      }
+
+      const tranzactieValida = p.tranzactie_matching_curent === null ||
+                               p.tranzactie_matching_curent === 'none';
+
+      return {
+        ...p,
+        score: parseFloat(p.score) || 0,
+        suma_tranzactie: parseFloat(p.suma_tranzactie) || 0,
+        suma_factura: parseFloat(p.suma_factura) || 0,
+        rest_de_plata: parseFloat(p.rest_de_plata) || 0,
+        diferenta_ron: parseFloat(p.diferenta_ron) || 0,
+        diferenta_procent: parseFloat(p.diferenta_procent) || 0,
+        tranzactie_data: p.tranzactie_data?.value || p.tranzactie_data,
+        data_creare: p.data_creare,
+        matching_details: typeof p.matching_details === 'string'
+          ? JSON.parse(p.matching_details)
+          : p.matching_details,
+        // Flag pentru validitate (tranzacția/factura nu au fost deja procesate)
+        is_valid: facturaValida && tranzactieValida
+      };
+    });
 
     // Statistici opționale
     let stats: any = null;
@@ -205,19 +228,35 @@ export async function POST(request: NextRequest) {
 
 /**
  * Aprobă toate propunerile auto-aprobabile
+ * Suportă atât facturi interne (FacturiGenerate) cât și externe (FacturiEmiseANAF)
  */
 async function approveAll(userId: string, userName: string) {
   // Obținem propunerile auto-aprobabile care sunt încă valide
+  // Verificăm validitatea în funcție de sursa facturii
   const [propuneri] = await bigquery.query(`
     SELECT p.id
     FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
-    LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg ON p.factura_id = fg.id
-    LEFT JOIN \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\` tb ON p.tranzactie_id = tb.id
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg
+      ON p.factura_id = fg.id AND COALESCE(p.factura_sursa, 'facturi_generate') = 'facturi_generate'
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\` fe
+      ON p.factura_id = fe.id AND p.factura_sursa = 'facturi_emise_anaf'
+    LEFT JOIN \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\` tb
+      ON p.tranzactie_id = tb.id
     WHERE
       p.status = 'pending'
       AND p.auto_approvable = TRUE
-      AND fg.status NOT IN ('platita', 'anulata', 'storno', 'stornata')
+      -- Tranzacția nu e deja matched
       AND (tb.matching_tip IS NULL OR tb.matching_tip = 'none')
+      -- Factura validă în funcție de sursa
+      AND (
+        -- Facturi interne: status nu e platita/anulata
+        (COALESCE(p.factura_sursa, 'facturi_generate') = 'facturi_generate'
+         AND fg.status NOT IN ('platita', 'anulata', 'storno', 'stornata'))
+        OR
+        -- Facturi externe: status_achitare nu e Incasat
+        (p.factura_sursa = 'facturi_emise_anaf'
+         AND fe.status_achitare != 'Incasat')
+      )
   `);
 
   if (propuneri.length === 0) {
