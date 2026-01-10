@@ -125,7 +125,17 @@ export async function GET(
     }
 
     // Query pentru facturi - Include detalii complete DAR EXCLUDE valorile financiare
+    // ✅ FIX 10.01.2026: Adăugat CTE incasari_facturi pentru calcul corect status încasări (ca la admin)
     const facturiQuery = `
+      WITH incasari_facturi AS (
+        -- Agregăm încasările din EtapeFacturi pentru fiecare factură (identic cu admin)
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        FROM ${ETAPE_FACTURI_TABLE}
+        WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      )
       SELECT
         fg.id as ID_Factura,
         fg.serie as Serie_Factura,
@@ -138,13 +148,26 @@ export async function GET(
         s.Denumire as Subproiect_Asociat,
         ef.tip_etapa,
 
-        -- Calcul status scadență (similar cu admin)
+        -- ✅ FIX: Calcul status scadență cu încasări corecte din EtapeFacturi
         CASE
-          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expirată'
-          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
-          WHEN (fg.total - COALESCE(fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
+          WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirată'
+          WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expiră curând'
+          WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Plătită'
           ELSE 'În regulă'
-        END as Status_Scadenta
+        END as Status_Scadenta,
+
+        -- ✅ NOU 10.01.2026: Status încasări (identic cu admin) - pentru afișare corectă în UI user
+        CASE
+          WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 OR COALESCE(inc.total_incasat, fg.valoare_platita, 0) >= fg.total THEN 'incasat_complet'
+          WHEN COALESCE(inc.total_incasat, fg.valoare_platita, 0) > 0 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'incasat_partial'
+          ELSE 'neincasat'
+        END as status_incasari,
+
+        -- ✅ NOU 10.01.2026: Procent încasat (fără sume în lei) - pentru afișare în UI user
+        CASE
+          WHEN fg.total > 0 THEN ROUND((COALESCE(inc.total_incasat, fg.valoare_platita, 0) / fg.total) * 100, 0)
+          ELSE 0
+        END as procent_incasat
 
         -- EXCLUDE: total, valoare_platita, rest_de_plata (sumele rămân ascunse)
       FROM ${FACTURI_TABLE} fg
@@ -152,6 +175,8 @@ export async function GET(
         ON fg.id = ef.factura_id AND ef.activ = true
       LEFT JOIN ${SUBPROIECTE_TABLE} s
         ON ef.subproiect_id = s.ID_Subproiect AND s.activ = true
+      LEFT JOIN incasari_facturi inc
+        ON fg.id = inc.factura_id
       WHERE fg.proiect_id = @projectId
       ORDER BY fg.data_factura DESC
     `;
@@ -207,7 +232,10 @@ export async function GET(
       Status_Plata: factura.Status_Plata,
       Status_Scadenta: factura.Status_Scadenta,
       Subproiect_Asociat: factura.Subproiect_Asociat,
-      tip_etapa: factura.tip_etapa
+      tip_etapa: factura.tip_etapa,
+      // ✅ NOU 10.01.2026: Status încasări și procent (fără sume financiare)
+      status_incasari: factura.status_incasari,
+      procent_incasat: factura.procent_incasat
       // EXCLUDE complet toate câmpurile financiare (nu le mapăm deloc)
     }));
 

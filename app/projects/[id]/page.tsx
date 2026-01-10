@@ -62,7 +62,9 @@ interface FacturaInfo {
   Status_Scadenta: string;
   Subproiect_Asociat?: string;
   tip_etapa?: string;
-  // Removed financial fields
+  // ✅ NOU 10.01.2026: Status încasări și procent (fără sume financiare)
+  status_incasari?: 'incasat_complet' | 'incasat_partial' | 'neincasat';
+  procent_incasat?: number;
 }
 
 export default function UserProiectDetailsPage() {
@@ -973,19 +975,39 @@ export default function UserProiectDetailsPage() {
                         <span style={{ color: '#6c757d' }}>Termen: </span>
                         <span style={{ fontWeight: 500 }}>{formatDate(factura.Data_Scadenta)}</span>
                       </div>
+                      {/* ✅ FIX 10.01.2026: Afișare status încasări corect (ca la admin) */}
                       <div>
-                        <span style={{ color: '#6c757d' }}>Status: </span>
+                        <span style={{ color: '#6c757d' }}>Status încasări: </span>
                         <span style={{
                           fontWeight: 500,
-                          color: factura.Status_Scadenta === 'Plătită' ? '#27ae60' :
-                                 factura.Status_Scadenta === 'Expirată' ? '#e74c3c' : '#3498db'
+                          color: factura.status_incasari === 'incasat_complet' ? '#27ae60' :
+                                 factura.status_incasari === 'incasat_partial' ? '#f39c12' : '#e74c3c'
                         }}>
-                          {factura.Status_Scadenta === 'Plătită' ? 'Încasată' :
-                           factura.Status_Scadenta === 'Expirată' ? 'Neîncasată (Expirată)' :
-                           factura.Status_Scadenta === 'Expiră curând' ? 'Neîncasată (Expiră curând)' : 'Neîncasată'}
+                          {factura.status_incasari === 'incasat_complet' ? 'Încasat complet' :
+                           factura.status_incasari === 'incasat_partial' ? `Încasat parțial (${factura.procent_incasat || 0}%)` :
+                           'Neîncasat'}
                         </span>
                       </div>
                     </div>
+                    {/* ✅ NOU 10.01.2026: Progress bar pentru plăți parțiale */}
+                    {factura.status_incasari === 'incasat_partial' && factura.procent_incasat && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <div style={{
+                          height: '6px',
+                          background: '#e9ecef',
+                          borderRadius: '3px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(factura.procent_incasat, 100)}%`,
+                            background: factura.procent_incasat >= 50 ? '#27ae60' : '#f39c12',
+                            borderRadius: '3px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
