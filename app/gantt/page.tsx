@@ -471,17 +471,47 @@ export default function GanttView() {
 
     if (totalDuration <= 0) return headers;
 
+    // Pentru modul ZILE: afisam doar lunile fiecarei saptamani (pentru lizibilitate)
+    if (timelineSettings.viewMode === 'days') {
+      // Gaseste prima zi de luni din interval (sau prima zi daca nu e luni)
+      const firstMonday = new Date(current);
+      const dayOfWeek = firstMonday.getDay();
+      // Daca nu e luni (0=duminica, 1=luni), mergi la urmatoarea luni
+      if (dayOfWeek !== 1) {
+        const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+        firstMonday.setDate(firstMonday.getDate() + daysUntilMonday);
+      }
+
+      // Genereaza header pentru fiecare luni
+      const mondayCurrent = new Date(firstMonday);
+      while (mondayCurrent <= end) {
+        const headerStart = new Date(mondayCurrent);
+        const headerEnd = new Date(mondayCurrent);
+        headerEnd.setDate(headerEnd.getDate() + 7); // Saptamana intreaga
+
+        const leftPercent = Math.max(0, ((headerStart.getTime() - timelineSettings.startDate.getTime()) / totalDuration) * 100);
+        const effectiveEnd = headerEnd.getTime() > end.getTime() ? end.getTime() : headerEnd.getTime();
+        const widthPercent = Math.max(0, ((effectiveEnd - headerStart.getTime()) / totalDuration) * 100);
+
+        headers.push({
+          date: headerStart,
+          leftPercent,
+          widthPercent
+        });
+
+        mondayCurrent.setDate(mondayCurrent.getDate() + 7);
+      }
+
+      return headers;
+    }
+
+    // Pentru SAPTAMANI si LUNI: comportament standard
     while (current <= end) {
       const headerStart = new Date(current);
 
       // Calculăm data de sfârșit a acestui header
       let headerEnd: Date;
       switch (timelineSettings.viewMode) {
-        case 'days':
-          headerEnd = new Date(current);
-          headerEnd.setDate(headerEnd.getDate() + 1);
-          current.setDate(current.getDate() + 1);
-          break;
         case 'weeks':
           headerEnd = new Date(current);
           headerEnd.setDate(headerEnd.getDate() + 7);
@@ -671,19 +701,27 @@ export default function GanttView() {
   };
 
   const formatDate = (date: Date) => {
-    const currentYear = new Date().getFullYear();
     const dateYear = date.getFullYear();
-    const shouldShowYear = dateYear !== currentYear;
+
+    // Helper pentru prescurtare luna cu prima litera mare
+    const getShortMonth = (d: Date) => {
+      const month = d.toLocaleDateString('ro-RO', { month: 'short' });
+      return month.charAt(0).toUpperCase() + month.slice(1);
+    };
 
     switch (timelineSettings.viewMode) {
       case 'days':
-        const dayFormat = date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' });
-        return shouldShowYear ? `${dayFormat} ${dateYear}` : dayFormat;
+        // Format: "01 Ian. 2025" - doar pentru luni (afisate in generateTimelineHeaders)
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${day} ${getShortMonth(date)} ${dateYear}`;
       case 'weeks':
-        const weekFormat = `S${Math.ceil(date.getDate() / 7)} ${date.toLocaleDateString('ro-RO', { month: 'short' })}`;
-        return shouldShowYear ? `${weekFormat} ${dateYear}` : weekFormat;
+        // Format: "S1 ian. 2026" - MEREU cu an
+        const weekNum = Math.ceil(date.getDate() / 7);
+        const monthShort = date.toLocaleDateString('ro-RO', { month: 'short' });
+        return `S${weekNum} ${monthShort} ${dateYear}`;
       case 'months':
-        return date.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+        // Format: "Ian. 2026" - prescurtat, orizontal
+        return `${getShortMonth(date)} ${dateYear}`;
       default:
         return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short', year: 'numeric' });
     }
@@ -1233,7 +1271,7 @@ export default function GanttView() {
                 Proiectele și Sarcinile Mele
               </div>
 
-              {/* Timeline Header - Date afișate vertical pentru vizibilitate mai bună */}
+              {/* Timeline Header - Date afișate orizontal pentru lizibilitate */}
               <div style={{
                 flex: 1,
                 height: `${HEADER_HEIGHT}px`,
@@ -1248,7 +1286,7 @@ export default function GanttView() {
                       left: `${header.leftPercent}%`,
                       width: `${header.widthPercent}%`,
                       height: '100%',
-                      padding: '1rem 0.25rem',
+                      padding: '0.25rem',
                       fontSize: '0.75rem',
                       fontWeight: '500',
                       color: '#374151',
@@ -1262,13 +1300,9 @@ export default function GanttView() {
                     }}
                   >
                     <span style={{
-                      writingMode: header.widthPercent < 8 ? 'vertical-rl' : 'horizontal-tb',
-                      textOrientation: header.widthPercent < 8 ? 'mixed' : 'mixed',
-                      transform: header.widthPercent < 8 ? 'rotate(180deg)' : 'none',
-                      fontSize: header.widthPercent < 5 ? '0.6rem' : '0.7rem',
+                      fontSize: '0.75rem',
                       lineHeight: '1.2',
-                      whiteSpace: 'nowrap',
-                      maxHeight: header.widthPercent < 8 ? '55px' : 'none'
+                      whiteSpace: 'nowrap'
                     }}>
                       {formatDate(header.date)}
                     </span>
