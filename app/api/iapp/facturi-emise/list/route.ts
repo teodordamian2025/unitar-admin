@@ -3,6 +3,7 @@
 // Returnează listă facturi emise cu filtrare și paginare
 // URL: GET /api/iapp/facturi-emise/list
 // Data: 29.10.2025
+// ACTUALIZAT: 10.01.2026 - Sincronizare status plată cu FacturiGenerate_v2
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,6 +23,8 @@ const bigquery = new BigQuery({
 });
 
 const FACTURI_EMISE_TABLE = `${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2`;
+const FACTURI_GENERATE_TABLE = `${PROJECT_ID}.${DATASET}.FacturiGenerate_v2`;
+const ETAPE_FACTURI_TABLE = `${PROJECT_ID}.${DATASET}.EtapeFacturi_v2`;
 
 /**
  * GET /api/iapp/facturi-emise/list
@@ -71,75 +74,131 @@ export async function GET(req: NextRequest) {
 
     console.log(`📋 [iapp.ro Emise List] Fetching facturi: ${dataStart} → ${dataEnd}, limit=${limit}, offset=${offset}`);
 
-    // Build query dinamică cu filtre
+    // Build query dinamică cu filtre - folosim prefix fe. pentru tabel FacturiEmiseANAF_v2
     let whereConditions: string[] = [
-      'activ = TRUE',
-      `DATE(data_factura) >= DATE('${dataStart}')`,
-      `DATE(data_factura) <= DATE('${dataEnd}')`
+      'fe.activ = TRUE',
+      `DATE(fe.data_factura) >= DATE('${dataStart}')`,
+      `DATE(fe.data_factura) <= DATE('${dataEnd}')`
     ];
 
     const queryParams: any = {};
 
     if (statusAnaf) {
-      whereConditions.push('status_anaf = @status_anaf');
+      whereConditions.push('fe.status_anaf = @status_anaf');
       queryParams.status_anaf = statusAnaf.toUpperCase();
     }
 
     if (cifClient) {
-      whereConditions.push('cif_client = @cif_client');
+      whereConditions.push('fe.cif_client = @cif_client');
       queryParams.cif_client = cifClient;
     }
 
     if (trimisaDe) {
-      whereConditions.push('trimisa_de = @trimisa_de');
+      whereConditions.push('fe.trimisa_de = @trimisa_de');
       queryParams.trimisa_de = trimisaDe;
     }
 
     if (search) {
       whereConditions.push(`(
-        LOWER(nume_client) LIKE @search OR
-        LOWER(serie_numar) LIKE @search OR
-        cif_client LIKE @search
+        LOWER(fe.nume_client) LIKE @search OR
+        LOWER(fe.serie_numar) LIKE @search OR
+        fe.cif_client LIKE @search
       )`);
       queryParams.search = `%${search.toLowerCase()}%`;
     }
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Query principal - include campuri pentru status achitare
+    // Query principal - JOIN cu FacturiGenerate_v2 și EtapeFacturi_v2 pentru status real de plată
+    // IMPORTANT: Încercăm match în ordinea: factura_generata_id direct, apoi serie_numar
     const query = `
+      WITH incasari_facturi AS (
+        -- Agregăm încasările din EtapeFacturi pentru fiecare factură generată
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat,
+          MAX(data_incasare) as ultima_data_incasare,
+          MAX(status_incasare) as status_incasare_ef
+        FROM \`${ETAPE_FACTURI_TABLE}\`
+        WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      )
       SELECT
-        id,
-        id_incarcare,
-        id_descarcare,
-        cif_client,
-        nume_client,
-        serie_numar,
-        data_factura,
-        valoare_totala,
-        moneda,
-        valoare_ron,
-        status_anaf,
-        mesaj_anaf,
-        trimisa_de,
-        tip_document,
-        zip_file_id,
-        pdf_file_id,
-        factura_generata_id,
-        data_preluare,
-        data_incarcare_anaf,
-        observatii,
-        -- Campuri status achitare
-        COALESCE(valoare_platita, 0) as valoare_platita,
-        COALESCE(status_achitare, 'Neincasat') as status_achitare,
-        data_ultima_plata,
-        matched_tranzactie_id,
-        matching_tip,
-        -- Rest de plata calculat
-        COALESCE(valoare_ron, valoare_totala) - COALESCE(valoare_platita, 0) as rest_de_plata
-      FROM \`${FACTURI_EMISE_TABLE}\`
+        fe.id,
+        fe.id_incarcare,
+        fe.id_descarcare,
+        fe.cif_client,
+        fe.nume_client,
+        fe.serie_numar,
+        fe.data_factura,
+        fe.valoare_totala,
+        fe.moneda,
+        fe.valoare_ron,
+        fe.status_anaf,
+        fe.mesaj_anaf,
+        fe.trimisa_de,
+        fe.tip_document,
+        fe.zip_file_id,
+        fe.pdf_file_id,
+        fe.factura_generata_id,
+        fe.data_preluare,
+        fe.data_incarcare_anaf,
+        fe.observatii,
+        -- Campuri status achitare - PRIORITATE: EtapeFacturi > FacturiGenerate > FacturiEmiseANAF
+        -- Folosim COALESCE pentru a lua prima valoare non-null din: match direct, match serie_numar, valoarea locală
+        COALESCE(
+          inc_direct.total_incasat,
+          fg_direct.valoare_platita,
+          inc_serie.total_incasat,
+          fg_serie.valoare_platita,
+          fe.valoare_platita,
+          0
+        ) as valoare_platita,
+        -- Status achitare calculat pe baza valorilor reale
+        CASE
+          WHEN COALESCE(inc_direct.total_incasat, fg_direct.valoare_platita, inc_serie.total_incasat, fg_serie.valoare_platita, fe.valoare_platita, 0) >=
+               COALESCE(fe.valoare_ron, fe.valoare_totala) * 0.99 THEN 'Incasat'
+          WHEN COALESCE(inc_direct.total_incasat, fg_direct.valoare_platita, inc_serie.total_incasat, fg_serie.valoare_platita, fe.valoare_platita, 0) > 0 THEN 'Partial'
+          ELSE 'Neincasat'
+        END as status_achitare,
+        -- Convertim toate datele la TIMESTAMP pentru COALESCE
+        COALESCE(
+          TIMESTAMP(inc_direct.ultima_data_incasare),
+          fg_direct.data_plata,
+          TIMESTAMP(inc_serie.ultima_data_incasare),
+          fg_serie.data_plata,
+          fe.data_ultima_plata
+        ) as data_ultima_plata,
+        fe.matched_tranzactie_id,
+        fe.matching_tip,
+        -- Rest de plata calculat corect
+        COALESCE(fe.valoare_ron, fe.valoare_totala) -
+          COALESCE(inc_direct.total_incasat, fg_direct.valoare_platita, inc_serie.total_incasat, fg_serie.valoare_platita, fe.valoare_platita, 0) as rest_de_plata,
+        -- Info despre sursa datelor de plată
+        CASE
+          WHEN inc_direct.total_incasat IS NOT NULL THEN 'EtapeFacturi (direct)'
+          WHEN fg_direct.valoare_platita IS NOT NULL THEN 'FacturiGenerate (direct)'
+          WHEN inc_serie.total_incasat IS NOT NULL THEN 'EtapeFacturi (serie)'
+          WHEN fg_serie.valoare_platita IS NOT NULL THEN 'FacturiGenerate (serie)'
+          ELSE 'FacturiEmiseANAF'
+        END as sursa_status_plata,
+        -- ID factură generată găsită (pentru debugging)
+        COALESCE(fe.factura_generata_id, fg_serie.id) as factura_generata_id_resolved
+      FROM \`${FACTURI_EMISE_TABLE}\` fe
+      -- Match direct prin factura_generata_id
+      LEFT JOIN \`${FACTURI_GENERATE_TABLE}\` fg_direct
+        ON fe.factura_generata_id = fg_direct.id
+      LEFT JOIN incasari_facturi inc_direct
+        ON fe.factura_generata_id = inc_direct.factura_id
+      -- Match prin serie_numar când factura_generata_id nu există
+      LEFT JOIN \`${FACTURI_GENERATE_TABLE}\` fg_serie
+        ON fe.factura_generata_id IS NULL
+        AND fe.serie_numar = CONCAT(fg_serie.serie, '-', fg_serie.numar)
+      LEFT JOIN incasari_facturi inc_serie
+        ON fe.factura_generata_id IS NULL
+        AND fg_serie.id = inc_serie.factura_id
       WHERE ${whereClause}
-      ORDER BY ${orderBy} ${orderDir.toUpperCase()}
+      ORDER BY fe.${orderBy} ${orderDir.toUpperCase()}
       LIMIT ${limit}
       OFFSET ${offset}
     `;
@@ -147,7 +206,7 @@ export async function GET(req: NextRequest) {
     // Query count pentru total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM \`${FACTURI_EMISE_TABLE}\`
+      FROM \`${FACTURI_EMISE_TABLE}\` fe
       WHERE ${whereClause}
     `;
 

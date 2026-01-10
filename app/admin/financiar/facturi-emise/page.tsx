@@ -41,6 +41,8 @@ interface FacturaEmisa {
   data_ultima_plata?: { value: string } | string | null;
   matched_tranzactie_id?: string | null;
   matching_tip?: string | null;
+  // Sursa datelor de plată (EtapeFacturi, FacturiGenerate, FacturiEmiseANAF)
+  sursa_status_plata?: string;
 }
 
 interface SyncStats {
@@ -242,6 +244,24 @@ export default function FacturiEmisePage() {
       default:
         return <span className="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">{status}</span>;
     }
+  };
+
+  // Helper: Determină clasa CSS pentru colorare rând bazat pe status plată
+  const getRowColorClass = (factura: FacturaEmisa): string => {
+    const status = factura.status_achitare || 'Neincasat';
+    const valoareRon = parseFloat(String(factura.valoare_ron)) || parseFloat(String(factura.valoare_totala)) || 0;
+    const platit = parseFloat(String(factura.valoare_platita)) || 0;
+    const rest = parseFloat(String(factura.rest_de_plata)) || (valoareRon - platit);
+
+    if (status === 'Incasat' || rest <= 0) {
+      // Verde pentru încasat complet
+      return 'bg-green-900/20 hover:bg-green-900/30 border-l-4 border-l-green-500';
+    } else if (status === 'Partial' || platit > 0) {
+      // Portocaliu/galben pentru încasare parțială
+      return 'bg-amber-900/20 hover:bg-amber-900/30 border-l-4 border-l-amber-500';
+    }
+    // Default pentru neîncasat
+    return 'hover:bg-white/5';
   };
 
   // Status badge Achitare
@@ -464,10 +484,11 @@ export default function FacturiEmisePage() {
                   return (
                     <>
                       {/* Rand principal - clickable pentru expand */}
+                      {/* Colorare: verde=încasat complet, portocaliu=partial, default=neîncasat */}
                       <tr
                         key={factura.id}
                         onClick={() => toggleExpand(factura.id)}
-                        className="hover:bg-white/5 transition-colors cursor-pointer"
+                        className={`${getRowColorClass(factura)} transition-colors cursor-pointer`}
                       >
                         <td className="px-4 py-3 text-sm text-white font-medium">
                           <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
