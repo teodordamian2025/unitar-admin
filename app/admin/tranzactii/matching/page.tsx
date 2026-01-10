@@ -4,6 +4,24 @@
 // DESCRIERE: Pagină dedicată pentru matching manual tranzacții cu facturi
 // FUNCȚIONALITATE: UI modern glassmorphism pentru manual matching
 // ==================================================================
+//
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                    ⚠️  PAGINĂ DEZACTIVATĂ  ⚠️                    ║
+// ║                                                                   ║
+// ║  DATA DEZACTIVARE: 10.01.2026                                    ║
+// ║                                                                   ║
+// ║  MOTIV: Funcționalitățile acestei pagini au fost preluate de:    ║
+// ║  - /admin/tranzactii/dashboard (buton Match la fiecare tranzacție)║
+// ║  - /admin/rapoarte/facturi (asociere directă din lista facturi)  ║
+// ║  - /admin/financiar/propuneri-incasari (propuneri automate)      ║
+// ║  - /admin/financiar/propuneri-plati (propuneri automate)         ║
+// ║                                                                   ║
+// ║  ATENȚIE: Nu efectuați corecții pe această pagină!               ║
+// ║  Codul este păstrat pentru referință și rollback dacă e nevoie.  ║
+// ║                                                                   ║
+// ║  Link meniu dezactivat în: app/components/ModernLayout.tsx       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+//
 
 'use client';
 
@@ -45,6 +63,9 @@ interface EtapaFacturaCandidat {
   diferenta_procent?: number;
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ⚠️  PAGINĂ DEZACTIVATĂ - Redirect automat la dashboard
+// ══════════════════════════════════════════════════════════════════
 export default function MatchingPage() {
   const router = useRouter();
   const [user, loading] = useAuthState(auth);
@@ -58,7 +79,15 @@ export default function MatchingPage() {
   const [candidatiFacuri, setCandidatiFacuri] = useState<EtapaFacturaCandidat[]>([]);
   const [loadingCandidati, setLoadingCandidati] = useState(false);
 
-  // Auth check
+  // ══════════════════════════════════════════════════════════════════
+  // ⚠️  DEZACTIVAT: Redirect automat la dashboard - 10.01.2026
+  // ══════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    // Pagină dezactivată - redirect la dashboard
+    router.replace('/admin/tranzactii/dashboard');
+  }, [router]);
+
+  // Auth check - DEZACTIVAT dar păstrat pentru referință
   useEffect(() => {
     if (loading) return;
     if (!user) {

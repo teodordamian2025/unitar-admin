@@ -74,9 +74,11 @@ const navStructure: NavItem[] = [
         icon: '💳',
         children: [
           { href: '/admin/tranzactii/dashboard', label: 'Dashboard', icon: '📊' },
-          { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '📤' },
-          { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
-          { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' }
+          { href: '/admin/tranzactii/import', label: 'Import CSV', icon: '📤' }
+          // DEZACTIVAT 10.01.2026: Paginile matching și manual au fost dezactivate
+          // Funcționalitățile lor sunt preluate de: dashboard (match), facturi, propuneri-incasari, propuneri-plati
+          // { href: '/admin/tranzactii/matching', label: 'Asociere Auto', icon: '🔄' },
+          // { href: '/admin/tranzactii/manual', label: 'Asociere Manuala', icon: '✍️' }
         ]
       },
       { href: '/admin/financiar/facturi-primite', label: 'Facturi Primite ANAF', icon: '📥' },

@@ -4,6 +4,18 @@
 // Actualizat: 22 decembrie 2025 - Scoring unificat
 // Cale: app/api/tranzactii/manual-match/route.ts
 // =================================================================
+//
+// NOTĂ 10.01.2026: Paginile standalone pentru acest API au fost DEZACTIVATE:
+// - /admin/tranzactii/matching (redirect automat la dashboard)
+// - /admin/tranzactii/manual (redirect automat la dashboard)
+//
+// Acest API este ÎNCĂ UTILIZAT de:
+// - ManualMatchingModal.tsx din dashboard (/admin/tranzactii/dashboard)
+// - Propuneri încasări (/admin/financiar/propuneri-incasari)
+// - Propuneri plăți (/admin/financiar/propuneri-plati)
+//
+// NU dezactivați acest API!
+// =================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
