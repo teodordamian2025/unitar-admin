@@ -1271,43 +1271,53 @@ export default function GanttView() {
                 Proiectele și Sarcinile Mele
               </div>
 
-              {/* Timeline Header - Date afișate orizontal pentru lizibilitate */}
+              {/* Timeline Header - Text vertical pentru săptămâni/zile, orizontal pentru luni */}
               <div style={{
                 flex: 1,
                 height: `${HEADER_HEIGHT}px`,
                 background: 'rgba(243, 244, 246, 0.9)',
                 position: 'relative'
               }}>
-                {timelineHeaders.map((header, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      position: 'absolute',
-                      left: `${header.leftPercent}%`,
-                      width: `${header.widthPercent}%`,
-                      height: '100%',
-                      padding: '0.25rem',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      color: '#374151',
-                      textAlign: 'center',
-                      borderRight: index < timelineHeaders.length - 1 ? '1px solid rgba(229, 231, 235, 0.5)' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxSizing: 'border-box',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <span style={{
-                      fontSize: '0.75rem',
-                      lineHeight: '1.2',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {formatDate(header.date)}
-                    </span>
-                  </div>
-                ))}
+                {timelineHeaders.map((header, index) => {
+                  const isVertical = timelineSettings.viewMode === 'weeks' || timelineSettings.viewMode === 'days';
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        position: 'absolute',
+                        left: `${header.leftPercent}%`,
+                        width: `${header.widthPercent}%`,
+                        height: '100%',
+                        padding: '0.25rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        textAlign: 'center',
+                        borderRight: index < timelineHeaders.length - 1 ? '1px solid rgba(229, 231, 235, 0.5)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: isVertical ? '0.65rem' : '0.75rem',
+                        lineHeight: '1.2',
+                        whiteSpace: 'nowrap',
+                        ...(isVertical ? {
+                          writingMode: 'vertical-rl',
+                          transform: 'rotate(180deg)',
+                          maxHeight: '55px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        } : {})
+                      }}>
+                        {formatDate(header.date)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
