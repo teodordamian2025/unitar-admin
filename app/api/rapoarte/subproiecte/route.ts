@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii subproiect (Principal, Normal, Observator)
+    // FIX 10.01.2026: Adăugat email în STRUCT pentru a fi disponibil în ProiectEditModal
     let query = `
       WITH responsabili_subproiect AS (
         SELECT
@@ -63,7 +64,8 @@ export async function GET(request: NextRequest) {
               sr.responsabil_nume,
               sr.rol_in_subproiect as rol_in_proiect,
               u.prenume,
-              u.nume
+              u.nume,
+              u.email
             )
             ORDER BY
               CASE sr.rol_in_subproiect

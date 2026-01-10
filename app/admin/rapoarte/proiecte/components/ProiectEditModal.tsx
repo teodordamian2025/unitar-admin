@@ -413,13 +413,15 @@ export default function ProiectEditModal({
   };
 
   // Încarcă subproiectele existente
+  // FIX 10.01.2026: Folosește responsabili_toti din API-ul subproiecte (CTE) în loc de apeluri separate
+  // Aceasta rezolvă problema că la unele subproiecte nu se vedeau responsabilii la editare
   const loadSubproiecte = async () => {
     if (!proiect.ID_Proiect) return;
-    
+
     try {
       const response = await fetch(`/api/rapoarte/subproiecte?proiect_id=${proiect.ID_Proiect}`);
       const data = await response.json();
-      
+
       if (data.success && data.data) {
         const subproiecteFormatate = data.data.map((sub: any) => ({
           id: sub.ID_Subproiect,
@@ -437,17 +439,76 @@ export default function ProiectEditModal({
           isExisting: true,
           isDeleted: false
         }));
-        
+
         setFormData(prev => ({
           ...prev,
           subproiecte: subproiecteFormatate
         }));
-        
-        // Încarcă responsabilii pentru subproiectele existente
-        const subproiecteIds = subproiecteFormatate.map(s => s.ID_Subproiect!);
-        await loadResponsabiliSubproiecte(subproiecteIds);
-        
-        console.log(`Încărcate ${subproiecteFormatate.length} subproiecte existente`);
+
+        // FIX 10.01.2026: Extrage responsabilii direct din responsabili_toti (din CTE-ul API-ului subproiecte)
+        // Aceasta este mai eficientă și mai fiabilă decât apeluri separate pentru fiecare subproiect
+        const responsabiliMap: {[key: string]: ResponsabilSelectat[]} = {};
+
+        for (const sub of data.data) {
+          const subproiectId = sub.ID_Subproiect;
+
+          // Verifică dacă avem responsabili_toti din CTE-ul API-ului
+          if (sub.responsabili_toti && Array.isArray(sub.responsabili_toti) && sub.responsabili_toti.length > 0) {
+            responsabiliMap[subproiectId] = sub.responsabili_toti.map((resp: any) => ({
+              uid: resp.responsabil_uid,
+              nume_complet: resp.responsabil_nume || `${resp.prenume || ''} ${resp.nume || ''}`.trim(),
+              email: resp.email || '',
+              rol_in_proiect: resp.rol_in_proiect || 'Normal'
+            }));
+            console.log(`✅ [loadSubproiecte] Subproiect ${subproiectId}: ${responsabiliMap[subproiectId].length} responsabili din responsabili_toti`);
+          }
+          // Fallback: dacă nu avem responsabili_toti dar avem câmpul legacy Responsabil
+          else if (sub.Responsabil && sub.Responsabil.trim() !== '') {
+            console.log(`⚠️ [loadSubproiecte] Subproiect ${subproiectId}: Nu există în SubproiecteResponsabili_v2, folosesc câmpul legacy Responsabil: "${sub.Responsabil}"`);
+
+            // Încearcă să găsească utilizatorul după nume pentru a obține uid-ul
+            const numeLegacy = sub.Responsabil.trim();
+            try {
+              const utilizatoriResponse = await fetch(`/api/rapoarte/utilizatori?search=${encodeURIComponent(numeLegacy)}&limit=1`);
+              const utilizatoriData = await utilizatoriResponse.json();
+
+              if (utilizatoriData.success && utilizatoriData.data && utilizatoriData.data.length > 0) {
+                const user = utilizatoriData.data[0];
+                responsabiliMap[subproiectId] = [{
+                  uid: user.uid,
+                  nume_complet: `${user.nume} ${user.prenume}`,
+                  email: user.email || '',
+                  rol_in_proiect: 'Principal'
+                }];
+                console.log(`✅ [loadSubproiecte] Creat responsabil fallback pentru subproiect ${subproiectId}: ${responsabiliMap[subproiectId][0].nume_complet}`);
+              } else {
+                // Dacă nu găsim utilizatorul, creăm un responsabil placeholder cu datele disponibile
+                responsabiliMap[subproiectId] = [{
+                  uid: `legacy_${subproiectId}`,
+                  nume_complet: numeLegacy,
+                  email: '',
+                  rol_in_proiect: 'Principal'
+                }];
+                console.log(`⚠️ [loadSubproiecte] Responsabil legacy fără uid pentru subproiect ${subproiectId}: ${numeLegacy}`);
+              }
+            } catch (err) {
+              console.error(`Eroare la căutarea utilizatorului ${numeLegacy}:`, err);
+              // Fallback minimal
+              responsabiliMap[subproiectId] = [{
+                uid: `legacy_${subproiectId}`,
+                nume_complet: numeLegacy,
+                email: '',
+                rol_in_proiect: 'Principal'
+              }];
+            }
+          } else {
+            // Nu există responsabili nici în SubproiecteResponsabili_v2 nici în câmpul legacy
+            responsabiliMap[subproiectId] = [];
+          }
+        }
+
+        setResponsabiliSubproiecte(responsabiliMap);
+        console.log(`Încărcate ${subproiecteFormatate.length} subproiecte existente cu responsabili din responsabili_toti`);
       }
     } catch (error) {
       console.error('Eroare la încărcarea subproiectelor:', error);
