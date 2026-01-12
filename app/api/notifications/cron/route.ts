@@ -1,10 +1,12 @@
 // CALEA: /app/api/notifications/cron/route.ts
-// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 14.12.2025
+// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 12.01.2026
 // DESCRIERE: Cron job pentru verificare termene apropiate ȘI DEPĂȘITE (proiecte, subproiecte, sarcini)
+// MODIFICAT: 12.01.2026 - Consolidare email-uri per user + link-uri corecte admin/user + ID proiect vizibil
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import type { NotificareContext } from '@/lib/notifications/types';
+import { sendNotificationEmail, renderTemplate } from '@/lib/notifications/send-email';
 
 // Force dynamic rendering for this route (fixes DynamicServerError)
 export const dynamic = 'force-dynamic';
@@ -34,6 +36,43 @@ const bigquery = new BigQuery({
   },
 });
 
+// =====================================================
+// INTERFACES pentru consolidare email-uri per user
+// =====================================================
+
+interface NotificareItem {
+  tip: 'proiect' | 'subproiect' | 'sarcina';
+  tip_notificare: string;
+  denumire: string;
+  proiect_id: string;
+  proiect_denumire?: string;
+  client?: string;
+  deadline: string;
+  zile_ramase?: number;
+  zile_intarziere?: number;
+  link_detalii: string;
+  prioritate?: string;
+}
+
+interface UserNotificationsGroup {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_rol: 'admin' | 'normal';
+  notificari: NotificareItem[];
+}
+
+// Map pentru colectarea notificărilor per user
+const userNotificationsMap = new Map<string, UserNotificationsGroup>();
+
+// Helper pentru generarea link-ului corect în funcție de rol
+function getProjectLink(baseUrl: string, proiectId: string, userRol: 'admin' | 'normal'): string {
+  if (userRol === 'admin') {
+    return `${baseUrl}/admin/rapoarte/proiecte/${proiectId}`;
+  }
+  return `${baseUrl}/projects/${proiectId}`;
+}
+
 // Helper pentru extragere dată din object BigQuery
 function extractDateValue(date: { value: string } | string | undefined): string | undefined {
   if (!date) return undefined;
@@ -59,8 +98,115 @@ function calculeazaZileDiferenta(dataTarget: string | undefined): { zileRamase: 
   }
 }
 
-// Helper generic pentru trimitere notificare
-async function trimitereNotificare(
+// Helper pentru adăugare notificare în grupul userului
+function addNotificationToUser(
+  userId: string,
+  userName: string,
+  userEmail: string,
+  userRol: 'admin' | 'normal',
+  notificare: NotificareItem
+) {
+  if (!userNotificationsMap.has(userId)) {
+    userNotificationsMap.set(userId, {
+      user_id: userId,
+      user_name: userName,
+      user_email: userEmail,
+      user_rol: userRol,
+      notificari: [],
+    });
+  }
+  userNotificationsMap.get(userId)!.notificari.push(notificare);
+}
+
+// Helper pentru trimitere email consolidat pentru un user
+async function sendConsolidatedEmail(
+  userGroup: UserNotificationsGroup,
+  baseUrl: string,
+  dryRun: boolean
+): Promise<{ success: boolean; count: number }> {
+  if (dryRun || userGroup.notificari.length === 0) {
+    return { success: true, count: userGroup.notificari.length };
+  }
+
+  if (!userGroup.user_email) {
+    console.warn(`⚠️ User ${userGroup.user_id} nu are email configurat`);
+    return { success: false, count: 0 };
+  }
+
+  // Generează subiect și conținut email consolidat
+  const notifCount = userGroup.notificari.length;
+  const subject = notifCount === 1
+    ? `Reminder: ${userGroup.notificari[0].denumire} - termen ${userGroup.notificari[0].zile_ramase !== undefined ? 'aproape' : 'depășit'}`
+    : `${notifCount} notificări despre termene proiecte`;
+
+  // Generează HTML pentru fiecare notificare
+  const notificariHtml = userGroup.notificari.map((n, index) => {
+    const isOverdue = n.zile_intarziere !== undefined && n.zile_intarziere > 0;
+    const statusColor = isOverdue ? '#EF4444' : '#F59E0B';
+    const statusText = isOverdue
+      ? `⚠️ DEPĂȘIT cu ${n.zile_intarziere} zile`
+      : `⏰ Mai sunt ${n.zile_ramase} zile`;
+
+    const tipLabel = n.tip === 'proiect' ? 'Proiect' : n.tip === 'subproiect' ? 'Subproiect' : 'Sarcină';
+
+    return `
+      <div style="background: #ffffff; border: 1px solid #E5E7EB; border-left: 4px solid ${statusColor}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <span style="background: ${statusColor}20; color: ${statusColor}; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 4px; text-transform: uppercase;">${tipLabel}</span>
+            <span style="background: #3B82F620; color: #3B82F6; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 4px; margin-left: 8px;">ID: ${n.proiect_id}</span>
+          </div>
+          <span style="color: ${statusColor}; font-weight: 600; font-size: 13px;">${statusText}</span>
+        </div>
+        <h3 style="margin: 0 0 8px 0; color: #1F2937; font-size: 16px; font-weight: 600;">${n.denumire}</h3>
+        ${n.proiect_denumire && n.tip !== 'proiect' ? `<p style="margin: 0 0 4px 0; color: #6B7280; font-size: 13px;">📁 Proiect: ${n.proiect_denumire}</p>` : ''}
+        ${n.client ? `<p style="margin: 0 0 4px 0; color: #6B7280; font-size: 13px;">👤 Client: ${n.client}</p>` : ''}
+        <p style="margin: 0 0 12px 0; color: #6B7280; font-size: 13px;">📅 Termen: ${n.deadline}</p>
+        <a href="${n.link_detalii}" style="display: inline-block; background: #3B82F6; color: white; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500;">Vezi Detalii ${tipLabel}</a>
+      </div>
+    `;
+  }).join('');
+
+  const htmlContent = `
+    <p>Bună <strong>${userGroup.user_name}</strong>,</p>
+    <p style="color: #4B5563; margin-bottom: 20px;">Ai ${notifCount} ${notifCount === 1 ? 'notificare' : 'notificări'} despre termene proiecte care necesită atenția ta:</p>
+    ${notificariHtml}
+    <p style="margin-top: 24px; color: #6B7280; font-size: 14px;">
+      Pentru a vizualiza toate notificările, accesează <a href="${baseUrl}/notifications" style="color: #3B82F6; text-decoration: none;">pagina de notificări</a>.
+    </p>
+  `;
+
+  const textContent = userGroup.notificari.map(n => {
+    const status = n.zile_intarziere !== undefined && n.zile_intarziere > 0
+      ? `DEPĂȘIT cu ${n.zile_intarziere} zile`
+      : `Mai sunt ${n.zile_ramase} zile`;
+    return `
+${n.tip.toUpperCase()} (ID: ${n.proiect_id}): ${n.denumire}
+${n.proiect_denumire && n.tip !== 'proiect' ? `Proiect: ${n.proiect_denumire}` : ''}
+${n.client ? `Client: ${n.client}` : ''}
+Termen: ${n.deadline}
+Status: ${status}
+Link: ${n.link_detalii}
+---`;
+  }).join('\n');
+
+  try {
+    const result = await sendNotificationEmail(
+      userGroup.user_email,
+      subject,
+      `Bună ${userGroup.user_name},\n\nAi ${notifCount} notificări despre termene proiecte:\n${textContent}`,
+      htmlContent,
+      {} as NotificareContext
+    );
+    return { success: result.success, count: notifCount };
+  } catch (error: any) {
+    console.error(`❌ Eroare trimitere email consolidat pentru ${userGroup.user_email}:`, error);
+    return { success: false, count: 0 };
+  }
+}
+
+// Helper generic pentru trimitere notificare în clopotel (fără email)
+async function trimitereNotificareClopotel(
   baseUrl: string,
   tipNotificare: string,
   userId: string,
@@ -72,6 +218,7 @@ async function trimitereNotificare(
   }
 
   try {
+    // Trimite doar pentru clopotel (UI), nu email - email-ul va fi consolidat
     const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,6 +226,7 @@ async function trimitereNotificare(
         tip_notificare: tipNotificare,
         user_id: userId,
         context,
+        skip_email: true, // Flag pentru a nu trimite email individual
       }),
     });
 
@@ -166,6 +314,9 @@ export async function GET(request: NextRequest) {
     // Responsabil în Proiecte_v2 este un NUME (ex: "Ionescu Mihai"), nu un UID!
     // Trebuie să facem JOIN cu Utilizatori_v2 pentru a găsi UID-ul corect
 
+    // Resetăm map-ul de notificări pentru fiecare rulare
+    userNotificationsMap.clear();
+
     const proiecteApropiateQuery = `
       WITH proiecte_apropiate AS (
         SELECT
@@ -181,7 +332,7 @@ export async function GET(request: NextRequest) {
           AND p.Status = 'Activ'
           AND (p.progres_procent IS NULL OR p.progres_procent < 100)
       ),
-      -- Obține UID-ul responsabilului principal din Utilizatori
+      -- Obține UID-ul responsabilului principal din Utilizatori (cu rol și email)
       responsabil_principal AS (
         SELECT
           pa.id,
@@ -191,7 +342,9 @@ export async function GET(request: NextRequest) {
           pa.responsabil_nume,
           pa.progres_procent,
           u.uid as responsabil_uid,
-          CONCAT(u.nume, ' ', u.prenume) as user_name
+          CONCAT(u.nume, ' ', u.prenume) as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM proiecte_apropiate pa
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
           CONCAT(u.nume, ' ', u.prenume) = pa.responsabil_nume
@@ -200,7 +353,7 @@ export async function GET(request: NextRequest) {
         )
         WHERE u.uid IS NOT NULL
       ),
-      -- Adaugă și responsabilii din ProiecteResponsabili_v2
+      -- Adaugă și responsabilii din ProiecteResponsabili_v2 (cu rol și email)
       responsabili_aditionali AS (
         SELECT
           pa.id,
@@ -210,9 +363,12 @@ export async function GET(request: NextRequest) {
           pr.responsabil_nume,
           pa.progres_procent,
           pr.responsabil_uid,
-          pr.responsabil_nume as user_name
+          pr.responsabil_nume as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM proiecte_apropiate pa
         INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pa.id
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON pr.responsabil_uid = u.uid
       )
       -- Combină ambele surse, eliminând duplicatele
       SELECT DISTINCT * FROM responsabil_principal
@@ -229,6 +385,7 @@ export async function GET(request: NextRequest) {
 
       const dataFinal = extractDateValue(proiect.data_final);
       const { zileRamase } = calculeazaZileDiferenta(dataFinal);
+      const userRol = (proiect.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         proiect.responsabil_uid,
@@ -242,22 +399,44 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Generează link corect în funcție de rol
+      const linkDetalii = getProjectLink(baseUrl, proiect.id, userRol);
+
       const context: NotificareContext = {
         proiect_id: proiect.id,
         proiect_denumire: proiect.denumire,
         proiect_client: proiect.client,
         proiect_deadline: dataFinal || '',
         zile_ramase: zileRamase,
-        user_name: proiect.user_name || proiect.responsabil_nume, // FIX: Folosește numele utilizatorului
-        link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${proiect.id}`,
+        user_name: proiect.user_name || proiect.responsabil_nume,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_proiect_aproape',
-        proiect.responsabil_uid, // Acum este UID-ul real din Utilizatori_v2
+        proiect.responsabil_uid,
         context,
         dryRun
+      );
+
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        proiect.responsabil_uid,
+        proiect.user_name || proiect.responsabil_nume,
+        proiect.user_email || '',
+        userRol,
+        {
+          tip: 'proiect',
+          tip_notificare: 'termen_proiect_aproape',
+          denumire: proiect.denumire,
+          proiect_id: proiect.id,
+          client: proiect.client,
+          deadline: dataFinal || '',
+          zile_ramase: zileRamase,
+          link_detalii: linkDetalii,
+        }
       );
 
       if (result.success) {
@@ -294,7 +473,9 @@ export async function GET(request: NextRequest) {
           pd.responsabil_nume,
           pd.progres_procent,
           u.uid as responsabil_uid,
-          CONCAT(u.nume, ' ', u.prenume) as user_name
+          CONCAT(u.nume, ' ', u.prenume) as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM proiecte_depasite pd
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
           CONCAT(u.nume, ' ', u.prenume) = pd.responsabil_nume
@@ -312,9 +493,12 @@ export async function GET(request: NextRequest) {
           pr.responsabil_nume,
           pd.progres_procent,
           pr.responsabil_uid,
-          pr.responsabil_nume as user_name
+          pr.responsabil_nume as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM proiecte_depasite pd
         INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pd.id
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON pr.responsabil_uid = u.uid
       )
       SELECT DISTINCT * FROM responsabil_principal
       UNION DISTINCT
@@ -330,6 +514,7 @@ export async function GET(request: NextRequest) {
 
       const dataFinal = extractDateValue(proiect.data_final);
       const { zileIntarziere } = calculeazaZileDiferenta(dataFinal);
+      const userRol = (proiect.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         proiect.responsabil_uid,
@@ -343,22 +528,44 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Generează link corect în funcție de rol
+      const linkDetalii = getProjectLink(baseUrl, proiect.id, userRol);
+
       const context: NotificareContext = {
         proiect_id: proiect.id,
         proiect_denumire: proiect.denumire,
         proiect_client: proiect.client,
         proiect_deadline: dataFinal || '',
         zile_intarziere: zileIntarziere,
-        user_name: proiect.user_name || proiect.responsabil_nume, // FIX: Folosește numele utilizatorului
-        link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${proiect.id}`,
+        user_name: proiect.user_name || proiect.responsabil_nume,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_proiect_depasit',
-        proiect.responsabil_uid, // Acum este UID-ul real
+        proiect.responsabil_uid,
         context,
         dryRun
+      );
+
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        proiect.responsabil_uid,
+        proiect.user_name || proiect.responsabil_nume,
+        proiect.user_email || '',
+        userRol,
+        {
+          tip: 'proiect',
+          tip_notificare: 'termen_proiect_depasit',
+          denumire: proiect.denumire,
+          proiect_id: proiect.id,
+          client: proiect.client,
+          deadline: dataFinal || '',
+          zile_intarziere: zileIntarziere,
+          link_detalii: linkDetalii,
+        }
       );
 
       if (result.success) {
@@ -380,7 +587,8 @@ export async function GET(request: NextRequest) {
           sp.Data_Final as data_final,
           sp.Responsabil as responsabil_nume,
           sp.progres_procent,
-          p.Denumire as proiect_denumire
+          p.Denumire as proiect_denumire,
+          p.Client as client
         FROM ${TABLE_SUBPROIECTE} sp
         LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
         WHERE sp.Data_Final IS NOT NULL
@@ -398,8 +606,11 @@ export async function GET(request: NextRequest) {
           sa.responsabil_nume,
           sa.progres_procent,
           sa.proiect_denumire,
+          sa.client,
           u.uid as responsabil_uid,
-          CONCAT(u.nume, ' ', u.prenume) as user_name
+          CONCAT(u.nume, ' ', u.prenume) as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM subproiecte_apropiate sa
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
           CONCAT(u.nume, ' ', u.prenume) = sa.responsabil_nume
@@ -417,10 +628,14 @@ export async function GET(request: NextRequest) {
           sr.responsabil_nume,
           sa.progres_procent,
           sa.proiect_denumire,
+          sa.client,
           sr.responsabil_uid,
-          sr.responsabil_nume as user_name
+          sr.responsabil_nume as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM subproiecte_apropiate sa
         INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sa.id
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON sr.responsabil_uid = u.uid
       )
       SELECT DISTINCT * FROM responsabil_principal
       UNION DISTINCT
@@ -436,6 +651,7 @@ export async function GET(request: NextRequest) {
 
       const dataFinal = extractDateValue(subproiect.data_final);
       const { zileRamase } = calculeazaZileDiferenta(dataFinal);
+      const userRol = (subproiect.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         subproiect.responsabil_uid,
@@ -449,6 +665,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Generează link corect în funcție de rol (link la proiect părinte)
+      const linkDetalii = getProjectLink(baseUrl, subproiect.proiect_id, userRol);
+
       const context: NotificareContext = {
         subproiect_id: subproiect.id,
         subproiect_denumire: subproiect.denumire,
@@ -456,16 +675,36 @@ export async function GET(request: NextRequest) {
         proiect_denumire: subproiect.proiect_denumire,
         proiect_deadline: dataFinal || '',
         zile_ramase: zileRamase,
-        user_name: subproiect.user_name || subproiect.responsabil_nume, // FIX: Folosește numele utilizatorului
-        link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${subproiect.proiect_id}`,
+        user_name: subproiect.user_name || subproiect.responsabil_nume,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_subproiect_aproape',
-        subproiect.responsabil_uid, // Acum este UID-ul real
+        subproiect.responsabil_uid,
         context,
         dryRun
+      );
+
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        subproiect.responsabil_uid,
+        subproiect.user_name || subproiect.responsabil_nume,
+        subproiect.user_email || '',
+        userRol,
+        {
+          tip: 'subproiect',
+          tip_notificare: 'termen_subproiect_aproape',
+          denumire: subproiect.denumire,
+          proiect_id: subproiect.proiect_id,
+          proiect_denumire: subproiect.proiect_denumire,
+          client: subproiect.client,
+          deadline: dataFinal || '',
+          zile_ramase: zileRamase,
+          link_detalii: linkDetalii,
+        }
       );
 
       if (result.success) {
@@ -487,7 +726,8 @@ export async function GET(request: NextRequest) {
           sp.Data_Final as data_final,
           sp.Responsabil as responsabil_nume,
           sp.progres_procent,
-          p.Denumire as proiect_denumire
+          p.Denumire as proiect_denumire,
+          p.Client as client
         FROM ${TABLE_SUBPROIECTE} sp
         LEFT JOIN ${TABLE_PROIECTE} p ON sp.ID_Proiect = p.ID_Proiect
         WHERE sp.Data_Final IS NOT NULL
@@ -505,8 +745,11 @@ export async function GET(request: NextRequest) {
           sd.responsabil_nume,
           sd.progres_procent,
           sd.proiect_denumire,
+          sd.client,
           u.uid as responsabil_uid,
-          CONCAT(u.nume, ' ', u.prenume) as user_name
+          CONCAT(u.nume, ' ', u.prenume) as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM subproiecte_depasite sd
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
           CONCAT(u.nume, ' ', u.prenume) = sd.responsabil_nume
@@ -524,10 +767,14 @@ export async function GET(request: NextRequest) {
           sr.responsabil_nume,
           sd.progres_procent,
           sd.proiect_denumire,
+          sd.client,
           sr.responsabil_uid,
-          sr.responsabil_nume as user_name
+          sr.responsabil_nume as user_name,
+          u.email as user_email,
+          u.rol as user_rol
         FROM subproiecte_depasite sd
         INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sd.id
+        LEFT JOIN ${TABLE_UTILIZATORI} u ON sr.responsabil_uid = u.uid
       )
       SELECT DISTINCT * FROM responsabil_principal
       UNION DISTINCT
@@ -543,6 +790,7 @@ export async function GET(request: NextRequest) {
 
       const dataFinal = extractDateValue(subproiect.data_final);
       const { zileIntarziere } = calculeazaZileDiferenta(dataFinal);
+      const userRol = (subproiect.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         subproiect.responsabil_uid,
@@ -556,6 +804,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Generează link corect în funcție de rol (link la proiect părinte)
+      const linkDetalii = getProjectLink(baseUrl, subproiect.proiect_id, userRol);
+
       const context: NotificareContext = {
         subproiect_id: subproiect.id,
         subproiect_denumire: subproiect.denumire,
@@ -563,16 +814,36 @@ export async function GET(request: NextRequest) {
         proiect_denumire: subproiect.proiect_denumire,
         proiect_deadline: dataFinal || '',
         zile_intarziere: zileIntarziere,
-        user_name: subproiect.user_name || subproiect.responsabil_nume, // FIX: Folosește numele utilizatorului
-        link_detalii: `${baseUrl}/admin/rapoarte/proiecte?id=${subproiect.proiect_id}`,
+        user_name: subproiect.user_name || subproiect.responsabil_nume,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_subproiect_depasit',
-        subproiect.responsabil_uid, // Acum este UID-ul real
+        subproiect.responsabil_uid,
         context,
         dryRun
+      );
+
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        subproiect.responsabil_uid,
+        subproiect.user_name || subproiect.responsabil_nume,
+        subproiect.user_email || '',
+        userRol,
+        {
+          tip: 'subproiect',
+          tip_notificare: 'termen_subproiect_depasit',
+          denumire: subproiect.denumire,
+          proiect_id: subproiect.proiect_id,
+          proiect_denumire: subproiect.proiect_denumire,
+          client: subproiect.client,
+          deadline: dataFinal || '',
+          zile_intarziere: zileIntarziere,
+          link_detalii: linkDetalii,
+        }
       );
 
       if (result.success) {
@@ -593,9 +864,15 @@ export async function GET(request: NextRequest) {
         s.proiect_id as proiect_id,
         s.progres_procent as progres_procent,
         sr.responsabil_uid as responsabil_uid,
-        sr.responsabil_nume as responsabil_nume
+        sr.responsabil_nume as responsabil_nume,
+        u.email as user_email,
+        u.rol as user_rol,
+        p.Denumire as proiect_denumire,
+        p.Client as client
       FROM ${TABLE_SARCINI} s
       INNER JOIN ${TABLE_SARCINI_RESPONSABILI} sr ON s.id = sr.sarcina_id
+      LEFT JOIN ${TABLE_UTILIZATORI} u ON sr.responsabil_uid = u.uid
+      LEFT JOIN ${TABLE_PROIECTE} p ON s.proiect_id = p.ID_Proiect
       WHERE s.data_scadenta IS NOT NULL
         AND s.data_scadenta BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
         AND s.status IN ('Neinceput', 'In Progres')
@@ -611,6 +888,7 @@ export async function GET(request: NextRequest) {
 
       const dataScadenta = extractDateValue(sarcina.data_scadenta);
       const { zileRamase } = calculeazaZileDiferenta(dataScadenta);
+      const userRol = (sarcina.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         sarcina.responsabil_uid,
@@ -624,23 +902,48 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Link la proiect (unde sunt sarcinile vizibile)
+      const linkDetalii = getProjectLink(baseUrl, sarcina.proiect_id, userRol);
+
       const context: NotificareContext = {
         sarcina_id: sarcina.id,
         sarcina_titlu: sarcina.titlu,
         sarcina_prioritate: sarcina.prioritate,
         sarcina_deadline: dataScadenta || '',
         proiect_id: sarcina.proiect_id,
+        proiect_denumire: sarcina.proiect_denumire,
         zile_ramase: zileRamase,
         user_name: sarcina.responsabil_nume,
-        link_detalii: `${baseUrl}/admin/rapoarte/sarcini?id=${sarcina.id}`,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_sarcina_aproape',
         sarcina.responsabil_uid,
         context,
         dryRun
+      );
+
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        sarcina.responsabil_uid,
+        sarcina.responsabil_nume,
+        sarcina.user_email || '',
+        userRol,
+        {
+          tip: 'sarcina',
+          tip_notificare: 'termen_sarcina_aproape',
+          denumire: sarcina.titlu,
+          proiect_id: sarcina.proiect_id,
+          proiect_denumire: sarcina.proiect_denumire,
+          client: sarcina.client,
+          deadline: dataScadenta || '',
+          zile_ramase: zileRamase,
+          prioritate: sarcina.prioritate,
+          link_detalii: linkDetalii,
+        }
       );
 
       if (result.success) {
@@ -661,9 +964,15 @@ export async function GET(request: NextRequest) {
         s.proiect_id as proiect_id,
         s.progres_procent as progres_procent,
         sr.responsabil_uid as responsabil_uid,
-        sr.responsabil_nume as responsabil_nume
+        sr.responsabil_nume as responsabil_nume,
+        u.email as user_email,
+        u.rol as user_rol,
+        p.Denumire as proiect_denumire,
+        p.Client as client
       FROM ${TABLE_SARCINI} s
       INNER JOIN ${TABLE_SARCINI_RESPONSABILI} sr ON s.id = sr.sarcina_id
+      LEFT JOIN ${TABLE_UTILIZATORI} u ON sr.responsabil_uid = u.uid
+      LEFT JOIN ${TABLE_PROIECTE} p ON s.proiect_id = p.ID_Proiect
       WHERE s.data_scadenta IS NOT NULL
         AND s.data_scadenta < CURRENT_DATE()
         AND s.status IN ('Neinceput', 'In Progres')
@@ -679,6 +988,7 @@ export async function GET(request: NextRequest) {
 
       const dataScadenta = extractDateValue(sarcina.data_scadenta);
       const { zileIntarziere } = calculeazaZileDiferenta(dataScadenta);
+      const userRol = (sarcina.user_rol === 'admin' ? 'admin' : 'normal') as 'admin' | 'normal';
 
       const dejaTrimisa = await notificareTrimisaRecent(
         sarcina.responsabil_uid,
@@ -692,18 +1002,23 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Link la proiect (unde sunt sarcinile vizibile)
+      const linkDetalii = getProjectLink(baseUrl, sarcina.proiect_id, userRol);
+
       const context: NotificareContext = {
         sarcina_id: sarcina.id,
         sarcina_titlu: sarcina.titlu,
         sarcina_prioritate: sarcina.prioritate,
         sarcina_deadline: dataScadenta || '',
         proiect_id: sarcina.proiect_id,
+        proiect_denumire: sarcina.proiect_denumire,
         zile_intarziere: zileIntarziere,
         user_name: sarcina.responsabil_nume,
-        link_detalii: `${baseUrl}/admin/rapoarte/sarcini?id=${sarcina.id}`,
+        link_detalii: linkDetalii,
       };
 
-      const result = await trimitereNotificare(
+      // Trimite notificare doar în clopotel (UI), nu email
+      const result = await trimitereNotificareClopotel(
         baseUrl,
         'termen_sarcina_depasita',
         sarcina.responsabil_uid,
@@ -711,12 +1026,56 @@ export async function GET(request: NextRequest) {
         dryRun
       );
 
+      // Adaugă în grupul pentru email consolidat
+      addNotificationToUser(
+        sarcina.responsabil_uid,
+        sarcina.responsabil_nume,
+        sarcina.user_email || '',
+        userRol,
+        {
+          tip: 'sarcina',
+          tip_notificare: 'termen_sarcina_depasita',
+          denumire: sarcina.titlu,
+          proiect_id: sarcina.proiect_id,
+          proiect_denumire: sarcina.proiect_denumire,
+          client: sarcina.client,
+          deadline: dataScadenta || '',
+          zile_intarziere: zileIntarziere,
+          prioritate: sarcina.prioritate,
+          link_detalii: linkDetalii,
+        }
+      );
+
       if (result.success) {
         notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Sarcină DEPĂȘITĂ: ${sarcina.titlu} (${zileIntarziere} zile întârziere)`);
       }
     }
 
-    console.log(`✅ Cron notificări termene - FINISH (${notificariTrimise.length} notificări)`);
+    // ============================================
+    // 7. TRIMITERE EMAIL-URI CONSOLIDATE PER USER
+    // ============================================
+    console.log(`📧 Trimitere email-uri consolidate pentru ${userNotificationsMap.size} utilizatori...`);
+
+    let emailsTrimise = 0;
+    let emailsEsuate = 0;
+
+    // Convertim Map la array pentru iterare compatibilă
+    const userGroups = Array.from(userNotificationsMap.values());
+
+    for (const userGroup of userGroups) {
+      if (userGroup.notificari.length === 0) continue;
+
+      const emailResult = await sendConsolidatedEmail(userGroup, baseUrl, dryRun);
+      if (emailResult.success) {
+        emailsTrimise++;
+        console.log(`✅ Email consolidat trimis către ${userGroup.user_email} (${userGroup.notificari.length} notificări)`);
+      } else {
+        emailsEsuate++;
+        console.log(`❌ Eroare trimitere email către ${userGroup.user_email}`);
+      }
+    }
+
+    console.log(`✅ Cron notificări termene - FINISH (${notificariTrimise.length} notificări, ${emailsTrimise} email-uri consolidate, ${emailsEsuate} eșuate)`);
 
     return NextResponse.json({
       success: true,
@@ -725,6 +1084,11 @@ export async function GET(request: NextRequest) {
       tables_version: tableSuffix || 'legacy',
       stats,
       notificari_trimise: notificariTrimise.length,
+      emails_consolidate: {
+        total_users: userNotificationsMap.size,
+        trimise: emailsTrimise,
+        esuate: emailsEsuate,
+      },
       detalii: notificariTrimise,
     });
 

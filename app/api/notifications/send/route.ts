@@ -40,8 +40,8 @@ const bigquery = new BigQuery({
 
 export async function POST(request: NextRequest) {
   try {
-    const body: SendNotificationRequest = await request.json();
-    const { tip_notificare, user_id, context, prioritate, force_email } = body;
+    const body = await request.json();
+    const { tip_notificare, user_id, context, prioritate, force_email, skip_email } = body as SendNotificationRequest & { skip_email?: boolean };
 
     // Validare
     if (!tip_notificare || !user_id || !context) {
@@ -172,8 +172,8 @@ export async function POST(request: NextRequest) {
         notification_ids.push(notification_id);
       }
 
-      // 5. Trimite email dacă canal_email = true sau force_email
-      if ((settings.canal_email || force_email) && user.email) {
+      // 5. Trimite email dacă canal_email = true sau force_email (și skip_email nu este setat)
+      if ((settings.canal_email || force_email) && user.email && !skip_email) {
         try {
           const emailResult = await sendNotificationEmail(
             user.email,
