@@ -300,10 +300,32 @@ export default function ProiectDetailsPage() {
 
     setLoadingPayments(true);
     try {
-      // Skip payments for now as API doesn't exist - will be implemented later
-      setPlati([]);
+      const queryParams = new URLSearchParams();
+      queryParams.append('proiectId', proiectId);
+      console.log('💳 Payment fetch with proiectId:', proiectId);
+
+      const response = await fetch(`/api/rapoarte/proiecte/plati?${queryParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Procesăm datele de plăți
+        const platiFormatate = (data.plati || []).map((p: any) => ({
+          ...p,
+          data_tranzactie: p.data_tranzactie?.value || p.data_tranzactie
+        }));
+        setPlati(platiFormatate);
+        console.log(`💳 Plăți încărcate pentru proiect ${proiectId}: ${platiFormatate.length}`);
+      } else {
+        console.warn('💳 API plăți nu a returnat success:', data);
+        setPlati([]);
+      }
     } catch (error) {
-      console.error('Eroare la încărcarea plăților:', error);
+      console.error('💳 Eroare la încărcarea plăților:', error);
+      setPlati([]);
     } finally {
       setLoadingPayments(false);
     }
