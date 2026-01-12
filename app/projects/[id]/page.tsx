@@ -16,6 +16,9 @@ import UserLayout from '@/app/components/user/UserLayout';
 import { LoadingSpinner } from '@/app/components/ui';
 import UserSarciniProiectModal from '../components/UserSarciniProiectModal';
 import ProcesVerbalModal from '@/app/admin/rapoarte/proiecte/components/ProcesVerbalModal';
+import CommentsCard from '@/app/admin/rapoarte/proiecte/components/CommentsCard';
+import TasksCard from '@/app/admin/rapoarte/proiecte/components/TasksCard';
+import ResponsabiliCard from '@/app/admin/rapoarte/proiecte/components/ResponsabiliCard';
 import { useDebounce } from '@/app/hooks/useDebounce';
 import { toast } from 'react-toastify';
 
@@ -1211,6 +1214,42 @@ export default function UserProiectDetailsPage() {
             </div>
           </div>
         )}
+
+        {/* NOU 12.01.2026: Card-uri Comentarii, Sarcini și Responsabili */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '1.5rem',
+          marginTop: '1.5rem'
+        }}>
+          {/* Card Comentarii */}
+          <CommentsCard
+            proiectId={projectId}
+            tipProiect="proiect"
+            proiectDenumire={proiect.Denumire}
+            maxComments={5}
+            showAddButton={true}
+          />
+
+          {/* Card Sarcini */}
+          <TasksCard
+            proiectId={projectId}
+            tipProiect="proiect"
+            proiectDenumire={proiect.Denumire}
+            client={proiect.Client}
+            status={proiect.Status}
+            maxTasks={5}
+          />
+
+          {/* Card Responsabili Proiect */}
+          <ResponsabiliCard
+            entityId={projectId}
+            entityType="proiect"
+            entityName={proiect.Denumire}
+            compact={false}
+            onUpdate={() => loadProiectDetails()}
+          />
+        </div>
       </div>
 
       {/* Sarcini Modal */}

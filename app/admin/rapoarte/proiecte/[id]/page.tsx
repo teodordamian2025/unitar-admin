@@ -17,6 +17,10 @@ import ModernLayout from '@/app/components/ModernLayout';
 import ContractModal from '../components/ContractModal';
 import FacturaHibridModal from '../components/FacturaHibridModal';
 import ProiectEditModal from '../components/ProiectEditModal';
+import CommentsCard from '../components/CommentsCard';
+import TasksCard from '../components/TasksCard';
+import ResponsabiliCard from '../components/ResponsabiliCard';
+import DateEditButton from '../components/DateEditButton';
 import { useDebounce } from '@/app/hooks/useDebounce';
 
 interface ProiectDetails {
@@ -801,14 +805,32 @@ export default function ProiectDetailsPage() {
               <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
                 Data Început
               </label>
-              <div style={{ color: '#6c757d' }}>{renderData(proiect.Data_Start)}</div>
+              <div style={{ color: '#6c757d', display: 'flex', alignItems: 'center' }}>
+                {renderData(proiect.Data_Start)}
+                <DateEditButton
+                  entityId={proiectId}
+                  entityType="proiect"
+                  dateField="Data_Start"
+                  currentDate={proiect.Data_Start}
+                  onUpdate={() => fetchProiectDetails()}
+                />
+              </div>
             </div>
-            
+
             <div>
               <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
                 Data Finalizare
               </label>
-              <div style={{ color: '#6c757d' }}>{renderData(proiect.Data_Final)}</div>
+              <div style={{ color: '#6c757d', display: 'flex', alignItems: 'center' }}>
+                {renderData(proiect.Data_Final)}
+                <DateEditButton
+                  entityId={proiectId}
+                  entityType="proiect"
+                  dateField="Data_Final"
+                  currentDate={proiect.Data_Final}
+                  onUpdate={() => fetchProiectDetails()}
+                />
+              </div>
             </div>
             
             <div>
@@ -941,17 +963,20 @@ export default function ProiectDetailsPage() {
                   {subproiecte.map((sub) => (
                     <div
                       key={sub.ID_Subproiect}
-                      className="grid grid-cols-[2fr_1.3fr_0.7fr] gap-3 items-center p-3 rounded-md"
                       style={{
                         background: 'rgba(59, 130, 246, 0.05)',
-                        border: '1px solid rgba(59, 130, 246, 0.1)'
+                        border: '1px solid rgba(59, 130, 246, 0.1)',
+                        borderRadius: '8px',
+                        padding: '0.75rem'
                       }}>
-                      <div>
-                        <div style={{ fontWeight: 500, color: '#2c3e50' }}>{sub.Denumire}</div>
-                        <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem' }}>
-                          Status: {sub.Status}
+                      {/* Row 1: Denumire + Status + Progres */}
+                      <div className="grid grid-cols-[2fr_1.3fr_0.7fr] gap-3 items-center">
+                        <div>
+                          <div style={{ fontWeight: 500, color: '#2c3e50' }}>{sub.Denumire}</div>
+                          <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem' }}>
+                            Status: {sub.Status}
+                          </div>
                         </div>
-                      </div>
 
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
@@ -1023,6 +1048,18 @@ export default function ProiectDetailsPage() {
                             %
                           </span>
                         </div>
+                      </div>
+                      </div>
+                      {/* Row 2: Responsabili subproiect (NOU 12.01.2026) */}
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                        <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '0.5rem' }}>Responsabili:</div>
+                        <ResponsabiliCard
+                          entityId={sub.ID_Subproiect}
+                          entityType="subproiect"
+                          entityName={sub.Denumire}
+                          compact={true}
+                          onUpdate={() => fetchSubproiecte()}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1645,6 +1682,34 @@ export default function ProiectDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* NOU 12.01.2026: Card Comentarii */}
+        <CommentsCard
+          proiectId={proiectId}
+          tipProiect="proiect"
+          proiectDenumire={proiect.Denumire}
+          maxComments={5}
+          showAddButton={true}
+        />
+
+        {/* NOU 12.01.2026: Card Sarcini */}
+        <TasksCard
+          proiectId={proiectId}
+          tipProiect="proiect"
+          proiectDenumire={proiect.Denumire}
+          client={proiect.Client}
+          status={proiect.Status}
+          maxTasks={5}
+        />
+
+        {/* NOU 12.01.2026: Card Responsabili Proiect */}
+        <ResponsabiliCard
+          entityId={proiectId}
+          entityType="proiect"
+          entityName={proiect.Denumire}
+          compact={false}
+          onUpdate={() => fetchProiectDetails()}
+        />
       </div>
 
       {/* CONTRACT MODAL */}
