@@ -101,10 +101,15 @@ async function getTranzactiiCandidate(limit: number = 500, checkExisting: boolea
   // Verificăm dacă tabelul propuneri există (pentru a exclude cele cu propuneri pending)
   const propuneriTableExists = checkExisting ? await tableExists() : false;
 
+  // Exclude tranzactii care au deja propuneri:
+  // - pending: propunere in asteptare
+  // - rejected: user a respins explicit propunerea
+  // - approved: deja aprobata (si matching_tip setat)
+  // Permitem re-propuneri doar pentru 'expired' (propuneri vechi nereactionate)
   const excludeClause = propuneriTableExists
     ? `AND NOT EXISTS (
         SELECT 1 FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
-        WHERE p.tranzactie_id = t.id AND p.status = 'pending'
+        WHERE p.tranzactie_id = t.id AND p.status IN ('pending', 'rejected', 'approved')
       )`
     : '';
 

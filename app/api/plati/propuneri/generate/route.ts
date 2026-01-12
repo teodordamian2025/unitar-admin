@@ -119,10 +119,15 @@ async function tableExists(): Promise<boolean> {
 async function getTranzactiiPlatiCandidate(limit: number = 500): Promise<TranzactiePlataCandidat[]> {
   const propuneriTableExists = await tableExists();
 
+  // Exclude tranzactii care au deja propuneri:
+  // - pending: propunere in asteptare
+  // - rejected: user a respins explicit propunerea
+  // - approved: deja aprobata (si matching_tip setat)
+  // Permitem re-propuneri doar pentru 'expired' (propuneri vechi nereactionate)
   const excludeClause = propuneriTableExists
     ? `AND NOT EXISTS (
         SELECT 1 FROM \`${PROJECT_ID}.${DATASET}.PlatiPropuneri_v2\` p
-        WHERE p.tranzactie_id = t.id AND p.status = 'pending'
+        WHERE p.tranzactie_id = t.id AND p.status IN ('pending', 'rejected', 'approved')
       )`
     : '';
 
