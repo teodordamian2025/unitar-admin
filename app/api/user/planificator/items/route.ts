@@ -174,6 +174,23 @@ export async function GET(request: NextRequest) {
       const is_realizat = comentariuComplet.includes(realizatMarker);
       const comentariu_curat = comentariuComplet.replace(realizatMarker, '').trim();
 
+      // Determină ID-ul proiectului pentru navigare către Detalii Proiect
+      let proiect_id_for_navigation: string | null = null;
+      if (row.tip_item === 'proiect') {
+        // Pentru proiecte: direct item_id
+        proiect_id_for_navigation = row.item_id;
+      } else if (row.tip_item === 'subproiect') {
+        // Pentru subproiecte: folosește proiectul părinte
+        proiect_id_for_navigation = row.subproiect_proiect_id || null;
+      } else if (row.tip_item === 'sarcina') {
+        // Pentru sarcini: depinde dacă e de proiect direct sau subproiect
+        if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
+          proiect_id_for_navigation = row.sarcina_proiect_parinte_id;
+        } else if (row.sarcina_proiect_id) {
+          proiect_id_for_navigation = row.sarcina_proiect_id;
+        }
+      }
+
       return {
         id: row.id,
         utilizator_uid: row.utilizator_uid,
@@ -187,7 +204,8 @@ export async function GET(request: NextRequest) {
         data_scadenta,
         zile_pana_scadenta: zile,
         urgenta,
-        comentariu_original
+        comentariu_original,
+        proiect_id_for_navigation
       };
     });
 

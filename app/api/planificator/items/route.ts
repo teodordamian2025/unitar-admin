@@ -81,8 +81,10 @@ export async function GET(request: NextRequest) {
         s.data_scadenta as sarcina_data_scadenta,
         s.progres_procent as sarcina_progres,
         s.tip_proiect as sarcina_tip_proiect,
+        s.proiect_id as sarcina_proiect_id,
 
         -- Pentru sarcini de proiect direct
+        pr3.ID_Proiect as sarcina_proiect_direct_id,
         pr3.Denumire as sarcina_proiect_nume,
 
         -- Pentru sarcini de subproiect
@@ -180,6 +182,23 @@ export async function GET(request: NextRequest) {
       const is_realizat = comentariuComplet.includes(realizatMarker);
       const comentariu_curat = comentariuComplet.replace(realizatMarker, '').trim();
 
+      // Determină ID-ul proiectului pentru navigare către Detalii Proiect
+      let proiect_id_for_navigation: string | null = null;
+      if (row.tip_item === 'proiect') {
+        // Pentru proiecte: direct item_id
+        proiect_id_for_navigation = row.item_id;
+      } else if (row.tip_item === 'subproiect') {
+        // Pentru subproiecte: folosește proiectul părinte
+        proiect_id_for_navigation = row.subproiect_proiect_id || null;
+      } else if (row.tip_item === 'sarcina') {
+        // Pentru sarcini: depinde dacă e de proiect direct sau subproiect
+        if (row.sarcina_tip_proiect === 'subproiect' && row.sarcina_proiect_parinte_id) {
+          proiect_id_for_navigation = row.sarcina_proiect_parinte_id;
+        } else if (row.sarcina_proiect_id) {
+          proiect_id_for_navigation = row.sarcina_proiect_id;
+        }
+      }
+
       return {
         id: row.id,
         utilizator_uid: row.utilizator_uid,
@@ -193,7 +212,8 @@ export async function GET(request: NextRequest) {
         data_scadenta,
         zile_pana_scadenta: zile,
         urgenta,
-        comentariu_original
+        comentariu_original,
+        proiect_id_for_navigation
       };
     });
 

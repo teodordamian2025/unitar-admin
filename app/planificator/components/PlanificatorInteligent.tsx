@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { User } from 'firebase/auth';
 import { toast } from 'react-toastify';
 import { useTimer } from '@/app/contexts/TimerContext';
@@ -26,6 +27,7 @@ interface PlanificatorItem {
   zile_pana_scadenta: number;
   urgenta: 'critica' | 'ridicata' | 'medie' | 'scazuta';
   comentariu_original?: string;
+  proiect_id_for_navigation?: string | null;
 }
 
 interface SearchItem {
@@ -62,6 +64,9 @@ interface UserRoleResponse {
 }
 
 const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user }) => {
+  // Router pentru navigare
+  const router = useRouter();
+
   // ✅ CONSUMĂ DATE DIN TIMERCONTEXT (ZERO DUPLICATE REQUESTS)
   const { activeSession: contextSession, hasActiveSession: contextHasActiveSession, forceRefresh } = useTimer();
 
@@ -1124,6 +1129,31 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                     zIndex: 9999,
                                     isolation: 'isolate'
                                   }}>
+                                  {/* Detalii Proiect button */}
+                                  {item.proiect_id_for_navigation && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/projects/${item.proiect_id_for_navigation}`);
+                                      }}
+                                      style={{
+                                        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '0.25rem 0.5rem',
+                                        fontSize: '0.75rem',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        fontWeight: '500'
+                                      }}
+                                      title="Vezi detalii proiect"
+                                    >
+                                      🔗 Detalii
+                                    </button>
+                                  )}
                                   {/* Realizat button */}
                                   <button
                                     onClick={(e) => {
