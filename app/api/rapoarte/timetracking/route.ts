@@ -31,8 +31,14 @@ const TIMETRACKING_TABLE = `\`${PROJECT_ID}.${DATASET}.${table}\``;
 const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
 
 // Helper function pentru escape SQL - PĂSTRAT
+// Escapes: single quotes, newlines, carriage returns, backslashes
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  if (!value) return '';
+  return value
+    .replace(/\\/g, '\\\\')     // Escape backslashes first
+    .replace(/'/g, "''")         // Escape single quotes
+    .replace(/\n/g, '\\n')       // Escape newlines
+    .replace(/\r/g, '\\r');      // Escape carriage returns
 };
 
 // Helper pentru formatare DATE BigQuery - PĂSTRAT

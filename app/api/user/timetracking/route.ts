@@ -36,8 +36,14 @@ const bigquery = new BigQuery({
 });
 
 // Helper function pentru validare și escape SQL
+// Escapes: single quotes, newlines, carriage returns, backslashes
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  if (!value) return '';
+  return value
+    .replace(/\\/g, '\\\\')     // Escape backslashes first
+    .replace(/'/g, "''")         // Escape single quotes
+    .replace(/\n/g, '\\n')       // Escape newlines
+    .replace(/\r/g, '\\r');      // Escape carriage returns
 };
 
 // Helper function pentru formatare DATE pentru BigQuery
