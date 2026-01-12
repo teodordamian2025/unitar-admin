@@ -90,6 +90,41 @@ interface EFacturaDetails {
   }>;
 }
 
+// ✅ NOU: Funcție pentru sanitizarea numelui clientului pentru filename PDF
+// Curăță caracterele invalide pentru filename și limitează la 40 caractere
+function sanitizeClientNameForFilename(clientName: string): string {
+  if (!clientName) return '';
+
+  // Înlocuiește diacriticele
+  let sanitized = clientName
+    .replace(/ă/g, 'a')
+    .replace(/Ă/g, 'A')
+    .replace(/â/g, 'a')
+    .replace(/Â/g, 'A')
+    .replace(/î/g, 'i')
+    .replace(/Î/g, 'I')
+    .replace(/ș/g, 's')
+    .replace(/Ș/g, 'S')
+    .replace(/ț/g, 't')
+    .replace(/Ț/g, 'T');
+
+  // Elimină caracterele invalide pentru filename (păstrează litere, cifre, spații, punct, liniuță)
+  sanitized = sanitized.replace(/[<>:"/\\|?*]/g, '');
+
+  // Elimină alte caractere non-ASCII
+  sanitized = sanitized.replace(/[^\x20-\x7E]/g, '');
+
+  // Înlocuiește spații multiple cu un singur spațiu
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+
+  // Limitează la 40 caractere (cu spații)
+  if (sanitized.length > 40) {
+    sanitized = sanitized.substring(0, 40).trim();
+  }
+
+  return sanitized;
+}
+
 // System global pentru management dropdown-uri multiple - IDENTIC cu ProiectActions
 let currentOpenDropdown: string | null = null;
 const openDropdowns = new Map<string, () => void>();
@@ -559,14 +594,22 @@ export default function FacturiList({
       }
 
       const contentType = response.headers.get('content-type');
-      
+
+      // ✅ MODIFICAT: Generează filename cu data și nume client (max 40 caractere)
+      // Format: factura-UPA-1056-2026-01-09-SIX DESIGN AND INNOVATIONSS.R.L..pdf
+      const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
+      const dateOnly = new Date().toISOString().split('T')[0];
+      const clientNameSanitized = sanitizeClientNameForFilename(factura.client_nume);
+      const generatedFileName = clientNameSanitized
+        ? `factura-${numarComplet}-${dateOnly}-${clientNameSanitized}.pdf`
+        : `factura-${numarComplet}-${dateOnly}.pdf`;
+
       if (contentType && contentType.includes('application/pdf')) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
-        link.download = `Factura_${numarComplet}.pdf`;
+        link.download = generatedFileName;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
@@ -576,16 +619,17 @@ export default function FacturiList({
         showToast(`Factura ${numarComplet} descarcata cu succes`, 'success');
       } else {
         const data = await response.json();
-        
+
         if (data.success && data.htmlContent) {
-          const numarComplet = factura.serie ? `${factura.serie}-${factura.numar}` : factura.numar;
-          await processPDFOptimized(data.htmlContent, `Factura_${numarComplet}.pdf`);
+          // Folosește fileName din API dacă există, altfel cel generat local
+          const finalFileName = data.fileName || generatedFileName;
+          await processPDFOptimized(data.htmlContent, finalFileName);
           showToast(`PDF regenerat si descarcat pentru factura ${numarComplet}`, 'success');
         } else {
           throw new Error(data.error || 'Nu s-a putut regenera PDF-ul');
         }
       }
-      
+
     } catch (error) {
       console.error('Error downloading PDF:', error);
       showToast(`Eroare la descarcarea PDF: ${error instanceof Error ? error.message : 'Eroare necunoscuta'}`, 'error');

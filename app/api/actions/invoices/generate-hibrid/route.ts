@@ -802,6 +802,41 @@ function cleanNonAscii(text: string): string {
     .replace(/[^\x00-\x7F]/g, '');
 }
 
+// ✅ NOU: Funcție pentru sanitizarea numelui clientului pentru filename PDF
+// Curăță caracterele invalide pentru filename și limitează la 40 caractere
+function sanitizeClientNameForFilename(clientName: string): string {
+  if (!clientName) return '';
+
+  // Înlocuiește diacriticele
+  let sanitized = clientName
+    .replace(/ă/g, 'a')
+    .replace(/Ă/g, 'A')
+    .replace(/â/g, 'a')
+    .replace(/Â/g, 'A')
+    .replace(/î/g, 'i')
+    .replace(/Î/g, 'I')
+    .replace(/ș/g, 's')
+    .replace(/Ș/g, 'S')
+    .replace(/ț/g, 't')
+    .replace(/Ț/g, 'T');
+
+  // Elimină caracterele invalide pentru filename (păstrează litere, cifre, spații, punct, liniuță)
+  sanitized = sanitized.replace(/[<>:"/\\|?*]/g, '');
+
+  // Elimină alte caractere non-ASCII
+  sanitized = sanitized.replace(/[^\x20-\x7E]/g, '');
+
+  // Înlocuiește spații multiple cu un singur spațiu
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+
+  // Limitează la 40 caractere (cu spații)
+  if (sanitized.length > 40) {
+    sanitized = sanitized.substring(0, 40).trim();
+  }
+
+  return sanitized;
+}
+
 // ✅ NOU: Funcție pentru escape HTML entities (PĂSTREAZĂ diacriticele românești)
 function escapeHtml(text: string): string {
   if (!text) return '';
@@ -1026,7 +1061,8 @@ export async function POST(request: NextRequest) {
 
     // ✅ PĂSTRAT: TEMPLATE HTML cu marker pentru Edit Mode în antet și footer
     const safeFormat = (num: number) => (Number(num) || 0).toFixed(2);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    // ✅ MODIFICAT: Folosește doar data (YYYY-MM-DD) în loc de timestamp complet
+    const dateOnly = new Date().toISOString().split('T')[0];
 
     // ✅ FIX DIACRITICE: Curăță caracterele non-ASCII pentru nota cursului valutar
     const notaCursValutarClean = cleanNonAscii(notaCursValutar);
@@ -1048,8 +1084,12 @@ export async function POST(request: NextRequest) {
     // Reconstruiește cu seria corectă
     const numarFacturaDisplay = `${serieForDisplay}${separatorForDisplay}${numarForDisplay}`;
 
-    // ✅ Folosește seria corectă și în numele fișierului PDF
-    const fileName = `factura-${numarFacturaDisplay || proiectId}-${timestamp}.pdf`;
+    // ✅ MODIFICAT: Filename cu numele clientului (sanitizat, max 40 caractere)
+    // Format: factura-UPA-1056-2026-01-09-SIX DESIGN AND INNOVATIONSS.R.L..pdf
+    const clientNameForFilename = sanitizeClientNameForFilename(safeClientData.nume);
+    const fileName = clientNameForFilename
+      ? `factura-${numarFacturaDisplay || proiectId}-${dateOnly}-${clientNameForFilename}.pdf`
+      : `factura-${numarFacturaDisplay || proiectId}-${dateOnly}.pdf`;
 
     console.log(`🔢 [PDF] Număr factură pentru display: "${numarFactura}" -> "${numarFacturaDisplay}" (serie: ${serieForDisplay})`);
     console.log(`📄 [PDF] Nume fișier generat: ${fileName}`);

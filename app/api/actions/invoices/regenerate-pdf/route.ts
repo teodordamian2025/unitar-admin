@@ -189,6 +189,41 @@ function cleanNonAscii(text: string): string {
     .replace(/[^\x00-\x7F]/g, '');
 }
 
+// ✅ NOU: Funcție pentru sanitizarea numelui clientului pentru filename PDF
+// Curăță caracterele invalide pentru filename și limitează la 40 caractere
+function sanitizeClientNameForFilename(clientName: string): string {
+  if (!clientName) return '';
+
+  // Înlocuiește diacriticele
+  let sanitized = clientName
+    .replace(/ă/g, 'a')
+    .replace(/Ă/g, 'A')
+    .replace(/â/g, 'a')
+    .replace(/Â/g, 'A')
+    .replace(/î/g, 'i')
+    .replace(/Î/g, 'I')
+    .replace(/ș/g, 's')
+    .replace(/Ș/g, 'S')
+    .replace(/ț/g, 't')
+    .replace(/Ț/g, 'T');
+
+  // Elimină caracterele invalide pentru filename (păstrează litere, cifre, spații, punct, liniuță)
+  sanitized = sanitized.replace(/[<>:"/\\|?*]/g, '');
+
+  // Elimină alte caractere non-ASCII
+  sanitized = sanitized.replace(/[^\x20-\x7E]/g, '');
+
+  // Înlocuiește spații multiple cu un singur spațiu
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+
+  // Limitează la 40 caractere (cu spații)
+  if (sanitized.length > 40) {
+    sanitized = sanitized.substring(0, 40).trim();
+  }
+
+  return sanitized;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -691,11 +726,19 @@ export async function POST(request: NextRequest) {
     </body>
     </html>`;
 
+    // ✅ MODIFICAT: Filename cu data și numele clientului (sanitizat, max 40 caractere)
+    // Format: factura-UPA-1056-2026-01-09-SIX DESIGN AND INNOVATIONSS.R.L..pdf
+    const dateOnly = new Date().toISOString().split('T')[0];
+    const clientNameForFilename = sanitizeClientNameForFilename(clientInfo.nume);
+    const generatedFileName = clientNameForFilename
+      ? `factura-${cleanNonAscii(numarComplet)}-${dateOnly}-${clientNameForFilename}.pdf`
+      : `factura-${cleanNonAscii(numarComplet)}-${dateOnly}.pdf`;
+
     // Return HTML pentru regenerare în browser
     return NextResponse.json({
       success: true,
       htmlContent: htmlTemplate,
-      fileName: `Factura_${cleanNonAscii(numarComplet)}.pdf`,
+      fileName: generatedFileName,
       message: 'Template HTML generat pentru regenerare PDF',
       facturaData: {
         id: facturaData.id,
