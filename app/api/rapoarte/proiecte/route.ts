@@ -632,8 +632,9 @@ export async function POST(request: NextRequest) {
 
         // Caută UID-ul responsabilului după nume în tabela Utilizatori_v2
         // Caută în ambele ordini: "Nume Prenume" SAU "Prenume Nume"
+        // FIX 13.01.2026: Adăugat câmpul `rol` pentru a genera link corect în funcție de rolul utilizatorului
         const responsabiliQuery = `
-          SELECT uid, nume, prenume, email
+          SELECT uid, nume, prenume, email, rol
           FROM \`${PROJECT_ID}.${dataset}.${tableUtilizatori}\`
           WHERE CONCAT(nume, ' ', prenume) = @responsabil
             OR CONCAT(prenume, ' ', nume) = @responsabil
@@ -651,8 +652,15 @@ export async function POST(request: NextRequest) {
         // Dacă găsim responsabilul, trimitem notificarea
         if (responsabiliRows.length > 0) {
           const responsabilUser = responsabiliRows[0];
+          const baseUrl = request.url.split('/api/')[0];
 
-          const notifyResponse = await fetch(`${request.url.split('/api/')[0]}/api/notifications/send`, {
+          // FIX 13.01.2026: Generează link direct la detalii proiect în funcție de rolul utilizatorului
+          const userRol = responsabilUser.rol || 'normal';
+          const linkDetalii = userRol === 'admin'
+            ? `${baseUrl}/admin/rapoarte/proiecte/${ID_Proiect}`
+            : `${baseUrl}/projects/${ID_Proiect}`;
+
+          const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -668,7 +676,7 @@ export async function POST(request: NextRequest) {
                 user_prenume: responsabilUser.prenume, // ✅ ADDED: Prenume pentru adresare în email
                 data_atribuire: new Date().toISOString().split('T')[0],
                 termen_realizare: Data_Final || 'Nespecificat',
-                link_detalii: `${request.url.split('/api/')[0]}/admin/rapoarte/proiecte?search=${encodeURIComponent(ID_Proiect)}`
+                link_detalii: linkDetalii // FIX 13.01.2026: Link direct în funcție de rol
               }
             })
           });
