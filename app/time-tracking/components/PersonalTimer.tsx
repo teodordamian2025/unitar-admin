@@ -106,6 +106,7 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingStartTimer, setLoadingStartTimer] = useState(false); // FIX: Prevent double-click
 
   // State pentru modal ierarhic identic cu admin
   const [selectedProject, setSelectedProject] = useState<string>('');
@@ -246,6 +247,12 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
   };
 
   const startTimer = async () => {
+    // FIX: Prevent double-click by checking loading state
+    if (loadingStartTimer) {
+      console.log('⚠️ PersonalTimer: Start timer already in progress, ignoring click');
+      return;
+    }
+
     const finalProiectId = selectedLevel === 'subproiect' ? selectedSubproiect : selectedProject;
     let finalSarcinaId: string | null = null; // FIX: Declară tipul corect
 
@@ -257,6 +264,8 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
       toast.error('Selectează un proiect pentru a începe timer-ul!');
       return;
     }
+
+    setLoadingStartTimer(true); // FIX: Set loading state before API call
 
     try {
       const response = await fetch('/api/analytics/live-timer', {
@@ -300,6 +309,8 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
     } catch (error) {
       console.error('Error starting timer:', error);
       toast.error('Eroare la pornirea timer-ului');
+    } finally {
+      setLoadingStartTimer(false); // FIX: Reset loading state after API call
     }
   };
 
@@ -822,23 +833,24 @@ export default function PersonalTimer({ user, onUpdate }: PersonalTimerProps) {
               </button>
               <button
                 onClick={startTimer}
-                disabled={!selectedProject || (selectedLevel === 'subproiect' && !selectedSubproiect)}
+                disabled={!selectedProject || (selectedLevel === 'subproiect' && !selectedSubproiect) || loadingStartTimer}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect)) 
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                  background: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect) && !loadingStartTimer)
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                     : '#9ca3af',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect)) 
-                    ? 'pointer' 
+                  cursor: (selectedProject && (selectedLevel === 'proiect' || selectedSubproiect) && !loadingStartTimer)
+                    ? 'pointer'
                     : 'not-allowed',
                   fontSize: '0.875rem',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  opacity: loadingStartTimer ? 0.7 : 1
                 }}
               >
-                🚀 Începe Timer
+                {loadingStartTimer ? '⏳ Se pornește...' : '🚀 Începe Timer'}
               </button>
             </div>
 

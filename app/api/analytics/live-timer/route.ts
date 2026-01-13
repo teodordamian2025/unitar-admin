@@ -140,9 +140,9 @@ export async function GET(request: NextRequest) {
     const includeCompleted = searchParams.get('include_completed') === 'true';
     const teamView = searchParams.get('team_view') !== 'false';
 
-    // Query optimizat cu ierarhie corectă - FIX: Eliminat JOIN Sarcini pentru a preveni duplicate
+    // Query optimizat cu ierarhie corectă - FIX: Deduplicare per utilizator (doar cea mai recentă sesiune activă)
     const activeSessionsQuery = `
-      WITH active_sessions AS (
+      WITH active_sessions_raw AS (
         SELECT
           sl.id,
           sl.utilizator_uid,
@@ -202,7 +202,10 @@ export async function GET(request: NextRequest) {
                 TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), COALESCE(sl.data_stop, sl.data_start), SECOND)
               ELSE 0
             END AS INT64
-          ) as break_time_seconds
+          ) as break_time_seconds,
+
+          -- FIX: ROW_NUMBER pentru a păstra doar cea mai recentă sesiune per utilizator
+          ROW_NUMBER() OVER (PARTITION BY sl.utilizator_uid ORDER BY sl.data_start DESC) as row_num
 
         FROM ${TABLE_SESIUNI_LUCRU} sl
         LEFT JOIN ${TABLE_UTILIZATORI} u
@@ -220,9 +223,12 @@ export async function GET(request: NextRequest) {
         WHERE sl.status IN ('activ', 'pausat')
           AND sl.data_start >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
           ${userId ? `AND sl.utilizator_uid = @userId` : ''}
-        ORDER BY sl.data_start DESC
+      ),
+      -- FIX: Filtrăm doar prima sesiune (cea mai recentă) per utilizator
+      active_sessions AS (
+        SELECT * FROM active_sessions_raw WHERE row_num = 1
       )
-      
+
       SELECT
         id,
         utilizator_uid,
@@ -240,12 +246,13 @@ export async function GET(request: NextRequest) {
         ultima_activitate,
         productivity_score,
         break_time_seconds,
-        
+
         -- Format pentru frontend
         FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', data_start) as data_start_formatted,
         FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', ultima_activitate) as ultima_activitate_formatted
-        
+
       FROM active_sessions
+      ORDER BY data_start DESC
       ${includeCompleted ? `
         UNION ALL
         SELECT
