@@ -174,17 +174,18 @@ export default function FacturiList({
   const [showIncasareModal, setShowIncasareModal] = useState(false);
   const [selectedFacturaIncasare, setSelectedFacturaIncasare] = useState<Factura | null>(null);
 
-  // ✅ FIX PERFORMANȚĂ: Debounce pentru search input (500ms)
+  // ✅ FIX PERFORMANȚĂ: Debounce pentru search input (800ms - optimizat pentru scriere lentă)
   useEffect(() => {
     // Curăță timeout-ul anterior
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
 
-    // Setează un nou timeout pentru a actualiza filtrul după 500ms
+    // Setează un nou timeout pentru a actualiza filtrul după 800ms
+    // 800ms oferă timp suficient pentru scriere lentă fără întreruperi
     searchDebounceRef.current = setTimeout(() => {
       setFilters(prev => ({ ...prev, search: searchInput }));
-    }, 500);
+    }, 800);
 
     // Cleanup la unmount
     return () => {
