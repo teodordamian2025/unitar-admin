@@ -32,10 +32,8 @@ const bigquery = new BigQuery({
 const dataset = 'PanouControlUnitar';
 const table = `ProiectComentarii${tableSuffix}`;
 
-// Helper function pentru escape SQL
-const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
-};
+// NOTA: Folosim parameterized queries în loc de escapeString pentru securitate și
+// gestionarea corectă a caracterelor speciale (newline, tab, etc.)
 
 export async function GET(request: NextRequest) {
   try {
@@ -157,27 +155,36 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Insert comentariu
+    // Insert comentariu cu parameterized query (evită probleme cu newline și caractere speciale)
     const insertQuery = `
       INSERT INTO \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      (id, proiect_id, tip_proiect, autor_uid, autor_nume, comentariu, 
+      (id, proiect_id, tip_proiect, autor_uid, autor_nume, comentariu,
        data_comentariu, tip_comentariu)
       VALUES (
-        '${escapeString(id)}',
-        '${escapeString(proiect_id)}',
-        '${escapeString(tip_proiect)}',
-        '${escapeString(autor_uid)}',
-        '${escapeString(autor_nume)}',
-        '${escapeString(comentariu)}',
+        @id,
+        @proiect_id,
+        @tip_proiect,
+        @autor_uid,
+        @autor_nume,
+        @comentariu,
         CURRENT_TIMESTAMP(),
-        '${escapeString(tip_comentariu)}'
+        @tip_comentariu
       )
     `;
 
-    console.log('Insert comentariu query:', insertQuery);
+    console.log('Insert comentariu - using parameterized query for id:', id);
 
     await bigquery.query({
       query: insertQuery,
+      params: {
+        id,
+        proiect_id,
+        tip_proiect,
+        autor_uid,
+        autor_nume,
+        comentariu,
+        tip_comentariu
+      },
       location: 'EU',
     });
 
@@ -346,16 +353,17 @@ export async function PUT(request: NextRequest) {
     const { id, ...updateData } = body;
 
     if (!id) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
-        error: 'ID comentariu necesar pentru actualizare' 
+        error: 'ID comentariu necesar pentru actualizare'
       }, { status: 400 });
     }
 
     console.log('Update comentariu:', id, updateData);
 
-    // Construire query UPDATE dinamic
+    // Construire query UPDATE cu parameterized query
     const updateFields: string[] = [];
+    const params: Record<string, any> = { id };
     const allowedFields = ['comentariu', 'tip_comentariu'];
 
     Object.entries(updateData).forEach(([key, value]) => {
@@ -363,28 +371,30 @@ export async function PUT(request: NextRequest) {
         if (value === null || value === '') {
           updateFields.push(`${key} = NULL`);
         } else {
-          updateFields.push(`${key} = '${escapeString(value.toString())}'`);
+          updateFields.push(`${key} = @${key}`);
+          params[key] = value.toString();
         }
       }
     });
 
     if (updateFields.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
-        error: 'Nu există câmpuri de actualizat' 
+        error: 'Nu există câmpuri de actualizat'
       }, { status: 400 });
     }
 
     const updateQuery = `
       UPDATE \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
       SET ${updateFields.join(', ')}
-      WHERE id = '${escapeString(id)}'
+      WHERE id = @id
     `;
 
-    console.log('Update comentariu query:', updateQuery);
+    console.log('Update comentariu - using parameterized query for id:', id);
 
     await bigquery.query({
       query: updateQuery,
+      params,
       location: 'EU',
     });
 
@@ -397,7 +407,7 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error('Eroare la actualizarea comentariului:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: false,
       error: 'Eroare la actualizarea comentariului',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
@@ -411,22 +421,23 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: false,
-        error: 'ID comentariu necesar pentru ștergere' 
+        error: 'ID comentariu necesar pentru ștergere'
       }, { status: 400 });
     }
 
     // Soft delete nu este necesar pentru comentarii - le ștergem definitiv
     const deleteQuery = `
       DELETE FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      WHERE id = '${escapeString(id)}'
+      WHERE id = @id
     `;
 
-    console.log('Delete comentariu query:', deleteQuery);
+    console.log('Delete comentariu - using parameterized query for id:', id);
 
     await bigquery.query({
       query: deleteQuery,
+      params: { id },
       location: 'EU',
     });
 
@@ -439,7 +450,7 @@ export async function DELETE(request: NextRequest) {
 
   } catch (error) {
     console.error('Eroare la ștergerea comentariului:', error);
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: false,
       error: 'Eroare la ștergerea comentariului',
       details: error instanceof Error ? error.message : 'Eroare necunoscută'
