@@ -113,7 +113,231 @@ export default function UserProiectDetailsPage() {
   const debouncedProgresSubproiecte = useDebounce(localProgresSubproiecte, 800);
   const debouncedStatusPredareSubproiecte = useDebounce(localStatusPredareSubproiecte, 800);
 
-  // Firebase Auth Loading
+  // FIX 13.01.2026: Decodifică projectId din URL pentru a preveni URL-encoded IDs
+  const decodedProjectId = projectId ? decodeURIComponent(projectId) : '';
+
+  // Helper: Format date pentru input (YYYY-MM-DD) - mutat înainte de useEffect pentru a fi disponibil
+  const formatDateForInput = (dateValue: any): string => {
+    if (!dateValue) return '';
+    const dateStr = typeof dateValue === 'object' && dateValue.value
+      ? dateValue.value
+      : dateValue.toString();
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
+  // FIX 13.01.2026: Toate useEffect-urile ÎNAINTE de early returns pentru a preveni React Error #310
+  // Load project details când se schimbă projectId sau user
+  useEffect(() => {
+    if (decodedProjectId && user && !loading) {
+      loadProiectDetailsInternal();
+    }
+  }, [decodedProjectId, user, loading]);
+
+  // Funcție internă pentru a încărca detalii proiect (folosită în useEffect)
+  const loadProiectDetailsInternal = async () => {
+    if (!decodedProjectId) return;
+
+    setLoadingData(true);
+    setError(null);
+
+    try {
+      // Load project details from user API (without financial data)
+      const response = await fetch(`/api/user/projects/${encodeURIComponent(decodedProjectId)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Eroare la încărcarea detaliilor proiectului');
+      }
+
+      setProiect(data.proiect);
+      setSubproiecte(data.subproiecte || []);
+      setContracte(data.contracte || []);
+      setFacturi(data.facturi || []);
+    } catch (error) {
+      console.error('Eroare la încărcarea detaliilor:', error);
+      setError(error instanceof Error ? error.message : 'Eroare neașteptată');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Funcții interne pentru handlers debounced (definite înainte de useEffect care le folosesc)
+  const handleProiectProgresSaveInternal = async (value: number) => {
+    if (!decodedProjectId) return;
+    if (value < 0 || value > 100) return;
+
+    setIsSavingProgresProiect(true);
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progres_procent: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Progres proiect salvat!', { autoClose: 2000 });
+        setProiect(prev => prev ? { ...prev, progres_procent: value } : null);
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea progresului proiect:', error);
+    } finally {
+      setIsSavingProgresProiect(false);
+    }
+  };
+
+  const handleStatusPredareProiectInternal = async (value: string) => {
+    if (!decodedProjectId) return;
+
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status_predare: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Status predare actualizat!', { autoClose: 2000 });
+        setProiect(prev => prev ? { ...prev, status_predare: value } : null);
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea statusului predare:', error);
+    }
+  };
+
+  const handleSubproiectProgresSaveInternal = async (subproiectId: string, value: number) => {
+    if (value < 0 || value > 100) return;
+
+    setSavingProgresSubproiect(subproiectId);
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progres_procent: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Progres subproiect salvat!', { autoClose: 2000 });
+        setSubproiecte(prev => prev.map(sub =>
+          (sub.ID_Subproiect || sub.ID_Proiect) === subproiectId ? { ...sub, progres_procent: value } : sub
+        ));
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea progresului subproiect:', error);
+    } finally {
+      setSavingProgresSubproiect(null);
+    }
+  };
+
+  const handleStatusPredareSubproiectInternal = async (subproiectId: string, value: string) => {
+    setSavingStatusSubproiect(subproiectId);
+    try {
+      const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status_predare: value })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Status predare subproiect actualizat!', { autoClose: 2000 });
+        setSubproiecte(prev => prev.map(sub =>
+          (sub.ID_Subproiect || sub.ID_Proiect) === subproiectId ? { ...sub, status_predare: value } : sub
+        ));
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea statusului predare subproiect:', error);
+    } finally {
+      setSavingStatusSubproiect(null);
+    }
+  };
+
+  // Sincronizare local state cu proiect când se încarcă
+  useEffect(() => {
+    if (proiect) {
+      setLocalProgresProiect(proiect.progres_procent ?? 0);
+      setLocalStatusPredareProiect(proiect.status_predare || 'Nepredat');
+      setLocalStatusProiect(proiect.Status || 'Activ');
+      setLocalDataStart(formatDateForInput(proiect.Data_Start));
+      setLocalDataFinal(formatDateForInput(proiect.Data_Final));
+    }
+  }, [proiect?.progres_procent, proiect?.status_predare, proiect?.Status, proiect?.Data_Start, proiect?.Data_Final]);
+
+  // Sincronizare local state cu subproiecte când se încarcă
+  useEffect(() => {
+    if (subproiecte.length > 0) {
+      const newProgres: Record<string, number> = {};
+      const newStatusPredare: Record<string, string> = {};
+      const newStatus: Record<string, string> = {};
+      subproiecte.forEach(sub => {
+        const subId = sub.ID_Subproiect || sub.ID_Proiect;
+        newProgres[subId] = sub.progres_procent ?? 0;
+        newStatusPredare[subId] = sub.status_predare || 'Nepredat';
+        newStatus[subId] = sub.Status || 'Activ';
+      });
+      setLocalProgresSubproiecte(newProgres);
+      setLocalStatusPredareSubproiecte(newStatusPredare);
+      setLocalStatusSubproiecte(newStatus);
+    }
+  }, [subproiecte]);
+
+  // Trigger API save când debounced progres proiect se schimbă
+  useEffect(() => {
+    if (proiect && user && debouncedProgresProiect !== proiect.progres_procent && subproiecte.length === 0) {
+      handleProiectProgresSaveInternal(debouncedProgresProiect);
+    }
+  }, [debouncedProgresProiect, proiect, user, subproiecte.length]);
+
+  // Trigger API save când debounced status predare proiect se schimbă
+  useEffect(() => {
+    if (proiect && user && debouncedStatusPredareProiect !== proiect.status_predare) {
+      handleStatusPredareProiectInternal(debouncedStatusPredareProiect);
+    }
+  }, [debouncedStatusPredareProiect, proiect, user]);
+
+  // Trigger API save când debounced progres subproiecte se schimbă
+  useEffect(() => {
+    if (!user) return;
+    Object.keys(debouncedProgresSubproiecte).forEach(subproiectId => {
+      const debouncedValue = debouncedProgresSubproiecte[subproiectId];
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
+
+      if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.progres_procent) {
+        handleSubproiectProgresSaveInternal(subproiectId, debouncedValue);
+      }
+    });
+  }, [debouncedProgresSubproiecte, subproiecte, user]);
+
+  // Trigger API save când debounced status predare subproiecte se schimbă
+  useEffect(() => {
+    if (!user) return;
+    Object.keys(debouncedStatusPredareSubproiecte).forEach(subproiectId => {
+      const debouncedValue = debouncedStatusPredareSubproiecte[subproiectId];
+      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
+
+      if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.status_predare) {
+        handleStatusPredareSubproiectInternal(subproiectId, debouncedValue);
+      }
+    });
+  }, [debouncedStatusPredareSubproiecte, subproiecte, user]);
+
+  // Firebase Auth Loading - DUPĂ toate hooks-urile
   if (loading) {
     return (
       <div style={{
@@ -133,7 +357,7 @@ export default function UserProiectDetailsPage() {
     );
   }
 
-  // Not authenticated
+  // Not authenticated - DUPĂ toate hooks-urile
   if (!user) {
     if (typeof window !== 'undefined') {
       window.location.href = '/';
@@ -144,124 +368,8 @@ export default function UserProiectDetailsPage() {
   const displayName = user.displayName || user.email || 'Utilizator';
   const userRole = 'normal';
 
-  useEffect(() => {
-    if (projectId && user) {
-      loadProiectDetails();
-    }
-  }, [projectId, user]);
-
-  const loadProiectDetails = async () => {
-    setLoadingData(true);
-    setError(null);
-
-    try {
-      // Load project details from user API (without financial data)
-      const response = await fetch(`/api/user/projects/${projectId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Eroare la încărcarea detaliilor proiectului');
-      }
-
-      setProiect(data.proiect);
-      setSubproiecte(data.subproiecte || []);
-      setContracte(data.contracte || []);
-      setFacturi(data.facturi || []);
-    } catch (error) {
-      console.error('Eroare la încărcarea detaliilor:', error);
-      setError(error instanceof Error ? error.message : 'Eroare neașteptată');
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  // Helper: Format date pentru input (YYYY-MM-DD)
-  const formatDateForInput = (dateValue: any): string => {
-    if (!dateValue) return '';
-    const dateStr = typeof dateValue === 'object' && dateValue.value
-      ? dateValue.value
-      : dateValue.toString();
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      return d.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
-
-  // NOU: Sincronizare local state cu proiect când se încarcă (04.10.2025)
-  useEffect(() => {
-    if (proiect) {
-      setLocalProgresProiect(proiect.progres_procent ?? 0);
-      setLocalStatusPredareProiect(proiect.status_predare || 'Nepredat');
-      // NOU 09.01.2026: Sincronizare Status proiect
-      setLocalStatusProiect(proiect.Status || 'Activ');
-      // NOU 13.01.2026: Sincronizare date Start/Final
-      setLocalDataStart(formatDateForInput(proiect.Data_Start));
-      setLocalDataFinal(formatDateForInput(proiect.Data_Final));
-    }
-  }, [proiect?.progres_procent, proiect?.status_predare, proiect?.Status, proiect?.Data_Start, proiect?.Data_Final]);
-
-  // NOU: Sincronizare local state cu subproiecte când se încarcă (04.10.2025)
-  useEffect(() => {
-    if (subproiecte.length > 0) {
-      const newProgres: Record<string, number> = {};
-      const newStatusPredare: Record<string, string> = {};
-      // NOU 09.01.2026: Status subproiecte
-      const newStatus: Record<string, string> = {};
-      subproiecte.forEach(sub => {
-        // FIX: Folosim ID_Subproiect pentru indexare, nu ID_Proiect
-        const subId = sub.ID_Subproiect || sub.ID_Proiect;
-        newProgres[subId] = sub.progres_procent ?? 0;
-        newStatusPredare[subId] = sub.status_predare || 'Nepredat';
-        newStatus[subId] = sub.Status || 'Activ';
-      });
-      setLocalProgresSubproiecte(newProgres);
-      setLocalStatusPredareSubproiecte(newStatusPredare);
-      setLocalStatusSubproiecte(newStatus);
-    }
-  }, [subproiecte]);
-
-  // NOU: Trigger API save când debounced progres proiect se schimbă (04.10.2025)
-  useEffect(() => {
-    if (proiect && debouncedProgresProiect !== proiect.progres_procent && subproiecte.length === 0) {
-      handleProiectProgresSave(debouncedProgresProiect);
-    }
-  }, [debouncedProgresProiect]);
-
-  // NOU: Trigger API save când debounced status predare proiect se schimbă (04.10.2025)
-  useEffect(() => {
-    if (proiect && debouncedStatusPredareProiect !== proiect.status_predare) {
-      handleStatusPredareProiect(debouncedStatusPredareProiect);
-    }
-  }, [debouncedStatusPredareProiect]);
-
-  // NOU: Trigger API save când debounced progres subproiecte se schimbă (04.10.2025)
-  useEffect(() => {
-    Object.keys(debouncedProgresSubproiecte).forEach(subproiectId => {
-      const debouncedValue = debouncedProgresSubproiecte[subproiectId];
-      // FIX: Căutăm subproiectul după ID_Subproiect, nu ID_Proiect
-      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
-
-      if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.progres_procent) {
-        handleSubproiectProgresSave(subproiectId, debouncedValue);
-      }
-    });
-  }, [debouncedProgresSubproiecte]);
-
-  // NOU: Trigger API save când debounced status predare subproiecte se schimbă (04.10.2025)
-  useEffect(() => {
-    Object.keys(debouncedStatusPredareSubproiecte).forEach(subproiectId => {
-      const debouncedValue = debouncedStatusPredareSubproiecte[subproiectId];
-      // FIX: Căutăm subproiectul după ID_Subproiect, nu ID_Proiect
-      const currentSub = subproiecte.find(s => (s.ID_Subproiect || s.ID_Proiect) === subproiectId);
-
-      if (currentSub && debouncedValue !== undefined && debouncedValue !== currentSub.status_predare) {
-        handleStatusPredareSubproiect(subproiectId, debouncedValue);
-      }
-    });
-  }, [debouncedStatusPredareSubproiecte]);
+  // Funcție publică pentru reload (folosită de butoane și callbacks)
+  const loadProiectDetails = loadProiectDetailsInternal;
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return 'N/A';
@@ -309,7 +417,7 @@ export default function UserProiectDetailsPage() {
 
   // NOU: Handler pentru actualizare progres proiect - DOAR API SAVE (04.10.2025)
   const handleProiectProgresSave = async (value: number) => {
-    if (!projectId) return;
+    if (!decodedProjectId) return;
 
     if (value < 0 || value > 100) {
       toast.error('Progresul trebuie să fie între 0 și 100');
@@ -318,7 +426,7 @@ export default function UserProiectDetailsPage() {
 
     setIsSavingProgresProiect(true);
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ progres_procent: value })
@@ -344,10 +452,10 @@ export default function UserProiectDetailsPage() {
 
   // NOU: Handler pentru actualizare status predare proiect (04.10.2025)
   const handleStatusPredareProiect = async (value: string) => {
-    if (!projectId) return;
+    if (!decodedProjectId) return;
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status_predare: value })
@@ -371,12 +479,12 @@ export default function UserProiectDetailsPage() {
 
   // NOU 09.01.2026: Handler pentru actualizare Status proiect (Activ, Planificat, Suspendat, Finalizat)
   const handleStatusProiectChange = async (value: string) => {
-    if (!projectId) return;
+    if (!decodedProjectId) return;
 
     setLocalStatusProiect(value); // Update optimist
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Status: value })
@@ -517,11 +625,11 @@ export default function UserProiectDetailsPage() {
 
   // NOU 13.01.2026: Handler pentru actualizare Data Start proiect
   const handleSaveDataStart = async () => {
-    if (!projectId || !localDataStart) return;
+    if (!decodedProjectId || !localDataStart) return;
 
     setIsSavingDataStart(true);
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Data_Start: localDataStart })
@@ -548,11 +656,11 @@ export default function UserProiectDetailsPage() {
 
   // NOU 13.01.2026: Handler pentru actualizare Data Final proiect
   const handleSaveDataFinal = async () => {
-    if (!projectId || !localDataFinal) return;
+    if (!decodedProjectId || !localDataFinal) return;
 
     setIsSavingDataFinal(true);
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(decodedProjectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Data_Final: localDataFinal })
@@ -1476,7 +1584,7 @@ export default function UserProiectDetailsPage() {
         }}>
           {/* Card Comentarii */}
           <CommentsCard
-            proiectId={projectId}
+            proiectId={decodedProjectId}
             tipProiect="proiect"
             proiectDenumire={proiect.Denumire}
             maxComments={5}
@@ -1485,7 +1593,7 @@ export default function UserProiectDetailsPage() {
 
           {/* Card Sarcini */}
           <TasksCard
-            proiectId={projectId}
+            proiectId={decodedProjectId}
             tipProiect="proiect"
             proiectDenumire={proiect.Denumire}
             client={proiect.Client}
@@ -1495,7 +1603,7 @@ export default function UserProiectDetailsPage() {
 
           {/* Card Responsabili Proiect */}
           <ResponsabiliCard
-            entityId={projectId}
+            entityId={decodedProjectId}
             entityType="proiect"
             entityName={proiect.Denumire}
             compact={false}

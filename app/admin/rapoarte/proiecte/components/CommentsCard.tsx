@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
@@ -40,7 +40,8 @@ interface UtilizatorCurent {
   rol: string;
 }
 
-export default function CommentsCard({
+// FIX 13.01.2026: Wrap cu React.memo pentru a preveni re-render-uri inutile (input lent)
+function CommentsCardComponent({
   proiectId,
   tipProiect = 'proiect',
   proiectDenumire = '',
@@ -488,3 +489,6 @@ export default function CommentsCard({
     </div>
   );
 }
+
+// FIX 13.01.2026: Export cu React.memo pentru optimizare
+export default memo(CommentsCardComponent);

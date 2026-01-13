@@ -34,49 +34,63 @@ const escapeString = (value: string): string => {
 };
 
 // NOU: Funcție pentru recalculare progres proiect din subproiecte (04.10.2025)
-async function recalculateProiectProgres(proiectId: string): Promise<number> {
-  try {
-    console.log(`🔄 Recalculare progres pentru proiect: ${proiectId}`);
+// FIX 13.01.2026: Adăugat retry logic pentru concurrent update errors în BigQuery
+async function recalculateProiectProgres(proiectId: string, maxRetries: number = 3): Promise<number> {
+  console.log(`🔄 Recalculare progres pentru proiect: ${proiectId}`);
 
-    // Calculează media progresului subproiectelor active
-    const calcQuery = `
-      SELECT
-        COALESCE(ROUND(AVG(COALESCE(progres_procent, 0)), 0), 0) as avg_progres
-      FROM ${TABLE_SUBPROIECTE}
-      WHERE ID_Proiect = @proiectId AND activ = true
-    `;
+  // Calculează media progresului subproiectelor active
+  const calcQuery = `
+    SELECT
+      COALESCE(ROUND(AVG(COALESCE(progres_procent, 0)), 0), 0) as avg_progres
+    FROM ${TABLE_SUBPROIECTE}
+    WHERE ID_Proiect = @proiectId AND activ = true
+  `;
 
-    const [calcRows] = await bigquery.query({
-      query: calcQuery,
-      params: { proiectId },
-      types: { proiectId: 'STRING' },
-      location: 'EU',
-    });
+  const [calcRows] = await bigquery.query({
+    query: calcQuery,
+    params: { proiectId },
+    types: { proiectId: 'STRING' },
+    location: 'EU',
+  });
 
-    const avgProgres = parseInt(calcRows[0]?.avg_progres?.toString() || '0');
-    console.log(`📊 Progres mediu calculat pentru proiect ${proiectId}: ${avgProgres}%`);
+  const avgProgres = parseInt(calcRows[0]?.avg_progres?.toString() || '0');
+  console.log(`📊 Progres mediu calculat pentru proiect ${proiectId}: ${avgProgres}%`);
 
-    // Actualizează progresul proiectului
-    const updateQuery = `
-      UPDATE ${TABLE_PROIECTE}
-      SET progres_procent = @avgProgres
-      WHERE ID_Proiect = @proiectId
-    `;
+  // Actualizează progresul proiectului cu retry logic
+  const updateQuery = `
+    UPDATE ${TABLE_PROIECTE}
+    SET progres_procent = @avgProgres
+    WHERE ID_Proiect = @proiectId
+  `;
 
-    await bigquery.query({
-      query: updateQuery,
-      params: { avgProgres, proiectId },
-      types: { avgProgres: 'INT64', proiectId: 'STRING' },
-      location: 'EU',
-    });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await bigquery.query({
+        query: updateQuery,
+        params: { avgProgres, proiectId },
+        types: { avgProgres: 'INT64', proiectId: 'STRING' },
+        location: 'EU',
+      });
 
-    console.log(`✅ Progres proiect ${proiectId} actualizat la ${avgProgres}%`);
-    return avgProgres;
+      console.log(`✅ Progres proiect ${proiectId} actualizat la ${avgProgres}% (attempt ${attempt})`);
+      return avgProgres;
+    } catch (error: any) {
+      const isConcurrentError = error?.message?.includes('concurrent update') ||
+        error?.errors?.[0]?.message?.includes('concurrent update');
 
-  } catch (error) {
-    console.error('❌ Eroare la recalcularea progresului proiectului:', error);
-    throw error;
+      if (isConcurrentError && attempt < maxRetries) {
+        // Exponential backoff: 100ms, 200ms, 400ms...
+        const delay = 100 * Math.pow(2, attempt - 1);
+        console.log(`⏳ Concurrent update conflict, retry ${attempt}/${maxRetries} after ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error(`❌ Eroare la recalcularea progresului proiectului (attempt ${attempt}):`, error);
+        throw error;
+      }
+    }
   }
+
+  return avgProgres;
 }
 
 // PUT: Actualizare status_predare sau status_contract

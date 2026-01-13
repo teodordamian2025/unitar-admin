@@ -40,7 +40,9 @@ const escapeString = (value: string): string => {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const proiectId = searchParams.get('proiect_id');
+    // FIX 13.01.2026: Decode proiect_id pentru a preveni probleme cu URL-encoding
+    const rawProiectId = searchParams.get('proiect_id');
+    const proiectId = rawProiectId ? decodeURIComponent(rawProiectId) : null;
     const tipProiect = searchParams.get('tip_proiect');
     const tipComentariu = searchParams.get('tip_comentariu');
 
@@ -126,16 +128,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('POST comentariu request body:', body);
-    
-    const { 
+
+    const {
       id,
-      proiect_id,
+      proiect_id: rawProiectId,
       tip_proiect = 'proiect',
       autor_uid,
       autor_nume,
       comentariu,
       tip_comentariu = 'General'
     } = body;
+
+    // FIX 13.01.2026: Decode proiect_id pentru a preveni probleme cu URL-encoding
+    const proiect_id = rawProiectId ? decodeURIComponent(rawProiectId) : rawProiectId;
 
     // Validări
     if (!id || !proiect_id || !autor_uid || !autor_nume || !comentariu) {

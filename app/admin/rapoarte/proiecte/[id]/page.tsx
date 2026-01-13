@@ -437,7 +437,7 @@ export default function ProiectDetailsPage() {
   };
 
   // NOU: Handler pentru actualizare status subproiect (04.10.2025)
-  const handleSubproiectStatusUpdate = async (subproiectId: string, field: 'status_predare' | 'status_contract', value: string) => {
+  const handleSubproiectStatusUpdate = async (subproiectId: string, field: 'status_predare' | 'status_contract' | 'Status', value: string) => {
     try {
       const response = await fetch(`/api/rapoarte/subproiecte/${subproiectId}`, {
         method: 'PUT',
@@ -991,15 +991,37 @@ export default function ProiectDetailsPage() {
                         borderRadius: '8px',
                         padding: '0.75rem'
                       }}>
-                      {/* Row 1: Denumire + Status + Progres */}
-                      <div className="grid grid-cols-[2fr_1.3fr_0.7fr] gap-3 items-center">
+                      {/* Row 1: Denumire + Status + Predare + Progres */}
+                      <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.7fr] gap-3 items-center">
                         <div>
                           <div style={{ fontWeight: 500, color: '#2c3e50' }}>{sub.Denumire}</div>
-                          <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '0.25rem' }}>
-                            Status: {sub.Status}
-                          </div>
                         </div>
 
+                      {/* Dropdown Status (Activ/Planificat/Suspendat/Finalizat) */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
+                          Status
+                        </label>
+                        <select
+                          value={sub.Status || 'Activ'}
+                          onChange={(e) => handleSubproiectStatusUpdate(sub.ID_Subproiect, 'Status', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            background: 'white'
+                          }}
+                        >
+                          <option value="Activ">Activ</option>
+                          <option value="Planificat">Planificat</option>
+                          <option value="Suspendat">Suspendat</option>
+                          <option value="Finalizat">Finalizat</option>
+                        </select>
+                      </div>
+
+                      {/* Dropdown Predare */}
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', color: '#6c757d', marginBottom: '0.25rem' }}>
                           Predare
