@@ -26,6 +26,7 @@ export enum TipNotificare {
   PV_GENERAT_FARA_FACTURA = 'pv_generat_fara_factura',
   FACTURA_ACHITATA = 'factura_achitata',
   ANAF_EROARE = 'anaf_eroare',
+  FACTURA_NETRIMISA_ANAF = 'factura_netrimisa_anaf',
 
   // Clienți (viitor)
   CONTRACT_NOU_CLIENT = 'contract_nou_client',

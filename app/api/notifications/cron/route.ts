@@ -27,6 +27,9 @@ const TABLE_NOTIFICARI = `\`${PROJECT_ID}.${DATASET}.Notificari${tableSuffix}\``
 const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
 const TABLE_PROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\``;
 const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\``;
+const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
+const TABLE_FACTURI_EMISE_ANAF = `\`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF${tableSuffix}\``;
+const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -305,6 +308,7 @@ export async function GET(request: NextRequest) {
       subproiecte_depasite: 0,
       sarcini_apropiate: 0,
       sarcini_depasite: 0,
+      facturi_netrimise_anaf: 0,
     };
 
     // ============================================
@@ -1052,7 +1056,146 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 7. TRIMITERE EMAIL-URI CONSOLIDATE PER USER
+    // 7. FACTURI NETRIMISE LA ANAF (>2 zile de la emitere)
+    // ============================================
+    // Verifică facturile generate care nu au ajuns în e-Factura ANAF după 2 zile
+    // Trimite notificare către toți adminii
+
+    const facturiNetrimiseQuery = `
+      SELECT
+        fg.id,
+        fg.serie,
+        fg.numar,
+        fg.data_factura,
+        fg.data_creare,
+        fg.client_nume,
+        fg.client_cui,
+        fg.total,
+        fg.efactura_enabled,
+        fg.efactura_status,
+        fg.anaf_upload_id,
+        DATE_DIFF(CURRENT_DATE(), DATE(fg.data_creare), DAY) as zile_de_la_emitere
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      WHERE fg.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+        AND fg.data_creare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY)
+        AND (
+          -- Facturi care nu au efactura_status = 'ok' sau 'trimis'
+          fg.efactura_status IS NULL
+          OR fg.efactura_status NOT IN ('ok', 'trimis', 'validat', 'CONFIRMAT')
+        )
+        -- Excludem facturile care au un record valid în AnafEFactura_v2 cu status OK
+        AND NOT EXISTS (
+          SELECT 1 FROM ${TABLE_ANAF_EFACTURA} ae
+          WHERE ae.factura_id = fg.id
+          AND ae.anaf_status IN ('ok', 'trimis', 'validat', 'CONFIRMAT')
+        )
+        -- Excludem facturile care apar în FacturiEmiseANAF_v2 cu status CONFIRMAT
+        AND NOT EXISTS (
+          SELECT 1 FROM ${TABLE_FACTURI_EMISE_ANAF} fea
+          WHERE fea.factura_generata_id = fg.id
+          AND fea.status_anaf IN ('CONFIRMAT', 'DESCARCAT')
+        )
+      ORDER BY fg.data_creare DESC
+    `;
+
+    const [facturiNetrimise] = await bigquery.query({ query: facturiNetrimiseQuery });
+    stats.facturi_netrimise_anaf = facturiNetrimise.length;
+    console.log(`📄 Facturi netrimise la ANAF (>2 zile): ${facturiNetrimise.length}`);
+
+    if (facturiNetrimise.length > 0) {
+      // Obține toți adminii pentru a le trimite notificarea
+      const adminiQuery = `
+        SELECT uid, nume, prenume, email
+        FROM ${TABLE_UTILIZATORI}
+        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+      `;
+
+      const [admini] = await bigquery.query({ query: adminiQuery });
+      console.log(`👤 Admini pentru notificare facturi ANAF: ${admini.length}`);
+
+      for (const factura of facturiNetrimise) {
+        const serieNumar = `${factura.serie || ''}${factura.numar || ''}`.trim();
+        const dataFactura = extractDateValue(factura.data_factura);
+        const dataCreare = extractDateValue(factura.data_creare);
+
+        // Verifică dacă notificarea a fost deja trimisă pentru această factură
+        // Folosim o verificare per factură, nu per admin (pentru a nu spama)
+        const dejaTrimisaQuery = `
+          SELECT COUNT(*) as count
+          FROM ${TABLE_NOTIFICARI}
+          WHERE tip_notificare = 'factura_netrimisa_anaf'
+            AND JSON_EXTRACT_SCALAR(continut_json, '$.factura_id') = @factura_id
+            AND data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+        `;
+
+        const [checkRows] = await bigquery.query({
+          query: dejaTrimisaQuery,
+          params: { factura_id: factura.id },
+        });
+
+        if ((checkRows[0]?.count || 0) > 0) {
+          console.log(`⏭️ Skip - notificare factură netrimisă ANAF deja trimisă recent pentru ${serieNumar}`);
+          continue;
+        }
+
+        // Link cu filtru de căutare după numărul facturii
+        const linkDetalii = `${baseUrl}/admin/rapoarte/facturi?search=${encodeURIComponent(serieNumar)}`;
+
+        for (const admin of admini) {
+          const adminName = `${admin.nume || ''} ${admin.prenume || ''}`.trim() || 'Admin';
+
+          const context: NotificareContext = {
+            factura_id: factura.id,
+            serie_factura: factura.serie,
+            numar_factura: factura.numar,
+            serie_numar: serieNumar,
+            client_nume: factura.client_nume,
+            client_cui: factura.client_cui,
+            suma_totala: factura.total,
+            data_factura: dataFactura || '',
+            data_emitere: dataCreare || '',
+            zile_de_la_emitere: factura.zile_de_la_emitere,
+            efactura_status: factura.efactura_status || 'netrimis',
+            user_name: adminName,
+            link_detalii: linkDetalii,
+          };
+
+          // Trimite notificare în clopotel (UI) pentru fiecare admin
+          const result = await trimitereNotificareClopotel(
+            baseUrl,
+            'factura_netrimisa_anaf',
+            admin.uid,
+            context,
+            dryRun
+          );
+
+          // Adaugă în grupul pentru email consolidat
+          addNotificationToUser(
+            admin.uid,
+            adminName,
+            admin.email || '',
+            'admin',
+            {
+              tip: 'proiect', // folosim 'proiect' pentru compatibilitate cu interfața existentă
+              tip_notificare: 'factura_netrimisa_anaf',
+              denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
+              proiect_id: factura.id, // folosim factura_id pentru referință
+              client: factura.client_nume,
+              deadline: dataFactura || '',
+              zile_intarziere: factura.zile_de_la_emitere,
+              link_detalii: linkDetalii,
+            }
+          );
+
+          if (result.success) {
+            notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Factură NETRIMISĂ ANAF: ${serieNumar} - ${factura.client_nume} (${factura.zile_de_la_emitere} zile)`);
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // 8. TRIMITERE EMAIL-URI CONSOLIDATE PER USER
     // ============================================
     console.log(`📧 Trimitere email-uri consolidate pentru ${userNotificationsMap.size} utilizatori...`);
 

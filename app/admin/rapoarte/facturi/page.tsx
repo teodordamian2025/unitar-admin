@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
 import FacturiList from '../proiecte/components/FacturiList';
 
@@ -28,11 +28,15 @@ interface FacturiStats {
 export default function FacturiPage() {
   const [user, authLoading] = useAuthState(auth);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [displayName, setDisplayName] = useState('Utilizator');
   const [userRole, setUserRole] = useState('admin');
   const [stats, setStats] = useState<FacturiStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [perioada, setPerioada] = useState(30);
+
+  // Citește parametrul search din URL (pentru link-uri din notificări)
+  const initialSearch = searchParams?.get('search') || '';
 
   useEffect(() => {
     loadStats();
@@ -335,7 +339,7 @@ export default function FacturiPage() {
           .facturi-row-3 {
             background-color: #f8fafc !important; /* Albastru foarte deschis */
           }
-          
+
           .facturi-row-1:hover {
             background-color: #fdf6e3 !important;
           }
@@ -346,9 +350,10 @@ export default function FacturiPage() {
             background-color: #e2e8f0 !important;
           }
         `}</style>
-        <FacturiList 
-          showFilters={true} 
+        <FacturiList
+          showFilters={true}
           maxHeight="600px"
+          initialSearch={initialSearch}
         />
       </div>
     </div>

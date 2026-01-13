@@ -73,6 +73,7 @@ interface FacturiListProps {
   clientId?: string;
   showFilters?: boolean;
   maxHeight?: string;
+  initialSearch?: string; // Pentru link-uri din notificări cu filtru pre-aplicat
 }
 
 interface EFacturaDetails {
@@ -129,25 +130,26 @@ function sanitizeClientNameForFilename(clientName: string): string {
 let currentOpenDropdown: string | null = null;
 const openDropdowns = new Map<string, () => void>();
 
-export default function FacturiList({ 
-  proiectId, 
-  clientId, 
+export default function FacturiList({
+  proiectId,
+  clientId,
   showFilters = true,
-  maxHeight = '500px'
+  maxHeight = '500px',
+  initialSearch = ''
 }: FacturiListProps) {
   const [facturi, setFacturi] = useState<Factura[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     status: '',
-    search: '',
+    search: initialSearch, // Inițializat cu valoarea din URL dacă există
     scadenta: '',
     statusIncasari: '', // NOU: incasat_complet | incasat_partial | neincasat
     perioada: '30'
   });
 
   // State local pentru input-ul de căutare (fără debounce)
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(initialSearch);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
@@ -191,6 +193,14 @@ export default function FacturiList({
       }
     };
   }, [searchInput]);
+
+  // ✅ Sincronizare initialSearch cu state-ul intern (pentru link-uri din notificări)
+  useEffect(() => {
+    if (initialSearch && initialSearch !== searchInput) {
+      setSearchInput(initialSearch);
+      setFilters(prev => ({ ...prev, search: initialSearch }));
+    }
+  }, [initialSearch]);
 
   // Încarcă facturile când se schimbă filtrele (dar nu searchInput direct)
   useEffect(() => {
