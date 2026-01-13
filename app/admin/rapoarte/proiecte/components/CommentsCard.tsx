@@ -204,167 +204,8 @@ function CommentsCardComponent({
   const displayedComments = comentarii.slice(0, maxComments);
   const hasMoreComments = comentarii.length > maxComments;
 
-  // Modal pentru răspuns
-  const ReplyModal = () => {
-    if (!mounted) return null;
-
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 60000,
-          padding: '1rem'
-        }}
-        onClick={() => setShowReplyModal(false)}
-      >
-        <div
-          style={{
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '16px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: 'calc(100vh - 4rem)',
-            overflow: 'hidden'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div style={{
-            padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(16, 185, 129, 0.05))'
-          }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#1f2937' }}>
-              💬 Adaugă Comentariu
-            </h3>
-            <button
-              onClick={() => setShowReplyModal(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '1.25rem',
-                cursor: 'pointer',
-                color: '#6b7280',
-                padding: '0.25rem'
-              }}
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Content */}
-          <div style={{ padding: '1.5rem' }}>
-            {proiectDenumire && (
-              <div style={{
-                padding: '0.75rem 1rem',
-                background: 'rgba(59, 130, 246, 0.08)',
-                borderRadius: '8px',
-                marginBottom: '1rem',
-                fontSize: '0.875rem',
-                color: '#1f2937'
-              }}>
-                <strong>Proiect:</strong> {proiectDenumire}
-              </div>
-            )}
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                Tip Comentariu
-              </label>
-              <select
-                value={tipComentariu}
-                onChange={(e) => setTipComentariu(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.625rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              >
-                <option value="General">💬 General</option>
-                <option value="Progres">📈 Progres</option>
-                <option value="Problemă">⚠️ Problemă</option>
-                <option value="Întrebare">❓ Întrebare</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                Comentariu
-              </label>
-              <textarea
-                value={newComentariu}
-                onChange={(e) => setNewComentariu(e.target.value)}
-                placeholder="Scrieți comentariul dvs..."
-                style={{
-                  width: '100%',
-                  minHeight: '120px',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowReplyModal(false)}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}
-              >
-                Anulează
-              </button>
-              <button
-                onClick={handleSubmitComentariu}
-                disabled={submitting || !newComentariu.trim()}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  background: submitting ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-                }}
-              >
-                {submitting ? 'Se salvează...' : '💬 Trimite'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
+  // FIX 13.01.2026: Modal-ul este acum direct în JSX, nu ca funcție nested
+  // pentru a preveni re-montarea și pierderea focus-ului pe textarea
 
   return (
     <div style={{
@@ -484,8 +325,164 @@ function CommentsCardComponent({
         </div>
       )}
 
-      {/* Reply Modal */}
-      {showReplyModal && <ReplyModal />}
+      {/* Reply Modal - FIX 13.01.2026: Direct în JSX pentru a preveni pierderea focus-ului */}
+      {showReplyModal && mounted && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 60000,
+            padding: '1rem'
+          }}
+          onClick={() => setShowReplyModal(false)}
+        >
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.98)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '16px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: 'calc(100vh - 4rem)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(16, 185, 129, 0.05))'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#1f2937' }}>
+                💬 Adaugă Comentariu
+              </h3>
+              <button
+                onClick={() => setShowReplyModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.25rem',
+                  cursor: 'pointer',
+                  color: '#6b7280',
+                  padding: '0.25rem'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '1.5rem' }}>
+              {proiectDenumire && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  fontSize: '0.875rem',
+                  color: '#1f2937'
+                }}>
+                  <strong>Proiect:</strong> {proiectDenumire}
+                </div>
+              )}
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  Tip Comentariu
+                </label>
+                <select
+                  value={tipComentariu}
+                  onChange={(e) => setTipComentariu(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    background: 'white'
+                  }}
+                >
+                  <option value="General">💬 General</option>
+                  <option value="Progres">📈 Progres</option>
+                  <option value="Problemă">⚠️ Problemă</option>
+                  <option value="Întrebare">❓ Întrebare</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  Comentariu
+                </label>
+                <textarea
+                  value={newComentariu}
+                  onChange={(e) => setNewComentariu(e.target.value)}
+                  placeholder="Scrieți comentariul dvs..."
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    minHeight: '120px',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowReplyModal(false)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={handleSubmitComentariu}
+                  disabled={submitting || !newComentariu.trim()}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    background: submitting ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                  }}
+                >
+                  {submitting ? 'Se salvează...' : '💬 Trimite'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
