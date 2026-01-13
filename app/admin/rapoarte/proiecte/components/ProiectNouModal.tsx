@@ -543,7 +543,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       id: Date.now().toString(),
       denumire: '',
       valoare: '',
-      moneda: 'RON',
+      moneda: formData.moneda || 'RON', // Moștenește valuta de la proiect
       status: 'Planificat',
       data_start: formData.Data_Start || '',
       data_final: formData.Data_Final || ''
@@ -580,7 +580,7 @@ export default function ProiectNouModal({ isOpen, onClose, onProiectAdded }: Pro
       subcontractant_cui: '',
       descriere: '',
       valoare: '',
-      moneda: 'RON',
+      moneda: formData.moneda || 'RON', // Moștenește valuta de la proiect
       status_predare: 'Nepredat',
       status_contract: 'Nu e cazul',
       status_facturare: 'Nefacturat',
