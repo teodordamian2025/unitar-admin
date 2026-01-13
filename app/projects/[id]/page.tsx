@@ -99,6 +99,14 @@ export default function UserProiectDetailsPage() {
   // NOU 09.01.2026: State pentru Status subproiecte
   const [localStatusSubproiecte, setLocalStatusSubproiecte] = useState<Record<string, string>>({});
 
+  // NOU 13.01.2026: State pentru editare date Start/Final proiect
+  const [isEditingDataStart, setIsEditingDataStart] = useState(false);
+  const [isEditingDataFinal, setIsEditingDataFinal] = useState(false);
+  const [localDataStart, setLocalDataStart] = useState('');
+  const [localDataFinal, setLocalDataFinal] = useState('');
+  const [isSavingDataStart, setIsSavingDataStart] = useState(false);
+  const [isSavingDataFinal, setIsSavingDataFinal] = useState(false);
+
   // Debounced values - trigger API call după 800ms fără schimbări
   const debouncedProgresProiect = useDebounce(localProgresProiect, 800);
   const debouncedStatusPredareProiect = useDebounce(localStatusPredareProiect, 800);
@@ -167,6 +175,21 @@ export default function UserProiectDetailsPage() {
     }
   };
 
+  // Helper: Format date pentru input (YYYY-MM-DD)
+  const formatDateForInput = (dateValue: any): string => {
+    if (!dateValue) return '';
+    const dateStr = typeof dateValue === 'object' && dateValue.value
+      ? dateValue.value
+      : dateValue.toString();
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   // NOU: Sincronizare local state cu proiect când se încarcă (04.10.2025)
   useEffect(() => {
     if (proiect) {
@@ -174,8 +197,11 @@ export default function UserProiectDetailsPage() {
       setLocalStatusPredareProiect(proiect.status_predare || 'Nepredat');
       // NOU 09.01.2026: Sincronizare Status proiect
       setLocalStatusProiect(proiect.Status || 'Activ');
+      // NOU 13.01.2026: Sincronizare date Start/Final
+      setLocalDataStart(formatDateForInput(proiect.Data_Start));
+      setLocalDataFinal(formatDateForInput(proiect.Data_Final));
     }
-  }, [proiect?.progres_procent, proiect?.status_predare, proiect?.Status]);
+  }, [proiect?.progres_procent, proiect?.status_predare, proiect?.Status, proiect?.Data_Start, proiect?.Data_Final]);
 
   // NOU: Sincronizare local state cu subproiecte când se încarcă (04.10.2025)
   useEffect(() => {
@@ -489,6 +515,68 @@ export default function UserProiectDetailsPage() {
     }
   };
 
+  // NOU 13.01.2026: Handler pentru actualizare Data Start proiect
+  const handleSaveDataStart = async () => {
+    if (!projectId || !localDataStart) return;
+
+    setIsSavingDataStart(true);
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Data_Start: localDataStart })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Data Start actualizată!', { autoClose: 2000 });
+        setProiect(prev => prev ? { ...prev, Data_Start: localDataStart } : null);
+        setIsEditingDataStart(false);
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea datei de start:', error);
+      toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      setLocalDataStart(formatDateForInput(proiect?.Data_Start));
+    } finally {
+      setIsSavingDataStart(false);
+    }
+  };
+
+  // NOU 13.01.2026: Handler pentru actualizare Data Final proiect
+  const handleSaveDataFinal = async () => {
+    if (!projectId || !localDataFinal) return;
+
+    setIsSavingDataFinal(true);
+    try {
+      const response = await fetch(`/api/rapoarte/proiecte/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Data_Final: localDataFinal })
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Data Finalizare actualizată!', { autoClose: 2000 });
+        setProiect(prev => prev ? { ...prev, Data_Final: localDataFinal } : null);
+        setIsEditingDataFinal(false);
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare');
+      }
+    } catch (error) {
+      console.error('Eroare la actualizarea datei de finalizare:', error);
+      toast.error(`Eroare salvare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+      setLocalDataFinal(formatDateForInput(proiect?.Data_Final));
+    } finally {
+      setIsSavingDataFinal(false);
+    }
+  };
+
   if (loadingData) {
     return (
       <UserLayout user={user} displayName={displayName} userRole={userRole}>
@@ -577,17 +665,170 @@ export default function UserProiectDetailsPage() {
             gap: '2rem',
             marginTop: '2rem'
           }}>
+            {/* NOU 13.01.2026: Data Start cu edit */}
             <div>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: '#3498db' }}>📅 Data Start</h4>
-              <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
-                {formatDate(proiect.Data_Start)}
-              </p>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#3498db', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                📅 Data Start
+                {!isEditingDataStart && (
+                  <button
+                    onClick={() => setIsEditingDataStart(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      fontSize: '14px',
+                      color: '#6c757d',
+                      opacity: 0.7,
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                    title="Editează data start"
+                  >
+                    ✏️
+                  </button>
+                )}
+              </h4>
+              {isEditingDataStart ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="date"
+                    value={localDataStart}
+                    onChange={(e) => setLocalDataStart(e.target.value)}
+                    disabled={isSavingDataStart}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #3498db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      background: isSavingDataStart ? '#f0f0f0' : 'white'
+                    }}
+                  />
+                  <button
+                    onClick={handleSaveDataStart}
+                    disabled={isSavingDataStart}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      background: '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isSavingDataStart ? 'not-allowed' : 'pointer',
+                      fontSize: '12px'
+                    }}
+                    title="Salvează"
+                  >
+                    {isSavingDataStart ? '...' : '✓'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingDataStart(false);
+                      setLocalDataStart(formatDateForInput(proiect.Data_Start));
+                    }}
+                    disabled={isSavingDataStart}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                    title="Anulează"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
+                  {formatDate(proiect.Data_Start)}
+                </p>
+              )}
             </div>
+
+            {/* NOU 13.01.2026: Data Final cu edit */}
             <div>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c' }}>🏁 Data Final</h4>
-              <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
-                {formatDate(proiect.Data_Final)}
-              </p>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#e74c3c', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                🏁 Data Final
+                {!isEditingDataFinal && (
+                  <button
+                    onClick={() => setIsEditingDataFinal(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      fontSize: '14px',
+                      color: '#6c757d',
+                      opacity: 0.7,
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                    title="Editează data finalizare"
+                  >
+                    ✏️
+                  </button>
+                )}
+              </h4>
+              {isEditingDataFinal ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="date"
+                    value={localDataFinal}
+                    onChange={(e) => setLocalDataFinal(e.target.value)}
+                    disabled={isSavingDataFinal}
+                    style={{
+                      padding: '0.5rem',
+                      border: '1px solid #e74c3c',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      background: isSavingDataFinal ? '#f0f0f0' : 'white'
+                    }}
+                  />
+                  <button
+                    onClick={handleSaveDataFinal}
+                    disabled={isSavingDataFinal}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      background: '#27ae60',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isSavingDataFinal ? 'not-allowed' : 'pointer',
+                      fontSize: '12px'
+                    }}
+                    title="Salvează"
+                  >
+                    {isSavingDataFinal ? '...' : '✓'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingDataFinal(false);
+                      setLocalDataFinal(formatDateForInput(proiect.Data_Final));
+                    }}
+                    disabled={isSavingDataFinal}
+                    style={{
+                      padding: '0.4rem 0.6rem',
+                      background: '#e74c3c',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                    title="Anulează"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>
+                  {formatDate(proiect.Data_Final)}
+                </p>
+              )}
             </div>
             {proiect.Responsabil_Principal && (
               <div>
@@ -1207,6 +1448,17 @@ export default function UserProiectDetailsPage() {
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  {/* NOU 13.01.2026: Responsabili Subproiect */}
+                  <div style={{ marginTop: '1rem' }}>
+                    <ResponsabiliCard
+                      entityId={subId}
+                      entityType="subproiect"
+                      entityName={subproiect.Denumire}
+                      compact={true}
+                      onUpdate={() => loadProiectDetails()}
+                    />
                   </div>
                 </div>
               );

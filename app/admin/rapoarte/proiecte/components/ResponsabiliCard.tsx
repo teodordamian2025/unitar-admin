@@ -445,7 +445,7 @@ export default function ResponsabiliCard({
         marginBottom: '1rem'
       }}>
         <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          👥 Responsabili {responsabili.length > 0 && `(${responsabili.length})`}
+          👥 {entityType === 'proiect' ? 'Responsabili Proiect' : entityType === 'subproiect' ? 'Responsabili Subproiect' : 'Responsabili'} {responsabili.length > 0 && `(${responsabili.length})`}
         </h3>
         <button
           onClick={() => setShowAddModal(true)}
