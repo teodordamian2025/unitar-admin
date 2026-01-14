@@ -129,6 +129,13 @@ export default function ContractActions({
       color: 'primary'
     },
     {
+      key: 'viewProject',
+      label: 'Detalii Proiect',
+      icon: '👁️',
+      color: 'primary',
+      disabled: !contract.proiect_id
+    },
+    {
       key: 'edit',
       label: 'Editează Contract',
       icon: '✏️',
@@ -197,6 +204,9 @@ export default function ContractActions({
       switch (actionKey) {
         case 'view':
           await handleViewDetails();
+          break;
+        case 'viewProject':
+          handleViewProject();
           break;
         case 'edit':
           await handleEdit();
@@ -273,16 +283,16 @@ export default function ContractActions({
   };
 
   const handleViewDetails = async () => {
-    const statusInfo = contract.Status === 'Semnat' ? ' ✅' : 
+    const statusInfo = contract.Status === 'Semnat' ? ' ✅' :
                       contract.Status === 'Anulat' ? ' 🔴' : '';
-    const etapeInfo = contract.etape_count ? 
+    const etapeInfo = contract.etape_count ?
       `\n📋 Etape: ${contract.etape_count} total (${contract.etape_facturate || 0} facturate, ${contract.etape_incasate || 0} încasate)` : '';
-    
+
     // ACTUALIZAT: Afișează și datele de semnare/expirare
-    const dateInfo = contract.Data_Semnare || contract.Data_Expirare ? 
-      `\n📅 Semnat: ${formatDate(contract.Data_Semnare)}\n📅 Expirare: ${formatDate(contract.Data_Expirare)}` : 
+    const dateInfo = contract.Data_Semnare || contract.Data_Expirare ?
+      `\n📅 Semnat: ${formatDate(contract.Data_Semnare)}\n📅 Expirare: ${formatDate(contract.Data_Expirare)}` :
       '\n📅 Date semnare: Lipsesc - folosește "Marchează Semnat"';
-    
+
     const detalii = `📄 CONTRACT: ${contract.ID_Contract}
 
 🏷️ Număr: ${contract.numar_contract}
@@ -291,9 +301,18 @@ export default function ContractActions({
 📊 Status: ${contract.Status}${statusInfo}
 💰 Valoare: ${contract.Valoare ? `${contract.Valoare.toLocaleString('ro-RO')} ${contract.Moneda || 'RON'}` : 'N/A'}${dateInfo}${etapeInfo}
 📝 Observații: ${contract.Observatii || 'Fără observații'}`;
-    
+
     showToast(detalii, 'info');
     console.log('Detalii contract:', contract);
+  };
+
+  // NOU: Handler pentru navigare la pagina proiectului
+  const handleViewProject = () => {
+    if (contract.proiect_id) {
+      window.location.href = `/admin/rapoarte/proiecte/${contract.proiect_id}`;
+    } else {
+      showToast('Contractul nu are un proiect asociat', 'error');
+    }
   };
 
   // MODIFICAT: Pentru alte status-uri (nu Semnat), păstrează logica veche

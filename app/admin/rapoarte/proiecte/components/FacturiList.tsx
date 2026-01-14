@@ -25,7 +25,8 @@ import {
   Clock,
   XCircle,
   Receipt,
-  Banknote
+  Banknote,
+  Eye
 } from 'lucide-react';
 import EditFacturaModal from './EditFacturaModal';
 import ChitantaModal from './ChitantaModal';
@@ -1635,6 +1636,7 @@ export default function FacturiList({
                           onRetryANAF={() => handleRetryANAF(factura)}
                           onShowDetails={() => showEFacturaDetailsModal(factura)}
                           onDelete={() => handleDeleteFactura(factura)}
+                          onViewProject={() => factura.proiect_id && (window.location.href = `/admin/rapoarte/proiecte/${factura.proiect_id}`)}
                           isProcessing={processingActions[factura.id]}
                         />
                       </td>
@@ -1785,6 +1787,7 @@ interface EnhancedActionDropdownProps {
   onRetryANAF: () => void;
   onShowDetails: () => void;
   onDelete: () => void;
+  onViewProject: () => void; // NOU: handler detalii proiect
   isProcessing: boolean;
 }
 
@@ -1805,6 +1808,7 @@ function EnhancedActionDropdown({
   onRetryANAF,
   onShowDetails,
   onDelete,
+  onViewProject,
   isProcessing
 }: EnhancedActionDropdownProps) {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -2045,6 +2049,44 @@ function EnhancedActionDropdown({
                   {loading === 'download' ? <Clock size={16} /> : <Download size={16} />}
                   Descarca PDF
                 </button>
+
+                {/* Detalii Proiect - NOU 14.01.2026 */}
+                {factura.proiect_id && (
+                  <button
+                    onClick={() => handleActionClick('viewProject', onViewProject)}
+                    disabled={loading === 'viewProject'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: loading === 'viewProject' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      color: '#2c3e50',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseOver={(e) => {
+                      if (loading !== 'viewProject') {
+                        e.currentTarget.style.background = '#9b59b615';
+                        e.currentTarget.style.color = '#9b59b6';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#2c3e50';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    {loading === 'viewProject' ? <Clock size={16} /> : <Eye size={16} />}
+                    Detalii Proiect
+                  </button>
+                )}
 
                 {/* Edit */}
                 {canEdit && (
