@@ -44,6 +44,19 @@ const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffi
 console.log(`🔧 Invoice Generation - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, SetariBanca (no _v2), FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
 
+// ✅ FIX STREAMING BUFFER: Funcție pentru escapare string-uri în SQL raw queries
+// Aceasta permite INSERT-ul să folosească bigquery.query() în loc de table.insert()
+// Astfel se evită streaming buffer-ul care blochează UPDATE/DELETE timp de ~90 minute
+const escapeString = (value: string): string => {
+  if (!value) return '';
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first
+    .replace(/'/g, "''")     // Escape single quotes
+    .replace(/\n/g, '\\n')   // Escape newlines
+    .replace(/\r/g, '\\r')   // Escape carriage returns
+    .replace(/\t/g, '\\t');  // Escape tabs
+};
+
 // ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
   tip: 'etapa_contract' | 'etapa_anexa';
@@ -1537,8 +1550,8 @@ export async function POST(request: NextRequest) {
     let xmlResult: any = null;
 
     try {
-      const dataset = bigquery.dataset(DATASET);
-      const table = dataset.table(`FacturiGenerate${tableSuffix}`);
+      // ✅ FIX STREAMING BUFFER: Nu mai folosim table.insert() pentru FacturiGenerate
+      // Toate operațiile folosesc bigquery.query() cu raw SQL pentru a evita streaming buffer
 
       if (isEdit && facturaId) {
         console.log('🔍 EDIT MODE: Actualizez factură existentă în BigQuery cu date exacte din frontend...');
@@ -1715,57 +1728,86 @@ export async function POST(request: NextRequest) {
 
         console.log(`🔢 FIX NUMAR FACTURA: ${fullInvoiceNumber} -> serie: "${serieFactura}", numar: "${numarFacturaExtras}"`);
 
-        const facturaData = [{
-          id: currentFacturaId,
-          proiect_id: proiectId,
-          serie: serieFactura,
-          numar: numarFacturaExtras,
-          data_factura: new Date().toISOString().split('T')[0],
-          data_scadenta: new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          id_factura_externa: null,
-          url_publica: null,
-          url_download: null,
-          client_id: clientInfo?.id || null,
-          client_nume: safeClientData.nume,
-          client_cui: safeClientData.cui,
-          subtotal: Number(subtotal.toFixed(2)),
-          total_tva: Number(totalTva.toFixed(2)),
-          total: Number(total.toFixed(2)),
-          valoare_platita: 0,
-          status: isStorno ? 'storno' : 'generata',
-          data_trimitere: null,
-          data_plata: null,
-          date_complete_json: JSON.stringify({
-            liniiFactura: liniiFacturaActualizate,
-            observatii: observatiiFinale,
-            clientInfo: safeClientData,
-            proiectInfo: {
-              id: proiectId,
-              ID_Proiect: proiectId,
-              denumire: safeInvoiceData.denumireProiect
-            },
-            proiectId: proiectId,
-            contariBancare: contariFinale,
-            setariFacturare,
-            cursuriUtilizate,
-            etapeFacturate,
-            isStorno,
-            facturaOriginala: facturaOriginala || null,
-            mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
-            fara_recalculare: true,
-            fixAplicat: 'new_mode_etape_facturi_race_condition_fixed',
-            sistem_etape_facturi: true,
-            versiune: 6
-          }),
-          data_creare: new Date().toISOString(),
-          data_actualizare: new Date().toISOString(),
-          efactura_enabled: sendToAnaf,
-          efactura_status: sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'draft') : null,
-          anaf_upload_id: null // ✅ Se va actualiza mai târziu când se trimite efectiv la ANAF (evită streaming buffer)
-        }];
+        // ✅ FIX STREAMING BUFFER: Folosim raw SQL INSERT în loc de table.insert()
+        // Aceasta permite UPDATE/DELETE imediat după INSERT (fără așteptare ~90 minute)
+        // Pattern similar cu cel folosit în /api/rapoarte/proiecte
 
-        await table.insert(facturaData);
-        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu date EXACTE din frontend (cu EtapeFacturi + race condition fix)`);
+        const dataFactura = new Date().toISOString().split('T')[0];
+        const dataScadenta = new Date(Date.now() + (setariFacturare?.termen_plata_standard || 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const dataCreare = new Date().toISOString();
+        const statusFactura = isStorno ? 'storno' : 'generata';
+        const efacturaStatusValue = sendToAnaf ? (MOCK_EFACTURA_MODE ? 'mock_pending' : 'draft') : null;
+
+        // Construiește date_complete_json și escape pentru SQL
+        const dateCompleteJsonObj = {
+          liniiFactura: liniiFacturaActualizate,
+          observatii: observatiiFinale,
+          clientInfo: safeClientData,
+          proiectInfo: {
+            id: proiectId,
+            ID_Proiect: proiectId,
+            denumire: safeInvoiceData.denumireProiect
+          },
+          proiectId: proiectId,
+          contariBancare: contariFinale,
+          setariFacturare,
+          cursuriUtilizate,
+          etapeFacturate,
+          isStorno,
+          facturaOriginala: facturaOriginala || null,
+          mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
+          fara_recalculare: true,
+          fixAplicat: 'new_mode_etape_facturi_race_condition_fixed_batch',
+          sistem_etape_facturi: true,
+          versiune: 6
+        };
+        const dateCompleteJsonEscaped = escapeString(JSON.stringify(dateCompleteJsonObj));
+
+        // ✅ RAW SQL INSERT - evită streaming buffer complet
+        const insertFacturaQuery = `
+          INSERT INTO ${TABLE_FACTURI_GENERATE}
+          (id, proiect_id, serie, numar, data_factura, data_scadenta,
+           id_factura_externa, url_publica, url_download,
+           client_id, client_nume, client_cui,
+           subtotal, total_tva, total, valoare_platita, status,
+           data_trimitere, data_plata, date_complete_json,
+           data_creare, data_actualizare,
+           efactura_enabled, efactura_status, anaf_upload_id)
+          VALUES (
+            '${escapeString(currentFacturaId)}',
+            '${escapeString(proiectId)}',
+            '${escapeString(serieFactura)}',
+            '${escapeString(numarFacturaExtras)}',
+            DATE('${dataFactura}'),
+            DATE('${dataScadenta}'),
+            NULL,
+            NULL,
+            NULL,
+            ${clientInfo?.id ? `'${escapeString(clientInfo.id)}'` : 'NULL'},
+            '${escapeString(safeClientData.nume || '')}',
+            '${escapeString(safeClientData.cui || '')}',
+            ${Number(subtotal.toFixed(2))},
+            ${Number(totalTva.toFixed(2))},
+            ${Number(total.toFixed(2))},
+            0,
+            '${statusFactura}',
+            NULL,
+            NULL,
+            '${dateCompleteJsonEscaped}',
+            TIMESTAMP('${dataCreare}'),
+            TIMESTAMP('${dataCreare}'),
+            ${sendToAnaf},
+            ${efacturaStatusValue ? `'${efacturaStatusValue}'` : 'NULL'},
+            NULL
+          )
+        `;
+
+        await bigquery.query({
+          query: insertFacturaQuery,
+          location: 'EU'
+        });
+
+        console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu RAW SQL (fără streaming buffer - UPDATE/DELETE instant disponibil)`);
       }
 
       // ✅ NOU: Update statusuri etape după salvarea facturii cu flag isEdit
