@@ -239,13 +239,21 @@ export default function FacturiList({
         }));
 
         if (filters.search) {
-          const searchLower = filters.search.toLowerCase();
-          result = result.filter((f: Factura) =>
-            f.numar.toLowerCase().includes(searchLower) ||
-            (f.serie && f.serie.toLowerCase().includes(searchLower)) ||
-            f.client_nume.toLowerCase().includes(searchLower) ||
-            f.proiect_denumire.toLowerCase().includes(searchLower)
-          );
+          // Split search term into words for multi-word search support (e.g., "UPA 1043")
+          const searchWords = filters.search.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
+
+          result = result.filter((f: Factura) => {
+            // Create a combined searchable string from all relevant fields
+            const searchableText = [
+              f.numar || '',
+              f.serie || '',
+              f.client_nume || '',
+              f.proiect_denumire || ''
+            ].join(' ').toLowerCase();
+
+            // All search words must be found in the combined text
+            return searchWords.every(word => searchableText.includes(word));
+          });
         }
 
         if (filters.scadenta) {
