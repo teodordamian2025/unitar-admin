@@ -110,12 +110,20 @@ export async function GET(request: NextRequest) {
             ELSE false
           END as efactura_mock_mode,
 
+          -- ✅ STORNO TRACKING (14.01.2026)
+          COALESCE(fg.is_storno, false) as is_storno,
+          fg.storno_pentru_factura_id,
+          fg.stornata_de_factura_id,
+
           -- ✅ Calcule utile
           (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
           DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,
 
           -- ✅ Status scadență (fără diacritice pentru match cu frontend filters)
+          -- ✅ STORNO: Facturi stornate sau de stornare au status special
           CASE
+            WHEN COALESCE(fg.is_storno, false) = true THEN 'Storno'
+            WHEN fg.stornata_de_factura_id IS NOT NULL THEN 'Stornata'
             WHEN fg.data_scadenta < CURRENT_DATE() AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expirata'
             WHEN DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) <= 7 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'Expira curand'
             WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 THEN 'Platita'
@@ -123,7 +131,10 @@ export async function GET(request: NextRequest) {
           END as status_scadenta,
 
           -- ✅ Status încasări (pentru filtru frontend)
+          -- ✅ STORNO: Facturi stornate/de stornare nu au status încasări relevant
           CASE
+            WHEN COALESCE(fg.is_storno, false) = true THEN 'storno'
+            WHEN fg.stornata_de_factura_id IS NOT NULL THEN 'stornata'
             WHEN (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) <= 0 OR COALESCE(inc.total_incasat, fg.valoare_platita, 0) >= fg.total THEN 'incasat_complet'
             WHEN COALESCE(inc.total_incasat, fg.valoare_platita, 0) > 0 AND (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) > 0 THEN 'incasat_partial'
             ELSE 'neincasat'

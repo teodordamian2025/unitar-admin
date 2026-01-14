@@ -1764,6 +1764,7 @@ export async function POST(request: NextRequest) {
         const dateCompleteJsonEscaped = escapeString(JSON.stringify(dateCompleteJsonObj));
 
         // ✅ RAW SQL INSERT - evită streaming buffer complet
+        // ✅ STORNO TRACKING: Adăugat is_storno și storno_pentru_factura_id (14.01.2026)
         const insertFacturaQuery = `
           INSERT INTO ${TABLE_FACTURI_GENERATE}
           (id, proiect_id, serie, numar, data_factura, data_scadenta,
@@ -1772,7 +1773,8 @@ export async function POST(request: NextRequest) {
            subtotal, total_tva, total, valoare_platita, status,
            data_trimitere, data_plata, date_complete_json,
            data_creare, data_actualizare,
-           efactura_enabled, efactura_status, anaf_upload_id)
+           efactura_enabled, efactura_status, anaf_upload_id,
+           is_storno, storno_pentru_factura_id)
           VALUES (
             '${escapeString(currentFacturaId)}',
             '${escapeString(proiectId)}',
@@ -1798,7 +1800,9 @@ export async function POST(request: NextRequest) {
             TIMESTAMP('${dataCreare}'),
             ${sendToAnaf},
             ${efacturaStatusValue ? `'${efacturaStatusValue}'` : 'NULL'},
-            NULL
+            NULL,
+            ${isStorno},
+            ${isStorno && facturaOriginala ? `'${escapeString(facturaOriginala)}'` : 'NULL'}
           )
         `;
 
@@ -1808,6 +1812,33 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`✅ Factură ${isStorno ? 'de stornare' : 'nouă'} ${numarFactura} salvată în BigQuery cu RAW SQL (fără streaming buffer - UPDATE/DELETE instant disponibil)`);
+
+        // ✅ STORNO TRACKING: Dacă aceasta este o factură de stornare, actualizăm factura originală
+        // pentru a marca că a fost stornată (14.01.2026)
+        if (isStorno && facturaOriginala) {
+          try {
+            console.log(`↩️ [STORNO] Actualizez factura originală ${facturaOriginala} ca stornată...`);
+
+            const updateOriginalQuery = `
+              UPDATE ${TABLE_FACTURI_GENERATE}
+              SET
+                stornata_de_factura_id = '${escapeString(currentFacturaId)}',
+                status = 'stornata',
+                data_actualizare = CURRENT_TIMESTAMP()
+              WHERE id = '${escapeString(facturaOriginala)}'
+            `;
+
+            await bigquery.query({
+              query: updateOriginalQuery,
+              location: 'EU'
+            });
+
+            console.log(`✅ [STORNO] Factura originală ${facturaOriginala} marcată ca stornată de ${currentFacturaId}`);
+          } catch (stornoError) {
+            console.error(`❌ [STORNO] Eroare la actualizarea facturii originale:`, stornoError);
+            // Nu oprim procesul - continuăm chiar dacă update-ul eșuează
+          }
+        }
       }
 
       // ✅ NOU: Update statusuri etape după salvarea facturii cu flag isEdit

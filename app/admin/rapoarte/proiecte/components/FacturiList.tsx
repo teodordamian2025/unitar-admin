@@ -58,7 +58,7 @@ interface Factura {
   rest_de_plata: number;
   status: string;
   status_scadenta: string;
-  status_incasari: string; // NOU: incasat_complet | incasat_partial | neincasat
+  status_incasari: string; // NOU: incasat_complet | incasat_partial | neincasat | storno | stornata
   zile_pana_scadenta: number;
   data_creare: string | { value: string };
   efactura_enabled?: boolean;
@@ -66,6 +66,10 @@ interface Factura {
   anaf_upload_id?: string;
   fileName?: string;
   date_complete_json?: string;
+  // ✅ STORNO TRACKING (14.01.2026)
+  is_storno?: boolean;
+  storno_pentru_factura_id?: string;
+  stornata_de_factura_id?: string;
 }
 
 interface FacturiListProps {
@@ -340,6 +344,42 @@ export default function FacturiList({
     let textClass = '';
     let IconComponent = FileText;
 
+    // ✅ STORNO TRACKING (14.01.2026): Verifică ÎNTÂI dacă e storno sau stornată
+    // Aceasta are prioritate față de alte statusuri
+    if (factura.is_storno === true || factura.status === 'storno') {
+      displayStatus = 'STORNO';
+      bgClass = 'bg-amber-100';
+      textClass = 'text-amber-800';
+      IconComponent = RotateCcw;
+
+      return (
+        <span
+          className={`px-2 py-1 rounded text-xs font-bold ${bgClass} ${textClass} flex items-center gap-1 border border-amber-300`}
+          title={`Factură de stornare${factura.storno_pentru_factura_id ? ` pentru factura ${factura.storno_pentru_factura_id}` : ''}`}
+        >
+          <IconComponent size={12} />
+          {displayStatus}
+        </span>
+      );
+    }
+
+    if (factura.stornata_de_factura_id || factura.status === 'stornata') {
+      displayStatus = 'STORNATĂ';
+      bgClass = 'bg-slate-200';
+      textClass = 'text-slate-700';
+      IconComponent = XCircle;
+
+      return (
+        <span
+          className={`px-2 py-1 rounded text-xs font-bold ${bgClass} ${textClass} flex items-center gap-1 border border-slate-400 line-through`}
+          title={`Factura a fost stornată${factura.stornata_de_factura_id ? ` de factura ${factura.stornata_de_factura_id}` : ''}`}
+        >
+          <IconComponent size={12} />
+          {displayStatus}
+        </span>
+      );
+    }
+
     if (factura.efactura_enabled) {
       const eDetails = eFacturaDetails[factura.id];
       const anafStatus = eDetails?.anafStatus || factura.efactura_status;
@@ -403,18 +443,18 @@ export default function FacturiList({
         'anaf_error': { bg: 'bg-red-100', text: 'text-red-800', label: 'Eroare ANAF', icon: XCircle },
         'stornata': { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Stornata', icon: RotateCcw }
       };
-      
-      const config = statusConfig[factura.status as keyof typeof statusConfig] || 
+
+      const config = statusConfig[factura.status as keyof typeof statusConfig] ||
         { bg: 'bg-gray-100', text: 'text-gray-800', label: factura.status, icon: FileText };
-      
+
       displayStatus = config.label;
       bgClass = config.bg;
       textClass = config.text;
       IconComponent = config.icon;
     }
-    
+
     return (
-      <span 
+      <span
         className={`px-2 py-1 rounded text-xs font-medium ${bgClass} ${textClass} flex items-center gap-1`}
         title={factura.efactura_enabled ? 'Factura cu e-factura ANAF' : 'Factura doar PDF'}
       >
@@ -425,12 +465,42 @@ export default function FacturiList({
   };
 
   // Scadenta badge cu Lucide icons
-  const getScadentaBadge = (statusScadenta: string, zile: number) => {
+  // ✅ STORNO TRACKING (14.01.2026): Adăugat status pentru storno/stornată
+  const getScadentaBadge = (statusScadenta: string, zile: number, factura?: Factura) => {
+    // ✅ STORNO: Verifică mai întâi dacă e storno sau stornată
+    if (factura) {
+      const stornoStatus = isStornoOrStornata(factura);
+      if (stornoStatus === 'storno') {
+        return (
+          <span
+            className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1 border border-amber-300"
+            title="Factură de stornare - nu necesită plată"
+          >
+            <RotateCcw size={12} />
+            Storno
+          </span>
+        );
+      }
+      if (stornoStatus === 'stornata') {
+        return (
+          <span
+            className="px-2 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700 flex items-center gap-1 border border-slate-400 line-through"
+            title="Factura a fost stornată - anulată"
+          >
+            <XCircle size={12} />
+            Stornată
+          </span>
+        );
+      }
+    }
+
     const scadentaConfig = {
       'Expirata': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle },
       'Expira curand': { bg: 'bg-orange-100', text: 'text-orange-800', icon: AlertCircle },
       'Platita': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle },
-      'In regula': { bg: 'bg-gray-100', text: 'text-gray-800', icon: Clock }
+      'In regula': { bg: 'bg-gray-100', text: 'text-gray-800', icon: Clock },
+      'Storno': { bg: 'bg-amber-100', text: 'text-amber-800', icon: RotateCcw },
+      'Stornata': { bg: 'bg-slate-200', text: 'text-slate-700', icon: XCircle }
     };
 
     const config = scadentaConfig[statusScadenta as keyof typeof scadentaConfig] ||
@@ -450,7 +520,68 @@ export default function FacturiList({
   };
 
   // NOU: Status încasări - similar cu contractele
+  // ✅ STORNO TRACKING (14.01.2026): Facturi storno/stornate nu au status încasări
   const getStatusIncasari = (factura: Factura) => {
+    // ✅ STORNO: Verifică mai întâi dacă e storno sau stornată
+    const stornoStatus = isStornoOrStornata(factura);
+    if (stornoStatus === 'storno') {
+      return (
+        <div style={{
+          fontSize: '11px',
+          lineHeight: '1.4',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 8px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            color: '#b45309',
+            fontWeight: '600',
+            marginBottom: '4px',
+            border: '1px solid #fbbf24'
+          }}>
+            <RotateCcw size={12} />
+            Storno
+          </div>
+          <div style={{ color: '#b45309', fontSize: '10px' }}>
+            Nu se încasează
+          </div>
+        </div>
+      );
+    }
+    if (stornoStatus === 'stornata') {
+      return (
+        <div style={{
+          fontSize: '11px',
+          lineHeight: '1.4',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 8px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(100, 116, 139, 0.15)',
+            color: '#475569',
+            fontWeight: '600',
+            marginBottom: '4px',
+            border: '1px solid #94a3b8',
+            textDecoration: 'line-through'
+          }}>
+            <XCircle size={12} />
+            Stornată
+          </div>
+          <div style={{ color: '#64748b', fontSize: '10px' }}>
+            Anulată
+          </div>
+        </div>
+      );
+    }
+
     const total = factura.total || 0;
     const platit = factura.valoare_platita || 0;
     const rest = factura.rest_de_plata || (total - platit);
@@ -573,7 +704,21 @@ export default function FacturiList({
     );
   };
 
-  const getRowBackgroundColor = (index: number): string => {
+  // ✅ STORNO TRACKING (14.01.2026): Verifică dacă factura e storno sau stornată
+  const isStornoOrStornata = (factura: Factura): 'storno' | 'stornata' | null => {
+    if (factura.is_storno === true || factura.status === 'storno') return 'storno';
+    if (factura.stornata_de_factura_id || factura.status === 'stornata') return 'stornata';
+    return null;
+  };
+
+  const getRowBackgroundColor = (index: number, factura?: Factura): string => {
+    // ✅ STORNO: Folosește culori speciale pentru facturi storno/stornate
+    if (factura) {
+      const stornoStatus = isStornoOrStornata(factura);
+      if (stornoStatus === 'storno') return '#fffbeb'; // amber-50 - factură de stornare
+      if (stornoStatus === 'stornata') return '#f1f5f9'; // slate-100 - factură stornată
+    }
+
     const colorIndex = index % 3;
     switch (colorIndex) {
       case 0: return '#fefdf8';
@@ -583,7 +728,14 @@ export default function FacturiList({
     }
   };
 
-  const getRowHoverColor = (index: number): string => {
+  const getRowHoverColor = (index: number, factura?: Factura): string => {
+    // ✅ STORNO: Folosește culori speciale pentru hover pe facturi storno/stornate
+    if (factura) {
+      const stornoStatus = isStornoOrStornata(factura);
+      if (stornoStatus === 'storno') return '#fef3c7'; // amber-100
+      if (stornoStatus === 'stornata') return '#e2e8f0'; // slate-200
+    }
+
     const colorIndex = index % 3;
     switch (colorIndex) {
       case 0: return '#fdf6e3';
@@ -1396,18 +1548,21 @@ export default function FacturiList({
                                     factura.status !== 'stornata';
                   const canStorno = factura.status !== 'stornata';
                   
+                  // ✅ STORNO TRACKING (14.01.2026): Pasăm factura pentru stilizare specială
                   return (
-                    <tr 
-                      key={factura.id} 
-                      style={{ 
-                        backgroundColor: getRowBackgroundColor(index),
-                        transition: 'background-color 0.2s ease'
+                    <tr
+                      key={factura.id}
+                      style={{
+                        backgroundColor: getRowBackgroundColor(index, factura),
+                        transition: 'background-color 0.2s ease',
+                        // ✅ STORNO: Adaugă opacity pentru facturi stornate
+                        opacity: (factura.stornata_de_factura_id || factura.status === 'stornata') ? 0.7 : 1
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = getRowHoverColor(index);
+                        e.currentTarget.style.backgroundColor = getRowHoverColor(index, factura);
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = getRowBackgroundColor(index);
+                        e.currentTarget.style.backgroundColor = getRowBackgroundColor(index, factura);
                       }}
                     >
                       <td className="px-4 py-3">
@@ -1454,20 +1609,22 @@ export default function FacturiList({
                         {getStatusBadge(factura)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div>{getScadentaBadge(factura.status_scadenta, factura.zile_pana_scadenta)}</div>
+                        {/* ✅ STORNO TRACKING (14.01.2026): Pasăm factura pentru badge storno */}
+                        <div>{getScadentaBadge(factura.status_scadenta, factura.zile_pana_scadenta, factura)}</div>
                         <div className="text-xs text-gray-500 mt-1">
                           {formatDateSafe(factura.data_scadenta)}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
                         {/* Enhanced Action Dropdown - IDENTIC cu ProiectActions */}
+                        {/* ✅ STORNO TRACKING (14.01.2026): Dezactivează acțiuni pentru facturi stornate */}
                         <EnhancedActionDropdown
                           factura={factura}
-                          canEdit={canEdit}
-                          canDelete={canDelete}
-                          canStorno={canStorno}
-                          canChitanta={factura.status !== 'stornata' && factura.rest_de_plata > 0}
-                          canIncasare={factura.status !== 'stornata' && factura.rest_de_plata > 0}
+                          canEdit={canEdit && !factura.stornata_de_factura_id && factura.status !== 'stornata'}
+                          canDelete={canDelete && !factura.stornata_de_factura_id && factura.status !== 'stornata'}
+                          canStorno={canStorno && !factura.is_storno && !factura.stornata_de_factura_id && factura.status !== 'stornata' && factura.status !== 'storno'}
+                          canChitanta={factura.status !== 'stornata' && factura.status !== 'storno' && !factura.is_storno && !factura.stornata_de_factura_id && factura.rest_de_plata > 0}
+                          canIncasare={factura.status !== 'stornata' && factura.status !== 'storno' && !factura.is_storno && !factura.stornata_de_factura_id && factura.rest_de_plata > 0}
                           onDownload={() => handleDownload(factura)}
                           onEdit={() => handleEditFactura(factura, 'edit')}
                           onStorno={() => handleEditFactura(factura, 'storno')}

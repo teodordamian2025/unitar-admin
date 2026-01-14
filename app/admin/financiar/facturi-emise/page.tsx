@@ -43,6 +43,10 @@ interface FacturaEmisa {
   matching_tip?: string | null;
   // Sursa datelor de plată (EtapeFacturi, FacturiGenerate, FacturiEmiseANAF)
   sursa_status_plata?: string;
+  // ✅ STORNO TRACKING (14.01.2026)
+  is_storno?: boolean;
+  storno_pentru_factura_id?: string;
+  stornata_de_factura_id?: string;
 }
 
 interface SyncStats {
@@ -232,8 +236,34 @@ export default function FacturiEmisePage() {
     }
   };
 
+  // ✅ STORNO TRACKING (14.01.2026): Helper pentru verificare storno
+  const isStornoOrStornata = (factura: FacturaEmisa): 'storno' | 'stornata' | null => {
+    if (factura.is_storno === true || factura.valoare_totala < 0) return 'storno';
+    if (factura.stornata_de_factura_id) return 'stornata';
+    return null;
+  };
+
   // Status badge ANAF
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, factura?: FacturaEmisa) => {
+    // ✅ STORNO TRACKING: Verifică dacă e storno sau stornată
+    if (factura) {
+      const stornoStatus = isStornoOrStornata(factura);
+      if (stornoStatus === 'storno') {
+        return (
+          <span className="px-2 py-1 text-xs font-bold rounded-full bg-amber-500/20 text-amber-400 border-2 border-amber-500/50">
+            ↩️ STORNO
+          </span>
+        );
+      }
+      if (stornoStatus === 'stornata') {
+        return (
+          <span className="px-2 py-1 text-xs font-bold rounded-full bg-slate-500/20 text-slate-400 border-2 border-slate-500/50 line-through">
+            ✗ STORNATĂ
+          </span>
+        );
+      }
+    }
+
     switch (status) {
       case 'CONFIRMAT':
         return <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">✓ Confirmat</span>;
@@ -248,7 +278,26 @@ export default function FacturiEmisePage() {
 
   // Helper: Determină stilul inline pentru colorare rând bazat pe status plată
   // Folosim inline styles pentru că Tailwind JIT nu compilează clase dinamice
+  // ✅ STORNO TRACKING (14.01.2026): Adăugat stiluri pentru storno
   const getRowStyle = (factura: FacturaEmisa): React.CSSProperties => {
+    // ✅ STORNO: Verifică mai întâi dacă e storno sau stornată
+    const stornoStatus = isStornoOrStornata(factura);
+    if (stornoStatus === 'storno') {
+      return {
+        backgroundColor: 'rgba(245, 158, 11, 0.1)', // amber-100 transparent
+        borderLeft: '4px solid rgb(245, 158, 11)', // amber
+        opacity: 0.85
+      };
+    }
+    if (stornoStatus === 'stornata') {
+      return {
+        backgroundColor: 'rgba(100, 116, 139, 0.1)', // slate-100 transparent
+        borderLeft: '4px solid rgb(148, 163, 184)', // slate-400
+        opacity: 0.6,
+        textDecoration: 'line-through'
+      };
+    }
+
     const status = factura.status_achitare || 'Neincasat';
     const valoareRon = parseFloat(String(factura.valoare_ron)) || parseFloat(String(factura.valoare_totala)) || 0;
     const platit = parseFloat(String(factura.valoare_platita)) || 0;
@@ -272,7 +321,35 @@ export default function FacturiEmisePage() {
   };
 
   // Status badge Achitare
+  // ✅ STORNO TRACKING (14.01.2026): Adăugat badge pentru storno
   const getStatusAchitareBadge = (factura: FacturaEmisa) => {
+    // ✅ STORNO: Verifică mai întâi dacă e storno sau stornată
+    const stornoStatus = isStornoOrStornata(factura);
+    if (stornoStatus === 'storno') {
+      return (
+        <div>
+          <div className="px-2 py-1 text-xs font-bold rounded-full bg-amber-500/20 text-amber-400 border-2 border-amber-500/50 inline-block mb-1">
+            ↩️ STORNO
+          </div>
+          <div className="text-xs text-amber-400">
+            Nu se încasează
+          </div>
+        </div>
+      );
+    }
+    if (stornoStatus === 'stornata') {
+      return (
+        <div>
+          <div className="px-2 py-1 text-xs font-bold rounded-full bg-slate-500/20 text-slate-400 border-2 border-slate-500/50 inline-block mb-1 line-through">
+            ✗ STORNATĂ
+          </div>
+          <div className="text-xs text-slate-400">
+            Anulată
+          </div>
+        </div>
+      );
+    }
+
     const status = factura.status_achitare || 'Neincasat';
     const valoareRon = parseFloat(String(factura.valoare_ron)) || parseFloat(String(factura.valoare_totala)) || 0;
     const platit = parseFloat(String(factura.valoare_platita)) || 0;
@@ -515,7 +592,8 @@ export default function FacturiEmisePage() {
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <div className="flex items-center gap-2">
-                            {getStatusBadge(factura.status_anaf)}
+                            {/* ✅ STORNO TRACKING (14.01.2026): Pasăm factura pentru badge storno */}
+                            {getStatusBadge(factura.status_anaf, factura)}
                             {factura.mesaj_anaf && factura.status_anaf === 'EROARE' && (
                               <button
                                 className="text-xs text-gray-400 hover:text-white"
@@ -530,7 +608,8 @@ export default function FacturiEmisePage() {
                         <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2 items-center">
                             {/* Buton Incasare - doar daca mai este rest de plata */}
-                            {restDePlata > 0 && (
+                            {/* ✅ STORNO TRACKING (14.01.2026): Dezactivat pentru facturi storno/stornate */}
+                            {restDePlata > 0 && !isStornoOrStornata(factura) && (
                               <button
                                 onClick={() => handleOpenIncasareModal(factura)}
                                 className="px-2 py-1 text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 rounded border border-green-600/30 transition-all"

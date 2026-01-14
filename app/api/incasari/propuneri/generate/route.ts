@@ -153,6 +153,7 @@ async function getTranzactiiCandidate(limit: number = 500, checkExisting: boolea
 
 /**
  * Obtine facturile candidate pentru matching din FacturiGenerate_v2
+ * ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate explicit
  */
 async function getFacturiGenerateCandidate(): Promise<FacturaCandidat[]> {
   const [rows] = await bigquery.query(`
@@ -173,6 +174,9 @@ async function getFacturiGenerateCandidate(): Promise<FacturaCandidat[]> {
       fg.status NOT IN ('platita', 'anulata', 'storno', 'stornata')
       AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
       AND fg.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
+      -- ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
+      AND COALESCE(fg.is_storno, false) = false
+      AND fg.stornata_de_factura_id IS NULL
     ORDER BY fg.data_factura DESC
   `);
 
@@ -194,6 +198,7 @@ async function getFacturiGenerateCandidate(): Promise<FacturaCandidat[]> {
 
 /**
  * Obtine facturile externe din FacturiEmiseANAF_v2 (care nu au link la FacturiGenerate)
+ * ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate explicit
  */
 async function getFacturiEmiseExterneCandidate(): Promise<FacturaCandidat[]> {
   const [rows] = await bigquery.query(`
@@ -219,6 +224,9 @@ async function getFacturiEmiseExterneCandidate(): Promise<FacturaCandidat[]> {
       AND fe.data_factura >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
       -- Doar facturi, nu note credit negative
       AND COALESCE(fe.valoare_ron, fe.valoare_totala) > 0
+      -- ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
+      AND COALESCE(fe.is_storno, false) = false
+      AND fe.stornata_de_factura_id IS NULL
     ORDER BY fe.data_factura DESC
   `);
 

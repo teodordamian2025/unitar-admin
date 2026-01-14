@@ -1061,6 +1061,7 @@ export async function GET(request: NextRequest) {
     // Verifică facturile generate care nu au ajuns în e-Factura ANAF după 2 zile
     // Trimite notificare către toți adminii
 
+    // ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
     const facturiNetrimiseQuery = `
       SELECT
         fg.id,
@@ -1095,6 +1096,10 @@ export async function GET(request: NextRequest) {
           WHERE fea.factura_generata_id = fg.id
           AND fea.status_anaf IN ('CONFIRMAT', 'DESCARCAT')
         )
+        -- ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
+        AND COALESCE(fg.is_storno, false) = false
+        AND fg.stornata_de_factura_id IS NULL
+        AND fg.status NOT IN ('storno', 'stornata')
       ORDER BY fg.data_creare DESC
     `;
 
