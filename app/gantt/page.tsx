@@ -99,14 +99,14 @@ export default function GanttView() {
   const [comentariiProiect, setComentariiProiect] = useState<any>(null);
   const [comentariiDefaultTab, setComentariiDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('comentarii');
 
-  // Filters
+  // Filters - Default status is 'in_progress' to show only active projects on page load
   const [filters, setFilters] = useState({
     proiect_id: '',
     responsabil_nume: '',
     proiect_nume: '',
     client_nume: '',
     tip_task: '', // 'proiect', 'subproiect', 'sarcina'
-    status: '', // 'to_do', 'in_progress', 'finalizata', 'anulata'
+    status: 'in_progress', // DEFAULT: 'in_progress' - 'to_do', 'in_progress', 'finalizata', 'anulata'
     prioritate: '', // 'normala', 'ridicata', 'urgent'
     start_date: '',
     end_date: ''
