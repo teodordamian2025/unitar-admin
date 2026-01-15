@@ -21,10 +21,9 @@ const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
 const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
-const TABLE_PLANIFICATOR = `\`${PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\``;
 
 console.log(`🔧 User TimeTracking API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: TimeTracking${tableSuffix}, PlanificatorPersonal${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, Utilizatori${tableSuffix}`);
+console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, Utilizatori${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -107,92 +106,35 @@ export async function GET(request: NextRequest) {
     console.log(`📊 Using table: ${TABLE_TIME_TRACKING}`);
     console.log(`🔧 V2 Tables enabled: ${useV2Tables}`);
 
-    // Query pentru time tracking utilizatori normali cu obiective multiple
-    // UNION între TimeTracking_v2 și PlanificatorPersonal_v2
+    // Query pentru time tracking utilizatori normali
+    // FIX: Eliminat UNION ALL cu PlanificatorPersonal_v2 pentru a evita înregistrări duplicate
+    // PIN-ul salvează deja în TimeTracking_v2 la unpin (tip_inregistrare = 'pin_silent')
     let baseQuery = `
-      WITH time_tracking_data AS (
-        -- Date din TimeTracking_v2 (înregistrări manuale)
-        SELECT
-          tt.id,
-          tt.utilizator_uid,
-          tt.utilizator_nume,
-          tt.proiect_id,
-          tt.subproiect_id,
-          tt.sarcina_id,
-          tt.descriere_lucru as task_description,
-          tt.data_lucru,
-          tt.ore_lucrate,
-          tt.tip_inregistrare,
-          tt.created_at
-        FROM ${TABLE_TIME_TRACKING} tt
-
-        UNION ALL
-
-        -- Date din PlanificatorPersonal_v2 (cronometru pin)
-        SELECT
-          pl.id,
-          pl.utilizator_uid,
-          NULL as utilizator_nume,  -- va fi completat din JOIN cu Utilizatori
-          CASE
-            WHEN pl.tip_item = 'proiect' THEN pl.item_id
-            WHEN pl.tip_item = 'subproiect' THEN sp.ID_Proiect
-            WHEN pl.tip_item = 'sarcina' THEN s.proiect_id
-            ELSE NULL
-          END as proiect_id,
-          CASE
-            WHEN pl.tip_item = 'subproiect' THEN pl.item_id
-            WHEN pl.tip_item = 'sarcina' THEN s.subproiect_id
-            ELSE NULL
-          END as subproiect_id,
-          CASE
-            WHEN pl.tip_item = 'sarcina' THEN pl.item_id
-            ELSE NULL
-          END as sarcina_id,
-          CONCAT('⏱️ Cronometru Planificator',
-            CASE
-              WHEN pl.comentariu_personal IS NOT NULL AND pl.comentariu_personal != ''
-              THEN CONCAT(' - ', pl.comentariu_personal)
-              ELSE ''
-            END
-          ) as task_description,
-          DATE(pl.pin_timestamp_start) as data_lucru,
-          -- Convertește secunde în ore (pin_total_seconds / 3600)
-          ROUND(CAST(pl.pin_total_seconds AS NUMERIC) / 3600, 2) as ore_lucrate,
-          'planificator_pin' as tip_inregistrare,
-          pl.pin_timestamp_stop as created_at
-        FROM ${TABLE_PLANIFICATOR} pl
-        LEFT JOIN ${TABLE_SUBPROIECTE} sp ON pl.tip_item = 'subproiect' AND pl.item_id = sp.ID_Subproiect
-        LEFT JOIN ${TABLE_SARCINI} s ON pl.tip_item = 'sarcina' AND pl.item_id = s.id
-        WHERE pl.pin_total_seconds IS NOT NULL
-          AND pl.pin_total_seconds > 0
-          AND pl.pin_timestamp_start IS NOT NULL
-          AND pl.pin_timestamp_stop IS NOT NULL
-      )
       SELECT
-        ttd.id,
-        ttd.utilizator_uid,
-        COALESCE(ttd.utilizator_nume, u.nume, u.email) as utilizator_nume,
-        ttd.proiect_id,
-        ttd.subproiect_id,
-        ttd.sarcina_id,
-        ttd.task_description,
-        ttd.data_lucru,
-        ttd.ore_lucrate,
-        ttd.tip_inregistrare,
-        ttd.created_at,
+        tt.id,
+        tt.utilizator_uid,
+        COALESCE(tt.utilizator_nume, u.nume, u.email) as utilizator_nume,
+        tt.proiect_id,
+        tt.subproiect_id,
+        tt.sarcina_id,
+        tt.descriere_lucru as task_description,
+        tt.data_lucru,
+        tt.ore_lucrate,
+        tt.tip_inregistrare,
+        tt.created_at,
         p.Denumire as proiect_nume,
         sp.Denumire as subproiect_nume,
         s.titlu as sarcina_nume,
         CASE
-          WHEN ttd.sarcina_id IS NOT NULL THEN 'sarcina'
-          WHEN ttd.subproiect_id IS NOT NULL THEN 'subproiect'
+          WHEN tt.sarcina_id IS NOT NULL THEN 'sarcina'
+          WHEN tt.subproiect_id IS NOT NULL THEN 'subproiect'
           ELSE 'proiect'
         END as tip_obiectiv
-      FROM time_tracking_data ttd
-      LEFT JOIN ${TABLE_UTILIZATORI} u ON ttd.utilizator_uid = u.uid
-      LEFT JOIN ${TABLE_PROIECTE} p ON ttd.proiect_id = p.ID_Proiect
-      LEFT JOIN ${TABLE_SUBPROIECTE} sp ON ttd.subproiect_id = sp.ID_Subproiect
-      LEFT JOIN ${TABLE_SARCINI} s ON ttd.sarcina_id = s.id
+      FROM ${TABLE_TIME_TRACKING} tt
+      LEFT JOIN ${TABLE_UTILIZATORI} u ON tt.utilizator_uid = u.uid
+      LEFT JOIN ${TABLE_PROIECTE} p ON tt.proiect_id = p.ID_Proiect
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp ON tt.subproiect_id = sp.ID_Subproiect
+      LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
     `;
 
     const conditions: string[] = [];
@@ -209,26 +151,26 @@ export async function GET(request: NextRequest) {
     }
 
     // ÎNTOTDEAUNA filtrăm pe utilizator pentru securitate
-    conditions.push('ttd.utilizator_uid = @userId');
+    conditions.push('tt.utilizator_uid = @userId');
     params.userId = userId;
     types.userId = 'STRING';
 
     // Filtrare pe interval de date
     if (startDate) {
-      conditions.push('ttd.data_lucru >= @startDate');
+      conditions.push('tt.data_lucru >= @startDate');
       params.startDate = startDate;
       types.startDate = 'DATE';
     }
 
     if (endDate) {
-      conditions.push('ttd.data_lucru <= @endDate');
+      conditions.push('tt.data_lucru <= @endDate');
       params.endDate = endDate;
       types.endDate = 'DATE';
     }
 
     // Filtrare pe proiect
     if (projectId) {
-      conditions.push('ttd.proiect_id = @projectId');
+      conditions.push('tt.proiect_id = @projectId');
       params.projectId = projectId;
       types.projectId = 'STRING';
     }
@@ -273,40 +215,11 @@ export async function GET(request: NextRequest) {
       console.log('🔍 Debugging: Check if data exists in TimeTracking_v2 table');
     }
 
-    // Query pentru total count - folosește aceeași structură CTE
+    // Query pentru total count - simplificat (fără UNION)
+    // FIX: Eliminat UNION ALL cu PlanificatorPersonal_v2 pentru a evita înregistrări duplicate
     let countQuery = `
-      WITH time_tracking_data AS (
-        -- Date din TimeTracking_v2 (înregistrări manuale)
-        SELECT
-          tt.id,
-          tt.utilizator_uid,
-          tt.proiect_id,
-          tt.data_lucru
-        FROM ${TABLE_TIME_TRACKING} tt
-
-        UNION ALL
-
-        -- Date din PlanificatorPersonal_v2 (cronometru pin)
-        SELECT
-          pl.id,
-          pl.utilizator_uid,
-          CASE
-            WHEN pl.tip_item = 'proiect' THEN pl.item_id
-            WHEN pl.tip_item = 'subproiect' THEN sp.ID_Proiect
-            WHEN pl.tip_item = 'sarcina' THEN s.proiect_id
-            ELSE NULL
-          END as proiect_id,
-          DATE(pl.pin_timestamp_start) as data_lucru
-        FROM ${TABLE_PLANIFICATOR} pl
-        LEFT JOIN ${TABLE_SUBPROIECTE} sp ON pl.tip_item = 'subproiect' AND pl.item_id = sp.ID_Subproiect
-        LEFT JOIN ${TABLE_SARCINI} s ON pl.tip_item = 'sarcina' AND pl.item_id = s.id
-        WHERE pl.pin_total_seconds IS NOT NULL
-          AND pl.pin_total_seconds > 0
-          AND pl.pin_timestamp_start IS NOT NULL
-          AND pl.pin_timestamp_stop IS NOT NULL
-      )
       SELECT COUNT(*) as total
-      FROM time_tracking_data ttd
+      FROM ${TABLE_TIME_TRACKING} tt
     `;
 
     if (conditions.length > 0) {
