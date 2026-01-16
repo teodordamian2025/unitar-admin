@@ -1129,9 +1129,18 @@ export async function GET(request: NextRequest) {
           AND ae.anaf_status IN ('ok', 'trimis', 'validat', 'CONFIRMAT')
         )
         -- Excludem facturile care apar în FacturiEmiseANAF_v2 cu status CONFIRMAT
+        -- FIX 16.01.2026: Verificăm atât prin factura_generata_id cât și prin serie+numar+valoare
         AND NOT EXISTS (
           SELECT 1 FROM ${TABLE_FACTURI_EMISE_ANAF} fea
-          WHERE fea.factura_generata_id = fg.id
+          WHERE (
+            -- Match prin factura_generata_id (link direct)
+            fea.factura_generata_id = fg.id
+            OR (
+              -- Match prin serie+numar (cu spațiu) și valoare identică
+              fea.serie_numar = CONCAT(fg.serie, ' ', fg.numar)
+              AND ABS(COALESCE(fea.valoare_totala, 0) - COALESCE(fg.total, 0)) < 0.01
+            )
+          )
           AND fea.status_anaf IN ('CONFIRMAT', 'DESCARCAT')
         )
         -- ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
@@ -1157,7 +1166,8 @@ export async function GET(request: NextRequest) {
       console.log(`👤 Admini pentru notificare facturi ANAF: ${admini.length}`);
 
       for (const factura of facturiNetrimise) {
-        const serieNumar = `${factura.serie || ''}${factura.numar || ''}`.trim();
+        // FIX 16.01.2026: Adăugat spațiu între serie și numar pentru căutare corectă
+        const serieNumar = `${factura.serie || ''} ${factura.numar || ''}`.trim();
         const dataFactura = extractDateValue(factura.data_factura);
         const dataCreare = extractDateValue(factura.data_creare);
 
