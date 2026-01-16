@@ -1,8 +1,9 @@
 // CALEA: /app/api/notifications/cron/route.ts
-// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 14.01.2026
+// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 16.01.2026
 // DESCRIERE: Cron job pentru verificare termene apropiate ȘI DEPĂȘITE (proiecte, subproiecte, sarcini)
 // MODIFICAT: 12.01.2026 - Consolidare email-uri per user + link-uri corecte admin/user + ID proiect vizibil
 // MODIFICAT: 14.01.2026 - FIX: Exclude proiecte/subproiecte cu status_achitare = 'Incasat' din notificări
+// MODIFICAT: 16.01.2026 - FIX: Exclude proiecte/subproiecte care au facturi deja plătite (verificare directă în FacturiGenerate_v2)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -323,6 +324,7 @@ export async function GET(request: NextRequest) {
     userNotificationsMap.clear();
 
     // FIX 14.01.2026: Exclude proiectele cu status_achitare = 'Incasat' - nu mai trimitem notificări pentru facturi deja încasate
+    // FIX 16.01.2026: Verificare directă dacă proiectul are facturi deja plătite în FacturiGenerate_v2
     const proiecteApropiateQuery = `
       WITH proiecte_apropiate AS (
         SELECT
@@ -338,6 +340,12 @@ export async function GET(request: NextRequest) {
           AND p.Status = 'Activ'
           AND (p.progres_procent IS NULL OR p.progres_procent < 100)
           AND COALESCE(p.status_achitare, 'Neachitat') != 'Incasat'
+          -- FIX 16.01.2026: Exclude proiectele care au facturi deja plătite integral
+          AND NOT EXISTS (
+            SELECT 1 FROM ${TABLE_FACTURI_GENERATE} fg
+            WHERE fg.proiect_id = p.ID_Proiect
+            AND (fg.status = 'platita' OR COALESCE(fg.valoare_platita, 0) >= COALESCE(fg.total, 0) * 0.99)
+          )
       ),
       -- Obține UID-ul responsabilului principal din Utilizatori (cu rol și email)
       responsabil_principal AS (
@@ -457,6 +465,7 @@ export async function GET(request: NextRequest) {
     // FIX 08.01.2026: Rezolvare corectă a UID-urilor (la fel ca proiecte apropiate)
 
     // FIX 14.01.2026: Exclude proiectele cu status_achitare = 'Incasat' - nu mai trimitem notificări pentru facturi deja încasate
+    // FIX 16.01.2026: Verificare directă dacă proiectul are facturi deja plătite în FacturiGenerate_v2
     const proiecteDepasiteQuery = `
       WITH proiecte_depasite AS (
         SELECT
@@ -472,6 +481,12 @@ export async function GET(request: NextRequest) {
           AND p.Status = 'Activ'
           AND (p.progres_procent IS NULL OR p.progres_procent < 100)
           AND COALESCE(p.status_achitare, 'Neachitat') != 'Incasat'
+          -- FIX 16.01.2026: Exclude proiectele care au facturi deja plătite integral
+          AND NOT EXISTS (
+            SELECT 1 FROM ${TABLE_FACTURI_GENERATE} fg
+            WHERE fg.proiect_id = p.ID_Proiect
+            AND (fg.status = 'platita' OR COALESCE(fg.valoare_platita, 0) >= COALESCE(fg.total, 0) * 0.99)
+          )
       ),
       responsabil_principal AS (
         SELECT
@@ -588,6 +603,7 @@ export async function GET(request: NextRequest) {
     // FIX 08.01.2026: Rezolvare corectă a UID-urilor din Utilizatori_v2 + SubproiecteResponsabili_v2
 
     // FIX 14.01.2026: Exclude subproiectele cu status_achitare = 'Incasat' - nu mai trimitem notificări pentru facturi deja încasate
+    // FIX 16.01.2026: Verificare directă dacă proiectul părinte are facturi deja plătite în FacturiGenerate_v2
     const subproiecteApropiateQuery = `
       WITH subproiecte_apropiate AS (
         SELECT
@@ -607,6 +623,12 @@ export async function GET(request: NextRequest) {
           AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
           AND sp.activ = true
           AND COALESCE(sp.status_achitare, 'Neachitat') != 'Incasat'
+          -- FIX 16.01.2026: Exclude subproiectele care au facturi deja plătite (prin proiectul părinte)
+          AND NOT EXISTS (
+            SELECT 1 FROM ${TABLE_FACTURI_GENERATE} fg
+            WHERE fg.proiect_id = sp.ID_Proiect
+            AND (fg.status = 'platita' OR COALESCE(fg.valoare_platita, 0) >= COALESCE(fg.total, 0) * 0.99)
+          )
       ),
       responsabil_principal AS (
         SELECT
@@ -729,6 +751,7 @@ export async function GET(request: NextRequest) {
     // FIX 08.01.2026: Rezolvare corectă a UID-urilor
 
     // FIX 14.01.2026: Exclude subproiectele cu status_achitare = 'Incasat' - nu mai trimitem notificări pentru facturi deja încasate
+    // FIX 16.01.2026: Verificare directă dacă proiectul părinte are facturi deja plătite în FacturiGenerate_v2
     const subproiecteDepasiteQuery = `
       WITH subproiecte_depasite AS (
         SELECT
@@ -748,6 +771,12 @@ export async function GET(request: NextRequest) {
           AND (sp.progres_procent IS NULL OR sp.progres_procent < 100)
           AND sp.activ = true
           AND COALESCE(sp.status_achitare, 'Neachitat') != 'Incasat'
+          -- FIX 16.01.2026: Exclude subproiectele care au facturi deja plătite (prin proiectul părinte)
+          AND NOT EXISTS (
+            SELECT 1 FROM ${TABLE_FACTURI_GENERATE} fg
+            WHERE fg.proiect_id = sp.ID_Proiect
+            AND (fg.status = 'platita' OR COALESCE(fg.valoare_platita, 0) >= COALESCE(fg.total, 0) * 0.99)
+          )
       ),
       responsabil_principal AS (
         SELECT
