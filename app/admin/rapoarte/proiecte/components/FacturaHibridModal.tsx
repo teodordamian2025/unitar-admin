@@ -308,9 +308,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [showEtapeSelector, setShowEtapeSelector] = useState(false);
   const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
   const [numarFactura, setNumarFactura] = useState(initialData?.numarFactura || '');
+  const [serieFactura, setSerieFactura] = useState(initialData?.serieFactura || ''); // ✅ NOU: State pentru serie editabilă
   const [dataFactura] = useState(new Date());
   const [isLoadingSetari, setIsLoadingSetari] = useState(false);
-  const [isManualNumber, setIsManualNumber] = useState(false); // State pentru editare manuală număr
+  const [isManualNumber, setIsManualNumber] = useState(false); // State pentru editare manuală număr (și la edit)
   const [sendToAnaf, setSendToAnaf] = useState(true); // ✅ Default checked - utilizatorul poate debifa dacă nu dorește transmitere e-Factură
   const [anafTokenStatus, setAnafTokenStatus] = useState<ANAFTokenStatus>({
     hasValidToken: false,
@@ -977,35 +978,41 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     }
 
     try {
-      // ✅ MODIFICAT: Folosește SetariFacturare_v2.numar_curent_facturi ca sursă primară
+      // ✅ FIX NUMEROTARE: Folosim MAX din BD ca sursă primară pentru a evita salturi
+      // Cazuri acoperite: facturi șterse, numere manuale diferite, counter desincronizat
       let nextNumber = 1001; // Fallback default
+      let maxFromDB = 0;
+      let counterFromSettings = numarCurent || 0;
 
-      if (numarCurent !== undefined && numarCurent > 0) {
-        // Folosește counter-ul din SetariFacturare_v2
-        nextNumber = numarCurent + 1;
-        console.log(`🔢 [NUMEROTARE] Counter actual: ${numarCurent}, următorul: ${nextNumber}`);
-      } else {
-        // Fallback: încearcă să ia ultimul număr din BD
-        console.log('⚠️ [NUMEROTARE] Counter nu e disponibil, încerc API last-number...');
-        const searchPattern = `${serie}${separator}`;
+      // 1. Întotdeauna verificăm MAX-ul din baza de date
+      console.log(`🔢 [NUMEROTARE] Verificare MAX din BD pentru seria: ${serie}`);
+      const searchPattern = `${serie}${separator}`;
 
-        const response = await fetch('/api/rapoarte/facturi/last-number', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            serie,
-            separator,
-            pattern: searchPattern
-          })
-        });
+      const response = await fetch('/api/rapoarte/facturi/last-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serie,
+          separator,
+          pattern: searchPattern
+        })
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (data.success && data.lastNumber !== undefined) {
-          nextNumber = (data.lastNumber || 0) + 1;
-          console.log(`🔢 [NUMEROTARE-FALLBACK] Ultimul număr din BD: ${data.lastNumber}, următorul: ${nextNumber}`);
-        }
+      if (data.success && data.lastNumber !== undefined) {
+        maxFromDB = data.lastNumber || 0;
+        console.log(`🔢 [NUMEROTARE] MAX din BD: ${maxFromDB}`);
       }
+
+      // 2. Folosim MAX dintre BD și counter pentru a asigura continuitatea
+      // Aceasta rezolvă cazurile când:
+      // - Facturi au fost șterse (counter > max BD)
+      // - Numere manuale au fost folosite (max BD > counter)
+      const maxNumber = Math.max(maxFromDB, counterFromSettings);
+      nextNumber = maxNumber + 1;
+
+      console.log(`🔢 [NUMEROTARE] Counter setări: ${counterFromSettings}, MAX BD: ${maxFromDB}, URMĂTORUL: ${nextNumber}`);
 
       // Construiește numărul complet
       let numarComplet = `${serie}${separator}${nextNumber}`;
@@ -1034,8 +1041,45 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   };
 
   const loadSetariFacturare = async () => {
+    // ✅ MODIFICAT: Pentru Edit, extragem seria și numărul din factura existentă
     if (isEdit && initialData?.numarFactura) {
-      setNumarFactura(initialData.numarFactura);
+      const fullNumber = initialData.numarFactura;
+      setNumarFactura(fullNumber);
+
+      // Extragem seria din numărul complet (ex: "UP-1060-2025" -> "UP")
+      if (fullNumber.includes('-')) {
+        const parts = fullNumber.split('-');
+        if (parts.length > 0 && parts[0] && !/^\d+$/.test(parts[0])) {
+          setSerieFactura(parts[0]);
+        }
+      }
+
+      // Încărcăm totuși setările pentru a avea separatorul corect
+      try {
+        const response = await fetch('/api/setari/facturare');
+        const data = await response.json();
+        if (data.success && data.setari) {
+          const processValue = (value: any) => {
+            if (value && typeof value === 'object' && value.value !== undefined) {
+              return value.value;
+            }
+            return value;
+          };
+          const setariProcesate: SetariFacturare = {
+            serie_facturi: processValue(data.setari.serie_facturi),
+            numar_curent_facturi: processValue(data.setari.numar_curent_facturi) || 1000,
+            format_numerotare: processValue(data.setari.format_numerotare),
+            separator_numerotare: processValue(data.setari.separator_numerotare),
+            include_an_numerotare: processValue(data.setari.include_an_numerotare),
+            include_luna_numerotare: processValue(data.setari.include_luna_numerotare),
+            termen_plata_standard: processValue(data.setari.termen_plata_standard)
+          };
+          setSetariFacturare(setariProcesate);
+          setTermenPlata(setariProcesate.termen_plata_standard || 30);
+        }
+      } catch (e) {
+        console.log('⚠️ Nu s-au putut încărca setările în modul Edit');
+      }
       return;
     }
 
@@ -1043,7 +1087,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     try {
       const response = await fetch('/api/setari/facturare');
       const data = await response.json();
-      
+
       if (data.success && data.setari) {
         const processValue = (value: any) => {
           if (value && typeof value === 'object' && value.value !== undefined) {
@@ -1068,12 +1112,15 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         setTermenPlata(setariProcesate.termen_plata_standard || 30);
 
         // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
-        const serieFactura = (iappConfig?.tip_facturare === 'iapp' && iappConfig?.serie_default)
+        const serieCalculata = (iappConfig?.tip_facturare === 'iapp' && iappConfig?.serie_default)
           ? iappConfig.serie_default
           : setariProcesate.serie_facturi;
 
+        // ✅ NOU: Setăm și seria pentru editare
+        setSerieFactura(serieCalculata);
+
         const { numarComplet } = await getNextInvoiceNumber(
-          serieFactura,
+          serieCalculata,
           setariProcesate.separator_numerotare,
           setariProcesate.include_an_numerotare,
           setariProcesate.include_luna_numerotare,
@@ -1082,7 +1129,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
         setNumarFactura(numarComplet);
         showToast(`✅ Număr factură generat: ${numarComplet}`, 'success');
-        
+
       } else {
         const defaultSetari: SetariFacturare = {
           serie_facturi: 'UP',
@@ -1093,22 +1140,24 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           include_luna_numerotare: false,
           termen_plata_standard: 30
         };
-        
+
         setSetariFacturare(defaultSetari);
-        
+        setSerieFactura('UP'); // ✅ NOU: Setăm seria default
+
         // Setează termen plată default
         setTermenPlata(30);
-        
+
         const { numarComplet } = await getNextInvoiceNumber('UP', '-', true, false);
         setNumarFactura(numarComplet);
         showToast(`ℹ️ Folosesc setări default. Număr: ${numarComplet}`, 'info');
       }
     } catch (error) {
       console.error('Eroare la încărcarea setărilor:', error);
-      const fallbackNumar = isStorno ? 
+      const fallbackNumar = isStorno ?
         `STORNO-${proiect.ID_Proiect}-${Date.now()}` :
         `INV-${proiect.ID_Proiect}-${Date.now()}`;
       setNumarFactura(fallbackNumar);
+      setSerieFactura('INV'); // ✅ NOU: Setăm seria fallback
       showToast('⚠️ Nu s-au putut încărca setările. Folosesc număr temporar.', 'error');
     } finally {
       setIsLoadingSetari(false);
@@ -1724,6 +1773,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           observatii,
           clientInfo,
           numarFactura,
+          serieFacturaManual: isManualNumber ? serieFactura : null, // ✅ NOU: Serie manual editată
           manual_number: isManualNumber, // ✅ NOU: Flag pentru număr manual (nu incrementează counter-ul)
           setariFacturare: {
             ...setariFacturare,
@@ -1948,10 +1998,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   marginBottom: '4px'
                 }}>
                   <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                    Număr factură:
+                    {isManualNumber ? 'Serie + Număr:' : 'Număr factură:'}
                   </div>
-                  {/* ✅ NOU: Checkbox pentru editare manuală (doar pentru facturi noi) */}
-                  {!isEdit && !isStorno && (
+                  {/* ✅ MODIFICAT: Checkbox pentru editare manuală (și pentru Edit mode, nu doar facturi noi) */}
+                  {!isStorno && (
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1970,8 +2020,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                         checked={isManualNumber}
                         onChange={(e) => {
                           setIsManualNumber(e.target.checked);
-                          if (!e.target.checked) {
-                            // Regenerează numărul automat când se dezactivează editarea
+                          if (!e.target.checked && !isEdit) {
+                            // Regenerează numărul automat când se dezactivează editarea (doar pentru facturi noi)
                             loadSetariFacturare();
                           }
                         }}
@@ -1981,28 +2031,77 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     </label>
                   )}
                 </div>
-                {/* ✅ NOU: Input editabil sau display read-only */}
-                {!isEdit && !isStorno && isManualNumber ? (
-                  <input
-                    type="text"
-                    value={numarFactura}
-                    onChange={(e) => setNumarFactura(e.target.value)}
-                    placeholder="Ex: UP-2000-2025"
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 'bold',
-                      color: 'white',
-                      fontFamily: 'monospace',
-                      background: 'rgba(241, 196, 15, 0.2)',
-                      border: '2px solid rgba(241, 196, 15, 0.5)',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      width: '200px',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.8)'}
-                    onBlur={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.5)'}
-                  />
+                {/* ✅ MODIFICAT: Input editabil pentru serie + număr (și în Edit mode) */}
+                {!isStorno && isManualNumber ? (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {/* ✅ NOU: Input pentru serie editabilă */}
+                    <input
+                      type="text"
+                      value={serieFactura}
+                      onChange={(e) => {
+                        const newSerie = e.target.value.toUpperCase();
+                        setSerieFactura(newSerie);
+                        // Actualizăm și numărul complet când se schimbă seria
+                        const separator = setariFacturare?.separator_numerotare || '-';
+                        const parts = numarFactura.split(separator);
+                        if (parts.length > 1) {
+                          // Înlocuim seria în numărul complet
+                          parts[0] = newSerie;
+                          setNumarFactura(parts.join(separator));
+                        }
+                      }}
+                      placeholder="UP"
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        fontFamily: 'monospace',
+                        background: 'rgba(241, 196, 15, 0.2)',
+                        border: '2px solid rgba(241, 196, 15, 0.5)',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        width: '70px',
+                        outline: 'none',
+                        textAlign: 'center'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.8)'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.5)'}
+                    />
+                    <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontFamily: 'monospace', fontSize: '18px' }}>-</span>
+                    {/* Input pentru număr complet (fără serie) */}
+                    <input
+                      type="text"
+                      value={(() => {
+                        // Extragem doar partea de număr (fără serie)
+                        const separator = setariFacturare?.separator_numerotare || '-';
+                        const parts = numarFactura.split(separator);
+                        if (parts.length > 1) {
+                          return parts.slice(1).join(separator);
+                        }
+                        return numarFactura;
+                      })()}
+                      onChange={(e) => {
+                        // Reconstruim numărul complet cu seria
+                        const separator = setariFacturare?.separator_numerotare || '-';
+                        setNumarFactura(`${serieFactura}${separator}${e.target.value}`);
+                      }}
+                      placeholder="1060-2025"
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        fontFamily: 'monospace',
+                        background: 'rgba(241, 196, 15, 0.2)',
+                        border: '2px solid rgba(241, 196, 15, 0.5)',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        width: '140px',
+                        outline: 'none'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.8)'}
+                      onBlur={(e) => e.target.style.borderColor = 'rgba(241, 196, 15, 0.5)'}
+                    />
+                  </div>
                 ) : (
                   <div style={{
                     fontSize: '20px',
@@ -2013,8 +2112,8 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     {isLoadingSetari ? '⏳ Se generează...' : numarFactura || 'Negenecat'}
                   </div>
                 )}
-                {/* ✅ NOU: Warning pentru număr manual */}
-                {!isEdit && !isStorno && isManualNumber && (
+                {/* ✅ MODIFICAT: Warning pentru număr manual (diferit pentru Edit vs New) */}
+                {!isStorno && isManualNumber && (
                   <div style={{
                     fontSize: '10px',
                     color: 'rgba(241, 196, 15, 0.9)',
@@ -2023,7 +2122,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     alignItems: 'center',
                     gap: '4px'
                   }}>
-                    ⚠️ Numerotarea automată va continua normal
+                    {isEdit
+                      ? '⚠️ Modificarea numărului/seriei va actualiza factura existentă'
+                      : '⚠️ Numerotarea automată va continua normal'}
                   </div>
                 )}
               </div>

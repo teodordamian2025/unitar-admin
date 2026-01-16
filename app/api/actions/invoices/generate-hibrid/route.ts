@@ -870,6 +870,7 @@ export async function POST(request: NextRequest) {
       observatii,
       clientInfo,
       numarFactura,
+      serieFacturaManual = null, // ✅ NOU: Serie manual editată din frontend
       manual_number = false, // ✅ NOU: Flag pentru număr manual (nu incrementează counter-ul)
       setariFacturare,
       sendToAnaf = false,
@@ -1080,22 +1081,30 @@ export async function POST(request: NextRequest) {
     // ✅ FIX DIACRITICE: Curăță caracterele non-ASCII pentru nota cursului valutar
     const notaCursValutarClean = cleanNonAscii(notaCursValutar);
 
-    // ✅ NOU: Construiește numărul facturii pentru afișare PDF cu seria corectă (UPA pentru iapp, UP pentru ANAF)
-    const serieForDisplay = (tip_facturare === 'iapp' && iappConfig?.serie_default)
-      ? iappConfig.serie_default
-      : (setariFacturare?.serie_facturi || 'INV');
+    // ✅ MODIFICAT: Prioritizează seria manual editată pentru afișare PDF
+    const serieForDisplay = serieFacturaManual
+      ? serieFacturaManual
+      : (tip_facturare === 'iapp' && iappConfig?.serie_default)
+        ? iappConfig.serie_default
+        : (setariFacturare?.serie_facturi || 'INV');
     const separatorForDisplay = setariFacturare?.separator_numerotare || '-';
 
-    // Extrage numărul din numarFactura (poate avea serie greșită din frontend)
-    let numarForDisplay = numarFactura || '';
-    if (numarForDisplay.includes('-')) {
-      // Split și ia doar ultima parte (numărul)
-      const parts = numarForDisplay.split('-');
-      numarForDisplay = parts[parts.length - 1]; // "UP-1001" -> "1001"
+    // ✅ FIX: Dacă e număr manual, folosește direct numarFactura fără reconstrucție
+    let numarFacturaDisplay = numarFactura || '';
+    if (!serieFacturaManual) {
+      // Extrage numărul din numarFactura (poate avea serie greșită din frontend)
+      let numarForDisplay = numarFactura || '';
+      if (numarForDisplay.includes('-')) {
+        // Split și ia partea numerică (prima secvență de cifre, excluzând seria și anul)
+        // Format: "UP-1060-2025" -> parts = ["UP", "1060", "2025"]
+        const parts = numarForDisplay.split('-');
+        // Găsește prima parte care e doar cifre și nu pare a fi un an (nu începe cu 20)
+        const numarPart = parts.find(part => /^\d+$/.test(part) && !part.startsWith('20')) || parts[1] || '';
+        numarForDisplay = numarPart;
+      }
+      // Reconstruiește cu seria corectă doar dacă nu e manual
+      numarFacturaDisplay = `${serieForDisplay}${separatorForDisplay}${numarForDisplay}`;
     }
-
-    // Reconstruiește cu seria corectă
-    const numarFacturaDisplay = `${serieForDisplay}${separatorForDisplay}${numarForDisplay}`;
 
     // ✅ MODIFICAT: Filename cu numele clientului (sanitizat, max 40 caractere)
     // Format: factura-UPA-1056-2026-01-09-SIX DESIGN AND INNOVATIONSS.R.L..pdf
@@ -1558,10 +1567,12 @@ export async function POST(request: NextRequest) {
 
         // ✅ FIX: Extragere număr fără seria pentru Edit Mode
         const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
-        // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
-        const serieFactura = (tip_facturare === 'iapp' && iappConfig?.serie_default)
-          ? iappConfig.serie_default
-          : (setariFacturare?.serie_facturi || 'INV');
+        // ✅ MODIFICAT: Prioritizează seria manual editată, apoi iapp, apoi setări
+        const serieFactura = serieFacturaManual
+          ? serieFacturaManual
+          : (tip_facturare === 'iapp' && iappConfig?.serie_default)
+            ? iappConfig.serie_default
+            : (setariFacturare?.serie_facturi || 'INV');
         const separatorFactura = setariFacturare?.separator_numerotare || '-';
 
         // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
@@ -1709,10 +1720,12 @@ export async function POST(request: NextRequest) {
 
         // ✅ FIX: Extragere număr fără seria pentru coloana numar
         const fullInvoiceNumber = numarFactura || safeInvoiceData.numarFactura;
-        // ✅ NOU: Folosește seria iapp pentru tip_facturare='iapp', altfel seria normală
-        const serieFactura = (tip_facturare === 'iapp' && iappConfig?.serie_default)
-          ? iappConfig.serie_default
-          : (setariFacturare?.serie_facturi || 'INV');
+        // ✅ MODIFICAT: Prioritizează seria manual editată, apoi iapp, apoi setări
+        const serieFactura = serieFacturaManual
+          ? serieFacturaManual
+          : (tip_facturare === 'iapp' && iappConfig?.serie_default)
+            ? iappConfig.serie_default
+            : (setariFacturare?.serie_facturi || 'INV');
         const separatorFactura = setariFacturare?.separator_numerotare || '-';
 
         // Extrage doar numărul din string-ul complet (de ex: "UP-1001" -> "1001")
