@@ -21,6 +21,7 @@ import CommentsCard from '../components/CommentsCard';
 import TasksCard from '../components/TasksCard';
 import ResponsabiliCard from '../components/ResponsabiliCard';
 import DateEditButton from '../components/DateEditButton';
+import FinancialStatsCard from '../components/FinancialStatsCard';
 import { useDebounce } from '@/app/hooks/useDebounce';
 
 interface ProiectDetails {
@@ -1753,6 +1754,12 @@ export default function ProiectDetailsPage() {
           entityName={proiect.Denumire}
           compact={false}
           onUpdate={() => fetchProiectDetails()}
+        />
+
+        {/* NOU 17.01.2026: Statistici Financiare și Timp Lucrat */}
+        <FinancialStatsCard
+          proiectId={proiectId}
+          onRefresh={() => fetchProiectDetails()}
         />
       </div>
 

@@ -149,6 +149,18 @@ const ModernSettingsPage: React.FC = () => {
         { label: 'ING Bank', value: 'RO82INGB***7533' },
         { label: 'Trezorerie', value: 'RO29TREZ***8857' }
       ]
+    },
+    {
+      title: 'Cost de Om',
+      description: 'Setări cost/oră și cost/zi pentru calcul productivitate și randament',
+      icon: '💰',
+      href: '/admin/setari/costuri',
+      color: 'bg-gradient-to-br from-amber-500/20 to-amber-600/30 border-amber-200',
+      stats: [
+        { label: 'Cost/oră', value: '40 EUR' },
+        { label: 'Cost/zi', value: '320 EUR' },
+        { label: 'Ore/zi', value: '8 ore' }
+      ]
     }
   ];
 
