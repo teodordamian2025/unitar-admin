@@ -1,6 +1,7 @@
 // ==================================================================
 // CALEA: app/api/actions/invoices/delete/route.ts
-// MODIFICAT: Nume complet tabel FacturiGenerate
+// DATA: 17.01.2026 (ora României)
+// MODIFICAT: Fix sincronizare numar_curent_facturi la ștergere factură
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,9 +17,10 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 // ✅ Tabele cu suffix dinamic
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+const TABLE_SETARI_FACTURARE = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
 
 console.log(`🔧 Invoice Delete API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
+console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}, SetariFacturare${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -28,6 +30,56 @@ const bigquery = new BigQuery({
     client_id: process.env.GOOGLE_CLOUD_CLIENT_ID,
   },
 });
+
+// ✅ FIX 17.01.2026: Funcție helper pentru sincronizarea counter-ului cu MAX(numar) din BD
+// Aceasta rezolvă problema când ștergerea/renumerotarea ultimei facturi provoacă salturi
+async function syncInvoiceCounter(serie: string) {
+  try {
+    console.log(`🔄 [SYNC-COUNTER] Sincronizez numar_curent_facturi pentru seria: ${serie}`);
+
+    // 1. Găsește MAX(numar) din FacturiGenerate pentru seria respectivă
+    const maxQuery = `
+      SELECT MAX(CAST(numar AS INT64)) as max_numar
+      FROM ${TABLE_FACTURI_GENERATE}
+      WHERE serie = @serie
+    `;
+
+    const [maxRows] = await bigquery.query({
+      query: maxQuery,
+      params: { serie },
+      types: { serie: 'STRING' },
+      location: 'EU'
+    });
+
+    const maxNumar = maxRows[0]?.max_numar || 0;
+    console.log(`🔢 [SYNC-COUNTER] MAX(numar) din BD pentru seria ${serie}: ${maxNumar}`);
+
+    // 2. Actualizează numar_curent_facturi în SetariFacturare
+    // Counter-ul trebuie să fie MAX-ul, astfel următoarea factură va fi MAX + 1
+    const updateQuery = `
+      UPDATE ${TABLE_SETARI_FACTURARE}
+      SET
+        numar_curent_facturi = @maxNumar,
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = 'setari_facturare_main'
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: { maxNumar },
+      types: { maxNumar: 'INT64' },
+      location: 'EU'
+    });
+
+    console.log(`✅ [SYNC-COUNTER] numar_curent_facturi actualizat la ${maxNumar} pentru seria ${serie}`);
+    return maxNumar;
+
+  } catch (error) {
+    console.error('❌ [SYNC-COUNTER] Eroare la sincronizarea counter-ului:', error);
+    // Nu oprește procesul - ștergerea facturii rămâne validă
+    return null;
+  }
+}
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -127,9 +179,17 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    // ✅ FIX 17.01.2026: Sincronizează counter-ul după ștergere
+    // Aceasta previne salturile în numerotare când se șterge ultima factură
+    if (factura.serie) {
+      const newCounter = await syncInvoiceCounter(factura.serie);
+      console.log(`📊 [DELETE] Counter sincronizat la ${newCounter} după ștergerea facturii ${numarComplet}`);
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Factura ${numarComplet} a fost ștearsă cu succes`
+      message: `Factura ${numarComplet} a fost ștearsă cu succes`,
+      counterSynced: !!factura.serie
     });
 
   } catch (error) {

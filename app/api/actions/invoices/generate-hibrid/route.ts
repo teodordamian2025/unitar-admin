@@ -40,6 +40,7 @@ const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_SETARI_BANCA = `\`${PROJECT_ID}.${DATASET}.SetariBanca\``; // ⚠️ SetariBanca NU are versiune _v2
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+const TABLE_SETARI_FACTURARE_GLOBAL = `\`${PROJECT_ID}.${DATASET}.SetariFacturare${tableSuffix}\``;
 
 console.log(`🔧 Invoice Generation - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: EtapeFacturi${tableSuffix}, EtapeContract${tableSuffix}, AnexeContract${tableSuffix}, Subproiecte${tableSuffix}, SetariBanca (no _v2), FacturiGenerate${tableSuffix}, AnafEFactura${tableSuffix}`);
@@ -56,6 +57,56 @@ const escapeString = (value: string): string => {
     .replace(/\r/g, '\\r')   // Escape carriage returns
     .replace(/\t/g, '\\t');  // Escape tabs
 };
+
+// ✅ FIX 17.01.2026: Funcție helper pentru sincronizarea counter-ului cu MAX(numar) din BD
+// Aceasta rezolvă problema când ștergerea/renumerotarea ultimei facturi provoacă salturi
+async function syncInvoiceCounter(serie: string) {
+  try {
+    console.log(`🔄 [SYNC-COUNTER] Sincronizez numar_curent_facturi pentru seria: ${serie}`);
+
+    // 1. Găsește MAX(numar) din FacturiGenerate pentru seria respectivă
+    const maxQuery = `
+      SELECT MAX(CAST(numar AS INT64)) as max_numar
+      FROM ${TABLE_FACTURI_GENERATE}
+      WHERE serie = @serie
+    `;
+
+    const [maxRows] = await bigquery.query({
+      query: maxQuery,
+      params: { serie },
+      types: { serie: 'STRING' },
+      location: 'EU'
+    });
+
+    const maxNumar = maxRows[0]?.max_numar || 0;
+    console.log(`🔢 [SYNC-COUNTER] MAX(numar) din BD pentru seria ${serie}: ${maxNumar}`);
+
+    // 2. Actualizează numar_curent_facturi în SetariFacturare
+    // Counter-ul trebuie să fie MAX-ul, astfel următoarea factură va fi MAX + 1
+    const updateQuery = `
+      UPDATE ${TABLE_SETARI_FACTURARE_GLOBAL}
+      SET
+        numar_curent_facturi = @maxNumar,
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = 'setari_facturare_main'
+    `;
+
+    await bigquery.query({
+      query: updateQuery,
+      params: { maxNumar },
+      types: { maxNumar: 'INT64' },
+      location: 'EU'
+    });
+
+    console.log(`✅ [SYNC-COUNTER] numar_curent_facturi actualizat la ${maxNumar} pentru seria ${serie}`);
+    return maxNumar;
+
+  } catch (error) {
+    console.error('❌ [SYNC-COUNTER] Eroare la sincronizarea counter-ului:', error);
+    // Nu oprește procesul - editarea facturii rămâne validă
+    return null;
+  }
+}
 
 // ✅ Interfață pentru etapele facturate (din frontend)
 interface EtapaFacturata {
@@ -1681,7 +1732,14 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`✅ Factură ${numarFactura} actualizată în BigQuery cu date EXACTE din frontend (Edit Mode cu EtapeFacturi + race condition fix)`);
-        
+
+        // ✅ FIX 17.01.2026: Sincronizează counter-ul după editarea numărului facturii
+        // Aceasta previne salturile în numerotare când se renumerotează ultima factură
+        if (serieFactura) {
+          const newCounter = await syncInvoiceCounter(serieFactura);
+          console.log(`📊 [EDIT] Counter sincronizat la ${newCounter} după editarea facturii ${numarFactura}`);
+        }
+
       } else {
         // ✅ Creează factură nouă (inclusiv storno) cu date exacte din frontend
         console.log('🔍 NEW MODE: Creez factură nouă în BigQuery cu date exacte din frontend...');
