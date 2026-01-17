@@ -1,9 +1,10 @@
 // CALEA: /app/api/notifications/cron/route.ts
-// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 16.01.2026
+// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 17.01.2026
 // DESCRIERE: Cron job pentru verificare termene apropiate ȘI DEPĂȘITE (proiecte, subproiecte, sarcini)
 // MODIFICAT: 12.01.2026 - Consolidare email-uri per user + link-uri corecte admin/user + ID proiect vizibil
 // MODIFICAT: 14.01.2026 - FIX: Exclude proiecte/subproiecte cu status_achitare = 'Incasat' din notificări
 // MODIFICAT: 16.01.2026 - FIX: Exclude proiecte/subproiecte care au facturi deja plătite (verificare directă în FacturiGenerate_v2)
+// MODIFICAT: 17.01.2026 - FIX: Rezolvat eroare BigQuery "LEFT ANTISEMI JOIN" prin separarea NOT EXISTS cu OR în două clauze AND
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -1130,17 +1131,19 @@ export async function GET(request: NextRequest) {
         )
         -- Excludem facturile care apar în FacturiEmiseANAF_v2 cu status CONFIRMAT
         -- FIX 16.01.2026: Verificăm atât prin factura_generata_id cât și prin serie+numar+valoare
+        -- FIX 17.01.2026: Separat NOT EXISTS în două clauze pentru a evita eroarea BigQuery
+        -- "LEFT ANTISEMI JOIN cannot be used without a condition that is an equality of fields from both sides"
+        -- Match prin factura_generata_id (link direct)
         AND NOT EXISTS (
           SELECT 1 FROM ${TABLE_FACTURI_EMISE_ANAF} fea
-          WHERE (
-            -- Match prin factura_generata_id (link direct)
-            fea.factura_generata_id = fg.id
-            OR (
-              -- Match prin serie+numar (cu spațiu) și valoare identică
-              fea.serie_numar = CONCAT(fg.serie, ' ', fg.numar)
-              AND ABS(COALESCE(fea.valoare_totala, 0) - COALESCE(fg.total, 0)) < 0.01
-            )
-          )
+          WHERE fea.factura_generata_id = fg.id
+          AND fea.status_anaf IN ('CONFIRMAT', 'DESCARCAT')
+        )
+        -- Match prin serie+numar (cu spațiu) și valoare identică - ca fallback
+        AND NOT EXISTS (
+          SELECT 1 FROM ${TABLE_FACTURI_EMISE_ANAF} fea
+          WHERE fea.serie_numar = CONCAT(fg.serie, ' ', fg.numar)
+          AND ABS(COALESCE(fea.valoare_totala, 0) - COALESCE(fg.total, 0)) < 0.01
           AND fea.status_anaf IN ('CONFIRMAT', 'DESCARCAT')
         )
         -- ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
