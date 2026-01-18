@@ -46,13 +46,14 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. Obține toți utilizatorii activi
+    // NOTA: Utilizatori_v2 nu are coloana 'echipa', folosim 'departament' în schimb
     const utilizatoriQuery = `
       SELECT
         uid,
         nume,
         email,
         rol,
-        echipa
+        departament as echipa
       FROM ${TABLE_UTILIZATORI}
       WHERE activ = TRUE
       ORDER BY nume ASC
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
     });
 
     // 2. Obține planificările pentru perioada specificată
+    // NOTA: Proiecte_v2 folosește ID_Proiect (nu id) și nu are coloana culoare
     let planificariQuery = `
       SELECT
         pz.id,
@@ -79,9 +81,8 @@ export async function GET(request: NextRequest) {
         pz.ore_planificate,
         pz.prioritate,
         pz.observatii,
-        p.culoare as proiect_culoare
+        '#3b82f6' as proiect_culoare
       FROM ${TABLE_PLANIFICARI} pz
-      LEFT JOIN ${TABLE_PROIECTE} p ON pz.proiect_id = p.id
       WHERE pz.activ = TRUE
         AND pz.data_planificare >= @data_start
         AND pz.data_planificare <= @data_end
