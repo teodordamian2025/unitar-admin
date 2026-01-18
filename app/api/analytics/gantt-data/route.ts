@@ -24,6 +24,9 @@ const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteRe
 const TABLE_SARCINI_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SarciniResponsabili${tableSuffix}\``;
 const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 const TABLE_PROIECT_COMENTARII = `\`${PROJECT_ID}.${DATASET}.ProiectComentarii${tableSuffix}\``;
+// ✅ 18.01.2026: Tabele pentru calcul timp economic
+const TABLE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+const TABLE_SETARI_COSTURI = `\`${PROJECT_ID}.${DATASET}.SetariCosturi${tableSuffix}\``;
 
 console.log(`🔧 Gantt Data API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: Proiecte${tableSuffix}, Subproiecte${tableSuffix}, Sarcini${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}, ProiectComentarii${tableSuffix}`);
@@ -61,52 +64,48 @@ export async function GET(request: NextRequest) {
     let allTasks: any[] = [];
 
     // 1. PROIECTE - nivel principal în hierarchy
+    // ✅ FIX 18.01.2026: Separat calculul orelor lucrate într-un CTE dedicat
+    // pentru a evita multiplicarea rezultatelor din JOIN cu responsabili
+    // ✅ 18.01.2026: Adăugat calcul timp economic (ore alocate din buget)
     const proiecteQuery = `
-      WITH project_stats AS (
+      -- CTE 1: Ore lucrate per proiect (FĂRĂ join cu responsabili)
+      WITH time_tracking_stats AS (
         SELECT
-          p.ID_Proiect,
-          p.Denumire,
-          p.Adresa,
-          p.Data_Start,
-          p.Data_Final,
-          p.Status,
-          p.Valoare_Estimata,
-          p.moneda,
-          p.Responsabil,
-
-          -- ✅ CITEȘTE DIRECT din Proiecte_v2.progres_procent (05.10.2025)
-          COALESCE(p.progres_procent, 0) as progress_from_column,
-
-          -- Ore estimate și lucrate
-          SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
-          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
-
-          -- Count subproiecte și sarcini
-          COUNT(DISTINCT sp.ID_Subproiect) as subproiecte_count,
-          COUNT(DISTINCT s.id) as sarcini_count,
-
-          -- Responsabili (agregat)
-          STRING_AGG(DISTINCT COALESCE(pr.responsabil_nume, p.Responsabil), ', ') as all_responsabili
-
-        FROM ${TABLE_PROIECTE} p
-        LEFT JOIN ${TABLE_SUBPROIECTE} sp
-          ON p.ID_Proiect = sp.ID_Proiect AND sp.activ = true
-        LEFT JOIN ${TABLE_SARCINI} s
-          ON p.ID_Proiect = s.proiect_id
-        LEFT JOIN ${TABLE_TIME_TRACKING} tt
-          ON s.id = tt.sarcina_id
-        LEFT JOIN ${TABLE_PROIECTE_RESPONSABILI} pr
-          ON p.ID_Proiect = pr.proiect_id
-        WHERE p.Data_Start IS NOT NULL
-          AND p.Data_Final IS NOT NULL
-          AND p.Status != 'Anulat'
-          ${projectIds ? 'AND p.ID_Proiect IN UNNEST(@projectIds)' : ''}
-          ${startDate ? 'AND CAST(p.Data_Final AS DATE) >= @startDate' : ''}
-          ${endDate ? 'AND CAST(p.Data_Start AS DATE) <= @endDate' : ''}
-        GROUP BY p.ID_Proiect, p.Denumire, p.Adresa, p.Data_Start, p.Data_Final,
-                 p.Status, p.Valoare_Estimata, p.moneda, p.Responsabil, p.progres_procent
+          COALESCE(tt.proiect_id, s.proiect_id) as proiect_id,
+          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours
+        FROM ${TABLE_TIME_TRACKING} tt
+        LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
+        WHERE tt.proiect_id IS NOT NULL OR s.proiect_id IS NOT NULL
+        GROUP BY COALESCE(tt.proiect_id, s.proiect_id)
       ),
-      -- ✅ Adaugă count comentarii per proiect
+      -- CTE 2: Ore estimate per proiect (din sarcini)
+      estimated_hours_stats AS (
+        SELECT
+          proiect_id,
+          SUM(COALESCE(timp_estimat_total_ore, 0)) as total_estimated_hours,
+          COUNT(DISTINCT id) as sarcini_count
+        FROM ${TABLE_SARCINI}
+        WHERE proiect_id IS NOT NULL
+        GROUP BY proiect_id
+      ),
+      -- CTE 3: Responsabili per proiect (agregat separat)
+      responsabili_stats AS (
+        SELECT
+          proiect_id,
+          STRING_AGG(DISTINCT responsabil_nume, ', ') as all_responsabili
+        FROM ${TABLE_PROIECTE_RESPONSABILI}
+        GROUP BY proiect_id
+      ),
+      -- CTE 4: Subproiecte count
+      subproiecte_stats AS (
+        SELECT
+          ID_Proiect,
+          COUNT(DISTINCT ID_Subproiect) as subproiecte_count
+        FROM ${TABLE_SUBPROIECTE}
+        WHERE activ = true
+        GROUP BY ID_Proiect
+      ),
+      -- CTE 5: Comentarii count
       comentarii_stats AS (
         SELECT
           proiect_id,
@@ -114,39 +113,153 @@ export async function GET(request: NextRequest) {
         FROM ${TABLE_PROIECT_COMENTARII}
         WHERE tip_proiect = 'proiect'
         GROUP BY proiect_id
+      ),
+      -- CTE 6: Cheltuieli per proiect (pentru calcul timp economic)
+      cheltuieli_stats AS (
+        SELECT
+          proiect_id,
+          SUM(COALESCE(valoare_ron, valoare, 0)) as total_cheltuieli_ron
+        FROM ${TABLE_CHELTUIELI}
+        WHERE activ = TRUE AND proiect_id IS NOT NULL
+        GROUP BY proiect_id
+      ),
+      -- CTE 7: Setări costuri (o singură înregistrare activă, cu fallback la default)
+      cost_settings AS (
+        SELECT
+          COALESCE(
+            (SELECT cost_ora FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            40
+          ) as cost_ora,
+          COALESCE(
+            (SELECT cost_zi FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            320
+          ) as cost_zi,
+          COALESCE(
+            (SELECT ore_pe_zi FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            8
+          ) as ore_pe_zi,
+          COALESCE(
+            (SELECT moneda FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            'EUR'
+          ) as moneda_cost
+      ),
+      -- CTE 8: Date proiect de bază
+      project_base AS (
+        SELECT
+          p.ID_Proiect,
+          p.Denumire,
+          p.Adresa,
+          p.Data_Start,
+          p.Data_Final,
+          p.Status,
+          COALESCE(p.Valoare_Estimata, 0) as Valoare_Estimata,
+          COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) as valoare_ron,
+          COALESCE(p.curs_valutar, 5) as curs_valutar,
+          p.moneda,
+          p.Responsabil,
+          COALESCE(p.progres_procent, 0) as progress_from_column
+        FROM ${TABLE_PROIECTE} p
+        WHERE p.Data_Start IS NOT NULL
+          AND p.Data_Final IS NOT NULL
+          AND p.Status != 'Anulat'
+          ${projectIds ? 'AND p.ID_Proiect IN UNNEST(@projectIds)' : ''}
+          ${startDate ? 'AND CAST(p.Data_Final AS DATE) >= @startDate' : ''}
+          ${endDate ? 'AND CAST(p.Data_Start AS DATE) <= @endDate' : ''}
       )
       SELECT
-        ps.ID_Proiect as id,
-        CONCAT(ps.ID_Proiect, ' - ', ps.Denumire) as name,
-        ps.Adresa,
-        ps.Data_Start as startDate,
-        ps.Data_Final as endDate,
-        ps.progress_from_column as progress,
+        pb.ID_Proiect as id,
+        CONCAT(pb.ID_Proiect, ' - ', pb.Denumire) as name,
+        pb.Adresa,
+        pb.Data_Start as startDate,
+        pb.Data_Final as endDate,
+        pb.progress_from_column as progress,
         'proiect' as type,
         NULL as parentId,
         ARRAY<STRING>[] as dependencies,
-        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(ps.all_responsabili, ',')) as r WHERE r != '') as resources,
+        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(COALESCE(rs.all_responsabili, pb.Responsabil), ',')) as r WHERE r != '') as resources,
         CASE
-          WHEN DATE_DIFF(ps.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
-          WHEN DATE_DIFF(ps.Data_Final, CURRENT_DATE(), DAY) <= 30 THEN 'ridicata'
+          WHEN DATE_DIFF(pb.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
+          WHEN DATE_DIFF(pb.Data_Final, CURRENT_DATE(), DAY) <= 30 THEN 'ridicata'
           ELSE 'normala'
         END as priority,
         CASE
-          WHEN ps.Status = 'Activ' THEN 'in_progress'
-          WHEN ps.Status = 'Finalizat' THEN 'finalizata'
-          WHEN ps.Status = 'Suspendat' THEN 'anulata'
+          WHEN pb.Status = 'Activ' THEN 'in_progress'
+          WHEN pb.Status = 'Finalizat' THEN 'finalizata'
+          WHEN pb.Status = 'Suspendat' THEN 'anulata'
           ELSE 'to_do'
         END as status,
-        ps.total_estimated_hours as estimatedHours,
-        ps.total_worked_hours as workedHours,
+        COALESCE(ehs.total_estimated_hours, 0) as estimatedHours,
+        COALESCE(tts.total_worked_hours, 0) as workedHours,
         false as isCollapsed,
         0 as level,
-        ps.subproiecte_count,
-        ps.sarcini_count,
-        COALESCE(cs.comentarii_count, 0) as comentarii_count
-      FROM project_stats ps
-      LEFT JOIN comentarii_stats cs ON ps.ID_Proiect = cs.proiect_id
-      ORDER BY ps.Data_Start ASC
+        COALESCE(sps.subproiecte_count, 0) as subproiecte_count,
+        COALESCE(ehs.sarcini_count, 0) as sarcini_count,
+        COALESCE(cs.comentarii_count, 0) as comentarii_count,
+        -- ✅ 18.01.2026: Câmpuri timp economic
+        pb.Valoare_Estimata as valoare_proiect,
+        pb.moneda as moneda_proiect,
+        pb.curs_valutar,
+        COALESCE(chs.total_cheltuieli_ron, 0) as total_cheltuieli_ron,
+        -- Cheltuieli în moneda proiectului
+        CASE
+          WHEN pb.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+          ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pb.curs_valutar, 0)
+        END as cheltuieli_in_moneda_proiect,
+        -- Marja brută = Valoare - Cheltuieli
+        pb.Valoare_Estimata - (
+          CASE
+            WHEN pb.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+            ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pb.curs_valutar, 0)
+          END
+        ) as marja_bruta,
+        -- Ore alocate economic = Marja brută / Cost oră
+        SAFE_DIVIDE(
+          pb.Valoare_Estimata - (
+            CASE
+              WHEN pb.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+              ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pb.curs_valutar, 0)
+            END
+          ),
+          csett.cost_ora
+        ) as economicHoursAllocated,
+        -- Ore rămase economic = Ore alocate - Ore lucrate
+        SAFE_DIVIDE(
+          pb.Valoare_Estimata - (
+            CASE
+              WHEN pb.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+              ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pb.curs_valutar, 0)
+            END
+          ),
+          csett.cost_ora
+        ) - COALESCE(tts.total_worked_hours, 0) as economicHoursRemaining,
+        -- Progres economic (%)
+        SAFE_DIVIDE(
+          COALESCE(tts.total_worked_hours, 0) * 100,
+          NULLIF(
+            SAFE_DIVIDE(
+              pb.Valoare_Estimata - (
+                CASE
+                  WHEN pb.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                  ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pb.curs_valutar, 0)
+                END
+              ),
+              csett.cost_ora
+            ),
+            0
+          )
+        ) as economicProgress,
+        -- Setări cost folosite
+        csett.cost_ora as cost_ora_setat,
+        csett.ore_pe_zi as ore_pe_zi
+      FROM project_base pb
+      LEFT JOIN time_tracking_stats tts ON pb.ID_Proiect = tts.proiect_id
+      LEFT JOIN estimated_hours_stats ehs ON pb.ID_Proiect = ehs.proiect_id
+      LEFT JOIN responsabili_stats rs ON pb.ID_Proiect = rs.proiect_id
+      LEFT JOIN subproiecte_stats sps ON pb.ID_Proiect = sps.ID_Proiect
+      LEFT JOIN comentarii_stats cs ON pb.ID_Proiect = cs.proiect_id
+      LEFT JOIN cheltuieli_stats chs ON pb.ID_Proiect = chs.proiect_id
+      CROSS JOIN cost_settings csett
+      ORDER BY pb.Data_Start ASC
     `;
 
     // Build params object using simplified format (key-value pairs)
@@ -181,8 +294,48 @@ export async function GET(request: NextRequest) {
     allTasks = [...proiecteRows];
 
     // 2. SUBPROIECTE - nivel 1 în hierarchy
+    // ✅ FIX 18.01.2026: Separat calculul orelor lucrate într-un CTE dedicat
+    // pentru a evita multiplicarea rezultatelor din JOIN cu responsabili
     const subproiecteQuery = `
-      WITH subproject_stats AS (
+      -- CTE 1: Ore lucrate per subproiect (FĂRĂ join cu responsabili)
+      WITH time_tracking_stats AS (
+        SELECT
+          COALESCE(tt.subproiect_id, s.subproiect_id) as subproiect_id,
+          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours
+        FROM ${TABLE_TIME_TRACKING} tt
+        LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
+        WHERE tt.subproiect_id IS NOT NULL OR s.subproiect_id IS NOT NULL
+        GROUP BY COALESCE(tt.subproiect_id, s.subproiect_id)
+      ),
+      -- CTE 2: Ore estimate per subproiect (din sarcini)
+      estimated_hours_stats AS (
+        SELECT
+          COALESCE(proiect_id, subproiect_id) as subproiect_id,
+          SUM(COALESCE(timp_estimat_total_ore, 0)) as total_estimated_hours,
+          COUNT(DISTINCT id) as sarcini_count
+        FROM ${TABLE_SARCINI}
+        WHERE tip_proiect = 'subproiect'
+        GROUP BY COALESCE(proiect_id, subproiect_id)
+      ),
+      -- CTE 3: Responsabili per subproiect (agregat separat)
+      responsabili_stats AS (
+        SELECT
+          subproiect_id,
+          STRING_AGG(DISTINCT responsabil_nume, ', ') as all_responsabili
+        FROM ${TABLE_SUBPROIECTE_RESPONSABILI}
+        GROUP BY subproiect_id
+      ),
+      -- CTE 4: Comentarii count
+      comentarii_stats AS (
+        SELECT
+          proiect_id,
+          COUNT(*) as comentarii_count
+        FROM ${TABLE_PROIECT_COMENTARII}
+        WHERE tip_proiect = 'subproiect'
+        GROUP BY proiect_id
+      ),
+      -- CTE 5: Date subproiect de bază
+      subproject_base AS (
         SELECT
           sp.ID_Subproiect,
           sp.ID_Proiect,
@@ -192,27 +345,8 @@ export async function GET(request: NextRequest) {
           sp.Status,
           sp.Valoare_Estimata,
           sp.Responsabil,
-
-          -- ✅ CITEȘTE DIRECT din Subproiecte_v2.progres_procent (05.10.2025)
-          COALESCE(sp.progres_procent, 0) as progress_from_column,
-
-          -- Ore
-          SUM(COALESCE(s.timp_estimat_total_ore, 0)) as total_estimated_hours,
-          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
-
-          -- Count sarcini
-          COUNT(DISTINCT s.id) as sarcini_count,
-
-          -- Responsabili
-          STRING_AGG(DISTINCT COALESCE(spr.responsabil_nume, sp.Responsabil), ', ') as all_responsabili
-
+          COALESCE(sp.progres_procent, 0) as progress_from_column
         FROM ${TABLE_SUBPROIECTE} sp
-        LEFT JOIN ${TABLE_SARCINI} s
-          ON sp.ID_Subproiect = s.proiect_id AND s.tip_proiect = 'subproiect'
-        LEFT JOIN ${TABLE_TIME_TRACKING} tt
-          ON s.id = tt.sarcina_id
-        LEFT JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} spr
-          ON sp.ID_Subproiect = spr.subproiect_id
         WHERE sp.Data_Start IS NOT NULL
           AND sp.Data_Final IS NOT NULL
           AND sp.Status != 'Anulat'
@@ -220,48 +354,40 @@ export async function GET(request: NextRequest) {
           ${projectIds ? 'AND sp.ID_Proiect IN UNNEST(@projectIds)' : ''}
           ${startDate ? 'AND CAST(sp.Data_Final AS DATE) >= @startDate' : ''}
           ${endDate ? 'AND CAST(sp.Data_Start AS DATE) <= @endDate' : ''}
-        GROUP BY sp.ID_Subproiect, sp.ID_Proiect, sp.Denumire, sp.Data_Start,
-                 sp.Data_Final, sp.Status, sp.Valoare_Estimata, sp.Responsabil, sp.progres_procent
-      ),
-      -- ✅ Adaugă count comentarii per subproiect
-      comentarii_stats AS (
-        SELECT
-          proiect_id,
-          COUNT(*) as comentarii_count
-        FROM ${TABLE_PROIECT_COMENTARII}
-        WHERE tip_proiect = 'subproiect'
-        GROUP BY proiect_id
       )
       SELECT
-        ss.ID_Subproiect as id,
-        ss.Denumire as name,
-        ss.Data_Start as startDate,
-        ss.Data_Final as endDate,
-        ss.progress_from_column as progress,
+        spb.ID_Subproiect as id,
+        spb.Denumire as name,
+        spb.Data_Start as startDate,
+        spb.Data_Final as endDate,
+        spb.progress_from_column as progress,
         'subproiect' as type,
-        ss.ID_Proiect as parentId,
+        spb.ID_Proiect as parentId,
         ARRAY<STRING>[] as dependencies,
-        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(ss.all_responsabili, ',')) as r WHERE r != '') as resources,
+        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(COALESCE(rs.all_responsabili, spb.Responsabil), ',')) as r WHERE r != '') as resources,
         CASE
-          WHEN DATE_DIFF(ss.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
-          WHEN DATE_DIFF(ss.Data_Final, CURRENT_DATE(), DAY) <= 15 THEN 'ridicata'
+          WHEN DATE_DIFF(spb.Data_Final, CURRENT_DATE(), DAY) <= 7 THEN 'urgent'
+          WHEN DATE_DIFF(spb.Data_Final, CURRENT_DATE(), DAY) <= 15 THEN 'ridicata'
           ELSE 'normala'
         END as priority,
         CASE
-          WHEN ss.Status = 'Activ' THEN 'in_progress'
-          WHEN ss.Status = 'Finalizat' THEN 'finalizata'
-          WHEN ss.Status = 'Suspendat' THEN 'anulata'
+          WHEN spb.Status = 'Activ' THEN 'in_progress'
+          WHEN spb.Status = 'Finalizat' THEN 'finalizata'
+          WHEN spb.Status = 'Suspendat' THEN 'anulata'
           ELSE 'to_do'
         END as status,
-        ss.total_estimated_hours as estimatedHours,
-        ss.total_worked_hours as workedHours,
+        COALESCE(ehs.total_estimated_hours, 0) as estimatedHours,
+        COALESCE(tts.total_worked_hours, 0) as workedHours,
         false as isCollapsed,
         1 as level,
-        ss.sarcini_count,
+        COALESCE(ehs.sarcini_count, 0) as sarcini_count,
         COALESCE(cs.comentarii_count, 0) as comentarii_count
-      FROM subproject_stats ss
-      LEFT JOIN comentarii_stats cs ON ss.ID_Subproiect = cs.proiect_id
-      ORDER BY ss.Data_Start ASC
+      FROM subproject_base spb
+      LEFT JOIN time_tracking_stats tts ON spb.ID_Subproiect = tts.subproiect_id
+      LEFT JOIN estimated_hours_stats ehs ON spb.ID_Subproiect = ehs.subproiect_id
+      LEFT JOIN responsabili_stats rs ON spb.ID_Subproiect = rs.subproiect_id
+      LEFT JOIN comentarii_stats cs ON spb.ID_Subproiect = cs.proiect_id
+      ORDER BY spb.Data_Start ASC
     `;
 
     const subproiecteQueryOptions: any = {
@@ -284,8 +410,36 @@ export async function GET(request: NextRequest) {
     allTasks = [...allTasks, ...subproiecteRows];
 
     // 3. SARCINI - nivel 2-3 în hierarchy
+    // ✅ FIX 18.01.2026: Separat calculul orelor lucrate într-un CTE dedicat
+    // pentru a evita multiplicarea rezultatelor din JOIN cu responsabili
     const sarciniQuery = `
-      WITH task_stats AS (
+      -- CTE 1: Ore lucrate per sarcină (FĂRĂ join cu responsabili)
+      WITH time_tracking_stats AS (
+        SELECT
+          sarcina_id,
+          SUM(COALESCE(ore_lucrate, 0)) as total_worked_hours
+        FROM ${TABLE_TIME_TRACKING}
+        WHERE sarcina_id IS NOT NULL
+        GROUP BY sarcina_id
+      ),
+      -- CTE 2: Responsabili per sarcină (agregat separat)
+      responsabili_stats AS (
+        SELECT
+          sarcina_id,
+          STRING_AGG(DISTINCT responsabil_nume, ', ') as all_responsabili
+        FROM ${TABLE_SARCINI_RESPONSABILI}
+        GROUP BY sarcina_id
+      ),
+      -- CTE 3: Sarcini filtrate după user (dacă e cazul)
+      ${userId ? `
+      user_tasks AS (
+        SELECT DISTINCT sarcina_id
+        FROM ${TABLE_SARCINI_RESPONSABILI}
+        WHERE responsabil_uid = @userId
+      ),
+      ` : ''}
+      -- CTE 4: Date sarcină de bază
+      task_base AS (
         SELECT
           s.id,
           s.proiect_id,
@@ -296,59 +450,52 @@ export async function GET(request: NextRequest) {
           s.status,
           s.prioritate,
           s.timp_estimat_total_ore,
-
-          -- ✅ CITEȘTE DIRECT din Sarcini_v2.progres_procent (05.10.2025)
-          COALESCE(s.progres_procent, 0) as progress_from_column,
-          
-          -- Ore lucrate
-          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours,
-          
-          -- Responsabili
-          STRING_AGG(DISTINCT sr.responsabil_nume, ', ') as all_responsabili,
-          
-          -- Dependencies (din alte sarcini cu deadline mai mic)
-          ARRAY_AGG(DISTINCT dep.id IGNORE NULLS) as task_dependencies
-          
+          COALESCE(s.progres_procent, 0) as progress_from_column
         FROM ${TABLE_SARCINI} s
-        LEFT JOIN ${TABLE_TIME_TRACKING} tt 
-          ON s.id = tt.sarcina_id
-        LEFT JOIN ${TABLE_SARCINI_RESPONSABILI} sr 
-          ON s.id = sr.sarcina_id
-        LEFT JOIN ${TABLE_SARCINI} dep 
-          ON s.proiect_id = dep.proiect_id 
-          AND dep.data_scadenta < s.data_scadenta 
-          AND dep.status = 'finalizata'
-          AND dep.prioritate IN ('urgent', 'ridicata')
+        ${userId ? `INNER JOIN user_tasks ut ON s.id = ut.sarcina_id` : ''}
         WHERE s.data_scadenta IS NOT NULL
           AND s.status != 'anulata'
           ${projectIds ? 'AND s.proiect_id IN UNNEST(@projectIds)' : ''}
-          ${userId ? 'AND sr.responsabil_uid = @userId' : ''}
           ${startDate ? 'AND CAST(s.data_scadenta AS DATE) >= @startDate' : ''}
           ${endDate ? 'AND CAST(s.data_creare AS DATE) <= @endDate' : ''}
-        GROUP BY s.id, s.proiect_id, s.tip_proiect, s.titlu, s.data_creare,
-                 s.data_scadenta, s.status, s.prioritate, s.timp_estimat_total_ore, s.progres_procent
+      ),
+      -- CTE 5: Dependencies (sarcini cu deadline mai mic și finalizate)
+      task_dependencies AS (
+        SELECT
+          tb.id as sarcina_id,
+          ARRAY_AGG(DISTINCT dep.id IGNORE NULLS) as dependencies
+        FROM task_base tb
+        LEFT JOIN ${TABLE_SARCINI} dep
+          ON tb.proiect_id = dep.proiect_id
+          AND dep.data_scadenta < tb.data_scadenta
+          AND dep.status = 'finalizata'
+          AND dep.prioritate IN ('urgent', 'ridicata')
+        GROUP BY tb.id
       )
       SELECT
-        id,
-        titlu as name,
-        data_creare as startDate,
-        data_scadenta as endDate,
-        progress_from_column as progress,
+        tb.id,
+        tb.titlu as name,
+        tb.data_creare as startDate,
+        tb.data_scadenta as endDate,
+        tb.progress_from_column as progress,
         'sarcina' as type,
-        proiect_id as parentId,
-        COALESCE(task_dependencies, ARRAY<STRING>[]) as dependencies,
-        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(all_responsabili, ',')) as r WHERE r != '') as resources,
-        prioritate as priority,
-        status,
-        timp_estimat_total_ore as estimatedHours,
-        total_worked_hours as workedHours,
+        tb.proiect_id as parentId,
+        COALESCE(td.dependencies, ARRAY<STRING>[]) as dependencies,
+        ARRAY(SELECT TRIM(r) FROM UNNEST(SPLIT(COALESCE(rs.all_responsabili, ''), ',')) as r WHERE r != '') as resources,
+        tb.prioritate as priority,
+        tb.status,
+        tb.timp_estimat_total_ore as estimatedHours,
+        COALESCE(tts.total_worked_hours, 0) as workedHours,
         false as isCollapsed,
-        CASE 
-          WHEN tip_proiect = 'subproiect' THEN 2
+        CASE
+          WHEN tb.tip_proiect = 'subproiect' THEN 2
           ELSE 1
         END as level
-      FROM task_stats
-      ORDER BY data_creare ASC
+      FROM task_base tb
+      LEFT JOIN time_tracking_stats tts ON tb.id = tts.sarcina_id
+      LEFT JOIN responsabili_stats rs ON tb.id = rs.sarcina_id
+      LEFT JOIN task_dependencies td ON tb.id = td.sarcina_id
+      ORDER BY tb.data_creare ASC
     `;
 
     // Build sarcini params (includes proiecte params + userId)

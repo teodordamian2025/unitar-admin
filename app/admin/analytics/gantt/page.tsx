@@ -40,6 +40,16 @@ interface GanttTask {
     comentariu: string;
     data_comentariu: string | { value: string };
   };
+  // ✅ 18.01.2026: Câmpuri timp economic (doar pentru proiecte)
+  economicHoursAllocated?: number;
+  economicHoursRemaining?: number;
+  economicProgress?: number;
+  valoare_proiect?: number;
+  moneda_proiect?: string;
+  cheltuieli_in_moneda_proiect?: number;
+  marja_bruta?: number;
+  cost_ora_setat?: number;
+  ore_pe_zi?: number;
 }
 
 interface TimelineSettings {
@@ -98,6 +108,20 @@ export default function GanttView() {
   const [showComentariiModal, setShowComentariiModal] = useState(false);
   const [comentariiProiect, setComentariiProiect] = useState<any>(null);
   const [comentariiDefaultTab, setComentariiDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('comentarii');
+
+  // ✅ 18.01.2026: State pentru Alocări Zilnice
+  const [showAllocationForm, setShowAllocationForm] = useState(false);
+  const [allocationData, setAllocationData] = useState({
+    data_planificare: new Date().toISOString().split('T')[0],
+    utilizator_uid: '',
+    utilizator_nume: '',
+    ore_planificate: 8,
+    prioritate: 'normala',
+    observatii: '',
+    sync_planificator_personal: true
+  });
+  const [savingAllocation, setSavingAllocation] = useState(false);
+  const [existingAllocations, setExistingAllocations] = useState<any[]>([]);
 
   // Filters - Default status is 'in_progress' to show only active projects on page load
   const [filters, setFilters] = useState({
@@ -266,6 +290,103 @@ export default function GanttView() {
       toast.error('Eroare la încărcarea datelor!');
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // ✅ 18.01.2026: Funcții pentru Alocări Zilnice
+
+  // Încarcă alocările existente pentru task-ul selectat
+  const loadExistingAllocations = async (taskId: string, taskType: string) => {
+    try {
+      const params = new URLSearchParams({ proiect_id: taskId });
+      const response = await fetch(`/api/planificari-zilnice?${params}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setExistingAllocations(result.data);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea alocărilor:', error);
+    }
+  };
+
+  // Salvează o nouă alocare zilnică
+  const handleSaveAllocation = async () => {
+    if (!selectedTask) return;
+
+    if (!allocationData.utilizator_uid || !allocationData.data_planificare) {
+      toast.error('Selectează un lucrător și o dată!');
+      return;
+    }
+
+    try {
+      setSavingAllocation(true);
+
+      const payload = {
+        ...allocationData,
+        proiect_id: selectedTask.type === 'proiect' ? selectedTask.id : selectedTask.parentId,
+        subproiect_id: selectedTask.type === 'subproiect' ? selectedTask.id : undefined,
+        sarcina_id: selectedTask.type === 'sarcina' ? selectedTask.id : undefined,
+        proiect_denumire: selectedTask.name,
+        creat_de: user?.uid,
+        creat_de_nume: displayName
+      };
+
+      const response = await fetch('/api/planificari-zilnice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`${allocationData.utilizator_nume} alocat pentru ${allocationData.data_planificare}`);
+        setShowAllocationForm(false);
+        setAllocationData({
+          data_planificare: new Date().toISOString().split('T')[0],
+          utilizator_uid: '',
+          utilizator_nume: '',
+          ore_planificate: 8,
+          prioritate: 'normala',
+          observatii: '',
+          sync_planificator_personal: true
+        });
+        // Reîncarcă alocările
+        loadExistingAllocations(selectedTask.id, selectedTask.type);
+      } else {
+        toast.error(result.error || 'Eroare la salvarea alocării');
+      }
+    } catch (error) {
+      console.error('Eroare salvare alocare:', error);
+      toast.error('Eroare la salvarea alocării');
+    } finally {
+      setSavingAllocation(false);
+    }
+  };
+
+  // Șterge o alocare
+  const handleDeleteAllocation = async (allocationId: string) => {
+    if (!confirm('Ștergi această alocare?')) return;
+
+    try {
+      const response = await fetch(`/api/planificari-zilnice/${allocationId}`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Alocare ștearsă');
+        if (selectedTask) {
+          loadExistingAllocations(selectedTask.id, selectedTask.type);
+        }
+      } else {
+        toast.error(result.error || 'Eroare la ștergerea alocării');
+      }
+    } catch (error) {
+      console.error('Eroare ștergere alocare:', error);
+      toast.error('Eroare la ștergere');
     }
   };
 
@@ -1795,7 +1916,7 @@ export default function GanttView() {
                 background: 'rgba(59, 130, 246, 0.05)',
                 borderRadius: '8px'
               }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Time Tracking</h4>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Time Tracking (Estimat)</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                   <div>
                     <strong>Estimat:</strong><br />
@@ -1812,6 +1933,367 @@ export default function GanttView() {
                 </div>
               </div>
             )}
+
+            {/* ✅ 18.01.2026: Secțiune Timp Economic (doar pentru proiecte) */}
+            {selectedTask.type === 'proiect' && selectedTask.economicHoursAllocated !== undefined && (
+              <div style={{
+                padding: '1rem',
+                background: (selectedTask.economicHoursRemaining || 0) < 0
+                  ? 'rgba(239, 68, 68, 0.1)'
+                  : 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '8px',
+                border: (selectedTask.economicHoursRemaining || 0) < 0
+                  ? '1px solid rgba(239, 68, 68, 0.3)'
+                  : '1px solid rgba(34, 197, 94, 0.3)'
+              }}>
+                <h4 style={{
+                  margin: '0 0 0.5rem 0',
+                  color: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span>💰</span>
+                  <span>Timp Economic (din Buget)</span>
+                  {(selectedTask.economicHoursRemaining || 0) < 0 && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '600'
+                    }}>
+                      DEPĂȘIRE!
+                    </span>
+                  )}
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <strong>Alocat:</strong><br />
+                    <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#059669' }}>
+                      {(selectedTask.economicHoursAllocated || 0).toFixed(1)}h
+                    </span>
+                    <br />
+                    <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      ({((selectedTask.economicHoursAllocated || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Consumat:</strong><br />
+                    <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#3b82f6' }}>
+                      {(selectedTask.workedHours || 0).toFixed(1)}h
+                    </span>
+                    <br />
+                    <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      ({((selectedTask.workedHours || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Rămas:</strong><br />
+                    <span style={{
+                      fontSize: '1.1rem',
+                      fontWeight: '600',
+                      color: (selectedTask.economicHoursRemaining || 0) < 0 ? '#ef4444' : '#059669'
+                    }}>
+                      {(selectedTask.economicHoursRemaining || 0).toFixed(1)}h
+                    </span>
+                    <br />
+                    <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      ({((selectedTask.economicHoursRemaining || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progres bar economic */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '0.85rem',
+                    marginBottom: '4px'
+                  }}>
+                    <span>Progres Economic</span>
+                    <span style={{
+                      fontWeight: '600',
+                      color: (selectedTask.economicProgress || 0) > 100 ? '#ef4444' : '#059669'
+                    }}>
+                      {Math.min(selectedTask.economicProgress || 0, 999).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div style={{
+                    height: '8px',
+                    background: '#e5e7eb',
+                    borderRadius: '4px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${Math.min(selectedTask.economicProgress || 0, 100)}%`,
+                      height: '100%',
+                      background: (selectedTask.economicProgress || 0) > 100
+                        ? '#ef4444'
+                        : (selectedTask.economicProgress || 0) > 80
+                          ? '#f59e0b'
+                          : '#22c55e',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+
+                {/* Detalii calcul */}
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: '#6b7280',
+                  borderTop: '1px solid rgba(0,0,0,0.1)',
+                  paddingTop: '0.5rem',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.5rem'
+                }}>
+                  <div>
+                    <strong>Valoare proiect:</strong> {(selectedTask.valoare_proiect || 0).toLocaleString('ro-RO')} {selectedTask.moneda_proiect || 'EUR'}
+                  </div>
+                  <div>
+                    <strong>Cheltuieli:</strong> {(selectedTask.cheltuieli_in_moneda_proiect || 0).toLocaleString('ro-RO')} {selectedTask.moneda_proiect || 'EUR'}
+                  </div>
+                  <div>
+                    <strong>Marjă brută:</strong> {(selectedTask.marja_bruta || 0).toLocaleString('ro-RO')} {selectedTask.moneda_proiect || 'EUR'}
+                  </div>
+                  <div>
+                    <strong>Cost/oră:</strong> {selectedTask.cost_ora_setat || 40} {selectedTask.moneda_proiect || 'EUR'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ✅ 18.01.2026: Secțiune Alocare Lucrători */}
+            <div style={{
+              padding: '1rem',
+              background: 'rgba(139, 92, 246, 0.05)',
+              borderRadius: '8px',
+              border: '1px solid rgba(139, 92, 246, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem'
+              }}>
+                <h4 style={{
+                  margin: 0,
+                  color: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span>👥</span>
+                  <span>Alocări Zilnice</span>
+                </h4>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowAllocationForm(!showAllocationForm);
+                    if (!showAllocationForm) {
+                      loadExistingAllocations(selectedTask.id, selectedTask.type);
+                    }
+                  }}
+                  style={{
+                    background: showAllocationForm ? '#8b5cf6' : 'transparent',
+                    color: showAllocationForm ? 'white' : '#8b5cf6',
+                    borderColor: '#8b5cf6'
+                  }}
+                >
+                  {showAllocationForm ? '✕ Închide' : '+ Alocă Lucrător'}
+                </Button>
+              </div>
+
+              {showAllocationForm && (
+                <div style={{
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  marginBottom: '0.75rem'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    {/* Selector Lucrător */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
+                        Lucrător *
+                      </label>
+                      <select
+                        value={allocationData.utilizator_uid}
+                        onChange={(e) => {
+                          const selectedUser = utilizatori.find(u => u.uid === e.target.value);
+                          setAllocationData({
+                            ...allocationData,
+                            utilizator_uid: e.target.value,
+                            utilizator_nume: selectedUser ? `${selectedUser.prenume || ''} ${selectedUser.nume || ''}`.trim() : ''
+                          });
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        <option value="">-- Selectează --</option>
+                        {utilizatori.map(u => (
+                          <option key={u.uid} value={u.uid}>
+                            {u.prenume} {u.nume}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Selector Data */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
+                        Data *
+                      </label>
+                      <input
+                        type="date"
+                        value={allocationData.data_planificare}
+                        onChange={(e) => setAllocationData({ ...allocationData, data_planificare: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Ore planificate */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
+                        Ore planificate
+                      </label>
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="12"
+                        step="0.5"
+                        value={allocationData.ore_planificate}
+                        onChange={(e) => setAllocationData({ ...allocationData, ore_planificate: parseFloat(e.target.value) || 8 })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.9rem'
+                        }}
+                      />
+                    </div>
+
+                    {/* Prioritate */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '500', marginBottom: '4px', color: '#374151' }}>
+                        Prioritate
+                      </label>
+                      <select
+                        value={allocationData.prioritate}
+                        onChange={(e) => setAllocationData({ ...allocationData, prioritate: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        <option value="normala">Normală</option>
+                        <option value="ridicata">Ridicată</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Checkbox sync planificator */}
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={allocationData.sync_planificator_personal}
+                        onChange={(e) => setAllocationData({ ...allocationData, sync_planificator_personal: e.target.checked })}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                        Adaugă automat în Planificatorul Personal al lucrătorului
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Buton salvare */}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveAllocation}
+                    loading={savingAllocation}
+                    disabled={!allocationData.utilizator_uid || !allocationData.data_planificare}
+                    style={{ width: '100%' }}
+                  >
+                    Salvează Alocare
+                  </Button>
+                </div>
+              )}
+
+              {/* Lista alocări existente */}
+              {existingAllocations.length > 0 && (
+                <div style={{ fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: '500', marginBottom: '0.5rem', color: '#6b7280' }}>
+                    Alocări existente ({existingAllocations.length}):
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {existingAllocations.slice(0, 5).map((alloc: any) => (
+                      <div
+                        key={alloc.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'white',
+                          borderRadius: '6px',
+                          border: '1px solid #e5e7eb'
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: '500' }}>{alloc.utilizator_nume}</span>
+                          <span style={{ color: '#6b7280', margin: '0 8px' }}>•</span>
+                          <span style={{ color: '#6b7280' }}>{alloc.data_planificare}</span>
+                          <span style={{ color: '#6b7280', margin: '0 8px' }}>•</span>
+                          <span style={{ color: '#3b82f6' }}>{alloc.ore_planificate}h</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteAllocation(alloc.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            borderRadius: '4px'
+                          }}
+                          onMouseOver={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                          onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                    {existingAllocations.length > 5 && (
+                      <div style={{ color: '#6b7280', textAlign: 'center', fontSize: '0.8rem' }}>
+                        ... și încă {existingAllocations.length - 5} alocări
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
               <Button
