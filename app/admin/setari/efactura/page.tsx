@@ -472,7 +472,7 @@ export default function SetariEFacturaPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="mt-3 p-3 bg-white/60 rounded border border-blue-200">
+                  <div className="mt-3 p-3 rounded border border-blue-200" style={{ background: 'rgba(255, 255, 255, 0.6)' }}>
                     <p className="text-xs text-gray-600">
                       <strong>💡 Notă:</strong> Link-urile iapp.ro rămân disponibile și dacă această opțiune este dezactivată.
                       Download-ul automat asigură backup permanent pentru conformitate fiscală.

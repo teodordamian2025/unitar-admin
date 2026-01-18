@@ -26,7 +26,9 @@ interface SettingCard {
   description: string;
   icon: string;
   href: string;
-  color: string;
+  gradientFrom: string;
+  gradientTo: string;
+  borderColor: string;
   stats?: { label: string; value: string }[];
 }
 
@@ -84,7 +86,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Management utilizatori, roluri și permisiuni Firebase + BigQuery',
       icon: '👥',
       href: '/admin/setari/utilizatori',
-      color: 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/30 border-indigo-200',
+      gradientFrom: 'rgba(99, 102, 241, 0.2)',
+      gradientTo: 'rgba(79, 70, 229, 0.3)',
+      borderColor: '#c7d2fe',
       stats: [
         { label: 'Utilizatori activi', value: '2' },
         { label: 'Administratori', value: '1' },
@@ -96,7 +100,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Configurare numerotare, serii și parametri facturi',
       icon: '📄',
       href: '/admin/setari/facturare',
-      color: 'bg-gradient-to-br from-blue-500/20 to-blue-600/30 border-blue-200',
+      gradientFrom: 'rgba(59, 130, 246, 0.2)',
+      gradientTo: 'rgba(37, 99, 235, 0.3)',
+      borderColor: '#bfdbfe',
       stats: [
         { label: 'Serie curentă', value: 'INV-{proiectId}' },
         { label: 'Proforme', value: 'PRF' },
@@ -108,7 +114,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Configurare metodă transmitere ANAF: iapp.ro sau OAuth direct',
       icon: '📤',
       href: '/admin/setari/efactura',
-      color: 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/30 border-emerald-200',
+      gradientFrom: 'rgba(16, 185, 129, 0.2)',
+      gradientTo: 'rgba(5, 150, 105, 0.3)',
+      borderColor: '#a7f3d0',
       stats: [
         { label: 'Metodă', value: 'iapp.ro' },
         { label: 'Serie default', value: 'SERIE_TEST' },
@@ -120,7 +128,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Informații complete despre companie și date legale',
       icon: '🏢',
       href: '/admin/setari/firma',
-      color: 'bg-gradient-to-br from-green-500/20 to-green-600/30 border-green-200',
+      gradientFrom: 'rgba(34, 197, 94, 0.2)',
+      gradientTo: 'rgba(22, 163, 74, 0.3)',
+      borderColor: '#bbf7d0',
       stats: [
         { label: 'Firma', value: 'UNITAR PROIECT TDA SRL' },
         { label: 'CUI', value: 'RO35639210' },
@@ -132,7 +142,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Configurare numerotare și format pentru contracte, PV-uri și anexe',
       icon: '📋',
       href: '/admin/setari/contracte',
-      color: 'bg-gradient-to-br from-purple-500/20 to-purple-600/30 border-purple-200',
+      gradientFrom: 'rgba(168, 85, 247, 0.2)',
+      gradientTo: 'rgba(147, 51, 234, 0.3)',
+      borderColor: '#e9d5ff',
       stats: [
         { label: 'Contracte', value: 'CONTR' },
         { label: 'Procese Verbale', value: 'PV' },
@@ -144,7 +156,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Management conturi bancare și configurare tranzacții',
       icon: '🏦',
       href: '/admin/setari/banca',
-      color: 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/30 border-indigo-200',
+      gradientFrom: 'rgba(99, 102, 241, 0.2)',
+      gradientTo: 'rgba(79, 70, 229, 0.3)',
+      borderColor: '#c7d2fe',
       stats: [
         { label: 'ING Bank', value: 'RO82INGB***7533' },
         { label: 'Trezorerie', value: 'RO29TREZ***8857' }
@@ -155,7 +169,9 @@ const ModernSettingsPage: React.FC = () => {
       description: 'Setări cost/oră și cost/zi pentru calcul productivitate și randament',
       icon: '💰',
       href: '/admin/setari/costuri',
-      color: 'bg-gradient-to-br from-amber-500/20 to-amber-600/30 border-amber-200',
+      gradientFrom: 'rgba(245, 158, 11, 0.2)',
+      gradientTo: 'rgba(217, 119, 6, 0.3)',
+      borderColor: '#fde68a',
       stats: [
         { label: 'Cost/oră', value: '40 EUR' },
         { label: 'Cost/zi', value: '320 EUR' },
@@ -331,36 +347,72 @@ const ModernSettingsPage: React.FC = () => {
       )}
 
       {/* Main Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(1, 1fr)',
+        gap: '2rem',
+        marginBottom: '2rem'
+      }} className="lg:grid-cols-2">
         {settingsCards.map((setting, index) => (
-          <Card
+          <div
             key={index}
-            variant="default"
-            className={`p-6 cursor-pointer transition-all duration-300 hover:scale-105 ${setting.color}`}
             onClick={() => router.push(setting.href)}
+            style={{
+              background: `linear-gradient(135deg, ${setting.gradientFrom} 0%, ${setting.gradientTo} 100%)`,
+              border: `1px solid ${setting.borderColor}`,
+              borderRadius: '12px',
+              padding: '1.5rem',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            }}
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#1f2937',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
                   {setting.icon} {setting.title}
                 </h3>
-                <p className="text-gray-600 text-sm mb-4">
+                <p style={{ color: '#4b5563', fontSize: '0.875rem', marginBottom: '1rem' }}>
                   {setting.description}
                 </p>
               </div>
             </div>
 
             {setting.stats && (
-              <div className="space-y-3 mb-6">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
                 {setting.stats.map((stat, statIndex) => (
                   <div
                     key={statIndex}
-                    className="flex justify-between items-center p-3 bg-white/30 backdrop-blur-sm rounded-lg"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      background: 'rgba(255, 255, 255, 0.5)',
+                      backdropFilter: 'blur(4px)',
+                      borderRadius: '8px'
+                    }}
                   >
-                    <span className="text-sm font-medium text-gray-700">
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
                       {stat.label}
                     </span>
-                    <span className="text-sm text-gray-600 font-mono">
+                    <span style={{ fontSize: '0.875rem', color: '#4b5563', fontFamily: 'monospace' }}>
                       {stat.value}
                     </span>
                   </div>
@@ -375,7 +427,7 @@ const ModernSettingsPage: React.FC = () => {
             >
               ⚙️ Configurează
             </Button>
-          </Card>
+          </div>
         ))}
       </div>
 
