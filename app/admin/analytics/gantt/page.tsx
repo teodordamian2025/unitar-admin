@@ -1972,21 +1972,21 @@ export default function GanttView() {
                   <div>
                     <strong>Alocat:</strong><br />
                     <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#059669' }}>
-                      {(selectedTask.economicHoursAllocated || 0).toFixed(1)}h
+                      {Number(selectedTask.economicHoursAllocated || 0).toFixed(1)}h
                     </span>
                     <br />
                     <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      ({((selectedTask.economicHoursAllocated || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                      ({(Number(selectedTask.economicHoursAllocated || 0) / Number(selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
                     </span>
                   </div>
                   <div>
                     <strong>Consumat:</strong><br />
                     <span style={{ fontSize: '1.1rem', fontWeight: '600', color: '#3b82f6' }}>
-                      {(selectedTask.workedHours || 0).toFixed(1)}h
+                      {Number(selectedTask.workedHours || 0).toFixed(1)}h
                     </span>
                     <br />
                     <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      ({((selectedTask.workedHours || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                      ({(Number(selectedTask.workedHours || 0) / Number(selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
                     </span>
                   </div>
                   <div>
@@ -1994,13 +1994,13 @@ export default function GanttView() {
                     <span style={{
                       fontSize: '1.1rem',
                       fontWeight: '600',
-                      color: (selectedTask.economicHoursRemaining || 0) < 0 ? '#ef4444' : '#059669'
+                      color: Number(selectedTask.economicHoursRemaining || 0) < 0 ? '#ef4444' : '#059669'
                     }}>
-                      {(selectedTask.economicHoursRemaining || 0).toFixed(1)}h
+                      {Number(selectedTask.economicHoursRemaining || 0).toFixed(1)}h
                     </span>
                     <br />
                     <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      ({((selectedTask.economicHoursRemaining || 0) / (selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
+                      ({(Number(selectedTask.economicHoursRemaining || 0) / Number(selectedTask.ore_pe_zi || 8)).toFixed(1)} zile)
                     </span>
                   </div>
                 </div>
@@ -2016,9 +2016,9 @@ export default function GanttView() {
                     <span>Progres Economic</span>
                     <span style={{
                       fontWeight: '600',
-                      color: (selectedTask.economicProgress || 0) > 100 ? '#ef4444' : '#059669'
+                      color: Number(selectedTask.economicProgress || 0) > 100 ? '#ef4444' : '#059669'
                     }}>
-                      {Math.min(selectedTask.economicProgress || 0, 999).toFixed(1)}%
+                      {Math.min(Number(selectedTask.economicProgress || 0), 999).toFixed(1)}%
                     </span>
                   </div>
                   <div style={{
@@ -2028,11 +2028,11 @@ export default function GanttView() {
                     overflow: 'hidden'
                   }}>
                     <div style={{
-                      width: `${Math.min(selectedTask.economicProgress || 0, 100)}%`,
+                      width: `${Math.min(Number(selectedTask.economicProgress || 0), 100)}%`,
                       height: '100%',
-                      background: (selectedTask.economicProgress || 0) > 100
+                      background: Number(selectedTask.economicProgress || 0) > 100
                         ? '#ef4444'
-                        : (selectedTask.economicProgress || 0) > 80
+                        : Number(selectedTask.economicProgress || 0) > 80
                           ? '#f59e0b'
                           : '#22c55e',
                       transition: 'width 0.3s ease'

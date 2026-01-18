@@ -66,6 +66,11 @@ const userNavStructure: NavItem[] = [
     icon: '📊'
   },
   {
+    href: '/planning-overview',
+    label: 'Planning Overview',
+    icon: '👥'
+  },
+  {
     href: '/reports',
     label: 'Rapoartele Mele',
     icon: '📈'

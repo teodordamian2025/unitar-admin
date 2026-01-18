@@ -47,7 +47,8 @@ const navStructure: NavItem[] = [
       { href: '/admin/analytics/timetracking', label: 'Timp Masurare', icon: '⏱️' },
       { href: '/admin/analytics/calendar', label: 'Calendar', icon: '📅' },
       { href: '/admin/analytics/gantt', label: 'Gantt', icon: '📋' },
-      { href: '/admin/analytics/team', label: 'Echipa Indicatori', icon: '👥' },
+      { href: '/admin/analytics/planning-overview', label: 'Planning Overview', icon: '👥' },
+      { href: '/admin/analytics/team', label: 'Echipa Indicatori', icon: '📊' },
       { href: '/admin/analytics/live', label: 'Cronometru', icon: '🔴' }
     ]
   },
