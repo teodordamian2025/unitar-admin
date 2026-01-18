@@ -1934,8 +1934,8 @@ export default function GanttView() {
               </div>
             )}
 
-            {/* ✅ 18.01.2026: Secțiune Timp Economic (doar pentru proiecte) */}
-            {selectedTask.type === 'proiect' && selectedTask.economicHoursAllocated !== undefined && (
+            {/* ✅ 18.01.2026: Secțiune Timp Economic (pentru proiecte și subproiecte) */}
+            {(selectedTask.type === 'proiect' || selectedTask.type === 'subproiect') && selectedTask.economicHoursAllocated !== undefined && (
               <div style={{
                 padding: '1rem',
                 background: (selectedTask.economicHoursRemaining || 0) < 0

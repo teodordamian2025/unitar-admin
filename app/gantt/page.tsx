@@ -1974,8 +1974,8 @@ export default function GanttView() {
               </div>
             )}
 
-            {/* ✅ 18.01.2026: Secțiune Timp Economic (doar pentru proiecte) */}
-            {selectedTask.type === 'proiect' && selectedTask.economicHoursAllocated !== undefined && (
+            {/* ✅ 18.01.2026: Secțiune Timp Economic (pentru proiecte și subproiecte) */}
+            {(selectedTask.type === 'proiect' || selectedTask.type === 'subproiect') && selectedTask.economicHoursAllocated !== undefined && (
               <div style={{
                 padding: '1rem',
                 background: (selectedTask.economicHoursRemaining || 0) < 0
@@ -2080,17 +2080,6 @@ export default function GanttView() {
                   </div>
                 </div>
 
-                {/* Detalii calcul - fără cifre financiare directe */}
-                <div style={{
-                  fontSize: '0.8rem',
-                  color: '#6b7280',
-                  borderTop: '1px solid rgba(0,0,0,0.1)',
-                  paddingTop: '0.5rem'
-                }}>
-                  <div>
-                    <strong>Cost/oră:</strong> {selectedTask.cost_ora_setat || 40} {selectedTask.moneda_proiect || 'EUR'}
-                  </div>
-                </div>
               </div>
             )}
 

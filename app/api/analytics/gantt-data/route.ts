@@ -334,7 +334,19 @@ export async function GET(request: NextRequest) {
         WHERE tip_proiect = 'subproiect'
         GROUP BY proiect_id
       ),
-      -- CTE 5: Date subproiect de bază
+      -- CTE 5: Setări costuri (pentru calcul timp economic subproiecte)
+      cost_settings AS (
+        SELECT
+          COALESCE(
+            (SELECT cost_ora FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            40
+          ) as cost_ora,
+          COALESCE(
+            (SELECT ore_pe_zi FROM ${TABLE_SETARI_COSTURI} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            8
+          ) as ore_pe_zi
+      ),
+      -- CTE 6: Date subproiect de bază
       subproject_base AS (
         SELECT
           sp.ID_Subproiect,
@@ -343,7 +355,8 @@ export async function GET(request: NextRequest) {
           sp.Data_Start,
           sp.Data_Final,
           sp.Status,
-          sp.Valoare_Estimata,
+          COALESCE(sp.Valoare_Estimata, 0) as Valoare_Estimata,
+          sp.moneda,
           sp.Responsabil,
           COALESCE(sp.progres_procent, 0) as progress_from_column
         FROM ${TABLE_SUBPROIECTE} sp
@@ -381,12 +394,28 @@ export async function GET(request: NextRequest) {
         false as isCollapsed,
         1 as level,
         COALESCE(ehs.sarcini_count, 0) as sarcini_count,
-        COALESCE(cs.comentarii_count, 0) as comentarii_count
+        COALESCE(cs.comentarii_count, 0) as comentarii_count,
+        -- ✅ 18.01.2026: Câmpuri timp economic pentru subproiecte
+        spb.Valoare_Estimata as valoare_proiect,
+        spb.moneda as moneda_proiect,
+        csett.cost_ora as cost_ora_setat,
+        csett.ore_pe_zi,
+        -- Ore alocate economic = Valoare / Cost_Ora (fără cheltuieli pentru subproiecte)
+        SAFE_DIVIDE(spb.Valoare_Estimata, csett.cost_ora) as economicHoursAllocated,
+        -- Ore rămase economic = Ore alocate - Ore lucrate
+        SAFE_DIVIDE(spb.Valoare_Estimata, csett.cost_ora) - COALESCE(tts.total_worked_hours, 0) as economicHoursRemaining,
+        -- Progres economic = (Ore lucrate / Ore alocate) * 100
+        CASE
+          WHEN SAFE_DIVIDE(spb.Valoare_Estimata, csett.cost_ora) > 0
+          THEN (COALESCE(tts.total_worked_hours, 0) / SAFE_DIVIDE(spb.Valoare_Estimata, csett.cost_ora)) * 100
+          ELSE 0
+        END as economicProgress
       FROM subproject_base spb
       LEFT JOIN time_tracking_stats tts ON spb.ID_Subproiect = tts.subproiect_id
       LEFT JOIN estimated_hours_stats ehs ON spb.ID_Subproiect = ehs.subproiect_id
       LEFT JOIN responsabili_stats rs ON spb.ID_Subproiect = rs.subproiect_id
       LEFT JOIN comentarii_stats cs ON spb.ID_Subproiect = cs.proiect_id
+      CROSS JOIN cost_settings csett
       ORDER BY spb.Data_Start ASC
     `;
 
