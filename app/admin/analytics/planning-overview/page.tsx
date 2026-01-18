@@ -2,27 +2,13 @@
 
 // ==================================================================
 // CALEA: app/admin/analytics/planning-overview/page.tsx
-// DATA: 18.01.2026
-// DESCRIERE: Pagină vizualizare planning toți utilizatorii
-// FAZA 4 din GANTT_PLAN.md
+// DATA: 19.01.2026
+// DESCRIERE: Pagină vizualizare planning toți utilizatorii - ADMIN
+// ACTUALIZAT: Inline styles pentru compatibilitate (identic cu user)
 // ==================================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import ModernLayout from '@/app/components/ModernLayout';
-import {
-  Calendar,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  RefreshCw,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  MinusCircle,
-  Info,
-  X
-} from 'lucide-react';
 
 interface Utilizator {
   uid: string;
@@ -173,13 +159,13 @@ export default function PlanningOverviewPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'supraalocat':
-        return 'bg-red-500/30 border-red-500/50 text-red-300';
+        return { bg: '#fef2f2', border: '#fecaca', text: '#dc2626' };
       case 'complet':
-        return 'bg-green-500/30 border-green-500/50 text-green-300';
+        return { bg: '#f0fdf4', border: '#bbf7d0', text: '#16a34a' };
       case 'partial':
-        return 'bg-yellow-500/30 border-yellow-500/50 text-yellow-300';
+        return { bg: '#fefce8', border: '#fef08a', text: '#ca8a04' };
       default:
-        return 'bg-gray-500/10 border-gray-500/20 text-gray-400';
+        return { bg: '#f9fafb', border: '#e5e7eb', text: '#6b7280' };
     }
   };
 
@@ -187,84 +173,124 @@ export default function PlanningOverviewPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'supraalocat':
-        return <AlertTriangle className="w-3 h-3" />;
+        return '⚠️';
       case 'complet':
-        return <CheckCircle2 className="w-3 h-3" />;
+        return '✅';
       case 'partial':
-        return <Clock className="w-3 h-3" />;
+        return '⏰';
       default:
-        return <MinusCircle className="w-3 h-3" />;
+        return '➖';
     }
   };
 
   return (
     <ModernLayout>
-      <div className="p-6 space-y-6">
+      <div style={{ padding: '1.5rem' }}>
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl">
-              <Users className="w-6 h-6 text-blue-400" />
-            </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.75rem' }}>👥</span>
             <div>
-              <h1 className="text-2xl font-bold text-white">Planning Overview</h1>
-              <p className="text-sm text-gray-400">
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                Planning Overview
+              </h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
                 Vizualizare alocări zilnice pentru toți utilizatorii
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-2 rounded-lg flex items-center gap-2 transition-all ${
-                showFilters
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
-              }`}
+              style={{
+                padding: '0.5rem 1rem',
+                background: showFilters ? '#3b82f6' : 'white',
+                color: showFilters ? 'white' : '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
             >
-              <Filter className="w-4 h-4" />
-              Filtre
+              🔍 Filtre
             </button>
             <button
               onClick={loadData}
               disabled={loading}
-              className="px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50"
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'white',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                opacity: loading ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Reîncarcă
+              🔄 Reîncarcă
             </button>
           </div>
         </div>
 
         {/* Filtre */}
         {showFilters && (
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-            <div className="flex flex-wrap gap-4 items-end">
+          <div style={{
+            background: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                   Data start
                 </label>
                 <input
                   type="date"
                   value={dataStart}
                   onChange={(e) => setDataStart(e.target.value)}
-                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem'
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                   Data sfârșit
                 </label>
                 <input
                   type="date"
                   value={dataEnd}
                   onChange={(e) => setDataEnd(e.target.value)}
-                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem'
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                   Proiect (opțional)
                 </label>
                 <input
@@ -272,7 +298,12 @@ export default function PlanningOverviewPage() {
                   value={proiectFilter}
                   onChange={(e) => setProiectFilter(e.target.value)}
                   placeholder="ID proiect..."
-                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder:text-gray-500"
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem'
+                  }}
                 />
               </div>
             </div>
@@ -280,17 +311,33 @@ export default function PlanningOverviewPage() {
         )}
 
         {/* Navigare săptămână */}
-        <div className="flex items-center justify-between bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-3">
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#f9fafb',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem'
+        }}>
           <button
             onClick={goToPreviousWeek}
-            className="p-2 hover:bg-white/10 rounded-lg transition-all"
+            style={{
+              background: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
           >
-            <ChevronLeft className="w-5 h-5 text-gray-400" />
+            ◀ Săpt. anterioară
           </button>
 
-          <div className="flex items-center gap-4">
-            <Calendar className="w-5 h-5 text-blue-400" />
-            <span className="text-white font-medium">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ fontSize: '1.25rem' }}>📅</span>
+            <span style={{ fontWeight: '600', color: '#1f2937' }}>
               {new Date(dataStart).toLocaleDateString('ro-RO', {
                 day: 'numeric',
                 month: 'long'
@@ -304,7 +351,16 @@ export default function PlanningOverviewPage() {
             </span>
             <button
               onClick={goToCurrentWeek}
-              className="px-3 py-1 text-sm bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
+              style={{
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.5rem 1rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
             >
               Săptămâna curentă
             </button>
@@ -312,80 +368,146 @@ export default function PlanningOverviewPage() {
 
           <button
             onClick={goToNextWeek}
-            className="p-2 hover:bg-white/10 rounded-lg transition-all"
+            style={{
+              background: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
           >
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            Săpt. următoare ▶
           </button>
         </div>
 
         {/* Statistici */}
         {data && (
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="text-2xl font-bold text-white">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '1rem',
+            marginBottom: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1rem',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
                 {data.statistici.total_utilizatori}
               </div>
-              <div className="text-sm text-gray-400">Utilizatori activi</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Utilizatori activi</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="text-2xl font-bold text-white">
+            <div style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1rem',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#8b5cf6' }}>
                 {data.statistici.total_planificari}
               </div>
-              <div className="text-sm text-gray-400">Alocări în perioadă</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Alocări în perioadă</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="text-2xl font-bold text-white">
+            <div style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1rem',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
                 {data.statistici.ore_totale_planificate.toFixed(1)}h
               </div>
-              <div className="text-sm text-gray-400">Ore totale planificate</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Ore totale planificate</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-              <div className="text-2xl font-bold text-white">
+            <div style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1rem',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
                 {data.statistici.zile_in_perioada}
               </div>
-              <div className="text-sm text-gray-400">Zile în perioadă</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Zile în perioadă</div>
             </div>
           </div>
         )}
 
         {/* Legendă */}
-        <div className="flex items-center gap-6 text-sm">
-          <span className="text-gray-400">Legendă:</span>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-500/30 border border-red-500/50" />
-            <span className="text-gray-300">Supraalocat (&gt;8h)</span>
+        <div style={{
+          display: 'flex',
+          gap: '1.5rem',
+          marginBottom: '1rem',
+          fontSize: '0.8rem',
+          color: '#6b7280'
+        }}>
+          <span>Legendă:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#fef2f2', border: '1px solid #fecaca' }} />
+            <span>Supraalocat (&gt;8h)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-500/30 border border-green-500/50" />
-            <span className="text-gray-300">Complet (8h)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#f0fdf4', border: '1px solid #bbf7d0' }} />
+            <span>Complet (8h)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-yellow-500/30 border border-yellow-500/50" />
-            <span className="text-gray-300">Partial (&lt;8h)</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#fefce8', border: '1px solid #fef08a' }} />
+            <span>Partial (&lt;8h)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-gray-500/10 border border-gray-500/20" />
-            <span className="text-gray-300">Liber</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#f9fafb', border: '1px solid #e5e7eb' }} />
+            <span>Liber</span>
           </div>
         </div>
 
         {/* Conținut principal */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+          <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
+            <p style={{ color: '#6b7280' }}>Se încarcă datele...</p>
           </div>
         ) : error ? (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-            <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <p className="text-red-300">{error}</p>
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '8px',
+            padding: '1.5rem',
+            textAlign: 'center',
+            color: '#dc2626'
+          }}>
+            <span style={{ fontSize: '1.5rem', marginBottom: '0.5rem', display: 'block' }}>⚠️</span>
+            <p>{error}</p>
           </div>
         ) : data && data.utilizatori.length > 0 ? (
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <div style={{
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="sticky left-0 bg-[#1a1f36] px-4 py-3 text-left text-sm font-medium text-gray-400 min-w-[200px]">
+                  <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                    <th style={{
+                      position: 'sticky',
+                      left: 0,
+                      background: '#f9fafb',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      minWidth: '180px',
+                      zIndex: 1
+                    }}>
                       Utilizator
                     </th>
                     {data.zile.map((zi) => {
@@ -393,16 +515,18 @@ export default function PlanningOverviewPage() {
                       return (
                         <th
                           key={zi}
-                          className={`px-2 py-3 text-center text-sm font-medium min-w-[80px] ${
-                            isToday
-                              ? 'bg-blue-500/20 text-blue-300'
-                              : isWeekend
-                              ? 'bg-purple-500/10 text-purple-300'
-                              : 'text-gray-400'
-                          }`}
+                          style={{
+                            padding: '0.5rem',
+                            textAlign: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            minWidth: '70px',
+                            background: isToday ? '#dbeafe' : isWeekend ? '#f5f3ff' : '#f9fafb',
+                            color: isToday ? '#1d4ed8' : isWeekend ? '#7c3aed' : '#6b7280'
+                          }}
                         >
                           <div>{day}</div>
-                          <div className="text-xs opacity-70">
+                          <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>
                             {date} {month}
                           </div>
                         </th>
@@ -411,66 +535,100 @@ export default function PlanningOverviewPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.utilizatori.map((user) => (
+                  {data.utilizatori.map((utilizator, idx) => (
                     <tr
-                      key={user.uid}
-                      className="border-b border-white/5 hover:bg-white/5"
+                      key={utilizator.uid}
+                      style={{
+                        borderBottom: '1px solid #f3f4f6',
+                        background: idx % 2 === 0 ? 'white' : '#fafafa'
+                      }}
                     >
-                      <td className="sticky left-0 bg-[#1a1f36] px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
-                            {user.nume?.charAt(0)?.toUpperCase() || '?'}
+                      <td style={{
+                        position: 'sticky',
+                        left: 0,
+                        background: idx % 2 === 0 ? 'white' : '#fafafa',
+                        padding: '0.75rem 1rem',
+                        zIndex: 1
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
+                          }}>
+                            {utilizator.nume?.charAt(0)?.toUpperCase() || '?'}
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-white">
-                              {user.nume}
+                            <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#1f2937' }}>
+                              {utilizator.nume}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {user.rol}
+                            <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                              {utilizator.rol}
                             </div>
                           </div>
                         </div>
                       </td>
                       {data.zile.map((zi) => {
-                        const planificari =
-                          data.planificariMap[user.uid]?.[zi] || [];
-                        const ore =
-                          data.orePerZiPerUtilizator[user.uid]?.[zi] || 0;
-                        const status =
-                          data.alocareStatus[user.uid]?.[zi] || 'liber';
+                        const planificari = data.planificariMap[utilizator.uid]?.[zi] || [];
+                        const ore = data.orePerZiPerUtilizator[utilizator.uid]?.[zi] || 0;
+                        const status = data.alocareStatus[utilizator.uid]?.[zi] || 'liber';
+                        const colors = getStatusColor(status);
                         const { isWeekend, isToday } = formatDate(zi);
 
                         return (
                           <td
                             key={zi}
-                            className={`px-2 py-3 ${
-                              isToday ? 'bg-blue-500/10' : ''
-                            } ${isWeekend ? 'bg-purple-500/5' : ''}`}
+                            style={{
+                              padding: '0.5rem',
+                              background: isToday ? '#eff6ff' : isWeekend ? '#faf5ff' : 'transparent'
+                            }}
                           >
                             <button
-                              onClick={() =>
-                                setSelectedCell({
-                                  uid: user.uid,
-                                  nume: user.nume,
-                                  data: zi,
-                                  planificari,
-                                  ore
-                                })
-                              }
-                              className={`w-full p-2 rounded-lg border transition-all hover:scale-105 ${getStatusColor(
-                                status
-                              )}`}
+                              onClick={() => setSelectedCell({
+                                uid: utilizator.uid,
+                                nume: utilizator.nume,
+                                data: zi,
+                                planificari,
+                                ore
+                              })}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                borderRadius: '6px',
+                                border: `1px solid ${colors.border}`,
+                                background: colors.bg,
+                                cursor: 'pointer',
+                                transition: 'transform 0.15s ease'
+                              }}
+                              onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                              onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                             >
-                              <div className="flex items-center justify-center gap-1">
-                                {getStatusIcon(status)}
-                                <span className="text-sm font-medium">
-                                  {ore > 0 ? `${ore}h` : '-'}
-                                </span>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                color: colors.text,
+                                fontSize: '0.8rem',
+                                fontWeight: '500'
+                              }}>
+                                <span>{getStatusIcon(status)}</span>
+                                <span>{ore > 0 ? `${ore}h` : '-'}</span>
                               </div>
                               {planificari.length > 0 && (
-                                <div className="text-xs opacity-70 mt-1">
-                                  {planificari.length} task
-                                  {planificari.length > 1 ? '-uri' : ''}
+                                <div style={{
+                                  fontSize: '0.65rem',
+                                  color: '#9ca3af',
+                                  marginTop: '2px'
+                                }}>
+                                  {planificari.length} task{planificari.length > 1 ? '-uri' : ''}
                                 </div>
                               )}
                             </button>
@@ -484,26 +642,60 @@ export default function PlanningOverviewPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-12 text-center">
-            <Info className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p className="text-gray-400">Nu există utilizatori sau planificări</p>
-            <p className="text-sm text-gray-500 mt-2">
-              Asigurați-vă că există utilizatori activi în sistem și că tabelul
-              PlanificariZilnice_v2 a fost creat.
+          <div style={{
+            background: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '3rem',
+            textAlign: 'center'
+          }}>
+            <span style={{ fontSize: '2rem', marginBottom: '0.5rem', display: 'block' }}>ℹ️</span>
+            <p style={{ color: '#6b7280', margin: 0 }}>Nu există utilizatori sau planificări</p>
+            <p style={{ color: '#9ca3af', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+              Asigurați-vă că există utilizatori activi și că tabelul PlanificariZilnice_v2 a fost creat.
             </p>
           </div>
         )}
 
         {/* Modal detalii celulă */}
         {selectedCell && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1a1f36] border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '1rem'
+            }}
+            onClick={() => setSelectedCell(null)}
+          >
+            <div
+              style={{
+                background: 'white',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '500px',
+                maxHeight: '80vh',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '1rem 1.5rem',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#1f2937' }}>
                     {selectedCell.nume}
                   </h3>
-                  <p className="text-sm text-gray-400">
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>
                     {new Date(selectedCell.data).toLocaleDateString('ro-RO', {
                       weekday: 'long',
                       day: 'numeric',
@@ -514,20 +706,35 @@ export default function PlanningOverviewPage() {
                 </div>
                 <button
                   onClick={() => setSelectedCell(null)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#9ca3af',
+                    padding: '0.5rem'
+                  }}
                 >
-                  <X className="w-5 h-5 text-gray-400" />
+                  ✕
                 </button>
               </div>
 
-              <div className="p-4 overflow-y-auto max-h-[60vh]">
-                <div className="flex items-center gap-3 mb-4 p-3 bg-white/5 rounded-lg">
-                  <Clock className="w-5 h-5 text-blue-400" />
+              <div style={{ padding: '1.5rem', maxHeight: '60vh', overflowY: 'auto' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  marginBottom: '1rem',
+                  padding: '0.75rem',
+                  background: '#f9fafb',
+                  borderRadius: '8px'
+                }}>
+                  <span style={{ fontSize: '1.25rem' }}>⏱️</span>
                   <div>
-                    <div className="text-lg font-semibold text-white">
+                    <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#1f2937' }}>
                       {selectedCell.ore}h planificate
                     </div>
-                    <div className="text-sm text-gray-400">
+                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
                       {selectedCell.ore > 8
                         ? 'Supraalocat!'
                         : selectedCell.ore === 8
@@ -540,66 +747,93 @@ export default function PlanningOverviewPage() {
                 </div>
 
                 {selectedCell.planificari.length > 0 ? (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-gray-400">
+                  <div>
+                    <h4 style={{
+                      margin: '0 0 0.75rem 0',
+                      fontSize: '0.85rem',
+                      fontWeight: '500',
+                      color: '#6b7280'
+                    }}>
                       Alocări ({selectedCell.planificari.length})
                     </h4>
-                    {selectedCell.planificari.map((p) => (
-                      <div
-                        key={p.id}
-                        className="p-3 bg-white/5 border border-white/10 rounded-lg"
-                        style={{
-                          borderLeftColor: p.proiect_culoare || '#60A5FA',
-                          borderLeftWidth: '3px'
-                        }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            {p.proiect_denumire && (
-                              <div className="text-sm font-medium text-white">
-                                {p.proiect_denumire}
-                              </div>
-                            )}
-                            {p.subproiect_denumire && (
-                              <div className="text-xs text-blue-400">
-                                → {p.subproiect_denumire}
-                              </div>
-                            )}
-                            {p.sarcina_titlu && (
-                              <div className="text-xs text-purple-400">
-                                → {p.sarcina_titlu}
-                              </div>
-                            )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {selectedCell.planificari.map((p) => (
+                        <div
+                          key={p.id}
+                          style={{
+                            padding: '0.75rem',
+                            background: '#f9fafb',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            borderLeft: `3px solid ${p.proiect_culoare || '#3b82f6'}`
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start'
+                          }}>
+                            <div>
+                              {p.proiect_denumire && (
+                                <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#1f2937' }}>
+                                  {p.proiect_denumire}
+                                </div>
+                              )}
+                              {p.subproiect_denumire && (
+                                <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>
+                                  → {p.subproiect_denumire}
+                                </div>
+                              )}
+                              {p.sarcina_titlu && (
+                                <div style={{ fontSize: '0.75rem', color: '#8b5cf6' }}>
+                                  → {p.sarcina_titlu}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              color: '#1f2937'
+                            }}>
+                              {p.ore_planificate}h
+                            </div>
                           </div>
-                          <div className="text-sm font-semibold text-white">
-                            {p.ore_planificate}h
-                          </div>
-                        </div>
-                        {p.observatii && (
-                          <p className="text-xs text-gray-400 mt-2">
-                            {p.observatii}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded ${
-                              p.prioritate === 'urgenta'
-                                ? 'bg-red-500/20 text-red-300'
+                          {p.observatii && (
+                            <p style={{
+                              margin: '0.5rem 0 0 0',
+                              fontSize: '0.75rem',
+                              color: '#6b7280'
+                            }}>
+                              {p.observatii}
+                            </p>
+                          )}
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: p.prioritate === 'urgent'
+                                ? '#fef2f2'
                                 : p.prioritate === 'ridicata'
-                                ? 'bg-orange-500/20 text-orange-300'
-                                : 'bg-gray-500/20 text-gray-300'
-                            }`}
-                          >
-                            {p.prioritate}
-                          </span>
+                                ? '#fff7ed'
+                                : '#f9fafb',
+                              color: p.prioritate === 'urgent'
+                                ? '#dc2626'
+                                : p.prioritate === 'ridicata'
+                                ? '#ea580c'
+                                : '#6b7280'
+                            }}>
+                              {p.prioritate}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-400">
-                    <MinusCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p>Nu există alocări pentru această zi</p>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>
+                    <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '0.5rem' }}>➖</span>
+                    <p style={{ margin: 0 }}>Nu există alocări pentru această zi</p>
                   </div>
                 )}
               </div>

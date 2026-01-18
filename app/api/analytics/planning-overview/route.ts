@@ -47,16 +47,17 @@ export async function GET(request: NextRequest) {
 
     // 1. Obține toți utilizatorii activi
     // NOTA: Utilizatori_v2 nu are coloana 'echipa', folosim 'departament' în schimb
+    // Concatenăm prenume + nume pentru afișare completă
     const utilizatoriQuery = `
       SELECT
         uid,
-        nume,
+        CONCAT(COALESCE(prenume, ''), ' ', COALESCE(nume, '')) as nume,
         email,
         rol,
         departament as echipa
       FROM ${TABLE_UTILIZATORI}
       WHERE activ = TRUE
-      ORDER BY nume ASC
+      ORDER BY prenume ASC, nume ASC
     `;
 
     const [utilizatoriRows] = await bigquery.query({
