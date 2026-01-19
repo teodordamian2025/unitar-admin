@@ -52,15 +52,15 @@ export async function GET(request: NextRequest) {
     const types: any = {};
 
     if (data_start) {
-      query += ' AND pz.data_planificare >= @data_start';
+      query += ' AND pz.data_planificare >= DATE(@data_start)';
       params.data_start = data_start;
-      types.data_start = 'DATE';
+      types.data_start = 'STRING';
     }
 
     if (data_end) {
-      query += ' AND pz.data_planificare <= @data_end';
+      query += ' AND pz.data_planificare <= DATE(@data_end)';
       params.data_end = data_end;
-      types.data_end = 'DATE';
+      types.data_end = 'STRING';
     }
 
     if (utilizator_uid) {

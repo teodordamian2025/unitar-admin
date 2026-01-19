@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Obține planificările pentru perioada specificată
     // NOTA: Proiecte_v2 folosește ID_Proiect (nu id) și nu are coloana culoare
+    // Folosim DATE() function pentru conversie corectă STRING -> DATE în BigQuery
     let planificariQuery = `
       SELECT
         pz.id,
@@ -85,12 +86,12 @@ export async function GET(request: NextRequest) {
         '#3b82f6' as proiect_culoare
       FROM ${TABLE_PLANIFICARI} pz
       WHERE pz.activ = TRUE
-        AND pz.data_planificare >= @data_start
-        AND pz.data_planificare <= @data_end
+        AND pz.data_planificare >= DATE(@data_start)
+        AND pz.data_planificare <= DATE(@data_end)
     `;
 
     const params: any = { data_start, data_end };
-    const types: any = { data_start: 'DATE', data_end: 'DATE' };
+    const types: any = { data_start: 'STRING', data_end: 'STRING' };
 
     if (proiect_id) {
       planificariQuery += ` AND (pz.proiect_id = @proiect_id OR pz.subproiect_id = @proiect_id OR pz.sarcina_id = @proiect_id)`;
