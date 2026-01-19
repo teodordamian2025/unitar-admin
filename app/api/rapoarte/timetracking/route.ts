@@ -87,6 +87,9 @@ export async function GET(request: NextRequest) {
     }
 
     // ACTUALIZAT: Query pentru înregistrări time tracking cu detalii sarcină + proiect_id + subproiect_id
+    // FIX 19.01.2026: Adăugat JOIN-uri cu Subproiecte pentru filtrare corectă pe proiect
+    const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
     let query = `
       SELECT
         tt.id,
@@ -107,6 +110,12 @@ export async function GET(request: NextRequest) {
       FROM ${TIMETRACKING_TABLE} tt
       LEFT JOIN ${SARCINI_TABLE} s
         ON tt.sarcina_id = s.id
+      -- FIX: JOIN pentru a verifica dacă subproiectul asociat direct aparține proiectului
+      LEFT JOIN ${SUBPROIECTE_TABLE} sp
+        ON tt.subproiect_id = sp.ID_Subproiect
+      -- FIX: JOIN pentru a verifica dacă sarcina e pe un subproiect care aparține proiectului
+      LEFT JOIN ${SUBPROIECTE_TABLE} sp_sarcina
+        ON s.tip_proiect = 'subproiect' AND s.proiect_id = sp_sarcina.ID_Subproiect
       WHERE 1=1
     `;
 
@@ -132,10 +141,19 @@ export async function GET(request: NextRequest) {
       types.dataLucru = 'DATE';
     }
 
-    // ACTUALIZAT: Filtrare după proiect_id pentru raportare facilă
-    // Include atât înregistrările cu proiect_id cât și cu subproiect_id
+    // FIX 19.01.2026: Filtrare corectă pentru a include doar înregistrările care aparțin proiectului specificat
+    // Include:
+    // 1. Înregistrări directe pe proiect (tt.proiect_id = proiectId)
+    // 2. Înregistrări pe subproiect al proiectului (sp.ID_Proiect = proiectId)
+    // 3. Înregistrări pe sarcină directă pe proiect (s.tip_proiect = 'proiect' AND s.proiect_id = proiectId)
+    // 4. Înregistrări pe sarcină pe subproiect al proiectului (s.tip_proiect = 'subproiect' AND sp_sarcina.ID_Proiect = proiectId)
     if (proiectId) {
-      conditions.push('(tt.proiect_id = @proiectId OR tt.subproiect_id = @proiectId)');
+      conditions.push(`(
+        tt.proiect_id = @proiectId
+        OR sp.ID_Proiect = @proiectId
+        OR (s.tip_proiect = 'proiect' AND s.proiect_id = @proiectId)
+        OR (s.tip_proiect = 'subproiect' AND sp_sarcina.ID_Proiect = @proiectId)
+      )`);
       params.proiectId = proiectId;
       types.proiectId = 'STRING';
     }
