@@ -429,6 +429,15 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         // (identic cu logica din startTimer - linia 642)
         await forceRefresh();
 
+        // FIX 19.01.2026: Dispatch custom event pentru a notifica ActiveTimerNotification
+        // să refetch-eze pin status imediat (fără delay)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pin-status-changed', {
+            detail: { itemId, isPinned: !currentPinned }
+          }));
+          console.log('📡 Dispatched pin-status-changed event');
+        }
+
         console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
 
         // ✅ ENHANCED: Toast messages cu info durata la unpin

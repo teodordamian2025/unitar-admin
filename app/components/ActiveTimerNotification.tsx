@@ -100,35 +100,54 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     }
   }, [userId, idToken, contextHasSession]);
 
-  // ✅ ADĂUGAT: Check pentru pin activ la mount (ZERO POLLING - doar 1 request)
+  // ✅ REFACTORED: checkActivePin ca funcție separată pentru a fi apelată din event listener
+  const checkActivePin = async () => {
+    if (!userId || !idToken) return;
+
+    try {
+      const response = await fetch('/api/user/planificator/active-pin', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.pin) {
+          console.log('📌 ActiveTimerNotification: Found active pin:', data.pin.display_name);
+          setActivePin(data.pin);
+        } else {
+          console.log('📌 ActiveTimerNotification: No active pin');
+          setActivePin(null);
+        }
+      }
+    } catch (error) {
+      console.error('❌ ActiveTimerNotification: Error checking active pin:', error);
+    }
+  };
+
+  // ✅ Check pentru pin activ la mount (ZERO POLLING - doar 1 request)
+  useEffect(() => {
+    if (!userId || !idToken) return;
+    checkActivePin();
+  }, [userId, idToken]);
+
+  // ✅ FIX 19.01.2026: Listen pentru 'pin-status-changed' event pentru actualizare imediată
   useEffect(() => {
     if (!userId || !idToken) return;
 
-    const checkActivePin = async () => {
-      try {
-        const response = await fetch('/api/user/planificator/active-pin', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${idToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.pin) {
-            console.log('📌 ActiveTimerNotification: Found active pin:', data.pin.display_name);
-            setActivePin(data.pin);
-          } else {
-            setActivePin(null);
-          }
-        }
-      } catch (error) {
-        console.error('❌ ActiveTimerNotification: Error checking active pin:', error);
-      }
+    const handlePinStatusChanged = (event: Event) => {
+      console.log('📡 ActiveTimerNotification: Received pin-status-changed event, refetching...');
+      checkActivePin();
     };
 
-    checkActivePin();
+    window.addEventListener('pin-status-changed', handlePinStatusChanged);
+
+    return () => {
+      window.removeEventListener('pin-status-changed', handlePinStatusChanged);
+    };
   }, [userId, idToken]);
 
   const checkForInvisibleSessions = async () => {
