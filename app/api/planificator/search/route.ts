@@ -27,7 +27,9 @@ const bigquery = new BigQuery({
   },
 });
 
-console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function GET(request: NextRequest) {
+console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
+export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -53,7 +55,7 @@ console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async f
     const searchQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal\`
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
         WHERE utilizator_uid = @userId AND activ = TRUE
       )
 
@@ -66,15 +68,15 @@ console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async f
         -- Contorizare subproiecte și sarcini pentru feedback
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte\`
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
           WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
         ) as subproiecte_count,
         (
           SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini\`
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\`
           WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
         ) as sarcini_count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte\` p
+      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` p
       WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
         AND Status != 'Anulat'
         AND ID_Proiect NOT IN (

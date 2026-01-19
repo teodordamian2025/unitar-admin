@@ -28,7 +28,9 @@ const bigquery = new BigQuery({
   },
 });
 
-console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);export async function GET(request: NextRequest) {
+console.log(`🔧 [Search] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
+
+export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
