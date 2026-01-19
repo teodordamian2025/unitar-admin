@@ -2110,8 +2110,19 @@ export default function GanttView() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setShowAllocationForm(!showAllocationForm);
-                    if (!showAllocationForm) {
+                    const willShow = !showAllocationForm;
+                    setShowAllocationForm(willShow);
+                    if (willShow) {
+                      // Reset allocation data cu data curentă când deschidem formularul
+                      setAllocationData({
+                        data_planificare: new Date().toISOString().split('T')[0],
+                        utilizator_uid: '',
+                        utilizator_nume: '',
+                        ore_planificate: 8,
+                        prioritate: 'normala',
+                        observatii: '',
+                        sync_planificator_personal: true
+                      });
                       loadExistingAllocations(selectedTask.id, selectedTask.type);
                     }
                   }}

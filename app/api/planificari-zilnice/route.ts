@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      data_planificare,
+      data_planificare: rawDataPlanificare,
       utilizator_uid,
       utilizator_nume,
       proiect_id,
@@ -135,13 +135,49 @@ export async function POST(request: NextRequest) {
       sync_planificator_personal = false
     } = body;
 
-    // Validări
-    if (!data_planificare || !utilizator_uid || !utilizator_nume) {
+    // Validări de bază
+    if (!utilizator_uid || !utilizator_nume) {
       return NextResponse.json({
         success: false,
-        error: 'data_planificare, utilizator_uid și utilizator_nume sunt obligatorii'
+        error: 'utilizator_uid și utilizator_nume sunt obligatorii'
       }, { status: 400 });
     }
+
+    // Validare și normalizare data_planificare
+    let data_planificare = rawDataPlanificare;
+
+    // Dacă data este obiect BigQuery ({value: "2025-01-19"}), extrage valoarea
+    if (data_planificare && typeof data_planificare === 'object' && data_planificare.value) {
+      data_planificare = data_planificare.value;
+    }
+
+    // Dacă data lipsește sau e goală, folosește data curentă
+    if (!data_planificare || data_planificare === '' || data_planificare === 'undefined' || data_planificare === 'null') {
+      data_planificare = new Date().toISOString().split('T')[0];
+      console.log(`[Planificări Zilnice] data_planificare lipsea, folosind data curentă: ${data_planificare}`);
+    }
+
+    // Validare format dată YYYY-MM-DD
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(data_planificare)) {
+      console.error(`[Planificări Zilnice] Format dată invalid: ${data_planificare}`);
+      return NextResponse.json({
+        success: false,
+        error: `Format dată invalid: ${data_planificare}. Folosiți formatul YYYY-MM-DD.`
+      }, { status: 400 });
+    }
+
+    // Verifică dacă data este validă
+    const parsedDate = new Date(data_planificare);
+    if (isNaN(parsedDate.getTime())) {
+      console.error(`[Planificări Zilnice] Dată invalidă: ${data_planificare}`);
+      return NextResponse.json({
+        success: false,
+        error: `Dată invalidă: ${data_planificare}`
+      }, { status: 400 });
+    }
+
+    console.log(`[Planificări Zilnice] POST - utilizator: ${utilizator_uid}, data: ${data_planificare}, proiect: ${proiect_id || 'N/A'}, subproiect: ${subproiect_id || 'N/A'}, sarcina: ${sarcina_id || 'N/A'}`);
 
     if (!proiect_id && !subproiect_id && !sarcina_id) {
       return NextResponse.json({
@@ -150,12 +186,24 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validare finală - asigură că data_planificare este un string valid înainte de BigQuery
+    if (typeof data_planificare !== 'string' || !data_planificare) {
+      console.error(`[Planificări Zilnice] CRITICAL: data_planificare invalid după validare: ${data_planificare}, type: ${typeof data_planificare}`);
+      return NextResponse.json({
+        success: false,
+        error: 'Eroare internă: data_planificare invalidă'
+      }, { status: 500 });
+    }
+
     const id = uuidv4();
 
+    console.log(`[Planificări Zilnice] Executing check query with data_planificare: "${data_planificare}"`);
+
     // Verifică dacă există deja alocare pentru aceeași zi/utilizator/element
+    // Folosim DATE() function în query pentru a evita probleme cu parametrizarea DATE în BigQuery
     const checkQuery = `
       SELECT id FROM ${TABLE_PLANIFICARI}
-      WHERE data_planificare = @data_planificare
+      WHERE data_planificare = DATE(@data_planificare)
         AND utilizator_uid = @utilizator_uid
         AND activ = TRUE
         AND (
@@ -169,14 +217,14 @@ export async function POST(request: NextRequest) {
     const [existingRows] = await bigquery.query({
       query: checkQuery,
       params: {
-        data_planificare,
-        utilizator_uid,
+        data_planificare: data_planificare,
+        utilizator_uid: utilizator_uid,
         proiect_id: proiect_id || null,
         subproiect_id: subproiect_id || null,
         sarcina_id: sarcina_id || null
       },
       types: {
-        data_planificare: 'DATE',
+        data_planificare: 'STRING',
         utilizator_uid: 'STRING',
         proiect_id: 'STRING',
         subproiect_id: 'STRING',
@@ -192,7 +240,7 @@ export async function POST(request: NextRequest) {
       }, { status: 409 });
     }
 
-    // Insert planificare
+    // Insert planificare - folosim DATE() pentru conversie string -> DATE
     const insertQuery = `
       INSERT INTO ${TABLE_PLANIFICARI} (
         id, data_planificare, utilizator_uid, utilizator_nume,
@@ -202,7 +250,7 @@ export async function POST(request: NextRequest) {
         creat_de, creat_de_nume, data_creare, activ,
         sync_planificator_personal
       ) VALUES (
-        @id, @data_planificare, @utilizator_uid, @utilizator_nume,
+        @id, DATE(@data_planificare), @utilizator_uid, @utilizator_nume,
         @proiect_id, @subproiect_id, @sarcina_id,
         @proiect_denumire, @subproiect_denumire, @sarcina_titlu,
         @ore_planificate, @prioritate, @observatii,
@@ -233,7 +281,7 @@ export async function POST(request: NextRequest) {
       },
       types: {
         id: 'STRING',
-        data_planificare: 'DATE',
+        data_planificare: 'STRING',
         utilizator_uid: 'STRING',
         utilizator_nume: 'STRING',
         proiect_id: 'STRING',
