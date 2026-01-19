@@ -552,7 +552,7 @@ export default function PlanningOverviewPage() {
                             textAlign: 'center',
                             fontSize: '0.75rem',
                             fontWeight: '500',
-                            minWidth: '70px',
+                            minWidth: '130px',
                             background: isToday ? '#dbeafe' : isWeekend ? '#f5f3ff' : '#f9fafb',
                             color: isToday ? '#1d4ed8' : isWeekend ? '#7c3aed' : '#6b7280'
                           }}
@@ -632,35 +632,104 @@ export default function PlanningOverviewPage() {
                               })}
                               style={{
                                 width: '100%',
-                                padding: '0.5rem',
+                                minWidth: '120px',
+                                padding: '0.4rem',
                                 borderRadius: '6px',
                                 border: `1px solid ${colors.border}`,
                                 background: colors.bg,
                                 cursor: 'pointer',
-                                transition: 'transform 0.15s ease'
+                                transition: 'transform 0.15s ease',
+                                textAlign: 'left'
                               }}
-                              onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                              onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
                               onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                             >
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px',
-                                color: colors.text,
-                                fontSize: '0.8rem',
-                                fontWeight: '500'
-                              }}>
-                                <span>{getStatusIcon(status)}</span>
-                                <span>{ore > 0 ? `${ore}h` : '-'}</span>
-                              </div>
-                              {planificari.length > 0 && (
+                              {planificari.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  {/* Header cu ore și status */}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '4px',
+                                    color: colors.text,
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    marginBottom: '2px'
+                                  }}>
+                                    <span>{getStatusIcon(status)} {ore}h</span>
+                                    {planificari.length > 1 && (
+                                      <span style={{
+                                        fontSize: '0.6rem',
+                                        background: '#3b82f6',
+                                        color: 'white',
+                                        padding: '1px 4px',
+                                        borderRadius: '4px'
+                                      }}>
+                                        +{planificari.length - 1}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Prima planificare - afișare detaliată */}
+                                  {planificari.slice(0, 1).map((p) => (
+                                    <div key={p.id} style={{ fontSize: '0.65rem', lineHeight: '1.3' }}>
+                                      {/* Proiect denumire */}
+                                      {p.proiect_denumire && (
+                                        <div style={{
+                                          color: '#374151',
+                                          fontWeight: '500',
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          maxWidth: '110px'
+                                        }}>
+                                          📁 {p.proiect_denumire}
+                                        </div>
+                                      )}
+                                      {/* Subproiect sau Sarcină */}
+                                      {p.subproiect_denumire && (
+                                        <div style={{
+                                          color: '#3b82f6',
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          maxWidth: '110px'
+                                        }}>
+                                          📂 {p.subproiect_denumire}
+                                        </div>
+                                      )}
+                                      {p.sarcina_titlu && (
+                                        <div style={{
+                                          color: '#8b5cf6',
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          maxWidth: '110px'
+                                        }}>
+                                          ✓ {p.sarcina_titlu}
+                                        </div>
+                                      )}
+                                      {/* Dacă nu avem denumiri, afișăm ID-urile */}
+                                      {!p.proiect_denumire && !p.subproiect_denumire && !p.sarcina_titlu && (
+                                        <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>
+                                          {p.proiect_id ? `ID: ${p.proiect_id.substring(0, 15)}...` : 'Fără detalii'}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
                                 <div style={{
-                                  fontSize: '0.65rem',
-                                  color: '#9ca3af',
-                                  marginTop: '2px'
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: colors.text,
+                                  fontSize: '0.8rem',
+                                  fontWeight: '500',
+                                  padding: '0.25rem'
                                 }}>
-                                  {planificari.length} task{planificari.length > 1 ? '-uri' : ''}
+                                  <span>{getStatusIcon(status)}</span>
+                                  <span style={{ marginLeft: '4px' }}>-</span>
                                 </div>
                               )}
                             </button>
@@ -805,27 +874,65 @@ export default function PlanningOverviewPage() {
                             justifyContent: 'space-between',
                             alignItems: 'flex-start'
                           }}>
-                            <div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {/* Denumire Proiect */}
                               {p.proiect_denumire && (
                                 <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#1f2937' }}>
-                                  {p.proiect_denumire}
+                                  📁 {p.proiect_denumire}
                                 </div>
                               )}
+                              {/* ID Proiect */}
+                              {p.proiect_id && (
+                                <div style={{
+                                  fontSize: '0.7rem',
+                                  color: '#9ca3af',
+                                  fontFamily: 'monospace',
+                                  marginTop: '2px'
+                                }}>
+                                  ID: {p.proiect_id}
+                                </div>
+                              )}
+                              {/* Subproiect */}
                               {p.subproiect_denumire && (
-                                <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>
-                                  → {p.subproiect_denumire}
+                                <div style={{ fontSize: '0.8rem', color: '#3b82f6', marginTop: '4px' }}>
+                                  📂 Subproiect: {p.subproiect_denumire}
                                 </div>
                               )}
+                              {p.subproiect_id && !p.subproiect_denumire && (
+                                <div style={{
+                                  fontSize: '0.7rem',
+                                  color: '#3b82f6',
+                                  fontFamily: 'monospace',
+                                  marginTop: '2px'
+                                }}>
+                                  Subproiect ID: {p.subproiect_id}
+                                </div>
+                              )}
+                              {/* Sarcină */}
                               {p.sarcina_titlu && (
-                                <div style={{ fontSize: '0.75rem', color: '#8b5cf6' }}>
-                                  → {p.sarcina_titlu}
+                                <div style={{ fontSize: '0.8rem', color: '#8b5cf6', marginTop: '4px' }}>
+                                  ✓ Sarcină: {p.sarcina_titlu}
+                                </div>
+                              )}
+                              {p.sarcina_id && !p.sarcina_titlu && (
+                                <div style={{
+                                  fontSize: '0.7rem',
+                                  color: '#8b5cf6',
+                                  fontFamily: 'monospace',
+                                  marginTop: '2px'
+                                }}>
+                                  Sarcină ID: {p.sarcina_id}
                                 </div>
                               )}
                             </div>
                             <div style={{
-                              fontSize: '0.875rem',
+                              fontSize: '1rem',
                               fontWeight: '600',
-                              color: '#1f2937'
+                              color: '#1f2937',
+                              background: '#f0fdf4',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              marginLeft: '8px'
                             }}>
                               {p.ore_planificate}h
                             </div>

@@ -322,12 +322,39 @@ export default function GanttView() {
     try {
       setSavingAllocation(true);
 
+      // Determinare denumiri bazat pe tipul elementului selectat
+      let proiect_denumire = '';
+      let subproiect_denumire = '';
+      let sarcina_titlu = '';
+
+      if (selectedTask.type === 'proiect') {
+        proiect_denumire = selectedTask.name;
+      } else if (selectedTask.type === 'subproiect') {
+        // Pentru subproiecte, trebuie să găsim denumirea proiectului părinte
+        const parentProject = ganttData.find(t => t.id === selectedTask.parentId);
+        proiect_denumire = parentProject?.name || '';
+        subproiect_denumire = selectedTask.name;
+      } else if (selectedTask.type === 'sarcina') {
+        // Pentru sarcini, trebuie să găsim denumirile părinte
+        const parentTask = ganttData.find(t => t.id === selectedTask.parentId);
+        if (parentTask?.type === 'subproiect') {
+          const grandParent = ganttData.find(t => t.id === parentTask.parentId);
+          proiect_denumire = grandParent?.name || '';
+          subproiect_denumire = parentTask.name;
+        } else {
+          proiect_denumire = parentTask?.name || '';
+        }
+        sarcina_titlu = selectedTask.name;
+      }
+
       const payload = {
         ...allocationData,
         proiect_id: selectedTask.type === 'proiect' ? selectedTask.id : selectedTask.parentId,
         subproiect_id: selectedTask.type === 'subproiect' ? selectedTask.id : undefined,
         sarcina_id: selectedTask.type === 'sarcina' ? selectedTask.id : undefined,
-        proiect_denumire: selectedTask.name,
+        proiect_denumire,
+        subproiect_denumire: subproiect_denumire || undefined,
+        sarcina_titlu: sarcina_titlu || undefined,
         creat_de: user?.uid,
         creat_de_nume: displayName
       };
