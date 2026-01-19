@@ -206,13 +206,18 @@ export default function PlanningOverviewPage() {
 
   // Funcție pentru căutare proiecte
   const searchProiecte = useCallback(async (term: string) => {
-    if (!term.trim()) {
+    if (!term.trim() || !user) {
       setSearchResults([]);
       return;
     }
 
     try {
-      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}`);
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.results || []);
@@ -220,7 +225,7 @@ export default function PlanningOverviewPage() {
     } catch (error) {
       console.error('Error searching projects:', error);
     }
-  }, []);
+  }, [user]);
 
   // Debounce pentru căutare
   useEffect(() => {
@@ -237,6 +242,8 @@ export default function PlanningOverviewPage() {
 
   // Funcție pentru încărcarea ierarhiei unui proiect
   const loadProjectHierarchy = useCallback(async (proiect_id: string) => {
+    if (!user) return;
+
     try {
       setExpandedItems(prev => {
         const newMap = new Map(prev);
@@ -244,7 +251,12 @@ export default function PlanningOverviewPage() {
         return newMap;
       });
 
-      const response = await fetch(`/api/user/planificator/hierarchy/${proiect_id}`);
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/user/planificator/hierarchy/${proiect_id}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setExpandedItems(prev => {
@@ -267,10 +279,12 @@ export default function PlanningOverviewPage() {
         return newMap;
       });
     }
-  }, []);
+  }, [user]);
 
   // Funcție pentru încărcarea sarcinilor unui subproiect
   const loadSubprojectTasks = useCallback(async (subproiect_id: string) => {
+    if (!user) return;
+
     try {
       setExpandedItems(prev => {
         const newMap = new Map(prev);
@@ -278,7 +292,12 @@ export default function PlanningOverviewPage() {
         return newMap;
       });
 
-      const response = await fetch(`/api/user/planificator/hierarchy/subproiect/${subproiect_id}`);
+      const idToken = await user.getIdToken();
+      const response = await fetch(`/api/user/planificator/hierarchy/subproiect/${subproiect_id}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setExpandedItems(prev => {
@@ -300,7 +319,7 @@ export default function PlanningOverviewPage() {
         return newMap;
       });
     }
-  }, []);
+  }, [user]);
 
   // Toggle expand/collapse pentru ierarhie
   const toggleExpanded = (id: string, tip: 'proiect' | 'subproiect') => {
