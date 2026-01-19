@@ -47,6 +47,18 @@ const parseBigQueryDate = (dateField: any): Date => {
   return new Date(dateValue);
 };
 
+// Helper function to parse BigQuery NUMERIC fields (returns string, BigDecimal object, or number)
+// BigQuery NUMERIC/FLOAT64 fields can come as: "123.45", {value: "123.45"}, or actual numbers
+const parseBigQueryNumeric = (numericField: any): number => {
+  if (numericField === null || numericField === undefined) return 0;
+  // Handle object with .value property
+  const value = numericField?.value !== undefined ? numericField.value : numericField;
+  // Convert to number
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value));
+  // Return 0 if NaN
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 interface TeamMember {
   utilizator_uid: string;
   utilizator_nume: string;
@@ -372,13 +384,13 @@ export default function EnhancedTimeTrackingDashboard() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⏱️</div>
                 <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#1f2937', marginBottom: '0.5rem' }}>
-                  {overviewStats?.total_ore_lucrate || 0}h
+                  {parseBigQueryNumeric(overviewStats?.total_ore_lucrate)}h
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
                   Total Ore Lucrate
                 </div>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  {overviewStats?.media_ore_pe_zi || 0}h media zilnică
+                  {parseBigQueryNumeric(overviewStats?.media_ore_pe_zi)}h media zilnică
                 </div>
               </div>
             </Card>
@@ -387,13 +399,13 @@ export default function EnhancedTimeTrackingDashboard() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>👥</div>
                 <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#1f2937', marginBottom: '0.5rem' }}>
-                  {overviewStats?.total_utilizatori || 0}
+                  {parseBigQueryNumeric(overviewStats?.total_utilizatori)}
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
                   Utilizatori Activi
                 </div>
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  {overviewStats?.total_proiecte || 0} proiecte în lucru
+                  {parseBigQueryNumeric(overviewStats?.total_proiecte)} proiecte în lucru
                 </div>
               </div>
             </Card>
@@ -402,7 +414,7 @@ export default function EnhancedTimeTrackingDashboard() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📊</div>
                 <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#1f2937', marginBottom: '0.5rem' }}>
-                  {overviewStats?.eficienta_procent || 0}%
+                  {parseBigQueryNumeric(overviewStats?.eficienta_procent)}%
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem' }}>
                   Eficiență Echipă
@@ -427,13 +439,13 @@ export default function EnhancedTimeTrackingDashboard() {
                 data={[{
                   name: 'Ore Medii',
                   data: [
-                    { x: 'Luni', y: overviewStats?.media_luni || 0 },
-                    { x: 'Marți', y: overviewStats?.media_marti || 0 },
-                    { x: 'Miercuri', y: overviewStats?.media_miercuri || 0 },
-                    { x: 'Joi', y: overviewStats?.media_joi || 0 },
-                    { x: 'Vineri', y: overviewStats?.media_vineri || 0 },
-                    { x: 'Sâmbătă', y: overviewStats?.media_sambata || 0 },
-                    { x: 'Duminică', y: overviewStats?.media_duminica || 0 }
+                    { x: 'Luni', y: parseBigQueryNumeric(overviewStats?.media_luni) },
+                    { x: 'Marți', y: parseBigQueryNumeric(overviewStats?.media_marti) },
+                    { x: 'Miercuri', y: parseBigQueryNumeric(overviewStats?.media_miercuri) },
+                    { x: 'Joi', y: parseBigQueryNumeric(overviewStats?.media_joi) },
+                    { x: 'Vineri', y: parseBigQueryNumeric(overviewStats?.media_vineri) },
+                    { x: 'Sâmbătă', y: parseBigQueryNumeric(overviewStats?.media_sambata) },
+                    { x: 'Duminică', y: parseBigQueryNumeric(overviewStats?.media_duminica) }
                   ],
                   color: '#3b82f6'
                 }]}
@@ -451,10 +463,10 @@ export default function EnhancedTimeTrackingDashboard() {
             <Card>
               <AdvancedPieChart
                 data={teamData.length > 0 ? [
-                  { x: 'Urgent', y: teamData.reduce((sum, member) => sum + member.ore_urgent, 0), fill: '#ef4444' },
-                  { x: 'Ridicată', y: teamData.reduce((sum, member) => sum + member.ore_ridicata, 0), fill: '#f59e0b' },
-                  { x: 'Normală', y: teamData.reduce((sum, member) => sum + member.ore_normala, 0), fill: '#10b981' },
-                  { x: 'Scăzută', y: teamData.reduce((sum, member) => sum + member.ore_scazuta, 0), fill: '#3b82f6' }
+                  { x: 'Urgent', y: teamData.reduce((sum, member) => sum + parseBigQueryNumeric(member.ore_urgent), 0), fill: '#ef4444' },
+                  { x: 'Ridicată', y: teamData.reduce((sum, member) => sum + parseBigQueryNumeric(member.ore_ridicata), 0), fill: '#f59e0b' },
+                  { x: 'Normală', y: teamData.reduce((sum, member) => sum + parseBigQueryNumeric(member.ore_normala), 0), fill: '#10b981' },
+                  { x: 'Scăzută', y: teamData.reduce((sum, member) => sum + parseBigQueryNumeric(member.ore_scazuta), 0), fill: '#3b82f6' }
                 ] : []}
                 title="🎯 Distribuție Priorități Sarcini"
                 width={480}
@@ -476,7 +488,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     const date = parseBigQueryDate(item.data_lucru);
                     return {
                       x: date.getDate() + '/' + (date.getMonth() + 1),
-                      y: item.total_ore
+                      y: parseBigQueryNumeric(item.total_ore)
                     };
                   }),
                   color: '#3b82f6',
@@ -488,7 +500,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     const date = parseBigQueryDate(item.data_lucru);
                     return {
                       x: date.getDate() + '/' + (date.getMonth() + 1),
-                      y: item.utilizatori_activi * 8 // Scalare pentru vizibilitate
+                      y: parseBigQueryNumeric(item.utilizatori_activi) * 8 // Scalare pentru vizibilitate
                     };
                   }),
                   color: '#10b981'
@@ -533,14 +545,14 @@ export default function EnhancedTimeTrackingDashboard() {
                     👤 {member.utilizator_nume || 'Utilizator necunoscut'}
                   </h3>
                   <div style={{
-                    background: (member.eficienta_procent || 0) >= 90
+                    background: parseBigQueryNumeric(member.eficienta_procent) >= 90
                       ? 'rgba(16, 185, 129, 0.1)'
-                      : (member.eficienta_procent || 0) >= 80
+                      : parseBigQueryNumeric(member.eficienta_procent) >= 80
                         ? 'rgba(245, 158, 11, 0.1)'
                         : 'rgba(239, 68, 68, 0.1)',
-                    color: (member.eficienta_procent || 0) >= 90
+                    color: parseBigQueryNumeric(member.eficienta_procent) >= 90
                       ? '#10b981'
-                      : (member.eficienta_procent || 0) >= 80
+                      : parseBigQueryNumeric(member.eficienta_procent) >= 80
                         ? '#f59e0b'
                         : '#ef4444',
                     padding: '0.375rem 0.75rem',
@@ -548,7 +560,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     fontSize: '0.75rem',
                     fontWeight: '600'
                   }}>
-                    {member.eficienta_procent || 0}% eficiență
+                    {parseBigQueryNumeric(member.eficienta_procent)}% eficiență
                   </div>
                 </div>
 
@@ -560,7 +572,7 @@ export default function EnhancedTimeTrackingDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.total_ore || 0}h
+                      {parseBigQueryNumeric(member.total_ore)}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Total ore
@@ -568,7 +580,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.media_ore_zilnic || 0}h
+                      {parseBigQueryNumeric(member.media_ore_zilnic)}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Media zilnică
@@ -576,7 +588,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.proiecte_lucrate || 0}
+                      {parseBigQueryNumeric(member.proiecte_lucrate)}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Proiecte
@@ -584,7 +596,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {member.sarcini_lucrate || 0}
+                      {parseBigQueryNumeric(member.sarcini_lucrate)}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Sarcini
@@ -595,10 +607,10 @@ export default function EnhancedTimeTrackingDashboard() {
                 {/* Individual Priority Chart */}
                 <AdvancedPieChart
                   data={[
-                    { x: 'Urgent', y: member.ore_urgent || 0, fill: '#ef4444' },
-                    { x: 'Ridicată', y: member.ore_ridicata || 0, fill: '#f59e0b' },
-                    { x: 'Normală', y: member.ore_normala || 0, fill: '#10b981' },
-                    { x: 'Scăzută', y: member.ore_scazuta || 0, fill: '#3b82f6' }
+                    { x: 'Urgent', y: parseBigQueryNumeric(member.ore_urgent), fill: '#ef4444' },
+                    { x: 'Ridicată', y: parseBigQueryNumeric(member.ore_ridicata), fill: '#f59e0b' },
+                    { x: 'Normală', y: parseBigQueryNumeric(member.ore_normala), fill: '#10b981' },
+                    { x: 'Scăzută', y: parseBigQueryNumeric(member.ore_scazuta), fill: '#3b82f6' }
                   ]}
                   width={280}
                   height={200}
@@ -666,7 +678,7 @@ export default function EnhancedTimeTrackingDashboard() {
                 }}>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.total_ore || 0}h
+                      {parseBigQueryNumeric(project.total_ore)}h
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Total ore
@@ -674,7 +686,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.progres_procent || 0}%
+                      {parseBigQueryNumeric(project.progres_procent)}%
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Progres
@@ -682,7 +694,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {project.utilizatori_implicati || 0}
+                      {parseBigQueryNumeric(project.utilizatori_implicati)}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Echipă
@@ -690,7 +702,7 @@ export default function EnhancedTimeTrackingDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {(project.valoare_estimata || 0).toLocaleString()} {project.moneda || 'EUR'}
+                      {parseBigQueryNumeric(project.valoare_estimata).toLocaleString()} {project.moneda || 'EUR'}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                       Valoare
@@ -707,13 +719,13 @@ export default function EnhancedTimeTrackingDashboard() {
                   marginTop: '1rem'
                 }}>
                   <div style={{
-                    background: (project.progres_procent || 0) >= 80
+                    background: parseBigQueryNumeric(project.progres_procent) >= 80
                       ? '#10b981'
-                      : (project.progres_procent || 0) >= 50
+                      : parseBigQueryNumeric(project.progres_procent) >= 50
                         ? '#f59e0b'
                         : '#ef4444',
                     height: '100%',
-                    width: `${project.progres_procent || 0}%`,
+                    width: `${parseBigQueryNumeric(project.progres_procent)}%`,
                     borderRadius: '8px',
                     transition: 'width 0.5s ease'
                   }} />
@@ -732,7 +744,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     x: (project.proiect_nume || 'Proiect necunoscut').length > 15
                       ? (project.proiect_nume || 'Proiect necunoscut').substring(0, 15) + '...'
                       : (project.proiect_nume || 'Proiect necunoscut'),
-                    y: project.total_ore || 0
+                    y: parseBigQueryNumeric(project.total_ore)
                   })),
                   color: '#3b82f6'
                 },
@@ -742,7 +754,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     x: (project.proiect_nume || 'Proiect necunoscut').length > 15
                       ? (project.proiect_nume || 'Proiect necunoscut').substring(0, 15) + '...'
                       : (project.proiect_nume || 'Proiect necunoscut'),
-                    y: project.progres_procent || 0
+                    y: parseBigQueryNumeric(project.progres_procent)
                   })),
                   color: '#10b981'
                 }
@@ -772,7 +784,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     const date = parseBigQueryDate(item.data_lucru);
                     return {
                       x: date.getDate() + '/' + (date.getMonth() + 1),
-                      y: item.total_ore
+                      y: parseBigQueryNumeric(item.total_ore)
                     };
                   }),
                   color: '#3b82f6',
@@ -784,7 +796,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     const date = parseBigQueryDate(item.data_lucru);
                     return {
                       x: date.getDate() + '/' + (date.getMonth() + 1),
-                      y: item.utilizatori_activi * 8
+                      y: parseBigQueryNumeric(item.utilizatori_activi) * 8
                     };
                   }),
                   color: '#10b981'
@@ -795,7 +807,7 @@ export default function EnhancedTimeTrackingDashboard() {
                     const date = parseBigQueryDate(item.data_lucru);
                     return {
                       x: date.getDate() + '/' + (date.getMonth() + 1),
-                      y: item.proiecte_active * 5
+                      y: parseBigQueryNumeric(item.proiecte_active) * 5
                     };
                   }),
                   color: '#f59e0b'
