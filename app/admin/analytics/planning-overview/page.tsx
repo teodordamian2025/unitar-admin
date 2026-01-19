@@ -30,6 +30,7 @@ interface Planificare {
   proiect_denumire?: string;
   subproiect_denumire?: string;
   sarcina_titlu?: string;
+  sarcina_proiect_id?: string; // ID-ul proiectului părinte pentru sarcini
   ore_planificate: number;
   prioritate: string;
   observatii?: string;
@@ -56,6 +57,7 @@ interface SearchItem {
   tip: 'proiect' | 'subproiect' | 'sarcina';
   nume: string;
   proiect_nume?: string;
+  parent_proiect_id?: string; // ID-ul proiectului părinte pentru sarcini
   subproiecte_count?: number;
   sarcini_count?: number;
 }
@@ -339,6 +341,7 @@ export default function PlanningOverviewPage() {
       let proiect_denumire = '';
       let subproiect_denumire = '';
       let sarcina_titlu = '';
+      let sarcina_proiect_id = ''; // ID-ul proiectului părinte pentru sarcini
 
       if (selectedItem.tip === 'proiect') {
         proiect_id = selectedItem.id;
@@ -350,6 +353,8 @@ export default function PlanningOverviewPage() {
       } else if (selectedItem.tip === 'sarcina') {
         sarcina_id = selectedItem.id;
         sarcina_titlu = selectedItem.nume;
+        // Setăm ID-ul proiectului părinte pentru sarcini
+        sarcina_proiect_id = selectedItem.parent_proiect_id || '';
       }
 
       const payload = {
@@ -362,6 +367,7 @@ export default function PlanningOverviewPage() {
         proiect_denumire,
         subproiect_denumire,
         sarcina_titlu,
+        sarcina_proiect_id, // Adăugat pentru afișarea ID-ului proiectului la sarcini
         ore_planificate: oreAlocare,
         prioritate: prioritateAlocare,
         observatii: observatiiAlocare,
@@ -1028,19 +1034,35 @@ export default function PlanningOverviewPage() {
                                           📂 {p.subproiect_denumire}
                                         </div>
                                       )}
-                                      {/* Sarcină - text wrap pe 2 linii */}
+                                      {/* Sarcină - text wrap pe 2 linii + proiect_id */}
                                       {p.sarcina_titlu && (
-                                        <div style={{
-                                          color: '#8b5cf6',
-                                          display: '-webkit-box',
-                                          WebkitLineClamp: 2,
-                                          WebkitBoxOrient: 'vertical',
-                                          overflow: 'hidden',
-                                          maxWidth: '110px',
-                                          wordBreak: 'break-word'
-                                        }}>
-                                          ✓ {p.sarcina_titlu}
-                                        </div>
+                                        <>
+                                          {/* Proiect ID pentru sarcină */}
+                                          {p.sarcina_proiect_id && (
+                                            <div style={{
+                                              color: '#374151',
+                                              fontWeight: '500',
+                                              fontSize: '0.6rem',
+                                              maxWidth: '110px',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              whiteSpace: 'nowrap'
+                                            }}>
+                                              📁 {p.sarcina_proiect_id}
+                                            </div>
+                                          )}
+                                          <div style={{
+                                            color: '#8b5cf6',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden',
+                                            maxWidth: '110px',
+                                            wordBreak: 'break-word'
+                                          }}>
+                                            ✓ {p.sarcina_titlu}
+                                          </div>
+                                        </>
                                       )}
                                       {/* Dacă nu avem denumiri, afișăm ID-urile */}
                                       {!p.proiect_denumire && !p.subproiect_denumire && !p.sarcina_titlu && (
@@ -1382,9 +1404,27 @@ export default function PlanningOverviewPage() {
                                   )}
                                   {/* Sarcină */}
                                   {p.sarcina_titlu && (
-                                    <div style={{ fontSize: '0.8rem', color: '#8b5cf6', marginTop: '4px' }}>
-                                      ✓ Sarcină: {p.sarcina_titlu}
-                                    </div>
+                                    <>
+                                      {/* Proiect ID pentru sarcină - afișat la fel ca la proiecte/subproiecte */}
+                                      {p.sarcina_proiect_id && (
+                                        <>
+                                          <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#1f2937', marginTop: '4px' }}>
+                                            📁 Proiect
+                                          </div>
+                                          <div style={{
+                                            fontSize: '0.7rem',
+                                            color: '#9ca3af',
+                                            fontFamily: 'monospace',
+                                            marginTop: '2px'
+                                          }}>
+                                            ID: {p.sarcina_proiect_id}
+                                          </div>
+                                        </>
+                                      )}
+                                      <div style={{ fontSize: '0.8rem', color: '#8b5cf6', marginTop: '4px' }}>
+                                        ✓ Sarcină: {p.sarcina_titlu}
+                                      </div>
+                                    </>
                                   )}
                                   {p.sarcina_id && !p.sarcina_titlu && (
                                     <div style={{
@@ -1792,7 +1832,9 @@ export default function PlanningOverviewPage() {
                                                     <button
                                                       onClick={() => setSelectedItem({
                                                         ...sarcina,
-                                                        proiect_nume: result.nume
+                                                        proiect_nume: result.nume,
+                                                        // parent_proiect_id vine din API pentru sarcini de subproiect
+                                                        parent_proiect_id: sarcina.parent_proiect_id || result.id
                                                       })}
                                                       style={{
                                                         background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -1839,7 +1881,9 @@ export default function PlanningOverviewPage() {
                                           <button
                                             onClick={() => setSelectedItem({
                                               ...sarcina,
-                                              proiect_nume: result.nume
+                                              proiect_nume: result.nume,
+                                              // Pentru sarcini directe pe proiect, result.id este proiect_id
+                                              parent_proiect_id: result.id
                                             })}
                                             style={{
                                               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -1887,6 +1931,17 @@ export default function PlanningOverviewPage() {
                             {selectedItem.tip === 'sarcina' && '✓'}
                             {' '}{selectedItem.nume}
                           </div>
+                          {/* Pentru sarcini, afișăm și ID-ul proiectului părinte */}
+                          {selectedItem.tip === 'sarcina' && selectedItem.parent_proiect_id && (
+                            <div style={{
+                              fontSize: '0.7rem',
+                              color: '#9ca3af',
+                              fontFamily: 'monospace',
+                              marginTop: '2px'
+                            }}>
+                              📁 Proiect ID: {selectedItem.parent_proiect_id}
+                            </div>
+                          )}
                           {selectedItem.proiect_nume && (
                             <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '2px' }}>
                               din proiect: {selectedItem.proiect_nume}

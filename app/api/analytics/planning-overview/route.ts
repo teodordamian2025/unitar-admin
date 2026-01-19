@@ -16,6 +16,8 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 const TABLE_PLANIFICARI = `\`${PROJECT_ID}.${DATASET}.PlanificariZilnice${tableSuffix}\``;
 const TABLE_UTILIZATORI = `\`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\``;
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
+const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
 
 console.log(`🔧 Planning Overview API - Tables Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -68,6 +70,7 @@ export async function GET(request: NextRequest) {
     // 2. Obține planificările pentru perioada specificată
     // NOTA: Proiecte_v2 folosește ID_Proiect (nu id) și nu are coloana culoare
     // Folosim DATE() function pentru conversie corectă STRING -> DATE în BigQuery
+    // JOIN cu Sarcini și Subproiecte pentru a obține proiect_id părinte pentru sarcini
     let planificariQuery = `
       SELECT
         pz.id,
@@ -83,8 +86,18 @@ export async function GET(request: NextRequest) {
         pz.ore_planificate,
         pz.prioritate,
         pz.observatii,
-        '#3b82f6' as proiect_culoare
+        '#3b82f6' as proiect_culoare,
+        -- Pentru sarcini, obținem proiect_id părinte via JOIN
+        -- Dacă sarcina este directă pe proiect, s.proiect_id este proiect_id
+        -- Dacă sarcina este pe subproiect, sp.ID_Proiect este proiect_id
+        CASE
+          WHEN pz.sarcina_id IS NOT NULL AND pz.sarcina_id != '' THEN
+            COALESCE(sp.ID_Proiect, s.proiect_id)
+          ELSE NULL
+        END as sarcina_proiect_id
       FROM ${TABLE_PLANIFICARI} pz
+      LEFT JOIN ${TABLE_SARCINI} s ON pz.sarcina_id = s.id
+      LEFT JOIN ${TABLE_SUBPROIECTE} sp ON s.proiect_id = sp.ID_Subproiect
       WHERE pz.activ = TRUE
         AND pz.data_planificare >= DATE(@data_start)
         AND pz.data_planificare <= DATE(@data_end)
@@ -143,6 +156,7 @@ export async function GET(request: NextRequest) {
         proiect_denumire: row.proiect_denumire,
         subproiect_denumire: row.subproiect_denumire,
         sarcina_titlu: row.sarcina_titlu,
+        sarcina_proiect_id: row.sarcina_proiect_id || null, // ID proiect părinte pentru sarcini
         ore_planificate: parseFloat(row.ore_planificate) || 0,
         prioritate: row.prioritate,
         observatii: row.observatii,

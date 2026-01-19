@@ -55,11 +55,18 @@ export async function GET(
     }
 
     // Query pentru sarcinile unui subproiect specific
+    // NOTA: Pentru sarcini de subproiect, s.proiect_id = ID_Subproiect
+    // Trebuie să obținem parent proiect_id din tabelul Subproiecte
     const sarciniQuery = `
       WITH PlanificatorExistent AS (
         SELECT tip_item, item_id
         FROM ${PLANIFICATOR_TABLE}
         WHERE utilizator_uid = @userId AND activ = TRUE
+      ),
+      SubproiectInfo AS (
+        SELECT ID_Subproiect, ID_Proiect, Denumire
+        FROM ${SUBPROIECTE_TABLE}
+        WHERE ID_Subproiect = @subproiect_id
       )
 
       SELECT
@@ -72,8 +79,10 @@ export async function GET(
         s.progres_procent,
         s.timp_estimat_ore,
         s.created_by,
+        -- Parent project info (via Subproiecte table)
+        sp_info.ID_Proiect as parent_proiect_id,
         p.Denumire as proiect_nume,
-        sp.Denumire as subproiect_nume,
+        sp_info.Denumire as subproiect_nume,
         -- Verificare dacă este deja în planificator
         CASE
           WHEN s.id IN (SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'sarcina')
@@ -87,10 +96,9 @@ export async function GET(
           ELSE 999
         END as zile_pana_scadenta
       FROM ${SARCINI_TABLE} s
+      CROSS JOIN SubproiectInfo sp_info
       LEFT JOIN ${PROIECTE_TABLE} p
-        ON s.proiect_id = p.ID_Proiect
-      LEFT JOIN ${SUBPROIECTE_TABLE} sp
-        ON s.subproiect_id = sp.ID_Subproiect
+        ON sp_info.ID_Proiect = p.ID_Proiect
       WHERE s.proiect_id = @subproiect_id
         AND s.status NOT IN ('Finalizată', 'Anulată')
       ORDER BY
@@ -133,6 +141,8 @@ export async function GET(
         progres_procent: row.progres_procent || 0,
         timp_estimat_ore: row.timp_estimat_ore || 0,
         created_by: row.created_by,
+        // Parent project ID și denumire
+        parent_proiect_id: row.parent_proiect_id,
         proiect_nume: row.proiect_nume,
         subproiect_nume: row.subproiect_nume,
         in_planificator: row.in_planificator,
