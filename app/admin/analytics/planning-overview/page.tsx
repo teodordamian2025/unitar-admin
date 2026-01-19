@@ -113,6 +113,7 @@ export default function PlanningOverviewPage() {
   const [oreAlocare, setOreAlocare] = useState<number>(8);
   const [prioritateAlocare, setPrioritateAlocare] = useState<string>('normala');
   const [observatiiAlocare, setObservatiiAlocare] = useState<string>('');
+  const [syncPlanificatorPersonal, setSyncPlanificatorPersonal] = useState<boolean>(true);
   const [savingAlocare, setSavingAlocare] = useState(false);
 
   // State pentru editare alocare
@@ -316,6 +317,10 @@ export default function PlanningOverviewPage() {
     setSearchResults([]);
     setExpandedItems(new Map());
     setSelectedItem(null);
+    setOreAlocare(8);
+    setPrioritateAlocare('normala');
+    setObservatiiAlocare('');
+    setSyncPlanificatorPersonal(true);
   };
 
   // Funcție pentru salvarea alocării noi
@@ -359,7 +364,8 @@ export default function PlanningOverviewPage() {
         sarcina_titlu,
         ore_planificate: oreAlocare,
         prioritate: prioritateAlocare,
-        observatii: observatiiAlocare
+        observatii: observatiiAlocare,
+        sync_planificator_personal: syncPlanificatorPersonal
       };
 
       const response = await fetch('/api/planificari-zilnice', {
@@ -1950,7 +1956,7 @@ export default function PlanningOverviewPage() {
                     </div>
 
                     {/* Observații */}
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ marginBottom: '1rem' }}>
                       <label style={{ fontSize: '0.8rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
                         📝 Observații (opțional)
                       </label>
@@ -1968,6 +1974,21 @@ export default function PlanningOverviewPage() {
                           resize: 'vertical'
                         }}
                       />
+                    </div>
+
+                    {/* Checkbox sync planificator personal */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={syncPlanificatorPersonal}
+                          onChange={(e) => setSyncPlanificatorPersonal(e.target.checked)}
+                          style={{ width: '16px', height: '16px', accentColor: '#10b981' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                          Adaugă automat în Planificatorul Personal al lucrătorului
+                        </span>
+                      </label>
                     </div>
 
                     {/* Butoane acțiune */}
