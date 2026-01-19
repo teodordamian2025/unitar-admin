@@ -9,12 +9,13 @@ import { AdvancedLineChart, AdvancedBarChart, AdvancedPieChart } from '@/app/com
 import { toast } from 'react-toastify';
 import { useTimer } from '@/app/contexts/TimerContext';
 import { analyticsCache } from '@/app/lib/analyticsCache';
+import AdminTimeTrackingHistory from './components/AdminTimeTrackingHistory';
 
 // ==================================================================
 // CALEA: app/admin/analytics/timetracking/page.tsx
-// DATA: 02.10.2025 23:05 (ora României) - OPTIMIZED: Cache 5min + debounce + lazy load
-// DESCRIERE: Time Tracking Dashboard cu Victory.js advanced charts
-// FUNCȚIONALITATE: Analytics modernizat - cache 5min, ZERO polling, lazy load tabs
+// DATA: 19.01.2026 (ora României) - UPDATED: Adăugat tab Istoric
+// DESCRIERE: Time Tracking Dashboard cu Victory.js advanced charts + Istoric
+// FUNCȚIONALITATE: Analytics modernizat - cache 5min, ZERO polling, lazy load tabs + Istoric admin
 // ==================================================================
 
 interface OverviewStats {
@@ -337,12 +338,13 @@ export default function EnhancedTimeTrackingDashboard() {
 
       {/* Tab Navigation */}
       <Card style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {[
             { id: 'overview', label: '📊 Overview' },
             { id: 'team', label: '👥 Echipa' },
             { id: 'projects', label: '📋 Proiecte' },
-            { id: 'trends', label: '📈 Tendințe' }
+            { id: 'trends', label: '📈 Tendințe' },
+            { id: 'istoric', label: '📋 Istoric' }
           ].map((tab) => (
             <Button
               key={tab.id}
@@ -809,6 +811,11 @@ export default function EnhancedTimeTrackingDashboard() {
             />
           </Card>
         </div>
+      )}
+
+      {/* Istoric Tab */}
+      {activeTab === 'istoric' && user && (
+        <AdminTimeTrackingHistory user={user} />
       )}
     </ModernLayout>
   );
