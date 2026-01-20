@@ -8,7 +8,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTimer } from '@/app/contexts/TimerContext';
 
 interface ActiveTimerNotificationProps {
@@ -100,8 +100,8 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     }
   }, [userId, idToken, contextHasSession]);
 
-  // ✅ REFACTORED: checkActivePin ca funcție separată pentru a fi apelată din event listener
-  const checkActivePin = async () => {
+  // ✅ FIX 20.01.2026: useCallback pentru checkActivePin - evită stale closure
+  const checkActivePin = useCallback(async () => {
     if (!userId || !idToken) return;
 
     try {
@@ -126,21 +126,40 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     } catch (error) {
       console.error('❌ ActiveTimerNotification: Error checking active pin:', error);
     }
-  };
+  }, [userId, idToken]);
 
   // ✅ Check pentru pin activ la mount (ZERO POLLING - doar 1 request)
   useEffect(() => {
     if (!userId || !idToken) return;
     checkActivePin();
-  }, [userId, idToken]);
+  }, [userId, idToken, checkActivePin]);
 
-  // ✅ FIX 19.01.2026: Listen pentru 'pin-status-changed' event pentru actualizare imediată
+  // ✅ FIX 20.01.2026: Listen pentru 'pin-status-changed' event cu suport pentru date directe
+  // Rezolvă delay-ul de ~9 secunde cauzat de stale closure
   useEffect(() => {
-    if (!userId || !idToken) return;
-
     const handlePinStatusChanged = (event: Event) => {
-      console.log('📡 ActiveTimerNotification: Received pin-status-changed event, refetching...');
-      checkActivePin();
+      const customEvent = event as CustomEvent<{
+        isPinned: boolean;
+        pinData?: ActivePin | null;
+        itemId?: string;
+      }>;
+
+      console.log('📡 ActiveTimerNotification: Received pin-status-changed event', customEvent.detail);
+
+      // Dacă avem pin data direct în event, folosim-o instant (zero delay)
+      if (customEvent.detail?.pinData !== undefined) {
+        if (customEvent.detail.isPinned && customEvent.detail.pinData) {
+          console.log('📌 ActiveTimerNotification: Setting pin from event data (instant):', customEvent.detail.pinData.display_name);
+          setActivePin(customEvent.detail.pinData);
+        } else {
+          console.log('📌 ActiveTimerNotification: Clearing pin from event data (instant)');
+          setActivePin(null);
+        }
+      } else {
+        // Fallback: refetch din API dacă nu avem date în event
+        console.log('📌 ActiveTimerNotification: No pin data in event, fetching from API...');
+        checkActivePin();
+      }
     };
 
     window.addEventListener('pin-status-changed', handlePinStatusChanged);
@@ -148,7 +167,7 @@ const ActiveTimerNotification: React.FC<ActiveTimerNotificationProps> = ({
     return () => {
       window.removeEventListener('pin-status-changed', handlePinStatusChanged);
     };
-  }, [userId, idToken]);
+  }, [checkActivePin]); // ✅ FIX: checkActivePin în dependency array
 
   const checkForInvisibleSessions = async () => {
     if (!userId || !idToken) return;

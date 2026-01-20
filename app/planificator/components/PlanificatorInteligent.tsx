@@ -423,19 +423,40 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
       if (response.ok) {
         const data = await response.json();
+
+        // Găsește item-ul pentru a construi pin data
+        const currentItem = items.find(i => i.id === itemId);
+
         await loadPlanificatorItems();
 
         // CRITICAL FIX: Force refresh context pentru a actualiza live analytics în admin
         // (identic cu logica din startTimer - linia 642)
         await forceRefresh();
 
-        // FIX 19.01.2026: Dispatch custom event pentru a notifica ActiveTimerNotification
-        // să refetch-eze pin status imediat (fără delay)
+        // FIX 20.01.2026: Dispatch custom event cu pin data direct pentru afișare instant
+        // Elimină delay-ul de ~9 secunde cauzat de așteptarea API call în sidebar
         if (typeof window !== 'undefined') {
+          const pinData = !currentPinned && currentItem ? {
+            id: itemId,
+            utilizator_uid: user.uid,
+            tip_item: currentItem.tip_item,
+            item_id: currentItem.item_id,
+            display_name: currentItem.display_name,
+            comentariu_personal: currentItem.comentariu_personal || '',
+            pin_timestamp_start: new Date().toISOString(),
+            elapsed_seconds: 0,
+            context_proiect: null,
+            deadline: currentItem.data_scadenta || null
+          } : null;
+
           window.dispatchEvent(new CustomEvent('pin-status-changed', {
-            detail: { itemId, isPinned: !currentPinned }
+            detail: {
+              itemId,
+              isPinned: !currentPinned,
+              pinData  // ✅ Transmite datele direct pentru afișare instant
+            }
           }));
-          console.log('📡 Dispatched pin-status-changed event');
+          console.log('📡 Dispatched pin-status-changed event with pinData:', pinData ? pinData.display_name : 'null');
         }
 
         console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
