@@ -401,7 +401,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
     }
   };
 
-  // Pin/Unpin item
+  // Pin/Unpin item - OPTIMISTIC UI UPDATE pentru afișare instant
   const togglePin = async (itemId: string, currentPinned: boolean) => {
     // Dacă vrea să pin-eze (nu e pin-at acum), verifică dacă nu are timer activ
     if (!currentPinned && !canTogglePin(itemId)) {
@@ -409,6 +409,36 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       return;
     }
 
+    // ✅ FIX 20.01.2026: Capture datele ÎNAINTE de orice operațiune async
+    const currentItem = items.find(i => i.id === itemId);
+
+    // ✅ STEP 1: OPTIMISTIC UI - Dispatch INSTANT (înainte de API call)
+    // Pin-ul apare imediat în sidebar, fără să așteptăm răspunsul API
+    if (typeof window !== 'undefined') {
+      const pinData = !currentPinned && currentItem ? {
+        id: itemId,
+        utilizator_uid: user.uid,
+        tip_item: currentItem.tip_item,
+        item_id: currentItem.item_id,
+        display_name: currentItem.display_name,
+        comentariu_personal: currentItem.comentariu_personal || '',
+        pin_timestamp_start: new Date().toISOString(),
+        elapsed_seconds: 0,
+        context_proiect: null,
+        deadline: currentItem.data_scadenta || null
+      } : null;
+
+      window.dispatchEvent(new CustomEvent('pin-status-changed', {
+        detail: {
+          itemId,
+          isPinned: !currentPinned,
+          pinData  // ✅ Transmite datele direct pentru afișare instant
+        }
+      }));
+      console.log('📡 OPTIMISTIC: Dispatched pin-status-changed INSTANT:', pinData ? pinData.display_name : 'null (unpin)');
+    }
+
+    // ✅ STEP 2: API call (nu blochează UI - pin-ul e deja vizibil)
     try {
       const idToken = await user.getIdToken();
       const apiPath = getApiBasePath();
@@ -421,38 +451,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         body: JSON.stringify({ is_pinned: !currentPinned })
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        const data = await response.json();
-
-        // ✅ FIX 20.01.2026: Capture datele ÎNAINTE de orice operațiune async
-        const currentItem = items.find(i => i.id === itemId);
-
-        // ✅ STEP 1: Dispatch event IMEDIAT pentru UI instant (ZERO delay)
-        if (typeof window !== 'undefined') {
-          const pinData = !currentPinned && currentItem ? {
-            id: itemId,
-            utilizator_uid: user.uid,
-            tip_item: currentItem.tip_item,
-            item_id: currentItem.item_id,
-            display_name: currentItem.display_name,
-            comentariu_personal: currentItem.comentariu_personal || '',
-            pin_timestamp_start: new Date().toISOString(),
-            elapsed_seconds: 0,
-            context_proiect: null,
-            deadline: currentItem.data_scadenta || null
-          } : null;
-
-          window.dispatchEvent(new CustomEvent('pin-status-changed', {
-            detail: {
-              itemId,
-              isPinned: !currentPinned,
-              pinData  // ✅ Transmite datele direct pentru afișare instant
-            }
-          }));
-          console.log('📡 INSTANT: Dispatched pin-status-changed event with pinData:', pinData ? pinData.display_name : 'null');
-        }
-
-        // ✅ STEP 2: Toast imediat pentru feedback utilizator
+        // ✅ SUCCES - Confirmăm cu toast
         if (currentPinned) {
           // UNPIN - afișează durata dacă există
           if (data.duration_minutes && data.duration_minutes >= 1) {
@@ -467,26 +469,48 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
 
         console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
 
-        // ✅ STEP 3: Operațiuni async în background (nu blochează UI-ul)
-        // Rulează în paralel pentru sincronizare completă a datelor
+        // ✅ STEP 3: Background sync pentru actualizare date complete
         Promise.all([
           loadPlanificatorItems(),
           forceRefresh()
         ]).catch(err => {
           console.error('❌ Background sync error after pin toggle:', err);
         });
+
       } else {
-        // ✅ ENHANCED: Error handling pentru limită 8h
-        const errorData = await response.json();
-        if (errorData.error && errorData.error.includes('8 ore')) {
+        // ❌ ROLLBACK - Server a rejectat (ex: limita 8h depășită)
+        console.warn('⚠️ Server rejected pin, rolling back UI...');
+
+        // Dispatch event pentru a anula schimbarea în UI
+        window.dispatchEvent(new CustomEvent('pin-status-changed', {
+          detail: {
+            itemId,
+            isPinned: currentPinned,  // Revert la starea anterioară
+            pinData: null
+          }
+        }));
+
+        // Afișează eroarea
+        if (data.error && data.error.includes('8 ore')) {
           toast.error('⏰ Ai atins limita de 8 ore pe zi! Nu poți pin-a item-ul.');
         } else {
-          toast.error(errorData.error || '❌ Eroare la pin/unpin');
+          toast.error(data.error || '❌ Eroare la pin/unpin');
         }
       }
     } catch (error) {
+      // ❌ ROLLBACK - Eroare de rețea
       console.error('Error toggling pin:', error);
-      toast.error('❌ Eroare la pin/unpin');
+
+      // Dispatch event pentru a anula schimbarea în UI
+      window.dispatchEvent(new CustomEvent('pin-status-changed', {
+        detail: {
+          itemId,
+          isPinned: currentPinned,  // Revert la starea anterioară
+          pinData: null
+        }
+      }));
+
+      toast.error('❌ Eroare la pin/unpin - verifică conexiunea');
     }
   };
 
