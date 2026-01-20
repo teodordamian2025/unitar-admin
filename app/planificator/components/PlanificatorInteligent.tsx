@@ -424,17 +424,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
       if (response.ok) {
         const data = await response.json();
 
-        // Găsește item-ul pentru a construi pin data
+        // ✅ FIX 20.01.2026: Capture datele ÎNAINTE de orice operațiune async
         const currentItem = items.find(i => i.id === itemId);
 
-        await loadPlanificatorItems();
-
-        // CRITICAL FIX: Force refresh context pentru a actualiza live analytics în admin
-        // (identic cu logica din startTimer - linia 642)
-        await forceRefresh();
-
-        // FIX 20.01.2026: Dispatch custom event cu pin data direct pentru afișare instant
-        // Elimină delay-ul de ~9 secunde cauzat de așteptarea API call în sidebar
+        // ✅ STEP 1: Dispatch event IMEDIAT pentru UI instant (ZERO delay)
         if (typeof window !== 'undefined') {
           const pinData = !currentPinned && currentItem ? {
             id: itemId,
@@ -456,12 +449,10 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
               pinData  // ✅ Transmite datele direct pentru afișare instant
             }
           }));
-          console.log('📡 Dispatched pin-status-changed event with pinData:', pinData ? pinData.display_name : 'null');
+          console.log('📡 INSTANT: Dispatched pin-status-changed event with pinData:', pinData ? pinData.display_name : 'null');
         }
 
-        console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
-
-        // ✅ ENHANCED: Toast messages cu info durata la unpin
+        // ✅ STEP 2: Toast imediat pentru feedback utilizator
         if (currentPinned) {
           // UNPIN - afișează durata dacă există
           if (data.duration_minutes && data.duration_minutes >= 1) {
@@ -473,6 +464,17 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
           // PIN - informează despre silent tracking
           toast.success('📌 Pin activat! Timpul începe să fie monitorizat silențios.');
         }
+
+        console.log(`✅ Pin toggled successfully - itemId: ${itemId}, is_pinned: ${!currentPinned}`);
+
+        // ✅ STEP 3: Operațiuni async în background (nu blochează UI-ul)
+        // Rulează în paralel pentru sincronizare completă a datelor
+        Promise.all([
+          loadPlanificatorItems(),
+          forceRefresh()
+        ]).catch(err => {
+          console.error('❌ Background sync error after pin toggle:', err);
+        });
       } else {
         // ✅ ENHANCED: Error handling pentru limită 8h
         const errorData = await response.json();
