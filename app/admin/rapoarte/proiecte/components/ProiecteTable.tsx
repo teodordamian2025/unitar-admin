@@ -1559,8 +1559,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           textAlign: 'center'
                         }}>
                           {(() => {
-                            const progresGeneral = proiect.progres_procent || 0;
-                            const progresEconomic = proiect.progres_economic || 0;
+                            // Fix: Extrage valoarea numerică din obiect BigQuery sau valoare directă
+                            const extractNumber = (val: any): number => {
+                              if (val === null || val === undefined) return 0;
+                              if (typeof val === 'object' && val.value !== undefined) return Number(val.value) || 0;
+                              return Number(val) || 0;
+                            };
+                            const progresGeneral = extractNumber(proiect.progres_procent);
+                            const progresEconomic = extractNumber(proiect.progres_economic);
 
                             // Culori progres general: gri → albastru → portocaliu → verde
                             const getGeneralColor = (p: number) => {
@@ -2074,8 +2080,14 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             textAlign: 'center'
                           }}>
                             {(() => {
-                              const progresGeneral = subproiect.progres_procent || 0;
-                              const progresEconomic = subproiect.progres_economic || 0;
+                              // Fix: Extrage valoarea numerică din obiect BigQuery sau valoare directă
+                              const extractNumber = (val: any): number => {
+                                if (val === null || val === undefined) return 0;
+                                if (typeof val === 'object' && val.value !== undefined) return Number(val.value) || 0;
+                                return Number(val) || 0;
+                              };
+                              const progresGeneral = extractNumber(subproiect.progres_procent);
+                              const progresEconomic = extractNumber(subproiect.progres_economic);
 
                               // Culori progres general: gri → albastru → portocaliu → verde
                               const getGeneralColor = (p: number) => {
