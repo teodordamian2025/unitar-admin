@@ -116,6 +116,8 @@ export default function PlanningOverviewPage() {
   const [addModalDate, setAddModalDate] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Map<string, ExpandedItem>>(new Map());
   const [selectedItem, setSelectedItem] = useState<SearchItem | null>(null);
   const [oreAlocare, setOreAlocare] = useState<number>(8);
@@ -211,22 +213,38 @@ export default function PlanningOverviewPage() {
   const searchProiecte = useCallback(async (term: string) => {
     if (!term.trim() || !user) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
+    setSearchLoading(true);
+    setSearchError(null);
+
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}`, {
+      // FIX: Add timestamp to prevent service worker (PWA) caching
+      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}&_t=${Date.now()}`, {
         headers: {
-          'Authorization': `Bearer ${idToken}`
+          'Authorization': `Bearer ${idToken}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
       });
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.results || []);
+        setSearchError(null);
+      } else {
+        const errorText = await response.text();
+        console.error('Search API error:', response.status, errorText);
+        setSearchError(`Eroare API: ${response.status}`);
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error searching projects:', error);
+      setSearchError(`Eroare: ${error instanceof Error ? error.message : 'Necunoscută'}`);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
     }
   }, [user]);
 
@@ -350,6 +368,8 @@ export default function PlanningOverviewPage() {
     setShowAddModal(true);
     setSearchTerm('');
     setSearchResults([]);
+    setSearchError(null);
+    setSearchLoading(false);
     setExpandedItems(new Map());
     setSelectedItem(null);
     setOreAlocare(8);
@@ -1651,7 +1671,25 @@ export default function PlanningOverviewPage() {
 
                     {/* Rezultate căutare */}
                     <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                      {searchResults.length === 0 && searchTerm ? (
+                      {searchLoading ? (
+                        <div style={{
+                          textAlign: 'center',
+                          padding: '2rem',
+                          color: '#3b82f6',
+                          fontSize: '0.875rem'
+                        }}>
+                          ⏳ Se caută proiecte...
+                        </div>
+                      ) : searchError ? (
+                        <div style={{
+                          textAlign: 'center',
+                          padding: '2rem',
+                          color: '#ef4444',
+                          fontSize: '0.875rem'
+                        }}>
+                          ❌ {searchError}
+                        </div>
+                      ) : searchResults.length === 0 && searchTerm ? (
                         <div style={{
                           textAlign: 'center',
                           padding: '2rem',
