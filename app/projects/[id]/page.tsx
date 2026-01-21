@@ -70,6 +70,16 @@ interface FacturaInfo {
   procent_incasat?: number;
 }
 
+// ✅ 21.01.2026: Interfață pentru Timp Economic (doar ore, fără valori financiare)
+interface TimpEconomic {
+  workedHours: number;
+  estimatedHours: number;
+  economicHoursAllocated: number;
+  economicHoursRemaining: number;
+  economicProgress: number;
+  ore_pe_zi: number;
+}
+
 export default function UserProiectDetailsPage() {
   const params = useParams();
   const projectId = params?.id as string;
@@ -79,6 +89,7 @@ export default function UserProiectDetailsPage() {
   const [contracte, setContracte] = useState<ContractInfo[]>([]);
   const [facturi, setFacturi] = useState<FacturaInfo[]>([]);
   const [subproiecte, setSubproiecte] = useState<ProiectDetails[]>([]);
+  const [timpEconomic, setTimpEconomic] = useState<TimpEconomic | null>(null); // ✅ 21.01.2026
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSarciniModal, setShowSarciniModal] = useState(false);
@@ -159,6 +170,7 @@ export default function UserProiectDetailsPage() {
       setSubproiecte(data.subproiecte || []);
       setContracte(data.contracte || []);
       setFacturi(data.facturi || []);
+      setTimpEconomic(data.timpEconomic || null); // ✅ 21.01.2026
     } catch (error) {
       console.error('Eroare la încărcarea detaliilor:', error);
       setError(error instanceof Error ? error.message : 'Eroare neașteptată');
@@ -1123,6 +1135,175 @@ export default function UserProiectDetailsPage() {
               </p>
             </div>
           </div>
+
+          {/* ✅ 21.01.2026: Secțiune Timp Economic (sub Progres Proiect) */}
+          {timpEconomic && timpEconomic.economicHoursAllocated > 0 && (
+            <div style={{
+              marginTop: '1.5rem',
+              padding: '1.5rem',
+              background: timpEconomic.economicHoursRemaining < 0
+                ? 'rgba(239, 68, 68, 0.08)'
+                : 'rgba(34, 197, 94, 0.08)',
+              borderRadius: '12px',
+              border: timpEconomic.economicHoursRemaining < 0
+                ? '1px solid rgba(239, 68, 68, 0.3)'
+                : '1px solid rgba(34, 197, 94, 0.3)'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1rem'
+              }}>
+                <h4 style={{
+                  margin: 0,
+                  color: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span>💰</span>
+                  <span>Timp Economic (din Buget)</span>
+                </h4>
+                {timpEconomic.economicHoursRemaining < 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    ⚠️ DEPĂȘIRE BUGET!
+                  </span>
+                )}
+              </div>
+
+              {/* Grid cu 3 coloane: Alocat | Consumat | Rămas */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '1.5rem',
+                marginBottom: '1rem'
+              }}>
+                {/* Alocat */}
+                <div style={{
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  border: '1px solid rgba(5, 150, 105, 0.2)'
+                }}>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                    Ore Alocate
+                  </div>
+                  <div style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '700',
+                    color: '#059669'
+                  }}>
+                    {timpEconomic.economicHoursAllocated.toFixed(1)}h
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    ({(timpEconomic.economicHoursAllocated / timpEconomic.ore_pe_zi).toFixed(1)} zile)
+                  </div>
+                </div>
+
+                {/* Consumat */}
+                <div style={{
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  border: '1px solid rgba(59, 130, 246, 0.2)'
+                }}>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                    Ore Consumate
+                  </div>
+                  <div style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '700',
+                    color: '#3b82f6'
+                  }}>
+                    {timpEconomic.workedHours.toFixed(1)}h
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    ({(timpEconomic.workedHours / timpEconomic.ore_pe_zi).toFixed(1)} zile)
+                  </div>
+                </div>
+
+                {/* Rămas */}
+                <div style={{
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  border: timpEconomic.economicHoursRemaining < 0
+                    ? '1px solid rgba(239, 68, 68, 0.3)'
+                    : '1px solid rgba(5, 150, 105, 0.2)'
+                }}>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                    Ore Rămase
+                  </div>
+                  <div style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '700',
+                    color: timpEconomic.economicHoursRemaining < 0 ? '#ef4444' : '#059669'
+                  }}>
+                    {timpEconomic.economicHoursRemaining.toFixed(1)}h
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                    ({(timpEconomic.economicHoursRemaining / timpEconomic.ore_pe_zi).toFixed(1)} zile)
+                  </div>
+                </div>
+              </div>
+
+              {/* Bară de progres economic */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '0.85rem',
+                  marginBottom: '0.5rem'
+                }}>
+                  <span style={{ color: '#6b7280' }}>Progres Economic</span>
+                  <span style={{
+                    fontWeight: '600',
+                    color: timpEconomic.economicProgress > 100 ? '#ef4444' : '#059669'
+                  }}>
+                    {Math.min(timpEconomic.economicProgress, 999).toFixed(1)}%
+                  </span>
+                </div>
+                <div style={{
+                  height: '12px',
+                  background: '#e5e7eb',
+                  borderRadius: '6px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${Math.min(timpEconomic.economicProgress, 100)}%`,
+                    height: '100%',
+                    background: timpEconomic.economicProgress > 100
+                      ? '#ef4444'
+                      : timpEconomic.economicProgress > 80
+                        ? '#f59e0b'
+                        : '#22c55e',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                {timpEconomic.economicProgress > 100 && (
+                  <p style={{
+                    margin: '0.5rem 0 0 0',
+                    fontSize: '0.8rem',
+                    color: '#ef4444',
+                    fontWeight: '500'
+                  }}>
+                    ⚠️ S-au depășit orele alocate cu {(timpEconomic.economicProgress - 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {proiect.Descriere && (
             <div style={{ marginTop: '2rem' }}>

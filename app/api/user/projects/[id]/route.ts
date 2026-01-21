@@ -4,6 +4,7 @@
 // DESCRIERE: API pentru detalii proiect utilizatori normali - FĂRĂ date financiare
 // FUNCȚIONALITATE: Returnează detalii complete proiect cu contracte, facturi - dar exclude valorile financiare
 // MODIFICAT: Adăugat progres_procent, ID_Subproiect și fix tabele _v2
+// MODIFICAT: 21.01.2026 - Adăugat timp economic (doar ore, fără valori financiare)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -32,6 +33,11 @@ const CONTRACTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Contracte${tableSuffix}\``;
 const FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const ETAPE_CONTRACT_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuffix}\``;
 const ETAPE_FACTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+// ✅ 21.01.2026: Tabele pentru calcul timp economic
+const TIME_TRACKING_TABLE = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
+const SARCINI_TABLE = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const CHELTUIELI_TABLE = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+const SETARI_COSTURI_TABLE = `\`${PROJECT_ID}.${DATASET}.SetariCosturi${tableSuffix}\``;
 
 console.log(`🔧 [User Projects ID] - Mode: ${useV2Tables ? 'V2' : 'V1'}`);
 
@@ -191,6 +197,125 @@ export async function GET(
       console.warn('Tabelul FacturiGenerate nu există sau nu are date:', error);
     }
 
+    // ✅ 21.01.2026: Query pentru calcul timp economic (DOAR ore, fără valori financiare)
+    // Acest calcul este similar cu cel din gantt-data dar returnează doar orele
+    const timpEconomicQuery = `
+      WITH
+      -- Ore lucrate pe proiect (din TimeTracking)
+      time_tracking_stats AS (
+        SELECT
+          COALESCE(tt.proiect_id, s.proiect_id) as proiect_id,
+          SUM(COALESCE(tt.ore_lucrate, 0)) as total_worked_hours
+        FROM ${TIME_TRACKING_TABLE} tt
+        LEFT JOIN ${SARCINI_TABLE} s ON tt.sarcina_id = s.id
+        WHERE tt.proiect_id = @projectId OR s.proiect_id = @projectId
+        GROUP BY COALESCE(tt.proiect_id, s.proiect_id)
+      ),
+      -- Ore estimate din sarcini
+      estimated_hours_stats AS (
+        SELECT
+          proiect_id,
+          SUM(COALESCE(timp_estimat_total_ore, 0)) as total_estimated_hours
+        FROM ${SARCINI_TABLE}
+        WHERE proiect_id = @projectId
+        GROUP BY proiect_id
+      ),
+      -- Cheltuieli (pentru calcul ore economic)
+      cheltuieli_stats AS (
+        SELECT
+          proiect_id,
+          SUM(COALESCE(valoare_ron, valoare, 0)) as total_cheltuieli_ron
+        FROM ${CHELTUIELI_TABLE}
+        WHERE activ = TRUE AND proiect_id = @projectId
+        GROUP BY proiect_id
+      ),
+      -- Setări costuri
+      cost_settings AS (
+        SELECT
+          COALESCE(
+            (SELECT cost_ora FROM ${SETARI_COSTURI_TABLE} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            40
+          ) as cost_ora,
+          COALESCE(
+            (SELECT ore_pe_zi FROM ${SETARI_COSTURI_TABLE} WHERE activ = TRUE ORDER BY data_creare DESC LIMIT 1),
+            8
+          ) as ore_pe_zi
+      ),
+      -- Valoare proiect (doar pentru calcul intern)
+      proiect_valoare AS (
+        SELECT
+          ID_Proiect,
+          COALESCE(Valoare_Estimata, 0) as Valoare_Estimata,
+          COALESCE(valoare_ron, Valoare_Estimata, 0) as valoare_ron,
+          COALESCE(curs_valutar, 5) as curs_valutar,
+          moneda
+        FROM ${PROIECTE_TABLE}
+        WHERE ID_Proiect = @projectId
+      )
+      SELECT
+        -- Ore lucrate
+        COALESCE(tts.total_worked_hours, 0) as workedHours,
+        -- Ore estimate din sarcini
+        COALESCE(ehs.total_estimated_hours, 0) as estimatedHours,
+        -- Ore alocate economic = (Valoare - Cheltuieli) / Cost oră
+        -- NOTĂ: Returnăm doar orele, nu valorile financiare
+        SAFE_DIVIDE(
+          pv.Valoare_Estimata - (
+            CASE
+              WHEN pv.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+              ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pv.curs_valutar, 0)
+            END
+          ),
+          csett.cost_ora
+        ) as economicHoursAllocated,
+        -- Ore rămase economic
+        SAFE_DIVIDE(
+          pv.Valoare_Estimata - (
+            CASE
+              WHEN pv.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+              ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pv.curs_valutar, 0)
+            END
+          ),
+          csett.cost_ora
+        ) - COALESCE(tts.total_worked_hours, 0) as economicHoursRemaining,
+        -- Progres economic (%)
+        SAFE_DIVIDE(
+          COALESCE(tts.total_worked_hours, 0) * 100,
+          NULLIF(
+            SAFE_DIVIDE(
+              pv.Valoare_Estimata - (
+                CASE
+                  WHEN pv.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                  ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(pv.curs_valutar, 0)
+                END
+              ),
+              csett.cost_ora
+            ),
+            0
+          )
+        ) as economicProgress,
+        -- Ore pe zi (pentru afișare în zile)
+        csett.ore_pe_zi as ore_pe_zi
+      FROM proiect_valoare pv
+      LEFT JOIN time_tracking_stats tts ON pv.ID_Proiect = tts.proiect_id
+      LEFT JOIN estimated_hours_stats ehs ON pv.ID_Proiect = ehs.proiect_id
+      LEFT JOIN cheltuieli_stats chs ON pv.ID_Proiect = chs.proiect_id
+      CROSS JOIN cost_settings csett
+    `;
+
+    let timpEconomic: any = null;
+    try {
+      const [timpEconomicRows] = await bigquery.query({
+        query: timpEconomicQuery,
+        params: { projectId }
+      });
+      if (timpEconomicRows.length > 0) {
+        timpEconomic = timpEconomicRows[0];
+      }
+    } catch (error) {
+      console.warn('Nu s-a putut calcula timpul economic:', error);
+    }
+
     // Procesare date pentru a elimina orice urmă de informații financiare
     const processedProiect = {
       ...proiect,
@@ -244,7 +369,16 @@ export async function GET(
       proiect: processedProiect,
       subproiecte: processedSubproiecte,
       contracte: processedContracte,
-      facturi: processedFacturi
+      facturi: processedFacturi,
+      // ✅ 21.01.2026: Timp economic (doar ore, fără valori financiare)
+      timpEconomic: timpEconomic ? {
+        workedHours: Number(timpEconomic.workedHours || 0),
+        estimatedHours: Number(timpEconomic.estimatedHours || 0),
+        economicHoursAllocated: Number(timpEconomic.economicHoursAllocated || 0),
+        economicHoursRemaining: Number(timpEconomic.economicHoursRemaining || 0),
+        economicProgress: Number(timpEconomic.economicProgress || 0),
+        ore_pe_zi: Number(timpEconomic.ore_pe_zi || 8)
+      } : null
     });
 
   } catch (error) {
