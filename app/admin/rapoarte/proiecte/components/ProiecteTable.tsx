@@ -1557,10 +1557,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           {(() => {
                             const progres = proiect.progres_procent || 0;
                             const getProgressColor = (p: number) => {
-                              if (p >= 100) return '#22c55e'; // verde
-                              if (p >= 80) return '#f59e0b';  // orange
-                              if (p >= 50) return '#3b82f6';  // albastru
-                              return '#6b7280';               // gri
+                              if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
+                              if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                              if (p >= 50) return '#22c55e';  // verde - zona optimă
+                              return '#6b7280';               // gri - început
                             };
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2029,10 +2029,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             {(() => {
                               const progres = subproiect.progres_procent || 0;
                               const getProgressColor = (p: number) => {
-                                if (p >= 100) return '#22c55e'; // verde
-                                if (p >= 80) return '#f59e0b';  // orange
-                                if (p >= 50) return '#3b82f6';  // albastru
-                                return '#6b7280';               // gri
+                                if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
+                                if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                                if (p >= 50) return '#22c55e';  // verde - zona optimă
+                                return '#6b7280';               // gri - început
                               };
                               return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

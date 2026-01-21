@@ -779,10 +779,10 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                       {(() => {
                         const progres = project.progres_procent || 0;
                         const getProgressColor = (p: number) => {
-                          if (p >= 100) return '#22c55e';
-                          if (p >= 80) return '#f59e0b';
-                          if (p >= 50) return '#3b82f6';
-                          return '#6b7280';
+                          if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
+                          if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                          if (p >= 50) return '#22c55e';  // verde - zona optimă
+                          return '#6b7280';               // gri - început
                         };
                         return (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1132,10 +1132,10 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                         {(() => {
                           const progres = subproject.progres_procent || 0;
                           const getProgressColor = (p: number) => {
-                            if (p >= 100) return '#22c55e';
-                            if (p >= 80) return '#f59e0b';
-                            if (p >= 50) return '#3b82f6';
-                            return '#6b7280';
+                            if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
+                            if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                            if (p >= 50) return '#22c55e';  // verde - zona optimă
+                            return '#6b7280';               // gri - început
                           };
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
