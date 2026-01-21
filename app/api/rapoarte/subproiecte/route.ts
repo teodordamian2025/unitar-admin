@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
       cost_settings AS (
         SELECT
           COALESCE(cost_ora, 50) as cost_ora
-        FROM \`${PROJECT_ID}.${DATASET}.SetariCosturiOrar${tableSuffix}\`
+        FROM \`${PROJECT_ID}.${DATASET}.SetariCosturi${tableSuffix}\`
         WHERE activ = true
         ORDER BY data_creare DESC
         LIMIT 1
