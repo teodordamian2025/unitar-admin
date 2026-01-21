@@ -52,6 +52,8 @@ interface Proiect {
   Adresa?: string;
   Descriere?: string;
   Observatii?: string;
+  // ✅ 21.01.2026: Progres proiect pentru bara vizuală
+  progres_procent?: number;
   // Comentarii info
   comentarii_count?: number;
   ultimul_comentariu_data?: string;
@@ -83,6 +85,8 @@ interface Subproiect {
   status_achitare?: string;
   Client?: string;
   Proiect_Denumire?: string;
+  // ✅ 21.01.2026: Progres subproiect pentru bara vizuală
+  progres_procent?: number;
   // Responsabili (Principal, Normal, Observator) - MODIFICAT 08.01.2026
   responsabili_toti?: ResponsabilInfo[];
 }
@@ -1301,8 +1305,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   }}>
                     Client
                   </th>
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'center',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1312,8 +1316,21 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                   }}>
                     Status
                   </th>
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  {/* ✅ 21.01.2026: Coloana Progres */}
+                  <th style={{
+                    padding: '1rem 0.75rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '13px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    minWidth: '100px'
+                  }}>
+                    📊 Progres
+                  </th>
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'center',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1532,7 +1549,49 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             {getStatusIcon(proiect.Status)} {proiect.Status}
                           </span>
                         </td>
-                        <td style={{ 
+                        {/* ✅ 21.01.2026: Coloana Progres - bara vizuală */}
+                        <td style={{
+                          padding: '0.75rem',
+                          textAlign: 'center'
+                        }}>
+                          {(() => {
+                            const progres = proiect.progres_procent || 0;
+                            const getProgressColor = (p: number) => {
+                              if (p >= 100) return '#22c55e'; // verde
+                              if (p >= 80) return '#f59e0b';  // orange
+                              if (p >= 50) return '#3b82f6';  // albastru
+                              return '#6b7280';               // gri
+                            };
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{
+                                  width: '60px',
+                                  height: '8px',
+                                  backgroundColor: 'rgba(0,0,0,0.1)',
+                                  borderRadius: '4px',
+                                  overflow: 'hidden'
+                                }}>
+                                  <div style={{
+                                    width: `${Math.min(progres, 100)}%`,
+                                    height: '100%',
+                                    backgroundColor: getProgressColor(progres),
+                                    borderRadius: '4px',
+                                    transition: 'width 0.3s ease'
+                                  }} />
+                                </div>
+                                <span style={{
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  color: getProgressColor(progres),
+                                  minWidth: '35px'
+                                }}>
+                                  {progres.toFixed(0)}%
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td style={{
                           padding: '0.75rem',
                           textAlign: 'center',
                           fontFamily: 'monospace',
@@ -1962,7 +2021,49 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                               {getStatusIcon(subproiect.Status)} {subproiect.Status}
                             </span>
                           </td>
-                          <td style={{ 
+                          {/* ✅ 21.01.2026: Coloana Progres - bara vizuală pentru subproiecte */}
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center'
+                          }}>
+                            {(() => {
+                              const progres = subproiect.progres_procent || 0;
+                              const getProgressColor = (p: number) => {
+                                if (p >= 100) return '#22c55e'; // verde
+                                if (p >= 80) return '#f59e0b';  // orange
+                                if (p >= 50) return '#3b82f6';  // albastru
+                                return '#6b7280';               // gri
+                              };
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <div style={{
+                                    width: '50px',
+                                    height: '6px',
+                                    backgroundColor: 'rgba(0,0,0,0.1)',
+                                    borderRadius: '3px',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <div style={{
+                                      width: `${Math.min(progres, 100)}%`,
+                                      height: '100%',
+                                      backgroundColor: getProgressColor(progres),
+                                      borderRadius: '3px',
+                                      transition: 'width 0.3s ease'
+                                    }} />
+                                  </div>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    color: getProgressColor(progres),
+                                    minWidth: '30px'
+                                  }}>
+                                    {progres.toFixed(0)}%
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td style={{
                             padding: '0.5rem 0.75rem',
                             textAlign: 'center',
                             fontFamily: 'monospace',

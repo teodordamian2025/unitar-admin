@@ -37,6 +37,8 @@ interface Project {
   status_contract?: string;
   Responsabil?: string;
   Observatii?: string;
+  // ✅ 21.01.2026: Progres proiect pentru bara vizuală
+  progres_procent?: number;
   // Date client
   client_nume?: string;
   client_cui?: string;
@@ -66,6 +68,8 @@ interface Subproject {
   status_contract?: string;
   Client?: string;
   Proiect_Denumire?: string;
+  // ✅ 21.01.2026: Progres subproiect pentru bara vizuală
+  progres_procent?: number;
   // Responsabili (Principal, Normal, Observator) - MODIFICAT 08.01.2026
   responsabili_toti?: ResponsabilInfo[];
 }
@@ -617,6 +621,7 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
               <th style={{...thStyle, width: '100px'}}>Data Început</th>
               <th style={{...thStyle, width: '100px'}}>Data Final</th>
               <th style={{...thStyle, width: '90px'}}>Status</th>
+              <th style={{...thStyle, width: '100px'}}>📊 Progres</th>
               <th style={{...thStyle, width: '90px'}}>Predare</th>
               <th style={{...thStyle, width: '100px', textAlign: 'center'}}>💬 Comentarii</th>
               <th style={{...thStyle, width: '120px'}}>Acțiuni</th>
@@ -768,6 +773,46 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                     </td>
                     <td style={tdStyle}>
                       {getStatusBadge(project.Status)}
+                    </td>
+                    {/* ✅ 21.01.2026: Coloana Progres cu bară vizuală */}
+                    <td style={tdStyle}>
+                      {(() => {
+                        const progres = project.progres_procent || 0;
+                        const getProgressColor = (p: number) => {
+                          if (p >= 100) return '#22c55e';
+                          if (p >= 80) return '#f59e0b';
+                          if (p >= 50) return '#3b82f6';
+                          return '#6b7280';
+                        };
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              flex: 1,
+                              height: '8px',
+                              background: '#e5e7eb',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              minWidth: '50px'
+                            }}>
+                              <div style={{
+                                width: `${Math.min(progres, 100)}%`,
+                                height: '100%',
+                                background: getProgressColor(progres),
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              color: getProgressColor(progres),
+                              minWidth: '35px',
+                              textAlign: 'right'
+                            }}>
+                              {progres}%
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td style={tdStyle}>
                       {getStatusPredare(project.status_predare || 'Nepredat')}
@@ -1079,6 +1124,48 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                         }}>
                           {getStatusIcon(subproject.Status)} {subproject.Status}
                         </span>
+                      </td>
+                      {/* ✅ 21.01.2026: Coloana Progres subproiect */}
+                      <td style={{
+                        padding: '0.5rem 0.75rem'
+                      }}>
+                        {(() => {
+                          const progres = subproject.progres_procent || 0;
+                          const getProgressColor = (p: number) => {
+                            if (p >= 100) return '#22c55e';
+                            if (p >= 80) return '#f59e0b';
+                            if (p >= 50) return '#3b82f6';
+                            return '#6b7280';
+                          };
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <div style={{
+                                flex: 1,
+                                height: '6px',
+                                background: '#e5e7eb',
+                                borderRadius: '3px',
+                                overflow: 'hidden',
+                                minWidth: '40px'
+                              }}>
+                                <div style={{
+                                  width: `${Math.min(progres, 100)}%`,
+                                  height: '100%',
+                                  background: getProgressColor(progres),
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: getProgressColor(progres),
+                                minWidth: '30px',
+                                textAlign: 'right'
+                              }}>
+                                {progres}%
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{
                         padding: '0.5rem 0.75rem'
