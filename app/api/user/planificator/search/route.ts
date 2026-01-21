@@ -1,9 +1,11 @@
 // ==================================================================
 // CALEA: app/api/user/planificator/search/route.ts
-// DATA: 01.10.2025 00:00 (ora României) - RESTAURAT din versiunea funcțională
+// DATA: 21.01.2026 (ora României) - Actualizat pentru Planning Overview
 // DESCRIERE: API pentru căutare proiecte în planificator (doar proiecte, nu subproiecte/sarcini)
 // FUNCȚIONALITATE: GET cu query pentru adăugarea în planificator
-// IMPORTANTE: Folosește tabel Subproiecte (nu SubProiecte) și exclude proiecte deja în planificator
+// IMPORTANTE: Folosește tabel Subproiecte (nu SubProiecte)
+// PARAMETRU: context=planning-overview pentru a NU exclude proiecte din PlanificatorPersonal
+//            (util când vrei să adaugi același proiect în zile diferite)
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const searchTerm = searchParams.get('q');
+    const context = searchParams.get('context'); // 'planning-overview' = nu exclude din PlanificatorPersonal
 
     if (!searchTerm || searchTerm.trim().length < 2) {
       return NextResponse.json({ results: [] });
@@ -51,44 +54,73 @@ export async function GET(request: NextRequest) {
 
     const searchPattern = `%${searchTerm.toLowerCase()}%`;
 
-    // Query pentru căutarea doar a proiectelor (primul nivel al ierarhiei)
-    const searchQuery = `
-      WITH PlanificatorExistent AS (
-        SELECT tip_item, item_id
-        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
-        WHERE utilizator_uid = @userId AND activ = TRUE
-      )
+    // Pentru Planning Overview, NU excludem proiectele din PlanificatorPersonal
+    // deoarece utilizatorul poate dori să adauge același proiect în zile diferite
+    const skipPlanificatorFilter = context === 'planning-overview';
 
-      SELECT
-        'proiect' as tip,
-        ID_Proiect as id,
-        CONCAT(ID_Proiect, ' - ', Denumire) as nume,
-        CAST(NULL AS STRING) as proiect_nume,
-        1 as priority_order,
-        -- Contorizare subproiecte și sarcini pentru feedback
-        (
-          SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
-          WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
-        ) as subproiecte_count,
-        (
-          SELECT COUNT(*)
-          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\`
-          WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
-        ) as sarcini_count
-      FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` p
-      WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
-        AND Status != 'Anulat'
-        AND ID_Proiect NOT IN (
-          SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
+    // Query pentru căutarea doar a proiectelor (primul nivel al ierarhiei)
+    const searchQuery = skipPlanificatorFilter
+      ? `
+        SELECT
+          'proiect' as tip,
+          ID_Proiect as id,
+          CONCAT(ID_Proiect, ' - ', Denumire) as nume,
+          CAST(NULL AS STRING) as proiect_nume,
+          1 as priority_order,
+          -- Contorizare subproiecte și sarcini pentru feedback
+          (
+            SELECT COUNT(*)
+            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
+            WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
+          ) as subproiecte_count,
+          (
+            SELECT COUNT(*)
+            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\`
+            WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
+          ) as sarcini_count
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` p
+        WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
+          AND Status != 'Anulat'
+        ORDER BY Denumire ASC
+        LIMIT 20
+      `
+      : `
+        WITH PlanificatorExistent AS (
+          SELECT tip_item, item_id
+          FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.PlanificatorPersonal${tableSuffix}\`
+          WHERE utilizator_uid = @userId AND activ = TRUE
         )
-      ORDER BY Denumire ASC
-      LIMIT 20
-    `;
+
+        SELECT
+          'proiect' as tip,
+          ID_Proiect as id,
+          CONCAT(ID_Proiect, ' - ', Denumire) as nume,
+          CAST(NULL AS STRING) as proiect_nume,
+          1 as priority_order,
+          -- Contorizare subproiecte și sarcini pentru feedback
+          (
+            SELECT COUNT(*)
+            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\`
+            WHERE ID_Proiect = p.ID_Proiect AND activ = TRUE AND Status != 'Anulat'
+          ) as subproiecte_count,
+          (
+            SELECT COUNT(*)
+            FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\`
+            WHERE proiect_id = p.ID_Proiect AND status NOT IN ('Finalizată', 'Anulată')
+          ) as sarcini_count
+        FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\` p
+        WHERE (LOWER(Denumire) LIKE @searchPattern OR LOWER(ID_Proiect) LIKE @searchPattern)
+          AND Status != 'Anulat'
+          AND ID_Proiect NOT IN (
+            SELECT item_id FROM PlanificatorExistent WHERE tip_item = 'proiect'
+          )
+        ORDER BY Denumire ASC
+        LIMIT 20
+      `;
 
     const [rows] = await bigquery.query({
       query: searchQuery,
-      params: { userId, searchPattern }
+      params: skipPlanificatorFilter ? { searchPattern } : { userId, searchPattern }
     });
 
     const results = rows.map((row: any) => ({

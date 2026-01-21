@@ -222,8 +222,9 @@ export default function PlanningOverviewPage() {
 
     try {
       const idToken = await user.getIdToken();
+      // FIX: Add context=planning-overview pentru a permite adăugarea aceluiași proiect în zile diferite
       // FIX: Add timestamp to prevent service worker (PWA) caching
-      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}&_t=${Date.now()}`, {
+      const response = await fetch(`/api/user/planificator/search?q=${encodeURIComponent(term)}&context=planning-overview&_t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate'

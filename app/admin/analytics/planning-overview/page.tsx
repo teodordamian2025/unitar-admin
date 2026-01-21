@@ -169,7 +169,8 @@ export default function PlanningOverviewPage() {
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(`/api/planificator/search?q=${encodeURIComponent(term)}`, {
+      // FIX: Add context=planning-overview pentru a permite adăugarea aceluiași proiect în zile diferite
+      const response = await fetch(`/api/planificator/search?q=${encodeURIComponent(term)}&context=planning-overview`, {
         headers: {
           'Authorization': `Bearer ${idToken}`
         }
