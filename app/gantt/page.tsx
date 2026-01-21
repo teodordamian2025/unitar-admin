@@ -69,7 +69,8 @@ interface DateEditState {
 }
 
 // Constantă pentru înălțimea fiecărui rând - CHEIA PENTRU ALINIERE
-const ROW_HEIGHT = 60;
+// ✅ 21.01.2026: Mărit de la 60 la 85 pentru a face loc informațiilor de timp
+const ROW_HEIGHT = 85;
 const HEADER_HEIGHT = 60;
 
 export default function GanttView() {
@@ -251,7 +252,16 @@ export default function GanttView() {
           return;
         }
 
-        setDisplayName(localStorage.getItem('displayName') || user.displayName || 'Utilizator');
+        const userDisplayName = localStorage.getItem('displayName') || user.displayName || 'Utilizator';
+        setDisplayName(userDisplayName);
+
+        // ✅ 21.01.2026: Setează filtrul responsabil pe utilizatorul curent pentru utilizatori normali
+        // Aceasta face ca pagina să afișeze implicit proiectele la care este alocat utilizatorul
+        setFilters(prev => ({
+          ...prev,
+          responsabil_nume: userDisplayName
+        }));
+
         setIsAuthorized(true);
       } else {
         toast.error('Nu ai permisiunea să accesezi Gantt Chart!');
@@ -1635,6 +1645,103 @@ export default function GanttView() {
                           )}
                         </div>
                       )}
+
+                      {/* ✅ 21.01.2026: Afișare informații timp direct în lista Gantt */}
+                      {(() => {
+                        // Pentru Proiecte și Subproiecte: afișăm timpul economic
+                        if ((task.type === 'proiect' || task.type === 'subproiect') && task.economicHoursAllocated !== undefined && task.economicHoursAllocated > 0) {
+                          const alocat = Number(task.economicHoursAllocated || 0);
+                          const consumat = Number(task.workedHours || 0);
+                          const ramas = Number(task.economicHoursRemaining || 0);
+                          const progressEco = alocat > 0 ? Math.min((consumat / alocat) * 100, 100) : 0;
+                          const isOverBudget = ramas < 0;
+
+                          return (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              marginTop: '0.25rem',
+                              fontSize: '0.65rem',
+                              color: '#6b7280'
+                            }}>
+                              <span title="Timp Economic">💰</span>
+                              <span style={{ color: '#059669' }} title="Alocat din buget">{alocat.toFixed(0)}h</span>
+                              <span style={{ color: '#6b7280' }}>|</span>
+                              <span style={{ color: '#3b82f6' }} title="Consumat">{consumat.toFixed(0)}h</span>
+                              <span style={{ color: '#6b7280' }}>|</span>
+                              <span style={{ color: isOverBudget ? '#ef4444' : '#059669', fontWeight: isOverBudget ? '600' : '400' }} title="Rămas">
+                                {ramas.toFixed(0)}h
+                              </span>
+                              {/* Mini progress bar */}
+                              <div style={{
+                                flex: 1,
+                                minWidth: '30px',
+                                maxWidth: '50px',
+                                height: '4px',
+                                background: '#e5e7eb',
+                                borderRadius: '2px',
+                                overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${progressEco}%`,
+                                  height: '100%',
+                                  background: isOverBudget ? '#ef4444' : progressEco > 80 ? '#f59e0b' : '#22c55e',
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Pentru Sarcini: afișăm timpul estimat vs lucrat
+                        if (task.type === 'sarcina' && (task.estimatedHours || task.workedHours)) {
+                          const alocat = Number(task.estimatedHours || 0);
+                          const consumat = Number(task.workedHours || 0);
+                          const ramas = Math.max(0, alocat - consumat);
+                          const progressTask = alocat > 0 ? Math.min((consumat / alocat) * 100, 100) : 0;
+                          const isOver = consumat > alocat && alocat > 0;
+
+                          return (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              marginTop: '0.25rem',
+                              fontSize: '0.65rem',
+                              color: '#6b7280'
+                            }}>
+                              <span title="Timp Sarcină">⏱️</span>
+                              <span style={{ color: '#8b5cf6' }} title="Alocat">{alocat.toFixed(0)}h</span>
+                              <span style={{ color: '#6b7280' }}>|</span>
+                              <span style={{ color: '#3b82f6' }} title="Consumat">{consumat.toFixed(0)}h</span>
+                              <span style={{ color: '#6b7280' }}>|</span>
+                              <span style={{ color: isOver ? '#ef4444' : '#059669', fontWeight: isOver ? '600' : '400' }} title="Rămas">
+                                {isOver ? `-${(consumat - alocat).toFixed(0)}h` : `${ramas.toFixed(0)}h`}
+                              </span>
+                              {/* Mini progress bar */}
+                              <div style={{
+                                flex: 1,
+                                minWidth: '30px',
+                                maxWidth: '50px',
+                                height: '4px',
+                                background: '#e5e7eb',
+                                borderRadius: '2px',
+                                overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${progressTask}%`,
+                                  height: '100%',
+                                  background: isOver ? '#ef4444' : progressTask > 80 ? '#f59e0b' : '#22c55e',
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
                     </div>
 
                     <div style={{
