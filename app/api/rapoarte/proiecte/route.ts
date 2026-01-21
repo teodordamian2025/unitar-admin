@@ -264,6 +264,31 @@ export async function GET(request: NextRequest) {
         WHERE ef.tip_etapa = 'factura_directa'
           AND ef.activ = true
         GROUP BY ef.proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru ore lucrate per proiect (pentru progres economic)
+      time_tracking_stats AS (
+        SELECT
+          proiect_id,
+          SUM(ore_lucrate) as total_worked_hours
+        FROM \`${PROJECT_ID}.${dataset}.TimeTracking${tableSuffix}\`
+        GROUP BY proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru cheltuieli per proiect
+      cheltuieli_stats AS (
+        SELECT
+          proiect_id,
+          SUM(valoare_ron) as total_cheltuieli_ron
+        FROM \`${PROJECT_ID}.${dataset}.ProiecteCheltuieli${tableSuffix}\`
+        GROUP BY proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru setări cost orar
+      cost_settings AS (
+        SELECT
+          COALESCE(cost_ora, 50) as cost_ora
+        FROM \`${PROJECT_ID}.${dataset}.SetariCosturiOrar${tableSuffix}\`
+        WHERE activ = true
+        ORDER BY data_creare DESC
+        LIMIT 1
       )
       SELECT
         p.*,
@@ -285,7 +310,26 @@ export async function GET(request: NextRequest) {
         cc.ultimul_comentariu_data,
         cc.ultim_comentariu,
         -- Responsabili proiect (Principal, Normal, Observator)
-        COALESCE(rp.responsabili, []) as responsabili_toti
+        COALESCE(rp.responsabili, []) as responsabili_toti,
+        -- ✅ 21.01.2026: Progres economic calculat
+        ROUND(
+          SAFE_DIVIDE(
+            COALESCE(tts.total_worked_hours, 0) * 100,
+            NULLIF(
+              SAFE_DIVIDE(
+                COALESCE(p.Valoare_Estimata, 0) - (
+                  CASE
+                    WHEN p.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                    ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(p.curs_valutar, 0)
+                  END
+                ),
+                csett.cost_ora
+              ),
+              0
+            )
+          ),
+          1
+        ) as progres_economic
       FROM \`${PROJECT_ID}.${dataset}.${table}\` p
       LEFT JOIN \`${PROJECT_ID}.${dataset}.${tableClienti}\` c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
@@ -297,6 +341,11 @@ export async function GET(request: NextRequest) {
         ON cc.proiect_id = p.ID_Proiect
       LEFT JOIN responsabili_proiect rp
         ON rp.proiect_id = p.ID_Proiect
+      LEFT JOIN time_tracking_stats tts
+        ON tts.proiect_id = p.ID_Proiect
+      LEFT JOIN cheltuieli_stats chs
+        ON chs.proiect_id = p.ID_Proiect
+      CROSS JOIN cost_settings csett
     `;
 
     const conditions: string[] = [];

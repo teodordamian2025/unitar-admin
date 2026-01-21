@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
     // Query pentru utilizatori normali - FĂRĂ date financiare
     // MODIFICAT 06.01.2026: Adăugat CTE pentru count comentarii per proiect
     // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii proiect (Principal, Normal, Observator)
+    // ✅ 21.01.2026: Adăugat CTEs pentru progres economic
     let baseQuery = `
       WITH responsabili_proiect AS (
         SELECT
@@ -143,6 +144,31 @@ export async function GET(request: NextRequest) {
           )[SAFE_OFFSET(0)] as ultim_comentariu
         FROM \`${PROJECT_ID}.${DATASET}.ProiectComentarii${tableSuffix}\`
         GROUP BY proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru ore lucrate per proiect (pentru progres economic)
+      time_tracking_stats AS (
+        SELECT
+          proiect_id,
+          SUM(ore_lucrate) as total_worked_hours
+        FROM \`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\`
+        GROUP BY proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru cheltuieli per proiect
+      cheltuieli_stats AS (
+        SELECT
+          proiect_id,
+          SUM(valoare_ron) as total_cheltuieli_ron
+        FROM \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\`
+        GROUP BY proiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru setări cost orar
+      cost_settings AS (
+        SELECT
+          COALESCE(cost_ora, 50) as cost_ora
+        FROM \`${PROJECT_ID}.${DATASET}.SetariCosturiOrar${tableSuffix}\`
+        WHERE activ = true
+        ORDER BY data_creare DESC
+        LIMIT 1
       )
       SELECT
         p.ID_Proiect,
@@ -170,7 +196,26 @@ export async function GET(request: NextRequest) {
         cc.ultimul_comentariu_data,
         cc.ultim_comentariu,
         -- Responsabili proiect (Principal, Normal, Observator)
-        COALESCE(rp.responsabili, []) as responsabili_toti
+        COALESCE(rp.responsabili, []) as responsabili_toti,
+        -- ✅ 21.01.2026: Progres economic calculat (fără expunere date financiare)
+        ROUND(
+          SAFE_DIVIDE(
+            COALESCE(tts.total_worked_hours, 0) * 100,
+            NULLIF(
+              SAFE_DIVIDE(
+                COALESCE(p.Valoare_Estimata, 0) - (
+                  CASE
+                    WHEN p.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                    ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(p.curs_valutar, 0)
+                  END
+                ),
+                csett.cost_ora
+              ),
+              0
+            )
+          ),
+          1
+        ) as progres_economic
       FROM ${TABLE_PROIECTE} p
       LEFT JOIN ${TABLE_CLIENTI} c
         ON TRIM(LOWER(p.Client)) = TRIM(LOWER(c.nume))
@@ -178,6 +223,11 @@ export async function GET(request: NextRequest) {
         ON cc.proiect_id = p.ID_Proiect
       LEFT JOIN responsabili_proiect rp
         ON rp.proiect_id = p.ID_Proiect
+      LEFT JOIN time_tracking_stats tts
+        ON tts.proiect_id = p.ID_Proiect
+      LEFT JOIN cheltuieli_stats chs
+        ON chs.proiect_id = p.ID_Proiect
+      CROSS JOIN cost_settings csett
     `;
 
     const conditions: string[] = [];
@@ -284,6 +334,7 @@ export async function GET(request: NextRequest) {
 
     // Query pentru subproiecte - FĂRĂ date financiare, similar cu admin
     // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii subproiect (Principal, Normal, Observator)
+    // ✅ 21.01.2026: Adăugat CTEs pentru progres economic
     let subproiecteQuery = `
       WITH responsabili_subproiect AS (
         SELECT
@@ -309,6 +360,33 @@ export async function GET(request: NextRequest) {
         LEFT JOIN \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\` u
           ON sr.responsabil_uid = u.uid
         GROUP BY sr.subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru ore lucrate per subproiect (pentru progres economic)
+      time_tracking_stats AS (
+        SELECT
+          subproiect_id,
+          SUM(ore_lucrate) as total_worked_hours
+        FROM \`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\`
+        WHERE subproiect_id IS NOT NULL
+        GROUP BY subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru cheltuieli per subproiect
+      cheltuieli_stats AS (
+        SELECT
+          subproiect_id,
+          SUM(valoare_ron) as total_cheltuieli_ron
+        FROM \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\`
+        WHERE subproiect_id IS NOT NULL
+        GROUP BY subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru setări cost orar
+      cost_settings AS (
+        SELECT
+          COALESCE(cost_ora, 50) as cost_ora
+        FROM \`${PROJECT_ID}.${DATASET}.SetariCosturiOrar${tableSuffix}\`
+        WHERE activ = true
+        ORDER BY data_creare DESC
+        LIMIT 1
       )
       SELECT
         s.ID_Subproiect,
@@ -323,12 +401,36 @@ export async function GET(request: NextRequest) {
         s.progres_procent,
         p.Client,
         p.Denumire as Proiect_Denumire,
-        COALESCE(rs.responsabili, []) as responsabili_toti
+        COALESCE(rs.responsabili, []) as responsabili_toti,
+        -- ✅ 21.01.2026: Progres economic calculat pentru subproiecte
+        ROUND(
+          SAFE_DIVIDE(
+            COALESCE(tts.total_worked_hours, 0) * 100,
+            NULLIF(
+              SAFE_DIVIDE(
+                COALESCE(s.Valoare_Estimata, 0) - (
+                  CASE
+                    WHEN s.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                    ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(s.curs_valutar, 0)
+                  END
+                ),
+                csett.cost_ora
+              ),
+              0
+            )
+          ),
+          1
+        ) as progres_economic
       FROM ${TABLE_SUBPROIECTE} s
       LEFT JOIN ${TABLE_PROIECTE} p
         ON s.ID_Proiect = p.ID_Proiect
       LEFT JOIN responsabili_subproiect rs
         ON rs.subproiect_id = s.ID_Subproiect
+      LEFT JOIN time_tracking_stats tts
+        ON tts.subproiect_id = s.ID_Subproiect
+      LEFT JOIN cheltuieli_stats chs
+        ON chs.subproiect_id = s.ID_Subproiect
+      CROSS JOIN cost_settings csett
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
 
@@ -431,6 +533,8 @@ export async function GET(request: NextRequest) {
       Observatii: row.Observatii,
       progres: convertBigQueryNumeric(row.progres_procent) || 0,
       progres_procent: convertBigQueryNumeric(row.progres_procent) || 0,
+      // ✅ 21.01.2026: Progres economic
+      progres_economic: convertBigQueryNumeric(row.progres_economic) || 0,
       tip_proiect: 'Standard',
       // Date client (non-financiare)
       client_id: row.client_id,
@@ -466,6 +570,8 @@ export async function GET(request: NextRequest) {
       status_contract: row.status_contract,
       progres: convertBigQueryNumeric(row.progres_procent) || 0,
       progres_procent: convertBigQueryNumeric(row.progres_procent) || 0,
+      // ✅ 21.01.2026: Progres economic pentru subproiecte
+      progres_economic: convertBigQueryNumeric(row.progres_economic) || 0,
       Client: row.Client,
       Proiect_Denumire: row.Proiect_Denumire,
       // Responsabili subproiect (Principal, Normal, Observator) - MODIFICAT 08.01.2026

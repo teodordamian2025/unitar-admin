@@ -39,6 +39,8 @@ interface Project {
   Observatii?: string;
   // ✅ 21.01.2026: Progres proiect pentru bara vizuală
   progres_procent?: number;
+  // ✅ 21.01.2026: Progres economic pentru bara vizuală
+  progres_economic?: number;
   // Date client
   client_nume?: string;
   client_cui?: string;
@@ -70,6 +72,8 @@ interface Subproject {
   Proiect_Denumire?: string;
   // ✅ 21.01.2026: Progres subproiect pentru bara vizuală
   progres_procent?: number;
+  // ✅ 21.01.2026: Progres economic pentru bara vizuală
+  progres_economic?: number;
   // Responsabili (Principal, Normal, Observator) - MODIFICAT 08.01.2026
   responsabili_toti?: ResponsabilInfo[];
 }
@@ -774,42 +778,86 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                     <td style={tdStyle}>
                       {getStatusBadge(project.Status)}
                     </td>
-                    {/* ✅ 21.01.2026: Coloana Progres cu bară vizuală */}
+                    {/* ✅ 21.01.2026: Coloana Progres cu două bare vizuale - General și Economic */}
                     <td style={tdStyle}>
                       {(() => {
-                        const progres = project.progres_procent || 0;
-                        const getProgressColor = (p: number) => {
-                          if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
-                          if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                        const progresGeneral = project.progres_procent || 0;
+                        const progresEconomic = project.progres_economic || 0;
+
+                        // Culori progres general: gri → albastru → portocaliu → verde
+                        const getGeneralColor = (p: number) => {
+                          if (p >= 100) return '#22c55e'; // verde - finalizat
+                          if (p >= 80) return '#f59e0b';  // portocaliu - aproape
+                          if (p >= 50) return '#3b82f6';  // albastru - în progres
+                          return '#6b7280';               // gri - început
+                        };
+
+                        // Culori progres economic: gri → verde → portocaliu → roșu (depășire)
+                        const getEconomicColor = (p: number) => {
+                          if (p >= 100) return '#ef4444'; // roșu - depășire
+                          if (p >= 80) return '#f59e0b';  // portocaliu - aproape
                           if (p >= 50) return '#22c55e';  // verde - zona optimă
                           return '#6b7280';               // gri - început
                         };
+
                         return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{
-                              flex: 1,
-                              height: '8px',
-                              background: '#e5e7eb',
-                              borderRadius: '4px',
-                              overflow: 'hidden',
-                              minWidth: '50px'
-                            }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            {/* Progres General */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '9px', color: '#6b7280', minWidth: '20px' }}>Gen</span>
                               <div style={{
-                                width: `${Math.min(progres, 100)}%`,
-                                height: '100%',
-                                background: getProgressColor(progres),
-                                transition: 'width 0.3s ease'
-                              }} />
+                                flex: 1,
+                                height: '6px',
+                                background: '#e5e7eb',
+                                borderRadius: '3px',
+                                overflow: 'hidden',
+                                minWidth: '40px'
+                              }}>
+                                <div style={{
+                                  width: `${Math.min(progresGeneral, 100)}%`,
+                                  height: '100%',
+                                  background: getGeneralColor(progresGeneral),
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: getGeneralColor(progresGeneral),
+                                minWidth: '30px',
+                                textAlign: 'right'
+                              }}>
+                                {progresGeneral}%
+                              </span>
                             </div>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              color: getProgressColor(progres),
-                              minWidth: '35px',
-                              textAlign: 'right'
-                            }}>
-                              {progres}%
-                            </span>
+                            {/* Progres Economic */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '9px', color: '#6b7280', minWidth: '20px' }}>Eco</span>
+                              <div style={{
+                                flex: 1,
+                                height: '6px',
+                                background: '#e5e7eb',
+                                borderRadius: '3px',
+                                overflow: 'hidden',
+                                minWidth: '40px'
+                              }}>
+                                <div style={{
+                                  width: `${Math.min(progresEconomic, 100)}%`,
+                                  height: '100%',
+                                  background: getEconomicColor(progresEconomic),
+                                  transition: 'width 0.3s ease'
+                                }} />
+                              </div>
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: getEconomicColor(progresEconomic),
+                                minWidth: '30px',
+                                textAlign: 'right'
+                              }}>
+                                {progresEconomic > 100 ? `${Math.round(progresEconomic)}%` : `${progresEconomic}%`}
+                              </span>
+                            </div>
                           </div>
                         );
                       })()}
@@ -1125,44 +1173,88 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                           {getStatusIcon(subproject.Status)} {subproject.Status}
                         </span>
                       </td>
-                      {/* ✅ 21.01.2026: Coloana Progres subproiect */}
+                      {/* ✅ 21.01.2026: Coloana Progres subproiect - General și Economic */}
                       <td style={{
                         padding: '0.5rem 0.75rem'
                       }}>
                         {(() => {
-                          const progres = subproject.progres_procent || 0;
-                          const getProgressColor = (p: number) => {
-                            if (p >= 100) return '#ef4444'; // roșu - depășire (nu e bine)
-                            if (p >= 80) return '#f59e0b';  // portocaliu - aproape complet
+                          const progresGeneral = subproject.progres_procent || 0;
+                          const progresEconomic = subproject.progres_economic || 0;
+
+                          // Culori progres general: gri → albastru → portocaliu → verde
+                          const getGeneralColor = (p: number) => {
+                            if (p >= 100) return '#22c55e'; // verde - finalizat
+                            if (p >= 80) return '#f59e0b';  // portocaliu - aproape
+                            if (p >= 50) return '#3b82f6';  // albastru - în progres
+                            return '#6b7280';               // gri - început
+                          };
+
+                          // Culori progres economic: gri → verde → portocaliu → roșu (depășire)
+                          const getEconomicColor = (p: number) => {
+                            if (p >= 100) return '#ef4444'; // roșu - depășire
+                            if (p >= 80) return '#f59e0b';  // portocaliu - aproape
                             if (p >= 50) return '#22c55e';  // verde - zona optimă
                             return '#6b7280';               // gri - început
                           };
+
                           return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={{
-                                flex: 1,
-                                height: '6px',
-                                background: '#e5e7eb',
-                                borderRadius: '3px',
-                                overflow: 'hidden',
-                                minWidth: '40px'
-                              }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              {/* Progres General */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                <span style={{ fontSize: '8px', color: '#6b7280', minWidth: '18px' }}>Gen</span>
                                 <div style={{
-                                  width: `${Math.min(progres, 100)}%`,
-                                  height: '100%',
-                                  background: getProgressColor(progres),
-                                  transition: 'width 0.3s ease'
-                                }} />
+                                  flex: 1,
+                                  height: '5px',
+                                  background: '#e5e7eb',
+                                  borderRadius: '2px',
+                                  overflow: 'hidden',
+                                  minWidth: '30px'
+                                }}>
+                                  <div style={{
+                                    width: `${Math.min(progresGeneral, 100)}%`,
+                                    height: '100%',
+                                    background: getGeneralColor(progresGeneral),
+                                    transition: 'width 0.3s ease'
+                                  }} />
+                                </div>
+                                <span style={{
+                                  fontSize: '9px',
+                                  fontWeight: '600',
+                                  color: getGeneralColor(progresGeneral),
+                                  minWidth: '28px',
+                                  textAlign: 'right'
+                                }}>
+                                  {progresGeneral}%
+                                </span>
                               </div>
-                              <span style={{
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                color: getProgressColor(progres),
-                                minWidth: '30px',
-                                textAlign: 'right'
-                              }}>
-                                {progres}%
-                              </span>
+                              {/* Progres Economic */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                <span style={{ fontSize: '8px', color: '#6b7280', minWidth: '18px' }}>Eco</span>
+                                <div style={{
+                                  flex: 1,
+                                  height: '5px',
+                                  background: '#e5e7eb',
+                                  borderRadius: '2px',
+                                  overflow: 'hidden',
+                                  minWidth: '30px'
+                                }}>
+                                  <div style={{
+                                    width: `${Math.min(progresEconomic, 100)}%`,
+                                    height: '100%',
+                                    background: getEconomicColor(progresEconomic),
+                                    transition: 'width 0.3s ease'
+                                  }} />
+                                </div>
+                                <span style={{
+                                  fontSize: '9px',
+                                  fontWeight: '600',
+                                  color: getEconomicColor(progresEconomic),
+                                  minWidth: '28px',
+                                  textAlign: 'right'
+                                }}>
+                                  {progresEconomic > 100 ? `${Math.round(progresEconomic)}%` : `${progresEconomic}%`}
+                                </span>
+                              </div>
                             </div>
                           );
                         })()}

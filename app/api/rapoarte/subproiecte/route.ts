@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
 
     // MODIFICAT 08.01.2026: Adăugat CTE pentru toti responsabilii subproiect (Principal, Normal, Observator)
     // FIX 10.01.2026: Adăugat email în STRUCT pentru a fi disponibil în ProiectEditModal
+    // ✅ 21.01.2026: Adăugat CTEs pentru progres economic
     let query = `
       WITH responsabili_subproiect AS (
         SELECT
@@ -80,17 +81,68 @@ export async function GET(request: NextRequest) {
         LEFT JOIN \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\` u
           ON sr.responsabil_uid = u.uid
         GROUP BY sr.subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru ore lucrate per subproiect (pentru progres economic)
+      time_tracking_stats AS (
+        SELECT
+          subproiect_id,
+          SUM(ore_lucrate) as total_worked_hours
+        FROM \`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\`
+        WHERE subproiect_id IS NOT NULL
+        GROUP BY subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru cheltuieli per subproiect
+      cheltuieli_stats AS (
+        SELECT
+          subproiect_id,
+          SUM(valoare_ron) as total_cheltuieli_ron
+        FROM \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\`
+        WHERE subproiect_id IS NOT NULL
+        GROUP BY subproiect_id
+      ),
+      -- ✅ 21.01.2026: CTE pentru setări cost orar
+      cost_settings AS (
+        SELECT
+          COALESCE(cost_ora, 50) as cost_ora
+        FROM \`${PROJECT_ID}.${DATASET}.SetariCosturiOrar${tableSuffix}\`
+        WHERE activ = true
+        ORDER BY data_creare DESC
+        LIMIT 1
       )
       SELECT
         s.*,
         p.Client,
         p.Denumire as Proiect_Denumire,
-        COALESCE(rs.responsabili, []) as responsabili_toti
+        COALESCE(rs.responsabili, []) as responsabili_toti,
+        -- ✅ 21.01.2026: Progres economic calculat pentru subproiecte
+        ROUND(
+          SAFE_DIVIDE(
+            COALESCE(tts.total_worked_hours, 0) * 100,
+            NULLIF(
+              SAFE_DIVIDE(
+                COALESCE(s.Valoare_Estimata, 0) - (
+                  CASE
+                    WHEN s.moneda = 'RON' THEN COALESCE(chs.total_cheltuieli_ron, 0)
+                    ELSE COALESCE(chs.total_cheltuieli_ron, 0) / NULLIF(s.curs_valutar, 0)
+                  END
+                ),
+                csett.cost_ora
+              ),
+              0
+            )
+          ),
+          1
+        ) as progres_economic
       FROM ${SUBPROIECTE_TABLE} s
       LEFT JOIN ${PROIECTE_TABLE} p
         ON s.ID_Proiect = p.ID_Proiect
       LEFT JOIN responsabili_subproiect rs
         ON rs.subproiect_id = s.ID_Subproiect
+      LEFT JOIN time_tracking_stats tts
+        ON tts.subproiect_id = s.ID_Subproiect
+      LEFT JOIN cheltuieli_stats chs
+        ON chs.subproiect_id = s.ID_Subproiect
+      CROSS JOIN cost_settings csett
       WHERE (s.activ IS NULL OR s.activ = true)
     `;
     
