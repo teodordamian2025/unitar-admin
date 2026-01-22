@@ -2,6 +2,9 @@
 // CALEA: app/admin/tranzactii/dashboard/page.tsx
 // DATA: 19.09.2025 23:35 (ora României) - Updated 10.19.2025 for grid layout fix
 // MODIFICAT: 04.11.2025 - Adăugat buton refresh manual + cache 6h pentru Sold Disponibil
+// MODIFICAT: 22.01.2026 - Adăugat dropdown cu perioade predefinite (Luna curentă, Luna anterioară,
+//                        Ultimele 3/6 luni, An curent, An anterior, Date personalizate)
+//                        Default: An curent. Datele se calculează automat la schimbarea perioadei.
 // DESCRIERE: Dashboard modern tranzacții cu glassmorphism și real-time
 // FUNCȚIONALITATE: Management tranzacții bancare cu auto-matching și filtrare avansată
 // LAYOUT: Stats 5-column grid (always), Filters 5-column grid, Quick filters inline
@@ -67,7 +70,85 @@ interface FilterState {
   search_contrapartida: string;
   min_suma: string;
   max_suma: string;
+  period_preset: string; // Perioada predefinită selectată
 }
+
+// ==================================================================
+// TIPURI PERIOADA PREDEFINITĂ
+// ==================================================================
+
+type PeriodPreset = 'luna_curenta' | 'luna_anterioara' | 'ultimele_3_luni' | 'ultimele_6_luni' | 'an_curent' | 'an_anterior' | 'personalizat';
+
+const PERIOD_PRESETS: { value: PeriodPreset; label: string }[] = [
+  { value: 'an_curent', label: '📅 An curent' },
+  { value: 'luna_curenta', label: '📆 Luna curentă' },
+  { value: 'luna_anterioara', label: '📆 Luna anterioară' },
+  { value: 'ultimele_3_luni', label: '📊 Ultimele 3 luni' },
+  { value: 'ultimele_6_luni', label: '📊 Ultimele 6 luni' },
+  { value: 'an_anterior', label: '📅 An anterior' },
+  { value: 'personalizat', label: '⚙️ Date personalizate' },
+];
+
+// Funcție pentru calcularea datelor în funcție de perioada selectată
+const calculatePeriodDates = (preset: PeriodPreset): { data_start: string; data_end: string } => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  const formatDate = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  switch (preset) {
+    case 'luna_curenta': {
+      const startOfMonth = new Date(year, month, 1);
+      return {
+        data_start: formatDate(startOfMonth),
+        data_end: formatDate(today)
+      };
+    }
+    case 'luna_anterioara': {
+      const startOfPrevMonth = new Date(year, month - 1, 1);
+      const endOfPrevMonth = new Date(year, month, 0); // Ziua 0 a lunii curente = ultima zi din luna anterioară
+      return {
+        data_start: formatDate(startOfPrevMonth),
+        data_end: formatDate(endOfPrevMonth)
+      };
+    }
+    case 'ultimele_3_luni': {
+      const threeMonthsAgo = new Date(year, month - 3, today.getDate());
+      return {
+        data_start: formatDate(threeMonthsAgo),
+        data_end: formatDate(today)
+      };
+    }
+    case 'ultimele_6_luni': {
+      const sixMonthsAgo = new Date(year, month - 6, today.getDate());
+      return {
+        data_start: formatDate(sixMonthsAgo),
+        data_end: formatDate(today)
+      };
+    }
+    case 'an_curent': {
+      const startOfYear = new Date(year, 0, 1);
+      return {
+        data_start: formatDate(startOfYear),
+        data_end: formatDate(today)
+      };
+    }
+    case 'an_anterior': {
+      const startOfPrevYear = new Date(year - 1, 0, 1);
+      const endOfPrevYear = new Date(year - 1, 11, 31);
+      return {
+        data_start: formatDate(startOfPrevYear),
+        data_end: formatDate(endOfPrevYear)
+      };
+    }
+    case 'personalizat':
+    default:
+      return { data_start: '', data_end: '' };
+  }
+};
 
 interface PaginationInfo {
   totalCount: number;
@@ -154,6 +235,26 @@ const ModernFilterPanel: React.FC<{
     onFiltersChange({ ...filters, [key]: value });
   };
 
+  // Handler pentru schimbarea perioadei predefinite
+  const handlePeriodChange = (preset: PeriodPreset) => {
+    const { data_start, data_end } = calculatePeriodDates(preset);
+    onFiltersChange({
+      ...filters,
+      period_preset: preset,
+      data_start,
+      data_end
+    });
+  };
+
+  // Handler pentru modificarea manuală a datelor - setează automat pe "personalizat"
+  const handleDateChange = (key: 'data_start' | 'data_end', value: string) => {
+    onFiltersChange({
+      ...filters,
+      [key]: value,
+      period_preset: 'personalizat'
+    });
+  };
+
   // Debounced search handler
   const handleSearchChange = (value: string) => {
     setLocalSearch(value);
@@ -178,19 +279,42 @@ const ModernFilterPanel: React.FC<{
     };
   }, []);
 
+  // Obține label-ul perioadei curente pentru afișare în modul compact
+  const getCurrentPeriodLabel = () => {
+    const preset = PERIOD_PRESETS.find(p => p.value === filters.period_preset);
+    return preset?.label || '📅 An curent';
+  };
+
   return (
     <Card variant="default" className="p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
           🔍 Filtrare Avansată
         </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? '📄 Comprimă' : '📋 Extinde'}
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* Dropdown Perioadă - Vizibil mereu */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Perioadă:</label>
+            <select
+              value={filters.period_preset || 'an_curent'}
+              onChange={(e) => handlePeriodChange(e.target.value as PeriodPreset)}
+              className="px-3 py-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm min-w-[180px]"
+            >
+              {PERIOD_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? '📄 Comprimă' : '📋 Extinde'}
+          </Button>
+        </div>
       </div>
 
       {isExpanded && (
@@ -201,13 +325,13 @@ const ModernFilterPanel: React.FC<{
               type="date"
               label="Data start"
               value={filters.data_start}
-              onChange={(e) => updateFilter('data_start', e.target.value)}
+              onChange={(e) => handleDateChange('data_start', e.target.value)}
             />
             <Input
               type="date"
               label="Data end"
               value={filters.data_end}
-              onChange={(e) => updateFilter('data_end', e.target.value)}
+              onChange={(e) => handleDateChange('data_end', e.target.value)}
             />
             <Input
               type="number"
@@ -604,18 +728,24 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const [availableBalance, setAvailableBalance] = useState<number | null>(null);
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
-  // Starea filtrelor
-  const [filters, setFilters] = useState<FilterState>({
-    data_start: '',
-    data_end: '',
-    directie: '',
-    status: '',
-    matching_tip: '',
-    min_confidence: '',
-    search_contrapartida: '',
-    min_suma: '',
-    max_suma: ''
-  });
+  // Starea filtrelor - default: An curent
+  const getDefaultFilters = useCallback((): FilterState => {
+    const { data_start, data_end } = calculatePeriodDates('an_curent');
+    return {
+      data_start,
+      data_end,
+      directie: '',
+      status: '',
+      matching_tip: '',
+      min_confidence: '',
+      search_contrapartida: '',
+      min_suma: '',
+      max_suma: '',
+      period_preset: 'an_curent'
+    };
+  }, []);
+
+  const [filters, setFilters] = useState<FilterState>(getDefaultFilters);
 
   // ==================================================================
   // AUTHENTICATION
@@ -638,14 +768,16 @@ const ModernTranzactiiDashboard: React.FC = () => {
   const loadDashboardData = useCallback(async (page: number = 1) => {
     setIsLoading(true);
     try {
+      // Exclude period_preset din parametrii API (e doar pentru UI)
+      const apiFilters = Object.fromEntries(
+        Object.entries(filters).filter(([key, value]) => value !== '' && key !== 'period_preset')
+      );
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pagination.limit.toString(),
         sort_by: 'data_procesare',
         sort_order: 'desc', // Cele mai recente sus, cele mai vechi jos
-        ...Object.fromEntries(
-          Object.entries(filters).filter(([_, value]) => value !== '')
-        )
+        ...apiFilters
       });
 
       const response = await fetch(`/api/tranzactii/dashboard?${params}`);
@@ -721,17 +853,9 @@ const ModernTranzactiiDashboard: React.FC = () => {
   };
 
   const handleFiltersReset = () => {
-    setFilters({
-      data_start: '',
-      data_end: '',
-      directie: '',
-      status: '',
-      matching_tip: '',
-      min_confidence: '',
-      search_contrapartida: '',
-      min_suma: '',
-      max_suma: ''
-    });
+    // Reset la filtrele default (An curent)
+    const defaultFilters = getDefaultFilters();
+    setFilters(defaultFilters);
     setTimeout(() => loadDashboardData(1), 100);
   };
 
