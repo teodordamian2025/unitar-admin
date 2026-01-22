@@ -2,11 +2,12 @@
 
 // ==================================================================
 // CALEA: app/planning-overview/page.tsx
-// DATA: 19.01.2026
+// DATA: 22.01.2026
 // DESCRIERE: Pagină vizualizare planning toți utilizatorii - VERSIUNE UTILIZATORI
 // IDENTIC cu admin dar cu UserLayout
 // ACTUALIZAT: Adăugat buton "+" în celule goale, modal adăugare alocări cu search proiecte,
 //             butoane delete/edit/add în modal detalii, text wrapping pe 2 linii
+// ACTUALIZAT 22.01.2026: Adăugat bare de progres General și Economic + buton detalii proiect
 // ==================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -38,6 +39,10 @@ interface Planificare {
   prioritate: string;
   observatii?: string;
   proiect_culoare?: string;
+  // Progres - ADĂUGAT 22.01.2026
+  progres_procent?: number;
+  progres_economic?: number;
+  parent_proiect_id?: string;
 }
 
 interface PlanningData {
@@ -1545,6 +1550,139 @@ export default function PlanningOverviewPage() {
                                   {p.observatii}
                                 </p>
                               )}
+
+                              {/* Bare de progres - ADĂUGAT 22.01.2026 */}
+                              {(() => {
+                                const progresGeneral = p.progres_procent || 0;
+                                const progresEconomic = p.progres_economic || 0;
+
+                                // Funcții pentru culorile barelor
+                                const getGeneralColor = (val: number) => {
+                                  if (val >= 100) return '#22c55e'; // green
+                                  if (val >= 80) return '#f59e0b'; // orange
+                                  if (val >= 50) return '#3b82f6'; // blue
+                                  return '#6b7280'; // gray
+                                };
+
+                                const getEconomicColor = (val: number) => {
+                                  if (val >= 100) return '#ef4444'; // red - overspent
+                                  if (val >= 80) return '#f59e0b'; // orange
+                                  if (val >= 50) return '#22c55e'; // green
+                                  return '#6b7280'; // gray
+                                };
+
+                                return (
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.25rem',
+                                    marginTop: '0.5rem',
+                                    padding: '0.5rem',
+                                    background: '#f9fafb',
+                                    borderRadius: '6px'
+                                  }}>
+                                    {/* Progres General */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                      <span style={{ fontSize: '0.65rem', color: '#6b7280', minWidth: '28px' }}>Gen</span>
+                                      <div style={{
+                                        flex: 1,
+                                        height: '6px',
+                                        background: 'rgba(0,0,0,0.1)',
+                                        borderRadius: '3px',
+                                        overflow: 'hidden'
+                                      }}>
+                                        <div style={{
+                                          width: `${Math.min(progresGeneral, 100)}%`,
+                                          height: '100%',
+                                          background: getGeneralColor(progresGeneral),
+                                          borderRadius: '3px',
+                                          transition: 'width 0.3s ease'
+                                        }} />
+                                      </div>
+                                      <span style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: '600',
+                                        color: getGeneralColor(progresGeneral),
+                                        minWidth: '35px',
+                                        textAlign: 'right'
+                                      }}>
+                                        {progresGeneral.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                    {/* Progres Economic */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                      <span style={{ fontSize: '0.65rem', color: '#6b7280', minWidth: '28px' }}>Eco</span>
+                                      <div style={{
+                                        flex: 1,
+                                        height: '6px',
+                                        background: 'rgba(0,0,0,0.1)',
+                                        borderRadius: '3px',
+                                        overflow: 'hidden'
+                                      }}>
+                                        <div style={{
+                                          width: `${Math.min(progresEconomic, 100)}%`,
+                                          height: '100%',
+                                          background: getEconomicColor(progresEconomic),
+                                          borderRadius: '3px',
+                                          transition: 'width 0.3s ease'
+                                        }} />
+                                      </div>
+                                      <span style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: '600',
+                                        color: getEconomicColor(progresEconomic),
+                                        minWidth: '35px',
+                                        textAlign: 'right'
+                                      }}>
+                                        {progresEconomic > 100 ? Math.round(progresEconomic) : progresEconomic.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Buton detalii proiect - ADĂUGAT 22.01.2026 */}
+                              {(() => {
+                                const parentId = p.parent_proiect_id || p.proiect_id || p.sarcina_proiect_id;
+                                if (!parentId) return null;
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/projects/${parentId}`);
+                                    }}
+                                    style={{
+                                      marginTop: '0.5rem',
+                                      padding: '4px 10px',
+                                      background: 'transparent',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '4px',
+                                      fontSize: '0.7rem',
+                                      color: '#6b7280',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      width: 'fit-content'
+                                    }}
+                                    onMouseOver={(e) => {
+                                      e.currentTarget.style.background = '#f3f4f6';
+                                      e.currentTarget.style.borderColor = '#3b82f6';
+                                      e.currentTarget.style.color = '#3b82f6';
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.currentTarget.style.background = 'transparent';
+                                      e.currentTarget.style.borderColor = '#d1d5db';
+                                      e.currentTarget.style.color = '#6b7280';
+                                    }}
+                                    title="Vezi detalii proiect"
+                                  >
+                                    <span>📋</span>
+                                    <span>Detalii proiect</span>
+                                  </button>
+                                );
+                              })()}
+
                               <div style={{ marginTop: '0.5rem' }}>
                                 <span style={{
                                   fontSize: '0.7rem',
