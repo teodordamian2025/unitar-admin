@@ -28,6 +28,8 @@ const DATASET = 'PanouControlUnitar';
 const TABLE_TIME_TRACKING = `\`${PROJECT_ID}.${DATASET}.TimeTracking${tableSuffix}\``;
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_SARCINI = `\`${PROJECT_ID}.${DATASET}.Sarcini${tableSuffix}\``;
+const TABLE_CHELTUIELI = `\`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}\``;
+const TABLE_SETARI_COSTURI = `\`${PROJECT_ID}.${DATASET}.SetariCosturi${tableSuffix}\``;
 
 console.log(`🔧 Time Tracking Analytics - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: TimeTracking${tableSuffix}, Proiecte${tableSuffix}, Sarcini${tableSuffix}`);
@@ -154,36 +156,140 @@ export async function GET(request: NextRequest) {
         break;
 
       case 'project-breakdown':
+        // ✅ 23.01.2026: Query extins cu date financiare complete pentru admin
         query = `
+          WITH cost_settings AS (
+            SELECT
+              COALESCE(cost_ora, 40) as cost_ora,
+              COALESCE(cost_zi, 320) as cost_zi,
+              COALESCE(ore_pe_zi, 8) as ore_pe_zi,
+              COALESCE(moneda, 'EUR') as moneda_cost
+            FROM ${TABLE_SETARI_COSTURI}
+            WHERE activ = TRUE
+            ORDER BY data_creare DESC
+            LIMIT 1
+          ),
+          cheltuieli_proiect AS (
+            SELECT
+              proiect_id,
+              ROUND(SUM(COALESCE(valoare_ron, valoare)), 2) as total_cheltuieli_ron
+            FROM ${TABLE_CHELTUIELI}
+            WHERE activ = TRUE
+            GROUP BY proiect_id
+          ),
+          time_data AS (
+            SELECT
+              tt.proiect_id,
+              ROUND(SUM(tt.ore_lucrate), 2) as total_ore,
+              COUNT(DISTINCT tt.utilizator_uid) as utilizatori_implicati,
+              COUNT(DISTINCT tt.sarcina_id) as sarcini_lucrate,
+              ROUND(AVG(tt.ore_lucrate), 2) as media_ore_pe_sesiune,
+              SUM(COALESCE(s.timp_estimat_total_ore, 8)) as total_ore_estimate
+            FROM ${TABLE_TIME_TRACKING} tt
+            LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
+            WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
+              AND tt.ore_lucrate > 0
+            GROUP BY tt.proiect_id
+          )
           SELECT
-            tt.proiect_id,
+            td.proiect_id,
             p.Denumire as proiect_nume,
             p.Status as proiect_status,
-            p.Valoare_Estimata as valoare_estimata,
+            COALESCE(p.Valoare_Estimata, 0) as valoare_estimata,
             p.moneda,
-            ROUND(SUM(tt.ore_lucrate), 2) as total_ore,
-            COUNT(DISTINCT tt.utilizator_uid) as utilizatori_implicati,
-            COUNT(DISTINCT tt.sarcina_id) as sarcini_lucrate,
-            ROUND(AVG(tt.ore_lucrate), 2) as media_ore_pe_sesiune,
+            COALESCE(p.valoare_ron, p.Valoare_Estimata) as valoare_ron,
+            COALESCE(p.curs_valutar, 5) as curs_valutar,
+            td.total_ore,
+            td.utilizatori_implicati,
+            td.sarcini_lucrate,
+            td.media_ore_pe_sesiune,
 
-            -- Progres (ore lucrate vs estimate din sarcini)
+            -- Progres general (ore lucrate vs estimate din sarcini)
+            ROUND(
+              SAFE_DIVIDE(td.total_ore, td.total_ore_estimate) * 100,
+              1
+            ) as progres_procent,
+
+            -- Date financiare
+            COALESCE(ch.total_cheltuieli_ron, 0) as cheltuieli_directe_ron,
+            cs.cost_ora,
+            cs.moneda_cost,
+
+            -- Cost timp lucrat = ore * cost/oră
+            ROUND(td.total_ore * cs.cost_ora, 2) as cost_timp_lucrat,
+
+            -- Cheltuieli în moneda proiectului
+            CASE
+              WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+              ELSE ROUND(SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5)), 2)
+            END as cheltuieli_directe,
+
+            -- Cost total proiect = cheltuieli + cost timp
+            ROUND(
+              CASE
+                WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+                ELSE SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5))
+              END + (td.total_ore * cs.cost_ora),
+              2
+            ) as cost_total,
+
+            -- Profit/Pierdere = Valoare - Cost total
+            ROUND(
+              COALESCE(p.Valoare_Estimata, 0) - (
+                CASE
+                  WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+                  ELSE SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5))
+                END + (td.total_ore * cs.cost_ora)
+              ),
+              2
+            ) as profit_pierdere,
+
+            -- Este profitabil?
+            CASE
+              WHEN COALESCE(p.Valoare_Estimata, 0) - (
+                CASE
+                  WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+                  ELSE SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5))
+                END + (td.total_ore * cs.cost_ora)
+              ) >= 0 THEN TRUE
+              ELSE FALSE
+            END as este_profitabil,
+
+            -- Ore alocate disponibile = (Valoare - Cheltuieli) / cost_ora
             ROUND(
               SAFE_DIVIDE(
-                SUM(tt.ore_lucrate),
-                SUM(COALESCE(s.timp_estimat_total_ore, 8)) -- default 8h per sarcină
-              ) * 100,
-              1
-            ) as progres_procent
+                COALESCE(p.Valoare_Estimata, 0) - CASE
+                  WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+                  ELSE SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5))
+                END,
+                cs.cost_ora
+              ),
+              2
+            ) as ore_alocate_disponibile,
 
-          FROM ${TABLE_TIME_TRACKING} tt
-          LEFT JOIN ${TABLE_PROIECTE} p
-            ON tt.proiect_id = p.ID_Proiect
-          LEFT JOIN ${TABLE_SARCINI} s
-            ON tt.sarcina_id = s.id
-          WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
-            AND tt.ore_lucrate > 0
-          GROUP BY tt.proiect_id, p.Denumire, p.Status, p.Valoare_Estimata, p.moneda
-          ORDER BY total_ore DESC
+            -- Progres economic = (ore lucrate / ore alocate disponibile) * 100
+            ROUND(
+              SAFE_DIVIDE(
+                td.total_ore * 100,
+                NULLIF(
+                  SAFE_DIVIDE(
+                    COALESCE(p.Valoare_Estimata, 0) - CASE
+                      WHEN p.moneda = 'RON' THEN COALESCE(ch.total_cheltuieli_ron, 0)
+                      ELSE SAFE_DIVIDE(COALESCE(ch.total_cheltuieli_ron, 0), COALESCE(p.curs_valutar, 5))
+                    END,
+                    cs.cost_ora
+                  ),
+                  0
+                )
+              ),
+              1
+            ) as progres_economic
+
+          FROM time_data td
+          LEFT JOIN ${TABLE_PROIECTE} p ON td.proiect_id = p.ID_Proiect
+          LEFT JOIN cheltuieli_proiect ch ON td.proiect_id = ch.proiect_id
+          CROSS JOIN cost_settings cs
+          ORDER BY td.total_ore DESC
         `;
         queryParams = [{ name: 'period', parameterType: { type: 'INT64' }, parameterValue: { value: period } }];
         break;

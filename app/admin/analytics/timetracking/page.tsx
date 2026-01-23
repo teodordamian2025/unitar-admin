@@ -80,11 +80,24 @@ interface ProjectBreakdown {
   proiect_status: string;
   valoare_estimata: number;
   moneda: string;
+  valoare_ron: number;
+  curs_valutar: number;
   total_ore: number;
   utilizatori_implicati: number;
   sarcini_lucrate: number;
   media_ore_pe_sesiune: number;
   progres_procent: number;
+  // ✅ 23.01.2026: Date financiare extinse pentru admin
+  progres_economic: number;
+  cheltuieli_directe: number;
+  cheltuieli_directe_ron: number;
+  cost_timp_lucrat: number;
+  cost_total: number;
+  profit_pierdere: number;
+  este_profitabil: boolean;
+  ore_alocate_disponibile: number;
+  cost_ora: number;
+  moneda_cost: string;
 }
 
 export default function EnhancedTimeTrackingDashboard() {
@@ -631,107 +644,269 @@ export default function EnhancedTimeTrackingDashboard() {
         <div>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))',
             gap: '1.5rem',
             marginBottom: '2rem'
           }}>
-            {projectData.map((project) => (
-              <Card key={project.proiect_id} variant={
-                project.proiect_status === 'Activ' ? 'success' :
-                project.proiect_status === 'Întârziat' ? 'warning' : 'primary'
-              }>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '1rem'
-                }}>
-                  <h3 style={{
-                    margin: 0,
-                    fontSize: '1.25rem',
-                    fontWeight: '700',
-                    color: '#1f2937'
-                  }}>
-                    📋 {project.proiect_nume || 'Proiect necunoscut'}
-                  </h3>
-                  <div style={{
-                    background: (project.proiect_status || 'Necunoscut') === 'Activ'
-                      ? 'rgba(16, 185, 129, 0.1)'
-                      : 'rgba(245, 158, 11, 0.1)',
-                    color: (project.proiect_status || 'Necunoscut') === 'Activ'
-                      ? '#10b981'
-                      : '#f59e0b',
-                    padding: '0.375rem 0.75rem',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600'
-                  }}>
-                    {project.proiect_status || 'Necunoscut'}
-                  </div>
-                </div>
+            {projectData.map((project) => {
+              // ✅ 23.01.2026: Funcții helper pentru culori progres
+              const progresGeneral = parseBigQueryNumeric(project.progres_procent);
+              const progresEconomic = parseBigQueryNumeric(project.progres_economic);
+              const esteProfitabil = project.este_profitabil;
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '1rem',
-                  marginBottom: '1rem'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {parseBigQueryNumeric(project.total_ore)}h
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      Total ore
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {parseBigQueryNumeric(project.progres_procent)}%
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      Progres
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {parseBigQueryNumeric(project.utilizatori_implicati)}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      Echipă
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {parseBigQueryNumeric(project.valoare_estimata).toLocaleString()} {project.moneda || 'EUR'}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      Valoare
-                    </div>
-                  </div>
-                </div>
+              // Culori progres general: gri → albastru → portocaliu → verde
+              const getGeneralColor = (p: number) => {
+                if (p >= 100) return '#22c55e'; // verde - finalizat
+                if (p >= 80) return '#f59e0b';  // portocaliu - aproape
+                if (p >= 50) return '#3b82f6';  // albastru - în progres
+                return '#6b7280';               // gri - început
+              };
 
-                {/* Progress Bar */}
-                <div style={{
-                  background: 'rgba(156, 163, 175, 0.2)',
-                  borderRadius: '8px',
-                  height: '8px',
-                  overflow: 'hidden',
-                  marginTop: '1rem'
-                }}>
+              // Culori progres economic: gri → verde → portocaliu → roșu (depășire)
+              const getEconomicColor = (p: number) => {
+                if (p >= 100) return '#ef4444'; // roșu - depășire
+                if (p >= 80) return '#f59e0b';  // portocaliu - aproape
+                if (p >= 50) return '#22c55e';  // verde - zona optimă
+                return '#6b7280';               // gri - început
+              };
+
+              return (
+                <Card key={project.proiect_id} variant={
+                  project.proiect_status === 'Activ' ? 'success' :
+                  project.proiect_status === 'Întârziat' ? 'warning' : 'primary'
+                }>
+                  {/* Header cu nume și status */}
                   <div style={{
-                    background: parseBigQueryNumeric(project.progres_procent) >= 80
-                      ? '#10b981'
-                      : parseBigQueryNumeric(project.progres_procent) >= 50
-                        ? '#f59e0b'
-                        : '#ef4444',
-                    height: '100%',
-                    width: `${parseBigQueryNumeric(project.progres_procent)}%`,
-                    borderRadius: '8px',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-              </Card>
-            ))}
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '1rem'
+                  }}>
+                    <h3 style={{
+                      margin: 0,
+                      fontSize: '1.15rem',
+                      fontWeight: '700',
+                      color: '#1f2937',
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      paddingRight: '0.5rem'
+                    }}>
+                      📋 {project.proiect_nume || 'Proiect necunoscut'}
+                    </h3>
+                    <div style={{
+                      background: (project.proiect_status || 'Necunoscut') === 'Activ'
+                        ? 'rgba(16, 185, 129, 0.1)'
+                        : 'rgba(245, 158, 11, 0.1)',
+                      color: (project.proiect_status || 'Necunoscut') === 'Activ'
+                        ? '#10b981'
+                        : '#f59e0b',
+                      padding: '0.375rem 0.75rem',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      flexShrink: 0
+                    }}>
+                      {project.proiect_status || 'Necunoscut'}
+                    </div>
+                  </div>
+
+                  {/* ✅ Bare de progres Gen/Eco - ca în ProiecteTable */}
+                  <div style={{
+                    background: 'rgba(0,0,0,0.03)',
+                    borderRadius: '10px',
+                    padding: '0.75rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {/* Progres General */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '70px', fontWeight: '500' }}>Gen (ore)</span>
+                        <div style={{
+                          flex: 1,
+                          height: '8px',
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            width: `${Math.min(progresGeneral, 100)}%`,
+                            height: '100%',
+                            backgroundColor: getGeneralColor(progresGeneral),
+                            borderRadius: '4px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          color: getGeneralColor(progresGeneral),
+                          minWidth: '45px',
+                          textAlign: 'right'
+                        }}>
+                          {progresGeneral.toFixed(0)}%
+                        </span>
+                      </div>
+                      {/* Progres Economic */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '70px', fontWeight: '500' }}>Eco (buget)</span>
+                        <div style={{
+                          flex: 1,
+                          height: '8px',
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            width: `${Math.min(progresEconomic, 100)}%`,
+                            height: '100%',
+                            backgroundColor: getEconomicColor(progresEconomic),
+                            borderRadius: '4px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          color: getEconomicColor(progresEconomic),
+                          minWidth: '45px',
+                          textAlign: 'right'
+                        }}>
+                          {progresEconomic > 100 ? Math.round(progresEconomic) : progresEconomic.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statistici principale */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '0.75rem',
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+                        {parseBigQueryNumeric(project.total_ore)}h
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Ore lucrate
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                        {parseBigQueryNumeric(project.utilizatori_implicati)}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Echipă
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                        {parseBigQueryNumeric(project.sarcini_lucrate)}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Sarcini
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ✅ Informații financiare - ca în FinancialStatsCard */}
+                  <div style={{
+                    background: 'rgba(0,0,0,0.02)',
+                    borderRadius: '10px',
+                    padding: '0.75rem'
+                  }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gap: '0.5rem',
+                      fontSize: '12px'
+                    }}>
+                      {/* Valoare proiect */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.375rem 0.5rem',
+                        background: 'rgba(59, 130, 246, 0.08)',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #3b82f6'
+                      }}>
+                        <span style={{ color: '#6b7280' }}>Valoare</span>
+                        <span style={{ fontWeight: '600', color: '#3b82f6' }}>
+                          {parseBigQueryNumeric(project.valoare_estimata).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
+                        </span>
+                      </div>
+
+                      {/* Cheltuieli directe */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.375rem 0.5rem',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #ef4444'
+                      }}>
+                        <span style={{ color: '#6b7280' }}>Cheltuieli</span>
+                        <span style={{ fontWeight: '600', color: '#ef4444' }}>
+                          -{parseBigQueryNumeric(project.cheltuieli_directe).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
+                        </span>
+                      </div>
+
+                      {/* Cost timp lucrat */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.375rem 0.5rem',
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid #f59e0b'
+                      }}>
+                        <span style={{ color: '#6b7280' }}>Cost timp</span>
+                        <span style={{ fontWeight: '600', color: '#f59e0b' }}>
+                          -{parseBigQueryNumeric(project.cost_timp_lucrat).toLocaleString('ro-RO')} {project.moneda_cost || 'EUR'}
+                        </span>
+                      </div>
+
+                      {/* Profit/Pierdere */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.375rem 0.5rem',
+                        background: esteProfitabil ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        borderRadius: '6px',
+                        borderLeft: `3px solid ${esteProfitabil ? '#10b981' : '#ef4444'}`
+                      }}>
+                        <span style={{ color: '#6b7280' }}>{esteProfitabil ? 'Profit' : 'Pierdere'}</span>
+                        <span style={{ fontWeight: '700', color: esteProfitabil ? '#10b981' : '#ef4444' }}>
+                          {esteProfitabil ? '+' : ''}{parseBigQueryNumeric(project.profit_pierdere).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info cost orar */}
+                    <div style={{
+                      marginTop: '0.5rem',
+                      paddingTop: '0.5rem',
+                      borderTop: '1px solid rgba(0,0,0,0.06)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '10px',
+                      color: '#9ca3af'
+                    }}>
+                      <span>
+                        Cost: {parseBigQueryNumeric(project.cost_ora)} {project.moneda_cost || 'EUR'}/oră
+                      </span>
+                      <span>
+                        Ore disponibile: {parseBigQueryNumeric(project.ore_alocate_disponibile).toFixed(0)}h
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Project Performance Chart */}
