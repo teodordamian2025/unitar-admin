@@ -542,7 +542,16 @@ export default function EnhancedTimeTrackingDashboard() {
             marginBottom: '2rem'
           }}>
             {teamData.map((member) => (
-              <Card key={member.utilizator_uid} variant="primary">
+              <Card
+                key={member.utilizator_uid}
+                variant="primary"
+                style={{
+                  // ✅ 23.01.2026: Îmbunătățire contrast card - fundal mai vizibil
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  boxShadow: '0 4px 20px rgba(59, 130, 246, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08)'
+                }}
+              >
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -559,15 +568,15 @@ export default function EnhancedTimeTrackingDashboard() {
                   </h3>
                   <div style={{
                     background: parseBigQueryNumeric(member.eficienta_procent) >= 90
-                      ? 'rgba(16, 185, 129, 0.1)'
+                      ? 'rgba(16, 185, 129, 0.15)'
                       : parseBigQueryNumeric(member.eficienta_procent) >= 80
-                        ? 'rgba(245, 158, 11, 0.1)'
-                        : 'rgba(239, 68, 68, 0.1)',
+                        ? 'rgba(245, 158, 11, 0.15)'
+                        : 'rgba(239, 68, 68, 0.15)',
                     color: parseBigQueryNumeric(member.eficienta_procent) >= 90
-                      ? '#10b981'
+                      ? '#059669'
                       : parseBigQueryNumeric(member.eficienta_procent) >= 80
-                        ? '#f59e0b'
-                        : '#ef4444',
+                        ? '#d97706'
+                        : '#dc2626',
                     padding: '0.375rem 0.75rem',
                     borderRadius: '8px',
                     fontSize: '0.75rem',
@@ -670,11 +679,33 @@ export default function EnhancedTimeTrackingDashboard() {
                 return '#6b7280';               // gri - început
               };
 
+              // ✅ 23.01.2026: Culori pentru bordură în funcție de status
+              const getStatusBorderColor = () => {
+                if (project.proiect_status === 'Activ') return 'rgba(16, 185, 129, 0.3)';
+                if (project.proiect_status === 'Întârziat') return 'rgba(245, 158, 11, 0.3)';
+                return 'rgba(59, 130, 246, 0.25)';
+              };
+
+              const getStatusShadow = () => {
+                if (project.proiect_status === 'Activ') return '0 4px 20px rgba(16, 185, 129, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)';
+                if (project.proiect_status === 'Întârziat') return '0 4px 20px rgba(245, 158, 11, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)';
+                return '0 4px 20px rgba(59, 130, 246, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08)';
+              };
+
               return (
-                <Card key={project.proiect_id} variant={
-                  project.proiect_status === 'Activ' ? 'success' :
-                  project.proiect_status === 'Întârziat' ? 'warning' : 'primary'
-                }>
+                <Card
+                  key={project.proiect_id}
+                  variant={
+                    project.proiect_status === 'Activ' ? 'success' :
+                    project.proiect_status === 'Întârziat' ? 'warning' : 'primary'
+                  }
+                  style={{
+                    // ✅ 23.01.2026: Îmbunătățire contrast card - fundal mai vizibil
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    border: `1px solid ${getStatusBorderColor()}`,
+                    boxShadow: getStatusShadow()
+                  }}
+                >
                   {/* Header cu nume și status */}
                   <div style={{
                     display: 'flex',
@@ -697,11 +728,11 @@ export default function EnhancedTimeTrackingDashboard() {
                     </h3>
                     <div style={{
                       background: (project.proiect_status || 'Necunoscut') === 'Activ'
-                        ? 'rgba(16, 185, 129, 0.1)'
-                        : 'rgba(245, 158, 11, 0.1)',
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : 'rgba(245, 158, 11, 0.15)',
                       color: (project.proiect_status || 'Necunoscut') === 'Activ'
-                        ? '#10b981'
-                        : '#f59e0b',
+                        ? '#059669'
+                        : '#d97706',
                       padding: '0.375rem 0.75rem',
                       borderRadius: '8px',
                       fontSize: '0.75rem',
@@ -714,10 +745,11 @@ export default function EnhancedTimeTrackingDashboard() {
 
                   {/* ✅ Bare de progres Gen/Eco - ca în ProiecteTable */}
                   <div style={{
-                    background: 'rgba(0,0,0,0.03)',
+                    background: 'rgba(241, 245, 249, 0.8)',
                     borderRadius: '10px',
                     padding: '0.75rem',
-                    marginBottom: '1rem'
+                    marginBottom: '1rem',
+                    border: '1px solid rgba(203, 213, 225, 0.5)'
                   }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {/* Progres General */}
@@ -726,7 +758,7 @@ export default function EnhancedTimeTrackingDashboard() {
                         <div style={{
                           flex: 1,
                           height: '8px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          backgroundColor: 'rgba(203, 213, 225, 0.6)',
                           borderRadius: '4px',
                           overflow: 'hidden'
                         }}>
@@ -754,7 +786,7 @@ export default function EnhancedTimeTrackingDashboard() {
                         <div style={{
                           flex: 1,
                           height: '8px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          backgroundColor: 'rgba(203, 213, 225, 0.6)',
                           borderRadius: '4px',
                           overflow: 'hidden'
                         }}>
@@ -814,9 +846,10 @@ export default function EnhancedTimeTrackingDashboard() {
 
                   {/* ✅ Informații financiare - ca în FinancialStatsCard */}
                   <div style={{
-                    background: 'rgba(0,0,0,0.02)',
+                    background: 'rgba(241, 245, 249, 0.8)',
                     borderRadius: '10px',
-                    padding: '0.75rem'
+                    padding: '0.75rem',
+                    border: '1px solid rgba(203, 213, 225, 0.5)'
                   }}>
                     <div style={{
                       display: 'grid',
@@ -829,12 +862,12 @@ export default function EnhancedTimeTrackingDashboard() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         padding: '0.375rem 0.5rem',
-                        background: 'rgba(59, 130, 246, 0.08)',
+                        background: 'rgba(59, 130, 246, 0.12)',
                         borderRadius: '6px',
                         borderLeft: '3px solid #3b82f6'
                       }}>
-                        <span style={{ color: '#6b7280' }}>Valoare</span>
-                        <span style={{ fontWeight: '600', color: '#3b82f6' }}>
+                        <span style={{ color: '#475569' }}>Valoare</span>
+                        <span style={{ fontWeight: '600', color: '#2563eb' }}>
                           {parseBigQueryNumeric(project.valoare_estimata).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
                         </span>
                       </div>
@@ -844,12 +877,12 @@ export default function EnhancedTimeTrackingDashboard() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         padding: '0.375rem 0.5rem',
-                        background: 'rgba(239, 68, 68, 0.08)',
+                        background: 'rgba(239, 68, 68, 0.12)',
                         borderRadius: '6px',
                         borderLeft: '3px solid #ef4444'
                       }}>
-                        <span style={{ color: '#6b7280' }}>Cheltuieli</span>
-                        <span style={{ fontWeight: '600', color: '#ef4444' }}>
+                        <span style={{ color: '#475569' }}>Cheltuieli</span>
+                        <span style={{ fontWeight: '600', color: '#dc2626' }}>
                           -{parseBigQueryNumeric(project.cheltuieli_directe).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
                         </span>
                       </div>
@@ -859,12 +892,12 @@ export default function EnhancedTimeTrackingDashboard() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         padding: '0.375rem 0.5rem',
-                        background: 'rgba(245, 158, 11, 0.08)',
+                        background: 'rgba(245, 158, 11, 0.12)',
                         borderRadius: '6px',
                         borderLeft: '3px solid #f59e0b'
                       }}>
-                        <span style={{ color: '#6b7280' }}>Cost timp</span>
-                        <span style={{ fontWeight: '600', color: '#f59e0b' }}>
+                        <span style={{ color: '#475569' }}>Cost timp</span>
+                        <span style={{ fontWeight: '600', color: '#d97706' }}>
                           -{parseBigQueryNumeric(project.cost_timp_lucrat).toLocaleString('ro-RO')} {project.moneda_cost || 'EUR'}
                         </span>
                       </div>
@@ -874,12 +907,12 @@ export default function EnhancedTimeTrackingDashboard() {
                         display: 'flex',
                         justifyContent: 'space-between',
                         padding: '0.375rem 0.5rem',
-                        background: esteProfitabil ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        background: esteProfitabil ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)',
                         borderRadius: '6px',
-                        borderLeft: `3px solid ${esteProfitabil ? '#10b981' : '#ef4444'}`
+                        borderLeft: `3px solid ${esteProfitabil ? '#059669' : '#dc2626'}`
                       }}>
-                        <span style={{ color: '#6b7280' }}>{esteProfitabil ? 'Profit' : 'Pierdere'}</span>
-                        <span style={{ fontWeight: '700', color: esteProfitabil ? '#10b981' : '#ef4444' }}>
+                        <span style={{ color: '#475569' }}>{esteProfitabil ? 'Profit' : 'Pierdere'}</span>
+                        <span style={{ fontWeight: '700', color: esteProfitabil ? '#059669' : '#dc2626' }}>
                           {esteProfitabil ? '+' : ''}{parseBigQueryNumeric(project.profit_pierdere).toLocaleString('ro-RO')} {project.moneda || 'EUR'}
                         </span>
                       </div>
@@ -889,12 +922,12 @@ export default function EnhancedTimeTrackingDashboard() {
                     <div style={{
                       marginTop: '0.5rem',
                       paddingTop: '0.5rem',
-                      borderTop: '1px solid rgba(0,0,0,0.06)',
+                      borderTop: '1px solid rgba(148, 163, 184, 0.3)',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       fontSize: '10px',
-                      color: '#9ca3af'
+                      color: '#64748b'
                     }}>
                       <span>
                         Cost: {parseBigQueryNumeric(project.cost_ora)} {project.moneda_cost || 'EUR'}/oră
