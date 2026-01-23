@@ -474,7 +474,7 @@ export default function PlanningOverviewPage() {
     if (!confirm('Sigur doriți să ștergeți această alocare?')) return;
 
     try {
-      const response = await fetch(`/api/planificari-zilnice?id=${alocareId}`, {
+      const response = await fetch(`/api/planificari-zilnice/${alocareId}`, {
         method: 'DELETE'
       });
 
@@ -504,11 +504,10 @@ export default function PlanningOverviewPage() {
     if (!editingAlocare) return;
 
     try {
-      const response = await fetch('/api/planificari-zilnice', {
+      const response = await fetch(`/api/planificari-zilnice/${editingAlocare.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: editingAlocare.id,
           ore_planificate: editOre,
           prioritate: editPrioritate,
           observatii: editObservatii
