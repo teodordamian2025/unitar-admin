@@ -115,6 +115,9 @@ export async function GET(request: NextRequest) {
           fg.storno_pentru_factura_id,
           fg.stornata_de_factura_id,
 
+          -- ✅ EXCLUDE NOTIFICĂRI PLATĂ (23.01.2026) - pentru facturi vechi importate retroactiv
+          COALESCE(fg.exclude_notificari_plata, false) as exclude_notificari_plata,
+
           -- ✅ Calcule utile
           (fg.total - COALESCE(inc.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
           DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta,

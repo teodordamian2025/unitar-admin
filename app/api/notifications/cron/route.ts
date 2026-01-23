@@ -311,6 +311,8 @@ export async function GET(request: NextRequest) {
       subproiecte_depasite: 0,
       sarcini_apropiate: 0,
       sarcini_depasite: 0,
+      facturi_scadenta_apropiata: 0, // NOU 23.01.2026
+      facturi_scadenta_depasita: 0,  // NOU 23.01.2026
       facturi_netrimise_anaf: 0,
     };
 
@@ -1095,7 +1097,240 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 7. FACTURI NETRIMISE LA ANAF (>2 zile de la emitere)
+    // 7. FACTURI CU SCADENȚĂ APROPIATĂ (pentru admini)
+    // ============================================
+    // NOU 23.01.2026: Verifică facturile cu scadență în următoarele 7 zile
+    // EXCLUDE: facturi marcate cu exclude_notificari_plata = TRUE
+
+    const facturiScadentaApropiataQuery = `
+      SELECT
+        fg.id,
+        fg.serie,
+        fg.numar,
+        fg.data_factura,
+        fg.data_scadenta,
+        fg.client_nume,
+        fg.client_cui,
+        fg.total,
+        fg.valoare_platita,
+        fg.proiect_id,
+        (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+        DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      WHERE fg.data_scadenta IS NOT NULL
+        AND fg.data_scadenta BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
+        AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
+        AND COALESCE(fg.is_storno, false) = false
+        AND fg.stornata_de_factura_id IS NULL
+        AND fg.status NOT IN ('storno', 'stornata', 'platita')
+        -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
+        AND COALESCE(fg.exclude_notificari_plata, false) = false
+      ORDER BY fg.data_scadenta ASC
+    `;
+
+    const [facturiScadentaApropiate] = await bigquery.query({ query: facturiScadentaApropiataQuery });
+    stats.facturi_scadenta_apropiata = facturiScadentaApropiate.length;
+    console.log(`💳 Facturi cu scadență apropiată (${zileAvans} zile): ${facturiScadentaApropiate.length}`);
+
+    if (facturiScadentaApropiate.length > 0) {
+      // Obține toți adminii pentru notificare
+      const adminiScadentaQuery = `
+        SELECT uid, nume, prenume, email
+        FROM ${TABLE_UTILIZATORI}
+        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+      `;
+      const [adminiScadenta] = await bigquery.query({ query: adminiScadentaQuery });
+
+      for (const factura of facturiScadentaApropiate) {
+        const serieNumar = `${factura.serie || ''} ${factura.numar || ''}`.trim();
+        const dataScadenta = extractDateValue(factura.data_scadenta);
+        const zileRamase = parseInt(factura.zile_pana_scadenta) || 0;
+
+        // Verifică dacă notificarea a fost deja trimisă pentru această factură
+        const dejaTrimisaScadentaQuery = `
+          SELECT COUNT(*) as count
+          FROM ${TABLE_NOTIFICARI}
+          WHERE tip_notificare = 'factura_scadenta_aproape'
+            AND JSON_EXTRACT_SCALAR(continut_json, '$.factura_id') = @factura_id
+            AND data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+        `;
+
+        const [checkScadentaRows] = await bigquery.query({
+          query: dejaTrimisaScadentaQuery,
+          params: { factura_id: factura.id },
+        });
+
+        if ((checkScadentaRows[0]?.count || 0) > 0) {
+          console.log(`⏭️ Skip - notificare factură scadență aproape deja trimisă recent pentru ${serieNumar}`);
+          continue;
+        }
+
+        const linkDetalii = `${baseUrl}/admin/rapoarte/facturi?search=${encodeURIComponent(serieNumar)}`;
+
+        for (const admin of adminiScadenta) {
+          const adminName = `${admin.nume || ''} ${admin.prenume || ''}`.trim() || 'Admin';
+
+          const context: NotificareContext = {
+            factura_id: factura.id,
+            serie_factura: factura.serie,
+            numar_factura: factura.numar,
+            client_nume: factura.client_nume,
+            suma_totala: parseFloat(factura.total) || 0,
+            suma_achitata: parseFloat(factura.valoare_platita) || 0,
+            data_scadenta: dataScadenta || '',
+            zile_ramase: zileRamase,
+            user_name: adminName,
+            link_detalii: linkDetalii,
+          };
+
+          await trimitereNotificareClopotel(
+            baseUrl,
+            'factura_scadenta_aproape',
+            admin.uid,
+            context,
+            dryRun
+          );
+
+          addNotificationToUser(
+            admin.uid,
+            adminName,
+            admin.email || '',
+            'admin',
+            {
+              tip: 'proiect',
+              tip_notificare: 'factura_scadenta_aproape',
+              denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
+              proiect_id: factura.id,
+              client: factura.client_nume,
+              deadline: dataScadenta || '',
+              zile_ramase: zileRamase,
+              link_detalii: linkDetalii,
+            }
+          );
+        }
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Factură scadență aproape: ${serieNumar} - ${factura.client_nume} (${zileRamase} zile)`);
+      }
+    }
+
+    // ============================================
+    // 8. FACTURI CU SCADENȚĂ DEPĂȘITĂ (pentru admini)
+    // ============================================
+    // NOU 23.01.2026: Verifică facturile cu scadență depășită
+    // EXCLUDE: facturi marcate cu exclude_notificari_plata = TRUE
+
+    const facturiScadentaDepasitaQuery = `
+      SELECT
+        fg.id,
+        fg.serie,
+        fg.numar,
+        fg.data_factura,
+        fg.data_scadenta,
+        fg.client_nume,
+        fg.client_cui,
+        fg.total,
+        fg.valoare_platita,
+        fg.proiect_id,
+        (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+        DATE_DIFF(CURRENT_DATE(), fg.data_scadenta, DAY) as zile_intarziere
+      FROM ${TABLE_FACTURI_GENERATE} fg
+      WHERE fg.data_scadenta IS NOT NULL
+        AND fg.data_scadenta < CURRENT_DATE()
+        AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
+        AND COALESCE(fg.is_storno, false) = false
+        AND fg.stornata_de_factura_id IS NULL
+        AND fg.status NOT IN ('storno', 'stornata', 'platita')
+        -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
+        AND COALESCE(fg.exclude_notificari_plata, false) = false
+      ORDER BY fg.data_scadenta ASC
+      LIMIT 50
+    `;
+
+    const [facturiScadentaDepasita] = await bigquery.query({ query: facturiScadentaDepasitaQuery });
+    stats.facturi_scadenta_depasita = facturiScadentaDepasita.length;
+    console.log(`💳 Facturi cu scadență depășită: ${facturiScadentaDepasita.length}`);
+
+    if (facturiScadentaDepasita.length > 0) {
+      // Obține toți adminii pentru notificare
+      const adminiDepasitaQuery = `
+        SELECT uid, nume, prenume, email
+        FROM ${TABLE_UTILIZATORI}
+        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+      `;
+      const [adminiDepasita] = await bigquery.query({ query: adminiDepasitaQuery });
+
+      for (const factura of facturiScadentaDepasita) {
+        const serieNumar = `${factura.serie || ''} ${factura.numar || ''}`.trim();
+        const dataScadenta = extractDateValue(factura.data_scadenta);
+        const zileIntarziere = parseInt(factura.zile_intarziere) || 0;
+
+        // Verifică dacă notificarea a fost deja trimisă pentru această factură
+        const dejaTrimisaDepasitaQuery = `
+          SELECT COUNT(*) as count
+          FROM ${TABLE_NOTIFICARI}
+          WHERE tip_notificare = 'factura_scadenta_depasita'
+            AND JSON_EXTRACT_SCALAR(continut_json, '$.factura_id') = @factura_id
+            AND data_creare >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)
+        `;
+
+        const [checkDepasitaRows] = await bigquery.query({
+          query: dejaTrimisaDepasitaQuery,
+          params: { factura_id: factura.id },
+        });
+
+        if ((checkDepasitaRows[0]?.count || 0) > 0) {
+          console.log(`⏭️ Skip - notificare factură scadență depășită deja trimisă recent pentru ${serieNumar}`);
+          continue;
+        }
+
+        const linkDetalii = `${baseUrl}/admin/rapoarte/facturi?search=${encodeURIComponent(serieNumar)}`;
+
+        for (const admin of adminiDepasita) {
+          const adminName = `${admin.nume || ''} ${admin.prenume || ''}`.trim() || 'Admin';
+
+          const context: NotificareContext = {
+            factura_id: factura.id,
+            serie_factura: factura.serie,
+            numar_factura: factura.numar,
+            client_nume: factura.client_nume,
+            suma_totala: parseFloat(factura.total) || 0,
+            suma_achitata: parseFloat(factura.valoare_platita) || 0,
+            data_scadenta: dataScadenta || '',
+            zile_intarziere: zileIntarziere,
+            user_name: adminName,
+            link_detalii: linkDetalii,
+          };
+
+          await trimitereNotificareClopotel(
+            baseUrl,
+            'factura_scadenta_depasita',
+            admin.uid,
+            context,
+            dryRun
+          );
+
+          addNotificationToUser(
+            admin.uid,
+            adminName,
+            admin.email || '',
+            'admin',
+            {
+              tip: 'proiect',
+              tip_notificare: 'factura_scadenta_depasita',
+              denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
+              proiect_id: factura.id,
+              client: factura.client_nume,
+              deadline: dataScadenta || '',
+              zile_intarziere: zileIntarziere,
+              link_detalii: linkDetalii,
+            }
+          );
+        }
+        notificariTrimise.push(`${dryRun ? '[DRY RUN] ' : ''}Factură scadență DEPĂȘITĂ: ${serieNumar} - ${factura.client_nume} (${zileIntarziere} zile întârziere)`);
+      }
+    }
+
+    // ============================================
+    // 9. FACTURI NETRIMISE LA ANAF (>2 zile de la emitere)
     // ============================================
     // Verifică facturile generate care nu au ajuns în e-Factura ANAF după 2 zile
     // Trimite notificare către toți adminii

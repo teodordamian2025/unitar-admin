@@ -278,9 +278,10 @@ export async function PUT(request: NextRequest) {
       keys: Object.keys(body)
     });
 
-    // ✅ VERIFICARE: Tip de update - simplu (doar status) sau complet (editare)
-    const isSimpleStatusUpdate = body.status && !body.liniiFactura && !body.clientInfo;
-    
+    // ✅ VERIFICARE: Tip de update - simplu (doar status sau exclude_notificari_plata) sau complet (editare)
+    // ✅ MODIFICAT 23.01.2026: Include și cazul cu exclude_notificari_plata
+    const isSimpleStatusUpdate = (body.status || body.exclude_notificari_plata !== undefined) && !body.liniiFactura && !body.clientInfo;
+
     if (isSimpleStatusUpdate) {
       console.log('🔍 Simple status update pentru factura:', body.facturaId);
       return await handleSimpleStatusUpdate(body);
@@ -302,8 +303,9 @@ export async function PUT(request: NextRequest) {
 }
 
 // ✅ FUNCȚIE EXISTENTĂ: Update simplu doar pentru status (backward compatibility)
+// ✅ MODIFICAT 23.01.2026: Suport pentru exclude_notificari_plata
 async function handleSimpleStatusUpdate(body: any) {
-  const { facturaId, status, observatii } = body;
+  const { facturaId, status, observatii, exclude_notificari_plata } = body;
 
   if (!facturaId) {
     return NextResponse.json(
@@ -312,11 +314,46 @@ async function handleSimpleStatusUpdate(body: any) {
     );
   }
 
+  // ✅ NOU 23.01.2026: Toggle pentru exclude_notificari_plata (fără schimbare status)
+  if (exclude_notificari_plata !== undefined && !status) {
+    console.log(`🔔 Toggle exclude_notificari_plata pentru factură ${facturaId}: ${exclude_notificari_plata}`);
+
+    const toggleQuery = `
+      UPDATE ${TABLE_FACTURI_GENERATE}
+      SET
+        exclude_notificari_plata = @excludeNotificari,
+        data_actualizare = CURRENT_TIMESTAMP()
+      WHERE id = @facturaId
+    `;
+
+    await bigquery.query({
+      query: toggleQuery,
+      params: {
+        facturaId,
+        excludeNotificari: exclude_notificari_plata
+      },
+      types: {
+        facturaId: 'STRING',
+        excludeNotificari: 'BOOL'
+      },
+      location: 'EU'
+    });
+
+    console.log(`✅ Factură ${facturaId} - exclude_notificari_plata = ${exclude_notificari_plata}`);
+
+    return NextResponse.json({
+      success: true,
+      message: exclude_notificari_plata
+        ? 'Factura a fost exclusă din notificările de întârziere plată'
+        : 'Factura va primi notificări de întârziere plată'
+    });
+  }
+
   console.log(`🔍 Simple update factură ${facturaId}: status=${status}`);
 
   const updateQuery = `
     UPDATE ${TABLE_FACTURI_GENERATE}
-    SET 
+    SET
       status = @status,
       data_actualizare = CURRENT_TIMESTAMP()
     WHERE id = @facturaId
@@ -324,7 +361,7 @@ async function handleSimpleStatusUpdate(body: any) {
 
   await bigquery.query({
     query: updateQuery,
-    params: { 
+    params: {
       facturaId,
       status
     },

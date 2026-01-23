@@ -72,6 +72,8 @@ interface InvoiceInfo {
   tip_etapa?: string; // 'contract' sau 'anexa'
   etapa_id?: string;
   anexa_id?: string;
+  // NOU: Excludere din notificări întârziere plată (23.01.2026)
+  exclude_notificari_plata?: boolean;
 }
 
 interface PaymentInfo {
@@ -495,6 +497,43 @@ export default function ProiectDetailsPage() {
       }
     } catch (error) {
       console.error(`Eroare la actualizarea ${field}:`, error);
+      toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  };
+
+  // NOU 23.01.2026: Handler pentru toggle excludere din notificări plată
+  const handleToggleExcludeNotificari = async (facturaId: string, currentValue: boolean) => {
+    const newValue = !currentValue;
+
+    try {
+      const response = await fetch('/api/actions/invoices/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facturaId,
+          exclude_notificari_plata: newValue
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message, { autoClose: 3000 });
+        // Actualizează local state-ul
+        setFacturi(prev => prev.map(f =>
+          f.id === facturaId
+            ? { ...f, exclude_notificari_plata: newValue }
+            : f
+        ));
+      } else {
+        throw new Error(data.error || 'Eroare la actualizare');
+      }
+    } catch (error) {
+      console.error('Eroare la toggle excludere notificări:', error);
       toast.error(`Eroare: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
     }
   };
@@ -1265,6 +1304,47 @@ export default function ProiectDetailsPage() {
                         {renderValoare(factura.rest_de_plata)}
                       </span>
                     </div>
+                  </div>
+
+                  {/* NOU 23.01.2026: Toggle excludere din notificări întârziere plată */}
+                  <div style={{
+                    marginTop: '0.75rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px dashed #dee2e6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        color: factura.exclude_notificari_plata ? '#6c757d' : '#495057'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={factura.exclude_notificari_plata || false}
+                        onChange={() => handleToggleExcludeNotificari(factura.id, factura.exclude_notificari_plata || false)}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          cursor: 'pointer',
+                          accentColor: '#6c757d'
+                        }}
+                      />
+                      <span>
+                        🔕 Exclude din notificări întârziere
+                        {factura.exclude_notificari_plata && (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '11px', color: '#6c757d' }}>
+                            (factură veche / importată)
+                          </span>
+                        )}
+                      </span>
+                    </label>
                   </div>
                 </div>
               ))}
