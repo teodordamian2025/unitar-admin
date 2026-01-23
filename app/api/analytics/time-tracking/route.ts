@@ -119,10 +119,24 @@ export async function GET(request: NextRequest) {
         break;
 
       case 'team-performance':
+        // ✅ 23.01.2026: Fix duplicare utilizatori - JOIN cu Utilizatori pentru nume canonic (Prenume Nume)
+        // Group doar pe utilizator_uid pentru a cumula timpii corect - folosește ANY_VALUE pentru nume
         query = `
+          WITH user_names AS (
+            SELECT
+              uid,
+              TRIM(CONCAT(COALESCE(prenume, ''), ' ', COALESCE(nume, ''))) as nume_complet
+            FROM \`${PROJECT_ID}.${DATASET}.Utilizatori${tableSuffix}\`
+            WHERE activ = TRUE OR activ IS NULL
+          )
           SELECT
             tt.utilizator_uid,
-            tt.utilizator_nume,
+            -- Prioritate: 1. Prenume+Nume din Utilizatori, 2. utilizator_nume din TimeTracking, 3. fallback
+            COALESCE(
+              NULLIF(ANY_VALUE(un.nume_complet), ''),
+              ANY_VALUE(tt.utilizator_nume),
+              'Utilizator necunoscut'
+            ) as utilizator_nume,
             ROUND(SUM(tt.ore_lucrate), 2) as total_ore,
             ROUND(AVG(tt.ore_lucrate), 2) as media_ore_zilnic,
             COUNT(DISTINCT tt.data_lucru) as zile_active,
@@ -145,11 +159,11 @@ export async function GET(request: NextRequest) {
             ROUND(SUM(CASE WHEN s.prioritate = 'Scăzută' THEN tt.ore_lucrate ELSE 0 END), 2) as ore_scazuta
 
           FROM ${TABLE_TIME_TRACKING} tt
-          LEFT JOIN ${TABLE_SARCINI} s
-            ON tt.sarcina_id = s.id
+          LEFT JOIN user_names un ON tt.utilizator_uid = un.uid
+          LEFT JOIN ${TABLE_SARCINI} s ON tt.sarcina_id = s.id
           WHERE tt.data_lucru >= DATE_SUB(CURRENT_DATE(), INTERVAL ${period} DAY)
             AND tt.ore_lucrate > 0
-          GROUP BY tt.utilizator_uid, tt.utilizator_nume
+          GROUP BY tt.utilizator_uid
           ORDER BY total_ore DESC
         `;
         queryParams = [{ name: 'period', parameterType: { type: 'INT64' }, parameterValue: { value: period } }];

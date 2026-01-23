@@ -115,12 +115,19 @@ export async function GET(request: NextRequest) {
       userId, projectId, startDate, endDate, search, sortBy, sortOrder, page, limit
     });
 
+    // ✅ 23.01.2026: Fix format nume - folosește Prenume Nume din Utilizatori
     // Construiește query-ul principal
     let baseQuery = `
       SELECT
         tt.id,
         tt.utilizator_uid,
-        COALESCE(tt.utilizator_nume, u.nume, u.email) as utilizator_nume,
+        -- Prioritate: 1. Prenume+Nume din Utilizatori, 2. utilizator_nume din TimeTracking, 3. email
+        COALESCE(
+          NULLIF(TRIM(CONCAT(COALESCE(u.prenume, ''), ' ', COALESCE(u.nume, ''))), ''),
+          tt.utilizator_nume,
+          u.email,
+          'Utilizator necunoscut'
+        ) as utilizator_nume,
         tt.proiect_id,
         tt.subproiect_id,
         tt.sarcina_id,
@@ -457,13 +464,20 @@ export async function DELETE(request: NextRequest) {
 // GET pentru lista utilizatori unici (pentru dropdown filtru)
 export async function OPTIONS(request: NextRequest) {
   try {
+    // ✅ 23.01.2026: Fix format nume - folosește Prenume Nume din Utilizatori
     const usersQuery = `
-      SELECT DISTINCT
+      SELECT
         tt.utilizator_uid,
-        COALESCE(tt.utilizator_nume, u.nume, u.email) as utilizator_nume
+        COALESCE(
+          NULLIF(TRIM(CONCAT(COALESCE(u.prenume, ''), ' ', COALESCE(u.nume, ''))), ''),
+          ANY_VALUE(tt.utilizator_nume),
+          u.email,
+          'Utilizator necunoscut'
+        ) as utilizator_nume
       FROM ${TABLE_TIME_TRACKING} tt
       LEFT JOIN ${TABLE_UTILIZATORI} u ON tt.utilizator_uid = u.uid
       WHERE tt.utilizator_uid IS NOT NULL
+      GROUP BY tt.utilizator_uid, u.prenume, u.nume, u.email
       ORDER BY utilizator_nume
     `;
 
