@@ -97,26 +97,37 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
     flexWrap: 'wrap' as const
   };
 
-  // Calculate total for percentage display
-  const total = data.reduce((sum, item) => sum + (item.y || 0), 0);
+  // ✅ 23.01.2026: Fix NaN% în labels - asigură conversie numerică robustă
+  // Funcție helper pentru a obține valoarea numerică sigură
+  const getNumericValue = (val: any): number => {
+    if (val === null || val === undefined) return 0;
+    const num = typeof val === 'number' ? val : parseFloat(String(val));
+    return isNaN(num) || !isFinite(num) ? 0 : num;
+  };
 
-  // Prepare data with colors - filter out zero/invalid values
+  // Calculate total for percentage display - cu conversie robustă
+  const total = data.reduce((sum, item) => sum + getNumericValue(item.y), 0);
+
+  // Prepare data with colors - filter out zero/invalid values, ensure numeric y
   const processedData = data
-    .filter(item => item.y && item.y > 0)
     .map((item, index) => ({
       ...item,
+      y: getNumericValue(item.y),
       fill: item.fill || defaultColors[index % defaultColors.length]
-    }));
+    }))
+    .filter(item => item.y > 0);
 
   const formatTooltipLabel = (datum: any) => {
-    const percentage = ((datum.y / total) * 100).toFixed(1);
-    return `${datum.x}: ${datum.y} (${percentage}%)`;
+    const y = getNumericValue(datum.y);
+    const percentage = total > 0 ? ((y / total) * 100).toFixed(1) : '0.0';
+    return `${datum.x}: ${y.toLocaleString()} (${percentage}%)`;
   };
 
   const formatPieLabel = (datum: any) => {
     if (!showLabels && !showValues) return '';
 
-    const percentage = ((datum.y / total) * 100).toFixed(1);
+    const y = getNumericValue(datum.y);
+    const percentage = total > 0 ? ((y / total) * 100).toFixed(1) : '0.0';
 
     if (showLabels && showValues) {
       return `${datum.x}\n${percentage}%`;
@@ -140,16 +151,16 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
 
       {!hasData ? (
         <div style={{
-          padding: '3rem 2rem',
+          padding: '2rem 1.5rem',
           textAlign: 'center',
           color: theme === 'dark' ? '#9ca3af' : '#6b7280'
         }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-          <div style={{ fontSize: '1rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-            Nu există date disponibile
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.6 }}>📊</div>
+          <div style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem' }}>
+            Nu există date
           </div>
-          <div style={{ fontSize: '0.875rem' }}>
-            Nu s-au găsit date pentru perioada selectată
+          <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+            Nicio sarcină cu prioritate în această perioadă
           </div>
         </div>
       ) : (
@@ -275,25 +286,25 @@ const AdvancedPieChart: React.FC<AdvancedPieChartProps> = ({
           {/* Summary Stats */}
           <div style={{
         marginTop: '1rem',
-        padding: '1rem',
+        padding: '0.75rem',
         background: theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(249, 250, 251, 0.8)',
         borderRadius: '8px',
         width: '100%',
         textAlign: 'center'
       }}>
         <div style={{
-          fontSize: '0.875rem',
+          fontSize: '0.8rem',
           color: theme === 'dark' ? '#9ca3af' : '#6b7280',
           marginBottom: '0.25rem'
         }}>
-          Total Elemente: {data.length} | Valoare Totală: {total.toLocaleString()}
+          Total: {total.toLocaleString('ro-RO', { maximumFractionDigits: 2 })} ore ({processedData.length} categorii active)
         </div>
         <div style={{
-          fontSize: '0.75rem',
+          fontSize: '0.7rem',
           color: theme === 'dark' ? '#6b7280' : '#9ca3af'
         }}>
-          Cel mai mare: {Math.max(...data.map(d => d.y || 0)).toLocaleString()} |
-          Cel mai mic: {Math.min(...data.map(d => d.y || 0)).toLocaleString()}
+          Max: {processedData.length > 0 ? Math.max(...processedData.map(d => d.y)).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) : 0} |
+          Min: {processedData.length > 0 ? Math.min(...processedData.map(d => d.y)).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) : 0}
         </div>
           </div>
         </>
