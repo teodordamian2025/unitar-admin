@@ -5,6 +5,8 @@
 // MODIFICAT: 14.01.2026 - FIX: Exclude proiecte/subproiecte cu status_achitare = 'Incasat' din notificări
 // MODIFICAT: 16.01.2026 - FIX: Exclude proiecte/subproiecte care au facturi deja plătite (verificare directă în FacturiGenerate_v2)
 // MODIFICAT: 17.01.2026 - FIX: Rezolvat eroare BigQuery "LEFT ANTISEMI JOIN" prin separarea NOT EXISTS cu OR în două clauze AND
+// MODIFICAT: 24.01.2026 - FIX: Verifică încasările din EtapeFacturi_v2 în plus față de FacturiGenerate_v2.valoare_platita
+//                         (facturile sunt marcate încasate în EtapeFacturi_v2, nu în FacturiGenerate_v2)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -33,6 +35,8 @@ const TABLE_SUBPROIECTE_RESPONSABILI = `\`${PROJECT_ID}.${DATASET}.SubproiecteRe
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_FACTURI_EMISE_ANAF = `\`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF${tableSuffix}\``;
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
+// ✅ FIX 24.01.2026: Adăugat tabel pentru verificare încasări (sursa corectă de adevăr pentru statusul de încasare)
+const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -1101,8 +1105,19 @@ export async function GET(request: NextRequest) {
     // ============================================
     // NOU 23.01.2026: Verifică facturile cu scadență în următoarele 7 zile
     // EXCLUDE: facturi marcate cu exclude_notificari_plata = TRUE
+    // FIX 24.01.2026: Verifică încasările din EtapeFacturi_v2 (sursa corectă) în plus față de FacturiGenerate_v2
 
     const facturiScadentaApropiataQuery = `
+      WITH incasari_facturi AS (
+        -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
+        -- Aceasta este sursa corectă de adevăr pentru statusul de încasare
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      )
       SELECT
         fg.id,
         fg.serie,
@@ -1112,14 +1127,17 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        fg.valoare_platita,
+        -- ✅ FIX 24.01.2026: Folosim încasările din EtapeFacturi (prioritar) sau din FacturiGenerate (fallback)
+        COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
         fg.proiect_id,
-        (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+        (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta
       FROM ${TABLE_FACTURI_GENERATE} fg
+      LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
-        AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
+        -- ✅ FIX 24.01.2026: Verificăm restul de plată folosind ambele surse de încasare
+        AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
         AND fg.status NOT IN ('storno', 'stornata', 'platita')
@@ -1217,8 +1235,19 @@ export async function GET(request: NextRequest) {
     // ============================================
     // NOU 23.01.2026: Verifică facturile cu scadență depășită
     // EXCLUDE: facturi marcate cu exclude_notificari_plata = TRUE
+    // FIX 24.01.2026: Verifică încasările din EtapeFacturi_v2 (sursa corectă) în plus față de FacturiGenerate_v2
 
     const facturiScadentaDepasitaQuery = `
+      WITH incasari_facturi AS (
+        -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
+        -- Aceasta este sursa corectă de adevăr pentru statusul de încasare
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      )
       SELECT
         fg.id,
         fg.serie,
@@ -1228,14 +1257,17 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        fg.valoare_platita,
+        -- ✅ FIX 24.01.2026: Folosim încasările din EtapeFacturi (prioritar) sau din FacturiGenerate (fallback)
+        COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
         fg.proiect_id,
-        (fg.total - COALESCE(fg.valoare_platita, 0)) as rest_de_plata,
+        (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(CURRENT_DATE(), fg.data_scadenta, DAY) as zile_intarziere
       FROM ${TABLE_FACTURI_GENERATE} fg
+      LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta < CURRENT_DATE()
-        AND (fg.total - COALESCE(fg.valoare_platita, 0)) > 0
+        -- ✅ FIX 24.01.2026: Verificăm restul de plată folosind ambele surse de încasare
+        AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
         AND fg.status NOT IN ('storno', 'stornata', 'platita')
