@@ -290,14 +290,24 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   // NOU: State pentru expand/collapse contracte cu etape/anexe
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
 
+  // ✅ FIX 24.01.2026: State pentru paginare
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(50); // Număr de contracte per pagină
+
   // FIX: Serializare searchParams pentru comparare stabilă în useEffect (evită race condition)
   const searchParamsString = JSON.stringify(searchParams || {});
+
+  // ✅ FIX 24.01.2026: Reset la pagina 1 când se schimbă filtrele
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchParamsString]);
 
   // UseEffect-uri pentru încărcarea datelor
   // FIX: Folosim searchParamsString în loc de searchParams pentru a evita re-fetch-uri multiple
   useEffect(() => {
     loadData();
-  }, [searchParamsString, refreshTrigger]);
+  }, [searchParamsString, refreshTrigger, currentPage]);
 
   useEffect(() => {
     if (contracte.length > 0) {
@@ -429,6 +439,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         });
       }
 
+      // ✅ FIX 24.01.2026: Adaugă parametri de paginare
+      queryParams.set('limit', itemsPerPage.toString());
+      queryParams.set('offset', ((currentPage - 1) * itemsPerPage).toString());
+
       const response = await fetch(`/api/rapoarte/contracte?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -445,8 +459,11 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
           data_curs_valutar: c.data_curs_valutar?.value || c.data_curs_valutar
         }));
         setContracte(contracteFormatate);
-        
-        console.log(`Contracte încărcate: ${contracteFormatate.length}`);
+
+        // ✅ FIX 24.01.2026: Actualizează totalul pentru paginare
+        setTotalItems(data.total || contracteFormatate.length);
+
+        console.log(`Contracte încărcate: ${contracteFormatate.length} din ${data.total || contracteFormatate.length}`);
         
         // NOU: Log statistici pentru etape și anexe
         if (data.stats) {
@@ -953,13 +970,13 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         zIndex: 10
       }}>
         <div>
-          <h3 style={{ 
-            margin: 0, 
+          <h3 style={{
+            margin: 0,
             color: '#2c3e50',
             fontSize: '1.4rem',
             fontWeight: '600'
           }}>
-            📄 Contracte găsite: {contracte.length} 
+            📄 Contracte găsite: {totalItems > contracte.length ? `${contracte.length} din ${totalItems}` : contracte.length} 
             {contracte.reduce((acc, c) => acc + (c.etape_count || 0) + (c.anexe_count || 0), 0) > 0 && (
               ` (+ ${contracte.reduce((acc, c) => acc + (c.etape_count || 0), 0)} etape, ${contracte.reduce((acc, c) => acc + (c.anexe_count || 0), 0)} anexe)`
             )}
@@ -1749,6 +1766,106 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                   <br/>
                   (Sistem contracte cu etape si anexe)
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ FIX 24.01.2026: Paginare pentru navigare între pagini */}
+          {totalItems > itemsPerPage && (
+            <div style={{
+              padding: '1.5rem',
+              borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div style={{ fontSize: '14px', color: '#7f8c8d' }}>
+                Afișare {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} din {totalItems} contracte
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    background: currentPage === 1 ? '#f0f0f0' : 'white',
+                    color: currentPage === 1 ? '#bdc3c7' : '#2c3e50',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Prima
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    background: currentPage === 1 ? '#f0f0f0' : 'white',
+                    color: currentPage === 1 ? '#bdc3c7' : '#2c3e50',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  ← Înapoi
+                </button>
+                <span style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  background: 'white',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  borderRadius: '8px'
+                }}>
+                  Pagina {currentPage} din {Math.ceil(totalItems / itemsPerPage)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalItems / itemsPerPage), prev + 1))}
+                  disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    background: currentPage >= Math.ceil(totalItems / itemsPerPage) ? '#f0f0f0' : 'white',
+                    color: currentPage >= Math.ceil(totalItems / itemsPerPage) ? '#bdc3c7' : '#2c3e50',
+                    cursor: currentPage >= Math.ceil(totalItems / itemsPerPage) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Înainte →
+                </button>
+                <button
+                  onClick={() => setCurrentPage(Math.ceil(totalItems / itemsPerPage))}
+                  disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    background: currentPage >= Math.ceil(totalItems / itemsPerPage) ? '#f0f0f0' : 'white',
+                    color: currentPage >= Math.ceil(totalItems / itemsPerPage) ? '#bdc3c7' : '#2c3e50',
+                    cursor: currentPage >= Math.ceil(totalItems / itemsPerPage) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Ultima
+                </button>
               </div>
             </div>
           )}

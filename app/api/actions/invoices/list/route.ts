@@ -43,7 +43,11 @@ export async function GET(request: NextRequest) {
     const proiectId = searchParams.get('proiectId');
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // ✅ FIX 24.01.2026: Adăugat parametru search pentru căutare server-side
+    const search = searchParams.get('search');
+    // ✅ FIX 24.01.2026: Mărit limita default la 100 și adăugat support pentru "all"
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam === 'all' ? 10000 : parseInt(limitParam || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // ✅ FIX PERFORMANȚĂ 14.12.2025: Query unic cu COUNT(*) OVER() pentru a elimina al doilea query
@@ -174,6 +178,20 @@ export async function GET(request: NextRequest) {
       query += ' AND fg.status = @status';
       params.status = status;
       types.status = 'STRING';
+    }
+
+    // ✅ FIX 24.01.2026: Adăugat căutare server-side pentru search
+    if (search && search.trim()) {
+      query += ` AND (
+        LOWER(fg.serie) LIKE LOWER(@search) OR
+        LOWER(CAST(fg.numar AS STRING)) LIKE LOWER(@search) OR
+        LOWER(CONCAT(COALESCE(fg.serie, ''), '-', CAST(fg.numar AS STRING))) LIKE LOWER(@search) OR
+        LOWER(fg.client_nume) LIKE LOWER(@search) OR
+        LOWER(COALESCE(p.Denumire, '')) LIKE LOWER(@search) OR
+        LOWER(fg.proiect_id) LIKE LOWER(@search)
+      )`;
+      params.search = `%${search.trim()}%`;
+      types.search = 'STRING';
     }
 
     // ✅ FIX PERFORMANȚĂ: Închide CTE și adaugă COUNT(*) OVER() pentru total count într-un singur query

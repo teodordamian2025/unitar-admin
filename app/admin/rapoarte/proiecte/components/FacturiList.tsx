@@ -179,6 +179,11 @@ export default function FacturiList({
   const [showIncasareModal, setShowIncasareModal] = useState(false);
   const [selectedFacturaIncasare, setSelectedFacturaIncasare] = useState<Factura | null>(null);
 
+  // ✅ FIX 24.01.2026: State pentru paginare
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(50); // Număr de facturi per pagină
+
   // ✅ FIX PERFORMANȚĂ: Debounce pentru search input (800ms - optimizat pentru scriere lentă)
   useEffect(() => {
     // Curăță timeout-ul anterior
@@ -209,32 +214,49 @@ export default function FacturiList({
   }, [initialSearch]);
 
   // Încarcă facturile când se schimbă filtrele (dar nu searchInput direct)
+  // ✅ FIX 24.01.2026: Reset la pagina 1 când se schimbă filtrele
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [proiectId, clientId, filters.search, filters.status, filters.scadenta, filters.statusIncasari, filters.perioada, customPeriod]);
+
   useEffect(() => {
     loadFacturi();
-  }, [proiectId, clientId, filters, customPeriod]);
+  }, [proiectId, clientId, filters, customPeriod, currentPage]);
 
   const loadFacturi = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const params = new URLSearchParams();
       if (proiectId) params.append('proiectId', proiectId);
       if (clientId) params.append('clientId', clientId);
       if (filters.status) params.append('status', filters.status);
-      
+
+      // ✅ FIX 24.01.2026: Trimite search la server pentru căutare server-side
+      if (filters.search && filters.search.trim()) {
+        params.append('search', filters.search.trim());
+      }
+
+      // ✅ FIX 24.01.2026: Adaugă parametri de paginare
+      params.append('limit', itemsPerPage.toString());
+      params.append('offset', ((currentPage - 1) * itemsPerPage).toString());
+
       if (filters.perioada === 'custom' && customPeriod.dataStart && customPeriod.dataEnd) {
         params.append('dataStart', customPeriod.dataStart);
         params.append('dataEnd', customPeriod.dataEnd);
       } else if (filters.perioada !== 'toate') {
         params.append('perioada', filters.perioada);
       }
-      
+
       const response = await fetch(`/api/actions/invoices/list?${params}`);
       const data = await response.json();
-      
+
       if (data.success) {
         let result = data.facturi;
+
+        // ✅ FIX 24.01.2026: Actualizează totalul pentru paginare
+        setTotalItems(data.pagination?.total || result.length);
 
         result = result.map((f: any) => ({
           ...f,
@@ -243,24 +265,8 @@ export default function FacturiList({
           data_creare_formatted: formatDateSafe(f.data_creare)
         }));
 
-        if (filters.search) {
-          // Split search term into words for multi-word search support (e.g., "UPA 1043")
-          const searchWords = filters.search.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
-
-          result = result.filter((f: Factura) => {
-            // Create a combined searchable string from all relevant fields
-            const searchableText = [
-              f.numar || '',
-              f.serie || '',
-              f.client_nume || '',
-              f.proiect_denumire || ''
-            ].join(' ').toLowerCase();
-
-            // All search words must be found in the combined text
-            return searchWords.every(word => searchableText.includes(word));
-          });
-        }
-
+        // ✅ FIX 24.01.2026: Filtrele de scadenta și statusIncasari rămân client-side
+        // deoarece sunt calculate dinamic în API (nu sunt coloane în DB)
         if (filters.scadenta) {
           result = result.filter((f: Factura) => f.status_scadenta === filters.scadenta);
         }
@@ -1370,7 +1376,7 @@ export default function FacturiList({
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             Facturi Generate
             <span className="text-sm font-normal text-gray-500">
-              ({facturi.length} {facturi.length === 1 ? 'factura' : 'facturi'})
+              ({totalItems > 0 ? `${facturi.length} din ${totalItems}` : facturi.length} {totalItems === 1 || facturi.length === 1 ? 'factura' : 'facturi'})
             </span>
           </h3>
           <button
@@ -1646,6 +1652,66 @@ export default function FacturiList({
               </tbody>
             </table>
           </div>
+
+          {/* ✅ FIX 24.01.2026: Paginare pentru navigare între pagini */}
+          {totalItems > itemsPerPage && (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Afișare {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} din {totalItems} facturi
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      currentPage === 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    Prima
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      currentPage === 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    ← Înapoi
+                  </button>
+                  <span className="px-4 py-1.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg">
+                    Pagina {currentPage} din {Math.ceil(totalItems / itemsPerPage)}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalItems / itemsPerPage), prev + 1))}
+                    disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      currentPage >= Math.ceil(totalItems / itemsPerPage)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    Înainte →
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.ceil(totalItems / itemsPerPage))}
+                    disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      currentPage >= Math.ceil(totalItems / itemsPerPage)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    Ultima
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
