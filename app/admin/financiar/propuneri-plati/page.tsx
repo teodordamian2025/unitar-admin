@@ -580,8 +580,8 @@ export default function PropuneriPlatiPage() {
           </div>
         )}
 
-        {/* Propuneri invalide */}
-        {!loading && invalid.length > 0 && (
+        {/* Propuneri invalide - ascuns când filtrul este 'pending' (În așteptare) */}
+        {!loading && invalid.length > 0 && statusFilter !== 'pending' && (
           <div style={{
             backgroundColor: '#f3f4f6',
             borderRadius: '12px',
