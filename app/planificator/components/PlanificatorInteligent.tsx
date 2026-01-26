@@ -491,8 +491,8 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         }));
 
         // Afișează eroarea
-        if (data.error && data.error.includes('8 ore')) {
-          toast.error('⏰ Ai atins limita de 8 ore pe zi! Nu poți pin-a item-ul.');
+        if (data.error && data.error.includes('12 ore')) {
+          toast.error('⏰ Ai atins limita de 12 ore pe zi! Nu poți pin-a item-ul.');
         } else {
           toast.error(data.error || '❌ Eroare la pin/unpin');
         }
@@ -643,12 +643,13 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
         const data = await response.json();
         const totalSecondsToday = data.stats?.total_time_today || 0;
 
-        // 8 ore = 28800 secunde
-        if (totalSecondsToday >= 28800) {
-          toast.error('⏰ Ai atins limita de 8 ore pe zi! Nu poți porni alt timer.');
+        // 12 ore = 43200 secunde (limita zilnică totală)
+        // Fiecare sesiune individuală este limitată la 8h prin auto-stop
+        if (totalSecondsToday >= 43200) {
+          toast.error('⏰ Ai atins limita de 12 ore pe zi! Nu poți porni alt timer.');
           return;
-        } else if (totalSecondsToday >= 27000) { // 7.5 ore
-          toast.warn('⚠️ Atenție! Ai lucrat peste 7.5 ore astăzi. Te apropii de limita de 8 ore!');
+        } else if (totalSecondsToday >= 39600) { // 11 ore
+          toast.warn('⚠️ Atenție! Ai lucrat peste 11 ore astăzi. Te apropii de limita de 12 ore!');
         }
       }
     } catch (error) {

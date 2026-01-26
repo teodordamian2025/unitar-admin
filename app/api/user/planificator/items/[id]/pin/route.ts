@@ -130,10 +130,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       const totalOreToday = todayTimeRows[0]?.total_ore || 0;
 
-      if (totalOreToday >= 8) {
-        console.warn(`⚠️ [User Pin API] - 8h limit reached for userId=${userId}, total_ore=${totalOreToday}`);
+      // Limita pe zi: 12h total (pin-ul individual este limitat la 8h prin auto-stop)
+      if (totalOreToday >= 12) {
+        console.warn(`⚠️ [User Pin API] - 12h daily limit reached for userId=${userId}, total_ore=${totalOreToday}`);
         return NextResponse.json({
-          error: 'Ai atins limita de 8 ore pe zi! Nu poți pin-a item-ul.',
+          error: 'Ai atins limita de 12 ore pe zi! Nu poți pin-a item-ul.',
           total_ore_today: totalOreToday
         }, { status: 400 });
       }
