@@ -187,6 +187,76 @@ export async function GET(request: NextRequest) {
         FROM \`${PROJECT_ID}.${dataset}.ProiectComentarii${tableSuffix}\`
         GROUP BY proiect_id
       ),
+      -- NOU 26.01.2026: CTE pentru facturi per contract (etape + anexe)
+      facturi_per_contract AS (
+        SELECT
+          ec.contract_id,
+          ec.subproiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              ef.id as etapa_factura_id,
+              ef.factura_id,
+              CONCAT(fg.serie, '-', fg.numar) as numar_factura,
+              fg.serie as factura_serie,
+              fg.numar as factura_numar,
+              ef.valoare,
+              ef.moneda,
+              ef.valoare_ron,
+              ef.status_incasare,
+              ef.data_facturare,
+              ef.data_incasare,
+              ef.valoare_incasata,
+              fg.data_factura,
+              fg.data_scadenta,
+              fg.total as factura_total,
+              ec.etapa_index,
+              ec.denumire as etapa_denumire,
+              ec.subproiect_id as factura_subproiect_id
+            )
+            ORDER BY ef.data_facturare DESC
+          ) as facturi_etape
+        FROM \`${PROJECT_ID}.${dataset}.EtapeContract${tableSuffix}\` ec
+        JOIN \`${PROJECT_ID}.${dataset}.EtapeFacturi${tableSuffix}\` ef
+          ON ef.etapa_id = ec.ID_Etapa AND ef.activ = true
+        JOIN \`${PROJECT_ID}.${dataset}.FacturiGenerate${tableSuffix}\` fg
+          ON ef.factura_id = fg.id
+        GROUP BY ec.contract_id, ec.subproiect_id
+      ),
+      -- NOU 26.01.2026: CTE pentru facturi per anexă
+      facturi_per_anexa AS (
+        SELECT
+          an.contract_id,
+          an.subproiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              ef.id as etapa_factura_id,
+              ef.factura_id,
+              CONCAT(fg.serie, '-', fg.numar) as numar_factura,
+              fg.serie as factura_serie,
+              fg.numar as factura_numar,
+              ef.valoare,
+              ef.moneda,
+              ef.valoare_ron,
+              ef.status_incasare,
+              ef.data_facturare,
+              ef.data_incasare,
+              ef.valoare_incasata,
+              fg.data_factura,
+              fg.data_scadenta,
+              fg.total as factura_total,
+              an.anexa_numar,
+              an.denumire as anexa_denumire,
+              an.subproiect_id as factura_subproiect_id
+            )
+            ORDER BY ef.data_facturare DESC
+          ) as facturi_anexe
+        FROM \`${PROJECT_ID}.${dataset}.AnexeContract${tableSuffix}\` an
+        JOIN \`${PROJECT_ID}.${dataset}.EtapeFacturi${tableSuffix}\` ef
+          ON ef.anexa_id = an.ID_Anexa AND ef.activ = true
+        JOIN \`${PROJECT_ID}.${dataset}.FacturiGenerate${tableSuffix}\` fg
+          ON ef.factura_id = fg.id
+        GROUP BY an.contract_id, an.subproiect_id
+      ),
       contracte_cu_anexe AS (
         SELECT
           co.proiect_id,
@@ -212,26 +282,46 @@ export async function GET(request: NextRequest) {
           ON an.contract_id = co.ID_Contract
         GROUP BY co.proiect_id, co.ID_Contract, co.serie_contract, co.numar_contract, co.tip_document, co.Data_Semnare
       ),
+      -- NOU 26.01.2026: CTE pentru toate facturile unui contract (etape + anexe combinate)
+      contracte_cu_facturi AS (
+        SELECT
+          cca.proiect_id,
+          cca.ID_Contract,
+          cca.serie_contract,
+          cca.numar_contract,
+          cca.tip_document,
+          cca.Data_Semnare,
+          cca.anexe,
+          ARRAY(
+            SELECT AS STRUCT * FROM UNNEST(fpc.facturi_etape)
+            UNION ALL
+            SELECT AS STRUCT * FROM UNNEST(fpa.facturi_anexe)
+          ) as facturi_contract
+        FROM contracte_cu_anexe cca
+        LEFT JOIN facturi_per_contract fpc ON fpc.contract_id = cca.ID_Contract
+        LEFT JOIN facturi_per_anexa fpa ON fpa.contract_id = cca.ID_Contract
+      ),
       proiecte_cu_contracte AS (
         SELECT
           p.ID_Proiect,
           ARRAY_AGG(
-            IF(cca.ID_Contract IS NOT NULL,
+            IF(ccf.ID_Contract IS NOT NULL,
               STRUCT(
-                cca.ID_Contract,
-                cca.serie_contract,
-                cca.numar_contract,
-                cca.tip_document,
-                cca.anexe
+                ccf.ID_Contract,
+                ccf.serie_contract,
+                ccf.numar_contract,
+                ccf.tip_document,
+                ccf.anexe,
+                ccf.facturi_contract
               ),
               NULL
             )
             IGNORE NULLS
-            ORDER BY cca.Data_Semnare DESC
+            ORDER BY ccf.Data_Semnare DESC
           ) as contracte
         FROM \`${PROJECT_ID}.${dataset}.${table}\` p
-        LEFT JOIN contracte_cu_anexe cca
-          ON cca.proiect_id = p.ID_Proiect
+        LEFT JOIN contracte_cu_facturi ccf
+          ON ccf.proiect_id = p.ID_Proiect
         GROUP BY p.ID_Proiect
       ),
       -- NOU: CTE pentru facturi directe (fără contract)

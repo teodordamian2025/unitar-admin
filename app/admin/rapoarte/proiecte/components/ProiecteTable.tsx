@@ -1391,9 +1391,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                     color: '#2c3e50',
                     fontSize: '13px',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    letterSpacing: '0.5px',
+                    minWidth: '280px'
                   }}>
-                    Contract
+                    Contract+Facturi
                   </th>
                   <th style={{
                     padding: '1rem 0.75rem',
@@ -1700,41 +1701,143 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                         </td>
                         <td style={{
                           padding: '0.75rem',
-                          textAlign: 'left'
+                          textAlign: 'left',
+                          minWidth: '280px'
                         }}>
                           {(() => {
                             const contracte = (proiect as any).contracte || [];
                             const facturiDirecte = (proiect as any).facturi_directe || [];
 
+                            // Helper pentru formatarea status-ului factură
+                            const formatFacturaStatus = (factura: any) => {
+                              const statusIncasare = factura.status_incasare || 'Neincasat';
+                              const isIncasat = statusIncasare === 'Incasat' || statusIncasare === 'Încasat' || statusIncasare === 'Incasat complet' || statusIncasare === 'Încasat complet';
+                              const isPartial = statusIncasare === 'Partial' || statusIncasare === 'Parțial' || statusIncasare === 'Incasat partial' || statusIncasare === 'Încasat parțial';
+
+                              const valoare = ensureNumber(factura.valoare);
+                              const valoareIncasata = ensureNumber(factura.valoare_incasata);
+                              const moneda = factura.moneda || 'RON';
+
+                              // Formatare data
+                              let dataStr = '';
+                              if (factura.data_facturare) {
+                                try {
+                                  const data = new Date(factura.data_facturare?.value || factura.data_facturare);
+                                  if (!isNaN(data.getTime())) {
+                                    dataStr = data.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                  }
+                                } catch (e) { /* ignore */ }
+                              }
+
+                              // Formatare data încasare
+                              let dataIncasareStr = '';
+                              if (factura.data_incasare) {
+                                try {
+                                  const data = new Date(factura.data_incasare?.value || factura.data_incasare);
+                                  if (!isNaN(data.getTime())) {
+                                    dataIncasareStr = data.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                  }
+                                } catch (e) { /* ignore */ }
+                              }
+
+                              return (
+                                <div key={factura.factura_id || factura.etapa_factura_id} style={{
+                                  fontSize: '11px',
+                                  lineHeight: '1.4',
+                                  padding: '0.35rem 0.5rem',
+                                  marginTop: '0.25rem',
+                                  background: isIncasat ? 'rgba(39, 174, 96, 0.08)' : isPartial ? 'rgba(243, 156, 18, 0.08)' : 'rgba(231, 76, 60, 0.08)',
+                                  borderRadius: '6px',
+                                  borderLeft: `3px solid ${isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'}`
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                      🧾 {factura.numar_factura}
+                                    </span>
+                                    {dataStr && (
+                                      <span style={{ color: '#7f8c8d' }}>
+                                        ({dataStr})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: '600', color: '#3498db' }}>
+                                      {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: moneda }).format(valoare)}
+                                    </span>
+                                    <span style={{ color: '#7f8c8d' }}>→</span>
+                                    <span style={{
+                                      fontWeight: '600',
+                                      color: isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'
+                                    }}>
+                                      {isIncasat ? '✅ Încasat complet' : isPartial ? `⏳ Parțial (${new Intl.NumberFormat('ro-RO', { style: 'currency', currency: moneda }).format(valoareIncasata)})` : '⏳ Neîncasat'}
+                                    </span>
+                                    {dataIncasareStr && (isIncasat || isPartial) && (
+                                      <span style={{ color: '#7f8c8d', fontSize: '10px' }}>
+                                        ({dataIncasareStr})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            };
+
                             // Dacă există contracte, le afișăm
                             if (contracte.length > 0) {
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                  {contracte.map((contract: any, idx: number) => (
-                                    <div key={contract.ID_Contract || idx} style={{ fontSize: '13px' }}>
-                                      <div style={{
-                                        fontWeight: '600',
-                                        color: '#2c3e50',
-                                        marginBottom: '0.25rem'
-                                      }}>
-                                        📄 {contract.numar_contract}
-                                      </div>
-                                      {contract.anexe && contract.anexe.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                  {contracte.map((contract: any, idx: number) => {
+                                    const facturiContract = contract.facturi_contract || [];
+
+                                    return (
+                                      <div key={contract.ID_Contract || idx} style={{ fontSize: '12px' }}>
+                                        {/* Număr contract cu prefix CTR: */}
                                         <div style={{
-                                          fontSize: '11px',
-                                          color: '#7f8c8d',
-                                          paddingLeft: '1rem'
+                                          fontWeight: '700',
+                                          color: '#2c3e50',
+                                          marginBottom: '0.25rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.5rem'
                                         }}>
-                                          {contract.anexe.map((anexa: any, aIdx: number) => (
-                                            <div key={anexa.ID_Anexa || aIdx}>
-                                              └─ Anexa {anexa.anexa_numar}
-                                              {anexa.anexa_denumire && `: ${anexa.anexa_denumire}`}
-                                            </div>
-                                          ))}
+                                          <span style={{
+                                            background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                                            color: 'white',
+                                            padding: '0.15rem 0.5rem',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: '700'
+                                          }}>
+                                            CTR:
+                                          </span>
+                                          <span style={{ color: '#2c3e50' }}>{contract.numar_contract}</span>
                                         </div>
-                                      )}
-                                    </div>
-                                  ))}
+
+                                        {/* Facturi pentru acest contract (fără subproiect legat = la nivel proiect părinte) */}
+                                        {facturiContract.filter((f: any) => !f.factura_subproiect_id).length > 0 && (
+                                          <div style={{ marginTop: '0.35rem' }}>
+                                            {facturiContract.filter((f: any) => !f.factura_subproiect_id).map((factura: any) => formatFacturaStatus(factura))}
+                                          </div>
+                                        )}
+
+                                        {/* Anexe */}
+                                        {contract.anexe && contract.anexe.length > 0 && (
+                                          <div style={{
+                                            fontSize: '11px',
+                                            color: '#7f8c8d',
+                                            paddingLeft: '0.75rem',
+                                            marginTop: '0.35rem'
+                                          }}>
+                                            {contract.anexe.map((anexa: any, aIdx: number) => (
+                                              <div key={anexa.ID_Anexa || aIdx} style={{ marginBottom: '0.15rem' }}>
+                                                └─ 📎 Anexa {anexa.anexa_numar}
+                                                {anexa.anexa_denumire && `: ${anexa.anexa_denumire}`}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               );
                             }
@@ -1743,68 +1846,15 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                             if (facturiDirecte.length > 0) {
                               return (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                  {facturiDirecte.map((factura: any, idx: number) => {
-                                    const statusIncasare = factura.status_incasare || 'Neincasat';
-                                    const isIncasat = statusIncasare === 'Incasat' || statusIncasare === 'Încasat';
-                                    const isPartial = statusIncasare === 'Partial' || statusIncasare === 'Parțial';
-
-                                    // Formatare valoare
-                                    const valoare = ensureNumber(factura.valoare);
-                                    const valoareRon = ensureNumber(factura.valoare_ron);
-                                    const moneda = factura.moneda || 'RON';
-
-                                    return (
-                                      <div key={factura.factura_id || idx} style={{
-                                        fontSize: '12px',
-                                        padding: '0.5rem',
-                                        background: 'rgba(52, 152, 219, 0.08)',
-                                        borderRadius: '8px',
-                                        borderLeft: `3px solid ${isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'}`
-                                      }}>
-                                        <div style={{
-                                          fontWeight: '600',
-                                          color: '#2c3e50',
-                                          marginBottom: '0.25rem',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '0.5rem'
-                                        }}>
-                                          <span>🧾 {factura.numar_factura}</span>
-                                          <span style={{
-                                            fontSize: '10px',
-                                            padding: '2px 6px',
-                                            borderRadius: '10px',
-                                            background: isIncasat ? 'rgba(39, 174, 96, 0.15)' : isPartial ? 'rgba(243, 156, 18, 0.15)' : 'rgba(231, 76, 60, 0.15)',
-                                            color: isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c',
-                                            fontWeight: '600'
-                                          }}>
-                                            {isIncasat ? '✅ Încasat' : isPartial ? '⏳ Parțial' : '⏳ Neîncasat'}
-                                          </span>
-                                        </div>
-                                        <div style={{
-                                          fontSize: '11px',
-                                          color: '#7f8c8d',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '2px'
-                                        }}>
-                                          <span style={{ fontWeight: '600', color: '#3498db' }}>
-                                            💰 {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: moneda }).format(valoare)}
-                                            {moneda !== 'RON' && valoareRon > 0 && (
-                                              <span style={{ color: '#7f8c8d', fontWeight: '400' }}>
-                                                {' '}(≈{new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(valoareRon)})
-                                              </span>
-                                            )}
-                                          </span>
-                                          {factura.data_facturare && (
-                                            <span>
-                                              📅 {new Date(factura.data_facturare?.value || factura.data_facturare).toLocaleDateString('ro-RO')}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                                  <div style={{
+                                    fontSize: '11px',
+                                    color: '#7f8c8d',
+                                    fontStyle: 'italic',
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    Facturi fără contract:
+                                  </div>
+                                  {facturiDirecte.map((factura: any, idx: number) => formatFacturaStatus(factura))}
                                 </div>
                               );
                             }
@@ -2219,15 +2269,114 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
                           </td>
                           <td style={{
                             padding: '0.5rem 0.75rem',
-                            textAlign: 'left'
+                            textAlign: 'left',
+                            minWidth: '280px'
                           }}>
-                            <span style={{
-                              color: '#95a5a6',
-                              fontSize: '11px',
-                              fontStyle: 'italic'
-                            }}>
-                              -
-                            </span>
+                            {(() => {
+                              // Găsește facturile legate de acest subproiect din contractele proiectului părinte
+                              const contracte = (proiect as any).contracte || [];
+                              const facturiSubproiect: any[] = [];
+
+                              // Caută în fiecare contract facturile legate de acest subproiect
+                              contracte.forEach((contract: any) => {
+                                const facturiContract = contract.facturi_contract || [];
+                                facturiContract.forEach((factura: any) => {
+                                  if (factura.factura_subproiect_id === subproiect.ID_Subproiect) {
+                                    facturiSubproiect.push({
+                                      ...factura,
+                                      contract_numar: contract.numar_contract
+                                    });
+                                  }
+                                });
+                              });
+
+                              if (facturiSubproiect.length === 0) {
+                                return (
+                                  <span style={{
+                                    color: '#95a5a6',
+                                    fontSize: '11px',
+                                    fontStyle: 'italic'
+                                  }}>
+                                    -
+                                  </span>
+                                );
+                              }
+
+                              // Helper pentru formatarea status-ului factură (identic cu cel de sus)
+                              const formatFacturaStatusSub = (factura: any) => {
+                                const statusIncasare = factura.status_incasare || 'Neincasat';
+                                const isIncasat = statusIncasare === 'Incasat' || statusIncasare === 'Încasat' || statusIncasare === 'Incasat complet' || statusIncasare === 'Încasat complet';
+                                const isPartial = statusIncasare === 'Partial' || statusIncasare === 'Parțial' || statusIncasare === 'Incasat partial' || statusIncasare === 'Încasat parțial';
+
+                                const valoare = ensureNumber(factura.valoare);
+                                const valoareIncasata = ensureNumber(factura.valoare_incasata);
+                                const moneda = factura.moneda || 'RON';
+
+                                // Formatare data
+                                let dataStr = '';
+                                if (factura.data_facturare) {
+                                  try {
+                                    const data = new Date(factura.data_facturare?.value || factura.data_facturare);
+                                    if (!isNaN(data.getTime())) {
+                                      dataStr = data.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                    }
+                                  } catch (e) { /* ignore */ }
+                                }
+
+                                // Formatare data încasare
+                                let dataIncasareStr = '';
+                                if (factura.data_incasare) {
+                                  try {
+                                    const data = new Date(factura.data_incasare?.value || factura.data_incasare);
+                                    if (!isNaN(data.getTime())) {
+                                      dataIncasareStr = data.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                    }
+                                  } catch (e) { /* ignore */ }
+                                }
+
+                                return (
+                                  <div key={factura.factura_id || factura.etapa_factura_id} style={{
+                                    fontSize: '10px',
+                                    lineHeight: '1.3',
+                                    padding: '0.25rem 0.4rem',
+                                    marginTop: '0.2rem',
+                                    background: isIncasat ? 'rgba(39, 174, 96, 0.08)' : isPartial ? 'rgba(243, 156, 18, 0.08)' : 'rgba(231, 76, 60, 0.08)',
+                                    borderRadius: '5px',
+                                    borderLeft: `2px solid ${isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'}`
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: '600', color: '#2c3e50' }}>
+                                        🧾 {factura.numar_factura}
+                                      </span>
+                                      {dataStr && (
+                                        <span style={{ color: '#7f8c8d', fontSize: '9px' }}>
+                                          ({dataStr})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.1rem', flexWrap: 'wrap' }}>
+                                      <span style={{ fontWeight: '600', color: '#3498db', fontSize: '10px' }}>
+                                        {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: moneda }).format(valoare)}
+                                      </span>
+                                      <span style={{ color: '#7f8c8d', fontSize: '9px' }}>→</span>
+                                      <span style={{
+                                        fontWeight: '600',
+                                        fontSize: '10px',
+                                        color: isIncasat ? '#27ae60' : isPartial ? '#f39c12' : '#e74c3c'
+                                      }}>
+                                        {isIncasat ? '✅ Încasat' : isPartial ? `⏳ Parțial` : '⏳ Neîncasat'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                  {facturiSubproiect.map((factura: any) => formatFacturaStatusSub(factura))}
+                                </div>
+                              );
+                            })()}
                           </td>
                           {/* ✅ NOU: Coloana Comentarii pentru subproiecte */}
                           <td style={{
