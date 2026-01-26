@@ -1,5 +1,5 @@
 // CALEA: /app/api/notifications/cron/route.ts
-// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 17.01.2026
+// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 26.01.2026
 // DESCRIERE: Cron job pentru verificare termene apropiate ȘI DEPĂȘITE (proiecte, subproiecte, sarcini)
 // MODIFICAT: 12.01.2026 - Consolidare email-uri per user + link-uri corecte admin/user + ID proiect vizibil
 // MODIFICAT: 14.01.2026 - FIX: Exclude proiecte/subproiecte cu status_achitare = 'Incasat' din notificări
@@ -7,6 +7,8 @@
 // MODIFICAT: 17.01.2026 - FIX: Rezolvat eroare BigQuery "LEFT ANTISEMI JOIN" prin separarea NOT EXISTS cu OR în două clauze AND
 // MODIFICAT: 24.01.2026 - FIX: Verifică încasările din EtapeFacturi_v2 în plus față de FacturiGenerate_v2.valoare_platita
 //                         (facturile sunt marcate încasate în EtapeFacturi_v2, nu în FacturiGenerate_v2)
+// MODIFICAT: 26.01.2026 - FIX: Notificări facturi - afișează ID proiect citibil (nu UUID factură),
+//                         verifică încasări din Chitante_v2 în plus față de EtapeFacturi_v2
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -37,6 +39,8 @@ const TABLE_FACTURI_EMISE_ANAF = `\`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF${t
 const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffix}\``;
 // ✅ FIX 24.01.2026: Adăugat tabel pentru verificare încasări (sursa corectă de adevăr pentru statusul de încasare)
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
+// ✅ FIX 26.01.2026: Adăugat tabel Chitante pentru verificare completă a încasărilor
+const TABLE_CHITANTE = `\`${PROJECT_ID}.${DATASET}.Chitante${tableSuffix}\``;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -1108,14 +1112,42 @@ export async function GET(request: NextRequest) {
     // FIX 24.01.2026: Verifică încasările din EtapeFacturi_v2 (sursa corectă) în plus față de FacturiGenerate_v2
 
     const facturiScadentaApropiataQuery = `
-      WITH incasari_facturi AS (
+      WITH incasari_etape AS (
         -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
-        -- Aceasta este sursa corectă de adevăr pentru statusul de încasare
         SELECT
           factura_id,
           SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_ETAPE_FACTURI}
         WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      ),
+      incasari_chitante AS (
+        -- ✅ FIX 26.01.2026: Agregăm încasările din Chitante (alternativă la EtapeFacturi)
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        FROM ${TABLE_CHITANTE}
+        WHERE activ = true AND COALESCE(anulata, false) = false AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      ),
+      incasari_combinate AS (
+        -- Combinăm încasările din ambele surse
+        SELECT
+          factura_id,
+          total_incasat
+        FROM incasari_etape
+        UNION ALL
+        SELECT
+          factura_id,
+          total_incasat
+        FROM incasari_chitante
+      ),
+      incasari_facturi AS (
+        -- Suma totală din toate sursele
+        SELECT
+          factura_id,
+          SUM(total_incasat) as total_incasat
+        FROM incasari_combinate
         GROUP BY factura_id
       )
       SELECT
@@ -1127,16 +1159,20 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        -- ✅ FIX 24.01.2026: Folosim încasările din EtapeFacturi (prioritar) sau din FacturiGenerate (fallback)
+        -- ✅ FIX 24.01.2026 + 26.01.2026: Folosim încasările din EtapeFacturi+Chitante (prioritar) sau din FacturiGenerate (fallback)
         COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
         fg.proiect_id,
+        -- ✅ FIX 26.01.2026: Adăugăm ID-ul proiectului din Proiecte pentru afișare în notificări
+        p.ID_Proiect as proiect_id_display,
+        p.Denumire as proiect_denumire,
         (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta
       FROM ${TABLE_FACTURI_GENERATE} fg
       LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
+      LEFT JOIN ${TABLE_PROIECTE} p ON fg.proiect_id = p.ID_Proiect
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
-        -- ✅ FIX 24.01.2026: Verificăm restul de plată folosind ambele surse de încasare
+        -- ✅ FIX 24.01.2026 + 26.01.2026: Verificăm restul de plată folosind toate sursele de încasare
         AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
@@ -1209,6 +1245,9 @@ export async function GET(request: NextRequest) {
             dryRun
           );
 
+          // ✅ FIX 26.01.2026: Folosim ID-ul proiectului citibil în loc de UUID factură
+          const proiectIdDisplay = factura.proiect_id_display || factura.proiect_id || 'N/A';
+
           addNotificationToUser(
             admin.uid,
             adminName,
@@ -1218,7 +1257,8 @@ export async function GET(request: NextRequest) {
               tip: 'proiect',
               tip_notificare: 'factura_scadenta_aproape',
               denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
-              proiect_id: factura.id,
+              proiect_id: proiectIdDisplay,
+              proiect_denumire: factura.proiect_denumire || undefined,
               client: factura.client_nume,
               deadline: dataScadenta || '',
               zile_ramase: zileRamase,
@@ -1238,14 +1278,42 @@ export async function GET(request: NextRequest) {
     // FIX 24.01.2026: Verifică încasările din EtapeFacturi_v2 (sursa corectă) în plus față de FacturiGenerate_v2
 
     const facturiScadentaDepasitaQuery = `
-      WITH incasari_facturi AS (
+      WITH incasari_etape AS (
         -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
-        -- Aceasta este sursa corectă de adevăr pentru statusul de încasare
         SELECT
           factura_id,
           SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_ETAPE_FACTURI}
         WHERE activ = true AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      ),
+      incasari_chitante AS (
+        -- ✅ FIX 26.01.2026: Agregăm încasările din Chitante (alternativă la EtapeFacturi)
+        SELECT
+          factura_id,
+          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        FROM ${TABLE_CHITANTE}
+        WHERE activ = true AND COALESCE(anulata, false) = false AND factura_id IS NOT NULL
+        GROUP BY factura_id
+      ),
+      incasari_combinate AS (
+        -- Combinăm încasările din ambele surse
+        SELECT
+          factura_id,
+          total_incasat
+        FROM incasari_etape
+        UNION ALL
+        SELECT
+          factura_id,
+          total_incasat
+        FROM incasari_chitante
+      ),
+      incasari_facturi AS (
+        -- Suma totală din toate sursele
+        SELECT
+          factura_id,
+          SUM(total_incasat) as total_incasat
+        FROM incasari_combinate
         GROUP BY factura_id
       )
       SELECT
@@ -1257,16 +1325,20 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        -- ✅ FIX 24.01.2026: Folosim încasările din EtapeFacturi (prioritar) sau din FacturiGenerate (fallback)
+        -- ✅ FIX 24.01.2026 + 26.01.2026: Folosim încasările din EtapeFacturi+Chitante (prioritar) sau din FacturiGenerate (fallback)
         COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
         fg.proiect_id,
+        -- ✅ FIX 26.01.2026: Adăugăm ID-ul proiectului din Proiecte pentru afișare în notificări
+        p.ID_Proiect as proiect_id_display,
+        p.Denumire as proiect_denumire,
         (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
         DATE_DIFF(CURRENT_DATE(), fg.data_scadenta, DAY) as zile_intarziere
       FROM ${TABLE_FACTURI_GENERATE} fg
       LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
+      LEFT JOIN ${TABLE_PROIECTE} p ON fg.proiect_id = p.ID_Proiect
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta < CURRENT_DATE()
-        -- ✅ FIX 24.01.2026: Verificăm restul de plată folosind ambele surse de încasare
+        -- ✅ FIX 24.01.2026 + 26.01.2026: Verificăm restul de plată folosind toate sursele de încasare
         AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
@@ -1340,6 +1412,9 @@ export async function GET(request: NextRequest) {
             dryRun
           );
 
+          // ✅ FIX 26.01.2026: Folosim ID-ul proiectului citibil în loc de UUID factură
+          const proiectIdDisplayDepasita = factura.proiect_id_display || factura.proiect_id || 'N/A';
+
           addNotificationToUser(
             admin.uid,
             adminName,
@@ -1349,7 +1424,8 @@ export async function GET(request: NextRequest) {
               tip: 'proiect',
               tip_notificare: 'factura_scadenta_depasita',
               denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
-              proiect_id: factura.id,
+              proiect_id: proiectIdDisplayDepasita,
+              proiect_denumire: factura.proiect_denumire || undefined,
               client: factura.client_nume,
               deadline: dataScadenta || '',
               zile_intarziere: zileIntarziere,
@@ -1368,6 +1444,7 @@ export async function GET(request: NextRequest) {
     // Trimite notificare către toți adminii
 
     // ✅ STORNO TRACKING (14.01.2026): Exclude facturi storno și stornate
+    // ✅ FIX 26.01.2026: Adăugat JOIN cu Proiecte pentru afișare ID citibil
     const facturiNetrimiseQuery = `
       SELECT
         fg.id,
@@ -1381,8 +1458,13 @@ export async function GET(request: NextRequest) {
         fg.efactura_enabled,
         fg.efactura_status,
         fg.anaf_upload_id,
+        fg.proiect_id,
+        -- ✅ FIX 26.01.2026: Adăugăm ID-ul proiectului din Proiecte pentru afișare în notificări
+        p.ID_Proiect as proiect_id_display,
+        p.Denumire as proiect_denumire,
         DATE_DIFF(CURRENT_DATE(), DATE(fg.data_creare), DAY) as zile_de_la_emitere
       FROM ${TABLE_FACTURI_GENERATE} fg
+      LEFT JOIN ${TABLE_PROIECTE} p ON fg.proiect_id = p.ID_Proiect
       WHERE fg.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         AND fg.data_creare <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 DAY)
         AND (
@@ -1492,6 +1574,9 @@ export async function GET(request: NextRequest) {
             dryRun
           );
 
+          // ✅ FIX 26.01.2026: Folosim ID-ul proiectului citibil în loc de UUID factură
+          const proiectIdDisplayAnaf = factura.proiect_id_display || factura.proiect_id || 'N/A';
+
           // Adaugă în grupul pentru email consolidat
           addNotificationToUser(
             admin.uid,
@@ -1502,7 +1587,8 @@ export async function GET(request: NextRequest) {
               tip: 'proiect', // folosim 'proiect' pentru compatibilitate cu interfața existentă
               tip_notificare: 'factura_netrimisa_anaf',
               denumire: `Factură ${serieNumar} - ${factura.client_nume}`,
-              proiect_id: factura.id, // folosim factura_id pentru referință
+              proiect_id: proiectIdDisplayAnaf,
+              proiect_denumire: factura.proiect_denumire || undefined,
               client: factura.client_nume,
               deadline: dataFactura || '',
               zile_intarziere: factura.zile_de_la_emitere,
