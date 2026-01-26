@@ -2356,9 +2356,8 @@ function EnhancedActionDropdown({
                       </button>
                     )}
 
-                    {/* Send to ANAF */}
-                    {(!factura.efactura_status || 
-                      factura.efactura_status === 'draft') && (
+                    {/* Send to ANAF - permanent vizibil (excepție: facturi stornate) */}
+                    {factura.efactura_status !== 'stornata' && (
                       <button
                         onClick={() => handleActionClick('sendANAF', onSendToANAF)}
                         disabled={loading === 'sendANAF' || isProcessing}
@@ -2392,46 +2391,11 @@ function EnhancedActionDropdown({
                         }}
                       >
                         {(loading === 'sendANAF' || isProcessing) ? <Clock size={16} /> : <Send size={16} />}
-                        Trimite ANAF
-                      </button>
-                    )}
-
-                    {/* Retry ANAF */}
-                    {factura.efactura_status === 'error' && (
-                      <button
-                        onClick={() => handleActionClick('retryANAF', onRetryANAF)}
-                        disabled={loading === 'retryANAF' || isProcessing}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 1rem',
-                          background: 'transparent',
-                          border: 'none',
-                          textAlign: 'left',
-                          cursor: (loading === 'retryANAF' || isProcessing) ? 'not-allowed' : 'pointer',
-                          fontSize: '14px',
-                          color: '#2c3e50',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          transition: 'all 0.3s ease',
-                          fontWeight: '500',
-                          opacity: (loading === 'retryANAF' || isProcessing) ? 0.5 : 1
-                        }}
-                        onMouseOver={(e) => {
-                          if (loading !== 'retryANAF' && !isProcessing) {
-                            e.currentTarget.style.background = '#f39c1215';
-                            e.currentTarget.style.color = '#f39c12';
-                            e.currentTarget.style.transform = 'translateX(4px)';
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.color = '#2c3e50';
-                          e.currentTarget.style.transform = 'translateX(0)';
-                        }}
-                      >
-                        {(loading === 'retryANAF' || isProcessing) ? <Clock size={16} /> : <RefreshCw size={16} />}
-                        Retry ANAF
+                        {['sent', 'validated', 'pending'].includes(factura.efactura_status || '')
+                          ? 'Re-trimite ANAF'
+                          : factura.efactura_status === 'error'
+                            ? 'Retry ANAF'
+                            : 'Trimite ANAF'}
                       </button>
                     )}
 
