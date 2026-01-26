@@ -1,0 +1,96 @@
+name: iapp.ro Invoice Retry (On-Demand)
+
+# Acest workflow se declanșează ON-DEMAND prin repository_dispatch
+# Nu consumă minute GitHub Actions când nu sunt facturi eșuate
+
+on:
+  repository_dispatch:
+    types: [iapp-retry-invoice]
+  workflow_dispatch: # Permite trigger manual pentru teste
+    inputs:
+      factura_id:
+        description: 'ID-ul facturii de retrimis'
+        required: true
+        type: string
+      delay_seconds:
+        description: 'Delay înainte de retry (secunde)'
+        required: false
+        default: '0'
+        type: string
+
+jobs:
+  retry-invoice:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract parameters
+        id: params
+        run: |
+          # Pentru repository_dispatch
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "factura_id=${{ github.event.client_payload.factura_id }}" >> $GITHUB_OUTPUT
+            echo "delay_seconds=${{ github.event.client_payload.delay_seconds }}" >> $GITHUB_OUTPUT
+          else
+            # Pentru workflow_dispatch (manual)
+            echo "factura_id=${{ github.event.inputs.factura_id }}" >> $GITHUB_OUTPUT
+            echo "delay_seconds=${{ github.event.inputs.delay_seconds }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait before retry
+        if: steps.params.outputs.delay_seconds != '0' && steps.params.outputs.delay_seconds != ''
+        run: |
+          delay=${{ steps.params.outputs.delay_seconds }}
+          echo "⏳ Waiting ${delay} seconds before retry..."
+          sleep $delay
+
+      - name: Trigger retry endpoint
+        run: |
+          factura_id="${{ steps.params.outputs.factura_id }}"
+
+          echo "🔄 Retrying invoice: $factura_id"
+
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://admin.unitarproiect.eu/api/iapp/retry-failed \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -d "{\"factura_id\": \"$factura_id\"}")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response: $body"
+
+          # Parsează răspunsul pentru status
+          success=$(echo "$body" | jq -r '.success // false')
+          message=$(echo "$body" | jq -r '.message // "Unknown"')
+          retry_count=$(echo "$body" | jq -r '.retry_count // 0')
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ "$success" = "true" ]; then
+            echo "✅ Retry SUCCESS for invoice $factura_id"
+            echo "   Message: $message"
+          else
+            echo "❌ Retry FAILED for invoice $factura_id"
+            echo "   Message: $message"
+            echo "   Attempt: $retry_count"
+
+            # Nu marcăm job-ul ca eșuat dacă s-a programat alt retry
+            next_retry=$(echo "$body" | jq -r '.next_retry_at // null')
+            if [ "$next_retry" != "null" ]; then
+              echo "   ⏳ Next retry scheduled at: $next_retry"
+            else
+              echo "   ⚠️ No more retries - admin notified"
+            fi
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Job-ul e considerat succes dacă API-ul a răspuns corect
+          # (chiar dacă retry-ul în sine a eșuat - se va programa altul)
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 401 ]; then
+            exit 0
+          else
+            echo "❌ API error - unexpected status code"
+            exit 1
+          fi

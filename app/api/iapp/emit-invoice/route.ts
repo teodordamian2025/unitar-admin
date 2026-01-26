@@ -360,6 +360,12 @@ export async function POST(request: NextRequest) {
 
     // 5. Salvează în IappFacturiEmise_v2
     const now = new Date().toISOString();
+    const isError = !response.ok;
+
+    // Calculează next_retry_at pentru erori (prima reîncercare după 60s)
+    const RETRY_INTERVALS = [60, 120, 300]; // secunde
+    const nextRetryAt = isError ? new Date(Date.now() + RETRY_INTERVALS[0] * 1000).toISOString() : null;
+
     const logRecord = [{
       id: crypto.randomUUID(),
       factura_id,
@@ -380,7 +386,10 @@ export async function POST(request: NextRequest) {
       data_emitere: factura.data_factura?.value || factura.data_factura || new Date().toISOString().split('T')[0],
       data_transmitere: now,
       data_actualizare: now,
-      creat_de: 'system'
+      creat_de: 'system',
+      // ✅ Câmpuri noi pentru retry automat
+      retry_count: 1,
+      next_retry_at: nextRetryAt
     }];
 
     console.log('💾 [iapp.ro] Salvez în IappFacturiEmise_v2:', logRecord[0].id);
@@ -388,6 +397,12 @@ export async function POST(request: NextRequest) {
     await bigquery.dataset(DATASET).table('IappFacturiEmise_v2').insert(logRecord);
 
     console.log('✅ [iapp.ro] Salvat în BigQuery IappFacturiEmise_v2');
+
+    // ✅ NOU: Declanșează retry automat dacă a eșuat
+    if (isError) {
+      console.log('🔄 [iapp.ro] Triggering automatic retry via GitHub Actions...');
+      await triggerRetryWorkflow(factura_id, RETRY_INTERVALS[0] * 1000);
+    }
 
     // ✅ RECOMANDAREA C: Verificare discrepanță numerotare
     if (factura.numar && responseData.numar && factura.numar !== String(responseData.numar)) {
@@ -470,6 +485,52 @@ export async function POST(request: NextRequest) {
       error: 'Failed to emit invoice via iapp.ro',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
+  }
+}
+
+// ==================================================================
+// HELPER: Declanșează retry workflow prin GitHub Actions (on-demand)
+// ==================================================================
+async function triggerRetryWorkflow(factura_id: string, delayMs: number): Promise<void> {
+  const githubToken = process.env.GITHUB_TOKEN;
+  const repoOwner = process.env.GITHUB_REPO_OWNER || 'teodordamian2025';
+  const repoName = process.env.GITHUB_REPO_NAME || 'unitar-admin';
+
+  if (!githubToken) {
+    console.warn('⚠️ [iapp.ro] GITHUB_TOKEN not configured - retry workflow not triggered');
+    console.warn('⚠️ [iapp.ro] To enable automatic retries, add GITHUB_TOKEN to environment variables');
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          event_type: 'iapp-retry-invoice',
+          client_payload: {
+            factura_id,
+            delay_seconds: Math.floor(delayMs / 1000)
+          }
+        })
+      }
+    );
+
+    if (response.ok || response.status === 204) {
+      console.log(`✅ [iapp.ro] Retry workflow triggered for factura ${factura_id} (delay: ${Math.floor(delayMs / 1000)}s)`);
+    } else {
+      const errorText = await response.text();
+      console.error(`❌ [iapp.ro] Failed to trigger retry workflow: ${response.status} - ${errorText}`);
+    }
+
+  } catch (error) {
+    console.error('❌ [iapp.ro] Error triggering retry workflow:', error);
   }
 }
 
