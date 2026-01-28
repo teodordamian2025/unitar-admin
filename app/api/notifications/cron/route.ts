@@ -1,5 +1,5 @@
 // CALEA: /app/api/notifications/cron/route.ts
-// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 26.01.2026
+// DATA: 05.10.2025 (ora României) - ACTUALIZAT: 28.01.2026
 // DESCRIERE: Cron job pentru verificare termene apropiate ȘI DEPĂȘITE (proiecte, subproiecte, sarcini)
 // MODIFICAT: 12.01.2026 - Consolidare email-uri per user + link-uri corecte admin/user + ID proiect vizibil
 // MODIFICAT: 14.01.2026 - FIX: Exclude proiecte/subproiecte cu status_achitare = 'Incasat' din notificări
@@ -9,6 +9,8 @@
 //                         (facturile sunt marcate încasate în EtapeFacturi_v2, nu în FacturiGenerate_v2)
 // MODIFICAT: 26.01.2026 - FIX: Notificări facturi - afișează ID proiect citibil (nu UUID factură),
 //                         verifică încasări din Chitante_v2 în plus față de EtapeFacturi_v2
+// MODIFICAT: 28.01.2026 - FIX CRITICAL: Exclude facturi cu status_incasare='Incasat' în EtapeFacturi direct
+//                         + verificare case-insensitive pentru status factură + exclude_notificari_plata
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -1149,6 +1151,14 @@ export async function GET(request: NextRequest) {
           SUM(total_incasat) as total_incasat
         FROM incasari_combinate
         GROUP BY factura_id
+      ),
+      -- ✅ FIX 28.01.2026: CTE pentru facturile marcate ca încasate direct în EtapeFacturi (status_incasare = 'Incasat')
+      facturi_incasate_ef AS (
+        SELECT DISTINCT factura_id
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE activ = true
+          AND factura_id IS NOT NULL
+          AND LOWER(status_incasare) = 'incasat'
       )
       SELECT
         fg.id,
@@ -1176,15 +1186,26 @@ export async function GET(request: NextRequest) {
         AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
-        AND fg.status NOT IN ('storno', 'stornata', 'platita')
+        -- ✅ FIX 28.01.2026: Verificare case-insensitive pentru status factură
+        AND LOWER(COALESCE(fg.status, '')) NOT IN ('storno', 'stornata', 'platita')
         -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
         AND COALESCE(fg.exclude_notificari_plata, false) = false
+        -- ✅ FIX 28.01.2026: Exclude facturile care au status_incasare='Incasat' în EtapeFacturi (chiar dacă valoare_incasata este 0)
+        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_ef)
       ORDER BY fg.data_scadenta ASC
     `;
 
     const [facturiScadentaApropiate] = await bigquery.query({ query: facturiScadentaApropiataQuery });
     stats.facturi_scadenta_apropiata = facturiScadentaApropiate.length;
     console.log(`💳 Facturi cu scadență apropiată (${zileAvans} zile): ${facturiScadentaApropiate.length}`);
+
+    // ✅ FIX 28.01.2026: Debug logging pentru diagnosticare
+    if (facturiScadentaApropiate.length > 0) {
+      console.log(`📋 Detalii facturi aproape scadente:`);
+      facturiScadentaApropiate.forEach((f: any) => {
+        console.log(`   - ${f.serie || ''} ${f.numar || ''}: total=${f.total}, platit=${f.valoare_platita}, rest=${f.rest_de_plata}, scadenta=${extractDateValue(f.data_scadenta)}`);
+      });
+    }
 
     if (facturiScadentaApropiate.length > 0) {
       // Obține toți adminii pentru notificare
@@ -1315,6 +1336,14 @@ export async function GET(request: NextRequest) {
           SUM(total_incasat) as total_incasat
         FROM incasari_combinate
         GROUP BY factura_id
+      ),
+      -- ✅ FIX 28.01.2026: CTE pentru facturile marcate ca încasate direct în EtapeFacturi (status_incasare = 'Incasat')
+      facturi_incasate_ef AS (
+        SELECT DISTINCT factura_id
+        FROM ${TABLE_ETAPE_FACTURI}
+        WHERE activ = true
+          AND factura_id IS NOT NULL
+          AND LOWER(status_incasare) = 'incasat'
       )
       SELECT
         fg.id,
@@ -1342,9 +1371,12 @@ export async function GET(request: NextRequest) {
         AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
-        AND fg.status NOT IN ('storno', 'stornata', 'platita')
+        -- ✅ FIX 28.01.2026: Verificare case-insensitive pentru status factură
+        AND LOWER(COALESCE(fg.status, '')) NOT IN ('storno', 'stornata', 'platita')
         -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
         AND COALESCE(fg.exclude_notificari_plata, false) = false
+        -- ✅ FIX 28.01.2026: Exclude facturile care au status_incasare='Incasat' în EtapeFacturi (chiar dacă valoare_incasata este 0)
+        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_ef)
       ORDER BY fg.data_scadenta ASC
       LIMIT 50
     `;
@@ -1353,7 +1385,13 @@ export async function GET(request: NextRequest) {
     stats.facturi_scadenta_depasita = facturiScadentaDepasita.length;
     console.log(`💳 Facturi cu scadență depășită: ${facturiScadentaDepasita.length}`);
 
+    // ✅ FIX 28.01.2026: Debug logging pentru diagnosticare
     if (facturiScadentaDepasita.length > 0) {
+      console.log(`📋 Detalii facturi depășite:`);
+      facturiScadentaDepasita.forEach((f: any) => {
+        console.log(`   - ${f.serie || ''} ${f.numar || ''}: total=${f.total}, platit=${f.valoare_platita}, rest=${f.rest_de_plata}, zile_intarziere=${f.zile_intarziere}`);
+      });
+
       // Obține toți adminii pentru notificare
       const adminiDepasitaQuery = `
         SELECT uid, nume, prenume, email
