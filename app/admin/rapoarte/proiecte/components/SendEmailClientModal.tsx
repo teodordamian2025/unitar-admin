@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 interface Contact {
   id: string;
@@ -414,25 +414,27 @@ export default function SendEmailClientModal({
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {/* Buton istoric */}
+            {/* Buton istoric - vizibil și clar */}
             <button
               type="button"
               onClick={() => setShowHistory(!showHistory)}
               style={{
                 padding: '0.5rem 1rem',
-                background: showHistory ? 'white' : 'rgba(255, 255, 255, 0.2)',
+                background: showHistory ? 'white' : 'rgba(255, 255, 255, 0.25)',
                 color: showHistory ? '#1d4ed8' : 'white',
-                border: 'none',
+                border: '2px solid rgba(255, 255, 255, 0.5)',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '700',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: '0.5rem',
+                transition: 'all 0.2s ease'
               }}
+              title="Vezi istoricul email-urilor trimise pentru acest proiect"
             >
-              📋 Istoric ({emailHistory.length})
+              📋 Istoric {emailHistory.length > 0 ? `(${emailHistory.length})` : ''}
             </button>
             <button
               onClick={onClose}
@@ -697,48 +699,71 @@ export default function SendEmailClientModal({
             padding: '1.25rem 2rem',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '1rem',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             background: '#f9fafb'
           }}>
+            {/* Link discret către istoric */}
             <button
               type="button"
-              onClick={onClose}
-              disabled={loading}
+              onClick={() => setShowHistory(true)}
               style={{
-                padding: '0.75rem 1.5rem',
-                background: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}
-            >
-              Anulează
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: loading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
+                padding: '0.5rem 0.75rem',
+                background: 'transparent',
+                color: '#6b7280',
                 border: 'none',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                boxShadow: loading ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.3)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: '0.35rem'
               }}
+              title="Vezi istoricul email-urilor trimise"
             >
-              {loading ? '⏳ Se trimite...' : '📧 Trimite Email'}
+              📋 <span style={{ textDecoration: 'underline' }}>Vezi istoric trimis ({emailHistory.length})</span>
             </button>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+              >
+                Anulează
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: loading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  boxShadow: loading ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {loading ? '⏳ Se trimite...' : '📧 Trimite Email'}
+              </button>
+            </div>
           </div>
         )}
       </div>
