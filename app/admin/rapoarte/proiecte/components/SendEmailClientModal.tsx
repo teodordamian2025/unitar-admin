@@ -334,6 +334,8 @@ export default function SendEmailClientModal({
 
       if (result.success) {
         toast.success(`Email trimis cu succes către ${result.deliveredTo?.length || 0} destinatar(i)!`);
+        // Refresh istoricul pentru a include noul email
+        await loadEmailHistory();
         onClose();
       } else {
         toast.error(result.error || 'Eroare la trimiterea email-ului');
