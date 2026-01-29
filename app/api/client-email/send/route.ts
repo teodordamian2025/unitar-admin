@@ -91,34 +91,22 @@ export async function POST(request: NextRequest) {
     const logId = `email_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
-    // Salvează în jurnal
+    // ✅ Helper pentru escape string și null (BigQuery nu acceptă parametri null fără tipuri)
+    const escapeValue = (val: string | null | undefined): string => {
+      if (val === null || val === undefined || val === '') return 'NULL';
+      return `'${String(val).replace(/'/g, "''")}'`;
+    };
+
+    // Salvează în jurnal cu valori inline
     const insertQuery = `
       INSERT INTO ${TABLE_EMAIL_LOG}
       (id, proiect_id, client_id, client_nume, tip_email, subiect, destinatari, continut_preview, template_folosit, trimis_de, trimis_de_nume, email_status, email_message_id, email_error, data_trimitere, data_creare)
       VALUES
-      (@id, @proiectId, @clientId, @clientNume, @tipEmail, @subiect, @destinatari, @continutPreview, @templateFolosit, @trimisDe, @trimisDeNume, @emailStatus, @emailMessageId, @emailError, @dataTrimitere, @dataCreare)
+      (${escapeValue(logId)}, ${escapeValue(proiect_id)}, ${escapeValue(client_id)}, ${escapeValue(client_nume)}, ${escapeValue(tip_email || 'custom')}, ${escapeValue(subiect.trim())}, ${escapeValue(JSON.stringify(validEmails))}, ${escapeValue(continut.trim().substring(0, 500))}, ${escapeValue(template_folosit)}, ${escapeValue(trimis_de)}, ${escapeValue(trimis_de_nume)}, ${escapeValue(emailResult.success ? 'trimis' : 'eroare')}, ${escapeValue(emailResult.messageId)}, ${escapeValue(emailResult.error)}, TIMESTAMP('${now}'), TIMESTAMP('${now}'))
     `;
 
     await bigquery.query({
       query: insertQuery,
-      params: {
-        id: logId,
-        proiectId: proiect_id,
-        clientId: client_id,
-        clientNume: client_nume || null,
-        tipEmail: tip_email || 'custom',
-        subiect: subiect.trim(),
-        destinatari: JSON.stringify(validEmails),
-        continutPreview: continut.trim().substring(0, 500),
-        templateFolosit: template_folosit || null,
-        trimisDe: trimis_de || null,
-        trimisDeNume: trimis_de_nume || null,
-        emailStatus: emailResult.success ? 'trimis' : 'eroare',
-        emailMessageId: emailResult.messageId || null,
-        emailError: emailResult.error || null,
-        dataTrimitere: now,
-        dataCreare: now
-      },
       location: 'EU',
     });
 

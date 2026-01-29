@@ -104,27 +104,22 @@ export async function POST(request: NextRequest) {
     const contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
+    // ✅ Folosim INSERT cu valori inline pentru a evita problema cu null și tipuri
+    // BigQuery nu acceptă parametri null fără tipuri explicite
+    const escapeString = (val: string | null | undefined): string => {
+      if (val === null || val === undefined || val === '') return 'NULL';
+      return `'${val.replace(/'/g, "''")}'`;
+    };
+
     const insertQuery = `
       INSERT INTO ${TABLE_CONTACTE}
       (id, client_id, prenume, nume, email, telefon, rol, comentariu, activ, primeste_notificari, data_creare, data_actualizare)
       VALUES
-      (@id, @clientId, @prenume, @nume, @email, @telefon, @rol, @comentariu, TRUE, @primeste_notificari, @dataCreare, @dataCreare)
+      (${escapeString(contactId)}, ${escapeString(client_id)}, ${escapeString(prenume?.trim())}, ${escapeString(nume.trim())}, ${escapeString(email.trim())}, ${escapeString(telefon?.trim())}, ${escapeString(rol?.trim())}, ${escapeString(comentariu?.trim())}, TRUE, ${primeste_notificari !== false}, TIMESTAMP('${now}'), TIMESTAMP('${now}'))
     `;
 
     await bigquery.query({
       query: insertQuery,
-      params: {
-        id: contactId,
-        clientId: client_id,
-        prenume: prenume?.trim() || null,
-        nume: nume.trim(),
-        email: email.trim(),
-        telefon: telefon?.trim() || null,
-        rol: rol?.trim() || null,
-        comentariu: comentariu?.trim() || null,
-        primeste_notificari: primeste_notificari !== false,
-        dataCreare: now
-      },
       location: 'EU',
     });
 
@@ -153,17 +148,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'ID contact necesar' }, { status: 400 });
     }
 
-    // Construire update dinamic
+    // ✅ Helper pentru escape string și null
+    const escapeValue = (val: string | null | undefined): string => {
+      if (val === null || val === undefined || val === '') return 'NULL';
+      return `'${val.replace(/'/g, "''")}'`;
+    };
+
+    // Construire update dinamic cu valori inline
     const updateFields: string[] = [];
-    const params: any = { id };
 
     if (prenume !== undefined) {
-      updateFields.push('prenume = @prenume');
-      params.prenume = prenume?.trim() || null;
+      updateFields.push(`prenume = ${escapeValue(prenume?.trim())}`);
     }
     if (nume !== undefined) {
-      updateFields.push('nume = @nume');
-      params.nume = nume?.trim() || null;
+      updateFields.push(`nume = ${escapeValue(nume?.trim())}`);
     }
     if (email !== undefined) {
       // Validare email
@@ -171,42 +169,37 @@ export async function PUT(request: NextRequest) {
       if (email && !emailRegex.test(email.trim())) {
         return NextResponse.json({ error: 'Format email invalid' }, { status: 400 });
       }
-      updateFields.push('email = @email');
-      params.email = email?.trim() || null;
+      updateFields.push(`email = ${escapeValue(email?.trim())}`);
     }
     if (telefon !== undefined) {
-      updateFields.push('telefon = @telefon');
-      params.telefon = telefon?.trim() || null;
+      updateFields.push(`telefon = ${escapeValue(telefon?.trim())}`);
     }
     if (rol !== undefined) {
-      updateFields.push('rol = @rol');
-      params.rol = rol?.trim() || null;
+      updateFields.push(`rol = ${escapeValue(rol?.trim())}`);
     }
     if (comentariu !== undefined) {
-      updateFields.push('comentariu = @comentariu');
-      params.comentariu = comentariu?.trim() || null;
+      updateFields.push(`comentariu = ${escapeValue(comentariu?.trim())}`);
     }
     if (primeste_notificari !== undefined) {
-      updateFields.push('primeste_notificari = @primeste_notificari');
-      params.primeste_notificari = primeste_notificari;
+      updateFields.push(`primeste_notificari = ${primeste_notificari ? 'TRUE' : 'FALSE'}`);
     }
 
     if (updateFields.length === 0) {
       return NextResponse.json({ error: 'Nu există câmpuri de actualizat' }, { status: 400 });
     }
 
-    updateFields.push('data_actualizare = @dataActualizare');
-    params.dataActualizare = new Date().toISOString();
+    const now = new Date().toISOString();
+    updateFields.push(`data_actualizare = TIMESTAMP('${now}')`);
 
+    const escapedId = id.replace(/'/g, "''");
     const updateQuery = `
       UPDATE ${TABLE_CONTACTE}
       SET ${updateFields.join(', ')}
-      WHERE id = @id AND activ = TRUE
+      WHERE id = '${escapedId}' AND activ = TRUE
     `;
 
     await bigquery.query({
       query: updateQuery,
-      params,
       location: 'EU',
     });
 
