@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
     // BigQuery nu acceptă parametri null fără tipuri explicite
     const escapeString = (val: string | null | undefined): string => {
       if (val === null || val === undefined || val === '') return 'NULL';
-      return `'${val.replace(/'/g, "''")}'`;
+      // Escape single quotes și newlines pentru BigQuery string literals
+      return `'${val.replace(/'/g, "''").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
     };
 
     const insertQuery = `
@@ -151,7 +152,8 @@ export async function PUT(request: NextRequest) {
     // ✅ Helper pentru escape string și null
     const escapeValue = (val: string | null | undefined): string => {
       if (val === null || val === undefined || val === '') return 'NULL';
-      return `'${val.replace(/'/g, "''")}'`;
+      // Escape single quotes și newlines pentru BigQuery string literals
+      return `'${val.replace(/'/g, "''").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
     };
 
     // Construire update dinamic cu valori inline

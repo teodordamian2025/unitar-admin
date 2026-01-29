@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
     // ✅ Helper pentru escape string și null (BigQuery nu acceptă parametri null fără tipuri)
     const escapeValue = (val: string | null | undefined): string => {
       if (val === null || val === undefined || val === '') return 'NULL';
-      return `'${String(val).replace(/'/g, "''")}'`;
+      // Escape single quotes și newlines pentru BigQuery string literals
+      return `'${String(val).replace(/'/g, "''").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
     };
 
     // Salvează în jurnal cu valori inline
