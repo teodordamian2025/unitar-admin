@@ -22,12 +22,15 @@ import TasksCard from '../components/TasksCard';
 import ResponsabiliCard from '../components/ResponsabiliCard';
 import DateEditButton from '../components/DateEditButton';
 import FinancialStatsCard from '../components/FinancialStatsCard';
+import SendEmailClientModal from '../components/SendEmailClientModal';
 import { useDebounce } from '@/app/hooks/useDebounce';
 
 interface ProiectDetails {
   ID_Proiect: string;
   Denumire: string;
   Client: string;
+  client_id?: string; // NOU: 29.01.2026 - Pentru email client
+  client_email?: string; // NOU: 29.01.2026 - Pentru email client
   Status: string;
   Data_Start: any;
   Data_Final: any;
@@ -1890,195 +1893,33 @@ export default function ProiectDetailsPage() {
         />
       )}
 
-      {/* EMAIL MODAL */}
-      {showEmailModal && proiect && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '1rem'
-        }} onClick={() => setShowEmailModal(false)}>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            width: '100%',
-            maxWidth: '600px',
-            maxHeight: 'calc(100vh - 4rem)',
-            overflow: 'hidden'
-          }} onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div style={{
-              padding: '1.5rem 2rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'rgba(255, 255, 255, 0.5)'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
-                📧 Trimite Email Client
-              </h2>
-              <button
-                onClick={() => setShowEmailModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  padding: '0.5rem'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Content */}
-            <div style={{ padding: '2rem' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-                padding: '1.5rem',
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1))',
-                borderRadius: '12px',
-                marginBottom: '1.5rem',
-                border: '1px solid rgba(59, 130, 246, 0.2)'
-              }}>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #3b82f6, #10b981)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem'
-                }}>
-                  📧
-                </div>
-                <div>
-                  <h3 style={{ margin: '0 0 0.5rem 0', color: '#1f2937' }}>
-                    Email Client pentru Proiect
-                  </h3>
-                  <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>
-                    Trimite un email automat către clientul {proiect.Client} cu detaliile proiectului {proiect.Denumire}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gap: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    Template Email
-                  </label>
-                  <select style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid rgba(209, 213, 219, 0.8)',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    background: 'rgba(255, 255, 255, 0.9)'
-                  }}>
-                    <option>Status Update - Proiect în desfășurare</option>
-                    <option>Invoice Ready - Factură disponibilă</option>
-                    <option>Project Completed - Proiect finalizat</option>
-                    <option>Contract Ready - Contract disponibil</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                    Mesaj Personalizat (Opțional)
-                  </label>
-                  <textarea
-                    placeholder="Adaugă un mesaj personalizat pentru client..."
-                    style={{
-                      width: '100%',
-                      minHeight: '100px',
-                      padding: '0.75rem',
-                      border: '1px solid rgba(209, 213, 219, 0.8)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      background: 'rgba(255, 255, 255, 0.9)',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                <div style={{
-                  padding: '1rem',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(245, 158, 11, 0.2)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '1.2rem' }}>⚠️</span>
-                    <strong style={{ color: '#92400e' }}>Funcționalitate în dezvoltare</strong>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#78716c' }}>
-                    Sistemul de email automat va fi implementat în următoarea versiune și va include:
-                  </p>
-                  <ul style={{ margin: '0.5rem 0 0 1.5rem', fontSize: '0.875rem', color: '#78716c' }}>
-                    <li>Template-uri personalizabile</li>
-                    <li>Atașamente automate (contracte, facturi)</li>
-                    <li>Tracking și confirmări de citire</li>
-                    <li>Integrare cu calendar pentru follow-up</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
-                <button
-                  onClick={() => setShowEmailModal(false)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'rgba(107, 114, 128, 0.1)',
-                    color: '#374151',
-                    border: '1px solid rgba(209, 213, 219, 0.8)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500'
-                  }}
-                >
-                  Anulează
-                </button>
-                <button
-                  onClick={() => {
-                    toast.info('Funcționalitatea va fi disponibilă în următoarea versiune!');
-                    setShowEmailModal(false);
-                  }}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-                  }}
-                >
-                  📧 Trimite Email
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* EMAIL MODAL - Nou sistem complet (29.01.2026) */}
+      <SendEmailClientModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        proiect={proiect ? {
+          id: proiect.ID_Proiect,
+          Denumire: proiect.Denumire,
+          Client: proiect.Client,
+          client_id: proiect.client_id || '',
+          client_email: proiect.client_email || '',
+          Status: proiect.Status,
+          Data_Start: proiect.Data_Start,
+          Data_Finalizare: proiect.Data_Final,
+          Progres_General: proiect.progres_procent
+        } : null}
+        subproiecte={subproiecte.map(sp => ({
+          id: sp.ID_Subproiect,
+          Denumire: sp.Denumire,
+          Status: sp.Status,
+          progres_procent: sp.progres_procent
+        }))}
+        currentUser={user ? {
+          uid: user.uid,
+          displayName: displayName,
+          email: user.email || undefined
+        } : undefined}
+      />
 
       {/* PROGRESS MODAL */}
       {showProgressModal && proiect && (

@@ -6,6 +6,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ClientContacteSection from './ClientContacteSection';
+
+interface Contact {
+  id?: string;
+  prenume: string;
+  nume: string;
+  email: string;
+  telefon: string;
+  rol: string;
+  comentariu: string;
+  primeste_notificari: boolean;
+}
 
 interface Client {
   id: string;
@@ -81,6 +93,8 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
 
 export default function ClientEditModal({ isOpen, onClose, onClientUpdated, client }: ClientEditModalProps) {
   const [loading, setLoading] = useState(false);
+  const [contacte, setContacte] = useState<Contact[]>([]);
+  const [contacteInitiale, setContacteInitiale] = useState<Contact[]>([]);
   const [formData, setFormData] = useState({
     nume: '',
     tip_client: 'Juridic',
@@ -102,7 +116,7 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
     observatii: ''
   });
 
-  // ✅ Populează formularul când se deschide modalul
+  // ✅ Populează formularul și încarcă contactele când se deschide modalul
   useEffect(() => {
     if (client && isOpen) {
       setFormData({
@@ -125,8 +139,35 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
         ci_eliberata_la: client.ci_eliberata_la || '',
         observatii: client.observatii || ''
       });
+
+      // Încarcă contactele clientului
+      loadContacte(client.id);
     }
   }, [client, isOpen]);
+
+  const loadContacte = async (clientId: string) => {
+    try {
+      const response = await fetch(`/api/rapoarte/clienti/contacte?client_id=${encodeURIComponent(clientId)}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const loadedContacte = result.data.map((c: any) => ({
+          id: c.id,
+          prenume: c.prenume || '',
+          nume: c.nume || '',
+          email: c.email || '',
+          telefon: c.telefon || '',
+          rol: c.rol || '',
+          comentariu: c.comentariu || '',
+          primeste_notificari: c.primeste_notificari !== false
+        }));
+        setContacte(loadedContacte);
+        setContacteInitiale(JSON.parse(JSON.stringify(loadedContacte)));
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea contactelor:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +217,9 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
       const result = await response.json();
 
       if (result.success || response.ok) {
+        // Gestionează contactele
+        await saveContacte(client.id);
+
         showToast('Client actualizat cu succes!', 'success');
         onClientUpdated();
         onClose();
@@ -234,6 +278,51 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
       ...prev,
       [field]: value
     }));
+  };
+
+  // Salvează modificările la contacte
+  const saveContacte = async (clientId: string) => {
+    try {
+      // Găsește contactele șterse (existau inițial dar nu mai sunt)
+      const contacteSterse = contacteInitiale.filter(
+        ci => ci.id && !contacte.find(c => c.id === ci.id)
+      );
+
+      // Șterge contactele eliminate
+      for (const contact of contacteSterse) {
+        if (contact.id) {
+          await fetch(`/api/rapoarte/clienti/contacte?id=${encodeURIComponent(contact.id)}`, {
+            method: 'DELETE'
+          });
+        }
+      }
+
+      // Adaugă/actualizează contactele curente
+      for (const contact of contacte) {
+        if (!contact.nume || !contact.email) continue;
+
+        if (contact.id) {
+          // Update contact existent
+          await fetch('/api/rapoarte/clienti/contacte', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contact)
+          });
+        } else {
+          // Adaugă contact nou
+          await fetch('/api/rapoarte/clienti/contacte', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: clientId,
+              ...contact
+            })
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la salvarea contactelor:', error);
+    }
   };
 
   if (!isOpen || !client) return null;
@@ -643,6 +732,14 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
                   }}
                 />
               </div>
+
+              {/* Secțiune Contacte pentru Notificări Email */}
+              <ClientContacteSection
+                clientId={client?.id}
+                contacte={contacte}
+                setContacte={setContacte}
+                disabled={loading}
+              />
 
               {/* Butoane */}
               <div style={{ 

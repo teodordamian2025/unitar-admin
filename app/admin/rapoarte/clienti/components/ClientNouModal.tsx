@@ -7,6 +7,18 @@
 
 import { useState } from 'react';
 import ANAFClientSearch from './ANAFClientSearch';
+import ClientContacteSection from './ClientContacteSection';
+
+interface Contact {
+  id?: string;
+  prenume: string;
+  nume: string;
+  email: string;
+  telefon: string;
+  rol: string;
+  comentariu: string;
+  primeste_notificari: boolean;
+}
 
 interface ClientNouModalProps {
   isOpen: boolean;
@@ -61,6 +73,7 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
   const [loading, setLoading] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [anafImported, setAnafImported] = useState(false);
+  const [contacte, setContacte] = useState<Contact[]>([]);
 
   const [formData, setFormData] = useState({
     nume: '',
@@ -171,6 +184,28 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
       const result = await response.json();
 
       if (result.success || response.ok) {
+        // Salvează contactele dacă există
+        const clientId = result.clientId || clientData.id;
+        if (contacte.length > 0 && clientId) {
+          showToast('Se salvează contactele...', 'info');
+          for (const contact of contacte) {
+            if (contact.nume && contact.email) {
+              try {
+                await fetch('/api/rapoarte/clienti/contacte', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    client_id: clientId,
+                    ...contact
+                  })
+                });
+              } catch (err) {
+                console.error('Eroare la salvarea contactului:', err);
+              }
+            }
+          }
+        }
+
         showToast('Client adăugat cu succes!', 'success');
         onClientAdded();
         onClose();
@@ -215,6 +250,7 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
       ci_eliberata_la: '',
       observatii: ''
     });
+    setContacte([]);
     setShowManualForm(false);
     setAnafImported(false);
   };
@@ -723,6 +759,13 @@ export default function ClientNouModal({ isOpen, onClose, onClientAdded }: Clien
                     }}
                   />
                 </div>
+
+                {/* Secțiune Contacte pentru Notificări Email */}
+                <ClientContacteSection
+                  contacte={contacte}
+                  setContacte={setContacte}
+                  disabled={loading}
+                />
 
                 {/* Butoane */}
                 <div style={{ 
