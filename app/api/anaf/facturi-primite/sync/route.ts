@@ -165,6 +165,12 @@ export async function POST(req: NextRequest) {
 
         // Salvează în BigQuery
         const facturaId = crypto.randomUUID();
+        // Calculează cota TVA dacă avem ambele valori
+        let cotaTva: number | undefined;
+        if (xmlData.valoare_fara_tva && xmlData.valoare_fara_tva > 0) {
+          cotaTva = (xmlData.valoare_tva / xmlData.valoare_fara_tva) * 100;
+        }
+
         const facturaRecord: Partial<FacturaPrimita> = {
           id: facturaId,
           id_mesaj_anaf: mesaj.id,
@@ -174,6 +180,9 @@ export async function POST(req: NextRequest) {
           serie_numar: xmlData.serie_numar,
           data_factura: xmlData.data_factura,
           valoare_totala: xmlData.valoare_totala,
+          valoare_fara_tva: xmlData.valoare_fara_tva,
+          valoare_tva: xmlData.valoare_tva,
+          cota_tva: cotaTva,
           moneda: xmlData.moneda,
           curs_valutar: xmlData.curs_valutar,
           data_curs_valutar: xmlData.data_curs_valutar,

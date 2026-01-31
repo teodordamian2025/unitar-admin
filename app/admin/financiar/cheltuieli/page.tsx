@@ -47,6 +47,35 @@ interface Cheltuiala {
   proiect_denumire?: string;
   proiect_client?: string;
   subproiect_denumire?: string;
+  // Date factură ANAF asociată
+  factura_anaf_id?: string;
+  factura_anaf_serie?: string;
+  factura_anaf_data?: { value: string } | string;
+  factura_anaf_valoare?: number;
+  factura_anaf_valoare_fara_tva?: number;
+  factura_anaf_moneda?: string;
+  factura_anaf_status?: string;
+  factura_anaf_auto?: boolean;
+  factura_anaf_confidence?: number;
+  factura_anaf_pdf_id?: string;
+}
+
+interface FacturaMatch {
+  factura_id: string;
+  serie_numar: string;
+  data_factura: string;
+  valoare_totala: number;
+  valoare_fara_tva?: number;
+  moneda: string;
+  nume_emitent: string;
+  cif_emitent: string;
+  score_total: number;
+  score_cui: number;
+  score_valoare: number;
+  score_data: number;
+  score_numar: number;
+  cui_match: boolean;
+  valoare_diff_percent: number;
 }
 
 interface Proiect {
@@ -122,6 +151,13 @@ export default function CheltuieliPage() {
   const [showSubcontractantModal, setShowSubcontractantModal] = useState(false);
   const [editingCheltuiala, setEditingCheltuiala] = useState<Cheltuiala | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Modal asociere factură ANAF
+  const [showAsociereModal, setShowAsociereModal] = useState(false);
+  const [cheltuialaForAsociere, setCheltuialaForAsociere] = useState<Cheltuiala | null>(null);
+  const [facturaMatches, setFacturaMatches] = useState<FacturaMatch[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [associating, setAssociating] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -405,6 +441,102 @@ export default function CheltuieliPage() {
     }
   }
 
+  // === ASOCIERE FACTURA ANAF ===
+
+  // Deschide modal de asociere și încarcă sugestii
+  async function openAsociereModal(cheltuiala: Cheltuiala) {
+    setCheltuialaForAsociere(cheltuiala);
+    setShowAsociereModal(true);
+    setLoadingMatches(true);
+    setFacturaMatches([]);
+
+    try {
+      // Căutăm facturi care se potrivesc cu această cheltuială
+      const response = await fetch(`/api/anaf/facturi-primite/match-for-cheltuiala?cheltuiala_id=${cheltuiala.id}&cui=${cheltuiala.furnizor_cui || ''}&valoare=${cheltuiala.valoare_ron || cheltuiala.valoare || 0}&moneda=${cheltuiala.moneda || 'RON'}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setFacturaMatches(data.matches || []);
+      } else {
+        toast.error(data.error || 'Eroare la căutare facturi');
+      }
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    } finally {
+      setLoadingMatches(false);
+    }
+  }
+
+  // Asociază factura selectată cu cheltuiala
+  async function handleAsociere(facturaId: string) {
+    if (!cheltuialaForAsociere) return;
+
+    try {
+      setAssociating(true);
+      const response = await fetch('/api/anaf/facturi-primite/associate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          factura_id: facturaId,
+          cheltuiala_id: cheltuialaForAsociere.id,
+          user_id: 'admin', // TODO: Get actual user ID from auth
+          manual: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Eroare la asociere');
+      }
+
+      toast.success('Factură asociată cu succes!');
+      setShowAsociereModal(false);
+      setCheltuialaForAsociere(null);
+      loadCheltuieli(); // Reîncarcă lista pentru a afișa asocierea
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    } finally {
+      setAssociating(false);
+    }
+  }
+
+  // Dezasociază factura de la cheltuială
+  async function handleDezasociere(cheltuiala: Cheltuiala) {
+    if (!cheltuiala.factura_anaf_id) return;
+    if (!confirm('Sigur vrei să dezasociezi factura de la această cheltuială?')) return;
+
+    try {
+      const response = await fetch('/api/anaf/facturi-primite/disassociate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          factura_id: cheltuiala.factura_anaf_id,
+          cheltuiala_id: cheltuiala.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Eroare la dezasociere');
+      }
+
+      toast.success('Factură dezasociată!');
+      loadCheltuieli();
+    } catch (error: any) {
+      toast.error(`Eroare: ${error.message}`);
+    }
+  }
+
+  // Funcție pentru a obține scorul color-coded
+  function getScoreColor(score: number): string {
+    if (score >= 0.8) return '#16a34a'; // Verde
+    if (score >= 0.6) return '#ca8a04'; // Galben
+    if (score >= 0.4) return '#ea580c'; // Portocaliu
+    return '#dc2626'; // Roșu
+  }
+
   // Handle proiect change
   function handleProiectChange(proiectId: string) {
     setFormData(prev => ({
@@ -587,8 +719,8 @@ export default function CheltuieliPage() {
               minWidth: '180px'
             }}
           />
-          {/* Proiect filter cu autocomplete */}
-          <div style={{ position: 'relative', width: '200px' }}>
+          {/* Proiect filter cu autocomplete - lățime mărită pentru conținut mai mare */}
+          <div style={{ position: 'relative', width: '350px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
@@ -714,6 +846,38 @@ export default function CheltuieliPage() {
             <option value="Neachitat">Neachitat</option>
             <option value="Partial">Partial</option>
           </select>
+          {/* Buton Reset Filtre */}
+          {(filters.search || filters.proiect_id || filters.status_predare || filters.status_facturare || filters.status_achitare) && (
+            <button
+              onClick={() => {
+                setFilters({
+                  search: '',
+                  status_predare: '',
+                  status_facturare: '',
+                  status_achitare: '',
+                  proiect_id: '',
+                });
+                setProiectSearch('');
+                setShowProiectSuggestions(false);
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+              title="Resetează toate filtrele"
+            >
+              ↻ Reset
+            </button>
+          )}
         </div>
 
         {/* Tabel */}
@@ -742,7 +906,7 @@ export default function CheltuieliPage() {
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Descriere</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Valoare</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Contract</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Factură</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Factură ANAF</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Predare</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Achitare</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Acțiuni</th>
@@ -811,21 +975,63 @@ export default function CheltuieliPage() {
                         )}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <div>
-                          <span style={{
-                            ...getStatusBadgeStyle(cheltuiala.status_facturare, 'facturare'),
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500'
-                          }}>
-                            {cheltuiala.status_facturare}
-                          </span>
-                        </div>
-                        {cheltuiala.nr_factura_furnizor && (
-                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                            {cheltuiala.nr_factura_furnizor}
+                        {cheltuiala.factura_anaf_id ? (
+                          // Factură ANAF asociată
+                          <div>
+                            <a
+                              href={`/admin/financiar/facturi-primite?id=${cheltuiala.factura_anaf_id}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                padding: '0.25rem 0.5rem',
+                                background: '#dcfce7',
+                                color: '#166534',
+                                borderRadius: '9999px',
+                                fontSize: '0.75rem',
+                                fontWeight: '500',
+                                textDecoration: 'none'
+                              }}
+                              title={`Asociată ${cheltuiala.factura_anaf_auto ? 'automat' : 'manual'} (${((cheltuiala.factura_anaf_confidence || 0) * 100).toFixed(0)}%)`}
+                            >
+                              {cheltuiala.factura_anaf_auto ? '🤖' : '👤'} {cheltuiala.factura_anaf_serie || 'Vezi'}
+                            </a>
+                            <div style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                              {formatValoare(cheltuiala.factura_anaf_valoare, cheltuiala.factura_anaf_moneda || 'RON')}
+                            </div>
+                            <button
+                              onClick={() => handleDezasociere(cheltuiala)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#dc2626',
+                                fontSize: '0.65rem',
+                                cursor: 'pointer',
+                                marginTop: '0.15rem',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Dezasociază
+                            </button>
                           </div>
+                        ) : (
+                          // Fără factură - buton de asociere
+                          <button
+                            onClick={() => openAsociereModal(cheltuiala)}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              border: '1px dashed #f59e0b',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: '500'
+                            }}
+                            title="Asociază factură din ANAF"
+                          >
+                            🔗 Asociază
+                          </button>
                         )}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
@@ -1365,6 +1571,233 @@ export default function CheltuieliPage() {
               setShowSubcontractantModal(false);
             }}
           />
+        )}
+
+        {/* Modal Asociere Factură ANAF */}
+        {showAsociereModal && cheltuialaForAsociere && typeof document !== 'undefined' && createPortal(
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+            }}>
+              {/* Modal Header */}
+              <div style={{
+                padding: '1.5rem',
+                borderBottom: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'sticky',
+                top: 0,
+                background: 'white',
+                zIndex: 10
+              }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>
+                    Asociază Factură ANAF
+                  </h2>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                    Cheltuială: {cheltuialaForAsociere.furnizor_nume} - {formatValoare(cheltuialaForAsociere.valoare_ron || cheltuialaForAsociere.valoare, cheltuialaForAsociere.moneda)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowAsociereModal(false);
+                    setCheltuialaForAsociere(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#6b7280'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div style={{ padding: '1.5rem' }}>
+                {/* Info cheltuială */}
+                <div style={{
+                  background: '#f3f4f6',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', fontSize: '0.875rem' }}>
+                    <div>
+                      <span style={{ color: '#6b7280' }}>Furnizor:</span>
+                      <div style={{ fontWeight: '500' }}>{cheltuialaForAsociere.furnizor_nume}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280' }}>CUI:</span>
+                      <div style={{ fontWeight: '500' }}>{cheltuialaForAsociere.furnizor_cui || '-'}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280' }}>Valoare (fără TVA):</span>
+                      <div style={{ fontWeight: '500' }}>{formatValoare(cheltuialaForAsociere.valoare_ron || cheltuialaForAsociere.valoare, cheltuialaForAsociere.moneda)}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280' }}>Nr. Factură:</span>
+                      <div style={{ fontWeight: '500' }}>{cheltuialaForAsociere.nr_factura_furnizor || '-'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista facturi potrivite */}
+                {loadingMatches ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+                    Se caută facturi potrivite...
+                  </div>
+                ) : facturaMatches.length === 0 ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+                    <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Nu s-au găsit facturi potrivite</div>
+                    <div style={{ fontSize: '0.875rem' }}>
+                      Verifică dacă factura a fost sincronizată din ANAF sau caută manual în{' '}
+                      <a href="/admin/financiar/facturi-primite" style={{ color: '#2563eb' }}>Facturi Primite</a>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ marginBottom: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                      {facturaMatches.length} factură/facturi potrivite găsite:
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {facturaMatches.map((match) => (
+                        <div
+                          key={match.factura_id}
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: match.score_total >= 0.8 ? '#f0fdf4' : 'white'
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <span style={{
+                                background: getScoreColor(match.score_total),
+                                color: 'white',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '9999px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600'
+                              }}>
+                                {(match.score_total * 100).toFixed(0)}%
+                              </span>
+                              <span style={{ fontWeight: '600', color: '#1f2937' }}>{match.serie_numar}</span>
+                              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                din {formatDate(match.data_factura)}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.875rem', color: '#374151' }}>
+                              <div>
+                                <span style={{ color: '#6b7280' }}>Furnizor: </span>
+                                {match.nume_emitent}
+                                {match.cui_match && <span style={{ color: '#16a34a', marginLeft: '0.25rem' }}>✓ CUI</span>}
+                              </div>
+                              <div>
+                                <span style={{ color: '#6b7280' }}>Valoare: </span>
+                                {formatValoare(match.valoare_totala, match.moneda)}
+                                {match.valoare_fara_tva && (
+                                  <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                                    {' '}(fără TVA: {formatValoare(match.valoare_fara_tva, match.moneda)})
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <span style={{ color: '#6b7280' }}>Diferență: </span>
+                                <span style={{ color: match.valoare_diff_percent <= 5 ? '#16a34a' : '#dc2626' }}>
+                                  {match.valoare_diff_percent.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAsociere(match.factura_id)}
+                            disabled={associating}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: associating ? '#9ca3af' : '#2563eb',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: associating ? 'not-allowed' : 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500'
+                            }}
+                          >
+                            {associating ? '...' : 'Asociază'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                padding: '1rem 1.5rem',
+                borderTop: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'sticky',
+                bottom: 0,
+                background: 'white'
+              }}>
+                <a
+                  href="/admin/financiar/facturi-primite"
+                  style={{ color: '#2563eb', fontSize: '0.875rem', textDecoration: 'none' }}
+                >
+                  Vezi toate facturile ANAF →
+                </a>
+                <button
+                  onClick={() => {
+                    setShowAsociereModal(false);
+                    setCheltuialaForAsociere(null);
+                  }}
+                  style={{
+                    padding: '0.5rem 1.5rem',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Închide
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
         )}
       </div>
     </ModernLayout>

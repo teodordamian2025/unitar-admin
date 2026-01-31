@@ -21,6 +21,7 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 const TABLE_PROIECTE_CHELTUIELI = `${PROJECT_ID}.${DATASET}.ProiecteCheltuieli${tableSuffix}`;
 const TABLE_PROIECTE = `${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}`;
 const TABLE_SUBPROIECTE = `${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}`;
+const TABLE_FACTURI_PRIMITE = `${PROJECT_ID}.${DATASET}.FacturiPrimiteANAF_v2`;
 
 console.log(`🔧 Cheltuieli API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: ProiecteCheltuieli${tableSuffix}, Proiecte${tableSuffix}, Subproiecte${tableSuffix}`);
@@ -60,18 +61,31 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Construire query cu filtre - PĂSTRAT identic
+    // Construire query cu filtre - ACTUALIZAT cu JOIN la FacturiPrimiteANAF_v2
     let query = `
-      SELECT 
+      SELECT
         pc.*,
         p.Denumire as proiect_denumire,
         p.Client as proiect_client,
-        sp.Denumire as subproiect_denumire
+        sp.Denumire as subproiect_denumire,
+        -- Date factură ANAF asociată (prin căutare inversă pe cheltuiala_asociata_id)
+        fp.id as factura_anaf_id,
+        fp.serie_numar as factura_anaf_serie,
+        fp.data_factura as factura_anaf_data,
+        fp.valoare_totala as factura_anaf_valoare,
+        fp.valoare_fara_tva as factura_anaf_valoare_fara_tva,
+        fp.moneda as factura_anaf_moneda,
+        fp.status_procesare as factura_anaf_status,
+        fp.asociere_automata as factura_anaf_auto,
+        fp.asociere_confidence as factura_anaf_confidence,
+        fp.pdf_file_id as factura_anaf_pdf_id
       FROM \`${TABLE_PROIECTE_CHELTUIELI}\` pc
       LEFT JOIN \`${TABLE_PROIECTE}\` p
         ON pc.proiect_id = p.ID_Proiect
       LEFT JOIN \`${TABLE_SUBPROIECTE}\` sp
         ON pc.subproiect_id = sp.ID_Subproiect
+      LEFT JOIN \`${TABLE_FACTURI_PRIMITE}\` fp
+        ON fp.cheltuiala_asociata_id = pc.id AND fp.activ = TRUE
       WHERE pc.activ = true
     `;
     

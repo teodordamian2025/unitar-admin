@@ -27,6 +27,14 @@ export interface FacturaPrimita {
   data_curs_valutar?: { value: string } | string;
   valoare_ron?: number;
 
+  // TVA breakdown (pentru matching cu cheltuieli fără TVA)
+  valoare_fara_tva?: number;
+  valoare_tva?: number;
+  cota_tva?: number;
+
+  // Link cu tranzacție bancară
+  tranzactie_asociata_id?: string;
+
   // Metadata
   tip_document?: string;
   status_procesare?: 'nou' | 'descarcat' | 'procesat' | 'asociat' | 'eroare';

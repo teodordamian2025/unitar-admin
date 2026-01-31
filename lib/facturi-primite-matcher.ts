@@ -48,6 +48,10 @@ const bigquery = new BigQuery({
 /**
  * Calculează match score între factură și cheltuială
  * Returnează scor 0-1 (0% - 100%)
+ *
+ * IMPORTANT: Cheltuielile sunt fără TVA, facturile primite sunt cu TVA
+ * Comparăm cheltuiala.valoare_ron cu factura.valoare_fara_tva
+ * Pentru valută, aplicăm marja 3% din cauza diferențelor de curs valutar
  */
 export function calculateMatchScore(
   factura: FacturaPrimita,
@@ -69,19 +73,38 @@ export function calculateMatchScore(
   }
 
   // === 2. Valoare Match (30% weight) ===
-  const factura_valoare_ron = factura.valoare_ron || factura.valoare_totala || 0;
-  const cheltuiala_valoare_ron = cheltuiala.valoare_ron || 0;
+  // IMPORTANT: Comparăm valori fără TVA
+  // Cheltuielile sunt fără TVA, facturile pot avea valoare_fara_tva sau valoare_totala (cu TVA)
 
-  if (factura_valoare_ron > 0 && cheltuiala_valoare_ron > 0) {
-    const valoare_diff = Math.abs(factura_valoare_ron - cheltuiala_valoare_ron);
-    const valoare_diff_percent = (valoare_diff / factura_valoare_ron) * 100;
+  // Obține valoarea facturii fără TVA
+  let factura_valoare_fara_tva = 0;
+  if (factura.valoare_fara_tva && factura.valoare_fara_tva > 0) {
+    // Dacă avem valoare_fara_tva, o folosim direct
+    factura_valoare_fara_tva = parseFloat(String(factura.valoare_fara_tva));
+  } else if (factura.valoare_totala && factura.valoare_totala > 0) {
+    // Fallback: calculăm din valoare_totala folosind cota TVA sau standard 19%
+    const cotaTva = factura.cota_tva || 19;
+    factura_valoare_fara_tva = parseFloat(String(factura.valoare_totala)) / (1 + cotaTva / 100);
+  }
 
-    if (valoare_diff_percent <= 2) {
-      score_valoare = 0.3; // Perfect match (±2%)
-    } else if (valoare_diff_percent <= 5) {
-      score_valoare = 0.2; // Good match (±5%)
-    } else if (valoare_diff_percent <= 10) {
-      score_valoare = 0.1; // Acceptable match (±10%)
+  // Valoarea cheltuielii (deja fără TVA)
+  const cheltuiala_valoare = parseFloat(String(cheltuiala.valoare_ron || cheltuiala.valoare || 0));
+
+  // Determină marja toleranță: 3% pentru valută, 2% pentru RON
+  const isValuta = cheltuiala.moneda && cheltuiala.moneda !== 'RON';
+  const margeTolerantaBase = isValuta ? 3 : 2;
+
+  if (factura_valoare_fara_tva > 0 && cheltuiala_valoare > 0) {
+    const valoare_diff = Math.abs(factura_valoare_fara_tva - cheltuiala_valoare);
+    const valoare_diff_percent = (valoare_diff / cheltuiala_valoare) * 100;
+
+    // Praguri ajustate pentru marja de toleranță valută
+    if (valoare_diff_percent <= margeTolerantaBase) {
+      score_valoare = 0.3; // Perfect match
+    } else if (valoare_diff_percent <= margeTolerantaBase + 3) {
+      score_valoare = 0.2; // Good match
+    } else if (valoare_diff_percent <= margeTolerantaBase + 8) {
+      score_valoare = 0.1; // Acceptable match
     }
   }
 
@@ -120,6 +143,11 @@ export function calculateMatchScore(
   // === Calculează scor total ===
   const score_total = score_cui + score_valoare + score_data + score_numar;
 
+  // Calculează diferența procentuală pentru afișare
+  const valoare_diff_final = factura_valoare_fara_tva > 0 && cheltuiala_valoare > 0
+    ? Math.abs(factura_valoare_fara_tva - cheltuiala_valoare) / cheltuiala_valoare * 100
+    : 999;
+
   return {
     cheltuiala_id: cheltuiala.id,
     proiect_id: cheltuiala.proiect_id,
@@ -132,9 +160,7 @@ export function calculateMatchScore(
     score_data,
     score_numar,
     cui_match,
-    valoare_diff_percent: parseFloat(
-      ((Math.abs(factura_valoare_ron - cheltuiala_valoare_ron) / factura_valoare_ron) * 100).toFixed(2)
-    ),
+    valoare_diff_percent: parseFloat(valoare_diff_final.toFixed(2)),
     data_diff_days,
     numar_match,
     cheltuiala: {
@@ -194,7 +220,7 @@ export async function findMatches(
       LEFT JOIN \`PanouControlUnitar.Proiecte_v2\` p ON ch.proiect_id = p.ID_Proiect
       LEFT JOIN \`PanouControlUnitar.Subproiecte_v2\` sp ON ch.subproiect_id = sp.ID_Subproiect
       WHERE ch.activ = TRUE
-        AND (ch.status_facturare IS NULL OR ch.status_facturare != 'asociat')
+        AND (ch.status_facturare IS NULL OR ch.status_facturare NOT IN ('Facturat', 'asociat'))
         AND ch.data_creare >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY)
       ORDER BY ch.data_creare DESC
     `;
@@ -268,12 +294,12 @@ export async function autoAssociate(
       },
     });
 
-    // Update cheltuială
+    // Update cheltuială - folosim 'Facturat' pentru consistență cu UI
     await bigquery.query({
       query: `
         UPDATE \`PanouControlUnitar.ProiecteCheltuieli_v2\`
         SET
-          status_facturare = 'asociat',
+          status_facturare = 'Facturat',
           nr_factura_furnizor = @nr_factura,
           data_factura_furnizor = @data_factura,
           data_actualizare = CURRENT_TIMESTAMP()
@@ -338,12 +364,12 @@ export async function manualAssociate(
       },
     });
 
-    // Update cheltuială
+    // Update cheltuială - folosim 'Facturat' pentru consistență cu UI
     await bigquery.query({
       query: `
         UPDATE \`PanouControlUnitar.ProiecteCheltuieli_v2\`
         SET
-          status_facturare = 'asociat',
+          status_facturare = 'Facturat',
           nr_factura_furnizor = @nr_factura,
           data_factura_furnizor = @data_factura,
           data_actualizare = CURRENT_TIMESTAMP()
