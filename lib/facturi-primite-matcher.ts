@@ -63,10 +63,8 @@ export function calculateMatchScore(
   let score_numar = 0;
 
   // === 1. CUI Match (40% weight) ===
-  const cui_match =
-    factura.cif_emitent &&
-    cheltuiala.furnizor_cui &&
-    factura.cif_emitent.trim() === cheltuiala.furnizor_cui.trim();
+  // Folosim cuiMatch care normalizează CUI-urile (elimină prefix RO, spații, etc.)
+  const cui_match = cuiMatch(factura.cif_emitent, cheltuiala.furnizor_cui);
 
   if (cui_match) {
     score_cui = 0.4;
@@ -78,12 +76,12 @@ export function calculateMatchScore(
 
   // Obține valoarea facturii fără TVA
   let factura_valoare_fara_tva = 0;
-  if (factura.valoare_fara_tva && factura.valoare_fara_tva > 0) {
+  if (factura.valoare_fara_tva && parseFloat(String(factura.valoare_fara_tva)) > 0) {
     // Dacă avem valoare_fara_tva, o folosim direct
     factura_valoare_fara_tva = parseFloat(String(factura.valoare_fara_tva));
   } else if (factura.valoare_totala && factura.valoare_totala > 0) {
-    // Fallback: calculăm din valoare_totala folosind cota TVA sau standard 19%
-    const cotaTva = factura.cota_tva || 19;
+    // Fallback: calculăm din valoare_totala folosind cota TVA sau standard 21% (România 2024+)
+    const cotaTva = factura.cota_tva || 21;
     factura_valoare_fara_tva = parseFloat(String(factura.valoare_totala)) / (1 + cotaTva / 100);
   }
 

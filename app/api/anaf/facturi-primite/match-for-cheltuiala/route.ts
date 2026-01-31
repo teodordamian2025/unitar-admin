@@ -2,6 +2,7 @@
 // API: Găsește facturi ANAF potrivite pentru o cheltuială
 // URL: GET /api/anaf/facturi-primite/match-for-cheltuiala
 // Data: 31.01.2026
+// ACTUALIZARE: Fix CUI normalization + TVA 21%
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,6 +22,29 @@ const bigquery = new BigQuery({
 });
 
 const FACTURI_TABLE = `${PROJECT_ID}.${DATASET}.FacturiPrimiteANAF_v2`;
+const SETARI_TABLE = `${PROJECT_ID}.${DATASET}.SetariFacturare_v2`;
+
+// Helper: Normalizează CUI - elimină prefix "RO" și spații
+function normalizeCUI(cui: string | null | undefined): string {
+  if (!cui) return '';
+  return cui.toString().replace(/^RO/i, '').replace(/\s/g, '').trim();
+}
+
+// Helper: Obține cota TVA standard din setări
+async function getCotaTVAStandard(): Promise<number> {
+  try {
+    const [rows] = await bigquery.query({
+      query: `SELECT cota_tva_standard FROM \`${SETARI_TABLE}\` LIMIT 1`,
+      location: 'EU',
+    });
+    if (rows.length > 0 && rows[0].cota_tva_standard) {
+      return parseInt(rows[0].cota_tva_standard);
+    }
+  } catch (e) {
+    console.log('⚠️ Nu s-au putut încărca setările TVA, folosim default 21%');
+  }
+  return 21; // Default România 2024+
+}
 
 /**
  * GET /api/anaf/facturi-primite/match-for-cheltuiala
@@ -35,12 +59,18 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const cheltuialaId = searchParams.get('cheltuiala_id');
-    const cui = searchParams.get('cui');
+    const cuiRaw = searchParams.get('cui');
     const valoare = parseFloat(searchParams.get('valoare') || '0');
     const moneda = searchParams.get('moneda') || 'RON';
     const nrFactura = searchParams.get('nr_factura');
 
-    console.log(`🔍 [Match for Cheltuiala] CUI: ${cui}, Valoare: ${valoare} ${moneda}`);
+    // Normalizez CUI - elimin prefix RO
+    const cheltuialaCUI = normalizeCUI(cuiRaw);
+
+    // Obțin cota TVA standard din setări
+    const cotaTVADefault = await getCotaTVAStandard();
+
+    console.log(`🔍 [Match for Cheltuiala] CUI original: ${cuiRaw}, CUI normalizat: ${cheltuialaCUI}, Valoare: ${valoare} ${moneda}, TVA default: ${cotaTVADefault}%`);
 
     // Query facturi neasociate din ultimele 365 zile
     const query = `
@@ -78,10 +108,9 @@ export async function GET(req: NextRequest) {
       let score_data = 0;
       let score_numar = 0;
 
-      // 1. CUI Match (40%)
-      const facturaCUI = (factura.cif_emitent || '').trim();
-      const cheltuialaCUI = (cui || '').trim();
-      const cui_match = facturaCUI && cheltuialaCUI && facturaCUI === cheltuialaCUI;
+      // 1. CUI Match (40%) - normalizez ambele CUI-uri pentru comparație
+      const facturaCUINormalized = normalizeCUI(factura.cif_emitent);
+      const cui_match = facturaCUINormalized && cheltuialaCUI && facturaCUINormalized === cheltuialaCUI;
 
       if (cui_match) {
         score_cui = 0.4;
@@ -90,11 +119,11 @@ export async function GET(req: NextRequest) {
       // 2. Valoare Match (30%)
       // Folosim valoare_fara_tva din factură pentru comparație cu cheltuiala (care e fără TVA)
       let facturaValoareFaraTVA = 0;
-      if (factura.valoare_fara_tva) {
+      if (factura.valoare_fara_tva && parseFloat(String(factura.valoare_fara_tva)) > 0) {
         facturaValoareFaraTVA = parseFloat(String(factura.valoare_fara_tva));
       } else if (factura.valoare_totala) {
-        // Calculăm din valoare_totala folosind cota TVA sau 19% standard
-        const cotaTva = factura.cota_tva || 19;
+        // Calculăm din valoare_totala folosind cota TVA din factură sau default din setări (21%)
+        const cotaTva = factura.cota_tva || cotaTVADefault;
         facturaValoareFaraTVA = parseFloat(String(factura.valoare_totala)) / (1 + cotaTva / 100);
       }
 
