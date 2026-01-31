@@ -130,6 +130,18 @@ export async function POST(req: NextRequest) {
         WHERE id = '${factura_id}'
       `);
 
+      // 6. Dacă factura e deja asociată cu o cheltuială, actualizăm status_achitare pe cheltuială
+      if (factura.cheltuiala_asociata_id) {
+        await bigquery.query(`
+          UPDATE \`${PROJECT_ID}.${DATASET}.ProiecteCheltuieli_v2\`
+          SET
+            status_achitare = 'Achitat',
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id = '${factura.cheltuiala_asociata_id}'
+        `);
+        console.log(`💰 Cheltuială ${factura.cheltuiala_asociata_id} marcată ca Achitat`);
+      }
+
       console.log(`✅ Asociere tranzacție completă: Factură ${factura_id} ↔ Tranzacție ${tranzactie_id}`);
 
       return NextResponse.json({

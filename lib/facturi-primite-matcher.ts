@@ -345,6 +345,22 @@ export async function manualAssociate(
 
     const factura = facturaRows[0] as FacturaPrimita;
 
+    // Verifică dacă factura e plătită (are matching cu tranzacție bancară)
+    const [paymentRows] = await bigquery.query({
+      query: `
+        SELECT tm.id, tm.tranzactie_id, tm.suma_tranzactie
+        FROM \`PanouControlUnitar.TranzactiiMatching_v2\` tm
+        WHERE tm.target_type = 'factura_primita'
+          AND tm.target_id = @factura_id
+          AND tm.status = 'active'
+        LIMIT 1
+      `,
+      params: { factura_id: facturaId },
+    });
+
+    const facturaEsteAchitata = paymentRows.length > 0;
+    console.log(`📋 Factura ${facturaId} - achitată: ${facturaEsteAchitata}`);
+
     // Update factură
     await bigquery.query({
       query: `
@@ -374,31 +390,59 @@ export async function manualAssociate(
     });
 
     // Update cheltuială - folosim 'Facturat' pentru consistență cu UI
-    await bigquery.query({
-      query: `
-        UPDATE \`PanouControlUnitar.ProiecteCheltuieli_v2\`
-        SET
-          status_facturare = 'Facturat',
-          nr_factura_furnizor = @nr_factura,
-          data_factura_furnizor = @data_factura,
-          data_actualizare = CURRENT_TIMESTAMP()
-        WHERE id = @cheltuiala_id
-      `,
-      params: {
-        cheltuiala_id: cheltuialaId,
-        nr_factura: factura.serie_numar || null,
-        data_factura: extractDateString(factura.data_factura) || null,
-      },
-      types: {
-        cheltuiala_id: 'STRING',
-        nr_factura: 'STRING',
-        data_factura: 'DATE',
-      },
-    });
+    // Dacă factura e achitată (are tranzacție bancară), setăm și status_achitare = 'Achitat'
+    const statusAchitare = facturaEsteAchitata ? 'Achitat' : null;
 
-    console.log(
-      `✅ Asociere manuală completă: Factură ${facturaId} → Cheltuială ${cheltuialaId}`
-    );
+    if (facturaEsteAchitata) {
+      // Factura e achitată - actualizăm și status_achitare
+      await bigquery.query({
+        query: `
+          UPDATE \`PanouControlUnitar.ProiecteCheltuieli_v2\`
+          SET
+            status_facturare = 'Facturat',
+            status_achitare = 'Achitat',
+            nr_factura_furnizor = @nr_factura,
+            data_factura_furnizor = @data_factura,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id = @cheltuiala_id
+        `,
+        params: {
+          cheltuiala_id: cheltuialaId,
+          nr_factura: factura.serie_numar || null,
+          data_factura: extractDateString(factura.data_factura) || null,
+        },
+        types: {
+          cheltuiala_id: 'STRING',
+          nr_factura: 'STRING',
+          data_factura: 'DATE',
+        },
+      });
+      console.log(`✅ Asociere manuală completă: Factură ${facturaId} → Cheltuială ${cheltuialaId} (+ status Achitat)`);
+    } else {
+      // Factura nu e achitată încă - actualizăm doar status_facturare
+      await bigquery.query({
+        query: `
+          UPDATE \`PanouControlUnitar.ProiecteCheltuieli_v2\`
+          SET
+            status_facturare = 'Facturat',
+            nr_factura_furnizor = @nr_factura,
+            data_factura_furnizor = @data_factura,
+            data_actualizare = CURRENT_TIMESTAMP()
+          WHERE id = @cheltuiala_id
+        `,
+        params: {
+          cheltuiala_id: cheltuialaId,
+          nr_factura: factura.serie_numar || null,
+          data_factura: extractDateString(factura.data_factura) || null,
+        },
+        types: {
+          cheltuiala_id: 'STRING',
+          nr_factura: 'STRING',
+          data_factura: 'DATE',
+        },
+      });
+      console.log(`✅ Asociere manuală completă: Factură ${facturaId} → Cheltuială ${cheltuialaId} (fără plată)`);
+    }
 
   } catch (error: any) {
     console.error('❌ Eroare la asociere manuală:', error.message);
