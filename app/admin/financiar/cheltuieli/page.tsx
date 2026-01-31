@@ -112,6 +112,11 @@ export default function CheltuieliPage() {
     proiect_id: '',
   });
 
+  // State pentru filtrul de proiecte cu autocomplete
+  const [proiectSearch, setProiectSearch] = useState('');
+  const [showProiectSuggestions, setShowProiectSuggestions] = useState(false);
+  const [filteredProiecte, setFilteredProiecte] = useState<Proiect[]>([]);
+
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [showSubcontractantModal, setShowSubcontractantModal] = useState(false);
@@ -160,10 +165,20 @@ export default function CheltuieliPage() {
     loadCheltuieli();
   }, [filters]);
 
-  // Calcul statistici
+  // Calcul statistici - FIX: parsare corectă a valorilor din BigQuery
   useEffect(() => {
     const total = cheltuieli.length;
-    const total_ron = cheltuieli.reduce((sum, c) => sum + (c.valoare_ron || c.valoare || 0), 0);
+    const total_ron = cheltuieli.reduce((sum, c) => {
+      // BigQuery poate returna valori ca string sau BigDecimal - parsăm corect
+      let valoare = c.valoare_ron ?? c.valoare ?? 0;
+      if (typeof valoare === 'string') {
+        valoare = parseFloat(valoare) || 0;
+      } else if (typeof valoare === 'object' && valoare !== null) {
+        // BigQuery BigDecimal object - încearcă să extragem valoarea
+        valoare = parseFloat(String(valoare)) || 0;
+      }
+      return sum + (typeof valoare === 'number' && !isNaN(valoare) ? valoare : 0);
+    }, 0);
     const predate = cheltuieli.filter(c => c.status_predare === 'Predat').length;
     const facturate = cheltuieli.filter(c => c.status_facturare === 'Facturat').length;
     const achitate = cheltuieli.filter(c => c.status_achitare === 'Achitat').length;
@@ -400,6 +415,39 @@ export default function CheltuieliPage() {
     loadSubproiecteForProiect(proiectId);
   }
 
+  // Handle proiect filter search
+  function handleProiectFilterSearch(searchValue: string) {
+    setProiectSearch(searchValue);
+    if (searchValue.trim().length > 0) {
+      const searchLower = searchValue.toLowerCase();
+      const filtered = proiecte.filter(p =>
+        p.ID_Proiect.toLowerCase().includes(searchLower) ||
+        p.Denumire.toLowerCase().includes(searchLower)
+      );
+      setFilteredProiecte(filtered);
+      setShowProiectSuggestions(true);
+    } else {
+      setFilteredProiecte([]);
+      setShowProiectSuggestions(false);
+      // Clear filter when search is empty
+      setFilters(prev => ({ ...prev, proiect_id: '' }));
+    }
+  }
+
+  // Handle proiect filter selection
+  function handleProiectFilterSelect(proiect: Proiect) {
+    setProiectSearch(`${proiect.ID_Proiect} - ${proiect.Denumire}`);
+    setFilters(prev => ({ ...prev, proiect_id: proiect.ID_Proiect }));
+    setShowProiectSuggestions(false);
+  }
+
+  // Clear proiect filter
+  function clearProiectFilter() {
+    setProiectSearch('');
+    setFilters(prev => ({ ...prev, proiect_id: '' }));
+    setShowProiectSuggestions(false);
+  }
+
   // Status badge styles
   function getStatusBadgeStyle(status: string, type: 'predare' | 'contract' | 'facturare' | 'achitare') {
     const greenStatuses = ['Predat', 'Semnat', 'Facturat', 'Achitat'];
@@ -519,10 +567,11 @@ export default function CheltuieliPage() {
 
         {/* Filtre */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '1rem',
-          marginBottom: '1.5rem'
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          marginBottom: '1.5rem',
+          alignItems: 'flex-start'
         }}>
           <input
             type="text"
@@ -533,35 +582,104 @@ export default function CheltuieliPage() {
               padding: '0.5rem 1rem',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              width: '220px',
+              minWidth: '180px'
             }}
           />
-          <select
-            value={filters.proiect_id}
-            onChange={(e) => setFilters(prev => ({ ...prev, proiect_id: e.target.value }))}
-            style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '0.875rem'
-            }}
-          >
-            <option value="">Toate proiectele</option>
-            {proiecte.map(p => (
-              <option key={p.ID_Proiect} value={p.ID_Proiect}>{p.Denumire}</option>
-            ))}
-          </select>
+          {/* Proiect filter cu autocomplete */}
+          <div style={{ position: 'relative', width: '200px' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Caută proiect (ID/Denumire)..."
+                value={proiectSearch}
+                onChange={(e) => handleProiectFilterSearch(e.target.value)}
+                onFocus={() => {
+                  if (proiectSearch.trim().length > 0) {
+                    setShowProiectSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  // Delay pentru a permite click pe sugestii
+                  setTimeout(() => setShowProiectSuggestions(false), 200);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  paddingRight: filters.proiect_id ? '2rem' : '1rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  width: '100%'
+                }}
+              />
+              {filters.proiect_id && (
+                <button
+                  onClick={clearProiectFilter}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    padding: '0 4px'
+                  }}
+                  title="Șterge filtrul"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {/* Dropdown sugestii proiecte */}
+            {showProiectSuggestions && filteredProiecte.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: 'white',
+                border: '1px solid #d1d5db',
+                borderTop: 'none',
+                borderRadius: '0 0 8px 8px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {filteredProiecte.slice(0, 10).map(p => (
+                  <div
+                    key={p.ID_Proiect}
+                    onClick={() => handleProiectFilterSelect(p)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      borderBottom: '1px solid #f3f4f6'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                  >
+                    <div style={{ fontWeight: '500', color: '#1f2937' }}>{p.ID_Proiect}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{p.Denumire}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <select
             value={filters.status_predare}
             onChange={(e) => setFilters(prev => ({ ...prev, status_predare: e.target.value }))}
             style={{
-              padding: '0.5rem 1rem',
+              padding: '0.5rem 0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              minWidth: '130px'
             }}
           >
-            <option value="">Status predare</option>
+            <option value="">Predare</option>
             <option value="Predat">Predat</option>
             <option value="Nepredat">Nepredat</option>
           </select>
@@ -569,13 +687,14 @@ export default function CheltuieliPage() {
             value={filters.status_facturare}
             onChange={(e) => setFilters(prev => ({ ...prev, status_facturare: e.target.value }))}
             style={{
-              padding: '0.5rem 1rem',
+              padding: '0.5rem 0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              minWidth: '130px'
             }}
           >
-            <option value="">Status facturare</option>
+            <option value="">Facturare</option>
             <option value="Facturat">Facturat</option>
             <option value="Nefacturat">Nefacturat</option>
           </select>
@@ -583,13 +702,14 @@ export default function CheltuieliPage() {
             value={filters.status_achitare}
             onChange={(e) => setFilters(prev => ({ ...prev, status_achitare: e.target.value }))}
             style={{
-              padding: '0.5rem 1rem',
+              padding: '0.5rem 0.75rem',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              minWidth: '130px'
             }}
           >
-            <option value="">Status achitare</option>
+            <option value="">Achitare</option>
             <option value="Achitat">Achitat</option>
             <option value="Neachitat">Neachitat</option>
             <option value="Partial">Partial</option>
@@ -644,7 +764,10 @@ export default function CheltuieliPage() {
                         )}
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        <div style={{ fontWeight: '500', color: '#1f2937' }}>{cheltuiala.proiect_denumire || '-'}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#3b82f6', fontWeight: '600', marginBottom: '0.15rem' }}>
+                          {cheltuiala.proiect_id || '-'}
+                        </div>
+                        <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '0.85rem' }}>{cheltuiala.proiect_denumire || '-'}</div>
                         {cheltuiala.subproiect_denumire && (
                           <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{cheltuiala.subproiect_denumire}</div>
                         )}
