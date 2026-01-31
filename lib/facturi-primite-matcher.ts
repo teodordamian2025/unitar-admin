@@ -308,6 +308,11 @@ export async function autoAssociate(
         nr_factura: factura.serie_numar || null,
         data_factura: extractDateString(factura.data_factura) || null,
       },
+      types: {
+        cheltuiala_id: 'STRING',
+        nr_factura: 'STRING',
+        data_factura: 'DATE',
+      },
     });
 
     return bestMatch;
@@ -360,6 +365,12 @@ export async function manualAssociate(
         user_id: userId,
         observatii: observatii || null,
       },
+      types: {
+        factura_id: 'STRING',
+        cheltuiala_id: 'STRING',
+        user_id: 'STRING',
+        observatii: 'STRING',
+      },
     });
 
     // Update cheltuială - folosim 'Facturat' pentru consistență cu UI
@@ -377,6 +388,11 @@ export async function manualAssociate(
         cheltuiala_id: cheltuialaId,
         nr_factura: factura.serie_numar || null,
         data_factura: extractDateString(factura.data_factura) || null,
+      },
+      types: {
+        cheltuiala_id: 'STRING',
+        nr_factura: 'STRING',
+        data_factura: 'DATE',
       },
     });
 
